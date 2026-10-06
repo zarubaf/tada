@@ -3,6 +3,8 @@
 pre-commit:
   parallel: true
   jobs:
+    - name: secrets
+      run: gitleaks git --pre-commit --staged --redact --no-banner
     - name: markdown format
       glob: "*.md"
       run: mdformat --check {staged_files}
