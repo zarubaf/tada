@@ -1,0 +1,130 @@
+# Components and patterns
+
+Screens use only the components in `apps/web/src/ui/` (ADR 0020).
+This document lists the core components and the patterns for the main screens.
+A new component needs an entry here in the same pull request.
+
+## Core components
+
+### Actions
+
+| Component   | Variants                          | Rules                                                                                           |
+| ----------- | --------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Button      | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap. |
+| IconButton  | quiet                             | Only in toolbars and rows. Always an accessible name and a tooltip.                             |
+| Link        | inline, standalone                | Inline links are underlined. A link never does what a button does.                              |
+| Menu        |                                   | For more than three secondary actions. The trigger is `dots-vertical`.                          |
+| CommandMenu |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                    |
+
+Button sizes follow `--control-height-*` of the density. The primary button uses `--color-accent` and `--color-text-on-accent`.
+The danger button is secondary in style with `--color-danger` text until a confirmation step.
+
+### Input
+
+| Component                   | Rules                                                                                    |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| TextField, TextArea         | Label above, help below, error below the help.                                           |
+| Select                      | For up to 7 options. More options use ComboBox.                                          |
+| ComboBox                    | Search in the options. Used for people, events and records.                              |
+| DatePicker, DateRangePicker | `de-CH` format; keyboard input and calendar. Shows the weekday.                          |
+| Checkbox, CheckboxGroup     | Label to the right of the box.                                                           |
+| RadioGroup                  | For two to five exclusive options that a member must see together.                       |
+| Switch                      | Only for a setting that has an immediate effect. Not inside forms with a submit button.  |
+| FileDrop                    | Drag and drop with a visible „Datei wählen“ button. Shows size limits before the upload. |
+
+### Display
+
+| Component      | Rules                                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| KnowledgeState | Shows the state of knowledge of a value (see [tokens.md](tokens.md)). Used in each place where a fact appears. |
+| StatusLabel    | Icon and text for a workflow status: „offen“, „in Arbeit“, „blockiert“ and „erledigt“.                         |
+| Badge          | A count, for example waiting proposals. Never decorative.                                                      |
+| Avatar         | Initials on `--color-bg-sunken`; a photo only if the member uploads one.                                       |
+| RecordId       | `ACT-042` in `--font-family-mono`, with a copy action.                                                         |
+| RelativeTime   | „vor 2 Stunden“ with the exact time in a tooltip.                                                              |
+| Kbd            | A keyboard key in hints and the shortcut list.                                                                 |
+| Skeleton       | Gray blocks in the shape of the content. No shimmer animation with reduced motion.                             |
+
+### Containers
+
+| Component  | Rules                                                                                                                                        |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Panel      | A bordered area in the page flow. No shadow.                                                                                                 |
+| Sheet      | Opens from the right (medium, wide) or from the bottom (narrow). For details, filters and the evidence panel.                                |
+| Dialog     | Only for a destructive confirmation or a blocking task. Title, one sentence, two buttons.                                                    |
+| Popover    | For small forms and pickers that belong to one control.                                                                                      |
+| Tooltip    | Text only, no interactive content. Opens on hover and on focus.                                                                              |
+| Tabs       | For two to six views of one record. Not for navigation between pages.                                                                        |
+| Banner     | A message for a whole page or the app, for example „Synchronisation seit 3 Stunden unterbrochen“. Cannot be hidden while the problem exists. |
+| Toast      | Confirms the last action of the member, with an „Rückgängig“ action if possible. Never for errors that need an action.                       |
+| EmptyState | A title, one sentence and one action. No illustration.                                                                                       |
+
+## Patterns for the main screens
+
+### Portfolio (PM, desktop first)
+
+- A table with one row for each event: name, dates, readiness, open exceptions, next milestone, lead.
+- Readiness is a StatusLabel with a text, not a percentage ring.
+- Exceptions (overdue, unowned, conflict, stale sync) appear as counts that link to the filtered register.
+- The default sort is by the next milestone.
+- Narrow layout: two-line rows; the exceptions move to the second line.
+
+### Event overview
+
+- A header with the event name, dates, place, the lead and the readiness. Each value has its KnowledgeState.
+- Sections in this order: „Offene Fragen“, „Ausnahmen“, „nächste Meilensteine“, „Workstreams“ and „zuletzt geändert“.
+- Unknown values show „Unbekannt“, never an empty space.
+- „Was ist noch unbekannt?“ opens the Ask Event panel with this question.
+
+### My Work (all members, mobile first)
+
+- A list grouped by due date: „überfällig“, „heute“, „diese Woche“ and „später“.
+- Each row: the RecordId, the title, the event, the due date and the StatusLabel.
+- The row actions on narrow layouts: „Erledigt“, „Blockiert“, „Neues Datum vorschlagen“. These match the Telegram buttons.
+- Items from several events appear in one list. The event name is visible in each row.
+
+### Registers and tables
+
+- A toolbar with: the search field (`/`), filters as chips, the view options and one primary action („Risiko erfassen“).
+- The table has a sticky header, tabular numbers and a row height of `--row-height`.
+- A click on a row opens the record in a sheet on medium and wide layouts, and as a page on narrow layouts.
+- Bulk actions appear in the toolbar only when rows are selected.
+- A filter that hides rows shows the count of hidden rows and a "Filter zurücksetzen" action.
+
+### Review Inbox („Eingang“)
+
+- A list with detail. The list shows proposals that wait for the member, oldest first.
+- The detail shows, from top to bottom:
+  1. The proposed change as a comparison: the current accepted value and the proposed value.
+  2. The source: the excerpt with the cited passage marked, the source version and the capture time.
+  3. Conditions and assumptions of the proposal.
+  4. The actions: „Annehmen“, „Bearbeiten und annehmen“, „Ablehnen“.
+- If the target record changed after the proposal, the detail shows a conflict and disables „Annehmen“ with the reason.
+- Keyboard: `J` and `K` move through the list; `A` accepts, `E` edits and `R` rejects, each with a visible hint.
+- Batch review: a member can select several proposals of the same kind and accept them together after a summary.
+
+### Evidence panel
+
+- Shows the provenance of the selected value: the evidence links, the source versions, who accepted the value and when.
+- Each source shows its freshness: „erfasst am 03.10.2026, 14:12“.
+- A source that the member cannot see shows „Quelle nicht freigegeben“, never its content.
+- Proposals and accepted values have separate sections, so the member never mixes them up.
+
+### Forms
+
+- One column, at most 40rem wide.
+- Group related fields under a heading. No more than seven fields in a group.
+- The actions are at the bottom: the primary action on the right on wide layouts, full width on narrow layouts.
+- Leaving a form with unsaved changes asks for a confirmation.
+
+### Empty, loading and error states
+
+| State                   | Pattern                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Empty, first use        | EmptyState with one sentence about the purpose and the first action: „Noch keine Risiken erfasst. Risiko erfassen“. |
+| Empty, after a filter   | „Keine Treffer für diese Filter.“ and "Filter zurücksetzen".                                                        |
+| Loading, first load     | Skeleton rows in the shape of the content.                                                                          |
+| Loading, refresh        | The old content stays; a small progress indicator appears in the toolbar.                                           |
+| Error, a request failed | Inline message in the area that failed, with „Erneut versuchen“. The rest of the page stays usable.                 |
+| Error, no access        | „Sie haben keinen Zugriff auf diesen Bereich.“ and the name of a person who can grant it.                           |
+| Stale data              | A Banner with the time of the last successful sync. tada never shows stale data as current.                         |

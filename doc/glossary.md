@@ -95,3 +95,17 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | code module    | A Rust module for one bounded context inside the `domain` and `app` crates.                            |                            |
 | worker         | The background process that runs jobs and schedules.                                                   |                            |
 | job            | A durable unit of background work with a versioned payload.                                            | task (in code)             |
+
+## Design
+
+| Term               | Meaning                                                                                                    | Avoid                         |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| design token       | A named value for color, type, spacing, radius, elevation, motion or z-index. Components use only tokens.  | variable, style constant      |
+| state of knowledge | The status of a value: accepted, proposed, assumption, unknown or conflict. Each value in the UI shows it. | confidence, certainty         |
+| density            | The spacing setting of the UI: compact or comfortable.                                                     | zoom, size mode               |
+| app shell          | The frame around all pages: navigation, top bar and the evidence panel area.                               | layout, chrome                |
+| evidence panel     | The panel that shows the provenance of the selected value.                                                 | sources view, citations panel |
+| sheet              | A panel that slides in from the right or the bottom over the page.                                         | drawer, side panel            |
+| dialog             | A modal window that blocks the page until the member answers.                                              | popup, modal (in UI text)     |
+| command menu       | The search and action menu that opens with `Ctrl+K`.                                                       | command palette               |
+| component gallery  | The development-only route `/_gallery` that shows all tokens and components.                               | style guide, storybook        |

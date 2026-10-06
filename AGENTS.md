@@ -26,6 +26,7 @@ tada is an event-planning workspace for clubs. Read these files before you chang
 - [doc/adr/](doc/adr/README.md): the decisions and their reasons. Do not contradict an accepted ADR; propose a new one.
 - [doc/glossary.md](doc/glossary.md): one meaning for each term. Use these terms in code and docs.
 - [doc/roadmap.md](doc/roadmap.md): the slices and their acceptance criteria.
+- [doc/design/](doc/design/README.md): the design system. Read it before any UI work.
 - [doc/writing.md](doc/writing.md): US English and Simplified Technical English.
 
 Rules for each session:
