@@ -16,7 +16,8 @@ A migration must never turn an assumption into a decision.
 - The committed `.sqlx` query cache lets CI build without a database.
 - Migrations are plain SQL files in `crates/store-pg/migrations/`. We write and review each file.
 - Only the command `tada migrate` runs migrations. The other roles never run them at startup.
-- The migrator tolerates applied migrations that the binary does not know, so the previous image still starts after an expand migration (ADR 0016).
+- The migrator tolerates applied migrations that the binary does not know, so the previous image still starts after an expand migration.
+- A release that removes schema forms (contract) cannot roll back by image. Its rollback is a restore of the backup from before the release.
 - Each schema change follows expand and contract:
   1. Add the new column or table.
   2. Backfill the data.

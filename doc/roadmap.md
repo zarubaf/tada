@@ -19,10 +19,10 @@ Goal: a repository and a runtime that later slices can build on without rework.
    - The job queue (ADR 0007).
    - Upload, download and versions in object storage (ADR 0009).
    - Telegram identity linking (ADR 0011).
-4. A priced deployment plan for staging and production (ADRs 0015 and 0016).
+4. A first deployment of the walking skeleton, from the operator's deployment repository (ADR 0033).
 5. ADRs for the decisions that the first code needs:
    - Observability: structured logs without personal data, health checks, an uptime check and alerts.
-   - Configuration and secrets: the creation of the first owner. ADRs 0025 and 0029 cover the rest.
+   - Configuration and secrets: the creation of the first owner. ADR 0025 covers the app side.
    - Error model: RFC 9457 problem types, stable error codes and the validation error format.
    - IDs and time: UUIDv7, event-local IDs such as `ACT-042`, UTC storage, the time crate and the time-zone rules for Europe/Zurich.
    - Service and actor identities: the worker, the AI PM, API keys and a later MCP interface.

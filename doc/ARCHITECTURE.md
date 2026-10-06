@@ -35,17 +35,17 @@ Optional later adapters: Microsoft Graph (mail, calendar, SharePoint), Nextcloud
 
 ## Building blocks
 
-| Block            | Responsibility                                                             | Decision                                                                                                                                               |
-| ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `domain` crate   | Types, rules and state machines. No I/O.                                   | [0002](adr/0002-monorepo-and-services.md), [0003](adr/0003-runtime-and-tooling.md)                                                                     |
-| `app` crate      | Domain commands, queries and ports. The only way to change accepted state. | [0002](adr/0002-monorepo-and-services.md)                                                                                                              |
-| `store-pg` crate | Repositories, SQL migrations, sessions and the job queue.                  | [0006](adr/0006-persistence.md), [0007](adr/0007-jobs-and-schedules.md), [0008](adr/0008-authentication.md)                                            |
-| `adapters` crate | Object storage, mail and model provider.                                   | [0009](adr/0009-object-storage.md), [0010](adr/0010-model-provider.md)                                                                                 |
-| `api` crate      | HTTP handlers, DTOs and the OpenAPI document.                              | [0017](adr/0017-api-contract-rust.md)                                                                                                                  |
-| `telegram` crate | Telegram gateway.                                                          | [0011](adr/0011-telegram.md)                                                                                                                           |
-| `tada` binary    | Composition root. Roles: `serve`, `worker`, `telegram`, `migrate`.         | [0025](adr/0025-platform-contract.md)                                                                                                                  |
-| `apps/web`       | React web client, German UI, design system.                                | [0005](adr/0005-web-client.md), [0018](adr/0018-design-system-foundation.md)–[0024](adr/0024-frontend-quality-gates.md)                                |
-| Runtime          | One image, Compose on one host first.                                      | [0015](adr/0015-deployment.md), [0016](adr/0016-environments-and-releases.md), [0025](adr/0025-platform-contract.md)–[0032](adr/0032-delivery-flow.md) |
+| Block            | Responsibility                                                                                     | Decision                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain` crate   | Types, rules and state machines. No I/O.                                                           | [0002](adr/0002-monorepo-and-services.md), [0003](adr/0003-runtime-and-tooling.md)                                                     |
+| `app` crate      | Domain commands, queries and ports. The only way to change accepted state.                         | [0002](adr/0002-monorepo-and-services.md)                                                                                              |
+| `store-pg` crate | Repositories, SQL migrations, sessions and the job queue.                                          | [0006](adr/0006-persistence.md), [0007](adr/0007-jobs-and-schedules.md), [0008](adr/0008-authentication.md)                            |
+| `adapters` crate | Object storage, mail and model provider.                                                           | [0009](adr/0009-object-storage.md), [0010](adr/0010-model-provider.md)                                                                 |
+| `api` crate      | HTTP handlers, DTOs and the OpenAPI document.                                                      | [0017](adr/0017-api-contract-rust.md)                                                                                                  |
+| `telegram` crate | Telegram gateway.                                                                                  | [0011](adr/0011-telegram.md)                                                                                                           |
+| `tada` binary    | Composition root. Roles: `serve`, `worker`, `telegram`, `migrate`.                                 | [0025](adr/0025-platform-contract.md)                                                                                                  |
+| `apps/web`       | React web client, German UI, design system.                                                        | [0005](adr/0005-web-client.md), [0018](adr/0018-design-system-foundation.md)–[0024](adr/0024-frontend-quality-gates.md)                |
+| Runtime          | One image that follows the platform contract. Each operator deploys it from a separate repository. | [0025](adr/0025-platform-contract.md), [0028](adr/0028-images-and-registry.md), [0033](adr/0033-deployment-outside-this-repository.md) |
 
 Search uses PostgreSQL full-text search first.
 pgvector comes only if an evaluation shows a benefit.
@@ -163,7 +163,7 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 
 - Schema changes follow expand and contract ([ADR 0006](adr/0006-persistence.md)). A migration never turns an assumption into a decision.
 - API contracts, document schemas, extraction output, templates, automation policies and job payloads have versions.
-- Releases go through a staging rehearsal on restored data ([ADR 0016](adr/0016-environments-and-releases.md)).
+- Operators rehearse a release on restored data before production. Their deployment repository defines how ([ADR 0033](adr/0033-deployment-outside-this-repository.md)).
 - Regression fixtures cover small events, the large-event concept, cross-channel changes, document approvals, isolation and old job payloads.
 - Exports contain versioned JSON and CSV, originals, retained versions, hashes and relationship manifests. A test rebuilds the data from an export.
 - The production AI PM changes records only through approved tools. It cannot change its own code or the database schema.

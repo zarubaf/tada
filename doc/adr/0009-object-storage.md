@@ -6,7 +6,7 @@
 ## Context
 
 tada stores originals, document versions, snapshots and exports.
-The first deployment is self-hosted (ADR 0015).
+The first deployments are self-hosted.
 The MinIO community edition stopped publishing maintained images in 2025.
 Garage has no object lock and no object versioning, so the storage cannot enforce immutability.
 An uploaded HTML or SVG file can run script in a browser if tada serves it inline.
@@ -35,7 +35,7 @@ Uploads and downloads:
 Immutability:
 
 - The application never writes to the key of a published version. No API exists for that.
-- Backups (ADR 0016) hold the second copy. The storage itself does not enforce immutability.
+- Backups of the operator hold the second copy. The storage itself does not enforce immutability.
 
 ## Consequences
 

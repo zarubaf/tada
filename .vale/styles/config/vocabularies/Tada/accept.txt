@@ -124,10 +124,8 @@ Kbd
 (?i)lorem
 (?i)ipsum
 Ansible
-Backblaze
 Coolify
 Dokploy
-Hetzner
 Kamal
 Nomad
 Watchtower

@@ -5,9 +5,8 @@
 
 ## Context
 
-The first runtime is one VM with Docker Compose (ADR 0015).
-Later, tada can run on Kubernetes, Google Cloud Run or a managed platform.
-If the app code knows about Compose, Caddy, Cloudflare or host paths, each move needs code changes.
+tada can run on Docker Compose, Kubernetes, Google Cloud Run or a managed platform.
+If the app code knows about a runtime, a proxy, a DNS provider or host paths, each move needs code changes.
 A small, written contract lets each runtime run the same image without changes.
 
 ## Decision
@@ -51,11 +50,11 @@ Forbidden in app code:
 ## Consequences
 
 - Compose, Kubernetes and Cloud Run all start the same image with different manifests only.
-- The deployment files in `deploy/` hold all knowledge about the runtime.
+- The deployment repository of each operator holds all knowledge about the runtime (ADR 0033).
 - Each new setting needs an entry in the settings reference and a startup check.
 
 ## Alternatives
 
 - A configuration file in the image: each environment needs its own image.
-- Secrets in environment variables: they leak through `docker inspect`, crash reports and child processes (ADR 0016).
+- Secrets in environment variables: they leak through `docker inspect`, crash reports and child processes.
 - Platform-specific code, for example Cloud Run metadata calls: a lock-in that the product owner wants to avoid.

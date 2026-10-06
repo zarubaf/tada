@@ -27,7 +27,6 @@ tada is an event-planning workspace for clubs. Read these files before you chang
 - [doc/glossary.md](doc/glossary.md): one meaning for each term. Use these terms in code and docs.
 - [doc/roadmap.md](doc/roadmap.md): the slices and their acceptance criteria.
 - [doc/design/](doc/design/README.md): the design system. Read it before any UI work.
-- [doc/operations/deployment.md](doc/operations/deployment.md): runtime, releases and approval gates.
 - [doc/writing.md](doc/writing.md): US English and Simplified Technical English.
 
 Rules for each session:
@@ -39,3 +38,5 @@ Rules for each session:
 5. Do not commit real personal data, club contacts or secrets. The repository is public.
 6. Do not commit or link to `tasks/`. It holds private notes.
 7. Write durable decisions into the repository, not into chat or agent memory.
+8. Write all scripts in Python (ADR 0034). Never write shell scripts.
+9. Do not add operator details (hosts, domains, providers) to this repository (ADR 0033).
