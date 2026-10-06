@@ -1,6 +1,6 @@
 # 0016. Environments and release promotion
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

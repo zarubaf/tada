@@ -1,6 +1,6 @@
 # 0011. Telegram channel adapter
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

@@ -1,6 +1,6 @@
 # 0022. Accessibility standard: WCAG 2.2 AA
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

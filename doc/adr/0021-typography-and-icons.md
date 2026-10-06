@@ -1,6 +1,6 @@
 # 0021. Self-hosted typography and one icon set
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

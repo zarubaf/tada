@@ -1,6 +1,6 @@
 # 0002. Monorepo with one core and enforced boundaries
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

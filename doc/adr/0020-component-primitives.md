@@ -1,6 +1,6 @@
 # 0020. React Aria Components as the accessible base
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

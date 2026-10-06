@@ -1,6 +1,6 @@
 # 0010. One model provider port with limited AI authority
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

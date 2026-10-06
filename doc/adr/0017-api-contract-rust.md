@@ -1,6 +1,6 @@
 # 0017. HTTP API contract from Rust types
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 - Supersedes: [0004](0004-http-api-contract.md)
 

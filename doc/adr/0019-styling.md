@@ -1,6 +1,6 @@
 # 0019. Styling with CSS custom properties and CSS Modules
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

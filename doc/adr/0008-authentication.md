@@ -1,6 +1,6 @@
 # 0008. Authentication separate from authorization
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

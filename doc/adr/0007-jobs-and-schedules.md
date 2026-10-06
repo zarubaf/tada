@@ -1,6 +1,6 @@
 # 0007. Durable jobs and schedules in PostgreSQL
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

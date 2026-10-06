@@ -1,6 +1,6 @@
 # 0023. Responsive layout: one app, two primary contexts
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

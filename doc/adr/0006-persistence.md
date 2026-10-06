@@ -1,6 +1,6 @@
 # 0006. PostgreSQL, sqlx and reviewed SQL migrations
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

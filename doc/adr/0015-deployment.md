@@ -1,6 +1,6 @@
 # 0015. Single-host deployment with Docker Compose
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

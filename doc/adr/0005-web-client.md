@@ -1,6 +1,6 @@
 # 0005. React and Vite web client with German UI
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

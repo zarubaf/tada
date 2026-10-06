@@ -1,6 +1,6 @@
 # 0009. Object storage through the S3 API
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

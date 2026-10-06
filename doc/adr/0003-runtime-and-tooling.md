@@ -1,6 +1,6 @@
 # 0003. Rust for the backend, TypeScript only for the web client
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context
