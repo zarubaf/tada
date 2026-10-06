@@ -22,7 +22,9 @@ export interface DataTableProps<T> {
 /** A read-only table with a sticky header (doc/design/components.md, „Registers and tables“). */
 export function DataTable<T>({ label, columns, rows, rowKey }: DataTableProps<T>) {
   return (
-    <div className={styles.container}>
+    // A narrow screen scrolls the table sideways. The keyboard reaches the scroll area through tabIndex.
+    // biome-ignore lint/a11y/noNoninteractiveTabindex: WCAG 2.1.1 needs a focusable scroll area
+    <section className={styles.container} aria-label={label} tabIndex={0}>
       <table className={styles.table} aria-label={label}>
         <thead>
           <tr>
@@ -49,6 +51,6 @@ export function DataTable<T>({ label, columns, rows, rowKey }: DataTableProps<T>
           ))}
         </tbody>
       </table>
-    </div>
+    </section>
   );
 }
