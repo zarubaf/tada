@@ -138,3 +138,17 @@ rmcp
 Codex
 Streamable
 OAuth
+Mailpit
+(?i)nonroot
+distroless
+(?i)sccache
+Renovate
+Dependabot
+ClamAV
+WebP
+DOCX
+XLSX
+PPTX
+OpenDocument
+PDFs?
+APIs?

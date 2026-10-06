@@ -21,12 +21,8 @@ Goal: a repository and a runtime that later slices can build on without rework.
    - Telegram identity linking (ADR 0011).
 4. A first deployment of the walking skeleton, from the operator's deployment repository (ADR 0033).
 5. ADRs for the decisions that the first code needs: observability ([0035](adr/0035-observability.md)), configuration ([0036](adr/0036-configuration.md)), the error model ([0037](adr/0037-error-model.md)), IDs and time ([0038](adr/0038-ids-and-time.md)) and actors ([0039](adr/0039-actors-and-identities.md)).
-6. ADRs that must exist before their slice starts:
-   - Data protection under revDSG: the processors (VPS, mail, model provider, Telegram), the privacy notice, retention and breach handling. No real personal data goes to a model provider before this ADR.
-   - Transactional and inbound email: the provider, SPF, DKIM, DMARC and the inbound address for each event.
-   - CI build and dependency policy: the Rust build cache, Renovate and a scheduled `cargo-deny` run. ADR 0028 covers the image registry.
-   - API conventions for pagination and filters.
-   - Upload policy: allowed content types and malware checks.
+6. ADRs for Slice 0 and Slice 1: CI build and dependencies ([0041](adr/0041-ci-build-and-dependencies.md)), transactional email ([0042](adr/0042-transactional-email.md)), upload policy ([0043](adr/0043-upload-policy.md)) and API conventions ([0044](adr/0044-api-conventions.md)).
+7. ADRs for the core of Slice 1: the event profile and fact model, proposals and review, and document drafts with provenance.
 
 ## Slice 1: Preliminary event concept
 

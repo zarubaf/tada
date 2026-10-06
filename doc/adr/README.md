@@ -55,6 +55,10 @@ The ADRs are the authority for the decisions in this project.
 | [0038](0038-ids-and-time.md)                       | IDs and time                                             | Accepted           |
 | [0039](0039-actors-and-identities.md)              | Callers, actors and service identities                   | Accepted           |
 | [0040](0040-ai-intake-through-mcp.md)              | AI intake through MCP first                              | Accepted           |
+| [0041](0041-ci-build-and-dependencies.md)          | CI build and dependency policy                           | Proposed           |
+| [0042](0042-transactional-email.md)                | Transactional email                                      | Proposed           |
+| [0043](0043-upload-policy.md)                      | Upload policy                                            | Proposed           |
+| [0044](0044-api-conventions.md)                    | API conventions                                          | Proposed           |
 
 ## New ADR
 

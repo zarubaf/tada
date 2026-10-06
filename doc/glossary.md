@@ -105,6 +105,8 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | problem code     | The stable code of an error response, for example `record-version-conflict`.                                                                      | error message                                    |
 | MCP server       | The `/mcp` endpoint of tada. AI clients of members use it to read data and create proposals.                                                      | AI API                                           |
 | API token        | A personal token with the prefix `tada_pat_`, bound to one member and one organization, with the scope `read` or `propose`.                       | API key                                          |
+| outbound intent  | A stored record of a message that tada will send, written in the same transaction as the change that causes it.                                   | queue entry                                      |
+| cursor           | An opaque value that a list response returns to get the next page. Clients never build it.                                                        | offset, page number                              |
 
 ## Design
 
