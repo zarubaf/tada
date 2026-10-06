@@ -68,6 +68,7 @@ The ADRs are the authority for the decisions in this project.
 | [0051](0051-document-drafts-and-provenance.md)     | Document drafts and provenance                           | Accepted           |
 | [0052](0052-event-roles-and-ownership.md)          | Event roles and record ownership                         | Accepted           |
 | [0053](0053-development-authenticator.md)          | Development authenticator for the walking skeleton       | Accepted           |
+| [0054](0054-job-queue-implementation.md)           | Job queue in store-pg                                    | Proposed           |
 
 ## New ADR
 
