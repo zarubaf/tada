@@ -1,6 +1,6 @@
 # 0039. Callers, actors and service identities
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

@@ -1,6 +1,6 @@
 # 0036. Configuration, secrets and the first owner
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

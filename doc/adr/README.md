@@ -39,7 +39,7 @@ The ADRs are the authority for the decisions in this project.
 | [0022](0022-accessibility.md)                      | Accessibility standard: WCAG 2.2 AA                      | Accepted           |
 | [0023](0023-responsive-layout.md)                  | Responsive layout: one app, two primary contexts         | Accepted           |
 | [0024](0024-frontend-quality-gates.md)             | Frontend quality gates                                   | Accepted           |
-| [0025](0025-platform-contract.md)                  | Platform contract between the app and its runtime        | Proposed           |
+| [0025](0025-platform-contract.md)                  | Platform contract between the app and its runtime        | Accepted           |
 | [0026](0026-first-runtime.md)                      | Docker Compose as the first runtime, managed by scripts  | Moved by 0033      |
 | [0027](0027-ingress-tls-dns.md)                    | Ingress, TLS and DNS                                     | Moved by 0033      |
 | [0028](0028-images-and-registry.md)                | Container images and registry                            | Accepted           |
@@ -49,11 +49,11 @@ The ADRs are the authority for the decisions in this project.
 | [0032](0032-delivery-flow.md)                      | Delivery flow and approval gates                         | Moved by 0033      |
 | [0033](0033-deployment-outside-this-repository.md) | Deployment outside this repository                       | Accepted           |
 | [0034](0034-python-for-scripts.md)                 | Python for all scripts                                   | Accepted           |
-| [0035](0035-observability.md)                      | Observability without direct identifiers                 | Proposed           |
-| [0036](0036-configuration.md)                      | Configuration, secrets and the first owner               | Proposed           |
-| [0037](0037-error-model.md)                        | Error model                                              | Proposed           |
-| [0038](0038-ids-and-time.md)                       | IDs and time                                             | Proposed           |
-| [0039](0039-actors-and-identities.md)              | Callers, actors and service identities                   | Proposed           |
+| [0035](0035-observability.md)                      | Observability without direct identifiers                 | Accepted           |
+| [0036](0036-configuration.md)                      | Configuration, secrets and the first owner               | Accepted           |
+| [0037](0037-error-model.md)                        | Error model                                              | Accepted           |
+| [0038](0038-ids-and-time.md)                       | IDs and time                                             | Accepted           |
+| [0039](0039-actors-and-identities.md)              | Callers, actors and service identities                   | Accepted           |
 
 ## New ADR
 

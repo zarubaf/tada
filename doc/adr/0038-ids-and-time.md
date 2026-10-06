@@ -1,6 +1,6 @@
 # 0038. IDs and time
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context
