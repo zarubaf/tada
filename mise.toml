@@ -1,0 +1,21 @@
+# Single source of truth for tool versions and project tasks.
+# Local development and CI both use these pins. See doc/adr/0003-runtime-and-tooling.md.
+# Checks read only the Markdown files that Git can track; ignored files stay out.
+
+[tools]
+node = "26.10.0"
+pnpm = "12.9.1"
+uv = "0.12.23"
+"pipx:mdformat" = { version = "1.0.0", uvx_args = "--with mdformat-gfm --with mdformat-frontmatter" }
+
+[tasks."check:docs-format"]
+description = "Check Markdown formatting"
+run = "mdformat --check $(git ls-files --cached --others --exclude-standard '*.md')"
+
+[tasks.check]
+description = "Run every check that CI runs"
+depends = ["check:docs-format"]
+
+[tasks.fmt]
+description = "Format Markdown files in place"
+run = "mdformat $(git ls-files --cached --others --exclude-standard '*.md')"

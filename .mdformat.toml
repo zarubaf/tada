@@ -1,0 +1,5 @@
+# Markdown formatting. See doc/adr/0012-documentation.md.
+# "keep" preserves one sentence per line, which keeps diffs small.
+wrap = "keep"
+number = true
+end_of_line = "lf"

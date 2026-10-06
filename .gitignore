@@ -1,1 +1,15 @@
+# Private working notes. Never tracked.
 tasks/
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local agent settings
+.claude/settings.local.json
