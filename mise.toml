@@ -3,7 +3,7 @@
 # Checks read only the Markdown files that Git can track; ignored files stay out.
 
 [tools]
-node = "26.10.0"
+node = "24.21.0"
 pnpm = "12.9.1"
 uv = "0.12.23"
 vale = "3.24.0"
