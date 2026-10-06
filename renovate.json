@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Dependency updates as reviewed pull requests (ADR 0041).",
+  "extends": [
+    "config:recommended",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests",
+    ":semanticCommits"
+  ],
+  "timezone": "Europe/Zurich",
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "labels": ["dependencies"],
+  "vulnerabilityAlerts": {
+    "schedule": ["at any time"],
+    "labels": ["security"]
+  },
+  "packageRules": [
+    { "matchManagers": ["cargo"], "groupName": "Cargo crates" },
+    { "matchManagers": ["npm"], "groupName": "pnpm packages" },
+    { "matchManagers": ["github-actions"], "groupName": "GitHub Actions" },
+    { "matchManagers": ["dockerfile", "docker-compose"], "groupName": "Docker images" },
+    { "matchManagers": ["mise"], "groupName": "mise tools" }
+  ]
+}
