@@ -7,6 +7,7 @@ node = "26.10.0"
 pnpm = "12.9.1"
 uv = "0.12.23"
 vale = "3.24.0"
+lefthook = "2.1.17"
 "pipx:mdformat" = { version = "1.0.0", uvx_args = "--with mdformat-gfm --with mdformat-frontmatter" }
 
 [tasks."check:docs-format"]
@@ -33,3 +34,6 @@ run = "mdformat $(git ls-files --cached --others --exclude-standard '*.md')"
 description = "Show all prose findings, including warnings and suggestions"
 run = "vale $(git ls-files --cached --others --exclude-standard '*.md')"
 
+[tasks.setup]
+description = "Install pinned tools and Git hooks"
+run = ["mise install", "lefthook install"]

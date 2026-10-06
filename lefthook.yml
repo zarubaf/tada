@@ -1,0 +1,16 @@
+# Git hooks. Install once with: mise run setup
+# The hooks run the same checks as CI, but only on staged files.
+pre-commit:
+  parallel: true
+  jobs:
+    - name: markdown format
+      glob: "*.md"
+      run: mdformat --check {staged_files}
+    - name: prose style
+      glob: "*.md"
+      run: vale --minAlertLevel=error {staged_files}
+
+commit-msg:
+  jobs:
+    - name: conventional commit
+      run: scripts/check-commit-msg.sh {1}
