@@ -49,6 +49,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org):
 - Mark a breaking change of a public contract with `!`, for example `feat(api)!: ...`.
 - Keep the subject at 72 characters or fewer, in the imperative mood.
 - Make each commit one logical change that builds and passes the checks.
+- Keep the message brief. The body explains why. The diff shows what.
+- Do not add `Co-Authored-By` or other AI attribution trailers.
 - Do not mix formatting changes with content changes.
 
 The `commit-msg` hook and CI check the subject.
