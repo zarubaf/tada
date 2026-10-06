@@ -1,0 +1,18 @@
+@layer components {
+  .error {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius-lg);
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+
+  .requestId {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+  }
+}

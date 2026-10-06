@@ -1,6 +1,7 @@
 # Design tokens
 
-This document is the authority for token names and values until `apps/web/src/styles/tokens.css` exists (ADR 0018).
+[tokens.css](../../apps/web/src/styles/tokens.css) is the authority for the token names and values (ADR 0018).
+The values in this document are for review. If a value here differs from tokens.css, tokens.css is correct; change both together.
 Components use only these tokens. Stylelint rejects raw values (ADR 0019).
 
 ## Color

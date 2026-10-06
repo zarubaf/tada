@@ -1,0 +1,2 @@
+# pnpm installs only versions that are at least three days old, as Renovate proposes them (ADR 0041).
+minimumReleaseAge: 4320

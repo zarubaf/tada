@@ -77,13 +77,22 @@ run = [
 description = "Fail on a breaking change of the API contract against main"
 run = "uv run --quiet scripts/check_contract.py"
 
+[tasks."check:web"]
+description = "Type-check, lint, test and build the web client"
+dir = "apps/web"
+run = [
+  "pnpm install --frozen-lockfile",
+  "pnpm run check",
+  "uv run --quiet ../../scripts/check_bundle_size.py",
+]
+
 [tasks."check:rust"]
 description = "Run all Rust checks"
 depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps", "check:generated", "check:contract"]
 
 [tasks.check]
 description = "Run every check that CI runs"
-depends = ["check:docs", "check:secrets", "check:scripts", "check:rust"]
+depends = ["check:docs", "check:secrets", "check:scripts", "check:rust", "check:web"]
 
 [tasks.gen]
 description = "Write the files that the code generates: settings, problem codes and the API contract"
@@ -109,6 +118,15 @@ run = "uv run --quiet scripts/dev_secrets.py"
 description = "Start PostgreSQL, Garage and Mailpit for development"
 depends = ["dev:secrets"]
 run = ["docker compose up --detach --wait", "uv run --quiet scripts/dev_storage.py"]
+
+[tasks."dev:serve"]
+description = "Migrate the development database and run tada serve on port 8080"
+run = ["cargo run --quiet -p tada -- migrate", "cargo run --quiet -p tada -- serve"]
+
+[tasks."dev:web"]
+description = "Run the web client with hot reload; it calls the API of dev:serve"
+dir = "apps/web"
+run = ["pnpm install --frozen-lockfile", "pnpm dev"]
 
 [tasks."dev:down"]
 description = "Stop the development services; the volumes stay"

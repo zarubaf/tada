@@ -1,0 +1,186 @@
+/*
+ * Design tokens: the authority for token names and values (ADR 0018).
+ * doc/design/tokens.md gives the rules and the reasons. Components use only these tokens (ADR 0019).
+ * The theme follows prefers-color-scheme; data-theme on <html> overrides it.
+ * The density follows the pointer; data-density on <html> overrides it.
+ */
+
+@layer tokens {
+  :root {
+    color-scheme: light;
+
+    /* Color, light theme */
+    --color-bg-canvas: oklch(98.5% 0.002 255);
+    --color-bg-surface: oklch(100% 0 255);
+    --color-bg-raised: oklch(100% 0 255);
+    --color-bg-sunken: oklch(96.5% 0.004 255);
+    --color-bg-hover: oklch(94.5% 0.005 255);
+    --color-border-subtle: oklch(91.5% 0.005 255);
+    --color-border-control: oklch(62% 0.012 255);
+    --color-text: oklch(22% 0.012 255);
+    --color-text-muted: oklch(48% 0.014 255);
+    --color-text-on-accent: oklch(100% 0 255);
+    --color-accent: oklch(48% 0.082 220);
+    --color-accent-hover: oklch(42% 0.072 220);
+    --color-accent-text: oklch(47% 0.08 220);
+    --color-accent-subtle: oklch(95.5% 0.018 220);
+    --color-focus: oklch(52% 0.088 220);
+    --color-success: oklch(47% 0.11 150);
+    --color-success-subtle: oklch(95.5% 0.03 150);
+    --color-warning: oklch(50% 0.11 65);
+    --color-warning-subtle: oklch(96% 0.04 85);
+    --color-danger: oklch(50% 0.17 25);
+    --color-danger-subtle: oklch(95.5% 0.02 25);
+    --color-scrim: oklch(16.5% 0.006 255 / 0.4);
+
+    /* Typography */
+    --font-family-sans: "Mona Sans Variable", system-ui, sans-serif;
+    --font-family-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.8125rem;
+    --font-size-md: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 1.875rem;
+    --line-height-xs: 1rem;
+    --line-height-sm: 1.25rem;
+    --line-height-md: 1.25rem;
+    --line-height-base: 1.5rem;
+    --line-height-lg: 1.75rem;
+    --line-height-xl: 1.75rem;
+    --line-height-2xl: 2rem;
+    --line-height-3xl: 2.25rem;
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --letter-spacing-tight: -0.01em;
+
+    /* Spacing */
+    --space-0-5: 2px;
+    --space-1: 4px;
+    --space-1-5: 6px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    /* Density: compact */
+    --control-height-sm: 24px;
+    --control-height-md: 28px;
+    --control-height-lg: 32px;
+    --row-height: 32px;
+    --font-size-ui: var(--font-size-md);
+    --line-height-ui: var(--line-height-md);
+
+    /* Radius */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-full: 9999px;
+
+    /* Elevation */
+    --shadow-0: none;
+    --shadow-1: 0 1px 2px oklch(22% 0.012 255 / 0.06), 0 4px 12px oklch(22% 0.012 255 / 0.1);
+    --shadow-2: 0 8px 32px oklch(22% 0.012 255 / 0.18);
+
+    /* Motion */
+    --duration-fast: 120ms;
+    --duration-base: 180ms;
+    --duration-slow: 240ms;
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Z-index */
+    --z-sticky: 10;
+    --z-shell: 20;
+    --z-toast: 60;
+  }
+
+  /* Comfortable density with a coarse pointer, or on request. */
+  @media (pointer: coarse) {
+    :root:not([data-density="compact"]) {
+      --control-height-sm: 32px;
+      --control-height-md: 40px;
+      --control-height-lg: 44px;
+      --row-height: 44px;
+      --font-size-ui: var(--font-size-base);
+      --line-height-ui: var(--line-height-base);
+    }
+  }
+
+  :root[data-density="comfortable"] {
+    --control-height-sm: 32px;
+    --control-height-md: 40px;
+    --control-height-lg: 44px;
+    --row-height: 44px;
+    --font-size-ui: var(--font-size-base);
+    --line-height-ui: var(--line-height-base);
+  }
+
+  /* Dark theme: the same values for the system preference and for the explicit choice. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+
+      --color-bg-canvas: oklch(16.5% 0.006 255);
+      --color-bg-surface: oklch(20% 0.007 255);
+      --color-bg-raised: oklch(23.5% 0.008 255);
+      --color-bg-sunken: oklch(14.5% 0.006 255);
+      --color-bg-hover: oklch(24.5% 0.008 255);
+      --color-border-subtle: oklch(28% 0.008 255);
+      --color-border-control: oklch(53% 0.012 255);
+      --color-text: oklch(94% 0.006 255);
+      --color-text-muted: oklch(72% 0.012 255);
+      --color-text-on-accent: oklch(16.5% 0.006 255);
+      --color-accent: oklch(74% 0.1 220);
+      --color-accent-hover: oklch(80% 0.09 220);
+      --color-accent-text: oklch(76% 0.1 220);
+      --color-accent-subtle: oklch(27% 0.04 220);
+      --color-focus: oklch(74% 0.12 220);
+      --color-success: oklch(76% 0.13 150);
+      --color-success-subtle: oklch(27% 0.04 150);
+      --color-warning: oklch(80% 0.12 80);
+      --color-warning-subtle: oklch(28% 0.045 75);
+      --color-danger: oklch(72% 0.15 25);
+      --color-danger-subtle: oklch(28% 0.05 25);
+      --shadow-1: 0 4px 12px oklch(0% 0 0 / 0.4);
+      --shadow-2: 0 8px 32px oklch(0% 0 0 / 0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-bg-canvas: oklch(16.5% 0.006 255);
+    --color-bg-surface: oklch(20% 0.007 255);
+    --color-bg-raised: oklch(23.5% 0.008 255);
+    --color-bg-sunken: oklch(14.5% 0.006 255);
+    --color-bg-hover: oklch(24.5% 0.008 255);
+    --color-border-subtle: oklch(28% 0.008 255);
+    --color-border-control: oklch(53% 0.012 255);
+    --color-text: oklch(94% 0.006 255);
+    --color-text-muted: oklch(72% 0.012 255);
+    --color-text-on-accent: oklch(16.5% 0.006 255);
+    --color-accent: oklch(74% 0.1 220);
+    --color-accent-hover: oklch(80% 0.09 220);
+    --color-accent-text: oklch(76% 0.1 220);
+    --color-accent-subtle: oklch(27% 0.04 220);
+    --color-focus: oklch(74% 0.12 220);
+    --color-success: oklch(76% 0.13 150);
+    --color-success-subtle: oklch(27% 0.04 150);
+    --color-warning: oklch(80% 0.12 80);
+    --color-warning-subtle: oklch(28% 0.045 75);
+    --color-danger: oklch(72% 0.15 25);
+    --color-danger-subtle: oklch(28% 0.05 25);
+    --shadow-1: 0 4px 12px oklch(0% 0 0 / 0.4);
+    --shadow-2: 0 8px 32px oklch(0% 0 0 / 0.5);
+  }
+}

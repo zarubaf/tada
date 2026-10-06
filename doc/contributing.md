@@ -17,10 +17,13 @@ Docker Compose starts PostgreSQL, Garage and Mailpit for development.
 The file [compose.yaml](../compose.yaml) is not a deployment ([ADR 0033](adr/0033-deployment-outside-this-repository.md)).
 
 1. Run `mise run dev:up`. This generates the missing secrets into `.dev/secrets/`, starts the services and prepares the storage bucket.
-2. Open Mailpit at `http://127.0.0.1:8025` to read the mail that tada sends.
-3. Run `mise run dev:down` to stop the services. The data volumes stay.
+2. Run `mise run dev:serve`. This applies the migrations and starts the API on port 8080.
+3. Run `mise run dev:web` in a second terminal. It starts the web client and shows its address.
+4. Open Mailpit at `http://127.0.0.1:8025` to read the mail that tada sends.
+5. Run `mise run dev:down` to stop the services. The data volumes stay.
 
 Do not remove `.dev/secrets/` while the volumes exist. The database and the storage keep the first secrets.
+A debug build acts as the owner of a development organization for each request ([ADR 0053](adr/0053-development-authenticator.md)).
 
 ## Sources of truth
 

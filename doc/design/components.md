@@ -44,20 +44,22 @@ The danger button is secondary in style with `--color-danger` text until a confi
 | RelativeTime   | „vor 2 Stunden“ with the exact time in a tooltip.                                                              |
 | Kbd            | A keyboard key in hints and the shortcut list.                                                                 |
 | Skeleton       | Gray blocks in the shape of the content. No shimmer animation with reduced motion.                             |
+| DataTable      | A read-only table with a sticky header, `--row-height` rows, and monospace or tabular columns where needed.    |
 
 ### Containers
 
-| Component  | Rules                                                                                                                                        |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Panel      | A bordered area in the page flow. No shadow.                                                                                                 |
-| Sheet      | Opens from the right (medium, wide) or from the bottom (narrow). For details, filters and the evidence panel.                                |
-| Dialog     | Only for a destructive confirmation or a blocking task. Title, one sentence, two buttons.                                                    |
-| Popover    | For small forms and pickers that belong to one control.                                                                                      |
-| Tooltip    | Text only, no interactive content. Opens on hover and on focus.                                                                              |
-| Tabs       | For two to six views of one record. Not for navigation between pages.                                                                        |
-| Banner     | A message for a whole page or the app, for example „Synchronisation seit 3 Stunden unterbrochen“. Cannot be hidden while the problem exists. |
-| Toast      | Confirms the last action of the member, with an „Rückgängig“ action if possible. Never for errors that need an action.                       |
-| EmptyState | A title, one sentence and one action. No illustration.                                                                                       |
+| Component   | Rules                                                                                                                                        |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Panel       | A bordered area in the page flow. No shadow.                                                                                                 |
+| Sheet       | Opens from the right (medium, wide) or from the bottom (narrow). For details, filters and the evidence panel.                                |
+| Dialog      | Only for a destructive confirmation or a blocking task. Title, one sentence, two buttons.                                                    |
+| Popover     | For small forms and pickers that belong to one control.                                                                                      |
+| Tooltip     | Text only, no interactive content. Opens on hover and on focus.                                                                              |
+| Tabs        | For two to six views of one record. Not for navigation between pages.                                                                        |
+| Banner      | A message for a whole page or the app, for example „Synchronisation seit 3 Stunden unterbrochen“. Cannot be hidden while the problem exists. |
+| Toast       | Confirms the last action of the member, with an „Rückgängig“ action if possible. Never for errors that need an action.                       |
+| EmptyState  | A title, one sentence and one action, if the member can act there. No illustration.                                                          |
+| InlineError | A failed request in the area that failed: the message, the request ID and „Erneut versuchen“.                                                |
 
 ## Patterns for the main screens
 

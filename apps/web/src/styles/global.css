@@ -1,0 +1,67 @@
+/* The cascade layers, in this order (ADR 0019). */
+@layer reset, tokens, components;
+
+@import url("./tokens.css");
+
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  body,
+  h1,
+  h2,
+  h3,
+  p,
+  table {
+    margin: 0;
+  }
+
+  html {
+    accent-color: var(--color-accent);
+    caret-color: var(--color-accent);
+  }
+
+  body {
+    min-height: 100dvh;
+    background: var(--color-bg-canvas);
+    color: var(--color-text);
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-ui);
+    line-height: var(--line-height-ui);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: var(--color-accent-subtle);
+    color: var(--color-text);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /*
+   * Reduced motion wins over each component. An important declaration in the first layer wins over
+   * the later layers, because the layer order reverses for important declarations.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      /* biome-ignore lint/complexity/noImportantStyles: see the comment above */
+      transition-duration: var(--duration-fast) !important;
+
+      /* biome-ignore lint/complexity/noImportantStyles: see the comment above */
+      animation: none !important;
+    }
+  }
+}
