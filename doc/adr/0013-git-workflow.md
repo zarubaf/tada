@@ -11,7 +11,7 @@ LLM agents make many commits; without rules the history becomes noise.
 ## Decision
 
 - `main` has a linear history. Pull requests merge with rebase or squash.
-- Commit subjects follow Conventional Commits. `scripts/check-commit-msg.sh` checks them in a hook and in CI.
+- Commit subjects follow Conventional Commits. `scripts/check_commit_msg.py` checks them in a hook and in CI.
 - A breaking change of a public contract has a `!` in the subject.
 - Each commit is one logical change and passes `mise run check`.
 - Formatting changes and content changes are separate commits.

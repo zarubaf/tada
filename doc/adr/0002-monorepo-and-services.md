@@ -25,7 +25,7 @@ crates/
   tada/          the binary: serve, worker, telegram and migrate commands
 apps/web/        web client in TypeScript (ADR 0005)
 contracts/       the generated openapi.json (ADR 0017)
-deploy/          Compose files and deployment scripts (ADR 0015)
+scripts/         Python scripts for checks (ADR 0034)
 ```
 
 Cargo enforces the direction of dependencies, because a crate can only use the crates in its `Cargo.toml`:

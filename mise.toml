@@ -9,8 +9,7 @@ uv = "0.12.23"
 vale = "3.24.0"
 lefthook = "2.1.17"
 gitleaks = "8.30.1"
-jq = "1.8.2"
-shellcheck = "0.11.0"
+ruff = "0.16.10"
 "pipx:mdformat" = { version = "1.0.0", uvx_args = "--with mdformat-gfm --with mdformat-frontmatter" }
 
 [tasks."check:docs-format"]
@@ -30,8 +29,8 @@ description = "Scan the full Git history for secrets"
 run = "gitleaks git --redact --no-banner ."
 
 [tasks."check:scripts"]
-description = "Lint shell scripts"
-run = "shellcheck $(git ls-files --cached --others --exclude-standard '*.sh')"
+description = "Lint and format-check Python scripts"
+run = ["ruff check .", "ruff format --check ."]
 
 [tasks.check]
 description = "Run every check that CI runs"
@@ -49,6 +48,3 @@ run = "vale $(git ls-files --cached --others --exclude-standard '*.md')"
 description = "Install pinned tools and Git hooks"
 run = ["mise install", "lefthook install"]
 
-[tasks."dns:apply"]
-description = "Create or update the DNS records in Cloudflare; pass --dry-run to only show the plan"
-run = "deploy/scripts/dns-apply.sh"
