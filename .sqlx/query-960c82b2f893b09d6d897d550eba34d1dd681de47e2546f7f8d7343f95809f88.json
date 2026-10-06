@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO worker_heartbeat (worker_id, started_at, last_loop_at, queue_depth, oldest_due_seconds)\n             SELECT $1, now(), now(), count(*), extract(epoch FROM now() - min(run_at))::bigint\n             FROM job\n             WHERE failed_at IS NULL AND run_at <= now()\n             ON CONFLICT (worker_id) DO UPDATE\n             SET last_loop_at = now(), queue_depth = excluded.queue_depth,\n                 oldest_due_seconds = excluded.oldest_due_seconds",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "960c82b2f893b09d6d897d550eba34d1dd681de47e2546f7f8d7343f95809f88"
+}

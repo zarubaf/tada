@@ -15,7 +15,7 @@ Goal: a repository and a runtime that later slices can build on without rework.
    - The browser checks of ADR 0024: Playwright, axe, screenshots and the pseudo-locale test.
    - Renovate and the daily advisory workflow (ADR 0041).
 3. Spikes:
-   - The job queue (ADR 0007). (Done. The result is [ADR 0054](adr/0054-job-queue-implementation.md).)
+   - The job queue (ADR 0007). (Done. The result is [ADR 0054](adr/0054-job-queue-implementation.md). The queue exists; its schedules come with the scheduled checks of Slice 2.)
    - Upload, download and versions in object storage (ADR 0009).
    - Telegram identity linking (ADR 0011).
 4. A first deployment of the walking skeleton, from the operator's deployment repository (ADR 0033).

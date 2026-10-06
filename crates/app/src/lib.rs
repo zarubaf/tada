@@ -5,6 +5,7 @@ pub mod caller;
 pub mod clock;
 pub mod events;
 pub mod health;
+pub mod jobs;
 pub mod paging;
 pub mod problem;
 pub mod store;

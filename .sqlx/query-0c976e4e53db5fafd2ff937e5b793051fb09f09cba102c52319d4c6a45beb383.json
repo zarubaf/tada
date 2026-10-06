@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT queue_depth, oldest_due_seconds FROM worker_heartbeat WHERE worker_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "queue_depth",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "worker_heartbeat",
+            "name": "queue_depth"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "oldest_due_seconds",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "worker_heartbeat",
+            "name": "oldest_due_seconds"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "0c976e4e53db5fafd2ff937e5b793051fb09f09cba102c52319d4c6a45beb383"
+}

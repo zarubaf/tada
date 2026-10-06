@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM job WHERE id = $1 AND locked_by = $2 AND attempts = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fc38a4b96d761b01f7acd83c10c43d123f57c576f39c52600594d6d9c5b55079"
+}
