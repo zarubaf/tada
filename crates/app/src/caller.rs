@@ -1,5 +1,7 @@
 //! Callers (ADR 0039): the typed values that commands and queries take for authorization.
 
+use std::marker::PhantomData;
+
 use tada_domain::ids::{OrganizationId, UserId};
 
 /// The organization role of a member (glossary).
@@ -53,3 +55,25 @@ impl OrgScope {
         self.0
     }
 }
+
+/// A service identity of tada (ADR 0039). Each identity is its own type, so the set of commands
+/// that it can call is fixed in code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ServiceCaller<S>(PhantomData<S>);
+
+impl<S> ServiceCaller<S> {
+    /// For the process role of the identity only, for example `tada telegram`.
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<S> Default for ServiceCaller<S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The service identity `telegram-gateway`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TelegramGateway;

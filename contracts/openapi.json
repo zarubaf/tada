@@ -128,6 +128,128 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/telegram/link-codes": {
+      "post": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Creates a link code for the calling member.",
+        "operationId": "create_telegram_link_code",
+        "responses": {
+          "201": {
+            "description": "The new code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramLinkCode"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/telegram/link-requests": {
+      "get": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Lists the open link requests of the calling member.",
+        "operationId": "list_telegram_link_requests",
+        "responses": {
+          "200": {
+            "description": "The open requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramLinkRequestPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/telegram/link-requests/{request_id}/confirm": {
+      "post": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Confirms a link request. Only then does tada bind the Telegram account to the member.",
+        "operationId": "confirm_telegram_link",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "description": "The ID of the link request.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account is linked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramLink"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "not-found",
+          "invalid-transition",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
@@ -295,6 +417,80 @@
           "code": {
             "type": "string",
             "description": "The reason, for example `taken`. The list of codes is open."
+          }
+        }
+      },
+      "TelegramLink": {
+        "type": "object",
+        "description": "The linked Telegram account.",
+        "required": [
+          "telegram_user_id"
+        ],
+        "properties": {
+          "telegram_user_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "TelegramLinkCode": {
+        "type": "object",
+        "description": "A new link code. The member sends it to the bot within ten minutes.",
+        "required": [
+          "code",
+          "expires_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The code. It works once. The server shows it only in this response."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TelegramLinkRequest": {
+        "type": "object",
+        "description": "A Telegram account that sent a code of the member, and that waits for the confirmation.",
+        "required": [
+          "id",
+          "telegram_user_id",
+          "telegram_name",
+          "claimed_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "telegram_user_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "telegram_name": {
+            "type": "string",
+            "description": "The name of the Telegram account, as Telegram sends it."
+          },
+          "claimed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TelegramLinkRequestPage": {
+        "type": "object",
+        "description": "The open link requests of the member. A member has few, so the list has one page.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelegramLinkRequest"
+            }
           }
         }
       }

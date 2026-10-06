@@ -5,6 +5,7 @@ mod logging;
 pub mod serve;
 pub mod settings;
 mod shutdown;
+pub mod telegram;
 pub mod worker;
 
 use std::future::Future;

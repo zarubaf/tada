@@ -16,6 +16,8 @@ use super::{Section, Setting, Source};
 pub type ServeSettings = (Database, Http, Storage);
 /// The settings of `tada worker`.
 pub type WorkerSettings = (Database,);
+/// The settings of `tada telegram`.
+pub type TelegramSettings = (Database, Telegram);
 /// The settings of `tada migrate`.
 pub type MigrateSettings = (Database,);
 
@@ -244,6 +246,44 @@ impl Section for Storage {
             bucket: bucket?,
             access_key_id: access_key_id?,
             secret_access_key: secret_access_key?,
+        })
+    }
+}
+
+/// The Telegram gateway (ADR 0011).
+#[derive(Debug)]
+pub struct Telegram {
+    pub bot_token: SecretString,
+    pub api_url: Url,
+}
+
+const TELEGRAM_BOT_TOKEN: Setting = Setting {
+    name: "TADA_TELEGRAM_BOT_TOKEN_FILE",
+    kind: "file path",
+    default: None,
+    secret: true,
+    description: "The file that contains the token of the Telegram bot.",
+};
+
+const TELEGRAM_API_URL: Setting = Setting {
+    name: "TADA_TELEGRAM_API_URL",
+    kind: "URL",
+    default: Some("https://api.telegram.org"),
+    secret: false,
+    description: "The base URL of the Telegram Bot API. Tests set a local fake.",
+};
+
+impl Section for Telegram {
+    fn settings() -> Vec<&'static Setting> {
+        vec![&TELEGRAM_BOT_TOKEN, &TELEGRAM_API_URL]
+    }
+
+    fn read(source: &mut Source<'_>) -> Option<Self> {
+        let bot_token = source.secret(&TELEGRAM_BOT_TOKEN);
+        let api_url = source.value(&TELEGRAM_API_URL);
+        Some(Self {
+            bot_token: bot_token?,
+            api_url: api_url?,
         })
     }
 }

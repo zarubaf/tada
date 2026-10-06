@@ -6,6 +6,7 @@ mod extract;
 mod health;
 mod problem;
 mod request_id;
+mod telegram;
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -20,6 +21,7 @@ use tada_app::clock::Clock;
 use tada_app::events::EventStore;
 use tada_app::health::DependencyCheck;
 use tada_app::problem::ProblemCode;
+use tada_app::telegram::TelegramLinks;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa::openapi::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
@@ -36,6 +38,7 @@ pub struct ApiState {
     pub dependencies: Vec<Arc<dyn DependencyCheck>>,
     pub authenticator: Arc<dyn Authenticator>,
     pub events: Arc<dyn EventStore>,
+    pub telegram: Arc<dyn TelegramLinks>,
     pub clock: Arc<dyn Clock>,
     /// The proxies whose `X-Request-Id` the server accepts (ADR 0035).
     pub trusted_proxies: Vec<IpNet>,
@@ -46,9 +49,12 @@ pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
 /// The versioned API: its routes and its OpenAPI document.
 fn api() -> (Router<ApiState>, OpenApi) {
     let (router, document) = OpenApiRouter::<ApiState>::new()
-        .nest(API_PREFIX, events::routes())
+        .nest(API_PREFIX, events::routes().merge(telegram::routes()))
         .split_for_parts();
-    let problem_codes = events::problem_codes().into_iter().collect();
+    let problem_codes = events::problem_codes()
+        .into_iter()
+        .chain(telegram::problem_codes())
+        .collect();
     (router, contract::complete(document, &problem_codes))
 }
 
@@ -164,11 +170,60 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct NoTelegram;
+
+    #[async_trait::async_trait]
+    impl TelegramLinks for NoTelegram {
+        async fn create_code(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+            _: jiff::Timestamp,
+        ) -> Result<String, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn claim(
+            &self,
+            _: &str,
+            _: tada_app::telegram::TelegramUserId,
+            _: &tada_app::telegram::TelegramName,
+            _: jiff::Timestamp,
+        ) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn requests(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+            _: jiff::Timestamp,
+        ) -> Result<Vec<tada_app::telegram::LinkRequest>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn confirm(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+            _: uuid::Uuid,
+            _: jiff::Timestamp,
+        ) -> Result<tada_app::telegram::Confirmed, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn record_update(&self, _: i64) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
             authenticator: Arc::new(NoCaller),
             events: Arc::new(NoEvents),
+            telegram: Arc::new(NoTelegram),
             clock: Arc::new(NoClock),
             trusted_proxies: Vec::new(),
         }

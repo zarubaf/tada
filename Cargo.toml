@@ -19,6 +19,7 @@ tada-app = { path = "crates/app" }
 tada-store-pg = { path = "crates/store-pg" }
 tada-adapters = { path = "crates/adapters" }
 tada-api = { path = "crates/api" }
+tada-telegram = { path = "crates/telegram" }
 
 anyhow = "1.0.104"
 async-trait = "0.1.92"
@@ -27,7 +28,10 @@ bytes = "1.12.1"
 aws-sdk-s3 = { version = "1.152.0", default-features = false, features = ["rt-tokio", "default-https-client"] }
 axum = "0.8.9"
 clap = { version = "4.6.7", features = ["derive"] }
+fluent-bundle = "0.16.0"
+frankenstein = { version = "0.52.1", default-features = false, features = ["client-reqwest", "trait-async"] }
 futures = { version = "0.3.34", default-features = false, features = ["std"] }
+getrandom = "0.4.3"
 ipnet = "2.12.2"
 jiff = { version = "0.2.37", features = ["serde", "tzdb-bundle-always"] }
 jiff-sqlx = { version = "0.2.0", features = ["postgres"] }
@@ -35,6 +39,7 @@ json-subscriber = "0.3.0"
 secrecy = "0.10.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+sha2 = "0.11.0"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-native-roots", "postgres", "migrate", "macros", "uuid"] }
 tempfile = "3.27.0"
 testcontainers-modules = { version = "0.15.0", features = ["postgres"] }

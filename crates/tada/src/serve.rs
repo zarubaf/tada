@@ -30,6 +30,7 @@ pub async fn run((database, http, storage): ServeSettings) -> anyhow::Result<()>
             dependencies: vec![Arc::new(db.clone()), Arc::new(storage)],
             authenticator: authenticator(&db).await?,
             events: Arc::new(db.clone()),
+            telegram: Arc::new(db.clone()),
             clock: Arc::new(SystemClock),
             trusted_proxies: http.trusted_proxies,
         },

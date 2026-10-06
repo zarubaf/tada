@@ -28,6 +28,7 @@ impl Api {
                 dependencies: vec![Arc::new(test.database.clone())],
                 authenticator: Arc::new(DevAuthenticator),
                 events: Arc::new(test.database.clone()),
+                telegram: Arc::new(test.database.clone()),
                 clock: Arc::new(SystemClock),
                 trusted_proxies: Vec::new(),
             },

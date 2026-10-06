@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO telegram_update (update_id, received_at) VALUES ($1, now()) ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "52ad322809e80ec3f0152bafbc9e7bd06b8ac16ba9b040e3adf40c8ba983a8b7"
+}

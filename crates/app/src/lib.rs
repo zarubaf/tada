@@ -10,5 +10,6 @@ pub mod jobs;
 pub mod paging;
 pub mod problem;
 pub mod store;
+pub mod telegram;
 
 pub use tada_domain as domain;

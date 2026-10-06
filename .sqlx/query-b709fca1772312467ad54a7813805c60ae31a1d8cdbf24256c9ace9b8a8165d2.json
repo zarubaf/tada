@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO telegram_identity (telegram_user_id, user_id, linked_at) VALUES ($1, $2, $3)\n             ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b709fca1772312467ad54a7813805c60ae31a1d8cdbf24256c9ace9b8a8165d2"
+}

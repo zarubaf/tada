@@ -6,7 +6,10 @@ all-features = true
 
 [advisories]
 # Each ignored advisory needs a reason and an issue.
-ignore = []
+ignore = [
+  # paste is an unmaintained compile-time macro of frankenstein, with no known vulnerability. https://github.com/zarubaf/tada/issues/1
+  { id = "RUSTSEC-2024-0436", reason = "compile-time macro of frankenstein; tracked in https://github.com/zarubaf/tada/issues/1" },
+]
 
 [licenses]
 # Licenses that are compatible with Apache-2.0 for distribution (ADR 0014).
@@ -25,6 +28,14 @@ allow = [
 confidence-threshold = 0.9
 unused-allowed-license = "allow"
 
+# WTFPL permits any use, so it is compatible with Apache-2.0. ADR 0011 chose this crate.
+# CDLA-Permissive-2.0 covers the Mozilla CA list, which the TLS stack of frankenstein brings.
+# It permits distribution if the license text goes with the data.
+exceptions = [
+  { allow = ["WTFPL"], crate = "frankenstein" },
+  { allow = ["CDLA-Permissive-2.0"], crate = "webpki-root-certs" },
+]
+
 [licenses.private]
 ignore = true
 
@@ -39,13 +50,15 @@ allow-wildcard-paths = true
 # - The domain crate depends on no other tada crate.
 # - I/O crates are dependencies of adapter crates only.
 deny = [
-  { crate = "tada-app", wrappers = ["tada-store-pg", "tada-adapters", "tada-api", "tada"] },
+  { crate = "tada-app", wrappers = ["tada-store-pg", "tada-adapters", "tada-api", "tada-telegram", "tada"] },
   { crate = "tada-store-pg", wrappers = ["tada"] },
   { crate = "tada-adapters", wrappers = ["tada"] },
   { crate = "tada-api", wrappers = ["tada"] },
+  { crate = "tada-telegram", wrappers = ["tada"] },
   { crate = "sqlx", wrappers = ["tada-store-pg", "jiff-sqlx"] },
   { crate = "aws-sdk-s3", wrappers = ["tada-adapters"] },
-  { crate = "reqwest", wrappers = ["tada-adapters"] },
+  # frankenstein is the typed Bot API client of the telegram crate (ADR 0011).
+  { crate = "reqwest", wrappers = ["tada-adapters", "frankenstein"] },
 ]
 
 [sources]

@@ -7,6 +7,7 @@ mod error;
 mod events;
 mod heartbeat;
 mod jobs;
+mod telegram;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 

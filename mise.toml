@@ -130,6 +130,11 @@ description = "Run the web client with hot reload; it calls the API of dev:serve
 dir = "apps/web"
 run = ["pnpm install --frozen-lockfile", "pnpm dev"]
 
+[tasks."dev:telegram"]
+description = "Run the Telegram gateway with the bot token in .dev/secrets/telegram_bot_token"
+env = { TADA_TELEGRAM_BOT_TOKEN_FILE = "{{config_root}}/.dev/secrets/telegram_bot_token" }
+run = "cargo run --quiet -p tada -- telegram"
+
 [tasks."dev:down"]
 description = "Stop the development services; the volumes stay"
 run = "docker compose down"

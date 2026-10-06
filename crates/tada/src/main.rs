@@ -4,8 +4,8 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use tada::settings::{self, MigrateSettings, ServeSettings, WorkerSettings};
-use tada::{migrate, run, serve, worker};
+use tada::settings::{self, MigrateSettings, ServeSettings, TelegramSettings, WorkerSettings};
+use tada::{migrate, run, serve, telegram, worker};
 
 #[derive(Debug, Parser)]
 #[command(version, about = "tada: event planning for clubs")]
@@ -20,6 +20,8 @@ enum Command {
     Serve,
     /// Run jobs and schedules.
     Worker,
+    /// Run the Telegram gateway.
+    Telegram,
     /// Apply the pending database migrations, then stop.
     Migrate,
     /// Print the settings reference as Markdown.
@@ -34,6 +36,7 @@ fn main() -> ExitCode {
     match Cli::parse().command {
         Command::Serve => run::<ServeSettings, _>("serve", serve::run),
         Command::Worker => run::<WorkerSettings, _>("worker", worker::run),
+        Command::Telegram => run::<TelegramSettings, _>("telegram", telegram::run),
         Command::Migrate => run::<MigrateSettings, _>("migrate", migrate),
         Command::Settings => print(&settings::reference()),
         Command::Openapi => match tada_api::openapi().to_pretty_json() {
