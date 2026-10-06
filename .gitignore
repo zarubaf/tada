@@ -13,3 +13,6 @@ coverage/
 
 # Local agent settings
 .claude/settings.local.json
+
+# Local host inventory (IP addresses, SSH aliases). Never tracked.
+deploy/*.local
