@@ -40,7 +40,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 | Term        | Meaning                                                                                                 | Avoid     |
 | ----------- | ------------------------------------------------------------------------------------------------------- | --------- |
-| action      | A piece of work with one owner, a status and a due date. (open: the UI can call it "task")              | todo      |
+| action      | A piece of work with one owner, a status and a due date. The German UI calls it „Aufgabe“.              | todo      |
 | milestone   | A date by which a set of actions must be complete.                                                      | deadline  |
 | commitment  | A promise from a person or a supplier, with its conditions. A conditional commitment stays conditional. | agreement |
 | decision    | An approved statement with its exact wording, approver and evidence.                                    |           |
