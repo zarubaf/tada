@@ -1,3 +1,5 @@
+# tada architecture
+
 tada starts with a compact application, PostgreSQL, private object storage, a built-in file browser and independent member authentication. Web and Telegram call the same authorized domain tools. Nextcloud, Microsoft and alternative agent runtimes are optional later adapters.
 
 ## Data ownership and provenance
@@ -47,15 +49,17 @@ flowchart TD
   O --> C
 ```
 
-### Starting stack to validate
+### Starting stack
 
-- TypeScript, React/Next.js and a server-side domain API with an OpenAPI contract.
-- PostgreSQL for accepted state, relationships, proposals, audit events and a durable job queue.
-- Object storage for retained source snapshots and generated exports.
+The [ADRs](adr/README.md) record each stack decision and its reasons. If this section and an ADR disagree, the ADR is correct.
+
+- TypeScript on Node.js ([ADR 0003](adr/0003-runtime-and-tooling.md)), a Hono domain API with a versioned OpenAPI contract ([ADR 0004](adr/0004-http-api-contract.md)) and a React/Vite web client ([ADR 0005](adr/0005-web-client.md)).
+- PostgreSQL for accepted state, relationships, proposals, audit events ([ADR 0006](adr/0006-persistence.md)) and a durable job queue ([ADR 0007](adr/0007-jobs-and-schedules.md)).
+- S3-compatible object storage for retained source snapshots and generated exports ([ADR 0009](adr/0009-object-storage.md)).
 - Independent application identities: invited personal email with short-lived, single-use sign-in links, optionally passkeys. Telegram identities are linked through expiring invitation codes and verified membership; Entra/OIDC is optional later. No paid Microsoft seat is required for tada participation.
 - PostgreSQL full-text search first; add pgvector if evaluation shows useful semantic retrieval.
-- One model-provider adapter with schema-validated output, usage accounting and model/version tracking.
-- Two deployable processes, web/API and worker; no microservices, Kafka or graph database initially.
+- One model-provider adapter with schema-validated output, usage accounting and model/version tracking ([ADR 0010](adr/0010-model-provider.md)).
+- Two deployable processes, web/API and worker; no microservices, Kafka or graph database initially ([ADR 0002](adr/0002-modular-monolith.md)).
 
 These are proposed implementation choices, not purchased services. A hosting decision requires a priced deployment plan and an operator responsible for backups and updates.
 
@@ -71,7 +75,7 @@ API keys or a future MCP facade expose these same authorized commands. MCP is an
 
 The first integration is Telegram. Begin email/document capture with uploads and a per-event inbound email address that members can forward or copy messages to. This needs no Microsoft tenant integration; automatic forwarding may still be restricted by the mail provider. Supply a manual fallback. tada cannot observe messages or document changes it has not received. Microsoft Graph integration is optional later, when actual permissions and admin availability are proven.
 
-Codex must prove the actual Graph permission model in the club tenant. Delegated permissions and application permissions differ, and shared-resource scenarios have specific limitations. Never assume selecting a folder in the UI technically limits a broad API token. Document token privileges and enforce the configured boundary in the application.
+The implementer must prove the actual Graph permission model in the club tenant. Delegated permissions and application permissions differ, and shared-resource scenarios have specific limitations. Never assume selecting a folder in the UI technically limits a broad API token. Document token privileges and enforce the configured boundary in the application.
 
 | Connector                     | Inbound first                                          | Outbound later                                          |
 | ----------------------------- | ------------------------------------------------------ | ------------------------------------------------------- |
@@ -114,7 +118,7 @@ Copying a UI component can save frontend work, but check its license and mainten
 
 ### Authentication now
 
-Use a maintained library rather than implementing token/session cryptography. Better Auth is a candidate with documented magic-link and organization plugins; pin and test a suitable release. See [Magic links](https://better-auth.com/docs/plugins/magic-link) and [Organizations](https://better-auth.com/docs/plugins/organization).
+Use a maintained library rather than implementing token/session cryptography. Better Auth handles authentication only; tada owns memberships and roles, so we do not use its organization plugin ([ADR 0008](adr/0008-authentication.md)). See [Magic links](https://better-auth.com/docs/plugins/magic-link).
 
 Invite-only access: the owner invites an existing personal email address. A short-lived, single-use email link signs the member in and creates a revocable secure session. Disable unrestricted signup and do not grant membership merely because an email domain matches. Use secure HTTP-only cookies, request/redirect validation and rate limits provided/configured through the library. Transactional email delivery is a small explicit dependency to price and operate.
 
@@ -214,7 +218,7 @@ Versioned migrations and stable interfaces make changes testable and recoverable
 
 - Use feature flags and separate development/staging from the live project. Pin dependencies and record architecture decisions in Git.
 
-- The production AI PM changes records through approved tools; it cannot change its own deployed code or database schema. Codex development follows review, tests and deployment.
+- The production AI PM changes records through approved tools; it cannot change its own deployed code or database schema. Development follows review, tests and deployment.
 
 - Export versioned JSON/CSV plus originals, retained file versions, hashes and relationship manifests. Demonstrate reconstruction.
 

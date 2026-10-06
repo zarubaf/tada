@@ -1,4 +1,6 @@
-tada is a hosted workspace for planning multiple club events, with structured facts, browsable documents and AI participation across web and messaging. This document defines the product, its users and scope. Implementation details are in the architecture; the first deliverable and development instructions are in the PoC handoff.
+# tada product
+
+tada is a hosted workspace for planning multiple club events, with structured facts, browsable documents and AI participation across web and messaging. This document defines the product, its users and scope. [ARCHITECTURE.md](ARCHITECTURE.md) describes the implementation, and the [ADRs](adr/README.md) record the decisions.
 
 ## Product vision
 
