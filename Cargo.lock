@@ -3121,6 +3121,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "jiff",
+ "serde_json",
  "tada-domain",
  "thiserror",
  "tokio",
@@ -3144,6 +3145,7 @@ dependencies = [
  "jiff",
  "jiff-sqlx",
  "secrecy",
+ "serde_json",
  "sqlx",
  "tada-app",
  "testcontainers-modules",
