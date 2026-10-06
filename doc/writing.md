@@ -11,6 +11,8 @@ Vale and mdformat check most of these rules (see [ADR 0012](adr/0012-documentati
   If you need a new term, add it to the glossary in the same commit.
 - Do not translate German domain names such as "Verkehrsplan" or "Organisationskomitee".
   The glossary defines them.
+- Write German UI text in German quotation marks: „Vorschlag annehmen“.
+  This marks the text as literal UI copy, and Vale does not check its spelling.
 
 ## Simplified Technical English
 
