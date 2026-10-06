@@ -92,6 +92,6 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | port           | An interface that the application defines and an adapter implements.                                   |                            |
 | adapter        | The implementation of a port for one technology, for example S3 or Telegram.                           | driver                     |
 | connector      | An adapter that brings data from an external system into tada.                                         | integration (in code)      |
-| code module    | A folder under `apps/server/src/modules/` with one bounded context.                                    |                            |
+| code module    | A Rust module for one bounded context inside the `domain` and `app` crates.                            |                            |
 | worker         | The background process that runs jobs and schedules.                                                   |                            |
 | job            | A durable unit of background work with a versioned payload.                                            | task (in code)             |

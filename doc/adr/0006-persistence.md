@@ -1,4 +1,4 @@
-# 0006. PostgreSQL, Drizzle and reviewed migrations
+# 0006. PostgreSQL, sqlx and reviewed SQL migrations
 
 - Status: Proposed
 - Date: 2026-10-06
@@ -12,9 +12,9 @@ A migration must never turn an assumption into a decision.
 ## Decision
 
 - The database is PostgreSQL 18.
-- Drizzle defines the tables in TypeScript inside each code module's `infra` folder.
-- `drizzle-kit generate` writes SQL migration files. We commit and review each file.
-- We never use `drizzle-kit push` outside a local database.
+- The `store-pg` crate uses `sqlx` with SQL that the compiler checks against the schema.
+- The committed `.sqlx` query cache lets CI build without a database.
+- Migrations are plain SQL files in `crates/store-pg/migrations/`. We write and review each file.
 - Each schema change follows expand and contract:
   1. Add the new column or table.
   2. Backfill the data.
@@ -22,17 +22,17 @@ A migration must never turn an assumption into a decision.
   4. Remove the old form in a later release.
 - Each table with organization data has a non-null `organization_id`.
 - Each mutable record has a `version` column for optimistic concurrency.
-- Repositories implement ports. Domain code does not import Drizzle.
+- Repositories implement the ports of the `app` crate. The `domain` and `app` crates do not depend on `sqlx`.
 - Full-text search uses PostgreSQL. We add pgvector only if an evaluation shows a benefit.
 
 ## Consequences
 
 - Each migration is visible as SQL in review.
+- A query that does not match the schema fails at compile time.
 - CI applies all migrations to an empty database and to a fixture database.
-- We can change the query library later because only `infra` uses it.
 
 ## Alternatives
 
-- Prisma: a separate schema language and a query engine binary.
-- Kysely with hand-written migrations: good, but the table types must be kept in sync by hand.
-- An ORM with automatic schema sync: no review of the SQL that runs in production.
+- Diesel: a query DSL and its own migration format; `sqlx` keeps plain SQL.
+- SeaORM: an ORM layer that hides the SQL we want to review.
+- Migrations that an ORM generates: no review of the exact SQL.

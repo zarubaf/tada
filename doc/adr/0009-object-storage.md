@@ -1,6 +1,6 @@
 # 0009. Object storage through the S3 API
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context
@@ -12,8 +12,8 @@ Later, a club can want Nextcloud, OneDrive or a hosted S3 service.
 
 ## Decision
 
-- The `documents` code module defines a `BlobStore` port: put, get, head, delete and presign.
-- The first adapter uses the AWS SDK S3 client and works with any S3-compatible service.
+- The `app` crate defines a `BlobStore` port: put, get, head, delete and presign.
+- The `blob-s3` crate implements the port with the official `aws-sdk-s3` crate. It works with any S3-compatible service.
 - Self-hosted deployments use Garage as the S3 service.
 - Object keys are generated IDs, never file names.
 - PostgreSQL owns document IDs, versions, names, folders and permissions.

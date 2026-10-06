@@ -1,6 +1,6 @@
 # 0004. HTTP API contract and stability
 
-- Status: Accepted
+- Status: Superseded by [0017](0017-api-contract-rust.md)
 - Date: 2026-10-06
 
 ## Context

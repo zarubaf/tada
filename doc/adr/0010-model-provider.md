@@ -1,6 +1,6 @@
 # 0010. One model provider port
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context
@@ -11,9 +11,9 @@ The organization must accept the processing region and the terms of the model pr
 
 ## Decision
 
-- The `assistant` code module defines a `Model` port.
-- The port takes a prompt, the tools and a Zod output schema. It returns validated output and usage.
-- The first adapter uses the Anthropic SDK directly, with no AI framework.
+- The `app` crate defines a `Model` port.
+- The port takes a prompt, the tools and an output type. `schemars` generates the JSON Schema from the Rust type. The port returns validated output and usage.
+- Anthropic publishes no official Rust SDK. The `model` crate is a thin `reqwest` client for the Messages API, with no AI framework.
 - Each call records the model ID, the prompt version, the token usage and the event.
 - A per-event and per-organization quota pauses optional AI work when it reaches its limit.
 - AI tools call the same domain commands and queries as the API, with the permissions of the caller.

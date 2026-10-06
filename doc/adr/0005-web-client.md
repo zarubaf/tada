@@ -5,7 +5,7 @@
 
 ## Context
 
-The web client must use the same API as the other channels (ADR 0004).
+The web client must use the same API as the other channels (ADR 0017).
 Members in Zurich and Dübendorf use German.
 Mobile participation matters more than a decorative dashboard.
 

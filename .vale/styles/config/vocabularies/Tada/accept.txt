@@ -40,7 +40,7 @@ npm
 oasdiff
 OpenAPI
 Paperless
-passkeys?
+(?i)passkeys?
 pgvector
 pnpm
 pretix
@@ -54,6 +54,7 @@ Vite
 Vitest
 Zod
 # Technical words
+(?i)anonymiz(e|ed|er|ation)
 (?i)backfill
 (?i)cron
 (?i)dedupe
@@ -65,6 +66,10 @@ Zod
 (?i)monorepo
 (?i)namespace
 (?i)subagents?
+(?i)toolchains?
+(?i)newtypes?
+(?i)rustfmt
+(?i)nextest
 (?i)webhooks?
 (?i)browsable
 (?i)cooldowns?
@@ -75,3 +80,25 @@ Zod
 (?i)unrepresentable
 (?i)unreviewed
 Postgres
+apalis
+axum
+clippy
+Cargo
+reqwest
+schemars
+serde
+sqlx
+teloxide
+Tokio
+utoipa
+webauthn-rs
+tower-sessions
+Diesel
+SeaORM
+aide
+Kratos
+gRPC
+(?i)async
+(?i)enums?
+(?i)backoff
+Ory

@@ -53,13 +53,13 @@ flowchart TD
 
 The [ADRs](adr/README.md) record each stack decision and its reasons. If this section and an ADR disagree, the ADR is correct.
 
-- TypeScript on Node.js ([ADR 0003](adr/0003-runtime-and-tooling.md)), a Hono domain API with a versioned OpenAPI contract ([ADR 0004](adr/0004-http-api-contract.md)) and a React/Vite web client ([ADR 0005](adr/0005-web-client.md)).
+- A Rust backend and a TypeScript web client ([ADR 0003](adr/0003-runtime-and-tooling.md)): an `axum` domain API with a versioned OpenAPI contract ([ADR 0017](adr/0017-api-contract-rust.md)) and a React/Vite web client ([ADR 0005](adr/0005-web-client.md)).
 - PostgreSQL for accepted state, relationships, proposals, audit events ([ADR 0006](adr/0006-persistence.md)) and a durable job queue ([ADR 0007](adr/0007-jobs-and-schedules.md)).
 - S3-compatible object storage for retained source snapshots and generated exports ([ADR 0009](adr/0009-object-storage.md)).
 - Independent application identities: invited personal email with short-lived, single-use sign-in links, optionally passkeys. Telegram identities are linked through expiring invitation codes and verified membership; Entra/OIDC is optional later. No paid Microsoft seat is required for tada participation.
 - PostgreSQL full-text search first; add pgvector if evaluation shows useful semantic retrieval.
 - One model-provider adapter with schema-validated output, usage accounting and model/version tracking ([ADR 0010](adr/0010-model-provider.md)).
-- Two deployable processes, web/API and worker; no microservices, Kafka or graph database initially ([ADR 0002](adr/0002-modular-monolith.md)).
+- One monorepo with one Cargo workspace. One binary runs the roles `serve`, `worker` and `telegram`; all roles use the same domain commands. A role becomes a separate service only with an ADR ([ADR 0002](adr/0002-monorepo-and-services.md)). No Kafka or graph database initially.
 
 These are proposed implementation choices, not purchased services. A hosting decision requires a priced deployment plan and an operator responsible for backups and updates.
 
