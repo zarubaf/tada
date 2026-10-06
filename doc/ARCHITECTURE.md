@@ -1,4 +1,4 @@
-tada starts with a compact application, PostgreSQL, private object storage, a built-in file browser and independent member authentication. Web and Telegram call the same authorised domain tools. Nextcloud, Microsoft and alternative agent runtimes are optional later adapters.
+tada starts with a compact application, PostgreSQL, private object storage, a built-in file browser and independent member authentication. Web and Telegram call the same authorized domain tools. Nextcloud, Microsoft and alternative agent runtimes are optional later adapters.
 
 ## Data ownership and provenance
 
@@ -18,13 +18,13 @@ tada starts with a compact application, PostgreSQL, private object storage, a bu
 
 A source link alone is insufficient: documents change and messages may be deleted. Retain the exact source version or a permitted immutable snapshot, hash, capture time and locator such as page, paragraph or message passage.
 
-Minimum shared fields: UUID, organisation ID, event scope where applicable, human-readable event-local ID, owner, status, timestamps and record version. Shared club people and resources use organisation scope; event-specific notes and assignments use event scope.
+Minimum shared fields: UUID, organization ID, event scope where applicable, human-readable event-local ID, owner, status, timestamps and record version. Shared club people and resources use organization scope; event-specific notes and assignments use event scope.
 
 Separate SourceItem, SourceVersion, EvidenceLink, Proposal and accepted domain records. A proposal includes the proposed patch, source spans, extraction/model version, assumptions, reviewer and target record version.
 
 Do not put raw personal information into general audit messages. Retention/deletion rules must cover originals, snapshots, extracted facts, embeddings and backups; evidence preservation is bounded by those rules.
 
-AI answers retrieve accepted records and authorised evidence at request time. They distinguish accepted state, proposals, historical state and inference, and show source freshness. “No new mail” must never mean “the connector is disconnected.”
+AI answers retrieve accepted records and authorized evidence at request time. They distinguish accepted state, proposals, historical state and inference, and show source freshness. “No new mail” must never mean “the connector is disconnected.”
 
 Permission filtering happens before retrieval and applies to citations and source excerpts. Source access and event membership must both permit disclosure; copying a private document into an event does not silently broaden access.
 
@@ -61,11 +61,11 @@ These are proposed implementation choices, not purchased services. A hosting dec
 
 ### Domain integrity
 
-Use relational tables and explicit foreign keys for the stable core; use schema-validated JSON only for bounded extensions. Organisational isolation applies to all reads, writes, jobs and exports. Event-level permissions sit within that boundary.
+Use relational tables and explicit foreign keys for the stable core; use schema-validated JSON only for bounded extensions. Organizational isolation applies to all reads, writes, jobs and exports. Event-level permissions sit within that boundary.
 
 All mutations go through domain commands, including AI and connector updates. Validate ownership, allowed transitions and optimistic record versions. Commit the accepted change, audit event and outbound job atomically. If the record changed since a proposal was created, require re-evaluation rather than overwriting it.
 
-API keys or a future MCP facade expose these same authorised commands. MCP is an optional assistant interface, not the internal persistence layer or a substitute for background connectors.
+API keys or a future MCP facade expose these same authorized commands. MCP is an optional assistant interface, not the internal persistence layer or a substitute for background connectors.
 
 ## Integration design
 
@@ -75,7 +75,7 @@ Codex must prove the actual Graph permission model in the club tenant. Delegated
 
 | Connector                     | Inbound first                                          | Outbound later                                          |
 | ----------------------------- | ------------------------------------------------------ | ------------------------------------------------------- |
-| Telegram                      | Commands, direct replies and authorised button actions | Policy-controlled internal reminders and briefings      |
+| Telegram                      | Commands, direct replies and authorized button actions | Policy-controlled internal reminders and briefings      |
 | Inbound email/uploads         | Forwarded/copied messages and document versions        | Drafts and exports                                      |
 | Outlook mail, optional        | Selected messages, threads and attachments             | Drafts first; controlled sending                        |
 | SharePoint/OneDrive, optional | Selected document versions and metadata                | Approved generated packs and reports                    |
@@ -86,9 +86,9 @@ Codex must prove the actual Graph permission model in the club tenant. Delegated
 
 Every adapter must provide scoped authentication, capability metadata, checkpoints, source IDs/versions, deterministic mappings, incremental retrieval, reconciliation, revocation handling and diagnostics.
 
-Webhooks signal that something may have changed. Workers fetch and reconcile authoritative data. Renew subscriptions before expiry, honour provider rate limits, retry transient failures and surface terminal failures. Periodic reconciliation repairs missed notifications. Persist checkpoints only after durable capture.
+Webhooks signal that something may have changed. Workers fetch and reconcile authoritative data. Renew subscriptions before expiry, honor provider rate limits, retry transient failures and surface terminal failures. Periodic reconciliation repairs missed notifications. Persist checkpoints only after durable capture.
 
-Use at-least-once delivery with idempotent processing. Dedupe by organisation, connection, resource and version; dedupe outgoing commands separately. Preserve thread identity and attachment relationships. Track sync origin to prevent feedback loops.
+Use at-least-once delivery with idempotent processing. Dedupe by organization, connection, resource and version; dedupe outgoing commands separately. Preserve thread identity and attachment relationships. Track sync origin to prevent feedback loops.
 
 For the first release, most data flows one way into tada. Outbound fields have explicit ownership. If both systems edit the same field, flag the conflict rather than using blind last-write-wins.
 
@@ -106,21 +106,21 @@ Provide folders, upload/drag-and-drop, filename search, metadata, PDF/image/text
 
 PostgreSQL owns folders, document/version IDs, titles, event scope, ownership and processing state. Object storage holds originals, previews and extracted outputs under generated keys unrelated to filenames. A rename or move updates metadata rather than changing identity.
 
-The bucket is private. Authorise each upload/download server-side before issuing a short-lived URL. Presigned URLs are bearer credentials and may be reusable until expiry; never treat them as one-time user-authenticated links. See [S3 presigned URLs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html).
+The bucket is private. Authorize each upload/download server-side before issuing a short-lived URL. Presigned URLs are bearer credentials and may be reusable until expiry; never treat them as one-time user-authenticated links. See [S3 presigned URLs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html).
 
-Issue uploads to a unique staging key. Finalise after verifying the uploaded object, size/type and expected scope; reject unsafe previews and oversized uploads. Publish a version atomically in the database only after capture succeeds. Approved/retained blobs cannot be overwritten by a reused upload URL. Track abandoned uploads, orphaned objects and failed extraction; clean them using an explicit policy. For stricter immediate revocation, proxy downloads through the authenticated application instead of handing out signed URLs.
+Issue uploads to a unique staging key. Finalize after verifying the uploaded object, size/type and expected scope; reject unsafe previews and oversized uploads. Publish a version atomically in the database only after capture succeeds. Approved/retained blobs cannot be overwritten by a reused upload URL. Track abandoned uploads, orphaned objects and failed extraction; clean them using an explicit policy. For stricter immediate revocation, proxy downloads through the authenticated application instead of handing out signed URLs.
 
-Copying a UI component can save frontend work, but check its licence and maintenance. Do not copy an entire file manager that brings a second identity or metadata system.
+Copying a UI component can save frontend work, but check its license and maintenance. Do not copy an entire file manager that brings a second identity or metadata system.
 
 ### Authentication now
 
-Use a maintained library rather than implementing token/session cryptography. Better Auth is a candidate with documented magic-link and organisation plugins; pin and test a suitable release. See [Magic links](https://better-auth.com/docs/plugins/magic-link) and [Organisations](https://better-auth.com/docs/plugins/organization).
+Use a maintained library rather than implementing token/session cryptography. Better Auth is a candidate with documented magic-link and organization plugins; pin and test a suitable release. See [Magic links](https://better-auth.com/docs/plugins/magic-link) and [Organizations](https://better-auth.com/docs/plugins/organization).
 
 Invite-only access: the owner invites an existing personal email address. A short-lived, single-use email link signs the member in and creates a revocable secure session. Disable unrestricted signup and do not grant membership merely because an email domain matches. Use secure HTTP-only cookies, request/redirect validation and rate limits provided/configured through the library. Transactional email delivery is a small explicit dependency to price and operate.
 
-Internal records: User, ExternalIdentity, OrganisationMembership and EventMembership. Use stable user UUIDs; email, Telegram ID and future Microsoft identities are linked credentials, not primary keys.
+Internal records: User, ExternalIdentity, OrganizationMembership and EventMembership. Use stable user UUIDs; email, Telegram ID and future Microsoft identities are linked credentials, not primary keys.
 
-Organisation roles: owner/admin/member. Event roles: manager/contributor/viewer, with scoped workstream ownership. Authorisation stays in domain commands, not solely in UI buttons or authentication-provider claims.
+Organization roles: owner/admin/member. Event roles: manager/contributor/viewer, with scoped workstream ownership. Authorization stays in domain commands, not solely in UI buttons or authentication-provider claims.
 
 ### Telegram linking and future access
 
@@ -142,14 +142,14 @@ Three durable layers:
 
 3. A rebuildable AI index stores extracted text, OCR, page references and optional embeddings.
 
-Desktop/web, Telegram and later WhatsApp use the same authorised tada API. Conversations may differ; accepted state is shared according to permissions. Hosted workers operate when the user's laptop is off.
+Desktop/web, Telegram and later WhatsApp use the same authorized tada API. Conversations may differ; accepted state is shared according to permissions. Hosted workers operate when the user's laptop is off.
 
 ### Open-source candidates
 
 | Candidate     | Relevant capabilities                                                                                                        | Proposed role                                                      |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | Nextcloud     | Open-source file workspace, browser access, sharing, versions and documented WebDAV access; Assistant supports document work | Future optional adapter; not deployed in the PoC                   |
-| NanoClaw      | MIT-licensed containerised agent runtime, channel adapters and scheduled tasks                                               | Optional future runtime; not a PoC dependency                      |
+| NanoClaw      | MIT-licensed containerized agent runtime, channel adapters and scheduled tasks                                               | Optional future runtime; not a PoC dependency                      |
 | Paperless-ngx | Document ingestion/search and documented REST API                                                                            | Archive-focused alternative to evaluate if archival needs dominate |
 
 Sources checked 6 October 2026: [Nextcloud Files](https://nextcloud.com/files/), [WebDAV](https://docs.nextcloud.com/server/latest/developer_manual/client_apis/WebDAV/index.html), [Versions](https://docs.nextcloud.com/server/latest/user_manual/en/files/version_control.html), [Assistant](https://nextcloud.com/assistant/), [NanoClaw](https://github.com/nanocoai/nanoclaw), [Paperless API](https://docs.paperless-ngx.com/api/). These establish advertised capabilities, not a tested deployment.
@@ -158,7 +158,7 @@ Use a built-in file browser backed by private S3-compatible object storage and P
 
 The application has one identity system for browsing files, event records and AI interaction. Future Nextcloud/Microsoft connectors may link external identities without changing internal user or document IDs.
 
-NanoClaw is not a PoC dependency. Its channel adapters, container isolation and scheduling can save work for a broad personal assistant, but the first event workflow needs only a web interface, Telegram adapter and a narrow AI worker. The domain API, identity, versioned documents, review rules and migration discipline still need implementing. Reconsider NanoClaw only when a measured need justifies its additional runtime and customisation burden. Its advertised WhatsApp support does not establish an official WhatsApp Business integration.
+NanoClaw is not a PoC dependency. Its channel adapters, container isolation and scheduling can save work for a broad personal assistant, but the first event workflow needs only a web interface, Telegram adapter and a narrow AI worker. The domain API, identity, versioned documents, review rules and migration discipline still need implementing. Reconsider NanoClaw only when a measured need justifies its additional runtime and customization burden. Its advertised WhatsApp support does not establish an official WhatsApp Business integration.
 
 ### Document lifecycle and AI tools
 
@@ -166,7 +166,7 @@ Each Document has a stable tada ID independent of name, folder or provider. Each
 
 Folder moves preserve IDs. Referenced versions must be retained under an explicit policy; ordinary file-version history alone does not guarantee permanent evidence retention.
 
-AI tools list/search files, retrieve authorised versions, inspect linked facts, draft documents and propose revisions. Save drafts with the exact fact/source versions used. A change to accepted facts flags dependent documents for review; it does not silently rewrite approved documents.
+AI tools list/search files, retrieve authorized versions, inspect linked facts, draft documents and propose revisions. Save drafts with the exact fact/source versions used. A change to accepted facts flags dependent documents for review; it does not silently rewrite approved documents.
 
 For a Verkehrsplan, AI can draft explanatory text, extract issues and compare versions. Geometric checks need usable image/CAD/GIS input and demonstrated capabilities. OCR text alone cannot validate traffic capacity, evacuation geometry or aviation safety. Show unsupported pages/formats explicitly.
 
@@ -180,7 +180,7 @@ AI helps with extraction, matching, agendas, summaries, draft replies, consisten
 
 | Action class                                                         | Default handling                                                   |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Ingest, deduplicate, index authorised sources                        | Automatic                                                          |
+| Ingest, deduplicate, index authorized sources                        | Automatic                                                          |
 | Personal draft, summary, suggested label                             | Automatic within granted scope                                     |
 | New commitment, decision, requirement or consequential status change | Named owner review                                                 |
 | Repeated low-impact workflow                                         | May automate through an explicit, auditable rule                   |

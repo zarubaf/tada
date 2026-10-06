@@ -2,22 +2,22 @@ tada is a hosted workspace for planning multiple club events, with structured fa
 
 ## Product vision
 
-**An affordable coordination system for organisations that run events repeatedly, with AI that works from evidence and helps the whole team participate.**
+**An affordable coordination system for organizations that run events repeatedly, with AI that works from evidence and helps the whole team participate.**
 
 The project manager should spend time resolving exceptions and making decisions. Workstream leads should own their work directly. Volunteers and suppliers should be able to contribute through email, familiar documents and simple mobile forms.
 
 tada maintains accepted event state and its evidence. Members participate through Telegram and a lightweight web interface using their own email addresses. Existing email, document and calendar tools remain useful but are optional integrations. A scheduled AI PM checks progress, follows up with owners and escalates exceptions. Its durable state resides in tada.
 
-The initial market hypothesis is clubs and associations running several events each year, with temporary teams and limited software budgets. A broader commercial market remains a hypothesis to validate with other organisers. The product’s proposed distinction is accountable coordination across communications, evidence and readiness. It should not claim that competitors lack these capabilities without a deeper evaluation.
+The initial market hypothesis is clubs and associations running several events each year, with temporary teams and limited software budgets. A broader commercial market remains a hypothesis to validate with other organizers. The product’s proposed distinction is accountable coordination across communications, evidence and readiness. It should not claim that competitors lack these capabilities without a deeper evaluation.
 
-### Outcomes to optimise
+### Outcomes to optimize
 
 - Fewer messages and status updates routed through the project manager.
 - Clear ownership of every accepted action and commitment.
 - Source-backed answers with visible freshness and uncertainty.
 - Shared people and resources across events without leaking event-specific information.
 - Reuse of event templates and lessons without copying stale approvals.
-- A sustainable cost and maintenance burden for a volunteer organisation.
+- A sustainable cost and maintenance burden for a volunteer organization.
 
 ## Research and the build boundary
 
@@ -29,7 +29,7 @@ Official product documentation was checked on 6 October 2026. This is a focused 
 | Ticketing                    | pretix exposes a REST API; its pricing page distinguishes hosted and self-operated options. [API](https://docs.pretix.eu/dev/api/) · [Pricing](https://pretix.eu/about/en/pricing/)                                                                                                                                                                  | Integrate when public ticketing is needed. Do not build payments, refunds or gate scanning initially.                   |
 | Resource operations          | Rentman provides equipment and crew capabilities and an API supporting reads and writes. [Rentman](https://rentman.io/integrations/api)                                                                                                                                                                                                              | Keep lightweight internal reservations; connect a specialist tool if the club or suppliers already use one.             |
 | CRM and event administration | CiviCRM documents an extensible API. [CiviCRM](https://docs.civicrm.org/dev/en/latest/api/)                                                                                                                                                                                                                                                          | Evaluate reuse if membership/registration becomes a major need; do not introduce another platform merely to connect it. |
-| Workflow automation          | n8n’s official guidance identifies commercial embedding cases requiring an Embed licence. [n8n guidance](https://support.n8n.io/article/can-i-use-your-license-for-my-use-case)                                                                                                                                                                      | Optional club-side automation; do not make a sellable product depend on assumed free embedding rights.                  |
+| Workflow automation          | n8n’s official guidance identifies commercial embedding cases requiring an Embed license. [n8n guidance](https://support.n8n.io/article/can-i-use-your-license-for-my-use-case)                                                                                                                                                                      | Optional club-side automation; do not make a sellable product depend on assumed free embedding rights.                  |
 | Microsoft integration        | Graph supports change notifications and delta tracking. Permissions vary by resource and access model. [Notifications](https://learn.microsoft.com/en-us/graph/change-notifications-overview) · [Delta](https://learn.microsoft.com/en-us/graph/delta-query-overview) · [Permissions](https://learn.microsoft.com/en-us/graph/permissions-reference) | Optional later; not a release prerequisite. Validate mailbox, calendar and SharePoint scenarios individually.           |
 | Future Google integration    | Gmail push uses Pub/Sub; broad mail-read scopes can require restricted-scope verification and server-side security assessment. [Push](https://developers.google.com/workspace/gmail/api/guides/push) · [Scopes](https://developers.google.com/workspace/gmail/api/auth/scopes)                                                                       | Preserve a provider interface now; fund and validate Google support later.                                              |
 
@@ -39,7 +39,7 @@ Official product documentation was checked on 6 October 2026. This is a focused 
 
 **Supply a small native fallback where otherwise nobody can participate:** tasks, simple requests/forms, assignments and resource bookings. This should be enough to run a small club event without purchasing a project-management suite.
 
-No new paid platform is a prerequisite for the first slice. Open-source software still carries hosting, maintenance and licence obligations.
+No new paid platform is a prerequisite for the first slice. Open-source software still carries hosting, maintenance and license obligations.
 
 ## Users and everyday workflows
 
@@ -58,7 +58,7 @@ No new paid platform is a prerequisite for the first slice. Open-source software
 3. AI proposes: “Generator delivery Friday 15:00, subject to signed order.” The condition is preserved.
 4. Ground Ops receives the proposal directly and accepts or edits it.
 5. tada stores the commitment, owner, condition, due date and exact evidence.
-6. A draft follow-up or acknowledgement is prepared when needed. External sending requires an authorised person or an explicitly configured rule.
+6. A draft follow-up or acknowledgement is prepared when needed. External sending requires an authorized person or an explicitly configured rule.
 7. The PM sees an exception only if the commitment is late, unowned or affects a milestone.
 
 Incoming text is evidence, not authority to operate tools. A supplier’s “please send the full budget” never grants access or permission.
@@ -75,7 +75,7 @@ A transcript or minutes file produces proposed actions and decisions. The releva
 
 ### Core across all events
 
-Organisation, event series, event occurrence, membership/access, workstream, action, milestone, decision, risk, requirement, commitment, evidence, review proposal, participant, resource, reservation and audit history.
+Organization, event series, event occurrence, membership/access, workstream, action, milestone, decision, risk, requirement, commitment, evidence, review proposal, participant, resource, reservation and audit history.
 
 Each event enables only the modules it needs. A small barbecue might need actions, catering commitments, volunteers and equipment. An airshow adds requirements, risks and aviation operations. Recurring events use a versioned template; each occurrence has its own accepted state.
 
@@ -93,7 +93,7 @@ Portfolio, event overview, My Work, registers, Review Inbox and integration heal
 
 ## Proactive AI project manager
 
-The AI PM is a persistent service in tada, not a conversation that must be kept open. A durable scheduler evaluates accepted project state; rules decide when contact is appropriate; AI prepares concise context and wording; authorised domain commands apply changes. Telegram delivers messages and receives responses. Every check, reminder, response and escalation is recorded.
+The AI PM is a persistent service in tada, not a conversation that must be kept open. A durable scheduler evaluates accepted project state; rules decide when contact is appropriate; AI prepares concise context and wording; authorized domain commands apply changes. Telegram delivers messages and receives responses. Every check, reminder, response and escalation is recorded.
 
 ### Suggested policy to configure
 
@@ -133,11 +133,11 @@ A stopped worker resumes durable schedules without flooding users with missed re
 
 ### Additional acceptance tests
 
-An invited member works without a Microsoft account. A verified task owner receives a policy-authorised reminder and updates the task through Telegram. An unrelated group member cannot do so. Quiet hours and cooldowns survive restarts. Blocked bots and stale ingestion never look healthy. Ambiguous sends do not cause uncontrolled duplicate retries. A changing deadline or completed task cancels obsolete reminders. No automated routine message requires the PM to relay it.
+An invited member works without a Microsoft account. A verified task owner receives a policy-authorized reminder and updates the task through Telegram. An unrelated group member cannot do so. Quiet hours and cooldowns survive restarts. Blocked bots and stale ingestion never look healthy. Ambiguous sends do not cause uncontrolled duplicate retries. A changing deadline or completed task cancels obsolete reminders. No automated routine message requires the PM to relay it.
 
 ## Cost and service expectations
 
-The first club deployment targets **less than CHF 100/month in incremental cash operating costs**, excluding development and existing Microsoft 365 licences. Event-day peaks, payment fees and future commercial compliance work require separate budgets.
+The first club deployment targets **less than CHF 100/month in incremental cash operating costs**, excluding development and existing Microsoft 365 licenses. Event-day peaks, payment fees and future commercial compliance work require separate budgets.
 
 The following is an allocation envelope, not vendor pricing:
 
@@ -154,6 +154,6 @@ A real quote may require combining hosting/database categories or changing deplo
 
 Control AI spend with source-version caching, incremental processing, inexpensive extraction models, larger models only for selected analyses, quotas and per-event usage reports. Hitting a cap pauses optional AI work; ordinary event records remain usable.
 
-Track the full cost: licences, transaction charges, support hours, upgrades and restore work. Someone must own operations. Self-hosting should be chosen only if it fits that responsibility.
+Track the full cost: licenses, transaction charges, support hours, upgrades and restore work. Someone must own operations. Self-hosting should be chosen only if it fits that responsibility.
 
 Initial service scope is event planning. Provide backups with a tested restore, full exports and downloadable approved packs. Reliable offline event command, live incident dispatch and high-availability operational systems require a later design and budget.
