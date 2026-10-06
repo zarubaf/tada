@@ -23,6 +23,7 @@ Goal: a repository and a runtime that later slices can build on without rework.
 5. ADRs for the decisions that the first code needs: observability ([0035](adr/0035-observability.md)), configuration ([0036](adr/0036-configuration.md)), the error model ([0037](adr/0037-error-model.md)), IDs and time ([0038](adr/0038-ids-and-time.md)) and actors ([0039](adr/0039-actors-and-identities.md)).
 6. ADRs for Slice 0 and Slice 1: CI build and dependencies ([0041](adr/0041-ci-build-and-dependencies.md)), transactional email ([0042](adr/0042-transactional-email.md)), upload policy ([0043](adr/0043-upload-policy.md)) and API conventions ([0044](adr/0044-api-conventions.md)).
 7. ADRs for the core of Slice 1: the event profile and fact model, proposals and review, and document drafts with provenance.
+8. ADRs for Slice 2, accepted before Slice 2 starts: data protection ([0045](adr/0045-data-protection.md)), inbound email ([0046](adr/0046-inbound-email.md)), the model adapter ([0047](adr/0047-model-adapter.md)) and the AI evaluation set ([0048](adr/0048-ai-evaluation-set.md)). No real personal data goes to a model provider before ADR 0045 is accepted.
 
 ## Slice 1: Preliminary event concept
 

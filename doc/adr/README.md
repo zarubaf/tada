@@ -59,6 +59,10 @@ The ADRs are the authority for the decisions in this project.
 | [0042](0042-transactional-email.md)                | Transactional email                                      | Proposed           |
 | [0043](0043-upload-policy.md)                      | Upload policy                                            | Proposed           |
 | [0044](0044-api-conventions.md)                    | API conventions                                          | Proposed           |
+| [0045](0045-data-protection.md)                    | Data protection under the revDSG                         | Proposed           |
+| [0046](0046-inbound-email.md)                      | Inbound email                                            | Proposed           |
+| [0047](0047-model-adapter.md)                      | Model adapter details                                    | Proposed           |
+| [0048](0048-ai-evaluation-set.md)                  | AI evaluation set                                        | Proposed           |
 
 ## New ADR
 
