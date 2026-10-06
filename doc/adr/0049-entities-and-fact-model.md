@@ -1,6 +1,6 @@
 # 0049. Typed entities and a field catalog for facts
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

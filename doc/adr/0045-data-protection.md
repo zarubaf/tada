@@ -1,6 +1,6 @@
 # 0045. Data protection under the revDSG
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

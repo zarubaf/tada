@@ -1,6 +1,6 @@
 # 0047. Model adapter details
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

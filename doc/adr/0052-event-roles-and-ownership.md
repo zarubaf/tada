@@ -1,6 +1,6 @@
 # 0052. Event roles and record ownership
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context
@@ -27,6 +27,11 @@ Event roles:
 - An event has at least one event manager. The project manager (PM) of an event usually has this role.
 - Event roles are access rights. Participation roles (ADR 0049) describe the involvement of people and institutions and give no access.
 - Each command checks the event role at the time of the call (ADR 0039). An AI caller never has more rights than its principal.
+
+API tokens and visibility:
+
+- An event viewer can create an API token with the scope `read` only (ADR 0039). A viewer cannot create a `propose` token.
+- A member with an organization membership but no event role sees only the list of their own events. They see no event content until an event role exists.
 
 Record ownership:
 

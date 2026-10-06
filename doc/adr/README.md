@@ -55,18 +55,18 @@ The ADRs are the authority for the decisions in this project.
 | [0038](0038-ids-and-time.md)                       | IDs and time                                             | Accepted           |
 | [0039](0039-actors-and-identities.md)              | Callers, actors and service identities                   | Accepted           |
 | [0040](0040-ai-intake-through-mcp.md)              | AI intake through MCP first                              | Accepted           |
-| [0041](0041-ci-build-and-dependencies.md)          | CI build and dependency policy                           | Proposed           |
-| [0042](0042-transactional-email.md)                | Transactional email                                      | Proposed           |
-| [0043](0043-upload-policy.md)                      | Upload policy                                            | Proposed           |
-| [0044](0044-api-conventions.md)                    | API conventions                                          | Proposed           |
-| [0045](0045-data-protection.md)                    | Data protection under the revDSG                         | Proposed           |
-| [0046](0046-inbound-email.md)                      | Inbound email                                            | Proposed           |
-| [0047](0047-model-adapter.md)                      | Model adapter details                                    | Proposed           |
-| [0048](0048-ai-evaluation-set.md)                  | AI evaluation set                                        | Proposed           |
-| [0049](0049-entities-and-fact-model.md)            | Typed entities and a field catalog for facts             | Proposed           |
-| [0050](0050-proposals-and-review.md)               | Proposals and review                                     | Proposed           |
-| [0051](0051-document-drafts-and-provenance.md)     | Document drafts and provenance                           | Proposed           |
-| [0052](0052-event-roles-and-ownership.md)          | Event roles and record ownership                         | Proposed           |
+| [0041](0041-ci-build-and-dependencies.md)          | CI build and dependency policy                           | Accepted           |
+| [0042](0042-transactional-email.md)                | Transactional email                                      | Accepted           |
+| [0043](0043-upload-policy.md)                      | Upload policy                                            | Accepted           |
+| [0044](0044-api-conventions.md)                    | API conventions                                          | Accepted           |
+| [0045](0045-data-protection.md)                    | Data protection under the revDSG                         | Accepted           |
+| [0046](0046-inbound-email.md)                      | Inbound email                                            | Accepted           |
+| [0047](0047-model-adapter.md)                      | Model adapter details                                    | Accepted           |
+| [0048](0048-ai-evaluation-set.md)                  | AI evaluation set                                        | Accepted           |
+| [0049](0049-entities-and-fact-model.md)            | Typed entities and a field catalog for facts             | Accepted           |
+| [0050](0050-proposals-and-review.md)               | Proposals and review                                     | Accepted           |
+| [0051](0051-document-drafts-and-provenance.md)     | Document drafts and provenance                           | Accepted           |
+| [0052](0052-event-roles-and-ownership.md)          | Event roles and record ownership                         | Accepted           |
 
 ## New ADR
 

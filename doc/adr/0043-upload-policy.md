@@ -1,6 +1,6 @@
 # 0043. Upload policy
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

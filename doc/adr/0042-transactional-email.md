@@ -1,6 +1,6 @@
 # 0042. Transactional email
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

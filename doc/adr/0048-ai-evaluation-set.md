@@ -1,6 +1,6 @@
 # 0048. AI evaluation set
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

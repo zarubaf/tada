@@ -1,6 +1,6 @@
 # 0051. Document drafts and provenance
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

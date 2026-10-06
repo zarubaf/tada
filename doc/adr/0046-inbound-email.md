@@ -1,6 +1,6 @@
 # 0046. Inbound email
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

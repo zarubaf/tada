@@ -1,6 +1,6 @@
 # 0041. CI build and dependency policy
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context
