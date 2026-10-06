@@ -7,7 +7,7 @@
 
 AI extraction and drafting can fail silently: a wrong date, a lost condition, a made-up approval.
 ARCHITECTURE.md lists the cases that the evaluation set must contain.
-PRODUCT.md targets 100% traceability of accepted extracted claims.
+The roadmap requires that every asserted fact traces to an accepted field or an exact source version.
 The repository is public, so fixtures must not contain real data.
 Live model calls cost money and give different answers each time.
 
