@@ -38,6 +38,14 @@ The ADRs are the authority for the decisions in this project.
 | [0022](0022-accessibility.md)                 | Accessibility standard: WCAG 2.2 AA                      | Accepted           |
 | [0023](0023-responsive-layout.md)             | Responsive layout: one app, two primary contexts         | Accepted           |
 | [0024](0024-frontend-quality-gates.md)        | Frontend quality gates                                   | Accepted           |
+| [0025](0025-platform-contract.md)             | Platform contract between the app and its runtime        | Proposed           |
+| [0026](0026-first-runtime.md)                 | Docker Compose as the first runtime, managed by scripts  | Proposed           |
+| [0027](0027-ingress-tls-dns.md)               | Ingress, TLS and DNS                                     | Proposed           |
+| [0028](0028-images-and-registry.md)           | Container images and registry                            | Proposed           |
+| [0029](0029-secrets-delivery.md)              | Secrets delivery                                         | Proposed           |
+| [0030](0030-host-provisioning.md)             | Host provisioning as code                                | Proposed           |
+| [0031](0031-backups.md)                       | Backups                                                  | Proposed           |
+| [0032](0032-delivery-flow.md)                 | Delivery flow and approval gates                         | Proposed           |
 
 ## New ADR
 

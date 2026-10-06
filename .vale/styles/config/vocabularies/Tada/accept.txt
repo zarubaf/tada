@@ -123,3 +123,15 @@ UIs
 Kbd
 (?i)lorem
 (?i)ipsum
+Ansible
+Backblaze
+Coolify
+Dokploy
+Hetzner
+Kamal
+Nomad
+Watchtower
+(?i)distroless
+(?i)hostnames?
+(?i)proxied
+(?i)restic
