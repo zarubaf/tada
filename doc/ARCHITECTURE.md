@@ -1,338 +1,181 @@
 # tada architecture
 
-tada starts with a compact application, PostgreSQL, private object storage, a built-in file browser and independent member authentication.
-Web and Telegram call the same authorized domain tools.
-Nextcloud, Microsoft and alternative agent runtimes are optional later adapters.
+This document shows how the parts of tada fit together now.
+The [ADRs](adr/README.md) contain each decision and its reasons.
+If this document and an ADR disagree, the ADR is correct; fix this document.
+[PRODUCT.md](PRODUCT.md) describes the users and the scope.
 
-## Data ownership and provenance
-
-“One system of record” means one authority for each kind of information, not copying every tool into Postgres.
-
-| Information                                                            | Authority                                                                        |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Accepted event actions, decisions, risks, requirements and commitments | tada                                                                             |
-| Mail messages and threads                                              | Existing mail provider; tada retains approved evidence snapshots and identifiers |
-| Working document content                                               | Existing document tool or tada uploads                                           |
-| Evidence used to justify an accepted record                            | Immutable, versioned snapshot or exact retained version with approved retention  |
-| Personal calendar availability                                         | Connected calendar provider, if available                                        |
-| Published event appointments                                           | The explicitly configured calendar owner                                         |
-| Tickets, payments and refunds                                          | Ticketing/payment provider                                                       |
-| Posted accounts                                                        | Accounting system                                                                |
-| AI proposals                                                           | tada proposal store; never accepted state until the applicable rule approves     |
-
-A source link alone is insufficient: documents change and messages may be deleted.
-Retain the exact source version or a permitted immutable snapshot, hash, capture time and locator such as page, paragraph or message passage.
-
-Minimum shared fields: UUID, organization ID, event scope where applicable, human-readable event-local ID, owner, status, timestamps and record version.
-Shared club people and resources use organization scope; event-specific notes and assignments use event scope.
-
-Separate SourceItem, SourceVersion, EvidenceLink, Proposal and accepted domain records.
-A proposal includes the proposed patch, source spans, extraction/model version, assumptions, reviewer and target record version.
-
-Do not put raw personal information into general audit messages.
-Retention/deletion rules must cover originals, snapshots, extracted facts, embeddings and backups; evidence preservation is bounded by those rules.
-
-AI answers retrieve accepted records and authorized evidence at request time.
-They distinguish accepted state, proposals, historical state and inference, and show source freshness.
-“No new mail” must never mean “the connector is disconnected.”
-
-Permission filtering happens before retrieval and applies to citations and source excerpts.
-Source access and event membership must both permit disclosure; copying a private document into an event does not silently broaden access.
-
-## Proposed architecture
-
-Start with a modular monolith and a background worker sharing one codebase.
-This keeps operations compact while preserving clear module boundaries.
+## Context
 
 ```mermaid
-flowchart TD
-  M["Telegram, email and optional tools"] --> C["Connectors and sync workers"]
-  C --> S["Versioned sources"]
-  S --> A["AI extraction and proposals"]
-  A --> R["Review and policy checks"]
-  U["Web and mobile users"] --> R
-  R --> D["Domain API and accepted state"]
-  D --> P["Portfolio and event views"]
-  D --> Q["Permission filtered AI queries"]
-  Q --> S
-  D --> O["Transactional outbound jobs"]
-  O --> C
+flowchart LR
+  M["Members (web, mobile)"] --> W["Web client"]
+  T["Members (Telegram)"] --> TG["Telegram Bot API"]
+  E["Suppliers and members (email, uploads)"] --> IN["Inbound email and uploads"]
+  W --> API
+  TG --> GW
+  IN --> API
+  subgraph tada
+    API["serve: HTTP API"]
+    GW["telegram: gateway"]
+    WK["worker: jobs, schedules, AI PM"]
+    APP["app: domain commands and queries"]
+    API --> APP
+    GW --> APP
+    WK --> APP
+    APP --> DB[("PostgreSQL")]
+    APP --> OBJ[("S3 object storage")]
+  end
+  WK --> LLM["Model provider"]
+  WK --> MAIL["Mail provider"]
+  WK --> TG
 ```
 
-### Starting stack
-
-The [ADRs](adr/README.md) record each stack decision and its reasons.
-If this section and an ADR disagree, the ADR is correct.
-
-- A Rust backend and a TypeScript web client ([ADR 0003](adr/0003-runtime-and-tooling.md)): an `axum` domain API with a versioned OpenAPI contract ([ADR 0017](adr/0017-api-contract-rust.md)) and a React/Vite web client ([ADR 0005](adr/0005-web-client.md)).
-- PostgreSQL for accepted state, relationships, proposals, audit events ([ADR 0006](adr/0006-persistence.md)) and a durable job queue ([ADR 0007](adr/0007-jobs-and-schedules.md)).
-- S3-compatible object storage for retained source snapshots and generated exports ([ADR 0009](adr/0009-object-storage.md)).
-- Independent application identities: invited personal email with short-lived, single-use sign-in links, optionally passkeys.
-  Telegram identities are linked through expiring invitation codes and verified membership; Entra/OIDC is optional later.
-  No paid Microsoft seat is required for tada participation.
-- PostgreSQL full-text search first; add pgvector if evaluation shows useful semantic retrieval.
-- One model-provider adapter with schema-validated output, usage accounting and model/version tracking ([ADR 0010](adr/0010-model-provider.md)).
-- One monorepo with one Cargo workspace.
-  One binary runs the roles `serve`, `worker` and `telegram`; all roles use the same domain commands.
-  A role becomes a separate service only with an ADR ([ADR 0002](adr/0002-monorepo-and-services.md)).
-  No Kafka or graph database initially.
-
-These are proposed implementation choices, not purchased services.
-A hosting decision requires a priced deployment plan and an operator responsible for backups and updates.
-
-### Domain integrity
-
-Use relational tables and explicit foreign keys for the stable core; use schema-validated JSON only for bounded extensions.
-Organizational isolation applies to all reads, writes, jobs and exports.
-Event-level permissions sit within that boundary.
-
-All mutations go through domain commands, including AI and connector updates.
-Validate ownership, allowed transitions and optimistic record versions.
-Commit the accepted change, audit event and outbound job atomically.
-If the record changed since a proposal was created, require re-evaluation rather than overwriting it.
-
-API keys or a future MCP facade expose these same authorized commands.
-MCP is an optional assistant interface, not the internal persistence layer or a substitute for background connectors.
-
-## Integration design
-
-The first integration is Telegram.
-Begin email/document capture with uploads and a per-event inbound email address that members can forward or copy messages to.
-This needs no Microsoft tenant integration; automatic forwarding may still be restricted by the mail provider.
-Supply a manual fallback. tada cannot observe messages or document changes it has not received.
-Microsoft Graph integration is optional later, when actual permissions and admin availability are proven.
-
-The implementer must prove the actual Graph permission model in the club tenant.
-Delegated permissions and application permissions differ, and shared-resource scenarios have specific limitations.
-Never assume selecting a folder in the UI technically limits a broad API token.
-Document token privileges and enforce the configured boundary in the application.
-
-| Connector                     | Inbound first                                          | Outbound later                                          |
-| ----------------------------- | ------------------------------------------------------ | ------------------------------------------------------- |
-| Telegram                      | Commands, direct replies and authorized button actions | Policy-controlled internal reminders and briefings      |
-| Inbound email/uploads         | Forwarded/copied messages and document versions        | Drafts and exports                                      |
-| Outlook mail, optional        | Selected messages, threads and attachments             | Drafts first; controlled sending                        |
-| SharePoint/OneDrive, optional | Selected document versions and metadata                | Approved generated packs and reports                    |
-| Calendar                      | Selected events and permitted availability             | Explicitly owned appointments; reconcile external edits |
-| Teams                         | Linked/uploaded minutes initially                      | Notifications after tenant and API capability checks    |
-| Ticketing                     | Registration/order status when needed                  | Usually keep checkout in the provider                   |
-| Club records                  | CSV import/export initially                            | API only after availability and ownership are verified  |
-
-Every adapter must provide scoped authentication, capability metadata, checkpoints, source IDs/versions, deterministic mappings, incremental retrieval, reconciliation, revocation handling and diagnostics.
-
-Webhooks signal that something may have changed.
-Workers fetch and reconcile authoritative data.
-Renew subscriptions before expiry, honor provider rate limits, retry transient failures and surface terminal failures.
-Periodic reconciliation repairs missed notifications.
-Persist checkpoints only after durable capture.
-
-Use at-least-once delivery with idempotent processing.
-Dedupe by organization, connection, resource and version; dedupe outgoing commands separately.
-Preserve thread identity and attachment relationships.
-Track sync origin to prevent feedback loops.
-
-For the first release, most data flows one way into tada.
-Outbound fields have explicit ownership.
-If both systems edit the same field, flag the conflict rather than using blind last-write-wins.
-
-Unknown event attribution goes to a triage queue.
-AI may suggest an event but must not silently expose a message to multiple event teams.
-Shared evidence requires explicit scope.
-
-Integration health is a product feature: last successful sync, permission expiry, backlog, stale sources and reauthentication requests are visible.
-Failure routes to a named integration owner, not automatically to the PM.
-
-## Simple storage and authentication baseline
-
-The product is named **tada**.
-
-### Built-in file browser
-
-Provide folders, upload/drag-and-drop, filename search, metadata, PDF/image/text preview, download, version history and links to event records.
-Start without browser Office editing, desktop sync or public sharing.
-Users can download/edit/re-upload office files; each upload creates a new version.
-
-PostgreSQL owns folders, document/version IDs, titles, event scope, ownership and processing state.
-Object storage holds originals, previews and extracted outputs under generated keys unrelated to filenames.
-A rename or move updates metadata rather than changing identity.
-
-The bucket is private and reachable only on the internal network.
-All uploads and downloads go through the authenticated application, which authorizes each request; tada issues no presigned URLs, because they are bearer credentials that cannot be revoked ([ADR 0009](adr/0009-object-storage.md)).
-
-Issue uploads to a unique staging key.
-Finalize after verifying the uploaded object, size/type and expected scope; reject unsafe previews and oversized uploads.
-Publish a version atomically in the database only after capture succeeds.
-The application never writes to the key of an approved or retained version.
-Track abandoned uploads, orphaned objects and failed extraction; clean them using an explicit policy.
-
-Copying a UI component can save frontend work, but check its license and maintenance.
-Do not copy an entire file manager that brings a second identity or metadata system.
-
-### Authentication now
-
-Do not implement cryptography. tada uses maintained cryptographic primitives and owns its magic links, sessions, memberships and roles ([ADR 0008](adr/0008-authentication.md)).
-
-Invite-only access: the owner invites an existing personal email address.
-A short-lived, single-use email link signs the member in and creates a revocable secure session.
-Disable unrestricted signup and do not grant membership merely because an email domain matches.
-Use secure HTTP-only cookies, request/redirect validation and rate limits provided/configured through the library.
-Transactional email delivery is a small explicit dependency to price and operate.
-
-Internal records: User, ExternalIdentity, OrganizationMembership and EventMembership.
-Use stable user UUIDs; email, Telegram ID and future Microsoft identities are linked credentials, not primary keys.
-
-Organization roles: owner/admin/member.
-Event roles: manager/contributor/viewer, with scoped workstream ownership.
-Authorization stays in domain commands, not solely in UI buttons or authentication-provider claims.
-
-### Telegram linking and future access
-
-A logged-in member requests a short-lived single-use link code, starts the bot and confirms the binding.
-Verify both application membership and stable Telegram user ID; never use a display name as identity.
-Incoming actions recheck current membership, role and record version.
-AI runs with the caller's scope; scheduled jobs use a named limited service identity.
-
-Revoking membership blocks both web and bot actions and revokes sessions.
-Provide unlinking/recovery through verified email or documented owner assistance with an audit record.
-No shared OK login and no Microsoft seat requirement.
-
-Later add passkeys/step-up authentication for privileged actions and Google/Microsoft OIDC if useful.
-These attach to the same User ID.
-No separate identity server or enterprise SSO deployment is needed for the PoC.
-Full membership and identity exportability remain requirements.
-
-## Hosted documents and AI working environment
-
-Documents are first-class records: Verkehrsplan, site drawings, budget sheets, minutes, authority correspondence and generated concepts are stored, browsable and linked to event records.
-Users open/download them without asking AI.
-
-Three durable layers:
-
-1. PostgreSQL stores accepted event facts, assumptions, open questions, owners and relationships.
-
-2. A document workspace stores editable originals, folders, metadata and versions.
-
-3. A rebuildable AI index stores extracted text, OCR, page references and optional embeddings.
-
-Desktop/web, Telegram and later WhatsApp use the same authorized tada API.
-Conversations may differ; accepted state is shared according to permissions.
-Hosted workers operate when the user's laptop is off.
-
-### Open-source candidates
-
-| Candidate     | Relevant capabilities                                                                                                        | Proposed role                                                      |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Nextcloud     | Open-source file workspace, browser access, sharing, versions and documented WebDAV access; Assistant supports document work | Future optional adapter; not deployed in the PoC                   |
-| NanoClaw      | MIT-licensed containerized agent runtime, channel adapters and scheduled tasks                                               | Optional future runtime; not a PoC dependency                      |
-| Paperless-ngx | Document ingestion/search and documented REST API                                                                            | Archive-focused alternative to evaluate if archival needs dominate |
-
-Sources checked 6 October 2026: [Nextcloud Files](https://nextcloud.com/files/), [WebDAV](https://docs.nextcloud.com/server/latest/developer_manual/client_apis/WebDAV/index.html), [Versions](https://docs.nextcloud.com/server/latest/user_manual/en/files/version_control.html), [Assistant](https://nextcloud.com/assistant/), [NanoClaw](https://github.com/nanocoai/nanoclaw), [Paperless API](https://docs.paperless-ngx.com/api/).
-These establish advertised capabilities, not a tested deployment.
-
-Use a built-in file browser backed by private S3-compatible object storage and PostgreSQL metadata.
-No Nextcloud or Paperless deployment in the PoC.
-Reuse suitably licensed UI components, but keep permissions and file lifecycle in the application backend.
-
-The application has one identity system for browsing files, event records and AI interaction.
-Future Nextcloud/Microsoft connectors may link external identities without changing internal user or document IDs.
-
-NanoClaw is not a PoC dependency.
-Its channel adapters, container isolation and scheduling can save work for a broad personal assistant, but the first event workflow needs only a web interface, Telegram adapter and a narrow AI worker.
-The domain API, identity, versioned documents, review rules and migration discipline still need implementing.
-Reconsider NanoClaw only when a measured need justifies its additional runtime and customization burden.
-Its advertised WhatsApp support does not establish an official WhatsApp Business integration.
-
-### Document lifecycle and AI tools
-
-Each Document has a stable tada ID independent of name, folder or provider.
-Each version records content hash, provider reference, author/uploader, timestamps, classification and processing status.
-States include draft, review, approved, superseded and archived.
-Approval applies to an exact version.
-Editing creates a new draft.
-
-Folder moves preserve IDs.
-Referenced versions must be retained under an explicit policy; ordinary file-version history alone does not guarantee permanent evidence retention.
-
-AI tools list/search files, retrieve authorized versions, inspect linked facts, draft documents and propose revisions.
-Save drafts with the exact fact/source versions used.
-A change to accepted facts flags dependent documents for review; it does not silently rewrite approved documents.
-
-For a Verkehrsplan, AI can draft explanatory text, extract issues and compare versions.
-Geometric checks need usable image/CAD/GIS input and demonstrated capabilities.
-OCR text alone cannot validate traffic capacity, evacuation geometry or aviation safety.
-Show unsupported pages/formats explicitly.
-
-Begin with editable Markdown concepts, PDF preview/export, text PDFs and selected office-file extraction.
-Specialist formats remain downloadable originals.
-Do not claim unsupported editing or analysis.
-
-Define a storage adapter for reading/writing blobs and a separate document service for IDs, metadata, versions, permissions, folders and approval state.
-The first storage adapter is private S3-compatible object storage.
-Nextcloud or OneDrive/SharePoint may follow.
-Migration preserves document/version IDs, hashes and approvals, with a tested mapping manifest.
-
-## AI and automation policy
-
-AI helps with extraction, matching, agendas, summaries, draft replies, consistency checks and source-backed questions.
-Rules and database queries perform counting, deadlines, permissions, reservation overlaps and state transitions.
-
-| Action class                                                         | Default handling                                                   |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Ingest, deduplicate, index authorized sources                        | Automatic                                                          |
-| Personal draft, summary, suggested label                             | Automatic within granted scope                                     |
-| New commitment, decision, requirement or consequential status change | Named owner review                                                 |
-| Repeated low-impact workflow                                         | May automate through an explicit, auditable rule                   |
-| Internal Telegram reminders and check-ins                            | Automatic under a configured policy for verified, opted-in members |
-| Supplier/public communication, spend or calendar invitation          | Explicit authority and applicable approval policy                  |
-| Aviation safety, emergency command and operating approval            | Accountable qualified human authority                              |
-
-Avoid one approval queue owned by the PM.
-Route proposals by event and workstream, support batch review and escalate only unowned or overdue items.
-Record why an automation rule permitted a change.
-Confidence scores are triage hints, not permission grants.
-
-Treat documents and emails as untrusted inputs.
-Extraction cannot execute tool instructions.
-AI receives narrow tools, permission-filtered data and output validation.
-New suppliers, changed bank details or altered recipients are never accepted merely because an email says so.
-
-Approved aviation packs should use deterministic rendering from approved fields and versioned operational text.
-AI may help draft text before approval; it cannot improvise published routes or instructions.
-
-A minimal evaluation set must include contradictory dates, conditional promises, German and English messages, duplicate emails, wrong-event routing, malicious instructions, private sources and missing evidence.
-
-## Safe evolution during event planning
-
-Versioned migrations and stable interfaces make changes testable and recoverable; they cannot guarantee zero breakage.
-
-- Add fields/tables first, backfill, support old/new representations during transition, and remove old forms in a separate release.
-
-- Version API contracts, document schemas, extraction output, templates and automation policies.
-  Persist job payload versions and handle or migrate old queued jobs explicitly.
-
-- Preserve UUIDs and semantics.
-  A migration cannot turn an assumption into an approved decision.
-
-- Rehearse upgrades on a staging restore of populated planning data.
-  Test documents, permissions, queries and important workflows.
-
-- Back up database and files consistently with a manifest.
-  Test restoration.
-  Code rollback alone may not reverse a data migration; define a roll-forward or restore plan.
-
-- Retain regression fixtures for small events and the Dübendorf concept, cross-channel changes, document approvals, isolation and old payloads.
-
-- Use feature flags and separate development/staging from the live project.
-  Pin dependencies and record architecture decisions in Git.
-
-- The production AI PM changes records through approved tools; it cannot change its own deployed code or database schema.
-  Development follows review, tests and deployment.
-
-- Export versioned JSON/CSV plus originals, retained file versions, hashes and relationship manifests.
-  Demonstrate reconstruction.
-
-Use a bounded typed core and schema-validated extensions for experiments.
-Promote stable concepts through migrations.
-Embeddings are rebuildable; accepted decisions are not reconstructed from chat.
-
-A release gate checks existing events, browsable files, sourced concept regeneration, access isolation and handling of old jobs.
+Optional later adapters: Microsoft Graph (mail, calendar, SharePoint), Nextcloud, ticketing (for example pretix) and club records (CSV first).
+
+## Building blocks
+
+| Block            | Responsibility                                                             | Decision                                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `domain` crate   | Types, rules and state machines. No I/O.                                   | [0002](adr/0002-monorepo-and-services.md), [0003](adr/0003-runtime-and-tooling.md)                                                                     |
+| `app` crate      | Domain commands, queries and ports. The only way to change accepted state. | [0002](adr/0002-monorepo-and-services.md)                                                                                                              |
+| `store-pg` crate | Repositories, SQL migrations, sessions and the job queue.                  | [0006](adr/0006-persistence.md), [0007](adr/0007-jobs-and-schedules.md), [0008](adr/0008-authentication.md)                                            |
+| `adapters` crate | Object storage, mail and model provider.                                   | [0009](adr/0009-object-storage.md), [0010](adr/0010-model-provider.md)                                                                                 |
+| `api` crate      | HTTP handlers, DTOs and the OpenAPI document.                              | [0017](adr/0017-api-contract-rust.md)                                                                                                                  |
+| `telegram` crate | Telegram gateway.                                                          | [0011](adr/0011-telegram.md)                                                                                                                           |
+| `tada` binary    | Composition root. Roles: `serve`, `worker`, `telegram`, `migrate`.         | [0025](adr/0025-platform-contract.md)                                                                                                                  |
+| `apps/web`       | React web client, German UI, design system.                                | [0005](adr/0005-web-client.md), [0018](adr/0018-design-system-foundation.md)–[0024](adr/0024-frontend-quality-gates.md)                                |
+| Runtime          | One image, Compose on one host first.                                      | [0015](adr/0015-deployment.md), [0016](adr/0016-environments-and-releases.md), [0025](adr/0025-platform-contract.md)–[0032](adr/0032-delivery-flow.md) |
+
+Search uses PostgreSQL full-text search first.
+pgvector comes only if an evaluation shows a benefit.
+
+## Runtime flows
+
+### A domain command
+
+1. A driving adapter (`api`, `telegram` or `worker`) receives a request and identifies the caller.
+2. The adapter calls one `app` command with the caller's capability.
+3. The command checks the permissions, the allowed transition and the record version.
+4. The command commits the change, the audit event and any outbound job in one transaction.
+5. If the record version changed since the caller read it, the command returns a conflict and changes nothing.
+
+### A proposal and its review
+
+1. A connector captures a source item once and stores an immutable source version.
+2. The AI extracts a proposal: a patch, source spans, the model and prompt version, assumptions and the target record version.
+3. tada routes the proposal to the owner of the workstream, not to the PM.
+4. The owner accepts, edits or rejects it. Silence is never acceptance.
+5. If the target record changed, the proposal goes into conflict and needs a new evaluation.
+
+### A scheduled reminder
+
+1. The worker finds due checks from accepted state and the configured policy.
+2. It stores an outbound intent before the send.
+3. The Telegram gateway sends one digest for each person and records the result as sent, failed or unknown.
+4. A changed deadline or a completed action cancels obsolete reminders.
+5. After a restart, the worker does not send missed reminders in a flood.
+
+## Rules for all parts
+
+### Data ownership
+
+"One system of record" means one authority for each kind of information.
+tada does not copy every tool into PostgreSQL.
+
+| Information                                                      | Authority                                                        |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Accepted actions, decisions, risks, requirements and commitments | tada                                                             |
+| Mail messages and threads                                        | The mail provider; tada keeps evidence snapshots and identifiers |
+| Working document content                                         | The document tool or tada uploads                                |
+| Evidence behind an accepted record                               | An immutable snapshot or an exact retained version               |
+| Personal calendar availability                                   | The connected calendar provider, if available                    |
+| Published event appointments                                     | The configured calendar owner                                    |
+| Tickets, payments and refunds                                    | The ticketing or payment provider                                |
+| Posted accounts                                                  | The accounting system                                            |
+| AI proposals                                                     | The tada proposal store; never accepted state                    |
+
+### Records and provenance
+
+- Each record has a UUID, an organization ID, an event scope where it applies, an event-local ID, an owner, a status, timestamps and a record version.
+- Shared people and resources have organization scope. Event notes and assignments have event scope.
+- Source items, source versions, evidence links, proposals and accepted records are separate tables.
+- A link to a source is not evidence, because documents change and messages disappear.
+  Evidence is the exact source version or a snapshot, with its hash, capture time and a locator such as a page or a passage.
+- Audit messages contain no raw personal data.
+- Retention and deletion rules cover originals, snapshots, extracted facts, embeddings and backups.
+
+### Permissions and isolation
+
+- Organization isolation applies to all reads, writes, jobs, search, citations and exports.
+  [ADR 0006](adr/0006-persistence.md) defines how the database enforces it.
+- Event permissions apply inside the organization boundary.
+- Permission filtering happens before retrieval, so AI answers and citations never contain data the caller cannot see.
+- A document copied into an event does not widen access. Both the source access and the event membership must allow disclosure.
+- Unknown event attribution goes to a triage queue. AI can suggest an event, but it never shows a message to more than one event team on its own.
+
+### AI authority
+
+AI helps with extraction, matching, agendas, summaries, draft replies, consistency checks and questions with sources.
+Rules and database queries do counting, deadlines, permissions, reservation overlaps and state transitions.
+[ADR 0010](adr/0010-model-provider.md) limits AI tools to queries and proposals.
+
+| Action class                                                              | Default handling                                                       |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Ingest, deduplicate and index authorized sources                          | Automatic                                                              |
+| Personal draft, summary or suggested label                                | Automatic within the granted scope                                     |
+| New commitment, decision or requirement, or a consequential status change | Review by the named owner                                              |
+| Repeated low-impact workflow                                              | Automatic only through an explicit rule with an audit record           |
+| Internal Telegram reminders and check-ins                                 | Automatic under a configured policy, for verified members who opted in |
+| Supplier or public communication, spend or calendar invitation            | Explicit authority and the applicable approval policy                  |
+| Aviation safety, emergency command and operating approval                 | An accountable, qualified person                                       |
+
+- Documents and emails are untrusted input. Extraction cannot run tool instructions.
+- New suppliers, changed bank details or changed recipients never become accepted because an email says so.
+- Confidence scores sort the review work. They never grant permission.
+- AI answers separate accepted state, proposals, historical state and inference, and show the freshness of each source.
+- Approved aviation packs come from deterministic rendering of approved fields. AI can draft text before approval, but it never writes published routes or instructions.
+- The evaluation set includes contradictory dates, conditional promises, German and English messages, duplicate emails, wrong-event routing, malicious instructions, private sources and missing evidence.
+
+### Integrations
+
+- Every adapter has scoped authentication, capability metadata, checkpoints, source IDs and versions, deterministic mappings, incremental retrieval, reconciliation, revocation handling and diagnostics.
+- A webhook only signals that something can have changed. A worker then fetches and reconciles the authoritative data.
+- Delivery is at least once, and processing is idempotent. Deduplication uses the organization, the connection, the resource and the version.
+- A checkpoint moves only after durable capture.
+- Most data flows into tada. If two systems change the same field, tada shows a conflict; it never uses blind last-write-wins.
+- Integration health is a product feature: last sync, permission expiry, backlog and stale sources are visible. "No new mail" must never hide "the connector is disconnected".
+- A failure goes to the named integration owner, not to the PM.
+- Microsoft Graph: test the real permission model in the club tenant before any promise. A folder selected in the UI does not limit a broad API token.
+
+### Documents
+
+- A document has a stable tada ID. Its name, folder and provider can change.
+- Each version records its hash, provider reference, uploader, timestamps, classification and processing status.
+- States: draft, review, approved, superseded and archived. Approval applies to one exact version. An edit creates a new draft.
+- A change of accepted facts marks dependent documents for review. It never rewrites an approved document.
+- Generated drafts store the exact fact versions and source versions that they used.
+- tada shows unsupported pages and formats explicitly. OCR text alone cannot check traffic capacity, evacuation geometry or aviation safety.
+- The first formats: Markdown concepts, PDF preview and export, text PDFs and selected office files. Specialist formats stay downloadable originals.
+- A move to another storage provider keeps document IDs, version IDs, hashes and approvals, with a tested mapping manifest.
+
+### Safe evolution
+
+- Schema changes follow expand and contract ([ADR 0006](adr/0006-persistence.md)). A migration never turns an assumption into a decision.
+- API contracts, document schemas, extraction output, templates, automation policies and job payloads have versions.
+- Releases go through a staging rehearsal on restored data ([ADR 0016](adr/0016-environments-and-releases.md)).
+- Regression fixtures cover small events, the large-event concept, cross-channel changes, document approvals, isolation and old job payloads.
+- Exports contain versioned JSON and CSV, originals, retained versions, hashes and relationship manifests. A test rebuilds the data from an export.
+- The production AI PM changes records only through approved tools. It cannot change its own code or the database schema.
+- Embeddings can be rebuilt. Accepted decisions never come from chat history.
+- A release gate checks existing events, files, concept regeneration, access isolation and old jobs.
+
+## Options not used now
+
+These tools were checked on 6 October 2026. They are optional adapters or alternatives, not dependencies.
+
+| Tool                                                 | Possible role                                               |
+| ---------------------------------------------------- | ----------------------------------------------------------- |
+| [Nextcloud](https://nextcloud.com/files/)            | A storage adapter through WebDAV, if a club already uses it |
+| [Paperless-ngx](https://docs.paperless-ngx.com/api/) | An archive alternative, if archival needs dominate          |
+| [NanoClaw](https://github.com/nanocoai/nanoclaw)     | An agent runtime; only if a measured need justifies it      |
