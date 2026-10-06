@@ -18,6 +18,7 @@ The [writing guide](writing.md) contains the rules for prose.
 | Architecture                | [doc/ARCHITECTURE.md](ARCHITECTURE.md) |
 | Decisions and their reasons | [doc/adr/](adr/README.md)              |
 | Terms                       | [doc/glossary.md](glossary.md)         |
+| Slices and acceptance       | [doc/roadmap.md](roadmap.md)           |
 | Tool versions and tasks     | [mise.toml](../mise.toml)              |
 
 Do not keep project state only in chat or in LLM memory.
