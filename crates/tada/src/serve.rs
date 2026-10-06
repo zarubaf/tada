@@ -25,13 +25,16 @@ pub async fn run((database, http, storage): ServeSettings) -> anyhow::Result<()>
         access_key_id: storage.access_key_id,
         secret_access_key: storage.secret_access_key,
     });
-    let router = tada_api::router(ApiState {
-        dependencies: vec![Arc::new(db.clone()), Arc::new(storage)],
-        authenticator: authenticator(&db).await?,
-        events: Arc::new(db.clone()),
-        clock: Arc::new(SystemClock),
-        trusted_proxies: http.trusted_proxies,
-    });
+    let router = tada_api::router(
+        ApiState {
+            dependencies: vec![Arc::new(db.clone()), Arc::new(storage)],
+            authenticator: authenticator(&db).await?,
+            events: Arc::new(db.clone()),
+            clock: Arc::new(SystemClock),
+            trusted_proxies: http.trusted_proxies,
+        },
+        http.web_root.as_deref(),
+    );
 
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, http.port));
     let listener = TcpListener::bind(address)

@@ -8,16 +8,19 @@ mod problem;
 mod request_id;
 
 use std::net::SocketAddr;
+use std::path::Path;
 use std::sync::Arc;
 
 use axum::Router;
 use axum::middleware;
+use axum::routing::any;
 use ipnet::IpNet;
 use tada_app::auth::Authenticator;
 use tada_app::clock::Clock;
 use tada_app::events::EventStore;
 use tada_app::health::DependencyCheck;
 use tada_app::problem::ProblemCode;
+use tower_http::services::{ServeDir, ServeFile};
 use utoipa::openapi::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 
@@ -50,11 +53,21 @@ fn api() -> (Router<ApiState>, OpenApi) {
 }
 
 /// All routes of the `serve` process role.
-pub fn router(state: ApiState) -> Router {
+///
+/// With `web_root`, the server also delivers the built web client from this folder (ADR 0005).
+/// A path outside `/api` that is not a file gets `index.html`, so that the client handles its own routes.
+pub fn router(state: ApiState, web_root: Option<&Path>) -> Router {
     let (api, _) = api();
-    Router::new()
+    let router = Router::new()
         .merge(api)
-        .fallback(not_found)
+        .route("/api/{*path}", any(not_found));
+    let router = match web_root {
+        Some(root) => router.fallback_service(
+            ServeDir::new(root).fallback(ServeFile::new(root.join("index.html"))),
+        ),
+        None => router.fallback(not_found),
+    };
+    router
         .layer(middleware::from_fn_with_state(
             state.clone(),
             request_id::track,
@@ -84,4 +97,129 @@ pub async fn serve(
     )
     .with_graceful_shutdown(shutdown)
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use tada_app::auth::AuthenticationError;
+    use tada_app::caller::MemberCaller;
+    use tower::ServiceExt;
+
+    use super::*;
+
+    #[derive(Debug)]
+    struct NoCaller;
+
+    #[async_trait::async_trait]
+    impl Authenticator for NoCaller {
+        async fn authenticate(
+            &self,
+            _token: Option<&str>,
+        ) -> Result<MemberCaller, AuthenticationError> {
+            Err(AuthenticationError::Unauthenticated)
+        }
+    }
+
+    #[derive(Debug)]
+    struct NoClock;
+
+    impl Clock for NoClock {
+        fn now(&self) -> jiff::Timestamp {
+            jiff::Timestamp::UNIX_EPOCH
+        }
+    }
+
+    #[derive(Debug)]
+    struct NoEvents;
+
+    #[async_trait::async_trait]
+    impl EventStore for NoEvents {
+        async fn insert(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::domain::events::Event,
+        ) -> Result<tada_app::events::Inserted, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn get(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+        ) -> Result<Option<tada_app::domain::events::Event>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn list(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: Option<&tada_app::events::EventCursor>,
+            _: u32,
+        ) -> Result<Vec<tada_app::domain::events::Event>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    fn state() -> ApiState {
+        ApiState {
+            dependencies: Vec::new(),
+            authenticator: Arc::new(NoCaller),
+            events: Arc::new(NoEvents),
+            clock: Arc::new(NoClock),
+            trusted_proxies: Vec::new(),
+        }
+    }
+
+    async fn get(router: &Router, path: &str) -> (StatusCode, String) {
+        let response = router
+            .clone()
+            .oneshot(Request::get(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, String::from_utf8(body.to_vec()).unwrap())
+    }
+
+    #[tokio::test]
+    async fn serves_the_web_client_and_keeps_problems_for_the_api() {
+        let web = tempfile::tempdir().unwrap();
+        fs::write(web.path().join("index.html"), "<html>tada</html>").unwrap();
+        fs::create_dir(web.path().join("assets")).unwrap();
+        fs::write(web.path().join("assets/app.js"), "console.log(1)").unwrap();
+        let router = router(state(), Some(web.path()));
+
+        assert_eq!(
+            get(&router, "/").await,
+            (StatusCode::OK, "<html>tada</html>".to_owned())
+        );
+        assert_eq!(
+            get(&router, "/assets/app.js").await,
+            (StatusCode::OK, "console.log(1)".to_owned())
+        );
+        assert_eq!(
+            get(&router, "/events/FLY28").await,
+            (StatusCode::OK, "<html>tada</html>".to_owned())
+        );
+
+        let (status, body) = get(&router, "/api/v1/nothing").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert!(body.contains("\"code\":\"not-found\""));
+        let (status, _) = get(&router, "/api/v1/events").await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn without_the_web_client_each_unknown_path_is_a_problem() {
+        let router = router(state(), None);
+        let (status, body) = get(&router, "/events").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert!(body.contains("\"code\":\"not-found\""));
+    }
 }

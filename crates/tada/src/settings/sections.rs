@@ -1,5 +1,6 @@
 //! The settings sections and the sections of each command.
 
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use ipnet::IpNet;
@@ -102,6 +103,7 @@ impl Section for Database {
 pub struct Http {
     pub port: u16,
     pub trusted_proxies: Vec<IpNet>,
+    pub web_root: Option<PathBuf>,
 }
 
 const PORT: Setting = Setting {
@@ -120,17 +122,35 @@ const TRUSTED_PROXIES: Setting = Setting {
     description: "The ranges of the reverse proxies, separated by commas, for example `10.0.0.0/8`. The server accepts `X-Request-Id` only from them.",
 };
 
+const WEB_ROOT: Setting = Setting {
+    name: "TADA_WEB_ROOT",
+    kind: "folder path",
+    default: Some(""),
+    secret: false,
+    description: "The folder of the built web client. The image sets it. If it is empty, the server delivers the API only.",
+};
+
 impl Section for Http {
     fn settings() -> Vec<&'static Setting> {
-        vec![&PORT, &TRUSTED_PROXIES]
+        vec![&PORT, &TRUSTED_PROXIES, &WEB_ROOT]
     }
 
     fn read(source: &mut Source<'_>) -> Option<Self> {
         let port = source.value(&PORT);
         let trusted_proxies: Option<NetworkRanges> = source.value(&TRUSTED_PROXIES);
+        let web_root: Option<String> = source.value(&WEB_ROOT);
+        let web_root = web_root?;
+        let web_root = (!web_root.is_empty()).then(|| PathBuf::from(web_root));
+        if let Some(root) = &web_root
+            && !root.join("index.html").is_file()
+        {
+            source.error(&WEB_ROOT, "names a folder without index.html");
+            return None;
+        }
         Some(Self {
             port: port?,
             trusted_proxies: trusted_proxies?.0,
+            web_root,
         })
     }
 }

@@ -23,13 +23,16 @@ impl Api {
     async fn start() -> Self {
         let test = TestDatabase::start().await;
         test.database.ensure_dev_organization().await.unwrap();
-        let router = tada_api::router(ApiState {
-            dependencies: vec![Arc::new(test.database.clone())],
-            authenticator: Arc::new(DevAuthenticator),
-            events: Arc::new(test.database.clone()),
-            clock: Arc::new(SystemClock),
-            trusted_proxies: Vec::new(),
-        });
+        let router = tada_api::router(
+            ApiState {
+                dependencies: vec![Arc::new(test.database.clone())],
+                authenticator: Arc::new(DevAuthenticator),
+                events: Arc::new(test.database.clone()),
+                clock: Arc::new(SystemClock),
+                trusted_proxies: Vec::new(),
+            },
+            None,
+        );
         Self {
             router,
             _database: test,
