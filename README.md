@@ -7,7 +7,7 @@ The [roadmap](doc/roadmap.md) shows what is done and what comes next.
 ## Run it locally
 
 You need [mise](https://mise.jdx.dev), [rustup](https://rustup.rs) and Docker.
-Add `~/.cargo/bin` to your `PATH`.
+The mise tasks find `cargo` in `~/.cargo/bin`. To use `cargo` directly in your shell, add `. "$HOME/.cargo/env"` to your shell profile.
 
 1. Run `mise run setup` once. This installs the pinned tools and the Git hooks.
 2. Run `mise run dev:up`. This starts PostgreSQL, Garage and Mailpit.

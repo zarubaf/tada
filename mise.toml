@@ -20,6 +20,8 @@ cargo-deny = "0.20.2"
 # Settings for local development (doc/settings.md). They point to the services of compose.yaml.
 # Builds use the committed .sqlx query cache, so they need no database (ADR 0006).
 [env]
+# rustup installs cargo here; the tasks find it also when the shell PATH does not have it.
+_.path = ["{{ env.CARGO_HOME | default(value=env.HOME ~ '/.cargo') }}/bin"]
 SQLX_OFFLINE = "true"
 TADA_DATABASE_URL = "postgres://tada@127.0.0.1:5432/tada"
 TADA_DATABASE_PASSWORD_FILE = "{{config_root}}/.dev/secrets/database_password"
