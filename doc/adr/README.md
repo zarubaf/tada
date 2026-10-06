@@ -67,6 +67,7 @@ The ADRs are the authority for the decisions in this project.
 | [0050](0050-proposals-and-review.md)               | Proposals and review                                     | Accepted           |
 | [0051](0051-document-drafts-and-provenance.md)     | Document drafts and provenance                           | Accepted           |
 | [0052](0052-event-roles-and-ownership.md)          | Event roles and record ownership                         | Accepted           |
+| [0053](0053-development-authenticator.md)          | Development authenticator for the walking skeleton       | Accepted           |
 
 ## New ADR
 
