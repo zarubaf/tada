@@ -54,7 +54,7 @@ The ADRs are the authority for the decisions in this project.
 | [0037](0037-error-model.md)                        | Error model                                              | Accepted           |
 | [0038](0038-ids-and-time.md)                       | IDs and time                                             | Accepted           |
 | [0039](0039-actors-and-identities.md)              | Callers, actors and service identities                   | Accepted           |
-| [0040](0040-ai-intake-through-mcp.md)              | AI intake through MCP first                              | Proposed           |
+| [0040](0040-ai-intake-through-mcp.md)              | AI intake through MCP first                              | Accepted           |
 
 ## New ADR
 

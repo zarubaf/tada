@@ -1,6 +1,6 @@
 # 0040. AI intake through MCP first
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context
