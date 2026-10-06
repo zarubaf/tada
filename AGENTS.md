@@ -16,3 +16,22 @@ HARD RULE: refactor to the principle FIRST, then change behavior.
 11. Honorable: Law of Demeter • fail fast / illegal states unrepresentable • optimize for deletion
 12. Unix do-one-thing + compose.
 13. Treat as constraints. Violate slogans when judgment says so.
+
+# Project context
+
+tada is an event-planning workspace for clubs. Read these files before you change anything:
+
+- [doc/contributing.md](doc/contributing.md): setup, commits, history and session handoff.
+- [doc/PRODUCT.md](doc/PRODUCT.md) and [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md): what we build and how.
+- [doc/adr/](doc/adr/README.md): the decisions and their reasons. Do not contradict an accepted ADR; propose a new one.
+- [doc/glossary.md](doc/glossary.md): one meaning for each term. Use these terms in code and docs.
+- [doc/writing.md](doc/writing.md): US English and Simplified Technical English.
+
+Rules for each session:
+
+1. Run `mise run check` before each commit. The Git hooks run the same checks.
+2. Use Conventional Commits. Make one logical change per commit.
+3. Do not push, create remotes or publish anything without a request from the product owner.
+4. Do not commit real personal data, club contacts or secrets. The repository is public.
+5. Do not commit or link to `tasks/`. It holds private notes.
+6. Write durable decisions into the repository, not into chat or agent memory.
