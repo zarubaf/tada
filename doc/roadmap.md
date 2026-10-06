@@ -16,7 +16,7 @@ Goal: a repository and a runtime that later slices can build on without rework.
    - Renovate and the daily advisory workflow (ADR 0041).
    - [tokens.md](design/tokens.md) still repeats the values of `tokens.css` (ADR 0018).
 3. Spikes:
-   - The job queue (ADR 0007). (Done. The result is the proposed [ADR 0054](adr/0054-job-queue-implementation.md).)
+   - The job queue (ADR 0007). (Done. The result is [ADR 0054](adr/0054-job-queue-implementation.md).)
    - Upload, download and versions in object storage (ADR 0009).
    - Telegram identity linking (ADR 0011).
 4. A first deployment of the walking skeleton, from the operator's deployment repository (ADR 0033).
