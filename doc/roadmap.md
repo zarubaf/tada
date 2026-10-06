@@ -22,13 +22,14 @@ Goal: a repository and a runtime that later slices can build on without rework.
 4. A first deployment of the walking skeleton, from the operator's deployment repository (ADR 0033).
 5. ADRs for the decisions that the first code needs: observability ([0035](adr/0035-observability.md)), configuration ([0036](adr/0036-configuration.md)), the error model ([0037](adr/0037-error-model.md)), IDs and time ([0038](adr/0038-ids-and-time.md)) and actors ([0039](adr/0039-actors-and-identities.md)).
 6. ADRs for Slice 0 and Slice 1: CI build and dependencies ([0041](adr/0041-ci-build-and-dependencies.md)), transactional email ([0042](adr/0042-transactional-email.md)), upload policy ([0043](adr/0043-upload-policy.md)) and API conventions ([0044](adr/0044-api-conventions.md)).
-7. ADRs for the core of Slice 1: entities and the fact model ([0049](adr/0049-entities-and-fact-model.md)), proposals and review ([0050](adr/0050-proposals-and-review.md)), and document drafts with provenance ([0051](adr/0051-document-drafts-and-provenance.md)).
+7. ADRs for the core of Slice 1: entities and the fact model ([0049](adr/0049-entities-and-fact-model.md)), proposals and review ([0050](adr/0050-proposals-and-review.md)), document drafts with provenance ([0051](adr/0051-document-drafts-and-provenance.md)), and event roles ([0052](adr/0052-event-roles-and-ownership.md)).
 8. ADRs for Slice 2, accepted before Slice 2 starts: data protection ([0045](adr/0045-data-protection.md)), inbound email ([0046](adr/0046-inbound-email.md)), the model adapter ([0047](adr/0047-model-adapter.md)) and the AI evaluation set ([0048](adr/0048-ai-evaluation-set.md)). No real personal data goes to a model provider before ADR 0045 is accepted.
 
 ## Slice 1: Preliminary event concept
 
 Goal: the team enters the known facts of a large event, uploads source documents and gets a German preliminary concept and an enquiry draft with provenance.
 tada sends no correspondence in this slice.
+Real personal data enters tada only after ADR 0045 is accepted, also in this slice. Before that, Slice 1 runs with invented data and public facts.
 
 Demonstration:
 
@@ -36,7 +37,7 @@ Demonstration:
 2. The member accepts or corrects the proposals in the Review Inbox.
 3. A member uploads source documents and browses them in the web client.
 4. A member asks the agent: "What are we planning and what remains unknown?" The agent answers from the read tools.
-5. The agent writes a German concept and an enquiry draft from accepted facts and labeled proposals, and proposes both as document drafts.
+5. The agent writes a German concept and an enquiry draft from accepted facts and labeled assumptions, and proposes both as document drafts.
 6. tada saves both drafts as document versions with fact and source-version provenance.
 7. A member proposes a change of the date window through a Telegram command. The owner reviews it. The agent writes a new draft version, and tada shows the differences.
 8. An operator restarts the services. All records and files stay available.
@@ -54,7 +55,6 @@ Acceptance:
 - (7) A document update preserves the evidence behind a prior accepted decision.
 - (9) An AI answer identifies source versions and separates accepted state from unreviewed proposals.
 - (10) Backup restoration and structured export are demonstrated.
-- (11) An AI cap leaves manual planning usable and provides per-event usage totals.
 
 ## Slice 2: Distributed planning and the AI PM
 
@@ -68,6 +68,7 @@ Acceptance:
 - (3) The designated workstream lead can review a supplier proposal without the PM relaying the message.
 - (5) A conditional promise stays conditional; no signature or approval is invented.
 - (6) Disconnected or delayed sync is visible and cannot produce a falsely reassuring brief.
+- (11) An AI cap leaves manual planning usable and provides per-event usage totals.
 - (12) A simple club event can be organized without purchasing a separate task-management tool.
 - Quiet hours and cooldowns survive restarts.
 - A changed deadline or a completed action cancels obsolete reminders.

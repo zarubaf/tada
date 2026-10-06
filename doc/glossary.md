@@ -9,38 +9,43 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 ## Organization and people
 
-| Term                      | Meaning                                                                                                                   | Avoid                                    |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| organization              | The tenant: a club or association. It owns all its data. Data never crosses an organization boundary.                     | club (in code), tenant (in UI)           |
-| user                      | A person with a stable internal UUID. Email and Telegram are linked credentials, not identities.                          | account                                  |
-| member                    | A user with an organization membership and one organization role: owner, admin or member.                                 |                                          |
-| external identity         | A credential linked to a user, for example a Telegram user ID or an email address.                                        |                                          |
-| organizing committee (OK) | The Organisationskomitee of one event: the people who plan it. Write "OK" only after you define it in a document.         | committee                                |
-| project manager (PM)      | The person who coordinates an event and makes the final decisions.                                                        |                                          |
-| workstream                | One area of work in an event, for example catering or ground operations.                                                  | team, department                         |
-| workstream lead           | The member who owns a workstream and reviews its proposals.                                                               |                                          |
-| volunteer                 | A person who receives assignments for an event.                                                                           | helper                                   |
-| supplier                  | An external party that provides goods or services. Suppliers have no access to internal records.                          | vendor                                   |
-| person                    | A record of a human being in an organization. A person can exist without a user account.                                  | contact                                  |
-| institution               | A record of an organization outside the tenant, for example an authority, a company or another club.                      | organization (that is the tenant), party |
-| participation             | A person or an institution in an event, with a role and a status: invited, interested, confirmed or declined. Not access. | membership                               |
+| Term                      | Meaning                                                                                                                                    | Avoid                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| organization              | The tenant: a club or association. It owns all its data. Data never crosses an organization boundary.                                      | club (in code), tenant (in UI)           |
+| user                      | A person with a stable internal UUID. Email and Telegram are linked credentials, not identities.                                           | account                                  |
+| member                    | A user with an organization membership and one organization role: owner, admin or member.                                                  |                                          |
+| external identity         | A credential linked to a user, for example a Telegram user ID or an email address.                                                         |                                          |
+| organizing committee (OK) | The Organisationskomitee of one event: the people who plan it. Write "OK" only after you define it in a document.                          | committee                                |
+| project manager (PM)      | The person who coordinates an event and makes the final decisions.                                                                         |                                          |
+| event manager             | The event role with all rights in one event: review, apply, field definitions, memberships and document approval (ADR 0052).               | admin (that is an organization role)     |
+| event contributor         | The event role that reads the event, creates proposals and work records, and changes its own work records.                                 | editor                                   |
+| event viewer              | The event role that only reads the event.                                                                                                  | guest                                    |
+| workstream                | One area of work in an event, for example catering or ground operations.                                                                   | team, department                         |
+| workstream lead           | The member who owns a workstream and reviews its proposals.                                                                                |                                          |
+| volunteer                 | A person who receives assignments for an event.                                                                                            | helper                                   |
+| supplier                  | An external party that provides goods or services. Suppliers have no access to internal records.                                           | vendor                                   |
+| person                    | A record of a human being in an organization. A person can exist without a user account.                                                   | contact                                  |
+| institution               | A record of an organization outside the tenant, for example an authority, a company or another club.                                       | organization (that is the tenant), party |
+| participation             | A person or an institution in an event, with a participation role and a status: invited, interested, confirmed or declined. Not access.    | membership                               |
+| participation role        | The involvement of a person or an institution in an event, for example organizing committee member, sponsor or authority. Gives no access. | role (alone)                             |
 
 ## Events
 
-| Term             | Meaning                                                                                                                         | Avoid                   |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| event series     | A recurring kind of event, for example the annual fly-in.                                                                       |                         |
-| event            | One occurrence of an event, with its own dates and accepted state.                                                              | occurrence (in UI)      |
-| template         | A versioned set of checklists, roles and relative deadlines for an event series. A template never copies approvals or evidence. |                         |
-| module           | A domain feature that an event enables, for example aviation. Do not confuse with a code module.                                | plugin                  |
-| event profile    | The typed fields of an event and all its facts, including assumptions and unknowns.                                             |                         |
-| fact             | A value for one field of one event, with a status (accepted, assumption or unknown) and evidence (ADR 0049).                    |                         |
-| assumption       | The fact status for a value that the team uses for planning but did not confirm.                                                |                         |
-| unknown          | The fact status for a value that nobody knows yet. The fact has no value, and tada never fills it in.                           | empty, missing          |
-| field definition | A record that defines a fact field: key, label, value type, cardinality, description and module.                                | attribute, custom field |
-| field catalog    | All field definitions that an event can use: the shipped modules and the event's own fields.                                    | schema (alone)          |
-| value type       | One of the fixed kinds of fact value: text, boolean, quantity, money, date, date window, choice or reference.                   | data type (alone)       |
-| open question    | A question that the team must answer. It has an owner.                                                                          |                         |
+| Term             | Meaning                                                                                                                            | Avoid                   |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| event series     | A recurring kind of event, for example the annual fly-in.                                                                          |                         |
+| event            | One occurrence of an event, with its own dates and accepted state.                                                                 | occurrence (in UI)      |
+| template         | A versioned set of checklists, roles and relative deadlines for an event series. A template never copies approvals or evidence.    |                         |
+| module           | A domain feature that an event enables, for example aviation. Do not confuse with a code module.                                   | plugin                  |
+| event profile    | The typed fields of an event and all its facts, including assumptions and unknowns.                                                |                         |
+| fact             | A value for one field of one event, with a status (accepted, assumption or unknown) and evidence (ADR 0049).                       |                         |
+| fact version     | One immutable state of a fact: accepted with a value, assumption with a value, or unknown, with its evidence.                      | revision                |
+| assumption       | The fact status for a value that the team uses for planning but did not confirm.                                                   |                         |
+| unknown          | The fact status for a value that nobody knows yet. The fact has no value, and tada never fills it in.                              | empty, missing          |
+| field definition | A record that defines a fact field: key, label, value type, description and module. Only `choice` fields can allow several values. | attribute, custom field |
+| field catalog    | All field definitions that an event can use: the shipped modules and the event's own fields.                                       | schema (alone)          |
+| value type       | One of the fixed kinds of fact value: text, boolean, quantity, money, date, date window, choice or reference.                      | data type (alone)       |
+| open question    | A question that the team must answer. It has an owner.                                                                             |                         |
 
 ## Work
 
@@ -71,6 +76,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | conflict            | The state of a proposal when its target record changed after the proposal was created.                                               |                          |
 | changeset           | The proposals of one intake, reviewed together. A proposal can depend on another proposal of its changeset.                          | batch                    |
 | provenance manifest | The list of fact versions and source passages that one document version uses, extracted from its `tada:` links.                      | citations list           |
+| legal redaction     | The audited replacement of personal data with a tombstone, the only exception to immutability (ADR 0045).                            | deletion (for evidence)  |
 
 ## Documents
 

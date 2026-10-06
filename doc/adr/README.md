@@ -66,6 +66,7 @@ The ADRs are the authority for the decisions in this project.
 | [0049](0049-entities-and-fact-model.md)            | Typed entities and a field catalog for facts             | Proposed           |
 | [0050](0050-proposals-and-review.md)               | Proposals and review                                     | Proposed           |
 | [0051](0051-document-drafts-and-provenance.md)     | Document drafts and provenance                           | Proposed           |
+| [0052](0052-event-roles-and-ownership.md)          | Event roles and record ownership                         | Proposed           |
 
 ## New ADR
 

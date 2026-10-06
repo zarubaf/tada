@@ -35,6 +35,7 @@ Uploads and downloads:
 Immutability:
 
 - The application never writes to the key of a published version. No API exists for that.
+- The only exception is a legal redaction (ADR 0045), which replaces the content with a tombstone and keeps the ID.
 - Backups of the operator hold the second copy. The storage itself does not enforce immutability.
 
 ## Consequences
