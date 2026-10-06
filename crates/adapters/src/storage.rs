@@ -1,10 +1,20 @@
 //! Object storage through the S3 API (ADR 0009).
 
+use std::io;
+
 use async_trait::async_trait;
 use aws_sdk_s3::Client;
 use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region, RequestChecksumCalculation};
+use aws_sdk_s3::primitives::ByteStream as S3Body;
+use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
+use bytes::{Bytes, BytesMut};
+use futures::StreamExt;
 use secrecy::{ExposeSecret, SecretString};
+use tada_app::blobs::{BlobError, BlobKey, BlobStore, ByteStream};
 use tada_app::health::{DependencyCheck, DependencyUnavailable};
+
+/// The size of one part of a multipart upload. S3 needs at least 5 MiB for each part except the last.
+const PART_SIZE: usize = 8 * 1024 * 1024;
 
 /// The connection data of one S3 bucket.
 #[derive(Debug)]
@@ -62,5 +72,409 @@ impl DependencyCheck for S3Storage {
             .await
             .map(|_| ())
             .map_err(|error| DependencyUnavailable(Box::new(error)))
+    }
+}
+
+fn storage_error(error: impl std::error::Error + Send + Sync + 'static) -> BlobError {
+    BlobError::Storage(Box::new(error))
+}
+
+impl S3Storage {
+    /// Uploads the parts of a multipart upload that has started. The caller aborts the upload on an error.
+    async fn upload_parts(
+        &self,
+        key: &BlobKey,
+        upload_id: &str,
+        first: Bytes,
+        body: &mut ByteStream,
+        limit: u64,
+    ) -> Result<(u64, Vec<CompletedPart>), BlobError> {
+        let mut parts = Vec::new();
+        let mut size = first.len() as u64;
+        let mut buffer = BytesMut::from(first);
+        loop {
+            let chunk = body.next().await.transpose().map_err(BlobError::Upload)?;
+            if let Some(chunk) = &chunk {
+                size += chunk.len() as u64;
+                if size > limit {
+                    return Err(BlobError::TooLarge { limit });
+                }
+                buffer.extend_from_slice(chunk);
+            }
+            let last = chunk.is_none();
+            if buffer.len() >= PART_SIZE || (last && !buffer.is_empty()) {
+                let number = i32::try_from(parts.len() + 1).map_err(storage_error)?;
+                let output = self
+                    .client
+                    .upload_part()
+                    .bucket(&self.bucket)
+                    .key(key.as_str())
+                    .upload_id(upload_id)
+                    .part_number(number)
+                    .body(S3Body::from(buffer.split().freeze()))
+                    .send()
+                    .await
+                    .map_err(storage_error)?;
+                parts.push(
+                    CompletedPart::builder()
+                        .part_number(number)
+                        .set_e_tag(output.e_tag().map(str::to_owned))
+                        .build(),
+                );
+            }
+            if last {
+                return Ok((size, parts));
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl BlobStore for S3Storage {
+    async fn put(&self, key: &BlobKey, mut body: ByteStream, limit: u64) -> Result<u64, BlobError> {
+        // Read up to one part. A small file then needs one request only.
+        let mut first = BytesMut::new();
+        while first.len() < PART_SIZE {
+            match body.next().await.transpose().map_err(BlobError::Upload)? {
+                Some(chunk) => {
+                    if (first.len() + chunk.len()) as u64 > limit {
+                        return Err(BlobError::TooLarge { limit });
+                    }
+                    first.extend_from_slice(&chunk);
+                }
+                None => {
+                    let size = first.len() as u64;
+                    self.client
+                        .put_object()
+                        .bucket(&self.bucket)
+                        .key(key.as_str())
+                        .body(S3Body::from(first.freeze()))
+                        .send()
+                        .await
+                        .map_err(storage_error)?;
+                    return Ok(size);
+                }
+            }
+        }
+
+        let started = self
+            .client
+            .create_multipart_upload()
+            .bucket(&self.bucket)
+            .key(key.as_str())
+            .send()
+            .await
+            .map_err(storage_error)?;
+        let upload_id = started.upload_id().unwrap_or_default().to_owned();
+        let result = match self
+            .upload_parts(key, &upload_id, first.freeze(), &mut body, limit)
+            .await
+        {
+            Ok((size, parts)) => self
+                .client
+                .complete_multipart_upload()
+                .bucket(&self.bucket)
+                .key(key.as_str())
+                .upload_id(&upload_id)
+                .multipart_upload(
+                    CompletedMultipartUpload::builder()
+                        .set_parts(Some(parts))
+                        .build(),
+                )
+                .send()
+                .await
+                .map(|_| size)
+                .map_err(storage_error),
+            Err(error) => Err(error),
+        };
+        if result.is_err() {
+            // Without the abort, the parts would stay in the store.
+            let aborted = self
+                .client
+                .abort_multipart_upload()
+                .bucket(&self.bucket)
+                .key(key.as_str())
+                .upload_id(&upload_id)
+                .send()
+                .await;
+            if let Err(error) = aborted {
+                tracing::warn!(error = %error, "cannot abort a multipart upload");
+            }
+        }
+        result
+    }
+
+    async fn get(&self, key: &BlobKey) -> Result<Option<ByteStream>, BlobError> {
+        let output = match self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key.as_str())
+            .send()
+            .await
+        {
+            Ok(output) => output,
+            Err(error)
+                if error
+                    .as_service_error()
+                    .is_some_and(|error| error.is_no_such_key()) =>
+            {
+                return Ok(None);
+            }
+            Err(error) => return Err(storage_error(error)),
+        };
+        let stream = futures::stream::unfold(output.body, |mut body| async move {
+            body.next()
+                .await
+                .map(|chunk| (chunk.map_err(io::Error::other), body))
+        });
+        Ok(Some(Box::pin(stream)))
+    }
+
+    async fn head(&self, key: &BlobKey) -> Result<Option<u64>, BlobError> {
+        match self
+            .client
+            .head_object()
+            .bucket(&self.bucket)
+            .key(key.as_str())
+            .send()
+            .await
+        {
+            Ok(output) => Ok(output
+                .content_length()
+                .and_then(|size| u64::try_from(size).ok())),
+            Err(error)
+                if error
+                    .as_service_error()
+                    .is_some_and(|error| error.is_not_found()) =>
+            {
+                Ok(None)
+            }
+            Err(error) => Err(storage_error(error)),
+        }
+    }
+
+    async fn delete(&self, key: &BlobKey) -> Result<(), BlobError> {
+        self.client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(key.as_str())
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(storage_error)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::TryStreamExt;
+    use tada_app::domain::ids::OrganizationId;
+    use testcontainers_modules::testcontainers::core::{ExecCommand, IntoContainerPort};
+    use testcontainers_modules::testcontainers::runners::AsyncRunner;
+    use testcontainers_modules::testcontainers::{ContainerAsync, GenericImage, ImageExt};
+    use uuid::Uuid;
+
+    use super::*;
+
+    /// The Garage image of `compose.yaml`.
+    const GARAGE: (&str, &str) = ("dxflrs/garage", "v2.4.1");
+    const BUCKET: &str = "tada-test";
+
+    /// A one-node Garage with a bucket and a key. The secrets are random for each test.
+    struct TestGarage {
+        storage: S3Storage,
+        _container: ContainerAsync<GenericImage>,
+    }
+
+    /// Hex digits from the random part of UUIDv7 values.
+    fn random_hex(bytes: usize) -> String {
+        let mut hex = String::new();
+        while hex.len() < bytes * 2 {
+            hex.push_str(&Uuid::now_v7().simple().to_string()[16..]);
+        }
+        hex.truncate(bytes * 2);
+        hex
+    }
+
+    async fn garage(container: &ContainerAsync<GenericImage>, args: &[&str]) -> String {
+        let mut command = vec!["/garage"];
+        command.extend_from_slice(args);
+        let mut result = container.exec(ExecCommand::new(command)).await.unwrap();
+        let stdout = result.stdout_to_vec().await.unwrap();
+        assert_eq!(
+            result.exit_code().await.unwrap(),
+            Some(0),
+            "garage {args:?} failed"
+        );
+        String::from_utf8(stdout).unwrap()
+    }
+
+    impl TestGarage {
+        async fn start() -> Self {
+            let config = format!(
+                "metadata_dir = \"/tmp/meta\"\ndata_dir = \"/tmp/data\"\ndb_engine = \"sqlite\"\n\
+                 replication_factor = 1\nrpc_bind_addr = \"[::]:3901\"\nrpc_public_addr = \"127.0.0.1:3901\"\n\
+                 rpc_secret = \"{}\"\n[s3_api]\ns3_region = \"garage\"\napi_bind_addr = \"[::]:3900\"\n",
+                random_hex(32)
+            );
+            let container = GenericImage::new(GARAGE.0, GARAGE.1)
+                .with_exposed_port(3900.tcp())
+                .with_copy_to("/etc/garage.toml", config.into_bytes())
+                .start()
+                .await
+                .expect("cannot start Garage; is Docker running?");
+
+            let mut node = String::new();
+            for _ in 0..50 {
+                let mut result = container
+                    .exec(ExecCommand::new(["/garage", "node", "id", "--quiet"]))
+                    .await
+                    .unwrap();
+                node = String::from_utf8(result.stdout_to_vec().await.unwrap()).unwrap();
+                if result.exit_code().await.unwrap() == Some(0) {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            }
+            let node = node.trim().split('@').next().unwrap().to_owned();
+            garage(
+                &container,
+                &[
+                    "layout",
+                    "assign",
+                    "--zone",
+                    "test",
+                    "--capacity",
+                    "1G",
+                    &node,
+                ],
+            )
+            .await;
+            garage(&container, &["layout", "apply", "--version", "1"]).await;
+            let key_id = format!("GK{}", random_hex(12));
+            let secret = random_hex(32);
+            garage(
+                &container,
+                &["key", "import", "--yes", "-n", "test", &key_id, &secret],
+            )
+            .await;
+            garage(&container, &["bucket", "create", BUCKET]).await;
+            garage(
+                &container,
+                &[
+                    "bucket", "allow", "--read", "--write", "--owner", BUCKET, "--key", &key_id,
+                ],
+            )
+            .await;
+
+            let port = container.get_host_port_ipv4(3900).await.unwrap();
+            let storage = S3Storage::new(S3Config {
+                endpoint: format!("http://127.0.0.1:{port}"),
+                region: "garage".to_owned(),
+                bucket: BUCKET.to_owned(),
+                access_key_id: SecretString::from(key_id),
+                secret_access_key: SecretString::from(secret),
+            });
+            Self {
+                storage,
+                _container: container,
+            }
+        }
+    }
+
+    fn key() -> BlobKey {
+        BlobKey::new(OrganizationId::from_uuid(Uuid::now_v7()))
+    }
+
+    /// A stream of `size` bytes in chunks of 64 KiB, as an HTTP body arrives.
+    fn body(data: &[u8]) -> ByteStream {
+        let chunks: Vec<Result<Bytes, io::Error>> = data
+            .chunks(64 * 1024)
+            .map(|chunk| Ok(Bytes::copy_from_slice(chunk)))
+            .collect();
+        Box::pin(futures::stream::iter(chunks))
+    }
+
+    fn data(size: usize) -> Vec<u8> {
+        (0..size).map(|index| (index % 251) as u8).collect()
+    }
+
+    async fn read(storage: &S3Storage, key: &BlobKey) -> Option<Vec<u8>> {
+        let stream = storage.get(key).await.unwrap()?;
+        let chunks: Vec<Bytes> = stream.try_collect().await.unwrap();
+        Some(chunks.concat())
+    }
+
+    async fn open_uploads(storage: &S3Storage) -> usize {
+        let output = storage
+            .client
+            .list_multipart_uploads()
+            .bucket(BUCKET)
+            .send()
+            .await
+            .unwrap();
+        output.uploads().len()
+    }
+
+    #[tokio::test]
+    async fn stores_reads_and_deletes_small_and_large_objects() {
+        let garage = TestGarage::start().await;
+        let storage = &garage.storage;
+        for size in [0, 1000, 2 * PART_SIZE + 12_345] {
+            let key = key();
+            let content = data(size);
+            assert_eq!(
+                storage.put(&key, body(&content), u64::MAX).await.unwrap(),
+                size as u64
+            );
+            assert_eq!(storage.head(&key).await.unwrap(), Some(size as u64));
+            assert_eq!(
+                read(storage, &key).await.as_deref(),
+                Some(content.as_slice()),
+                "size {size}"
+            );
+            storage.delete(&key).await.unwrap();
+            assert_eq!(storage.head(&key).await.unwrap(), None);
+            assert!(read(storage, &key).await.is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn keeps_nothing_of_an_upload_above_its_limit() {
+        let garage = TestGarage::start().await;
+        let storage = &garage.storage;
+        for (size, limit) in [(1000, 999), (2 * PART_SIZE, PART_SIZE as u64 + 1)] {
+            let key = key();
+            let result = storage.put(&key, body(&data(size)), limit).await;
+            assert!(
+                matches!(result, Err(BlobError::TooLarge { .. })),
+                "size {size}"
+            );
+            assert_eq!(storage.head(&key).await.unwrap(), None);
+        }
+        assert_eq!(
+            open_uploads(storage).await,
+            0,
+            "an aborted multipart upload left parts"
+        );
+    }
+
+    #[tokio::test]
+    async fn keeps_nothing_of_an_upload_whose_stream_fails() {
+        let garage = TestGarage::start().await;
+        let storage = &garage.storage;
+        let key = key();
+        let content = data(PART_SIZE + 1000);
+        let broken = body(&content).chain(futures::stream::once(async {
+            Err(io::Error::new(
+                io::ErrorKind::ConnectionReset,
+                "the client disconnected",
+            ))
+        }));
+        let result = storage.put(&key, Box::pin(broken), u64::MAX).await;
+        assert!(matches!(result, Err(BlobError::Upload(_))));
+        assert_eq!(storage.head(&key).await.unwrap(), None);
+        assert_eq!(open_uploads(storage).await, 0);
     }
 }

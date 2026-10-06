@@ -15,5 +15,13 @@ workspace = true
 tada-app.workspace = true
 async-trait.workspace = true
 aws-sdk-s3.workspace = true
+bytes.workspace = true
+futures.workspace = true
 jiff.workspace = true
 secrecy.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+testcontainers-modules.workspace = true
+tokio.workspace = true
+uuid.workspace = true
