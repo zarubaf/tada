@@ -133,3 +133,4 @@ Watchtower
 (?i)hostnames?
 (?i)proxied
 (?i)restic
+UUIDs?

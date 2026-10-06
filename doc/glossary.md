@@ -85,16 +85,21 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 ## Architecture
 
-| Term           | Meaning                                                                                                | Avoid                      |
-| -------------- | ------------------------------------------------------------------------------------------------------ | -------------------------- |
-| domain command | The only way to change accepted state. Web, Telegram, the worker and AI tools all use domain commands. | mutation, action (in code) |
-| query          | A read operation that applies permissions.                                                             |                            |
-| port           | An interface that the application defines and an adapter implements.                                   |                            |
-| adapter        | The implementation of a port for one technology, for example S3 or Telegram.                           | driver                     |
-| connector      | An adapter that brings data from an external system into tada.                                         | integration (in code)      |
-| code module    | A Rust module for one bounded context inside the `domain` and `app` crates.                            |                            |
-| worker         | The background process that runs jobs and schedules.                                                   |                            |
-| job            | A durable unit of background work with a versioned payload.                                            | task (in code)             |
+| Term             | Meaning                                                                                                                   | Avoid                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| domain command   | The only way to change accepted state. Web, Telegram, the worker and AI tools all use domain commands.                    | mutation, action (in code) |
+| query            | A read operation that applies permissions.                                                                                |                            |
+| port             | An interface that the application defines and an adapter implements.                                                      |                            |
+| adapter          | The implementation of a port for one technology, for example S3 or Telegram.                                              | driver                     |
+| connector        | An adapter that brings data from an external system into tada.                                                            | integration (in code)      |
+| code module      | A Rust module for one bounded context inside the `domain` and `app` crates.                                               |                            |
+| worker           | The background process that runs jobs and schedules.                                                                      |                            |
+| job              | A durable unit of background work with a versioned payload.                                                               | task (in code)             |
+| actor            | The one who calls a command: a member, a service identity, or AI on behalf of one of them.                                | user (in code)             |
+| service identity | A named role of tada that acts without a member, for example `worker` or `ai-pm`. Its allowed commands are fixed in code. | system user                |
+| channel          | The way a call reaches tada: web, Telegram, worker, API token or command line.                                            |                            |
+| event-local ID   | The short ID of a record inside its event, for example `ACT-042`.                                                         | number, key                |
+| problem code     | The stable code of an error response, for example `record-version-conflict`.                                              | error message              |
 
 ## Design
 

@@ -49,6 +49,11 @@ The ADRs are the authority for the decisions in this project.
 | [0032](0032-delivery-flow.md)                      | Delivery flow and approval gates                         | Moved by 0033      |
 | [0033](0033-deployment-outside-this-repository.md) | Deployment outside this repository                       | Accepted           |
 | [0034](0034-python-for-scripts.md)                 | Python for all scripts                                   | Accepted           |
+| [0035](0035-observability.md)                      | Observability without personal data                      | Proposed           |
+| [0036](0036-configuration.md)                      | Configuration, secrets and the first owner               | Proposed           |
+| [0037](0037-error-model.md)                        | Error model                                              | Proposed           |
+| [0038](0038-ids-and-time.md)                       | IDs and time                                             | Proposed           |
+| [0039](0039-actors-and-identities.md)              | Actors and service identities                            | Proposed           |
 
 ## New ADR
 

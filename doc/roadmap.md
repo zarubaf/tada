@@ -20,12 +20,8 @@ Goal: a repository and a runtime that later slices can build on without rework.
    - Upload, download and versions in object storage (ADR 0009).
    - Telegram identity linking (ADR 0011).
 4. A first deployment of the walking skeleton, from the operator's deployment repository (ADR 0033).
-5. ADRs for the decisions that the first code needs:
-   - Observability: structured logs without personal data, health checks, an uptime check and alerts.
-   - Configuration and secrets: the creation of the first owner. ADR 0025 covers the app side.
-   - Error model: RFC 9457 problem types, stable error codes and the validation error format.
-   - IDs and time: UUIDv7, event-local IDs such as `ACT-042`, UTC storage, the time crate and the time-zone rules for Europe/Zurich.
-   - Service and actor identities: the worker, the AI PM, API keys and a later MCP interface.
+5. ADRs for the decisions that the first code needs: observability ([0035](adr/0035-observability.md)), configuration ([0036](adr/0036-configuration.md)), the error model ([0037](adr/0037-error-model.md)), IDs and time ([0038](adr/0038-ids-and-time.md)) and actors ([0039](adr/0039-actors-and-identities.md)).
+6. ADRs that must exist before their slice starts:
    - Data protection under revDSG: the processors (VPS, mail, model provider, Telegram), the privacy notice, retention and breach handling. No real personal data goes to a model provider before this ADR.
    - Transactional and inbound email: the provider, SPF, DKIM, DMARC and the inbound address for each event.
    - CI build and dependency policy: the Rust build cache, Renovate and a scheduled `cargo-deny` run. ADR 0028 covers the image registry.
