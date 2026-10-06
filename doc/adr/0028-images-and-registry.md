@@ -1,6 +1,6 @@
 # 0028. Container images and registry
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

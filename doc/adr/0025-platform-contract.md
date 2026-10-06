@@ -1,6 +1,6 @@
 # 0025. Platform contract between the app and its runtime
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

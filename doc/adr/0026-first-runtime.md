@@ -1,6 +1,6 @@
 # 0026. Docker Compose as the first runtime, managed by scripts
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

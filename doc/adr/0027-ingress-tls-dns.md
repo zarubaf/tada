@@ -1,6 +1,6 @@
 # 0027. Ingress, TLS and DNS
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context

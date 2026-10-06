@@ -1,6 +1,6 @@
 # 0032. Delivery flow and approval gates
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 
 ## Context
