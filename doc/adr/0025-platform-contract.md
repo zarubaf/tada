@@ -1,6 +1,6 @@
 # 0025. Platform contract between the app and its runtime
 
-- Status: Accepted
+- Status: Proposed
 - Date: 2026-10-06
 
 ## Context
@@ -15,7 +15,8 @@ The `tada` image follows this contract on every runtime:
 
 Artifact:
 
-- One OCI image for all roles. The command selects the role: `tada serve`, `tada worker`, `tada telegram`, `tada migrate`.
+- One OCI image for all process roles. The command selects the role: `tada serve`, `tada worker`, `tada telegram`.
+- One-off commands use the same image: `tada migrate`, `tada bootstrap` and `tada settings` (ADR 0036).
 - The image runs as a non-root user and needs no write access to its file system, except `/tmp`.
 
 Configuration:
@@ -23,7 +24,7 @@ Configuration:
 - Settings come from environment variables with the prefix `TADA_`.
 - A secret comes from a file. The variable `TADA_<NAME>_FILE` gives the path. The app never reads a secret from a plain variable.
 - The app checks all settings at startup and stops with a clear error if one is missing or invalid.
-- PostgreSQL comes from `TADA_DATABASE_URL`. Object storage comes from an S3 endpoint, a bucket name and credentials.
+- PostgreSQL comes from `TADA_DATABASE_URL` without a password, plus `TADA_DATABASE_PASSWORD_FILE` (ADR 0036). Object storage comes from an S3 endpoint, a bucket name and credentials.
 - `TADA_PUBLIC_URL` gives the external base URL. The app builds magic links and webhook URLs only from it.
 - `TADA_TRUSTED_PROXIES` lists the network ranges whose `X-Forwarded-For` header the app trusts (ADR 0008).
 
@@ -38,7 +39,8 @@ Processes:
 
 Logs and metrics:
 
-- Logs go to standard output as JSON lines, one event per line, without personal data.
+- Logs go to standard output as JSON lines, one event per line, without direct identifiers (ADR 0035).
+- Each operator sets a retention limit for logs, because logs contain pseudonymous user IDs.
 - The app writes no log files.
 
 Forbidden in app code:

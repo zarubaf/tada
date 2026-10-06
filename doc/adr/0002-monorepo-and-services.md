@@ -42,7 +42,7 @@ Cargo enforces the direction of dependencies, because a crate can only use the c
 Bounded contexts, for example `identity`, `events`, `documents`, `provenance` and `assistant`, are Rust modules inside `domain` and `app`.
 Each module exports a small public interface; the rest is `pub(crate)` or private.
 
-The binary starts one role for each process: `tada serve`, `tada worker` and `tada telegram`.
+The binary starts one process role for each process: `tada serve`, `tada worker` and `tada telegram`. One-off commands, for example `tada migrate`, use the same binary (ADR 0025).
 All roles use the same image and the same `app` crate.
 Only these roles connect to the tada database.
 
