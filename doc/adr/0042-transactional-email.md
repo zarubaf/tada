@@ -23,6 +23,7 @@ Port and adapter:
 Sending:
 
 - No command sends mail directly. A command stores an outbound intent, and the `worker` sends it (ADR 0007).
+- An intent or a job payload never contains a token. For a magic link or an invitation, the intent names the user and the purpose; the worker creates the token when it sends, and stores only its hash (ADR 0008).
 - The worker records the result as sent, failed or unknown. A timeout gives "unknown"; the worker does not retry it blindly.
 - Each message has a `Message-ID` from tada, so that a later bounce can be matched.
 

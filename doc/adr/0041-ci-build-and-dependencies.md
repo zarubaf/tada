@@ -19,26 +19,29 @@ Workflows:
 - One `image` workflow runs on each push to `main` after `check` passes. It builds the image, pushes it to GHCR and creates the attestation (ADR 0028).
 - The required checks for `main` are the jobs of the `check` workflow.
 - All actions are pinned to a commit SHA, with the version in a comment.
-- Workflows have `permissions: contents: read` by default. Only the `image` workflow gets `packages: write`, `id-token: write` and `attestations: write`.
+- Workflows have `permissions: contents: read` by default. Only the `image` workflow gets `packages: write`, `id-token: write` and `attestations: write`. The daily advisory workflow gets `issues: write`.
 
 Caches:
 
 - Rust jobs use `Swatinem/rust-cache`. It caches the Cargo registry and the `target` folder by lock file and toolchain.
+- Rust builds in CI and in the image set `SQLX_OFFLINE=true` and use the committed `.sqlx` query cache (ADR 0006).
 - The image build uses `cargo-chef` in the first stage, so that a source change does not rebuild all dependencies. Docker layers use the GitHub Actions cache of `docker/build-push-action`.
 - The web build uses the pnpm store cache.
 - We do not use `sccache` now. It needs a storage backend and helps mostly for many parallel builds.
 
 Image:
 
-- The final stage is `gcr.io/distroless/cc` in its `nonroot` variant. It contains the CA certificates and the C runtime that the binary needs.
+- The build stages use Debian 13 (trixie), so that the C runtime of the build matches the final stage.
+- The final stage is `gcr.io/distroless/cc-debian13:nonroot`. The name includes the Debian release, because the name without it moves to new releases. It contains the CA certificates and the C runtime that the binary needs.
 - The time zone database is in the binary (ADR 0038), so the image needs no system time zone files.
 - The image contains only the `tada` binary and the built web files.
 
 Dependencies:
 
 - Renovate opens update pull requests. It groups updates by ecosystem (Cargo, pnpm, GitHub Actions, Docker base image) and runs once a week.
-- Renovate pins Docker base images and GitHub Actions by digest or SHA.
-- Security updates bypass the weekly schedule.
+- Renovate pins Docker base images and GitHub Actions by digest or SHA, through the presets `docker:pinDigests` and `helpers:pinGitHubActionDigests`.
+- Renovate waits for a minimum release age of three days before it proposes a new version, so that a broken or malicious release has time to be found.
+- Security updates bypass the weekly schedule. Renovate needs the GitHub vulnerability alerts of the repository for this, so these alerts are enabled.
 - A scheduled workflow runs `cargo deny check advisories` and `pnpm audit` each day. A finding opens an issue.
 - Lock files (`Cargo.lock`, `pnpm-lock.yaml`) are committed.
 

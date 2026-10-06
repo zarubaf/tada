@@ -40,8 +40,11 @@ Readable IDs:
 | Requirement   | event        | `REQ`  |
 | Commitment    | event        | `COM`  |
 | Open question | event        | `QST`  |
+| Milestone     | event        | `MIL`  |
 | Document      | organization | `DOC`  |
 | Resource      | organization | `RES`  |
+| Person        | organization | `PER`  |
+| Institution   | organization | `INS`  |
 
 - A record gets its readable ID when it becomes accepted state. Proposals have no readable ID.
 - A counter row for each scope and kind gives the next number. The command that creates the record runs `UPDATE … RETURNING` on the counter in the same transaction as the insert.

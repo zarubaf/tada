@@ -15,7 +15,8 @@ The same conventions must hold for the web client, the MCP server (ADR 0040) and
 
 Naming and format:
 
-- JSON field names use `snake_case`. Enum values use `kebab-case`, as problem codes do.
+- JSON field names use `snake_case`. Enum values use `kebab-case`, as problem codes do, for example `accepted-with-edit`.
+- Keys of the field catalog (ADR 0049), for example `date_window`, are data, not enum values. They use `snake_case`, because agents and exports use them as JSON keys.
 - Paths use plural nouns and IDs: `/api/v1/events/{event_id}/actions`.
 - Instants are RFC 3339 strings in UTC. Calendar dates are `YYYY-MM-DD` (ADR 0038).
 - An absent optional field and `null` mean the same. Responses omit absent fields.
@@ -33,7 +34,7 @@ Reads:
 
 Writes:
 
-- Each state change is a command: `POST /api/v1/<resource>/{id}/<command>`, for example `POST /api/v1/proposals/{proposal_id}/accept`.
+- Each state change is a command: `POST /api/v1/<resource>/{id}/<command>`, for example `POST /api/v1/changesets/{changeset_id}/apply` (ADR 0050).
 - A create is `POST` on the collection. The client can send the new UUID for a safe retry (ADR 0038).
 - A command on an existing record carries `expected_version`. A mismatch gives `record-version-conflict` (ADR 0037).
 - There is no generic `PATCH`. Each change has a named command, so that the audit log and the permissions know its meaning.
