@@ -1,0 +1,7 @@
+# STE: use simple tenses only.
+extends: existence
+message: "Use a simple tense instead of '%s'."
+level: warning
+ignorecase: true
+tokens:
+  - '(?:has|have|had)\s+(?:been|\w+ed)'

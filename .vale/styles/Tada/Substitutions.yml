@@ -1,0 +1,22 @@
+# STE approved verbs: one plain word for each action.
+extends: substitution
+message: "Use '%s' instead of '%s'."
+level: error
+ignorecase: true
+swap:
+  utilize: use
+  utilise: use
+  leverage: use
+  employ: use
+  ensure: make sure
+  guarantee: make sure
+  initiate: start
+  commence: start
+  terminate: stop
+  cease: stop
+  necessitate: need
+  in order to: to
+  prior to: before
+  subsequent to: after
+  a number of: some
+  e-mail: email

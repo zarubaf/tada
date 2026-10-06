@@ -1,0 +1,8 @@
+# STE: use the active voice and name the actor.
+extends: existence
+message: "'%s' looks passive. Name the actor and use the active voice."
+level: warning
+ignorecase: true
+raw:
+  - \b(?:am|are|is|was|were|be|been|being)\s+
+  - (?:\w+ed|built|chosen|done|drawn|found|given|held|kept|known|made|paid|run|sent|set|shown|taken|written)\b

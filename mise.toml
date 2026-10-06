@@ -6,16 +6,30 @@
 node = "26.10.0"
 pnpm = "12.9.1"
 uv = "0.12.23"
+vale = "3.24.0"
 "pipx:mdformat" = { version = "1.0.0", uvx_args = "--with mdformat-gfm --with mdformat-frontmatter" }
 
 [tasks."check:docs-format"]
 description = "Check Markdown formatting"
 run = "mdformat --check $(git ls-files --cached --others --exclude-standard '*.md')"
 
+[tasks."check:docs-style"]
+description = "Check prose style and spelling"
+run = "vale --minAlertLevel=error $(git ls-files --cached --others --exclude-standard '*.md')"
+
+[tasks."check:docs"]
+description = "Run all documentation checks"
+depends = ["check:docs-format", "check:docs-style"]
+
 [tasks.check]
 description = "Run every check that CI runs"
-depends = ["check:docs-format"]
+depends = ["check:docs"]
 
 [tasks.fmt]
 description = "Format Markdown files in place"
 run = "mdformat $(git ls-files --cached --others --exclude-standard '*.md')"
+
+[tasks.lint-prose]
+description = "Show all prose findings, including warnings and suggestions"
+run = "vale $(git ls-files --cached --others --exclude-standard '*.md')"
+

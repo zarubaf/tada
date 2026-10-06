@@ -1,0 +1,17 @@
+# The project uses US English. Vale's dictionary accepts many British forms,
+# so this rule finds the common ones. See doc/adr/0012-documentation.md.
+extends: existence
+message: "Use US spelling instead of '%s'."
+level: error
+ignorecase: true
+tokens:
+  - '\b(?:organ|author|priorit|optim|recogn|final|summar|normal|serial|initial|custom|minim|standard|categor|synchron|util|real|special|apolog|emphas|critic|central|visual|local|stabil|sanit|token|memor|character|capital|commercial|operational|internal|container)is(?:e|es|ed|ing|ation|ations|er|ers)\b'
+  - '\b(?:behavio|colo|favo|hono|labo|neighbo|rumo)urs?\b'
+  - '\blicences?\b'
+  - '\bcentres?\b'
+  - '\bcatalogues?\b'
+  - '\bprogrammes?\b'
+  - '\bdefence\b'
+  - '\b(?:cancel|model|label|travel|signal|fuel)l(?:ed|ing)\b'
+  - '\banalys(?:e|ed|ing)\b'
+  - '\b(?:whilst|amongst)\b'

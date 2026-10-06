@@ -1,0 +1,7 @@
+# STE: at most 20 words in procedures and 25 words in descriptions.
+extends: occurrence
+message: "Keep sentences to 25 words or fewer."
+level: warning
+scope: sentence
+max: 25
+token: \b(\w+)\b

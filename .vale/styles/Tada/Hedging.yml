@@ -1,0 +1,14 @@
+# STE: state facts directly. Do not pad.
+extends: existence
+message: "Remove '%s'. State the fact directly."
+level: warning
+ignorecase: true
+tokens:
+  - hopefully
+  - basically
+  - simply
+  - just
+  - quite
+  - very
+  - might want to
+  - feel free to

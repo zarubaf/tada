@@ -1,0 +1,17 @@
+# STE prefers one verb per action. These words are often fine in technical
+# names (for example "signature verification"), so this is a warning only.
+extends: substitution
+message: "Prefer '%s' over '%s' unless it is a fixed technical term."
+level: warning
+ignorecase: true
+swap:
+  verify: check
+  validate: check
+  confirm: check
+  display: show
+  exhibit: show
+  locate: find
+  modify: change
+  alter: change
+  require: need
+  eliminate: remove
