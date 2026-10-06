@@ -1,0 +1,54 @@
+# cargo-deny policy: crate boundaries, licenses, advisories and sources.
+# ADR 0002 defines the boundaries, ADR 0014 the licenses and ADR 0041 the advisory checks.
+
+[graph]
+all-features = true
+
+[advisories]
+# Each ignored advisory needs a reason and an issue.
+ignore = []
+
+[licenses]
+# Licenses that are compatible with Apache-2.0 for distribution (ADR 0014).
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "CC0-1.0",
+  "ISC",
+  "MIT",
+  "MIT-0",
+  "Unicode-3.0",
+  "Zlib",
+]
+confidence-threshold = 0.9
+unused-allowed-license = "allow"
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+# A crate in this list can only be a direct dependency of the crates in its `wrappers`.
+# This enforces the direction of ADR 0002:
+# - Only the binary depends on the adapter crates. It is the composition root.
+# - The domain crate depends on no other tada crate.
+# - I/O crates are dependencies of adapter crates only.
+deny = [
+  { crate = "tada-app", wrappers = ["tada-store-pg", "tada-adapters", "tada-api", "tada"] },
+  { crate = "tada-store-pg", wrappers = ["tada"] },
+  { crate = "tada-adapters", wrappers = ["tada"] },
+  { crate = "tada-api", wrappers = ["tada"] },
+  { crate = "sqlx", wrappers = ["tada-store-pg", "jiff-sqlx"] },
+  { crate = "aws-sdk-s3", wrappers = ["tada-adapters"] },
+  { crate = "reqwest", wrappers = ["tada-adapters"] },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
