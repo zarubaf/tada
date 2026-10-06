@@ -1,5 +1,8 @@
 //! The settings sections and the sections of each command.
 
+use std::str::FromStr;
+
+use ipnet::IpNet;
 use secrecy::SecretString;
 use tracing_subscriber::EnvFilter;
 use url::Url;
@@ -98,6 +101,7 @@ impl Section for Database {
 #[derive(Debug)]
 pub struct Http {
     pub port: u16,
+    pub trusted_proxies: Vec<IpNet>,
 }
 
 const PORT: Setting = Setting {
@@ -108,15 +112,42 @@ const PORT: Setting = Setting {
     description: "The TCP port of the HTTP server. The server does not handle TLS.",
 };
 
+const TRUSTED_PROXIES: Setting = Setting {
+    name: "TADA_TRUSTED_PROXIES",
+    kind: "list of network ranges",
+    default: Some(""),
+    secret: false,
+    description: "The ranges of the reverse proxies, separated by commas, for example `10.0.0.0/8`. The server accepts `X-Request-Id` only from them.",
+};
+
 impl Section for Http {
     fn settings() -> Vec<&'static Setting> {
-        vec![&PORT]
+        vec![&PORT, &TRUSTED_PROXIES]
     }
 
     fn read(source: &mut Source<'_>) -> Option<Self> {
+        let port = source.value(&PORT);
+        let trusted_proxies: Option<NetworkRanges> = source.value(&TRUSTED_PROXIES);
         Some(Self {
-            port: source.value(&PORT)?,
+            port: port?,
+            trusted_proxies: trusted_proxies?.0,
         })
+    }
+}
+
+/// Network ranges, separated by commas. An empty text is an empty list.
+struct NetworkRanges(Vec<IpNet>);
+
+impl FromStr for NetworkRanges {
+    type Err = ipnet::AddrParseError;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        text.split(',')
+            .map(str::trim)
+            .filter(|range| !range.is_empty())
+            .map(IpNet::from_str)
+            .collect::<Result<_, _>>()
+            .map(Self)
     }
 }
 

@@ -4,8 +4,10 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use anyhow::Context;
+use tada_adapters::clock::SystemClock;
 use tada_adapters::storage::{S3Config, S3Storage};
 use tada_api::ApiState;
+use tada_app::auth::Authenticator;
 use tada_store_pg::Database;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -25,6 +27,10 @@ pub async fn run((database, http, storage): ServeSettings) -> anyhow::Result<()>
     });
     let router = tada_api::router(ApiState {
         dependencies: vec![Arc::new(db.clone()), Arc::new(storage)],
+        authenticator: authenticator(&db).await?,
+        events: Arc::new(db.clone()),
+        clock: Arc::new(SystemClock),
+        trusted_proxies: http.trusted_proxies,
     });
 
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, http.port));
@@ -50,4 +56,35 @@ pub async fn run((database, http, storage): ServeSettings) -> anyhow::Result<()>
     }
     db.close().await;
     Ok(())
+}
+
+/// The development authenticator in debug builds (ADR 0053).
+#[cfg(debug_assertions)]
+async fn authenticator(db: &Database) -> anyhow::Result<Arc<dyn Authenticator>> {
+    db.ensure_dev_organization()
+        .await
+        .context("cannot create the development organization; did `tada migrate` run?")?;
+    tracing::warn!("debug build: each request acts as the development owner (ADR 0053)");
+    Ok(Arc::new(tada_store_pg::dev::DevAuthenticator))
+}
+
+/// Sign-in comes in Slice 1. Until then, a release build rejects each request (ADR 0053).
+#[cfg(not(debug_assertions))]
+async fn authenticator(_db: &Database) -> anyhow::Result<Arc<dyn Authenticator>> {
+    Ok(Arc::new(NoSignIn))
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Debug)]
+struct NoSignIn;
+
+#[cfg(not(debug_assertions))]
+#[async_trait::async_trait]
+impl Authenticator for NoSignIn {
+    async fn authenticate(
+        &self,
+        _session_token: Option<&str>,
+    ) -> Result<tada_app::caller::MemberCaller, tada_app::auth::AuthenticationError> {
+        Err(tada_app::auth::AuthenticationError::Unauthenticated)
+    }
 }

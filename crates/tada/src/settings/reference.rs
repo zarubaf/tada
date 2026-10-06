@@ -43,9 +43,11 @@ pub fn reference() -> String {
             [
                 format!("`{}`", setting.name),
                 setting.kind.to_owned(),
-                setting
-                    .default
-                    .map_or_else(|| "none".to_owned(), |default| format!("`{default}`")),
+                match setting.default {
+                    None => "none".to_owned(),
+                    Some("") => "empty".to_owned(),
+                    Some(default) => format!("`{default}`"),
+                },
                 if setting.secret { "yes" } else { "no" }.to_owned(),
                 used_by.join(", "),
                 setting.description.to_owned(),

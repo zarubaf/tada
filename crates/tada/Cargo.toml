@@ -17,6 +17,7 @@ tada-store-pg.workspace = true
 tada-adapters.workspace = true
 tada-api.workspace = true
 anyhow.workspace = true
+async-trait.workspace = true
 clap.workspace = true
 ipnet.workspace = true
 json-subscriber.workspace = true
@@ -29,4 +30,8 @@ uuid.workspace = true
 url.workspace = true
 
 [dev-dependencies]
+tada-store-pg = { workspace = true, features = ["testing"] }
+axum.workspace = true
+serde_json.workspace = true
 tempfile.workspace = true
+tower.workspace = true

@@ -19,6 +19,8 @@ pub fn init(process_role: &'static str, filter: &str) {
 /// of all spans, for example `request_id`, and `process_role`. All fields are at the top level.
 ///
 /// `process_role` is a static field, not a span field, so that it is also in the lines of spawned tasks.
+/// `json-subscriber` also writes the name of the innermost span as `name`. An event field `name` would
+/// repeat this key; ADR 0035 forbids names in logs anyway.
 fn layer<S, W>(process_role: &'static str, writer: W) -> JsonLayer<S, W>
 where
     S: tracing::Subscriber + for<'lookup> LookupSpan<'lookup>,
@@ -93,6 +95,7 @@ mod tests {
         assert_eq!(line["request_id"], "01a1114f-9428-7111-8a10-be3f0112e5e0");
         assert_eq!(line["job_id"], 7);
         assert_eq!(line["organization_id"], "org");
+        assert_eq!(line["name"], "job", "the name of the innermost span");
         assert!(line["target"].as_str().unwrap().starts_with("tada"));
         let timestamp = line["timestamp"].as_str().unwrap();
         assert!(timestamp.ends_with('Z'), "not UTC: {timestamp}");

@@ -15,4 +15,5 @@ workspace = true
 tada-app.workspace = true
 async-trait.workspace = true
 aws-sdk-s3.workspace = true
+jiff.workspace = true
 secrecy.workspace = true
