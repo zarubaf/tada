@@ -8,7 +8,7 @@
 A domain command must commit the change, the audit event and any outbound job in one transaction.
 The AI PM needs schedules that continue after a restart.
 A restart must not flood users with old reminders.
-The Rust job libraries are less mature than Graphile Worker for TypeScript.
+The Rust job libraries are younger than their TypeScript equivalents.
 
 ## Decision
 
@@ -18,8 +18,9 @@ The Rust job libraries are less mature than Graphile Worker for TypeScript.
 - Each job payload has a `version` field. A handler accepts all versions that can still be in the queue.
 - Schedules are rows with a next run time and an explicit limit for missed runs.
 - Outbound messages store an intent before the send, and record the result as sent, failed or unknown.
-- A spike in the walking skeleton tests `apalis` with its PostgreSQL backend.
-  We use `apalis` only if it can add a job inside the caller's transaction and supports the other points above.
+- A spike of at most two days in the walking skeleton tests the Rust `graphile_worker` crate and `apalis` (1.0 release candidate) with PostgreSQL.
+  The hard criterion: a command can add a job inside its own `sqlx` transaction.
+  We use a library only if it meets this criterion and the other points above.
   Otherwise, `store-pg` implements the queue itself.
 
 ## Consequences
@@ -31,5 +32,5 @@ The Rust job libraries are less mature than Graphile Worker for TypeScript.
 
 ## Alternatives
 
-- `underway`: the closest match, but too few users and no recent release.
+- `underway`: close to our needs, but few users and no release since July 2025.
 - Redis or a message broker: one more service and no shared transaction with the domain data.

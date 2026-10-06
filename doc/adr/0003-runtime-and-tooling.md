@@ -23,7 +23,8 @@ Backend:
 
 Web client:
 
-- Language: TypeScript with `strict` mode, on Node.js 26 with pnpm.
+- Language: TypeScript with `strict` mode, on Node.js with pnpm.
+- Node.js: the current Active LTS line, now 24. We move to 26 after it becomes LTS.
 - Format and lint: Biome.
 - Tests: Vitest.
 

@@ -18,10 +18,8 @@ We use one Git repository with one Cargo workspace for the backend (ADR 0003):
 crates/
   domain/        types, rules and state machines; no I/O dependencies
   app/           domain commands, queries and ports (traits)
-  store-pg/      PostgreSQL repositories, migrations and the job queue
-  blob-s3/       object storage adapter
-  mail-smtp/     mail adapter
-  model/         model provider adapter
+  store-pg/      PostgreSQL repositories, migrations, sessions and the job queue
+  adapters/      object storage, mail and model provider adapters
   api/           HTTP handlers and the OpenAPI document
   telegram/      Telegram gateway
   tada/          the binary: serve, worker, telegram and migrate commands
@@ -33,13 +31,13 @@ deploy/          Compose files and deployment scripts (ADR 0015)
 Cargo enforces the direction of dependencies, because a crate can only use the crates in its `Cargo.toml`:
 
 1. `domain` depends on no other tada crate and on no I/O crate.
-2. `app` depends on `domain` only.
+2. `app` depends on no tada crate except `domain`, and on no I/O crate.
 3. Each adapter crate depends on `app` and implements its ports.
 4. `api`, `telegram` and the worker call `app` commands and queries. They contain no domain rules.
 5. Only the `tada` binary depends on the adapter crates. It is the composition root.
 6. `apps/web` uses only the client that the build generates from `contracts/openapi.json`.
 
-A CI check reads `cargo metadata` and fails if a crate breaks rules 1–3 or 5.
+`cargo-deny` checks the rules that Cargo cannot see. Its `[bans]` section allows I/O crates such as `sqlx`, `aws-sdk-s3` and `reqwest` only as dependencies of the adapter crates.
 
 Bounded contexts, for example `identity`, `events`, `documents`, `provenance` and `assistant`, are Rust modules inside `domain` and `app`.
 Each module exports a small public interface; the rest is `pub(crate)` or private.
@@ -54,9 +52,9 @@ Each split needs an ADR, and the new service then talks to the core only through
 ## Consequences
 
 - Domain rules exist once, in `domain` and `app`.
-- The compiler enforces most boundaries; the CI check covers the rest.
+- The compiler enforces most boundaries; `cargo-deny` covers the rest.
 - A role can move to its own service later, because it already depends only on `app`.
-- More crates mean more `Cargo.toml` files. We split a crate only when a boundary needs it.
+- More crates mean more `Cargo.toml` files. We split a crate only when a boundary needs it. For example, `adapters` splits only when one adapter needs its own boundary.
 
 ## Alternatives
 

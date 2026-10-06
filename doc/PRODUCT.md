@@ -37,7 +37,7 @@ Official product documentation was checked on 6 October 2026. This is a focused 
 
 **Build:** event state, ownership, commitments, decisions, risks, requirements, provenance, review workflows, portfolio conflicts and readiness.
 
-**Reuse:** authentication libraries, email, calendar, documents, payments, ticketing, accounting, transcription services and mapping tools.
+**Reuse:** cryptographic and authentication primitives, email, calendar, documents, payments, ticketing, accounting, transcription services and mapping tools.
 
 **Supply a small native fallback where otherwise nobody can participate:** tasks, simple requests/forms, assignments and resource bookings. This should be enough to run a small club event without purchasing a project-management suite.
 

@@ -110,15 +110,15 @@ Provide folders, upload/drag-and-drop, filename search, metadata, PDF/image/text
 
 PostgreSQL owns folders, document/version IDs, titles, event scope, ownership and processing state. Object storage holds originals, previews and extracted outputs under generated keys unrelated to filenames. A rename or move updates metadata rather than changing identity.
 
-The bucket is private. Authorize each upload/download server-side before issuing a short-lived URL. Presigned URLs are bearer credentials and may be reusable until expiry; never treat them as one-time user-authenticated links. See [S3 presigned URLs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html).
+The bucket is private and reachable only on the internal network. All uploads and downloads go through the authenticated application, which authorizes each request; tada issues no presigned URLs, because they are bearer credentials that cannot be revoked ([ADR 0009](adr/0009-object-storage.md)).
 
-Issue uploads to a unique staging key. Finalize after verifying the uploaded object, size/type and expected scope; reject unsafe previews and oversized uploads. Publish a version atomically in the database only after capture succeeds. Approved/retained blobs cannot be overwritten by a reused upload URL. Track abandoned uploads, orphaned objects and failed extraction; clean them using an explicit policy. For stricter immediate revocation, proxy downloads through the authenticated application instead of handing out signed URLs.
+Issue uploads to a unique staging key. Finalize after verifying the uploaded object, size/type and expected scope; reject unsafe previews and oversized uploads. Publish a version atomically in the database only after capture succeeds. The application never writes to the key of an approved or retained version. Track abandoned uploads, orphaned objects and failed extraction; clean them using an explicit policy.
 
 Copying a UI component can save frontend work, but check its license and maintenance. Do not copy an entire file manager that brings a second identity or metadata system.
 
 ### Authentication now
 
-Use a maintained library rather than implementing token/session cryptography. Better Auth handles authentication only; tada owns memberships and roles, so we do not use its organization plugin ([ADR 0008](adr/0008-authentication.md)). See [Magic links](https://better-auth.com/docs/plugins/magic-link).
+Do not implement cryptography. tada uses maintained cryptographic primitives and owns its magic links, sessions, memberships and roles ([ADR 0008](adr/0008-authentication.md)).
 
 Invite-only access: the owner invites an existing personal email address. A short-lived, single-use email link signs the member in and creates a revocable secure session. Disable unrestricted signup and do not grant membership merely because an email domain matches. Use secure HTTP-only cookies, request/redirect validation and rate limits provided/configured through the library. Transactional email delivery is a small explicit dependency to price and operate.
 

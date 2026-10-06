@@ -102,3 +102,6 @@ gRPC
 (?i)enums?
 (?i)backoff
 Ory
+(?i)untrusted
+DTOs?
+revDSG

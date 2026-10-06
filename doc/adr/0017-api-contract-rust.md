@@ -12,15 +12,19 @@ The rules of ADR 0004 for versions and stability stay valid; only the tools chan
 
 ## Decision
 
-- The `api` crate uses `axum` for HTTP and `utoipa` for the OpenAPI document.
-- Rust types with `serde` and `utoipa` derives are the single definition of each request and response.
+- The `api` crate uses `axum` for HTTP, and `utoipa` with `utoipa-axum` for the OpenAPI document. `utoipa-axum` registers routes and their documentation together, so they cannot drift.
+- `Cargo.toml` pins `utoipa` and `utoipa-axum`; `mise.toml` pins `oasdiff`.
+- Request and response types (DTOs) live only in the `api` crate. They are the single definition of the contract.
+- The `api` crate maps DTOs to and from domain types. The `domain` crate never derives `ToSchema`, so a domain refactor cannot change the contract by accident.
 - The command `tada openapi` writes `contracts/openapi.json`. The file is committed.
 - A CI check fails if the committed file differs from the generated file.
 - All routes use the prefix `/api/v1`.
 - In v1, we only add: new routes, new optional request fields and new response fields.
 - CI compares `openapi.json` with `main` through `oasdiff` and fails on a breaking change.
 - A breaking change needs a new ADR, a `!` commit and a new version prefix.
-- The web client uses TypeScript types and a client that the build generates from `openapi.json`.
+- A new value in a response enum is a breaking change, unless the contract marks the enum as open and clients handle unknown values.
+- The web client uses types from `openapi-typescript` and calls the API with `openapi-fetch`.
+- A spike in the walking skeleton checks that `oasdiff` and `openapi-typescript` handle the real `utoipa` output.
 - HTTP handlers only translate HTTP to `app` commands and queries. They contain no domain rules.
 - Error responses use one format for all routes: RFC 9457 problem details.
 

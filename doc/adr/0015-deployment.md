@@ -1,6 +1,6 @@
 # 0015. Single-host deployment with Docker Compose
 
-- Status: Accepted
+- Status: Proposed
 - Date: 2026-10-06
 
 ## Context
@@ -12,9 +12,10 @@ The data of a Swiss club should stay in Switzerland or the EU.
 ## Decision
 
 - The first deployment is one virtual machine at a Swiss or EU provider.
-- Docker Compose runs these services: server, worker, PostgreSQL, Garage and Caddy.
+- Docker Compose runs these services: `serve`, `worker` and `telegram` (three roles of one image), PostgreSQL, Garage and Caddy.
 - Caddy terminates TLS with automatic certificates.
-- CI builds one container image for the server and the worker.
+- CI builds one container image for all roles.
+- Caddy routes the web client, the API and the Telegram webhook path to `serve` and `telegram`. Garage stays on the internal network.
 - Backups contain a database dump and the object storage, with a manifest. They go to a second provider.
 - We test a restore before the first real event data enters the system.
 - Development, staging and production are separate databases and buckets.
