@@ -12,3 +12,6 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+jiff.workspace = true
+thiserror.workspace = true
+uuid.workspace = true

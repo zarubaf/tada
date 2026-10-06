@@ -14,4 +14,9 @@ workspace = true
 [dependencies]
 tada-domain.workspace = true
 async-trait.workspace = true
+jiff.workspace = true
 thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
