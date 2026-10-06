@@ -44,9 +44,9 @@ Service identities:
 - Infrastructure queries without an organization scope exist only in `store-pg`, for example "claim the next due job". Each one is named in the code and returns the organization ID, so that the handler continues with a scoped caller.
 - Service identities are not network credentials. The process roles of the `tada` binary create them in process (ADR 0002).
 
-API tokens (later):
+API tokens (from Slice 1, for MCP clients; ADR 0040):
 
-- When an external client or an MCP interface needs access, members create personal API tokens.
+- Members create personal API tokens for external clients, for example MCP clients.
 - A token belongs to one member and one organization, and has a scope, an expiry and a name.
 - At first, the only scopes are `read` and `propose`. A token caller is an `AiCaller` for its member, because an AI can be behind any token. A `write` scope needs a new ADR.
 - The database stores only a hash of the token (ADR 0008). The token starts with `tada_pat_`, so that secret scanners can find it.

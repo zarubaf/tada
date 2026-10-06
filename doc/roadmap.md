@@ -35,13 +35,14 @@ tada sends no correspondence in this slice.
 
 Demonstration:
 
-1. A member enters the known facts in an event profile, with assumptions, unknowns and open questions.
-2. A member uploads source documents and browses them in the web client.
-3. A member asks: "What are we planning and what remains unknown?"
-4. tada generates a German concept and an enquiry draft from accepted facts and labeled proposals.
-5. tada saves both drafts as document versions with fact and source-version provenance.
-6. A member proposes a change of the date window through Telegram. The owner reviews it. tada generates a new draft version and shows the differences.
-7. An operator restarts the services. All records and files stay available.
+1. A member describes the event in free text to their own AI agent (Claude or Codex). The agent proposes facts, assumptions, unknowns and open questions through MCP ([ADR 0040](adr/0040-ai-intake-through-mcp.md)).
+2. The member accepts or corrects the proposals in the Review Inbox.
+3. A member uploads source documents and browses them in the web client.
+4. A member asks the agent: "What are we planning and what remains unknown?" The agent answers from the read tools.
+5. The agent writes a German concept and an enquiry draft from accepted facts and labeled proposals, and proposes both as document drafts.
+6. tada saves both drafts as document versions with fact and source-version provenance.
+7. A member proposes a change of the date window through a Telegram command. The owner reviews it. The agent writes a new draft version, and tada shows the differences.
+8. An operator restarts the services. All records and files stay available.
 
 Acceptance:
 
@@ -62,7 +63,7 @@ Acceptance:
 
 Goal: workstream leads own their work directly, and the AI PM follows up without the PM.
 
-Scope: actions and commitments, distributed review, durable scheduled checks, internal Telegram reminders, decisions, risks, requirements, templates, portfolio and resource views, and inbound email.
+Scope: AI intake inside tada (web and Telegram) through the model adapter, actions and commitments, distributed review, durable scheduled checks, internal Telegram reminders, decisions, risks, requirements, templates, portfolio and resource views, and inbound email.
 
 Acceptance:
 

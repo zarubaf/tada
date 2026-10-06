@@ -103,6 +103,8 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | channel          | The way a call reaches tada: web, Telegram, job, API token or command line.                                                                       |                                                  |
 | event-local ID   | The short ID of a record inside its event, for example `ACT-042`.                                                                                 | number, key                                      |
 | problem code     | The stable code of an error response, for example `record-version-conflict`.                                                                      | error message                                    |
+| MCP server       | The `/mcp` endpoint of tada. AI clients of members use it to read data and create proposals.                                                      | AI API                                           |
+| API token        | A personal token with the prefix `tada_pat_`, bound to one member and one organization, with the scope `read` or `propose`.                       | API key                                          |
 
 ## Design
 

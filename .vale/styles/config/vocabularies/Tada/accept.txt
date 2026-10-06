@@ -134,3 +134,7 @@ Watchtower
 (?i)proxied
 (?i)restic
 UUIDs?
+rmcp
+Codex
+Streamable
+OAuth
