@@ -89,21 +89,22 @@ The same image runs on each platform. Only the manifests in `deploy/` change.
 
 The owner column shows the steps that need the product owner.
 
-| Step                                                                                       | Who   | Command or action                            |
-| ------------------------------------------------------------------------------------------ | ----- | -------------------------------------------- |
-| 1. Confirm the hostnames                                                                   | owner | reply in the pull request                    |
-| 2. Create the dedicated VM (before real data)                                              | owner | Hetzner console, EU location, Ubuntu LTS     |
-| 3. Set the Hetzner Cloud Firewall: 22, 80, 443 inbound                                     | owner | Hetzner console                              |
-| 4. Write `deploy/inventory.local`                                                          | owner | host name and SSH user                       |
-| 5. Check the planned host changes                                                          | agent | `mise run host:provision -- --dry-run`       |
-| 6. Provision the host                                                                      | owner | `mise run host:provision`                    |
-| 7. Create the DNS records ("DNS only")                                                     | owner | Cloudflare dashboard                         |
-| 8. Create the B2 bucket and the two keys (append-only for the VM, full for pruning)        | owner | Backblaze console                            |
-| 9. Set all secrets from the password manager                                               | owner | `mise run secrets:set <environment> <name>`  |
-| 10. Check that all secrets exist                                                           | agent | `mise run secrets:check <environment>`       |
-| 11. Create the `production` GitHub environment with a required reviewer and the deploy key | owner | GitHub settings                              |
-| 12. First deploy and smoke test                                                            | agent | `mise run deploy:staging`, then the workflow |
-| 13. First restore test                                                                     | agent | `mise run release:rehearse <digest>`         |
+| Step                                                                                                                         | Who   | Command or action                                            |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------ |
+| 1. Confirm the hostnames                                                                                                     | owner | reply in the pull request                                    |
+| 2. Create the dedicated VM (before real data)                                                                                | owner | Hetzner console, EU location, Ubuntu LTS                     |
+| 3. Set the Hetzner Cloud Firewall: 22, 80, 443 inbound                                                                       | owner | Hetzner console                                              |
+| 4. Write `deploy/inventory.local` from `deploy/inventory.example`                                                            | owner | host, SSH target and public addresses                        |
+| 5. Check the planned host changes                                                                                            | agent | `mise run host:provision -- --dry-run`                       |
+| 6. Provision the host                                                                                                        | owner | `mise run host:provision`                                    |
+| 7. Create a Cloudflare API token: DNS edit for the `zaruba.email` zone only, stored in `~/.config/tada/cloudflare-api-token` | owner | Cloudflare dashboard                                         |
+| 8. Create or update the DNS records ("DNS only")                                                                             | agent | `mise run dns:apply -- --dry-run`, then `mise run dns:apply` |
+| 9. Create the B2 bucket and the two keys (append-only for the VM, full for pruning)                                          | owner | Backblaze console                                            |
+| 10. Set all secrets from the password manager                                                                                | owner | `mise run secrets:set <environment> <name>`                  |
+| 11. Check that all secrets exist                                                                                             | agent | `mise run secrets:check <environment>`                       |
+| 12. Create the `production` GitHub environment with a required reviewer and the deploy key                                   | owner | GitHub settings                                              |
+| 13. First deploy and smoke test                                                                                              | agent | `mise run deploy:staging`, then the workflow                 |
+| 14. First restore test                                                                                                       | agent | `mise run release:rehearse <digest>`                         |
 
 ## Each release
 

@@ -1,0 +1,8 @@
+# Copy to deploy/inventory.local and fill in. Git ignores *.local files.
+# Never commit real host addresses; the repository is public.
+
+# SSH target of the host, for example an alias from ~/.ssh/config.
+TADA_HOST_SSH=user@host
+# Public addresses of the host. The DNS records point here.
+TADA_HOST_IPV4=192.0.2.10
+TADA_HOST_IPV6=2001:db8::10
