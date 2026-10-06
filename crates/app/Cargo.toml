@@ -13,3 +13,5 @@ workspace = true
 
 [dependencies]
 tada-domain.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true

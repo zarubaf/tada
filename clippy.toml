@@ -1,0 +1,4 @@
+# Tests can unwrap: a panic is a test failure with a location.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-print-in-tests = true

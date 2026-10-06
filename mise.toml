@@ -13,7 +13,20 @@ gitleaks = "8.30.1"
 ruff = "0.16.10"
 "pipx:mdformat" = { version = "1.0.0", uvx_args = "--with mdformat-gfm --with mdformat-frontmatter" }
 cargo-deny = "0.20.2"
+"cargo:sqlx-cli" = { version = "0.9.0", default-features = false, features = "postgres,rustls" }
 "github:nextest-rs/nextest" = { version = "0.9.146", version_prefix = "cargo-nextest-" }
+
+# Settings for local development (doc/settings.md). They point to the services of compose.yaml.
+# Builds use the committed .sqlx query cache, so they need no database (ADR 0006).
+[env]
+SQLX_OFFLINE = "true"
+TADA_DATABASE_URL = "postgres://tada@127.0.0.1:5432/tada"
+TADA_DATABASE_PASSWORD_FILE = "{{config_root}}/.dev/secrets/database_password"
+TADA_S3_ENDPOINT = "http://127.0.0.1:3900"
+TADA_S3_REGION = "garage"
+TADA_S3_BUCKET = "tada"
+TADA_S3_ACCESS_KEY_ID_FILE = "{{config_root}}/.dev/secrets/s3_access_key_id"
+TADA_S3_SECRET_ACCESS_KEY_FILE = "{{config_root}}/.dev/secrets/s3_secret_access_key"
 
 [tasks."check:docs-format"]
 description = "Check Markdown formatting"
@@ -51,13 +64,21 @@ run = "cargo nextest run --workspace --locked --no-tests=pass"
 description = "Check crate boundaries, licenses and advisories"
 run = "cargo deny --workspace --locked check"
 
+[tasks."check:generated"]
+description = "Check that the generated files match the code"
+run = "cargo run --quiet --locked -p tada -- settings | diff -u doc/settings.md -"
+
 [tasks."check:rust"]
 description = "Run all Rust checks"
-depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps"]
+depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps", "check:generated"]
 
 [tasks.check]
 description = "Run every check that CI runs"
 depends = ["check:docs", "check:secrets", "check:scripts", "check:rust"]
+
+[tasks."gen:settings"]
+description = "Generate doc/settings.md from the settings code"
+run = "cargo run --quiet -p tada -- settings > doc/settings.md"
 
 [tasks.fmt]
 description = "Format Markdown files in place"
@@ -79,6 +100,14 @@ run = ["docker compose up --detach --wait", "uv run --quiet scripts/dev_storage.
 [tasks."dev:down"]
 description = "Stop the development services; the volumes stay"
 run = "docker compose down"
+
+[tasks."db:prepare"]
+description = "Migrate the development database and update the .sqlx query cache"
+env = { SQLX_OFFLINE = "false" }
+run = [
+  "DATABASE_URL=postgres://tada:$(cat .dev/secrets/database_password)@127.0.0.1:5432/tada sqlx migrate run --source crates/store-pg/migrations",
+  "DATABASE_URL=postgres://tada:$(cat .dev/secrets/database_password)@127.0.0.1:5432/tada cargo sqlx prepare --workspace -- --all-targets",
+]
 
 [tasks.setup]
 description = "Install pinned tools and Git hooks"

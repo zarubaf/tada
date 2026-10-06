@@ -13,3 +13,6 @@ workspace = true
 
 [dependencies]
 tada-app.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tracing.workspace = true

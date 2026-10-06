@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO worker_heartbeat (worker_id, started_at, last_loop_at)\n             VALUES ($1, now(), now())\n             ON CONFLICT (worker_id) DO UPDATE SET last_loop_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3cace280ad9ebbfff8ed1c1a2f2995327724fb9a248876a9c739b76220fd498a"
+}

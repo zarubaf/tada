@@ -13,3 +13,6 @@ workspace = true
 
 [dependencies]
 tada-app.workspace = true
+async-trait.workspace = true
+aws-sdk-s3.workspace = true
+secrecy.workspace = true
