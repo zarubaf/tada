@@ -52,17 +52,17 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 ## Evidence and review
 
-| Term           | Meaning                                                                                                                              | Avoid              |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
-| accepted state | The records that a member with the correct authority accepted. Only domain commands change it.                                       | truth, master data |
-| record version | A number that increases with each change of a record. Commands use it for optimistic concurrency.                                    | revision           |
-| source item    | An incoming item: a mail message, a document or a Telegram message.                                                                  |                    |
-| source version | One immutable version of a source item, with its hash and capture time.                                                              |                    |
-| evidence link  | A link from a record to an exact location in a source version.                                                                       | citation (in code) |
-| provenance     | The set of evidence links and fact versions behind a record or a generated draft.                                                    |                    |
-| proposal       | A suggested change to accepted state, with its source, its author and the target record version. A proposal is never accepted state. | suggestion         |
-| review         | The act in which the owner accepts, edits or rejects a proposal. Silence is never acceptance.                                        | approval           |
-| conflict       | The state of a proposal when its target record changed after the proposal was created.                                               |                    |
+| Term           | Meaning                                                                                                                              | Avoid                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| accepted state | The records that a member with the correct authority accepted. Only domain commands change it.                                       | truth, master data       |
+| record version | A number that increases with each change of a record. Commands use it for optimistic concurrency.                                    | revision                 |
+| source item    | An incoming item: a mail message, a document or a Telegram message.                                                                  |                          |
+| source version | One immutable version of a source item, with its hash and capture time.                                                              |                          |
+| evidence link  | A link from a record to an exact location in a source version.                                                                       | citation (in code)       |
+| provenance     | The set of evidence links and fact versions behind a record or a generated draft.                                                    |                          |
+| proposal       | A suggested change to accepted state, with its source, its author and the target record version. A proposal is never accepted state. | suggestion               |
+| review         | The act in which the owner accepts, edits or rejects a proposal. Silence is never acceptance.                                        | approval (of a proposal) |
+| conflict       | The state of a proposal when its target record changed after the proposal was created.                                               |                          |
 
 ## Documents
 

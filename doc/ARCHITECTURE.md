@@ -294,7 +294,7 @@ Confidence scores are triage hints, not permission grants.
 Treat documents and emails as untrusted inputs.
 Extraction cannot execute tool instructions.
 AI receives narrow tools, permission-filtered data and output validation.
-New vendors, changed bank details or altered recipients are never accepted merely because an email says so.
+New suppliers, changed bank details or altered recipients are never accepted merely because an email says so.
 
 Approved aviation packs should use deterministic rendering from approved fields and versioned operational text.
 AI may help draft text before approval; it cannot improvise published routes or instructions.

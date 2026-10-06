@@ -209,7 +209,7 @@ No automated routine message requires the PM to relay it.
 The first club deployment targets **less than CHF 100/month in incremental cash operating costs**, excluding development and existing Microsoft 365 licenses.
 Event-day peaks, payment fees and future commercial compliance work require separate budgets.
 
-The following is an allocation envelope, not vendor pricing:
+The following is an allocation envelope, not supplier pricing:
 
 | Cost category                         | Monthly target ceiling |
 | ------------------------------------- | ---------------------- |
