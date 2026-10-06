@@ -11,6 +11,17 @@ The [writing guide](writing.md) contains the rules for prose.
 3. Run `mise run setup`. This installs the pinned tools, the Rust toolchain and the Git hooks.
 4. Run `mise run check`. All checks must pass before you start.
 
+## Local runtime
+
+Docker Compose starts PostgreSQL, Garage and Mailpit for development.
+The file [compose.yaml](../compose.yaml) is not a deployment ([ADR 0033](adr/0033-deployment-outside-this-repository.md)).
+
+1. Run `mise run dev:up`. This generates the missing secrets into `.dev/secrets/`, starts the services and prepares the storage bucket.
+2. Open Mailpit at `http://127.0.0.1:8025` to read the mail that tada sends.
+3. Run `mise run dev:down` to stop the services. The data volumes stay.
+
+Do not remove `.dev/secrets/` while the volumes exist. The database and the storage keep the first secrets.
+
 ## Sources of truth
 
 | Topic                       | File                                   |

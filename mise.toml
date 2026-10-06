@@ -67,6 +67,19 @@ run = "mdformat $(git ls-files --cached --others --exclude-standard '*.md')"
 description = "Show all prose findings, including warnings and suggestions"
 run = "vale $(git ls-files --cached --others --exclude-standard '*.md')"
 
+[tasks."dev:secrets"]
+description = "Generate the missing development secrets"
+run = "uv run --quiet scripts/dev_secrets.py"
+
+[tasks."dev:up"]
+description = "Start PostgreSQL, Garage and Mailpit for development"
+depends = ["dev:secrets"]
+run = ["docker compose up --detach --wait", "uv run --quiet scripts/dev_storage.py"]
+
+[tasks."dev:down"]
+description = "Stop the development services; the volumes stay"
+run = "docker compose down"
+
 [tasks.setup]
 description = "Install pinned tools and Git hooks"
 run = ["mise install", "rustup toolchain install", "lefthook install"]
