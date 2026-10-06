@@ -16,7 +16,7 @@ Goal: a repository and a runtime that later slices can build on without rework.
    - Renovate and the daily advisory workflow (ADR 0041).
 3. Spikes:
    - The job queue (ADR 0007). (Done. The result is [ADR 0054](adr/0054-job-queue-implementation.md). The queue exists; its schedules come with the scheduled checks of Slice 2.)
-   - Upload, download and versions in object storage (ADR 0009).
+   - Upload, download and versions in object storage (ADR 0009). (Done. The `BlobStore` adapter streams uploads to Garage, also as multipart uploads, and keeps nothing of a failed upload. The type detection of ADR 0043 needs [ADR 0055](adr/0055-office-format-detection.md). Document versions come with the documents of Slice 1.)
    - Telegram identity linking (ADR 0011).
 4. A first deployment of the walking skeleton, from the operator's deployment repository (ADR 0033).
 5. ADRs for the decisions that the first code needs: observability ([0035](adr/0035-observability.md)), configuration ([0036](adr/0036-configuration.md)), the error model ([0037](adr/0037-error-model.md)), IDs and time ([0038](adr/0038-ids-and-time.md)) and actors ([0039](adr/0039-actors-and-identities.md)). (Done.)

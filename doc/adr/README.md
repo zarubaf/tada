@@ -69,6 +69,7 @@ The ADRs are the authority for the decisions in this project.
 | [0052](0052-event-roles-and-ownership.md)          | Event roles and record ownership                         | Accepted           |
 | [0053](0053-development-authenticator.md)          | Development authenticator for the walking skeleton       | Accepted           |
 | [0054](0054-job-queue-implementation.md)           | Job queue in store-pg                                    | Accepted           |
+| [0055](0055-office-format-detection.md)            | Detection of office formats in ZIP containers            | Proposed           |
 
 ## New ADR
 
