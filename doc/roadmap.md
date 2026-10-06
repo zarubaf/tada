@@ -20,6 +20,18 @@ Goal: a repository and a runtime that later slices can build on without rework.
    - Upload, download and versions in object storage (ADR 0009).
    - Telegram identity linking (ADR 0011).
 4. A priced deployment plan for staging and production (ADRs 0015 and 0016).
+5. ADRs for the decisions that the first code needs:
+   - Observability: structured logs without personal data, health checks, an uptime check and alerts.
+   - Configuration and secrets: the inventory, the storage, the rotation and the creation of the first owner.
+   - Error model: RFC 9457 problem types, stable error codes and the validation error format.
+   - IDs and time: UUIDv7, event-local IDs such as `ACT-042`, UTC storage, the time crate and the time-zone rules for Europe/Zurich.
+   - Service and actor identities: the worker, the AI PM, API keys and a later MCP interface.
+   - Backup tooling: the tool, encryption, the order of database and object backup, retention and erasure.
+   - Data protection under revDSG: the processors (VPS, mail, model provider, Telegram), the privacy notice, retention and breach handling. No real personal data goes to a model provider before this ADR.
+   - Transactional and inbound email: the provider, SPF, DKIM, DMARC and the inbound address for each event.
+   - CI build and dependency policy: the Rust build cache, the image registry, Renovate and a scheduled `cargo-deny` run.
+   - API conventions for pagination and filters.
+   - Upload policy: allowed content types and malware checks.
 
 ## Slice 1: Preliminary event concept
 
