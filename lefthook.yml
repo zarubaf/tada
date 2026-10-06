@@ -13,7 +13,7 @@ pre-commit:
       run: vale --minAlertLevel=error {staged_files}
     - name: rust format
       glob: "*.rs"
-      run: cargo fmt --all --check
+      run: mise exec -- cargo fmt --all --check
 
 commit-msg:
   jobs:
