@@ -7,8 +7,9 @@ The [writing guide](writing.md) contains the rules for prose.
 ## Setup
 
 1. Install [mise](https://mise.jdx.dev).
-2. Run `mise run setup`. This installs the pinned tools and the Git hooks.
-3. Run `mise run check`. All checks must pass before you start.
+2. Install [rustup](https://rustup.rs). `rust-toolchain.toml` selects the Rust version.
+3. Run `mise run setup`. This installs the pinned tools, the Rust toolchain and the Git hooks.
+4. Run `mise run check`. All checks must pass before you start.
 
 ## Sources of truth
 

@@ -1,0 +1,38 @@
+# The backend workspace. ADR 0002 defines the crates and the direction of their dependencies.
+# deny.toml enforces the rules that Cargo cannot see.
+
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+repository = "https://github.com/zarubaf/tada"
+publish = false
+
+[workspace.dependencies]
+tada-domain = { path = "crates/domain" }
+tada-app = { path = "crates/app" }
+tada-store-pg = { path = "crates/store-pg" }
+tada-adapters = { path = "crates/adapters" }
+tada-api = { path = "crates/api" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"

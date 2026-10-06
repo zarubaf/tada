@@ -11,6 +11,9 @@ pre-commit:
     - name: prose style
       glob: "*.md"
       run: vale --minAlertLevel=error {staged_files}
+    - name: rust format
+      glob: "*.rs"
+      run: cargo fmt --all --check
 
 commit-msg:
   jobs:

@@ -1,0 +1,15 @@
+[package]
+name = "tada-api"
+description = "HTTP handlers, DTOs and the OpenAPI document."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tada-app.workspace = true

@@ -1,5 +1,6 @@
 # Single source of truth for tool versions and project tasks.
 # Local development and CI both use these pins. See doc/adr/0003-runtime-and-tooling.md.
+# rust-toolchain.toml pins the Rust toolchain; rustup installs it.
 # Checks read only the Markdown files that Git can track; ignored files stay out.
 
 [tools]
@@ -11,6 +12,7 @@ lefthook = "2.1.17"
 gitleaks = "8.30.1"
 ruff = "0.16.10"
 "pipx:mdformat" = { version = "1.0.0", uvx_args = "--with mdformat-gfm --with mdformat-frontmatter" }
+"github:nextest-rs/nextest" = { version = "0.9.146", version_prefix = "cargo-nextest-" }
 
 [tasks."check:docs-format"]
 description = "Check Markdown formatting"
@@ -32,9 +34,25 @@ run = "gitleaks git --redact --no-banner ."
 description = "Lint and format-check Python scripts"
 run = ["ruff check .", "ruff format --check ."]
 
+[tasks."check:rust-format"]
+description = "Check Rust formatting"
+run = "cargo fmt --all --check"
+
+[tasks."check:rust-lint"]
+description = "Lint Rust code; warnings fail"
+run = "cargo clippy --workspace --all-targets --locked -- -D warnings"
+
+[tasks."check:rust-test"]
+description = "Run the Rust tests"
+run = "cargo nextest run --workspace --locked --no-tests=pass"
+
+[tasks."check:rust"]
+description = "Run all Rust checks"
+depends = ["check:rust-format", "check:rust-lint", "check:rust-test"]
+
 [tasks.check]
 description = "Run every check that CI runs"
-depends = ["check:docs", "check:secrets", "check:scripts"]
+depends = ["check:docs", "check:secrets", "check:scripts", "check:rust"]
 
 [tasks.fmt]
 description = "Format Markdown files in place"
@@ -46,5 +64,5 @@ run = "vale $(git ls-files --cached --others --exclude-standard '*.md')"
 
 [tasks.setup]
 description = "Install pinned tools and Git hooks"
-run = ["mise install", "lefthook install"]
+run = ["mise install", "rustup toolchain install", "lefthook install"]
 

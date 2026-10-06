@@ -1,0 +1,18 @@
+[package]
+name = "tada"
+description = "The tada binary: the composition root and all process roles."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tada-app.workspace = true
+tada-store-pg.workspace = true
+tada-adapters.workspace = true
+tada-api.workspace = true
