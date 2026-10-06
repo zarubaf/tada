@@ -1,0 +1,9 @@
+# Only the sources go into the build context.
+.git
+.dev
+tasks
+target
+**/node_modules
+apps/web/dist
+apps/web/src/api/schema.gen.ts
+.ruff_cache
