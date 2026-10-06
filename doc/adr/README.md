@@ -31,6 +31,13 @@ The ADRs are the authority for the decisions in this project.
 | [0015](0015-deployment.md)                    | Single-host deployment with Docker Compose               | Proposed                                |
 | [0016](0016-environments-and-releases.md)     | Environments and release promotion                       | Proposed                                |
 | [0017](0017-api-contract-rust.md)             | HTTP API contract from Rust types                        | Proposed                                |
+| [0018](0018-design-system-foundation.md)      | Design system foundation and tokens                      | Proposed                                |
+| [0019](0019-styling.md)                       | Styling with CSS custom properties and CSS Modules       | Proposed                                |
+| [0020](0020-component-primitives.md)          | React Aria Components as the accessible base             | Proposed                                |
+| [0021](0021-typography-and-icons.md)          | Self-hosted typography and one icon set                  | Proposed                                |
+| [0022](0022-accessibility.md)                 | Accessibility standard: WCAG 2.2 AA                      | Proposed                                |
+| [0023](0023-responsive-layout.md)             | Responsive layout: one app, two primary contexts         | Proposed                                |
+| [0024](0024-frontend-quality-gates.md)        | Frontend quality gates                                   | Proposed                                |
 
 ## New ADR
 
