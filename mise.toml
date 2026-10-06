@@ -86,7 +86,19 @@ run = [
   "pnpm install --frozen-lockfile",
   "pnpm run check",
   "uv run --quiet ../../scripts/check_bundle_size.py",
+  # The production build must not contain the component gallery (ADR 0024).
+  "! grep -rq Komponenten dist/assets",
 ]
+
+[tasks."check:browser"]
+description = "Run the browser checks of ADR 0024 in the pinned Playwright container"
+# After the Rust tests: their PostgreSQL and Garage containers time out while Docker pulls this image.
+depends = ["check:web", "check:rust-test"]
+run = "uv run --quiet scripts/check_browser.py"
+
+[tasks."gen:screenshots"]
+description = "Write the screenshot baselines again, after an intended design change"
+run = "uv run --quiet scripts/check_browser.py --update-snapshots"
 
 [tasks."check:rust"]
 description = "Run all Rust checks"
@@ -94,7 +106,7 @@ depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:dep
 
 [tasks.check]
 description = "Run every check that CI runs"
-depends = ["check:docs", "check:secrets", "check:scripts", "check:rust", "check:web"]
+depends = ["check:docs", "check:secrets", "check:scripts", "check:rust", "check:browser"]
 
 [tasks.gen]
 description = "Write the files that the code generates: settings, problem codes and the API contract"

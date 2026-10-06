@@ -1,0 +1,69 @@
+import type { Page } from "@playwright/test";
+
+/** Invented events with long German names and umlauts (doc/design/principles.md). */
+export const events = [
+  {
+    id: "0199b8e0-0000-7000-8000-000000000001",
+    key: "FLY28",
+    name: "Fly-in Musterhausen mit Veranstaltungsbewilligungsverfahren",
+    time_zone: "Europe/Zurich",
+    version: 1,
+    created_at: "2028-03-01T13:12:00Z",
+  },
+  {
+    id: "0199b8e0-0000-7000-8000-000000000002",
+    key: "TEST30",
+    name: "Tag der offenen Tür Testwil",
+    time_zone: "Europe/Zurich",
+    version: 1,
+    created_at: "2030-05-18T08:00:00Z",
+  },
+];
+
+/** The fake API of the browser checks: the answer of `GET /api/v1/events`. */
+export async function fakeEvents(page: Page, status: number, body: unknown): Promise<void> {
+  await page.route("**/api/v1/events*", (route) =>
+    route.fulfill({
+      status,
+      contentType: status < 400 ? "application/json" : "application/problem+json",
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+export const unavailable = {
+  type: "https://github.com/zarubaf/tada/blob/main/doc/problems.md#unavailable",
+  code: "unavailable",
+  title: "A dependency is unavailable. The client can retry.",
+  status: 503,
+  instance: "urn:uuid:01a1118e-3359-73dd-a500-feed65806a9d",
+  request_id: "01a1118e-3359-73dd-a500-feed65806a9d",
+};
+
+export const viewports = [
+  { name: "375", width: 375, height: 812 },
+  { name: "1440", width: 1440, height: 900 },
+] as const;
+
+export const themes = ["light", "dark"] as const;
+
+/** Sets the theme on the root element, as the settings will do (ADR 0018). */
+export async function setTheme(page: Page, theme: (typeof themes)[number]): Promise<void> {
+  await page.emulateMedia({ colorScheme: theme });
+  await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
+}
+
+/**
+ * Loads both web fonts before a screenshot. `document.fonts.ready` alone is not enough: a font whose
+ * text appears late starts to load after `ready` resolved (`font-display: swap`).
+ */
+export async function fontsLoaded(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await Promise.all([
+      document.fonts.load('400 1rem "Mona Sans Variable"', "Aä"),
+      document.fonts.load('600 1rem "Mona Sans Variable"', "Aä"),
+      document.fonts.load('400 1rem "JetBrains Mono Variable"', "Aä"),
+    ]);
+    await document.fonts.ready;
+  });
+}

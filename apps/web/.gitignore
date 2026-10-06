@@ -1,1 +1,4 @@
 src/api/schema.gen.ts
+dist-e2e/
+test-results/
+playwright-report/
