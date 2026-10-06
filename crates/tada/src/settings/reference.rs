@@ -58,7 +58,7 @@ pub fn reference() -> String {
     let mut out = String::from(
         "# Settings\n\n\
          The command `tada settings` writes this file. Do not change it by hand.\n\
-         Run `mise run gen:settings` after a change of the settings code.\n\n\
+         Run `mise run gen` after a change of the settings code.\n\n\
          Settings come from environment variables (ADR 0025).\n\
          A variable that ends in `_FILE` gives the path of a file that contains a secret (ADR 0036).\n\n",
     );

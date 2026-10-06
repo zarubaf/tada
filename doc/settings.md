@@ -1,7 +1,7 @@
 # Settings
 
 The command `tada settings` writes this file. Do not change it by hand.
-Run `mise run gen:settings` after a change of the settings code.
+Run `mise run gen` after a change of the settings code.
 
 Settings come from environment variables (ADR 0025).
 A variable that ends in `_FILE` gives the path of a file that contains a secret (ADR 0036).

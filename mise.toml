@@ -13,6 +13,7 @@ gitleaks = "8.30.1"
 ruff = "0.16.10"
 "pipx:mdformat" = { version = "1.0.0", uvx_args = "--with mdformat-gfm --with mdformat-frontmatter" }
 cargo-deny = "0.20.2"
+"github:oasdiff/oasdiff" = "1.33.0"
 "cargo:sqlx-cli" = { version = "0.9.0", default-features = false, features = "postgres,rustls" }
 "github:nextest-rs/nextest" = { version = "0.9.146", version_prefix = "cargo-nextest-" }
 
@@ -66,19 +67,31 @@ run = "cargo deny --workspace --locked check"
 
 [tasks."check:generated"]
 description = "Check that the generated files match the code"
-run = "cargo run --quiet --locked -p tada -- settings | diff -u doc/settings.md -"
+run = [
+  "cargo run --quiet --locked -p tada -- settings | diff -u doc/settings.md -",
+  "cargo run --quiet --locked -p tada -- problems | diff -u doc/problems.md -",
+  "cargo run --quiet --locked -p tada -- openapi | diff -u contracts/openapi.json -",
+]
+
+[tasks."check:contract"]
+description = "Fail on a breaking change of the API contract against main"
+run = "uv run --quiet scripts/check_contract.py"
 
 [tasks."check:rust"]
 description = "Run all Rust checks"
-depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps", "check:generated"]
+depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps", "check:generated", "check:contract"]
 
 [tasks.check]
 description = "Run every check that CI runs"
 depends = ["check:docs", "check:secrets", "check:scripts", "check:rust"]
 
-[tasks."gen:settings"]
-description = "Generate doc/settings.md from the settings code"
-run = "cargo run --quiet -p tada -- settings > doc/settings.md"
+[tasks.gen]
+description = "Write the files that the code generates: settings, problem codes and the API contract"
+run = [
+  "cargo run --quiet -p tada -- settings > doc/settings.md",
+  "cargo run --quiet -p tada -- problems > doc/problems.md",
+  "mkdir -p contracts && cargo run --quiet -p tada -- openapi > contracts/openapi.json",
+]
 
 [tasks.fmt]
 description = "Format Markdown files in place"

@@ -2,7 +2,7 @@
 
 This catalog lists the stable problem codes of the tada API (ADR 0037).
 The `type` of each error response links to its entry here.
-Once the `api` crate exists, the build generates this file from the code.
+The command `tada problems` writes this file. Do not change it by hand.
 
 A code never changes its meaning. A code that is no longer used stays reserved.
 

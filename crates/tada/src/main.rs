@@ -24,6 +24,10 @@ enum Command {
     Migrate,
     /// Print the settings reference as Markdown.
     Settings,
+    /// Print the OpenAPI document of the HTTP API.
+    Openapi,
+    /// Print the catalog of problem codes as Markdown.
+    Problems,
 }
 
 fn main() -> ExitCode {
@@ -31,9 +35,18 @@ fn main() -> ExitCode {
         Command::Serve => run::<ServeSettings, _>("serve", serve::run),
         Command::Worker => run::<WorkerSettings, _>("worker", worker::run),
         Command::Migrate => run::<MigrateSettings, _>("migrate", migrate),
-        Command::Settings => {
-            let _ = std::io::stdout().write_all(settings::reference().as_bytes());
-            ExitCode::SUCCESS
-        }
+        Command::Settings => print(&settings::reference()),
+        Command::Openapi => match tada_api::openapi().to_pretty_json() {
+            Ok(json) => print(&format!("{json}\n")),
+            Err(_) => ExitCode::FAILURE,
+        },
+        Command::Problems => print(&tada_api::problem_catalog()),
+    }
+}
+
+fn print(text: &str) -> ExitCode {
+    match std::io::stdout().write_all(text.as_bytes()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(_) => ExitCode::FAILURE,
     }
 }

@@ -1,5 +1,6 @@
 //! HTTP handlers, DTOs and the OpenAPI document.
 
+mod contract;
 mod events;
 mod extract;
 mod health;
@@ -37,11 +38,15 @@ pub struct ApiState {
     pub trusted_proxies: Vec<IpNet>,
 }
 
+pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
+
 /// The versioned API: its routes and its OpenAPI document.
 fn api() -> (Router<ApiState>, OpenApi) {
-    OpenApiRouter::<ApiState>::new()
+    let (router, document) = OpenApiRouter::<ApiState>::new()
         .nest(API_PREFIX, events::routes())
-        .split_for_parts()
+        .split_for_parts();
+    let problem_codes = events::problem_codes().into_iter().collect();
+    (router, contract::complete(document, &problem_codes))
 }
 
 /// All routes of the `serve` process role.

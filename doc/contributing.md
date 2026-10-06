@@ -46,7 +46,8 @@ Do not commit it, and do not link to it from tracked files.
 1. Refactor to the principle first, then change behavior. Use separate commits.
 2. Change the docs, the ADRs and the code in the same pull request when they belong together.
 3. Add an ADR when a change affects a public contract, a dependency, the data model or the operations.
-4. Run `mise run check` before you push.
+4. Run `mise run gen` after a change of the settings, the problem codes or the API. Commit the generated files.
+5. Run `mise run check` before you push.
 
 Do not change an accepted ADR to reverse its decision.
 Write a new ADR and set the old one to "Superseded by NNNN".

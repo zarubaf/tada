@@ -19,11 +19,27 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::ApiState;
+use crate::contract::{AUTHENTICATED, JSON_BODY, QUERY, codes};
 use crate::extract::{Caller, Json, Query};
 use crate::problem::{ApiError, Problem};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new().routes(routes!(list_events, create_event))
+}
+
+/// The problem codes of each operation (ADR 0037). They come from the error types of the `app` crate
+/// and from the extractors, so they cannot drift from the handlers.
+pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
+    vec![
+        (
+            "create_event",
+            codes(&[AUTHENTICATED, JSON_BODY, CreateEventError::CODES]),
+        ),
+        (
+            "list_events",
+            codes(&[AUTHENTICATED, QUERY, ListEventsError::CODES]),
+        ),
+    ]
 }
 
 /// An event.
@@ -109,6 +125,7 @@ async fn create_event(
 #[into_params(parameter_in = Query)]
 pub struct ListEventsQuery {
     /// The page size: 1 to 200. The default is 50.
+    #[param(minimum = 1, maximum = 200)]
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     pub cursor: Option<String>,

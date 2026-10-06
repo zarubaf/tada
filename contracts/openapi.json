@@ -1,0 +1,303 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "tada",
+    "description": "The tada HTTP API. The list of problem codes of each operation is open.",
+    "license": {
+      "name": "Apache-2.0"
+    },
+    "version": "1"
+  },
+  "paths": {
+    "/api/v1/events": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Lists the events that the caller can see, in the order of their keys.",
+        "operationId": "list_events",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Creates an event in the caller's organization.",
+        "description": "If an event with the same `id` and the same content exists, the response is this event with the\nstatus 200, and nothing changes.",
+        "operationId": "create_event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The event exists with this ID and the same content.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The new event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "forbidden",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateEventRequest": {
+        "type": "object",
+        "description": "The input of `CreateEvent`.",
+        "required": [
+          "key",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The UUIDv7 of the new event. A client that sends it can retry the request safely."
+          },
+          "key": {
+            "type": "string",
+            "description": "Two to eight capital letters and digits, unique in the organization.",
+            "example": "TEST30"
+          },
+          "name": {
+            "type": "string",
+            "description": "1 to 200 characters.",
+            "example": "Open Day Testwil"
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An IANA time zone. The default is `Europe/Zurich`."
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "description": "An event.",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "time_zone",
+          "version",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "description": "The short key of the event, unique in its organization, for example `FLY28`."
+          },
+          "name": {
+            "type": "string"
+          },
+          "time_zone": {
+            "type": "string",
+            "description": "The IANA time zone of the event, for example `Europe/Zurich`."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. A command that changes the event needs it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EventPage": {
+        "type": "object",
+        "description": "One page of events.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page. It is absent on the last page."
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "description": "An error response. `detail` never repeats input values.",
+        "required": [
+          "type",
+          "code",
+          "title",
+          "status",
+          "instance",
+          "request_id"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "The URL of the code in the public catalog."
+          },
+          "code": {
+            "type": "string",
+            "description": "The stable problem code. Clients react to this field. The list of codes is open."
+          },
+          "title": {
+            "type": "string",
+            "description": "A short, stable English text for developers."
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An English text about this case, for developers. Clients never show it to members."
+          },
+          "instance": {
+            "type": "string",
+            "description": "`urn:uuid:` and the request ID."
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProblemError"
+            },
+            "description": "The invalid values of a `validation-failed` problem."
+          }
+        }
+      },
+      "ProblemError": {
+        "type": "object",
+        "description": "One invalid value.",
+        "required": [
+          "pointer",
+          "code"
+        ],
+        "properties": {
+          "pointer": {
+            "type": "string",
+            "description": "A JSON pointer to the value in the request body, for example `/key`."
+          },
+          "code": {
+            "type": "string",
+            "description": "The reason, for example `taken`. The list of codes is open."
+          }
+        }
+      }
+    }
+  }
+}

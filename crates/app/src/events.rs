@@ -451,6 +451,26 @@ mod tests {
         );
     }
 
+    #[test]
+    fn each_error_gives_a_code_of_its_list() {
+        let store = || StoreError::Internal("test".into());
+        let errors = [
+            CreateEventError::Forbidden,
+            CreateEventError::Invalid(Vec::new()),
+            CreateEventError::Store(store()),
+            CreateEventError::Store(StoreError::Unavailable("test".into())),
+        ];
+        for error in errors {
+            assert!(CreateEventError::CODES.contains(&error.code()), "{error:?}");
+        }
+        for error in [
+            ListEventsError::Store(store()),
+            ListEventsError::Store(StoreError::Unavailable("test".into())),
+        ] {
+            assert!(ListEventsError::CODES.contains(&error.code()), "{error:?}");
+        }
+    }
+
     #[tokio::test]
     async fn members_cannot_create_events() {
         let store = MemoryStore::default();
