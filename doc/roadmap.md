@@ -11,9 +11,6 @@ Goal: a repository and a runtime that later slices can build on without rework.
 
 1. Foundation: tools, documentation checks, secret scanning, ADRs and CI. (Done.)
 2. Walking skeleton: Docker Compose with PostgreSQL, Garage and Mailpit; the `tada` binary with `serve`, `worker` and the web client; `CreateEvent` from the API to the web client, with tests; the first migration, the OpenAPI snapshot check and the crate boundary check. (Done.)
-   Open from the walking skeleton:
-   - The browser checks of ADR 0024: Playwright, axe, screenshots and the pseudo-locale test.
-   - Renovate and the daily advisory workflow (ADR 0041).
 3. Spikes:
    - The job queue (ADR 0007). (Done. The result is [ADR 0054](adr/0054-job-queue-implementation.md). The queue exists; its schedules come with the scheduled checks of Slice 2.)
    - Upload, download and versions in object storage (ADR 0009). (Done. The `BlobStore` adapter streams uploads to Garage, also as multipart uploads, and keeps nothing of a failed upload. The type detection of ADR 0043 needs [ADR 0055](adr/0055-office-format-detection.md). Document versions come with the documents of Slice 1.)
