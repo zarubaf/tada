@@ -63,6 +63,9 @@ The ADRs are the authority for the decisions in this project.
 | [0046](0046-inbound-email.md)                      | Inbound email                                            | Proposed           |
 | [0047](0047-model-adapter.md)                      | Model adapter details                                    | Proposed           |
 | [0048](0048-ai-evaluation-set.md)                  | AI evaluation set                                        | Proposed           |
+| [0049](0049-entities-and-fact-model.md)            | Typed entities and a field catalog for facts             | Proposed           |
+| [0050](0050-proposals-and-review.md)               | Proposals and review                                     | Proposed           |
+| [0051](0051-document-drafts-and-provenance.md)     | Document drafts and provenance                           | Proposed           |
 
 ## New ADR
 

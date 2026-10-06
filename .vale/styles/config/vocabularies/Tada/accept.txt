@@ -152,3 +152,7 @@ PPTX
 OpenDocument
 PDFs?
 APIs?
+(?i)changesets?
+(?i)queryable
+(?i)booleans?
+Testwil
