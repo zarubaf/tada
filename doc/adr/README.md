@@ -29,6 +29,7 @@ The ADRs are the authority for the decisions in this project.
 | [0013](0013-git-workflow.md)                  | Git workflow and checks                                  | Accepted           |
 | [0014](0014-license.md)                       | Apache-2.0 license and public repository                 | Accepted           |
 | [0015](0015-deployment.md)                    | Single-host deployment with Docker Compose               | Accepted           |
+| [0016](0016-environments-and-releases.md)     | Environments and release promotion                       | Proposed           |
 | [0017](0017-api-contract-rust.md)             | HTTP API contract from Rust types                        | Proposed           |
 
 ## New ADR
