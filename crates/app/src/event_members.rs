@@ -109,7 +109,7 @@ impl ListEventMembersError {
         match self {
             Self::NotFound => ProblemCode::NotFound,
             Self::Forbidden => ProblemCode::Forbidden,
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
     }
 }
@@ -141,7 +141,7 @@ impl AddEventMemberError {
             Self::NotFound => ProblemCode::NotFound,
             Self::Forbidden => ProblemCode::Forbidden,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
     }
 }
@@ -175,7 +175,7 @@ impl ChangeEventMemberError {
             Self::NotFound => ProblemCode::NotFound,
             Self::Forbidden => ProblemCode::Forbidden,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
     }
 }
@@ -302,13 +302,6 @@ fn changed_or_error<T>(changed: Changed<T>) -> Result<T, ChangeEventMemberError>
         Changed::Changed(value) => Ok(value),
         Changed::NotFound => Err(ChangeEventMemberError::NotFound),
         Changed::VersionConflict => Err(ChangeEventMemberError::VersionConflict),
-    }
-}
-
-fn store_code(error: &StoreError) -> ProblemCode {
-    match error {
-        StoreError::Unavailable(_) => ProblemCode::Unavailable,
-        StoreError::Internal(_) => ProblemCode::Internal,
     }
 }
 
