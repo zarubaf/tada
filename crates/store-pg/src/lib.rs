@@ -11,6 +11,7 @@ mod facts;
 mod heartbeat;
 mod identity;
 mod jobs;
+mod members;
 mod outbound;
 mod proposals;
 pub mod rate_limit;

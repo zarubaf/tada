@@ -877,6 +877,271 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/members": {
+      "get": {
+        "tags": [
+          "members"
+        ],
+        "summary": "Lists the members of the organization, in the order of their display names.\nEach member can read the list. Only owners and admins get the email addresses.",
+        "operationId": "list_members",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of members.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/members/{user_id}/remove": {
+      "post": {
+        "tags": [
+          "members"
+        ],
+        "summary": "Removes a member from the organization, with all event memberships of the member.",
+        "description": "Owners and admins remove members; only an owner removes an owner. Each member can leave.\nThe last owner and the only event manager of an event stay: this gives `invalid-transition`.\nThe member loses access with the next request.",
+        "operationId": "remove_member",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The ID of the member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "The membership is removed."
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/invitations": {
+      "get": {
+        "tags": [
+          "members"
+        ],
+        "summary": "Lists the pending invitations, the oldest first. Only owners and admins see them.",
+        "operationId": "list_invitations",
+        "responses": {
+          "200": {
+            "description": "All pending invitations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "members"
+        ],
+        "summary": "Invites a person into the organization. The worker sends the invitation mail.",
+        "description": "A pending invitation of the same email address is revoked. If an invitation with the same `id`\nand the same content exists, the response is this invitation with the status 200.",
+        "operationId": "invite_member",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The invitation exists with this ID and the same content.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invitation"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The new invitation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invitation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/invitations/{invitation_id}/revoke": {
+      "post": {
+        "tags": [
+          "members"
+        ],
+        "summary": "Revokes a pending invitation. Its links stop working at once.\nOnly owners and admins can do this.",
+        "operationId": "revoke_invitation",
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "description": "The ID of the invitation.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The invitation is revoked."
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
@@ -1081,6 +1346,51 @@
           "event-viewer"
         ]
       },
+      "Invitation": {
+        "type": "object",
+        "description": "An invitation to the organization.",
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "role",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrganizationRole"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InvitationPage": {
+        "type": "object",
+        "description": "The pending invitations. An organization has few, so the list has one page.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Invitation"
+            }
+          }
+        }
+      },
       "InvitationPreview": {
         "type": "object",
         "description": "What an invitation is for, before the invitee accepts it.",
@@ -1109,6 +1419,94 @@
           "token": {
             "type": "string",
             "description": "The token from the fragment of the invitation link."
+          }
+        }
+      },
+      "InviteMemberRequest": {
+        "type": "object",
+        "description": "The input of `InviteMember`.",
+        "required": [
+          "email",
+          "display_name",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The UUIDv7 of the new invitation. A client that sends it can retry the request safely."
+          },
+          "email": {
+            "type": "string",
+            "example": "anna@example.org"
+          },
+          "display_name": {
+            "type": "string",
+            "description": "1 to 100 characters.",
+            "example": "Anna Muster"
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrganizationRole",
+            "description": "An owner invites with any role; an admin with admin or member."
+          }
+        }
+      },
+      "Member": {
+        "type": "object",
+        "description": "A member of the organization.",
+        "required": [
+          "user_id",
+          "display_name",
+          "role",
+          "version"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The email address. Only owners and admins get it."
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrganizationRole"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version of the organization membership. `RemoveMember` needs it."
+          }
+        }
+      },
+      "MemberPage": {
+        "type": "object",
+        "description": "One page of members.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page. It is absent on the last page."
           }
         }
       },
@@ -1230,6 +1628,20 @@
       "RemoveEventMembershipRequest": {
         "type": "object",
         "description": "The input of `RemoveEventMembership`.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "RemoveMemberRequest": {
+        "type": "object",
+        "description": "The input of `RemoveMember`.",
         "required": [
           "expected_version"
         ],

@@ -68,6 +68,9 @@ pub trait BootstrapStore: Send + Sync {
 
 #[derive(Debug, thiserror::Error)]
 pub enum BootstrapError {
+    /// The invitation was accepted or revoked before the link was printed.
+    #[error("the invitation is no longer pending")]
+    NotPending,
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -109,6 +112,7 @@ pub async fn printed_link(
             invitation_id,
             clock.now() + PRINTED_LINK_LIFETIME,
         )
-        .await?;
+        .await?
+        .ok_or(BootstrapError::NotPending)?;
     Ok(public_url.invitation_link(&token))
 }

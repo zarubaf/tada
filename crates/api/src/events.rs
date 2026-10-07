@@ -12,7 +12,6 @@ use tada_app::domain::ids::EventId;
 use tada_app::events::{
     self as app, CreateEventError, Created, EventCursor, ListEventsError, NewEvent,
 };
-use tada_app::paging::PageLimit;
 use tada_app::problem::ProblemCode;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -21,7 +20,7 @@ use uuid::Uuid;
 
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
-use crate::extract::{Caller, Json, Path, Query};
+use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::problem::{ApiError, Problem};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
@@ -161,12 +160,7 @@ async fn list_events(
     Caller(caller): Caller,
     Query(query): Query<ListEventsQuery>,
 ) -> Result<axum::Json<EventPage>, ApiError> {
-    let limit = match query.limit {
-        None => PageLimit::DEFAULT,
-        Some(limit) => PageLimit::new(limit).ok_or_else(|| {
-            ApiError::new(ProblemCode::MalformedRequest).with_detail("The limit must be 1 to 200.")
-        })?,
-    };
+    let limit = page_limit(query.limit)?;
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
     let page = app::list_events(&caller, after, limit, state.events.as_ref()).await?;
     Ok(axum::Json(EventPage {

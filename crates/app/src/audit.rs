@@ -13,6 +13,9 @@ pub enum AuditAction {
     InvitationCreate,
     InvitationRevoke,
     InvitationAccept,
+    /// A new invitation of the same email address revoked a pending invitation (ADR 0008).
+    InvitationReplace,
+    OrganizationMembershipRemove,
     EventCreate,
     EventMembershipAdd,
     EventMembershipChangeRole,
@@ -28,6 +31,8 @@ impl AuditAction {
             Self::InvitationCreate => "invitation.create",
             Self::InvitationRevoke => "invitation.revoke",
             Self::InvitationAccept => "invitation.accept",
+            Self::InvitationReplace => "invitation.replace",
+            Self::OrganizationMembershipRemove => "organization_membership.remove",
             Self::EventCreate => "event.create",
             Self::EventMembershipAdd => "event_membership.add",
             Self::EventMembershipChangeRole => "event_membership.change_role",
@@ -40,9 +45,13 @@ impl AuditAction {
     pub fn record_kind(self) -> &'static str {
         match self {
             Self::OrganizationCreate => "organization",
-            Self::InvitationCreate | Self::InvitationRevoke | Self::InvitationAccept => {
-                "invitation"
-            }
+            Self::InvitationCreate
+            | Self::InvitationRevoke
+            | Self::InvitationAccept
+            | Self::InvitationReplace => "invitation",
+            // An organization membership has no ID of its own: the record ID is its organization,
+            // and the subject is its member.
+            Self::OrganizationMembershipRemove => "organization_membership",
             Self::EventCreate => "event",
             // An event membership has no ID of its own: the record ID is its event,
             // and the subject is its member.
@@ -159,6 +168,20 @@ impl AuditEvent {
                 existing.map(AuditRole::Organization),
                 Some(AuditRole::Organization(accepted)),
             )
+        }
+    }
+
+    /// An event of the same actor in the same organization about another record, without a
+    /// subject and without roles. A store uses it for the records that it finds in its transaction.
+    #[must_use]
+    pub fn for_record(&self, action: AuditAction, record_id: Uuid) -> Self {
+        Self {
+            actor: self.actor,
+            action,
+            record_id: Some(record_id),
+            organization_id: self.organization_id,
+            subject: None,
+            roles: None,
         }
     }
 

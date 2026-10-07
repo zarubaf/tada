@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE invitation SET status = 'revoked', revoked_at = $3\n             WHERE organization_id = $1 AND role = $2 AND status = 'pending'\n             RETURNING id",
+  "query": "UPDATE invitation SET status = 'revoked', revoked_at = $3\n         WHERE organization_id = $1 AND id = ANY($2) AND status = 'pending'\n         RETURNING id",
   "describe": {
     "columns": [
       {
@@ -18,7 +18,7 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Text",
+        "UuidArray",
         "Timestamptz"
       ]
     },
@@ -26,5 +26,5 @@
       false
     ]
   },
-  "hash": "fc6aab7d8954e1f471c095d76ec3c09f0f19ef5e868b0d607eeb18d035f88a37"
+  "hash": "dd5e988911979b572d5374ebf45fbfa91eae701bd5042037af9619f56f60c9e6"
 }

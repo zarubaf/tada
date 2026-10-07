@@ -10,12 +10,32 @@ use axum::http::{HeaderValue, header};
 use serde::de::DeserializeOwned;
 use tada_app::auth::Credential;
 use tada_app::caller::{Channel, MemberCaller};
+use tada_app::domain::RecordVersion;
+use tada_app::paging::PageLimit;
 use tada_app::problem::ProblemCode;
 use tada_app::session::ABSOLUTE_TIMEOUT;
 
 use crate::ApiState;
 use crate::problem::ApiError;
 use crate::request_id;
+
+/// The `limit` query parameter of a list (ADR 0044). The default is 50.
+pub(crate) fn page_limit(limit: Option<u32>) -> Result<PageLimit, ApiError> {
+    match limit {
+        None => Ok(PageLimit::DEFAULT),
+        Some(limit) => PageLimit::new(limit).ok_or_else(|| {
+            ApiError::new(ProblemCode::MalformedRequest).with_detail("The limit must be 1 to 200.")
+        }),
+    }
+}
+
+/// The `expected_version` of a command on an existing record (ADR 0044).
+pub(crate) fn record_version(value: i64) -> Result<RecordVersion, ApiError> {
+    RecordVersion::new(value).ok_or_else(|| {
+        ApiError::new(ProblemCode::MalformedRequest)
+            .with_detail("The expected version must be 1 or more.")
+    })
+}
 
 /// The name of the session cookie (ADR 0008).
 pub const SESSION_COOKIE: &str = "__Host-tada-session";

@@ -15,6 +15,7 @@ pub mod health;
 pub mod identity;
 pub mod jobs;
 pub mod mail;
+pub mod members;
 pub mod outbound;
 pub mod paging;
 pub mod problem;

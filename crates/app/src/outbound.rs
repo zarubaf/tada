@@ -109,12 +109,14 @@ pub trait OutboundStore: Send + Sync {
     ) -> Result<SecretString, StoreError>;
 
     /// Stores the hash of a new invitation token and returns the token.
+    /// Returns `None` if the invitation is not pending: a revoked or accepted invitation gets no
+    /// token. The check and the insert are atomic with a revocation.
     async fn issue_invitation_token(
         &self,
         scope: OrgScope,
         invitation_id: InvitationId,
         expires_at: Timestamp,
-    ) -> Result<SecretString, StoreError>;
+    ) -> Result<Option<SecretString>, StoreError>;
 
     /// Records the outcome of a claimed intent.
     async fn finish(&self, intent_id: Uuid, outcome: Outcome) -> Result<(), StoreError>;
@@ -170,7 +172,8 @@ impl SendOutbound {
     }
 
     /// Creates the token and renders the message. The token is only in the link of the message.
-    async fn message(&self, intent: PendingIntent) -> Result<OutgoingMessage, JobFailed> {
+    /// `None` if the invitation of the intent is no longer pending.
+    async fn message(&self, intent: PendingIntent) -> Result<Option<OutgoingMessage>, JobFailed> {
         let now = self.clock.now();
         let rendered = match intent.purpose {
             Purpose::MagicLink { user_id } => {
@@ -197,18 +200,21 @@ impl SendOutbound {
                     .issue_invitation_token(scope, invitation_id, now + INVITATION_LIFETIME)
                     .await
                     .map_err(store_failed)?;
+                let Some(token) = token else {
+                    return Ok(None);
+                };
                 let link = self.public_url.invitation_link(&token);
                 self.texts
                     .invitation(&intent.locale, organization_name, link.expose_secret())
             }
         };
-        Ok(OutgoingMessage {
+        Ok(Some(OutgoingMessage {
             to: intent.to,
             subject: rendered.subject,
             text: rendered.text,
             html: rendered.html,
             message_id: format!("<{}@{}>", intent.message_id, self.public_url.host()),
-        })
+        }))
     }
 
     /// Records the outcome of the claimed intent.
@@ -259,19 +265,23 @@ impl JobHandler for SendOutbound {
         if !self.store.claim(intent_id).await.map_err(store_failed)? {
             return Ok(None);
         }
-        if intent.obsolete {
+        let message = if intent.obsolete {
+            None
+        } else {
+            match self.message(intent).await {
+                Ok(message) => message,
+                Err(failure) => {
+                    // Nothing went out, so a retry is safe.
+                    self.store.release(intent_id).await.map_err(store_failed)?;
+                    return Err(failure);
+                }
+            }
+        };
+        let Some(message) = message else {
             self.finish(intent_id, Outcome::Failed).await?;
             return Ok(Some(JobWarning(format!(
                 "the invitation of the intent {intent_id} is no longer pending, so nothing was sent"
             ))));
-        }
-        let message = match self.message(intent).await {
-            Ok(message) => message,
-            Err(failure) => {
-                // Nothing went out, so a retry is safe.
-                self.store.release(intent_id).await.map_err(store_failed)?;
-                return Err(failure);
-            }
         };
         match self.mailer.send(&message).await {
             Ok(()) => {
@@ -329,6 +339,8 @@ mod tests {
         finished: Mutex<Vec<Outcome>>,
         /// Simulates a database failure when the handler records the outcome.
         finish_fails: bool,
+        /// Simulates an invitation that was revoked after `load_pending`.
+        revoked: bool,
     }
 
     impl MemoryStore {
@@ -339,6 +351,7 @@ mod tests {
                 issued: Mutex::default(),
                 finished: Mutex::default(),
                 finish_fails: false,
+                revoked: false,
             }
         }
 
@@ -386,8 +399,8 @@ mod tests {
             _: OrgScope,
             _: InvitationId,
             expires_at: Timestamp,
-        ) -> Result<SecretString, StoreError> {
-            Ok(self.issue(expires_at))
+        ) -> Result<Option<SecretString>, StoreError> {
+            Ok((!self.revoked).then(|| self.issue(expires_at)))
         }
 
         async fn finish(&self, _: Uuid, outcome: Outcome) -> Result<(), StoreError> {
@@ -647,6 +660,20 @@ mod tests {
         assert!(warning.0.contains(&INTENT.to_string()), "{warning:?}");
         assert!(sent(&setup).is_empty());
         assert!(setup.store.issued.lock().unwrap().is_empty());
+        assert_eq!(finished(&setup), [Outcome::Failed]);
+    }
+
+    /// A revocation between the load of the intent and the token: the store issues no token.
+    #[tokio::test]
+    async fn an_invitation_revoked_before_its_token_is_recorded_as_failed_without_a_mail() {
+        let store = MemoryStore {
+            revoked: true,
+            ..MemoryStore::with(invitation())
+        };
+        let setup = setup_with(store, Ok(()));
+        let warning = setup.handler.run(&job(1)).await.unwrap().unwrap();
+        assert!(warning.0.contains("no longer pending"), "{warning:?}");
+        assert!(sent(&setup).is_empty());
         assert_eq!(finished(&setup), [Outcome::Failed]);
     }
 
