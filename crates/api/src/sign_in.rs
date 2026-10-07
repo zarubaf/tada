@@ -6,7 +6,7 @@
 use axum::extract::State;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use tada_app::caller::OrganizationRole as Role;
 use tada_app::domain::ids::OrganizationId;
@@ -195,24 +195,36 @@ async fn redeem_magic_link(
     headers: HeaderMap,
     Json(body): Json<RedeemMagicLinkRequest>,
 ) -> Result<Response, ApiError> {
-    let user_agent = headers
-        .get(header::USER_AGENT)
-        .and_then(|value| value.to_str().ok());
-    let token = match app::redeem_magic_link(
+    let result = app::redeem_magic_link(
         &body.token,
-        user_agent,
+        user_agent(&headers),
         state.sign_in.as_ref(),
         state.clock.as_ref(),
     )
-    .await
-    {
+    .await;
+    new_session(&state, result).await
+}
+
+/// The `User-Agent` of a request, for the list of sessions.
+fn user_agent(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::USER_AGENT)
+        .and_then(|value| value.to_str().ok())
+}
+
+/// The response to a sign-in that started a session: the session and the cookie of its token.
+async fn new_session(
+    state: &ApiState,
+    result: Result<SecretString, SignInError>,
+) -> Result<Response, ApiError> {
+    let token = match result {
         Ok(token) => token,
         Err(SignInError::Unauthenticated) => {
             return Err(ApiError::new(ProblemCode::Unauthenticated));
         }
         Err(SignInError::Store(error)) => return Err(ApiError::store(&error)),
     };
-    let info = read_session(&state, token.expose_secret()).await?;
+    let info = read_session(state, token.expose_secret()).await?;
     let mut response = uncached(info);
     response
         .headers_mut()
@@ -220,9 +232,9 @@ async fn redeem_magic_link(
     Ok(response)
 }
 
-/// A session in a response that no cache keeps: it names the user and the memberships.
-fn uncached(info: SessionInfo) -> Response {
-    let mut response = axum::Json(info).into_response();
+/// A response that no cache keeps, because it holds personal data, for example the session.
+fn uncached(body: impl Serialize) -> Response {
+    let mut response = axum::Json(body).into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
