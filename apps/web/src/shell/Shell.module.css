@@ -32,6 +32,11 @@
   }
 
   .select {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: start;
+    cursor: pointer;
     min-height: var(--control-height-md);
     min-width: 0;
     padding: 0 var(--space-2);
@@ -121,7 +126,8 @@
     outline: none;
   }
 
-  .item[data-focused] {
+  .item[data-focused],
+  .item[data-selected] {
     background: var(--color-accent-subtle);
     color: var(--color-accent-text);
   }

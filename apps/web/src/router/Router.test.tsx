@@ -1,11 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { Link, Redirect, Route, Router, Routes, useNavigate, useParams } from "./Router";
 
 function Event() {
   const { eventId } = useParams();
-  return <p>Anlass {eventId}</p>;
+  return <h1>Anlass {eventId}</h1>;
 }
 
 function Go() {
@@ -31,7 +31,7 @@ function renderAt(path: string) {
           <Redirect to="/events" />
         </Route>
         <Route path="/events">
-          <p>Liste</p>
+          <h1>Liste</h1>
         </Route>
         <Route path="/events/:eventId">
           <Event />
@@ -83,5 +83,31 @@ describe("Router", () => {
     await userEvent.click(screen.getByRole("link", { name: "Andere" }));
     window.history.back();
     expect(await screen.findByText("Liste")).toBeInTheDocument();
+  });
+
+  it("treats a malformed escape as no match", () => {
+    renderAt("/events/%E0%A4%A");
+    expect(screen.getByText("Seite nicht gefunden")).toBeInTheDocument();
+  });
+
+  it("moves focus to the h1 after a navigation, not after the first render", async () => {
+    renderAt("/events");
+    expect(document.body).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "go" }));
+    expect(screen.getByRole("heading", { name: "Anlass TEST30" })).toHaveFocus();
+  });
+
+  it("does not push a duplicate entry for the current path", async () => {
+    renderAt("/events");
+    const length = window.history.length;
+    await userEvent.click(screen.getByRole("link", { name: "Anlässe" }));
+    expect(window.history.length).toBe(length);
+  });
+
+  it("leaves modified clicks to the browser", async () => {
+    renderAt("/events");
+    fireEvent.click(screen.getByRole("link", { name: "Andere" }), { altKey: true });
+    expect(window.location.pathname).toBe("/events");
   });
 });

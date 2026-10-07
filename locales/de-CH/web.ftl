@@ -59,6 +59,7 @@ not-found-text = Diese Adresse gibt es nicht. Prüfen Sie den Link oder wählen 
 ## Session
 
 session-loading = Sitzung wird geladen
+skip-link = Zum Inhalt springen
 shell-side = Seitenleiste
 shell-nav = Hauptnavigation
 nav-events = Anlässe

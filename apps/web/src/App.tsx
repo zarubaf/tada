@@ -5,6 +5,7 @@ import { NotFoundPage } from "./NotFoundPage";
 import { Redirect, Route, Router, Routes } from "./router/Router";
 import { SessionProvider } from "./session/SessionProvider";
 import { Shell } from "./shell/Shell";
+import { SkipLink } from "./ui/SkipLink";
 
 const defaultApi = createApi();
 
@@ -17,6 +18,7 @@ const Gallery =
 export function App({ api = defaultApi }: { api?: Api }) {
   return (
     <Router>
+      <SkipLink />
       <Routes>
         {Gallery && (
           <Route path="/_gallery">

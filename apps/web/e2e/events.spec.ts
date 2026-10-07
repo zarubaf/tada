@@ -48,7 +48,7 @@ for (const viewport of viewports) {
       await fakeEvents(page, 200, { items: events });
       await page.goto("/events");
       await setTheme(page, theme);
-      await expect(page.getByRole("combobox", { name: "Organisation" })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Organisation/ })).toBeVisible();
       await expect(page.getByRole("table")).toBeVisible();
 
       const results = await new AxeBuilder({ page })

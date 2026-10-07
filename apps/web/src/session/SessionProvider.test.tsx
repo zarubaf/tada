@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "../api/client";
 import { Router, usePathname } from "../router/Router";
-import { SessionProvider, useSession } from "./SessionProvider";
+import { SessionProvider, useOptionalSession } from "./SessionProvider";
 
 const orgId = "0199b8e0-0000-7000-8000-0000000000a1";
 const membership = { organization_id: orgId, name: "Fliegergruppe Testwil", role: "member" };
@@ -41,7 +41,11 @@ function fakeApi(...responses: Response[]) {
 }
 
 function Probe({ api }: { api: ReturnType<typeof createApi> }) {
-  const session = useSession();
+  // After a redirect to the public sign-in page, nobody is signed in.
+  const session = useOptionalSession();
+  if (!session) {
+    return null;
+  }
   return (
     <>
       <p>
@@ -71,6 +75,18 @@ function renderAt(path: string, api: ReturnType<typeof createApi>) {
       <Path />
       <SessionProvider api={api}>
         <Probe api={api} />
+      </SessionProvider>
+    </Router>,
+  );
+}
+
+function renderPublic(path: string, api: ReturnType<typeof createApi>) {
+  window.history.replaceState(null, "", path);
+  return render(
+    <Router>
+      <Path />
+      <SessionProvider api={api}>
+        <p>Öffentliche Seite</p>
       </SessionProvider>
     </Router>,
   );
@@ -137,5 +153,26 @@ describe("SessionProvider", () => {
 
     await screen.findByText(/Anna Muster/);
     expect(fetch.mock.calls[0]?.[0].credentials).toBe("same-origin");
+  });
+
+  it.each(["/sign-in", "/sign-in/link", "/invitation"])(
+    "shows the public page %s without a session",
+    async (path) => {
+      const { api, calls } = fakeApi(problem(401, "unauthenticated"));
+      renderPublic(path, api);
+
+      expect(screen.getByText("Öffentliche Seite")).toBeInTheDocument();
+      await vi.waitFor(() => expect(calls).toHaveLength(1));
+      await Promise.resolve();
+      expect(screen.getByText("Öffentliche Seite")).toBeInTheDocument();
+      expect(screen.getByTestId("path")).toHaveTextContent(path);
+    },
+  );
+
+  it("sends a signed-in member from the sign-in page to the events", async () => {
+    const { api } = fakeApi(json(200, info));
+    renderPublic("/sign-in", api);
+
+    await vi.waitFor(() => expect(screen.getByTestId("path")).toHaveTextContent("/events"));
   });
 });

@@ -10,6 +10,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -34,14 +35,34 @@ function useLocation(): Location {
 /** Keeps the path of the address in state and changes it with `history.pushState`. */
 export function Router({ children }: { children: ReactNode }) {
   const [pathname, setPathname] = useState(() => window.location.pathname);
+  // Focus moves to the new page after a member navigates, not after a redirect or the first render.
+  const moveFocus = useRef(false);
 
   useEffect(() => {
-    const sync = () => setPathname(window.location.pathname);
+    const sync = () => {
+      moveFocus.current = true;
+      setPathname(window.location.pathname);
+    };
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the path change is the trigger
+  useEffect(() => {
+    if (!moveFocus.current) {
+      return;
+    }
+    moveFocus.current = false;
+    const target = document.querySelector<HTMLElement>("h1") ?? document.querySelector("main");
+    target?.setAttribute("tabindex", "-1");
+    target?.focus();
+  }, [pathname]);
+
   const navigate = useCallback((to: string, options?: { replace?: boolean }) => {
+    if (to === window.location.pathname) {
+      return;
+    }
+    moveFocus.current = !options?.replace;
     if (options?.replace) {
       window.history.replaceState(null, "", to);
     } else {
@@ -79,7 +100,11 @@ function match(pattern: string, pathname: string): Params | null {
   for (const [index, segment] of wanted.entries()) {
     const value = actual[index] ?? "";
     if (segment.startsWith(":")) {
-      params[segment.slice(1)] = decodeURIComponent(value);
+      try {
+        params[segment.slice(1)] = decodeURIComponent(value);
+      } catch {
+        return null; // a malformed escape never matches
+      }
     } else if (segment !== value) {
       return null;
     }
@@ -131,7 +156,11 @@ export function Link({ to, className, children }: LinkProps) {
   const { pathname, navigate } = useLocation();
   const current = pathname === to || pathname.startsWith(`${to}/`);
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    const plain = event.button === 0 && !(event.metaKey || event.ctrlKey || event.shiftKey);
+    const plain =
+      event.button === 0 &&
+      !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) &&
+      !event.defaultPrevented &&
+      !event.currentTarget.target;
     if (plain) {
       event.preventDefault();
       navigate(to);

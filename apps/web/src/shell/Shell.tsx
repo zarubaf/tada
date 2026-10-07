@@ -1,21 +1,33 @@
 // The app shell (doc/design/layout-and-responsiveness.md): a sidebar on medium and wide layouts, a
 // top bar and a bottom bar on narrow layouts. It shows only the items that exist.
 import { Fragment, type ReactNode, useState } from "react";
-import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
+import {
+  Button,
+  Label,
+  ListBox,
+  ListBoxItem,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  Popover,
+  Select,
+  SelectValue,
+} from "react-aria-components";
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
 import { Link } from "../router/Router";
-import { useSession } from "../session/SessionProvider";
+import { useOptionalSession } from "../session/SessionProvider";
 import styles from "./Shell.module.css";
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
-  const { user, organization, memberships, refresh, signOut } = useSession();
+  const session = useOptionalSession();
   const [failure, setFailure] = useState<string>();
 
-  // Without an organization the member chooses one first; that page needs no frame.
-  if (!organization) {
+  // Without a session (public pages) or an organization (the choice page) there is no frame.
+  if (!session?.organization) {
     return children;
   }
+  const { user, organization, memberships, refresh, signOut } = session;
 
   const choose = async (organizationId: string) => {
     try {
@@ -36,20 +48,29 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       <aside className={styles.side} aria-label={t("shell-side")}>
         <p className={styles.brand}>{t("app-name")}</p>
         {memberships.length > 1 && (
-          <label className={styles.switcher}>
-            <span className={styles.switcherLabel}>{t("organization-switcher")}</span>
-            <select
-              className={styles.select}
-              value={organization.organization_id}
-              onChange={(event) => void choose(event.target.value)}
-            >
-              {memberships.map((membership) => (
-                <option key={membership.organization_id} value={membership.organization_id}>
-                  {membership.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select
+            className={styles.switcher}
+            selectedKey={organization.organization_id}
+            onSelectionChange={(key) => void choose(String(key))}
+          >
+            <Label className={styles.switcherLabel}>{t("organization-switcher")}</Label>
+            <Button className={styles.select}>
+              <SelectValue />
+            </Button>
+            <Popover className={styles.popover}>
+              <ListBox className={styles.menu}>
+                {memberships.map((membership) => (
+                  <ListBoxItem
+                    key={membership.organization_id}
+                    id={membership.organization_id}
+                    className={styles.item}
+                  >
+                    {membership.name}
+                  </ListBoxItem>
+                ))}
+              </ListBox>
+            </Popover>
+          </Select>
         )}
         <nav className={styles.nav} aria-label={t("shell-nav")}>
           <Link to="/events" className={styles.navLink}>

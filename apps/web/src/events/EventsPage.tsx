@@ -69,7 +69,7 @@ export function EventsPage({ api }: { api: Api }) {
   };
 
   return (
-    <main className={styles.page}>
+    <main id="main" className={styles.page}>
       <h1 className={styles.title}>{t("events-title")}</h1>
       {state.kind === "loading" && (
         <div className={styles.skeleton} role="status" aria-label={t("events-loading")}>

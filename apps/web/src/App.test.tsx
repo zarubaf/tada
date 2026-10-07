@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import { createApi } from "./api/client";
@@ -43,5 +44,16 @@ describe("App", () => {
   it("shows the not-found page for an unknown path", async () => {
     renderAt("/nowhere");
     expect(await screen.findByText("Seite nicht gefunden")).toBeInTheDocument();
+  });
+
+  it("has the skip link as its first focusable element, and it targets main", async () => {
+    renderAt("/events");
+    await screen.findByRole("heading", { name: "Anlässe" });
+
+    await userEvent.tab();
+    const link = screen.getByRole("link", { name: "Zum Inhalt springen" });
+    expect(link).toHaveFocus();
+    expect(link).toHaveAttribute("href", "#main");
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main");
   });
 });

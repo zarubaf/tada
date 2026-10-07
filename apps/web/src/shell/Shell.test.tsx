@@ -69,7 +69,7 @@ describe("Shell", () => {
 
     expect(await screen.findByText("Seiteninhalt")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Anlässe" })).toHaveAttribute("aria-current", "page");
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Organisation/ })).not.toBeInTheDocument();
   });
 
   it("switches the organization and loads the session again", async () => {
@@ -79,14 +79,13 @@ describe("Shell", () => {
       json(200, info([first, second], second)),
     );
 
-    const switcher = await screen.findByRole("combobox", { name: "Organisation" });
-    expect(switcher).toHaveValue(first.organization_id);
-    await userEvent.selectOptions(switcher, second.name);
+    const switcher = await screen.findByRole("button", { name: /Organisation/ });
+    expect(switcher).toHaveTextContent(first.name);
+    await userEvent.click(switcher);
+    await userEvent.click(await screen.findByRole("option", { name: second.name }));
 
     await vi.waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Organisation" })).toHaveValue(
-        second.organization_id,
-      ),
+      expect(screen.getByRole("button", { name: /Organisation/ })).toHaveTextContent(second.name),
     );
     expect(calls[1]).toMatchObject({ method: "POST", path: "/api/v1/session/organization" });
     expect(JSON.parse(calls[1]?.body ?? "")).toEqual({ organization_id: second.organization_id });

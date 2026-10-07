@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -20,9 +21,7 @@ import { t } from "../i18n";
 import { Redirect, useNavigate, usePathname } from "../router/Router";
 import { InlineError } from "../ui/InlineError";
 import { Skeleton } from "../ui/Skeleton";
-
-export const SIGN_IN_PATH = "/sign-in";
-export const CHOOSE_ORGANIZATION_PATH = "/choose-organization";
+import { CHOOSE_ORGANIZATION_PATH, isPublicPath, SIGN_IN_PATH } from "./paths";
 
 export interface Session {
   user: { id: string; displayName: string };
@@ -43,10 +42,15 @@ type State =
 
 const SessionContext = createContext<Session | null>(null);
 
+/** The session, or nothing on a public page where nobody has signed in. */
+export function useOptionalSession(): Session | null {
+  return useContext(SessionContext);
+}
+
 export function useSession(): Session {
-  const session = useContext(SessionContext);
+  const session = useOptionalSession();
   if (!session) {
-    throw new Error("useSession needs a <SessionProvider>");
+    throw new Error("useSession needs a signed-in member");
   }
   return session;
 }
@@ -55,6 +59,9 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
   const [state, setState] = useState<State>({ kind: "loading" });
   const navigate = useNavigate();
   const pathname = usePathname();
+  const isPublic = isPublicPath(pathname);
+  const onPublicPath = useRef(isPublic);
+  onPublicPath.current = isPublic;
 
   const refresh = useCallback(async () => {
     try {
@@ -89,7 +96,9 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
     const watcher = watchSessionProblems((code) => {
       if (code === "unauthenticated") {
         setState({ kind: "signed-out" });
-        navigate(SIGN_IN_PATH, { replace: true });
+        if (!onPublicPath.current) {
+          navigate(SIGN_IN_PATH, { replace: true });
+        }
       } else {
         navigate(CHOOSE_ORGANIZATION_PATH, { replace: true });
       }
@@ -113,6 +122,13 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
     [state, refresh, signOut],
   );
 
+  // A public page works without a session. A member who has one leaves the sign-in page.
+  if (isPublic && !session) {
+    return children;
+  }
+  if (session && pathname === SIGN_IN_PATH) {
+    return <Redirect to="/events" />;
+  }
   if (state.kind === "failed") {
     return (
       <InlineError
@@ -135,7 +151,7 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
       </div>
     );
   }
-  if (!session.organization && pathname !== CHOOSE_ORGANIZATION_PATH) {
+  if (!session.organization && !isPublic && pathname !== CHOOSE_ORGANIZATION_PATH) {
     return <Redirect to={CHOOSE_ORGANIZATION_PATH} />;
   }
   return <SessionContext value={session}>{children}</SessionContext>;
