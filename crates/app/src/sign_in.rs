@@ -33,6 +33,7 @@ pub trait SignInStore: Debug + Send + Sync {
     /// Deletes the magic link of `token`. If the link existed and was valid at `now`, the same
     /// transaction starts a session for its user and returns the session token.
     /// The organization of the session is `initial_organization` of the user's memberships.
+    /// A user without a membership gets no session, and the link is used up all the same.
     async fn redeem_magic_link(
         &self,
         token: &str,
@@ -84,8 +85,7 @@ impl SignInError {
     pub fn code(&self) -> ProblemCode {
         match self {
             Self::Unauthenticated => ProblemCode::Unauthenticated,
-            Self::Store(StoreError::Unavailable(_)) => ProblemCode::Unavailable,
-            Self::Store(StoreError::Internal(_)) => ProblemCode::Internal,
+            Self::Store(error) => error.code(),
         }
     }
 }

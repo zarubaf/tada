@@ -6,16 +6,16 @@
 use async_trait::async_trait;
 use jiff::Timestamp;
 use secrecy::SecretString;
-use sqlx::types::Uuid;
+use serde_json::json;
+use sqlx::types::{Json, Uuid};
 use tada_app::domain::identity::Email;
 use tada_app::domain::ids::{OrganizationId, UserId};
-use tada_app::outbound::Purpose;
+use tada_app::outbound::SEND_JOB;
 use tada_app::sign_in::{SignInStore, initial_organization};
 use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::error::store_error;
-use crate::outbound::queue_outbound;
 use crate::session::insert_session;
 use crate::token::hash_token;
 
@@ -26,25 +26,34 @@ impl SignInStore for Database {
         email: &Email,
         request_id: Option<Uuid>,
     ) -> Result<(), StoreError> {
-        let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let user_id = sqlx::query_scalar!(
-            "SELECT e.user_id FROM email_identity e
-             WHERE e.email = $1
-               AND EXISTS (SELECT 1 FROM organization_membership m WHERE m.user_id = e.user_id)",
+        // One statement for both cases, so a member and an unknown address cost one round trip each
+        // (ADR 0008). It writes the rows of `queue_outbound` for a magic link: the intent and its
+        // send job, whose payload names the intent only (ADR 0042).
+        let intent_id = Uuid::now_v7();
+        sqlx::query!(
+            "WITH member AS (
+                 SELECT e.user_id FROM email_identity e
+                 WHERE e.email = $1
+                   AND EXISTS (SELECT 1 FROM organization_membership m WHERE m.user_id = e.user_id)
+             ), intent AS (
+                 INSERT INTO outbound_intent (id, user_id, purpose, message_id, request_id, created_at)
+                 SELECT $2, user_id, 'magic-link', $3, $4, now() FROM member
+                 RETURNING id
+             )
+             INSERT INTO job (id, kind, version, payload, request_id, run_at, created_at)
+             SELECT $5, $6, 1, $7, $4, now(), now() FROM intent",
             email.as_str(),
+            intent_id,
+            intent_id.simple().to_string(),
+            request_id,
+            Uuid::now_v7(),
+            SEND_JOB,
+            Json(json!({"intent_id": intent_id})) as _,
         )
-        .fetch_optional(&mut *tx)
+        .execute(&self.pool)
         .await
         .map_err(store_error)?;
-        if let Some(user_id) = user_id {
-            let purpose = Purpose::MagicLink {
-                user_id: UserId::from_uuid(user_id),
-            };
-            queue_outbound(&mut tx, &purpose, request_id)
-                .await
-                .map_err(store_error)?;
-        }
-        tx.commit().await.map_err(store_error)
+        Ok(())
     }
 
     async fn redeem_magic_link(
@@ -81,6 +90,11 @@ impl SignInStore for Database {
         .into_iter()
         .map(OrganizationId::from_uuid)
         .collect();
+        // A person without a membership cannot sign in (ADR 0056). The link is used up all the same.
+        if memberships.is_empty() {
+            tx.commit().await.map_err(store_error)?;
+            return Ok(None);
+        }
         let session = insert_session(
             &mut tx,
             UserId::from_uuid(link.user_id),
@@ -99,7 +113,7 @@ mod tests {
     use jiff::SignedDuration;
     use secrecy::ExposeSecret;
     use tada_app::domain::identity::{DisplayName, OrganizationRole};
-    use tada_app::outbound::OutboundStore;
+    use tada_app::outbound::{OutboundStore, Purpose};
     use tada_app::session::SessionStore;
 
     use super::*;
@@ -143,12 +157,31 @@ mod tests {
         assert_eq!(count(&test, "outbound_intent").await, 0);
         assert_eq!(count(&test, "job").await, 0);
 
+        let request = Uuid::now_v7();
         test.database
-            .queue_magic_link(&email("anna@example.org"), Some(Uuid::now_v7()))
+            .queue_magic_link(&email("anna@example.org"), Some(request))
             .await
             .unwrap();
         assert_eq!(count(&test, "outbound_intent").await, 1);
-        assert_eq!(count(&test, "job").await, 1);
+
+        // The job is the one that `queue_outbound` writes: it names the intent only (ADR 0042).
+        let (kind, version, payload, job_request): (String, i32, serde_json::Value, Option<Uuid>) =
+            sqlx::query_as("SELECT kind, version, payload, request_id FROM job")
+                .fetch_one(&test.database.pool)
+                .await
+                .unwrap();
+        assert_eq!((kind.as_str(), version), (SEND_JOB, 1));
+        assert_eq!(job_request, Some(request));
+        let intent_id: Uuid = payload["intent_id"].as_str().unwrap().parse().unwrap();
+        assert_eq!(payload, json!({"intent_id": intent_id}));
+        let pending = test
+            .database
+            .load_pending(intent_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(pending.purpose, Purpose::MagicLink { user_id: anna });
+        assert_eq!(pending.to, email("anna@example.org"));
     }
 
     async fn magic_link(test: &TestDatabase, user: UserId, expires_at: Timestamp) -> String {
@@ -224,8 +257,28 @@ mod tests {
     #[tokio::test]
     async fn an_expired_magic_link_starts_no_session_and_is_deleted() {
         let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
         let anna = user(&test, "anna@example.org").await;
+        test.add_membership(testwil, anna, OrganizationRole::Member)
+            .await;
         let token = magic_link(&test, anna, now()).await;
+
+        let session = test
+            .database
+            .redeem_magic_link(&token, None, now())
+            .await
+            .unwrap();
+        assert!(session.is_none());
+        assert_eq!(count(&test, "magic_link").await, 0);
+        assert_eq!(count(&test, "session").await, 0);
+    }
+
+    #[tokio::test]
+    async fn a_user_without_a_membership_gets_no_session_and_the_link_is_used_up() {
+        let test = TestDatabase::start().await;
+        // The membership ended after the mail went out.
+        let anna = user(&test, "anna@example.org").await;
+        let token = magic_link(&test, anna, now() + SignedDuration::from_mins(15)).await;
 
         let session = test
             .database

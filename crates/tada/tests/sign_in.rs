@@ -240,6 +240,7 @@ async fn a_member_signs_in_with_the_magic_link_in_the_organization() {
     let token = app.magic_link("anna@example.org").await;
     let (response, session) = app.redeem(&token).await;
     assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
     let set_cookie = response.headers()[header::SET_COOKIE].to_str().unwrap();
     let cookie = session_cookie(&response).unwrap();
     assert_eq!(
@@ -261,6 +262,7 @@ async fn a_member_signs_in_with_the_magic_link_in_the_organization() {
     let (response, read) = app.get("/api/v1/session", Some(&cookie)).await;
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(read, session);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
     let (response, _) = app.get("/api/v1/events", Some(&cookie)).await;
     assert_eq!(response.status(), StatusCode::OK);
 }
@@ -300,6 +302,7 @@ async fn a_member_of_two_organizations_chooses_one() {
         )
         .await;
     assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
     assert_eq!(
         session["organization"]["organization_id"],
         json!(musterhausen.as_uuid())

@@ -14,6 +14,7 @@ use tada_app::identity::Membership;
 use tada_app::problem::ProblemCode;
 use tada_app::session::{self, ChooseOrganizationError, SessionError};
 use tada_app::sign_in::{self as app, SignInError};
+use tada_app::store::StoreError;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -23,9 +24,6 @@ use crate::ApiState;
 use crate::contract::{JSON_BODY, codes};
 use crate::extract::{Json, SessionToken, expired_session_cookie, request_id, session_cookie};
 use crate::problem::{ApiError, Problem};
-
-/// The codes of a store failure.
-const STORE: &[ProblemCode] = &[ProblemCode::Unavailable, ProblemCode::Internal];
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
@@ -38,7 +36,7 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
 
 pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
     vec![
-        ("request_sign_in", codes(&[JSON_BODY, STORE])),
+        ("request_sign_in", codes(&[JSON_BODY, StoreError::CODES])),
         (
             "redeem_magic_link",
             codes(&[JSON_BODY, SignInError::CODES, SessionError::CODES]),
@@ -52,7 +50,7 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
                 SessionError::CODES,
             ]),
         ),
-        ("sign_out", codes(&[STORE])),
+        ("sign_out", codes(&[StoreError::CODES])),
     ]
 }
 
@@ -215,11 +213,20 @@ async fn redeem_magic_link(
         Err(SignInError::Store(error)) => return Err(ApiError::store(&error)),
     };
     let info = read_session(&state, token.expose_secret()).await?;
-    let mut response = axum::Json(info).into_response();
-    let headers = response.headers_mut();
-    headers.insert(header::SET_COOKIE, session_cookie(token.expose_secret())?);
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    let mut response = uncached(info);
+    response
+        .headers_mut()
+        .insert(header::SET_COOKIE, session_cookie(token.expose_secret())?);
     Ok(response)
+}
+
+/// A session in a response that no cache keeps: it names the user and the memberships.
+fn uncached(info: SessionInfo) -> Response {
+    let mut response = axum::Json(info).into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
 }
 
 async fn read_session(state: &ApiState, token: &str) -> Result<SessionInfo, ApiError> {
@@ -251,8 +258,8 @@ async fn read_session(state: &ApiState, token: &str) -> Result<SessionInfo, ApiE
 async fn get_session(
     State(state): State<ApiState>,
     token: SessionToken,
-) -> Result<axum::Json<SessionInfo>, ApiError> {
-    Ok(axum::Json(read_session(&state, token.as_str()).await?))
+) -> Result<Response, ApiError> {
+    Ok(uncached(read_session(&state, token.as_str()).await?))
 }
 
 /// The input of `choose_organization`.
@@ -277,7 +284,7 @@ async fn choose_organization(
     State(state): State<ApiState>,
     token: SessionToken,
     Json(body): Json<ChooseOrganizationRequest>,
-) -> Result<axum::Json<SessionInfo>, ApiError> {
+) -> Result<Response, ApiError> {
     match session::choose_organization(
         token.as_str(),
         OrganizationId::from_uuid(body.organization_id),
@@ -294,7 +301,7 @@ async fn choose_organization(
         Err(ChooseOrganizationError::NotFound) => return Err(ApiError::new(ProblemCode::NotFound)),
         Err(ChooseOrganizationError::Store(error)) => return Err(ApiError::store(&error)),
     }
-    Ok(axum::Json(read_session(&state, token.as_str()).await?))
+    Ok(uncached(read_session(&state, token.as_str()).await?))
 }
 
 /// Signs out: ends the session and clears the cookie. It also succeeds without a session.
