@@ -2,10 +2,12 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
   fakePost,
+  fakeSession,
   fakeSignedOut,
   fontsLoaded,
   invitationPreview,
   problemBody,
+  sessionInfo,
   setTheme,
   textOverflows,
   themes,
@@ -37,6 +39,22 @@ const publicPages = [
     heading: "Anmelden",
     ready: "Dieser Link ist ungültig oder abgelaufen.",
     prepare: async (_page: Page) => {},
+  },
+  {
+    name: "choose organization",
+    path: "/choose-organization",
+    hash: "",
+    heading: "Organisation wählen",
+    ready: "Segelflugclub Musterhausen",
+    prepare: (page: Page) =>
+      fakeSession(page, {
+        user_id: sessionInfo.user_id,
+        display_name: sessionInfo.display_name,
+        memberships: [
+          sessionInfo.organization,
+          { ...sessionInfo.organization, organization_id: "x", name: "Segelflugclub Musterhausen" },
+        ],
+      }),
   },
   {
     name: "invitation",

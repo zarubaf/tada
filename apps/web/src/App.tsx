@@ -3,6 +3,7 @@ import { type Api, createApi } from "./api/client";
 import { EventsPage } from "./events/EventsPage";
 import { NotFoundPage } from "./NotFoundPage";
 import { Redirect, Route, Router, Routes } from "./router/Router";
+import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
 import { SessionProvider } from "./session/SessionProvider";
 import { Shell } from "./shell/Shell";
 import { InvitationPage } from "./sign-in/InvitationPage";
@@ -49,6 +50,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 </Route>
                 <Route path="/invitation">
                   <InvitationPage api={api} />
+                </Route>
+                <Route path="/choose-organization">
+                  <ChooseOrganizationPage api={api} />
                 </Route>
                 <Route path="*">
                   <NotFoundPage />

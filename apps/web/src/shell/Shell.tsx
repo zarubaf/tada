@@ -16,17 +16,18 @@ import {
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
 import { Link, usePathname } from "../router/Router";
-import { isPublicPath } from "../session/paths";
+import { CHOOSE_ORGANIZATION_PATH, isPublicPath } from "../session/paths";
 import { useOptionalSession } from "../session/SessionProvider";
 import styles from "./Shell.module.css";
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const session = useOptionalSession();
   const [failure, setFailure] = useState<string>();
-  const publicPage = isPublicPath(usePathname());
+  const pathname = usePathname();
+  const frameless = isPublicPath(pathname) || pathname === CHOOSE_ORGANIZATION_PATH;
 
-  // Without a session or an organization (the choice page), and on public pages, there is no frame.
-  if (publicPage || !session?.organization) {
+  // Without a session or an organization, and on the pages of the sign-in, there is no frame.
+  if (frameless || !session?.organization) {
     return children;
   }
   const { user, organization, memberships, refresh, signOut } = session;

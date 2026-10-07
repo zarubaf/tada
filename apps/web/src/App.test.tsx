@@ -48,9 +48,7 @@ describe("App", () => {
 
   it("shows a page without a session without the sidebar, even for a signed-in member", async () => {
     renderAt("/sign-in/link");
-    expect(
-      await screen.findByRole("heading", { name: "Anmelden" }, { timeout: 3000 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Anmelden" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Hauptnavigation" })).not.toBeInTheDocument();
   });
 

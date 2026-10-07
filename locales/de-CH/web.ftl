@@ -89,3 +89,10 @@ invitation-loading = Einladung wird geladen
 role-owner = Verantwortliche Person
 role-admin = Administration
 role-member = Mitglied
+
+## Choice of the organization (ADR 0056)
+
+choose-organization-title = Organisation wählen
+choose-organization-text = Wählen Sie die Organisation, mit der Sie arbeiten.
+choose-organization-empty-title = Keine Organisation
+choose-organization-empty-text = Sie sind noch in keiner Organisation Mitglied. Bitten Sie eine Administration um eine Einladung.
