@@ -9,15 +9,12 @@ use tada_domain::identity::{DisplayName, EventRole};
 use tada_domain::ids::{EventId, UserId};
 
 use crate::access::{self, AccessError};
-use crate::audit::AuditEvent;
+use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::IdentityStore;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
-
-/// The record kind of the audit events: a membership change is a change of the event.
-const AUDIT_RECORD_KIND: &str = "event";
 
 /// The event role of one member in one event.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -228,11 +225,10 @@ async fn can_manage_members(
     }
 }
 
-fn audit(caller: &MemberCaller, action: &'static str, event: EventId) -> AuditEvent {
+fn audit(caller: &MemberCaller, action: AuditAction, event: EventId) -> AuditEvent {
     AuditEvent::new(
         caller.actor(),
         action,
-        AUDIT_RECORD_KIND,
         Some(event.as_uuid()),
         Some(caller.scope()),
     )
@@ -267,7 +263,7 @@ pub async fn add_event_member(
         Some(false) => return Err(AddEventMemberError::Forbidden),
         Some(true) => {}
     }
-    let audit = audit(caller, "event_membership.add", event);
+    let audit = audit(caller, AuditAction::EventMembershipAdd, event);
     let invalid = |code| {
         AddEventMemberError::Invalid(vec![FieldError {
             field: "user_id",
@@ -295,7 +291,7 @@ pub async fn change_event_role(
     store: &dyn EventMemberStore,
 ) -> Result<EventMember, ChangeEventMemberError> {
     check_change(caller, event, identity).await?;
-    let audit = audit(caller, "event_membership.change_role", event);
+    let audit = audit(caller, AuditAction::EventMembershipChangeRole, event);
     let changed = store
         .change_role(caller.scope(), event, user, role, expected_version, &audit)
         .await?;
@@ -312,7 +308,7 @@ pub async fn remove_event_member(
     store: &dyn EventMemberStore,
 ) -> Result<(), ChangeEventMemberError> {
     check_change(caller, event, identity).await?;
-    let audit = audit(caller, "event_membership.remove", event);
+    let audit = audit(caller, AuditAction::EventMembershipRemove, event);
     let removed = store
         .remove(caller.scope(), event, user, expected_version, &audit)
         .await?;

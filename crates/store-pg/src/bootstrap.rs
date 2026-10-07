@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use jiff_sqlx::ToSqlx;
 use sqlx::types::Uuid;
-use tada_app::audit::AuditEvent;
+use tada_app::audit::{AuditAction, AuditEvent};
 use tada_app::bootstrap::{BootstrapOutcome, BootstrapStore, OwnerInvitation};
 use tada_app::caller::{Bootstrap, ServiceCaller};
 use tada_app::domain::identity::OrganizationRole;
@@ -109,17 +109,16 @@ impl BootstrapStore for Database {
 
         let mut events = Vec::new();
         if let Some(id) = created {
-            events.push(("organization.create", "organization", id));
+            events.push((AuditAction::OrganizationCreate, id));
         }
         events.extend(
             revoked
                 .into_iter()
-                .map(|id| ("invitation.revoke", "invitation", id)),
+                .map(|id| (AuditAction::InvitationRevoke, id)),
         );
-        events.push(("invitation.create", "invitation", invitation_id.as_uuid()));
-        for (action, record_kind, record_id) in events {
-            let event =
-                AuditEvent::by_bootstrap(caller, action, record_kind, record_id, organization_id);
+        events.push((AuditAction::InvitationCreate, invitation_id.as_uuid()));
+        for (action, record_id) in events {
+            let event = AuditEvent::by_bootstrap(caller, action, record_id, organization_id);
             record(&mut tx, &event).await.map_err(store_error)?;
         }
 

@@ -207,6 +207,7 @@ impl EventMemberStore for Database {
 
 #[cfg(test)]
 mod tests {
+    use tada_app::audit::AuditAction;
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::domain::identity::Email;
 
@@ -260,11 +261,10 @@ mod tests {
             self.owner.scope()
         }
 
-        fn audit(&self, action: &'static str) -> AuditEvent {
+        fn audit(&self, action: AuditAction) -> AuditEvent {
             AuditEvent::new(
                 self.owner.actor(),
                 action,
-                "event",
                 Some(self.event.as_uuid()),
                 Some(self.scope()),
             )
@@ -286,7 +286,7 @@ mod tests {
                     user,
                     role,
                     "2030-05-18T08:00:00.123456Z".parse().unwrap(),
-                    &self.audit("add"),
+                    &self.audit(AuditAction::EventMembershipAdd),
                 )
                 .await
                 .unwrap()
@@ -321,7 +321,7 @@ mod tests {
                 f.anna,
                 EventRole::EventManager,
                 RecordVersion::FIRST,
-                &f.audit("change"),
+                &f.audit(AuditAction::EventMembershipChangeRole),
             )
             .await
             .unwrap();
@@ -337,13 +337,20 @@ mod tests {
                 f.event,
                 f.anna,
                 changed.version,
-                &f.audit("remove"),
+                &f.audit(AuditAction::EventMembershipRemove),
             )
             .await
             .unwrap();
         assert_eq!(removed, Changed::Changed(()));
         assert!(db.list(f.scope(), f.event).await.unwrap().is_empty());
-        assert_eq!(f.audit_actions().await, ["add", "change", "remove"]);
+        assert_eq!(
+            f.audit_actions().await,
+            [
+                "event_membership.add",
+                "event_membership.change_role",
+                "event_membership.remove"
+            ]
+        );
     }
 
     #[tokio::test]
@@ -366,13 +373,19 @@ mod tests {
                 f.anna,
                 EventRole::EventManager,
                 second,
-                &f.audit("change"),
+                &f.audit(AuditAction::EventMembershipChangeRole),
             )
             .await
             .unwrap();
         assert_eq!(conflict, Changed::VersionConflict);
         let conflict = db
-            .remove(f.scope(), f.event, f.anna, second, &f.audit("remove"))
+            .remove(
+                f.scope(),
+                f.event,
+                f.anna,
+                second,
+                &f.audit(AuditAction::EventMembershipRemove),
+            )
             .await
             .unwrap();
         assert_eq!(conflict, Changed::VersionConflict);
@@ -382,13 +395,13 @@ mod tests {
                 f.event,
                 stranger,
                 RecordVersion::FIRST,
-                &f.audit("remove"),
+                &f.audit(AuditAction::EventMembershipRemove),
             )
             .await
             .unwrap();
         assert_eq!(missing, Changed::NotFound);
 
-        assert_eq!(f.audit_actions().await, ["add"]);
+        assert_eq!(f.audit_actions().await, ["event_membership.add"]);
     }
 
     /// A scope of another organization neither sees nor changes the membership (ADR 0006).
@@ -408,7 +421,7 @@ mod tests {
                 f.anna,
                 EventRole::EventManager,
                 RecordVersion::FIRST,
-                &f.audit("change"),
+                &f.audit(AuditAction::EventMembershipChangeRole),
             )
             .await
             .unwrap();
@@ -419,7 +432,7 @@ mod tests {
                 f.event,
                 f.anna,
                 RecordVersion::FIRST,
-                &f.audit("remove"),
+                &f.audit(AuditAction::EventMembershipRemove),
             )
             .await
             .unwrap();

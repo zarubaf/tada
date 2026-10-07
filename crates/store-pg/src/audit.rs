@@ -20,7 +20,7 @@ pub(crate) async fn record(conn: &mut PgConnection, event: &AuditEvent) -> Resul
         actor.principal(),
         actor.channel().as_str(),
         actor.request_id(),
-        event.action(),
+        event.action().as_str(),
         event.record_kind(),
         event.record_id(),
     )
@@ -31,6 +31,7 @@ pub(crate) async fn record(conn: &mut PgConnection, event: &AuditEvent) -> Resul
 
 #[cfg(test)]
 mod tests {
+    use tada_app::audit::AuditAction;
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::domain::ids::UserId;
 
@@ -55,8 +56,7 @@ mod tests {
             .with_request(tada_app::caller::Channel::Telegram, Some(request));
         let event = AuditEvent::new(
             caller.actor(),
-            "event.create",
-            "event",
+            AuditAction::EventCreate,
             Some(record_id),
             Some(caller.scope()),
         );

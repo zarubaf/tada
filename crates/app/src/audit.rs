@@ -5,12 +5,55 @@ use uuid::Uuid;
 
 use crate::caller::{Actor, Bootstrap, Channel, OrgScope, ServiceCaller};
 
+/// What an audit event records. The set is closed, so each action has one spelling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditAction {
+    OrganizationCreate,
+    InvitationCreate,
+    InvitationRevoke,
+    InvitationAccept,
+    EventCreate,
+    EventMembershipAdd,
+    EventMembershipChangeRole,
+    EventMembershipRemove,
+}
+
+impl AuditAction {
+    /// The name in the `action` column of the audit log.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::OrganizationCreate => "organization.create",
+            Self::InvitationCreate => "invitation.create",
+            Self::InvitationRevoke => "invitation.revoke",
+            Self::InvitationAccept => "invitation.accept",
+            Self::EventCreate => "event.create",
+            Self::EventMembershipAdd => "event_membership.add",
+            Self::EventMembershipChangeRole => "event_membership.change_role",
+            Self::EventMembershipRemove => "event_membership.remove",
+        }
+    }
+
+    /// The kind of the record that `record_id` identifies.
+    pub fn record_kind(self) -> &'static str {
+        match self {
+            Self::OrganizationCreate => "organization",
+            Self::InvitationCreate | Self::InvitationRevoke | Self::InvitationAccept => {
+                "invitation"
+            }
+            // An event membership has no ID of its own; the record is its event.
+            Self::EventCreate
+            | Self::EventMembershipAdd
+            | Self::EventMembershipChangeRole
+            | Self::EventMembershipRemove => "event",
+        }
+    }
+}
+
 /// One entry of the audit log. A command records it in its own transaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuditEvent {
     actor: Actor,
-    action: &'static str,
-    record_kind: &'static str,
+    action: AuditAction,
     record_id: Option<Uuid>,
     organization_id: Option<OrganizationId>,
 }
@@ -21,15 +64,13 @@ impl AuditEvent {
     /// The two exceptions are `by_bootstrap` and `by_invitee`.
     pub fn new(
         actor: Actor,
-        action: &'static str,
-        record_kind: &'static str,
+        action: AuditAction,
         record_id: Option<Uuid>,
         scope: Option<OrgScope>,
     ) -> Self {
         Self {
             actor,
             action,
-            record_kind,
             record_id,
             organization_id: scope.map(OrgScope::organization_id),
         }
@@ -41,15 +82,13 @@ impl AuditEvent {
     /// not a scope for other reads or writes.
     pub fn by_bootstrap(
         caller: &ServiceCaller<Bootstrap>,
-        action: &'static str,
-        record_kind: &'static str,
+        action: AuditAction,
         record_id: Uuid,
         organization_id: OrganizationId,
     ) -> Self {
         Self::new(
             caller.actor(),
             action,
-            record_kind,
             Some(record_id),
             Some(caller.scope(organization_id)),
         )
@@ -68,8 +107,7 @@ impl AuditEvent {
     ) -> Self {
         Self {
             actor: Actor::member(user_id, Channel::Web, request_id),
-            action: "invitation.accept",
-            record_kind: "invitation",
+            action: AuditAction::InvitationAccept,
             record_id: Some(invitation_id.as_uuid()),
             organization_id: Some(organization_id),
         }
@@ -79,12 +117,12 @@ impl AuditEvent {
         &self.actor
     }
 
-    pub fn action(&self) -> &'static str {
+    pub fn action(&self) -> AuditAction {
         self.action
     }
 
     pub fn record_kind(&self) -> &'static str {
-        self.record_kind
+        self.action.record_kind()
     }
 
     pub fn record_id(&self) -> Option<Uuid> {
@@ -120,7 +158,7 @@ mod tests {
         assert_eq!(
             (event.action(), event.record_kind(), event.record_id()),
             (
-                "invitation.accept",
+                AuditAction::InvitationAccept,
                 "invitation",
                 Some(invitation.as_uuid())
             )
