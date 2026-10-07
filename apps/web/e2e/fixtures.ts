@@ -34,6 +34,23 @@ export const sessionInfo = {
   memberships: [membership],
 };
 
+/** A session whose organization role is `role`. */
+export function sessionWithRole(role: string) {
+  const own = { ...membership, role };
+  return { ...sessionInfo, organization: own, memberships: [own] };
+}
+
+/** The fake API of the event screens: the answer of `GET /api/v1/events/{id}`. */
+export async function fakeEvent(page: Page, body: unknown, status = 200): Promise<void> {
+  await page.route("**/api/v1/events/*", (route) =>
+    route.fulfill({
+      status,
+      contentType: status < 400 ? "application/json" : "application/problem+json",
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
 /** The fake API of the browser checks: the answer of `GET /api/v1/session`. */
 export async function fakeSession(page: Page, info: unknown = sessionInfo): Promise<void> {
   await page.route("**/api/v1/session", (route) =>

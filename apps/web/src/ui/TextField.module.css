@@ -18,6 +18,24 @@
     font: inherit;
   }
 
+  .input[data-mono] {
+    font-family: var(--font-family-mono);
+  }
+
+  .input[data-invalid] {
+    border-color: var(--color-danger);
+  }
+
+  .help {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .error {
+    color: var(--color-danger);
+    font-size: var(--font-size-sm);
+  }
+
   /* 16 px on touch devices, so that iOS does not zoom (doc/design/layout-and-responsiveness.md) */
   @media (pointer: coarse) {
     .input {

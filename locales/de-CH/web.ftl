@@ -108,3 +108,24 @@ choose-organization-title = Organisation wählen
 choose-organization-text = Wählen Sie die Organisation, mit der Sie arbeiten.
 choose-organization-empty-title = Keine Organisation
 choose-organization-empty-text = Sie sind noch in keiner Organisation Mitglied. Bitten Sie eine Administration um eine Einladung.
+
+## Event screens (create, event page and event memberships)
+
+events-create = Anlass erfassen
+event-create-title = Anlass erfassen
+event-create-submit = Anlass erfassen
+event-create-key-help = Zwei bis acht Grossbuchstaben oder Ziffern, zum Beispiel FLY28.
+event-create-time-zone-help = Eine IANA-Zeitzone, zum Beispiel Europe/Zurich.
+event-error-key = Das Kürzel hat 2 bis 8 Grossbuchstaben oder Ziffern.
+event-error-key-taken = Dieses Kürzel ist schon vergeben.
+event-error-name = Der Name hat 1 bis 200 Zeichen.
+event-error-time_zone = Diese Zeitzone ist unbekannt.
+event-nav = Anlass
+event-nav-overview = Übersicht
+event-nav-members = Mitglieder
+event-overview-placeholder = Hier erscheint die Übersicht des Anlasses.
+event-loading = Anlass wird geladen
+problem-not-found = Das gibt es nicht, oder Sie dürfen es nicht sehen.
+problem-validation-failed = Die Eingabe ist ungültig.
+problem-record-version-conflict = Jemand hat diesen Eintrag inzwischen geändert. Laden Sie die Seite neu.
+problem-invalid-transition = Ein Anlass braucht mindestens eine Anlassleitung. Geben Sie zuerst jemand anderem diese Rolle.

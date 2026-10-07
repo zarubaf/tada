@@ -1,0 +1,25 @@
+@layer components {
+  /* Together with the class `button` of Button.module.css. */
+  .link {
+    text-decoration: none;
+  }
+
+  .link:hover {
+    background: var(--color-bg-hover);
+  }
+
+  .link:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .primary {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+  }
+
+  .primary:hover {
+    background: var(--color-accent-hover);
+  }
+}

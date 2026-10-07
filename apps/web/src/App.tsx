@@ -1,6 +1,9 @@
 import { lazy, Suspense } from "react";
 import { type Api, createApi } from "./api/client";
+import { CreateEventForm } from "./events/CreateEventForm";
+import { EventPage } from "./events/EventPage";
 import { EventsPage } from "./events/EventsPage";
+import { t } from "./i18n";
 import { NotFoundPage } from "./NotFoundPage";
 import { Redirect, Route, Router, Routes } from "./router/Router";
 import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
@@ -53,6 +56,15 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 </Route>
                 <Route path="/choose-organization">
                   <ChooseOrganizationPage api={api} />
+                </Route>
+                {/* Event screens (Task 21) */}
+                <Route path="/events/new">
+                  <CreateEventForm api={api} />
+                </Route>
+                <Route path="/events/:eventId">
+                  <EventPage api={api}>
+                    <p>{t("event-overview-placeholder")}</p>
+                  </EventPage>
                 </Route>
                 <Route path="*">
                   <NotFoundPage />

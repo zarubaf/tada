@@ -13,6 +13,7 @@ A new component needs an entry here in the same pull request.
 | Button      | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap. |
 | IconButton  | quiet                             | Only in toolbars and rows. Always an accessible name and a tooltip.                             |
 | Link        | inline, standalone                | Inline links are underlined. A link never does what a button does.                              |
+| LinkButton  | primary, secondary                | A link in the style of a button. Only for an action that opens a page, for example a form.      |
 | Menu        |                                   | For more than three secondary actions. The trigger is `dots-vertical`.                          |
 | CommandMenu |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                    |
 

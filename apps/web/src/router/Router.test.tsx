@@ -64,6 +64,25 @@ describe("Router", () => {
     expect(window.location.pathname).toBe("/events");
   });
 
+  it("marks an exact link only for its own path", () => {
+    window.history.replaceState(null, "", "/events/TEST30/members");
+    render(
+      <Router>
+        <Link to="/events/TEST30" exact>
+          Übersicht
+        </Link>
+        <Link to="/events/TEST30/members" exact>
+          Mitglieder
+        </Link>
+      </Router>,
+    );
+    expect(screen.getByRole("link", { name: "Übersicht" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "Mitglieder" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
   it("navigates with pushState and marks the current link", async () => {
     renderAt("/events");
     expect(screen.getByRole("link", { name: "Anlässe" })).toHaveAttribute("aria-current", "page");

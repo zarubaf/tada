@@ -2,6 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { createApi, type Event, type Problem } from "../api/client";
+import { Router } from "../router/Router";
+import { SessionProvider } from "../session/SessionProvider";
 import { EventsPage } from "./EventsPage";
 
 // Invented fixtures with long German names and umlauts (doc/design/principles.md).
@@ -104,5 +106,39 @@ describe("EventsPage", () => {
     expect(screen.getByText("AA")).toBeInTheDocument();
     expect(urls[1]).toContain("cursor=QUEgMDE");
     expect(screen.queryByRole("button", { name: "Weitere Anlässe laden" })).not.toBeInTheDocument();
+  });
+});
+
+describe("EventsPage toolbar", () => {
+  function signedIn(role: string) {
+    const membership = { organization_id: "o1", name: "Fliegergruppe Testwil", role };
+    const session = {
+      user_id: "u1",
+      display_name: "Anna Muster",
+      organization: membership,
+      memberships: [membership],
+    };
+    const fetch = async (request: Request) =>
+      json(200, new URL(request.url).pathname.endsWith("/session") ? session : { items: [] });
+    const api = createApi(fetch as unknown as typeof globalThis.fetch);
+    render(
+      <Router>
+        <SessionProvider api={api}>
+          <EventsPage api={api} />
+        </SessionProvider>
+      </Router>,
+    );
+  }
+
+  it.each(["owner", "admin"])("offers „Anlass erfassen“ to the role %s", async (role) => {
+    signedIn(role);
+    const link = await screen.findByRole("link", { name: "Anlass erfassen" });
+    expect(link).toHaveAttribute("href", "/events/new");
+  });
+
+  it("does not offer „Anlass erfassen“ to a member", async () => {
+    signedIn("member");
+    await screen.findByText("Noch keine Anlässe erfasst");
+    expect(screen.queryByRole("link", { name: "Anlass erfassen" })).not.toBeInTheDocument();
   });
 });
