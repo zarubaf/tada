@@ -21,6 +21,8 @@ pub type ServeSettings = (Database, Http, Storage);
 pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp);
 /// The settings of `tada telegram`.
 pub type TelegramSettings = (Database, Telegram);
+/// The settings of `tada bootstrap`.
+pub type BootstrapSettings = (Database, PublicUrl);
 /// The settings of `tada migrate`.
 pub type MigrateSettings = (Database,);
 

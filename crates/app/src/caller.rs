@@ -220,6 +220,26 @@ impl ServiceCaller<JobRunner> {
     }
 }
 
+/// The service identity `bootstrap`: the command `tada bootstrap` (ADR 0036).
+/// It is the only service identity without an organization (ADR 0039).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Bootstrap;
+
+impl ServiceIdentity for Bootstrap {
+    const NAME: &'static str = "bootstrap";
+    const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0003);
+    const CHANNEL: Channel = Channel::Cli;
+}
+
+impl ServiceCaller<Bootstrap> {
+    /// The scope of the organization that the slug of the operator names. `bootstrap` can only
+    /// create an organization and invite its first owner, so the store that does this takes the
+    /// scope here, after its infrastructure query by slug (ADR 0039).
+    pub fn scope(&self, organization_id: OrganizationId) -> OrgScope {
+        OrgScope(organization_id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,12 +285,16 @@ mod tests {
         assert_eq!(telegram.channel(), Channel::Telegram);
         let job = ServiceCaller::<JobRunner>::new().actor();
         assert_eq!(job.channel(), Channel::Job);
+        let bootstrap = ServiceCaller::<Bootstrap>::new().actor();
+        assert_eq!(bootstrap.channel(), Channel::Cli);
     }
 
     #[test]
     fn service_identities_have_distinct_ids() {
-        assert_ne!(JobRunner::ID, TelegramGateway::ID);
+        let ids = [JobRunner::ID, TelegramGateway::ID, Bootstrap::ID];
+        assert!(ids.iter().enumerate().all(|(i, id)| !ids[..i].contains(id)));
         assert_eq!(JobRunner::NAME, "job-runner");
+        assert_eq!(Bootstrap::NAME, "bootstrap");
     }
 
     #[test]

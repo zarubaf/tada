@@ -14,7 +14,9 @@ use std::str::FromStr;
 use secrecy::SecretString;
 
 pub use reference::reference;
-pub use sections::{Logging, MigrateSettings, ServeSettings, TelegramSettings, WorkerSettings};
+pub use sections::{
+    BootstrapSettings, Logging, MigrateSettings, ServeSettings, TelegramSettings, WorkerSettings,
+};
 
 /// The description of one setting, for the loader and for the reference.
 #[derive(Debug)]

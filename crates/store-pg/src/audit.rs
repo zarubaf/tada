@@ -6,8 +6,6 @@ use tada_app::audit::AuditEvent;
 use tada_app::domain::ids::OrganizationId;
 
 /// Adds an audit event inside the transaction of a command. A rollback removes it with the change.
-// The first command with an audit event calls this in Slice 1.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) async fn record(conn: &mut PgConnection, event: &AuditEvent) -> Result<(), sqlx::Error> {
     let actor = event.actor();
     sqlx::query!(

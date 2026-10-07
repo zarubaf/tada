@@ -3,6 +3,7 @@
 pub mod audit;
 pub mod auth;
 pub mod blobs;
+pub mod bootstrap;
 pub mod caller;
 pub mod clock;
 pub mod events;
