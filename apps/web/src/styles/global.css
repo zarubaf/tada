@@ -33,6 +33,14 @@
     line-height: var(--line-height-ui);
   }
 
+  /*
+   * The browser default for code is the generic monospace family. It has a smaller default size and
+   * resolves to a system font that can change in the middle of a page load. Use the token instead.
+   */
+  code {
+    font-family: var(--font-family-mono);
+  }
+
   h1,
   h2,
   h3 {
