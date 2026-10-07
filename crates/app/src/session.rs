@@ -127,7 +127,7 @@ impl SessionError {
     pub fn code(&self) -> ProblemCode {
         match self {
             Self::Unauthenticated => ProblemCode::Unauthenticated,
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
     }
 }
@@ -186,7 +186,7 @@ impl ChooseOrganizationError {
         match self {
             Self::Unauthenticated => ProblemCode::Unauthenticated,
             Self::NotFound => ProblemCode::NotFound,
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
     }
 }
@@ -211,6 +211,11 @@ pub async fn choose_organization(
         .set_organization(token, Some(organization_id))
         .await?;
     Ok(())
+}
+
+/// Ends the session of `token`: the sign-out of ADR 0008. An unknown token changes nothing.
+pub async fn sign_out(token: &str, sessions: &dyn SessionStore) -> Result<(), StoreError> {
+    sessions.delete(token).await
 }
 
 /// The `Authenticator` of sessions (ADR 0008, ADR 0056).
@@ -267,13 +272,6 @@ impl Authenticator for SessionAuthenticator {
             return Err(AuthenticationError::OrganizationRequired);
         };
         Ok(MemberCaller::new(session.user_id, organization_id, role))
-    }
-}
-
-fn store_code(error: &StoreError) -> ProblemCode {
-    match error {
-        StoreError::Unavailable(_) => ProblemCode::Unavailable,
-        StoreError::Internal(_) => ProblemCode::Internal,
     }
 }
 
@@ -695,6 +693,19 @@ mod tests {
         assert!(matches!(result, Err(ChooseOrganizationError::NotFound)));
         let caller = fixture.authenticate(&token).await.unwrap();
         assert_eq!(caller.scope().organization_id(), testwil());
+    }
+
+    #[tokio::test]
+    async fn sign_out_ends_the_session() {
+        let fixture = Fixture::new();
+        let token = fixture.sign_in(Some(testwil())).await;
+
+        sign_out(&token, &*fixture.sessions).await.unwrap();
+        assert!(matches!(
+            fixture.authenticate(&token).await,
+            Err(AuthenticationError::Unauthenticated)
+        ));
+        sign_out("unknown", &*fixture.sessions).await.unwrap();
     }
 
     #[test]

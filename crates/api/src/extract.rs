@@ -1,13 +1,17 @@
 //! Request extractors whose rejections are problem details (ADR 0037).
 
+use std::convert::Infallible;
+use std::fmt;
+
 use axum::extract::rejection::{JsonRejection, QueryRejection};
-use axum::extract::{FromRequest, FromRequestParts, Request};
-use axum::http::header;
+use axum::extract::{FromRequest, FromRequestParts, OptionalFromRequestParts, Request};
 use axum::http::request::Parts;
+use axum::http::{HeaderValue, header};
 use serde::de::DeserializeOwned;
 use tada_app::auth::{AuthenticationError, Credential};
 use tada_app::caller::{Channel, MemberCaller};
 use tada_app::problem::ProblemCode;
+use tada_app::session::ABSOLUTE_TIMEOUT;
 
 use crate::ApiState;
 use crate::problem::ApiError;
@@ -89,8 +93,64 @@ impl FromRequestParts<ApiState> for Caller {
     }
 }
 
+/// The token of the session cookie of the request. `Debug` never shows it (ADR 0035).
+/// A request without the cookie is `unauthenticated`.
+pub struct SessionToken(String);
+
+impl SessionToken {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for SessionToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("SessionToken(redacted)")
+    }
+}
+
+impl<S: Send + Sync> FromRequestParts<S> for SessionToken {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, ApiError> {
+        session_token(parts)
+            .map(|token| Self(token.to_owned()))
+            .ok_or_else(|| ApiError::new(ProblemCode::Unauthenticated))
+    }
+}
+
+impl<S: Send + Sync> OptionalFromRequestParts<S> for SessionToken {
+    type Rejection = Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Option<Self>, Infallible> {
+        Ok(session_token(parts).map(|token| Self(token.to_owned())))
+    }
+}
+
+/// The `Set-Cookie` value that gives the browser the session token (ADR 0008).
+/// The cookie lives as long as a session can live.
+pub(crate) fn session_cookie(token: &str) -> Result<HeaderValue, ApiError> {
+    cookie(token, ABSOLUTE_TIMEOUT.as_secs())
+}
+
+/// The `Set-Cookie` value that removes the session cookie from the browser.
+pub(crate) fn expired_session_cookie() -> Result<HeaderValue, ApiError> {
+    cookie("", 0)
+}
+
+/// The one format of the session cookie. `Domain` is absent, as the `__Host-` prefix requires.
+fn cookie(value: &str, max_age: i64) -> Result<HeaderValue, ApiError> {
+    let mut header = HeaderValue::from_str(&format!(
+        "{SESSION_COOKIE}={value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={max_age}"
+    ))
+    .map_err(|_| ApiError::new(ProblemCode::Internal))?;
+    // HTTP/2 then keeps the token out of its header compression tables.
+    header.set_sensitive(true);
+    Ok(header)
+}
+
 /// The ID of the current request. Outside a request it is the nil UUID, which is no ID.
-fn request_id() -> Option<uuid::Uuid> {
+pub(crate) fn request_id() -> Option<uuid::Uuid> {
     Some(request_id::current()).filter(|id| !id.is_nil())
 }
 

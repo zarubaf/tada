@@ -101,12 +101,8 @@ impl ApiError {
 
     /// A store failure. The log gets the cause; the response does not.
     pub fn store(error: &StoreError) -> Self {
-        let code = match error {
-            StoreError::Unavailable(_) => ProblemCode::Unavailable,
-            StoreError::Internal(_) => ProblemCode::Internal,
-        };
         tracing::error!(error = %error_chain(error), "the store failed");
-        Self::new(code)
+        Self::new(error.code())
     }
 }
 

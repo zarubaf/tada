@@ -241,6 +241,7 @@ mod tests {
                 "TADA_S3_BUCKET",
                 "TADA_S3_ACCESS_KEY_ID_FILE",
                 "TADA_S3_SECRET_ACCESS_KEY_FILE",
+                "TADA_PUBLIC_URL",
             ]
         );
     }

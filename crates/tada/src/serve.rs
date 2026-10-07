@@ -15,7 +15,9 @@ use tokio::sync::oneshot;
 use crate::settings::ServeSettings;
 use crate::shutdown;
 
-pub async fn run((database, http, storage): ServeSettings) -> anyhow::Result<()> {
+// The sign-in needs the one public origin of the installation (ADR 0008).
+// No handler of `serve` builds a link, so none reads it yet.
+pub async fn run((database, http, storage, _public_url): ServeSettings) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
     let storage = S3Storage::new(S3Config {
@@ -31,6 +33,9 @@ pub async fn run((database, http, storage): ServeSettings) -> anyhow::Result<()>
             authenticator: authenticator(&db).await?,
             events: Arc::new(db.clone()),
             telegram: Arc::new(db.clone()),
+            identity: Arc::new(db.clone()),
+            sessions: Arc::new(db.clone()),
+            sign_in: Arc::new(db.clone()),
             clock: Arc::new(SystemClock),
             trusted_proxies: http.trusted_proxies,
         },

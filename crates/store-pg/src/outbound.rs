@@ -24,6 +24,7 @@ use crate::token::new_token;
 
 /// Stores an outbound intent and its send job inside the transaction of a command.
 /// A rollback removes both, so a rolled-back command never sends mail (ADR 0042).
+/// The sign-in request writes the same rows in one statement of its own (`sign_in.rs`).
 pub(crate) async fn queue_outbound(
     conn: &mut PgConnection,
     purpose: &Purpose,

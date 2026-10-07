@@ -84,7 +84,7 @@ impl CreateEventError {
         match self {
             Self::Forbidden => ProblemCode::Forbidden,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
     }
 }
@@ -207,7 +207,7 @@ impl ListEventsError {
 
     pub fn code(&self) -> ProblemCode {
         match self {
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
     }
 }
@@ -242,13 +242,6 @@ pub async fn list_events(
             id: last.id,
         });
     Ok(Page { items, next })
-}
-
-fn store_code(error: &StoreError) -> ProblemCode {
-    match error {
-        StoreError::Unavailable(_) => ProblemCode::Unavailable,
-        StoreError::Internal(_) => ProblemCode::Internal,
-    }
 }
 
 #[cfg(test)]

@@ -255,10 +255,227 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/sign-in/requests": {
+      "post": {
+        "tags": [
+          "sign-in"
+        ],
+        "summary": "Asks for a magic link. The answer is the same for each address (ADR 0008).\nOnly a member gets a mail.",
+        "operationId": "request_sign_in",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "The request is accepted. The body is empty."
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/sign-in/magic-link": {
+      "post": {
+        "tags": [
+          "sign-in"
+        ],
+        "summary": "Signs in with the token of a magic link. The token works once.\nThe response sets the session cookie.",
+        "operationId": "redeem_magic_link",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemMagicLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new session. The `Set-Cookie` header holds its token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/session": {
+      "get": {
+        "tags": [
+          "sign-in"
+        ],
+        "summary": "Reads the session of the request. A session without an organization also gets its information.",
+        "operationId": "get_session",
+        "responses": {
+          "200": {
+            "description": "The session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/session/organization": {
+      "post": {
+        "tags": [
+          "sign-in"
+        ],
+        "summary": "Chooses or changes the organization of the session (ADR 0056). The token stays the same.",
+        "operationId": "choose_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChooseOrganizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "not-found",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/sign-out": {
+      "post": {
+        "tags": [
+          "sign-in"
+        ],
+        "summary": "Signs out: ends the session and clears the cookie. It also succeeds without a session.",
+        "operationId": "sign_out",
+        "responses": {
+          "204": {
+            "description": "The session ended."
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "ChooseOrganizationRequest": {
+        "type": "object",
+        "description": "The input of `choose_organization`.",
+        "required": [
+          "organization_id"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CreateEventRequest": {
         "type": "object",
         "description": "The input of `CreateEvent`.",
@@ -354,6 +571,37 @@
           }
         }
       },
+      "MembershipSummary": {
+        "type": "object",
+        "description": "A membership of the signed-in user.",
+        "required": [
+          "organization_id",
+          "name",
+          "role"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the organization."
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrganizationRole"
+          }
+        }
+      },
+      "OrganizationRole": {
+        "type": "string",
+        "description": "The role of a member in an organization.",
+        "enum": [
+          "owner",
+          "admin",
+          "member"
+        ]
+      },
       "Problem": {
         "type": "object",
         "description": "An error response. `detail` never repeats input values.",
@@ -422,6 +670,68 @@
           "code": {
             "type": "string",
             "description": "The reason, for example `taken`. The list of codes is open."
+          }
+        }
+      },
+      "RedeemMagicLinkRequest": {
+        "type": "object",
+        "description": "The input of a sign-in with a magic link.",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The token from the fragment of the magic link."
+          }
+        }
+      },
+      "SessionInfo": {
+        "type": "object",
+        "description": "The signed-in user and the organization of the session.",
+        "required": [
+          "user_id",
+          "display_name",
+          "memberships"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "organization": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MembershipSummary",
+                "description": "The organization of the session. It is absent until the member chooses one (ADR 0056)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memberships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MembershipSummary"
+            },
+            "description": "All memberships of the user, in the order of the organization names."
+          }
+        }
+      },
+      "SignInRequest": {
+        "type": "object",
+        "description": "The input of a sign-in request.",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address of the member."
           }
         }
       },
