@@ -190,18 +190,18 @@ mod tests {
         let id = add(&test, &job("ping")).await;
         let (first, second) = (Uuid::now_v7(), Uuid::now_v7());
 
-        let lost = test
-            .database
-            .claim(first, Duration::from_millis(200))
-            .await
-            .unwrap()
-            .unwrap();
+        let lost = test.database.claim(first, LEASE).await.unwrap().unwrap();
         assert_eq!(
             test.database.claim(second, LEASE).await.unwrap(),
             None,
             "the lease holds"
         );
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        // The lease ends now. A short real lease would end before the check above on a loaded machine.
+        sqlx::query("UPDATE job SET locked_until = now() - interval '1 second' WHERE id = $1")
+            .bind(id)
+            .execute(&test.database.pool)
+            .await
+            .unwrap();
         let again = test.database.claim(second, LEASE).await.unwrap().unwrap();
         assert_eq!((again.id, again.attempt), (id, 2));
 
