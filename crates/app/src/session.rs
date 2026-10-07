@@ -285,7 +285,7 @@ impl Authenticator for SessionAuthenticator {
             self.sessions.set_organization(token, None).await?;
             return Err(AuthenticationError::OrganizationRequired);
         };
-        Ok(MemberCaller::new(session.user_id, organization_id, role))
+        Ok(MemberCaller::create(session.user_id, organization_id, role))
     }
 }
 

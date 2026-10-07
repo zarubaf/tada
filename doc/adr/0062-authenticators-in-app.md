@@ -26,7 +26,7 @@ A second authenticator for API tokens comes later (ADR 0040), so the rule must b
 
 - The constructors of `OrgScope` stay private to `app`.
 - A new authenticator that needs I/O adds a store port, and an adapter crate implements that port.
-- The development authenticator in `store-pg` is an exception until it goes away with the session sign-in in production.
+- `MemberCaller::new` exists only for tests (feature `testing`). The authenticators in `app` use a crate-private constructor.
 
 ## Alternatives
 

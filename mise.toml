@@ -114,9 +114,13 @@ run = "uv run --quiet scripts/run_when_web_changed.py check:browser uv run --qui
 description = "Write the screenshot baselines again, after an intended design change"
 run = "uv run --quiet scripts/check_browser.py --update-snapshots"
 
+[tasks."check:no-dev-auth"]
+description = "Fail if the Rust sources contain a way around the session authenticator"
+run = "uv run --quiet scripts/check_no_dev_auth.py"
+
 [tasks."check:rust"]
 description = "Run all Rust checks"
-depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps", "check:generated", "check:contract"]
+depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps", "check:generated", "check:contract", "check:no-dev-auth"]
 
 [tasks.check]
 description = "Run every check that CI runs; skips the web and browser checks when no web file changed"

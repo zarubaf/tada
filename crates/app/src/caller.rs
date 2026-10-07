@@ -144,8 +144,18 @@ pub struct MemberCaller {
 }
 
 impl MemberCaller {
-    /// For `Authenticator` adapters and tests only. Other code gets a caller from an authenticator.
+    /// For tests of other crates only. Production code gets a caller from an authenticator.
+    #[cfg(any(test, feature = "testing"))]
     pub fn new(user_id: UserId, organization_id: OrganizationId, role: OrganizationRole) -> Self {
+        Self::create(user_id, organization_id, role)
+    }
+
+    /// For the authenticators of this crate (ADR 0062). Other code gets a caller from an authenticator.
+    pub(crate) fn create(
+        user_id: UserId,
+        organization_id: OrganizationId,
+        role: OrganizationRole,
+    ) -> Self {
         Self {
             user_id,
             organization_id,

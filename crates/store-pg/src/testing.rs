@@ -21,6 +21,7 @@ const POSTGRES_TAG: &str = "18.6-trixie";
 #[derive(Debug)]
 pub struct TestDatabase {
     pub database: Database,
+    url: String,
     _container: ContainerAsync<Postgres>,
 }
 
@@ -47,8 +48,15 @@ impl TestDatabase {
             .unwrap();
         Self {
             database,
+            url,
             _container: container,
         }
+    }
+
+    /// The URL of the database for a process under test. The password of the user is `postgres`.
+    #[must_use]
+    pub fn url(&self) -> &str {
+        &self.url
     }
 
     /// Creates an organization with the slug `slug`.

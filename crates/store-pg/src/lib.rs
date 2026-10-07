@@ -4,8 +4,6 @@ mod actor;
 mod audit;
 mod bootstrap;
 mod database;
-#[cfg(debug_assertions)]
-pub mod dev;
 mod error;
 mod event_members;
 mod events;

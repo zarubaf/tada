@@ -29,6 +29,7 @@ testcontainers-modules = { workspace = true, optional = true }
 uuid.workspace = true
 
 [dev-dependencies]
+tada-app = { workspace = true, features = ["testing"] }
 testcontainers-modules.workspace = true
 tokio.workspace = true
 

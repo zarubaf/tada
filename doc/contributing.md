@@ -23,10 +23,11 @@ The file [compose.yaml](../compose.yaml) is not a deployment ([ADR 0033](adr/003
    `cargo run -p tada -- bootstrap --organization-slug testwil --organization-name "Open Day Testwil" --owner-email owner@example.org`.
    Then run `cargo run -p tada -- worker` to send the invitation.
 5. Open Mailpit at `http://127.0.0.1:8025` to read the mail that tada sends.
+   Follow the link in the invitation mail to sign in.
+   Later sign-ins use the sign-in link that tada sends to the same address.
 6. Run `mise run dev:down` to stop the services. The data volumes stay.
 
 Do not remove `.dev/secrets/` while the volumes exist. The database and the storage keep the first secrets.
-A debug build acts as the owner of a development organization for each request ([ADR 0053](adr/0053-development-authenticator.md)).
 
 ## Sources of truth
 
