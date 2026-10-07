@@ -32,6 +32,8 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
         .routes(routes!(get_session))
         .routes(routes!(choose_organization))
         .routes(routes!(sign_out))
+        .routes(routes!(preview_invitation))
+        .routes(routes!(accept_invitation))
 }
 
 pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
@@ -51,6 +53,14 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
             ]),
         ),
         ("sign_out", codes(&[StoreError::CODES])),
+        (
+            "preview_invitation",
+            codes(&[JSON_BODY, SignInError::CODES]),
+        ),
+        (
+            "accept_invitation",
+            codes(&[JSON_BODY, SignInError::CODES, SessionError::CODES]),
+        ),
     ]
 }
 
@@ -341,4 +351,89 @@ async fn sign_out(
         .headers_mut()
         .insert(header::SET_COOKIE, expired_session_cookie()?);
     Ok(response)
+}
+
+/// The input of the invitation routes. Like the token of a magic link, the token of an invitation
+/// reaches the server only in the body of a POST request (ADR 0008).
+#[derive(Deserialize, ToSchema)]
+pub struct InvitationTokenRequest {
+    /// The token from the fragment of the invitation link.
+    pub token: String,
+}
+
+impl std::fmt::Debug for InvitationTokenRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // The token never goes to a log (ADR 0035).
+        f.write_str("InvitationTokenRequest(redacted)")
+    }
+}
+
+/// What an invitation is for, before the invitee accepts it.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct InvitationPreview {
+    /// The name of the organization of the invitation.
+    pub organization_name: String,
+    /// The role that the invitation gives.
+    pub role: OrganizationRole,
+}
+
+impl From<app::InvitationPreview> for InvitationPreview {
+    fn from(preview: app::InvitationPreview) -> Self {
+        Self {
+            organization_name: preview.organization_name,
+            role: preview.role.into(),
+        }
+    }
+}
+
+/// Shows the organization and the role of an invitation. It does not use the token.
+#[utoipa::path(
+    post,
+    path = "/invitations/preview",
+    operation_id = "preview_invitation",
+    tag = "sign-in",
+    request_body = InvitationTokenRequest,
+    responses(
+        (status = OK, description = "What the invitation is for.", body = InvitationPreview),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn preview_invitation(
+    State(state): State<ApiState>,
+    Json(body): Json<InvitationTokenRequest>,
+) -> Result<Response, ApiError> {
+    match app::preview_invitation(&body.token, state.sign_in.as_ref(), state.clock.as_ref()).await {
+        Ok(preview) => Ok(uncached(InvitationPreview::from(preview))),
+        Err(SignInError::Unauthenticated) => Err(ApiError::new(ProblemCode::Unauthenticated)),
+        Err(SignInError::Store(error)) => Err(ApiError::store(&error)),
+    }
+}
+
+/// Accepts an invitation. The token works once. The response sets the cookie of a new session
+/// in the organization of the invitation.
+#[utoipa::path(
+    post,
+    path = "/invitations/accept",
+    operation_id = "accept_invitation",
+    tag = "sign-in",
+    request_body = InvitationTokenRequest,
+    responses(
+        (status = OK, description = "The new session. The `Set-Cookie` header holds its token.", body = SessionInfo),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn accept_invitation(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(body): Json<InvitationTokenRequest>,
+) -> Result<Response, ApiError> {
+    let result = app::accept_invitation(
+        &body.token,
+        user_agent(&headers),
+        request_id(),
+        state.sign_in.as_ref(),
+        state.clock.as_ref(),
+    )
+    .await;
+    new_session(&state, result).await
 }
