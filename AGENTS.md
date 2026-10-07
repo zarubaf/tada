@@ -31,12 +31,13 @@ tada is an event-planning workspace for clubs. Read these files before you chang
 
 Rules for each session:
 
-1. Run `mise run check` before each commit. The Git hooks run the same checks.
-2. Use Conventional Commits. Make one logical change per commit. Explain why, not what.
-3. Do not add `Co-Authored-By` or other AI attribution trailers to commits or pull requests.
-4. Do not push, create remotes or publish anything without a request from the product owner.
-5. Do not commit real personal data, club contacts or secrets. The repository is public.
-6. Do not commit or link to `tasks/`. It holds private notes.
-7. Write durable decisions into the repository, not into chat or agent memory.
-8. Write all scripts in Python (ADR 0034). Never write shell scripts.
-9. Do not add operator details (hosts, domains, providers) to this repository (ADR 0033).
+01. Run `mise run check` before each commit. The Git hooks run the same checks.
+02. Use Conventional Commits. Make one logical change per commit. Explain why, not what.
+03. Do not add `Co-Authored-By` or other AI attribution trailers to commits or pull requests.
+04. Do not push, create remotes or publish anything without a request from the product owner.
+05. Do not commit real personal data, club contacts or secrets. The repository is public.
+06. Do not commit or link to `tasks/`. It holds private notes.
+07. Write durable decisions into the repository, not into chat or agent memory.
+08. Write all scripts in Python (ADR 0034). Never write shell scripts.
+09. Do not add operator details (hosts, domains, providers) to this repository (ADR 0033).
+10. Do implementation work with subagent-driven development as described in [Agent-driven implementation](doc/contributing.md#agent-driven-implementation).
