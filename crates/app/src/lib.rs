@@ -13,6 +13,7 @@ pub mod mail;
 pub mod outbound;
 pub mod paging;
 pub mod problem;
+pub mod public_url;
 pub mod store;
 pub mod telegram;
 

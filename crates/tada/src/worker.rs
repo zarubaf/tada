@@ -7,7 +7,8 @@ use anyhow::Context;
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
 use tada_app::jobs::{Handlers, Ran, run_next};
-use tada_app::outbound::{PublicUrl, SendOutbound};
+use tada_app::outbound::SendOutbound;
+use tada_app::public_url::PublicUrl;
 use tada_store_pg::Database;
 use uuid::Uuid;
 

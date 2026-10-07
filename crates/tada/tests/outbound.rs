@@ -10,7 +10,8 @@ use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
 use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::jobs::{Handlers, Ran, run_next};
-use tada_app::outbound::{PublicUrl, Purpose, SendOutbound};
+use tada_app::outbound::{Purpose, SendOutbound};
+use tada_app::public_url::PublicUrl;
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
