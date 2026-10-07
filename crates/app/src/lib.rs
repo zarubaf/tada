@@ -5,6 +5,7 @@ pub mod auth;
 pub mod blobs;
 pub mod caller;
 pub mod clock;
+pub mod drafts;
 pub mod events;
 pub mod health;
 pub mod identity;
