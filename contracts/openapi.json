@@ -738,7 +738,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Changes the event role of a member. Only event managers can do this.",
+        "summary": "Changes the event role of a member. Only event managers can do this.\nThe only event manager of an event keeps the role: the change gives `invalid-transition`.",
         "operationId": "change_event_role",
         "parameters": [
           {
@@ -801,6 +801,7 @@
           "forbidden",
           "not-found",
           "record-version-conflict",
+          "invalid-transition",
           "payload-too-large",
           "unsupported-media-type",
           "unavailable",
@@ -813,7 +814,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Removes the event role of a member. The member loses access to the event with the next request.",
+        "summary": "Removes the event role of a member. The member loses access to the event with the next request.\nThe only event manager of an event cannot be removed: this gives `invalid-transition`.",
         "operationId": "remove_event_membership",
         "parameters": [
           {
@@ -869,6 +870,7 @@
           "forbidden",
           "not-found",
           "record-version-conflict",
+          "invalid-transition",
           "payload-too-large",
           "unsupported-media-type",
           "unavailable",

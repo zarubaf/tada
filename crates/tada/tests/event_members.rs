@@ -318,3 +318,61 @@ async fn an_event_manager_does_not_see_the_event_with_a_session_of_another_organ
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert!(api.listed_keys(&anna_musterhausen).await.is_empty());
 }
+
+/// The only event manager cannot be demoted or removed, and a contributor or a viewer cannot change
+/// or remove an event membership (ADR 0052).
+#[tokio::test]
+async fn the_last_event_manager_stays_and_only_managers_change_event_roles() {
+    let api = Api::start().await;
+    let (owner_id, owner) = api.member("testwil", OrganizationRole::Owner).await;
+    let (anna, anna_cookie) = api.member("testwil", OrganizationRole::Member).await;
+    let (ben, ben_cookie) = api.member("testwil", OrganizationRole::Member).await;
+    let event = api.create_event(&owner, "TEST30").await;
+    api.add(&owner, &event, anna, "event-contributor").await;
+    api.add(&owner, &event, ben, "event-viewer").await;
+    let path = |user: UserId, command: &str| {
+        format!(
+            "/api/v1/events/{event}/memberships/{}/{command}",
+            user.as_uuid()
+        )
+    };
+
+    let (status, problem) = api
+        .post(
+            &owner,
+            &path(owner_id, "change-role"),
+            &json!({"event_role": "event-viewer", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(problem["code"], "invalid-transition");
+    let (status, problem) = api
+        .post(
+            &owner,
+            &path(owner_id, "remove"),
+            &json!({"expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(problem["code"], "invalid-transition");
+
+    for cookie in [&anna_cookie, &ben_cookie] {
+        let (status, problem) = api
+            .post(
+                cookie,
+                &path(ben, "change-role"),
+                &json!({"event_role": "event-manager", "expected_version": 1}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(problem["code"], "forbidden");
+        let (status, _) = api
+            .post(
+                cookie,
+                &path(anna, "remove"),
+                &json!({"expected_version": 1}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    }
+}

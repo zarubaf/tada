@@ -44,6 +44,8 @@ pub enum Changed<T> {
     NotFound,
     /// The membership has another version.
     VersionConflict,
+    /// The change would demote or remove the only event manager of the event (ADR 0052).
+    LastManager,
 }
 
 /// The repository port for event memberships. Each method stays inside `scope`.
@@ -178,6 +180,9 @@ pub enum ChangeEventMemberError {
     Forbidden,
     #[error("the event membership changed after the caller read it")]
     VersionConflict,
+    /// An event has at least one event manager (ADR 0052).
+    #[error("the event needs another event manager first")]
+    LastManager,
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -188,6 +193,7 @@ impl ChangeEventMemberError {
         ProblemCode::NotFound,
         ProblemCode::Forbidden,
         ProblemCode::RecordVersionConflict,
+        ProblemCode::InvalidTransition,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -199,6 +205,7 @@ impl CommandError for ChangeEventMemberError {
             Self::NotFound => ProblemCode::NotFound,
             Self::Forbidden => ProblemCode::Forbidden,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
+            Self::LastManager => ProblemCode::InvalidTransition,
             Self::Store(error) => error.code(),
         }
     }
@@ -335,6 +342,7 @@ fn changed_or_error<T>(changed: Changed<T>) -> Result<T, ChangeEventMemberError>
         Changed::Changed(value) => Ok(value),
         Changed::NotFound => Err(ChangeEventMemberError::NotFound),
         Changed::VersionConflict => Err(ChangeEventMemberError::VersionConflict),
+        Changed::LastManager => Err(ChangeEventMemberError::LastManager),
     }
 }
 
@@ -379,6 +387,7 @@ mod tests {
             ChangeEventMemberError::NotFound,
             ChangeEventMemberError::Forbidden,
             ChangeEventMemberError::VersionConflict,
+            ChangeEventMemberError::LastManager,
         ]
         .into_iter()
         .chain(stores().map(ChangeEventMemberError::Store));

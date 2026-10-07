@@ -65,32 +65,61 @@ async fn read_member(
     Ok(row.map(EventMember::try_from).transpose()?)
 }
 
-/// The event role and the version of the membership of `user` in `event`, locked for a change in
-/// the same transaction. `None` if the user has no event role in the event.
+/// The membership of one member, locked for a change, and the number of event managers of its event.
+struct Locked {
+    role: EventRole,
+    version: RecordVersion,
+    managers: usize,
+}
+
+impl Locked {
+    /// True if the member is the only event manager and `new` is not the event manager role.
+    /// `None` is a removal.
+    fn last_manager_goes(&self, new: Option<EventRole>) -> bool {
+        self.role == EventRole::EventManager
+            && new != Some(EventRole::EventManager)
+            && self.managers == 1
+    }
+}
+
+/// Locks the membership of `user` in `event` and all event manager rows of the event, in the order
+/// of the user IDs, for a change in the same transaction. `None` if the user has no event role in
+/// the event.
+///
+/// The order of the locks serializes two managers who demote or remove each other. READ COMMITTED
+/// checks the `WHERE` again on a row that another transaction changed, so the second one sees one
+/// manager less (ADR 0052).
 async fn lock_member(
     conn: &mut PgConnection,
     scope: OrgScope,
     event: EventId,
     user: UserId,
-) -> Result<Option<(EventRole, RecordVersion)>, StoreError> {
-    let row = sqlx::query!(
-        "SELECT event_role, version FROM event_membership
-         WHERE organization_id = $1 AND event_id = $2 AND user_id = $3
+) -> Result<Option<Locked>, StoreError> {
+    let rows = sqlx::query!(
+        "SELECT user_id, event_role, version FROM event_membership
+         WHERE organization_id = $1 AND event_id = $2
+           AND (user_id = $3 OR event_role = 'event-manager')
+         ORDER BY user_id
          FOR UPDATE",
         scope.organization_id().as_uuid(),
         event.as_uuid(),
         user.as_uuid(),
     )
-    .fetch_optional(conn)
+    .fetch_all(conn)
     .await
     .map_err(store_error)?;
-    let Some(row) = row else {
+    let managers = rows
+        .iter()
+        .filter(|row| row.event_role == EventRole::EventManager.as_str())
+        .count();
+    let Some(row) = rows.into_iter().find(|row| row.user_id == user.as_uuid()) else {
         return Ok(None);
     };
-    let role =
-        EventRole::parse(&row.event_role).ok_or(InvalidRow("event_membership.event_role"))?;
-    let version = RecordVersion::new(row.version).ok_or(InvalidRow("event_membership.version"))?;
-    Ok(Some((role, version)))
+    Ok(Some(Locked {
+        role: EventRole::parse(&row.event_role).ok_or(InvalidRow("event_membership.event_role"))?,
+        version: RecordVersion::new(row.version).ok_or(InvalidRow("event_membership.version"))?,
+        managers,
+    }))
 }
 
 #[async_trait]
@@ -168,11 +197,14 @@ impl EventMemberStore for Database {
         audit: &AuditEvent,
     ) -> Result<Changed<EventMember>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let Some((old, version)) = lock_member(&mut tx, scope, event, user).await? else {
+        let Some(locked) = lock_member(&mut tx, scope, event, user).await? else {
             return Ok(Changed::NotFound);
         };
-        if version != expected_version {
+        if locked.version != expected_version {
             return Ok(Changed::VersionConflict);
+        }
+        if locked.last_manager_goes(Some(role)) {
+            return Ok(Changed::LastManager);
         }
         sqlx::query!(
             "UPDATE event_membership SET event_role = $4, version = version + 1
@@ -188,9 +220,10 @@ impl EventMemberStore for Database {
         let member = read_member(&mut tx, scope, event, user)
             .await?
             .ok_or(InvalidRow("event_membership"))?;
-        let audit = audit
-            .clone()
-            .with_roles(Some(AuditRole::Event(old)), Some(AuditRole::Event(role)));
+        let audit = audit.clone().with_roles(
+            Some(AuditRole::Event(locked.role)),
+            Some(AuditRole::Event(role)),
+        );
         audit::record(&mut tx, &audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
         Ok(Changed::Changed(member))
@@ -205,11 +238,14 @@ impl EventMemberStore for Database {
         audit: &AuditEvent,
     ) -> Result<Changed<()>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let Some((old, version)) = lock_member(&mut tx, scope, event, user).await? else {
+        let Some(locked) = lock_member(&mut tx, scope, event, user).await? else {
             return Ok(Changed::NotFound);
         };
-        if version != expected_version {
+        if locked.version != expected_version {
             return Ok(Changed::VersionConflict);
+        }
+        if locked.last_manager_goes(None) {
+            return Ok(Changed::LastManager);
         }
         sqlx::query!(
             "DELETE FROM event_membership
@@ -221,7 +257,9 @@ impl EventMemberStore for Database {
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
-        let audit = audit.clone().with_roles(Some(AuditRole::Event(old)), None);
+        let audit = audit
+            .clone()
+            .with_roles(Some(AuditRole::Event(locked.role)), None);
         audit::record(&mut tx, &audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
         Ok(Changed::Changed(()))
@@ -296,6 +334,55 @@ mod tests {
             .about(self.anna)
         }
 
+        /// A new member of the organization, without an event role.
+        async fn member(&self) -> UserId {
+            let number = Uuid::now_v7().simple();
+            let user = self
+                .test
+                .create_user(
+                    &DisplayName::parse("Ben Beispiel").unwrap(),
+                    &Email::parse(&format!("ben-{number}@example.org")).unwrap(),
+                )
+                .await;
+            self.test
+                .add_membership(
+                    self.scope().organization_id(),
+                    user,
+                    OrganizationRole::Member,
+                )
+                .await;
+            user
+        }
+
+        async fn change(&self, user: UserId, role: EventRole) -> Changed<EventMember> {
+            self.test
+                .database
+                .change_role(
+                    self.scope(),
+                    self.event,
+                    user,
+                    role,
+                    RecordVersion::FIRST,
+                    &self.audit(AuditAction::EventMembershipChangeRole),
+                )
+                .await
+                .unwrap()
+        }
+
+        async fn remove(&self, user: UserId) -> Changed<()> {
+            self.test
+                .database
+                .remove(
+                    self.scope(),
+                    self.event,
+                    user,
+                    RecordVersion::FIRST,
+                    &self.audit(AuditAction::EventMembershipRemove),
+                )
+                .await
+                .unwrap()
+        }
+
         async fn audit_actions(&self) -> Vec<String> {
             sqlx::query_scalar("SELECT action FROM audit_event ORDER BY occurred_at, id")
                 .fetch_all(&self.test.database.pool)
@@ -358,7 +445,7 @@ mod tests {
                 f.scope(),
                 f.event,
                 f.anna,
-                EventRole::EventManager,
+                EventRole::EventContributor,
                 RecordVersion::FIRST,
                 &f.audit(AuditAction::EventMembershipChangeRole),
             )
@@ -367,7 +454,7 @@ mod tests {
         let Changed::Changed(changed) = changed else {
             panic!("not changed");
         };
-        assert_eq!(changed.event_role, EventRole::EventManager);
+        assert_eq!(changed.event_role, EventRole::EventContributor);
         assert_eq!(changed.version, RecordVersion::new(2).unwrap());
 
         let removed = db
@@ -399,9 +486,9 @@ mod tests {
                 (
                     kind(),
                     anna,
-                    Some(json!({"old_role": "event-viewer", "new_role": "event-manager"}))
+                    Some(json!({"old_role": "event-viewer", "new_role": "event-contributor"}))
                 ),
-                (kind(), anna, Some(json!({"old_role": "event-manager"}))),
+                (kind(), anna, Some(json!({"old_role": "event-contributor"}))),
             ]
         );
     }
@@ -491,5 +578,63 @@ mod tests {
             .unwrap();
         assert_eq!(removed, Changed::NotFound);
         assert_eq!(db.list(f.scope(), f.event).await.unwrap().len(), 1);
+    }
+
+    /// The only event manager of an event can be neither demoted nor removed (ADR 0052).
+    #[tokio::test]
+    async fn the_only_event_manager_stays() {
+        let f = Fixture::start().await;
+        f.add(f.anna, EventRole::EventManager).await;
+        assert_eq!(
+            f.change(f.anna, EventRole::EventViewer).await,
+            Changed::LastManager
+        );
+        assert_eq!(f.remove(f.anna).await, Changed::LastManager);
+        // A change that keeps the manager is no demotion.
+        let Changed::Changed(kept) = f.change(f.anna, EventRole::EventManager).await else {
+            panic!("not changed");
+        };
+        assert_eq!(kept.event_role, EventRole::EventManager);
+        assert_eq!(
+            f.audit_actions().await,
+            ["event_membership.add", "event_membership.change_role"]
+        );
+    }
+
+    #[tokio::test]
+    async fn one_of_two_event_managers_can_go() {
+        let f = Fixture::start().await;
+        let ben = f.member().await;
+        f.add(f.anna, EventRole::EventManager).await;
+        f.add(ben, EventRole::EventManager).await;
+        assert!(matches!(
+            f.change(f.anna, EventRole::EventContributor).await,
+            Changed::Changed(_)
+        ));
+        assert_eq!(f.remove(ben).await, Changed::LastManager);
+    }
+
+    /// Two managers who demote each other at the same time: the lock on the manager rows lets
+    /// exactly one of them go.
+    #[tokio::test]
+    async fn two_managers_who_demote_each_other_leave_one_manager() {
+        let f = Fixture::start().await;
+        let ben = f.member().await;
+        f.add(f.anna, EventRole::EventManager).await;
+        f.add(ben, EventRole::EventManager).await;
+        let (anna, ben) = tokio::join!(
+            f.change(f.anna, EventRole::EventViewer),
+            f.change(ben, EventRole::EventViewer)
+        );
+        let last = [&anna, &ben]
+            .iter()
+            .filter(|changed| ***changed == Changed::LastManager)
+            .count();
+        assert_eq!(last, 1, "{anna:?} {ben:?}");
+        let managers: i64 = f
+            .test
+            .scalar("SELECT count(*) FROM event_membership WHERE event_role = 'event-manager'")
+            .await;
+        assert_eq!(managers, 1);
     }
 }

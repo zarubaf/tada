@@ -212,6 +212,7 @@ async fn add_event_membership(
 }
 
 /// Changes the event role of a member. Only event managers can do this.
+/// The only event manager of an event keeps the role: the change gives `invalid-transition`.
 #[utoipa::path(
     post,
     path = "/events/{event_id}/memberships/{user_id}/change-role",
@@ -247,6 +248,7 @@ async fn change_event_role(
 }
 
 /// Removes the event role of a member. The member loses access to the event with the next request.
+/// The only event manager of an event cannot be removed: this gives `invalid-transition`.
 #[utoipa::path(
     post,
     path = "/events/{event_id}/memberships/{user_id}/remove",
