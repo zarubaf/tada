@@ -8,8 +8,8 @@ use sqlx::types::Uuid;
 use tada_app::audit::{AuditAction, AuditEvent, AuditRole};
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
-use tada_app::domain::identity::{DisplayName, Email};
-use tada_app::domain::ids::{InvitationId, OrganizationId, UserId};
+use tada_app::domain::identity::{DisplayName, Email, EventRole};
+use tada_app::domain::ids::{EventId, InvitationId, OrganizationId, UserId};
 use tada_app::members::{
     Invitation, InvitationInsert, LockedMembership, MemberCursor, MemberStore, OrganizationMember,
     Refusal, Remover,
@@ -117,7 +117,7 @@ async fn lock_membership(
     scope: OrgScope,
     member: UserId,
     remover: Remover,
-) -> Result<Option<LockedMembership>, StoreError> {
+) -> Result<Option<Locked>, StoreError> {
     let organization = scope.organization_id().as_uuid();
     // The row of the remover is locked too, so the removal uses the current role of the remover.
     let rows = sqlx::query!(
@@ -142,7 +142,8 @@ async fn lock_membership(
         return Ok(None);
     };
     let events = sqlx::query!(
-        "SELECT event_id, event_role = 'event-manager' AS \"manager!\", user_id = $2 AS \"member!\"
+        "SELECT event_id, event_role, event_role = 'event-manager' AS \"manager!\",
+                user_id = $2 AS \"member!\"
          FROM event_membership
          WHERE organization_id = $1 AND (user_id = $2 OR event_role = 'event-manager')
          ORDER BY event_id, user_id
@@ -163,14 +164,32 @@ async fn lock_membership(
         .iter()
         .filter(|row| row.member && row.manager)
         .any(|row| managers_of(row.event_id) == 1);
-    Ok(Some(LockedMembership {
-        role: organization_role(&row.role)?,
-        version: RecordVersion::new(row.version)
-            .ok_or(InvalidRow("organization_membership.version"))?,
-        owners,
-        only_manager,
-        remover_role,
+    let event_roles = events
+        .iter()
+        .filter(|row| row.member)
+        .map(|row| {
+            let role = EventRole::parse(&row.event_role)
+                .ok_or(InvalidRow("event_membership.event_role"))?;
+            Ok((EventId::from_uuid(row.event_id), role))
+        })
+        .collect::<Result<_, InvalidRow>>()?;
+    Ok(Some(Locked {
+        membership: LockedMembership {
+            role: organization_role(&row.role)?,
+            version: RecordVersion::new(row.version)
+                .ok_or(InvalidRow("organization_membership.version"))?,
+            owners,
+            only_manager,
+            remover_role,
+        },
+        event_roles,
     }))
+}
+
+/// The locked rows of a removal: the membership and the event roles of the member.
+struct Locked {
+    membership: LockedMembership,
+    event_roles: Vec<(EventId, EventRole)>,
 }
 
 #[async_trait]
@@ -378,7 +397,7 @@ impl MemberStore for Database {
         let Some(locked) = lock_membership(&mut tx, scope, member, remover).await? else {
             return Ok(Some(Refusal::NotFound));
         };
-        if let Some(refusal) = remover.refusal(member, expected_version, &locked) {
+        if let Some(refusal) = remover.refusal(member, expected_version, &locked.membership) {
             return Ok(Some(refusal));
         }
         // The event memberships of the member go with it (ON DELETE CASCADE).
@@ -390,9 +409,17 @@ impl MemberStore for Database {
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
+        // The log of each event shows that the member left it (ADR 0061).
+        for (event, role) in locked.event_roles {
+            let left = audit
+                .for_record(AuditAction::EventMembershipRemove, event.as_uuid())
+                .about(member)
+                .with_roles(Some(AuditRole::Event(role)), None);
+            audit::record(&mut tx, &left).await.map_err(store_error)?;
+        }
         let audit = audit
             .clone()
-            .with_roles(Some(AuditRole::Organization(locked.role)), None);
+            .with_roles(Some(AuditRole::Organization(locked.membership.role)), None);
         audit::record(&mut tx, &audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
         Ok(None)
@@ -403,8 +430,7 @@ impl MemberStore for Database {
 mod tests {
     use serde_json::json;
     use tada_app::caller::MemberCaller;
-    use tada_app::domain::identity::{EventRole, OrganizationRole};
-    use tada_app::domain::ids::EventId;
+    use tada_app::domain::identity::OrganizationRole;
     use tada_app::event_members::{self, Added, Changed};
     use tada_app::outbound::OutboundStore;
 
@@ -792,15 +818,24 @@ mod tests {
             1,
             "only the manager stays"
         );
-        let last = f.audit_rows().await.pop().unwrap();
+        // Each event that the member leaves records it, before the organization membership.
+        let rows = f.audit_rows().await;
         assert_eq!(
-            last,
-            (
-                "organization_membership.remove".to_owned(),
-                Some(f.scope().organization_id().as_uuid()),
-                Some(anna.as_uuid()),
-                Some(json!({"old_role": "admin"}))
-            )
+            rows[rows.len() - 2..],
+            [
+                (
+                    "event_membership.remove".to_owned(),
+                    Some(event.as_uuid()),
+                    Some(anna.as_uuid()),
+                    Some(json!({"old_role": "event-contributor"}))
+                ),
+                (
+                    "organization_membership.remove".to_owned(),
+                    Some(f.scope().organization_id().as_uuid()),
+                    Some(anna.as_uuid()),
+                    Some(json!({"old_role": "admin"}))
+                )
+            ]
         );
     }
 
