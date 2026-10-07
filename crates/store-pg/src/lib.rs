@@ -14,6 +14,7 @@ mod heartbeat;
 mod identity;
 mod jobs;
 mod outbound;
+mod proposals;
 pub mod rate_limit;
 mod session;
 mod sign_in;

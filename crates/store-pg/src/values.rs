@@ -178,10 +178,6 @@ pub(crate) fn value_type_from_json(json: &serde_json::Value) -> Result<ValueType
 }
 
 /// The columns `state`, `value` and `approximate` of a fact version.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the apply of proposals writes fact versions")
-)]
 pub(crate) fn fact_state_to_columns(
     state: &FactState<Valued>,
 ) -> (&'static str, Option<serde_json::Value>, bool) {
@@ -220,10 +216,6 @@ pub(crate) fn fact_state_from_columns(
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the apply of proposals writes fact versions")
-)]
 fn value_to_json(value: &FactValue) -> serde_json::Value {
     let decimal = |value: Decimal| DecimalRecord {
         units: value.units(),

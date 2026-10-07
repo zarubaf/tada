@@ -16,7 +16,7 @@ use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::error::{InvalidRow, store_error};
-use crate::values;
+use crate::{proposals, values};
 
 /// The sync of a shipped field catalog failed. It changed nothing.
 #[derive(Debug, thiserror::Error)]
@@ -302,7 +302,11 @@ impl FactStore for Database {
                 })
             })
             .collect::<Result<_, InvalidRow>>()?;
-        Ok(EventProfile { fields })
+        Ok(EventProfile {
+            fields,
+            proposals: proposals::open_fact_proposals(&self.pool, scope, event).await?,
+            open_questions: proposals::open_questions(&self.pool, scope, event).await?,
+        })
     }
 
     async fn current_version(

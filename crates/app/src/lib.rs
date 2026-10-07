@@ -18,6 +18,7 @@ pub mod mail;
 pub mod outbound;
 pub mod paging;
 pub mod problem;
+pub mod proposals;
 pub mod public_url;
 pub mod rate_limit;
 pub mod session;
