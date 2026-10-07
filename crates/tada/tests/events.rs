@@ -34,6 +34,7 @@ impl Api {
                 sign_in: Arc::new(test.database.clone()),
                 clock: Arc::new(SystemClock),
                 trusted_proxies: Vec::new(),
+                event_members: Arc::new(test.database.clone()),
             },
             None,
         );

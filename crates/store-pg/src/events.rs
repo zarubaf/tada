@@ -6,7 +6,7 @@ use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::events::{Event, EventKey, EventName, EventTimeZone};
-use tada_app::domain::ids::{EventId, OrganizationId};
+use tada_app::domain::ids::{EventId, OrganizationId, UserId};
 use tada_app::events::{EventCursor, EventStore, Inserted};
 use tada_app::store::StoreError;
 
@@ -113,14 +113,47 @@ impl EventStore for Database {
             .map(Event::try_from)
             .collect::<Result<_, _>>()?)
     }
+
+    async fn list_of_member(
+        &self,
+        scope: OrgScope,
+        member: UserId,
+        after: Option<&EventCursor>,
+        limit: u32,
+    ) -> Result<Vec<Event>, StoreError> {
+        let rows = sqlx::query_as!(
+            EventRow,
+            r#"SELECT e.id, e.organization_id, e.key, e.name, e.time_zone, e.version,
+                      e.created_at AS "created_at: jiff_sqlx::Timestamp"
+               FROM event e
+               JOIN event_membership m ON m.organization_id = e.organization_id AND m.event_id = e.id
+               WHERE e.organization_id = $1
+                 AND m.user_id = $2
+                 AND ($3::text IS NULL OR (e.key, e.id) > ($3, $4))
+               ORDER BY e.key, e.id
+               LIMIT $5"#,
+            scope.organization_id().as_uuid(),
+            member.as_uuid(),
+            after.map(|cursor| cursor.key.as_str()),
+            after.map(|cursor| cursor.id.as_uuid()),
+            i64::from(limit),
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(rows
+            .into_iter()
+            .map(Event::try_from)
+            .collect::<Result<_, _>>()?)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use jiff::Timestamp;
     use tada_app::caller::MemberCaller;
-    use tada_app::caller::OrganizationRole::Owner;
-    use tada_app::domain::ids::UserId;
+    use tada_app::caller::OrganizationRole::{Member, Owner};
+    use tada_app::domain::identity::{DisplayName, Email};
 
     use super::*;
     use crate::testing::TestDatabase;
@@ -250,5 +283,66 @@ mod tests {
             .unwrap();
         let keys: Vec<_> = second.iter().map(|event| event.key.as_str()).collect();
         assert_eq!(keys, ["CC", "DD"]);
+    }
+
+    #[tokio::test]
+    async fn lists_only_the_events_with_a_membership_of_the_member() {
+        let test = TestDatabase::start().await;
+        let organization = test.create_organization("testwil").await;
+        let anna = test
+            .create_user(
+                &DisplayName::parse("Anna Muster").unwrap(),
+                &Email::parse("anna@example.org").unwrap(),
+            )
+            .await;
+        test.add_membership(organization, anna, Member).await;
+        let mut events = Vec::new();
+        for key in ["CC", "AA", "BB"] {
+            let event = event(organization, key);
+            test.database
+                .insert(scope(organization), &event)
+                .await
+                .unwrap();
+            events.push(event);
+        }
+        for event in events.iter().filter(|event| event.key.as_str() != "AA") {
+            sqlx::query(
+                "INSERT INTO event_membership (organization_id, event_id, user_id, event_role, created_at)
+                 VALUES ($1, $2, $3, 'event-viewer', now())",
+            )
+            .bind(organization.as_uuid())
+            .bind(event.id.as_uuid())
+            .bind(anna.as_uuid())
+            .execute(&test.database.pool)
+            .await
+            .unwrap();
+        }
+
+        let first = test
+            .database
+            .list_of_member(scope(organization), anna, None, 1)
+            .await
+            .unwrap();
+        let keys: Vec<_> = first.iter().map(|event| event.key.as_str()).collect();
+        assert_eq!(keys, ["BB"]);
+        let cursor = EventCursor {
+            key: first[0].key.clone(),
+            id: first[0].id,
+        };
+        let rest = test
+            .database
+            .list_of_member(scope(organization), anna, Some(&cursor), 10)
+            .await
+            .unwrap();
+        let keys: Vec<_> = rest.iter().map(|event| event.key.as_str()).collect();
+        assert_eq!(keys, ["CC"]);
+
+        let other = UserId::from_uuid(Uuid::now_v7());
+        let none = test
+            .database
+            .list_of_member(scope(organization), other, None, 10)
+            .await
+            .unwrap();
+        assert!(none.is_empty());
     }
 }

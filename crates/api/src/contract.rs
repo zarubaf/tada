@@ -26,6 +26,8 @@ pub(crate) const JSON_BODY: &[ProblemCode] = &[
 ];
 /// The codes of each operation with query parameters.
 pub(crate) const QUERY: &[ProblemCode] = &[ProblemCode::MalformedRequest];
+/// The codes of each operation with path parameters.
+pub(crate) const PATH: &[ProblemCode] = &[ProblemCode::MalformedRequest];
 
 /// The sorted union of code lists.
 pub(crate) fn codes(lists: &[&[ProblemCode]]) -> Vec<ProblemCode> {

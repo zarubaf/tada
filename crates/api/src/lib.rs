@@ -1,6 +1,7 @@
 //! HTTP handlers, DTOs and the OpenAPI document.
 
 mod contract;
+mod event_members;
 mod events;
 mod extract;
 mod health;
@@ -21,6 +22,7 @@ use axum::routing::any;
 use ipnet::IpNet;
 use tada_app::auth::Authenticator;
 use tada_app::clock::Clock;
+use tada_app::event_members::EventMemberStore;
 use tada_app::events::EventStore;
 use tada_app::health::DependencyCheck;
 use tada_app::identity::IdentityStore;
@@ -51,6 +53,7 @@ pub struct ApiState {
     pub clock: Arc<dyn Clock>,
     /// The proxies whose `X-Request-Id` the server accepts (ADR 0035).
     pub trusted_proxies: Vec<IpNet>,
+    pub event_members: Arc<dyn EventMemberStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -62,7 +65,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
             API_PREFIX,
             events::routes()
                 .merge(telegram::routes())
-                .merge(sign_in::routes()),
+                .merge(sign_in::routes())
+                .merge(event_members::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -75,6 +79,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .into_iter()
         .chain(telegram::problem_codes())
         .chain(sign_in::problem_codes())
+        .chain(event_members::problem_codes())
         .collect()
 }
 
@@ -199,6 +204,16 @@ mod tests {
         ) -> Result<Vec<tada_app::domain::events::Event>, tada_app::store::StoreError> {
             unreachable!()
         }
+
+        async fn list_of_member(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+            _: Option<&tada_app::events::EventCursor>,
+            _: u32,
+        ) -> Result<Vec<tada_app::domain::events::Event>, tada_app::store::StoreError> {
+            unreachable!()
+        }
     }
 
     #[derive(Debug)]
@@ -285,6 +300,14 @@ mod tests {
             unreachable!()
         }
 
+        async fn event_exists(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+        ) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
         async fn event_role(
             &self,
             _: tada_app::caller::OrgScope,
@@ -364,6 +387,59 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct NoEventMembers;
+
+    #[async_trait::async_trait]
+    impl EventMemberStore for NoEventMembers {
+        async fn list(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+        ) -> Result<Vec<tada_app::event_members::EventMember>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn add(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::UserId,
+            _: tada_app::domain::identity::EventRole,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::event_members::Added, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn change_role(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::UserId,
+            _: tada_app::domain::identity::EventRole,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::event_members::Changed<tada_app::event_members::EventMember>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn remove(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::UserId,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::event_members::Changed<()>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
@@ -375,6 +451,7 @@ mod tests {
             sign_in: Arc::new(NoSignIn),
             clock: Arc::new(NoClock),
             trusted_proxies: Vec::new(),
+            event_members: Arc::new(NoEventMembers),
         }
     }
 

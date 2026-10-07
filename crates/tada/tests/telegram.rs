@@ -162,6 +162,7 @@ async fn the_member_confirms_the_link_in_the_web_client() {
             sign_in: Arc::new(test.database.clone()),
             clock: Arc::new(SystemClock),
             trusted_proxies: Vec::new(),
+            event_members: Arc::new(test.database.clone()),
         },
         None,
     );

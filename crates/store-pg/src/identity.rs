@@ -94,6 +94,17 @@ impl IdentityStore for Database {
         Ok(role.as_deref().map(organization_role).transpose()?)
     }
 
+    async fn event_exists(&self, scope: OrgScope, event: EventId) -> Result<bool, StoreError> {
+        sqlx::query_scalar!(
+            r#"SELECT EXISTS (SELECT 1 FROM event WHERE organization_id = $1 AND id = $2) AS "exists!""#,
+            scope.organization_id().as_uuid(),
+            event.as_uuid(),
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(store_error)
+    }
+
     async fn event_role(
         &self,
         scope: OrgScope,
@@ -306,6 +317,35 @@ mod tests {
                 .await
                 .unwrap(),
             Some(EventRole::EventContributor)
+        );
+    }
+
+    #[tokio::test]
+    async fn an_event_exists_only_in_its_organization() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let musterhausen = test.create_organization("musterhausen").await;
+        let event = create_event(&test, testwil).await;
+        assert!(
+            test.database
+                .event_exists(scope(testwil), event)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !test
+                .database
+                .event_exists(scope(musterhausen), event)
+                .await
+                .unwrap()
+        );
+        let unknown = EventId::from_uuid(Uuid::now_v7());
+        assert!(
+            !test
+                .database
+                .event_exists(scope(testwil), unknown)
+                .await
+                .unwrap()
         );
     }
 

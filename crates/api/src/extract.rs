@@ -3,7 +3,7 @@
 use std::convert::Infallible;
 use std::fmt;
 
-use axum::extract::rejection::{JsonRejection, QueryRejection};
+use axum::extract::rejection::{JsonRejection, PathRejection, QueryRejection};
 use axum::extract::{FromRequest, FromRequestParts, OptionalFromRequestParts, Request};
 use axum::http::request::Parts;
 use axum::http::{HeaderValue, header};
@@ -66,6 +66,28 @@ where
             .map_err(|_: QueryRejection| {
                 ApiError::new(ProblemCode::MalformedRequest)
                     .with_detail("The query parameters do not match the schema.")
+            })
+    }
+}
+
+/// The path parameters of a request.
+#[derive(Debug)]
+pub struct Path<T>(pub T);
+
+impl<S, T> FromRequestParts<S> for Path<T>
+where
+    S: Send + Sync,
+    T: DeserializeOwned + Send,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, ApiError> {
+        <axum::extract::Path<T> as FromRequestParts<S>>::from_request_parts(parts, state)
+            .await
+            .map(|axum::extract::Path(value)| Self(value))
+            .map_err(|_: PathRejection| {
+                ApiError::new(ProblemCode::MalformedRequest)
+                    .with_detail("The path parameters do not match the schema.")
             })
     }
 }

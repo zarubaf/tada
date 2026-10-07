@@ -38,6 +38,7 @@ pub async fn run((database, http, storage, _public_url): ServeSettings) -> anyho
             sign_in: Arc::new(db.clone()),
             clock: Arc::new(SystemClock),
             trusted_proxies: http.trusted_proxies,
+            event_members: Arc::new(db.clone()),
         },
         http.web_root.as_deref(),
     );

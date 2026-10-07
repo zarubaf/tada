@@ -445,6 +445,10 @@ mod tests {
                 .map(|membership| membership.role))
         }
 
+        async fn event_exists(&self, _: OrgScope, _: EventId) -> Result<bool, StoreError> {
+            unreachable!()
+        }
+
         async fn event_role(
             &self,
             _: OrgScope,

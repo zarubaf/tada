@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE event_membership SET event_role = $4, version = version + 1\n             WHERE organization_id = $1 AND event_id = $2 AND user_id = $3 AND version = $5",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "48d0f6a4acabc672243adfa3954670641bea2fdd616581e0bbc4de67798f3f1b"
+}

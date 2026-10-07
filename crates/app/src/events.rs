@@ -1,16 +1,18 @@
-//! The `CreateEvent` command and the `ListEvents` query.
+//! The `CreateEvent` command and the `ListEvents` and `GetEvent` queries.
 
 use std::fmt::Debug;
 
 use async_trait::async_trait;
 use tada_domain::RecordVersion;
 use tada_domain::events::{Event, EventKey, EventKeyError, EventName, EventTimeZone};
-use tada_domain::ids::{self, EventId};
+use tada_domain::ids::{self, EventId, UserId};
 use tada_domain::name::NameError;
 use uuid::Uuid;
 
+use crate::access::{self, AccessError, Principal};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
+use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{FieldError, ProblemCode};
 use crate::store::StoreError;
@@ -27,6 +29,15 @@ pub trait EventStore: Debug + Send + Sync {
     async fn list(
         &self,
         scope: OrgScope,
+        after: Option<&EventCursor>,
+        limit: u32,
+    ) -> Result<Vec<Event>, StoreError>;
+
+    /// Like `list`, but only the events in which `member` has an event membership.
+    async fn list_of_member(
+        &self,
+        scope: OrgScope,
+        member: UserId,
         after: Option<&EventCursor>,
         limit: u32,
     ) -> Result<Vec<Event>, StoreError>;
@@ -214,24 +225,24 @@ impl ListEventsError {
 
 /// Lists the events that the caller can see, in the order of their keys.
 ///
-/// Owners and admins see all events of the organization. Other members see only the events in which
-/// they have an event role (ADR 0052). Event roles do not exist yet, so they see none.
+/// Owners and admins see all events of the organization.
+/// Other members see only the events in which they have an event role (ADR 0052).
 pub async fn list_events(
-    caller: &MemberCaller,
+    caller: &impl Principal,
     after: Option<EventCursor>,
     limit: PageLimit,
     store: &dyn EventStore,
 ) -> Result<Page<Event, EventCursor>, ListEventsError> {
-    if !caller.is_owner_or_admin() {
-        return Ok(Page {
-            items: Vec::new(),
-            next: None,
-        });
-    }
+    let scope = caller.scope();
     // One more than the limit shows if a next page exists.
-    let mut items = store
-        .list(caller.scope(), after.as_ref(), limit.get() + 1)
-        .await?;
+    let fetch = limit.get() + 1;
+    let mut items = if access::sees_all_events(caller) {
+        store.list(scope, after.as_ref(), fetch).await?
+    } else {
+        store
+            .list_of_member(scope, caller.user_id(), after.as_ref(), fetch)
+            .await?
+    };
     let more = items.len() > limit.get() as usize;
     items.truncate(limit.get() as usize);
     let next = more
@@ -244,18 +255,35 @@ pub async fn list_events(
     Ok(Page { items, next })
 }
 
+/// The event `id`, if the caller can read it (ADR 0052).
+pub async fn get_event(
+    caller: &impl Principal,
+    id: EventId,
+    store: &dyn EventStore,
+    identity: &dyn IdentityStore,
+) -> Result<Event, AccessError> {
+    if !access::event_access(caller, id, identity).await?.can_read() {
+        return Err(AccessError::NotFound);
+    }
+    store
+        .get(caller.scope(), id)
+        .await?
+        .ok_or(AccessError::NotFound)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
 
     use jiff::Timestamp;
-    use tada_domain::ids::{OrganizationId, UserId};
+    use tada_domain::ids::OrganizationId;
 
     use super::*;
     use crate::caller::OrganizationRole;
 
+    /// The events and the event memberships (event, user).
     #[derive(Debug, Default)]
-    struct MemoryStore(Mutex<Vec<Event>>);
+    struct MemoryStore(Mutex<Vec<Event>>, Mutex<Vec<(EventId, UserId)>>);
 
     #[async_trait]
     impl EventStore for MemoryStore {
@@ -300,6 +328,20 @@ mod tests {
                 .cloned()
                 .collect();
             events.sort_by(|a, b| (&a.key, a.id).cmp(&(&b.key, b.id)));
+            events.truncate(limit as usize);
+            Ok(events)
+        }
+
+        async fn list_of_member(
+            &self,
+            scope: OrgScope,
+            member: UserId,
+            after: Option<&EventCursor>,
+            limit: u32,
+        ) -> Result<Vec<Event>, StoreError> {
+            let memberships = self.1.lock().unwrap().clone();
+            let mut events = self.list(scope, after, u32::MAX).await?;
+            events.retain(|event| memberships.contains(&(event.id, member)));
             events.truncate(limit as usize);
             Ok(events)
         }
@@ -493,6 +535,40 @@ mod tests {
             .map(|event| event.key.as_str())
             .collect();
         assert_eq!(keys, ["CC"]);
+        assert_eq!(second.next, None);
+    }
+
+    #[tokio::test]
+    async fn a_member_lists_only_the_events_with_an_event_membership() {
+        let store = MemoryStore::default();
+        for key in ["AA", "BB", "CC"] {
+            create_event(&owner(), new_event(key), &store, &FixedClock)
+                .await
+                .unwrap();
+        }
+        let member = caller(100, OrganizationRole::Member);
+        let page = list_events(&member, None, PageLimit::DEFAULT, &store)
+            .await
+            .unwrap();
+        assert!(page.items.is_empty(), "no event role, no event");
+
+        for event in store.0.lock().unwrap().iter() {
+            if event.key.as_str() != "BB" {
+                store.1.lock().unwrap().push((event.id, member.user_id()));
+            }
+        }
+        let limit = PageLimit::new(1).unwrap();
+        let first = list_events(&member, None, limit, &store).await.unwrap();
+        let second = list_events(&member, first.next, limit, &store)
+            .await
+            .unwrap();
+        let keys: Vec<_> = first
+            .items
+            .iter()
+            .chain(&second.items)
+            .map(|event| event.key.as_str())
+            .collect();
+        assert_eq!(keys, ["AA", "CC"]);
         assert_eq!(second.next, None);
     }
 

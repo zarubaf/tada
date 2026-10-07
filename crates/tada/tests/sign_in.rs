@@ -75,6 +75,7 @@ impl App {
                 sign_in: database.clone(),
                 clock: clock.clone(),
                 trusted_proxies: Vec::new(),
+                event_members: database.clone(),
             },
             None,
         );
