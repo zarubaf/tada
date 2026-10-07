@@ -41,32 +41,33 @@ Out of scope:
 
 Work items, in this order:
 
-1. Decisions: the product owner decides [ADR 0056](adr/0056-sign-in-details.md) (sign-in details) and [ADR 0055](adr/0055-office-format-detection.md) (office formats).
-2. Identity and mail:
+1. Identity and mail:
    - Users, email identities, organization memberships and event memberships in the `identity` code module and in `store-pg`.
    - The data inventory of ADR 0045 starts with these tables.
    - The Telegram tables get a foreign key to the user.
    - The `Mailer` port, the SMTP adapter, outbound intents and the send job of the worker (ADR 0042).
-3. Invitations and sign-in in the API:
+2. Invitations and sign-in in the API:
    - `tada bootstrap` creates the organization and the owner invitation (ADR 0036).
-   - Owners and admins invite members, revoke invitations and remove memberships (ADR 0056).
+   - Owners and admins invite members, revoke invitations and remove memberships ([ADR 0056](adr/0056-sign-in-details.md)).
    - Magic links, sessions, sign-out, the `Origin` check and the rate limits (ADR 0008, ADR 0056).
+   - The new secret `TADA_RATE_LIMIT_KEY_FILE` of `serve` (ADR 0056).
+     `mise run gen` adds it to [doc/settings.md](settings.md), and `scripts/dev_secrets.py` generates it for development.
    - The session authenticator replaces the development authenticator and the rejecting authenticator (ADR 0053).
-4. Sign-in in the web client:
+3. Sign-in in the web client:
    - The sign-in page, the confirmation pages for magic links and invitations, the choice of the organization and sign-out.
    - The member list and the invitation form for owners and admins.
    - The event memberships page, where an event manager gives event roles (ADR 0052).
    - The Telegram link confirmation (ADR 0011).
      The gateway keeps long polling in this slice.
-5. Facts and review: the field catalog, the event profile, facts, fact versions, changesets, conflicts and the Review Inbox (ADR 0049, ADR 0050).
+4. Facts and review: the field catalog, the event profile, facts, fact versions, changesets, conflicts and the Review Inbox (ADR 0049, ADR 0050).
    The event managers review all proposals (ADR 0052).
-6. API tokens and MCP: the token notice, and token creation and revocation (ADR 0039, ADR 0045).
+5. API tokens and MCP: the token notice, and token creation and revocation (ADR 0039, ADR 0045).
    The `/mcp` endpoint gives the read and proposal tools (ADR 0040).
-7. Documents:
-   - Upload with type detection, document versions and the document list in the web client (ADR 0043, ADR 0055).
+6. Documents:
+   - Upload with type detection, document versions and the document list in the web client ([ADR 0043](adr/0043-upload-policy.md), [ADR 0055](adr/0055-office-format-detection.md)).
    - Document drafts with a provenance manifest, approval, and the differences between two versions (ADR 0051).
-8. Telegram command: a linked member proposes a change of a fact (ADR 0011).
-9. Gates before the demonstration:
+7. Telegram command: a linked member proposes a change of a fact (ADR 0011).
+8. Gates before the demonstration:
    - Isolation tests with two organizations, the structured export, and a backup restoration in the operator's deployment repository (ADR 0033).
    - The privacy notice in the web client, from the template of ADR 0045.
    - The external review of the authentication code (ADR 0008).

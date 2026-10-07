@@ -1,6 +1,6 @@
 # 0055. Detection of office formats in ZIP containers
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 - Amends: [0043](0043-upload-policy.md)
 

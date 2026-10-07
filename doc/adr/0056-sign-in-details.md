@@ -1,6 +1,6 @@
 # 0056. Sign-in: organization, invitations and rate limits
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-07
 
 ## Context
@@ -23,7 +23,7 @@ Four questions remain open:
 
 ## Decision
 
-This ADR recommends the following.
+We decide the following. The alternatives below list the options that we rejected.
 
 Organization of a request:
 
