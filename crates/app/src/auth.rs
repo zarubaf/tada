@@ -39,6 +39,9 @@ pub trait Authenticator: Debug + Send + Sync {
 pub enum AuthenticationError {
     #[error("no valid session")]
     Unauthenticated,
+    /// The session has no organization, or the membership in it no longer exists (ADR 0056).
+    #[error("the session has no organization")]
+    OrganizationRequired,
     #[error(transparent)]
     Store(#[from] StoreError),
 }

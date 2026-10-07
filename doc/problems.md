@@ -10,6 +10,7 @@ A code never changes its meaning. A code that is no longer used stays reserved.
 | ------------------------------------------------------------- | ------ | ----------------------------------------------------------------------- |
 | <a id="malformed-request"></a>`malformed-request`             | 400    | The body is not valid JSON or does not match the schema.                |
 | <a id="unauthenticated"></a>`unauthenticated`                 | 401    | No valid session or token.                                              |
+| <a id="organization-required"></a>`organization-required`     | 403    | The session has no organization. The client lets the member choose one. |
 | <a id="forbidden"></a>`forbidden`                             | 403    | The caller can see the record but lacks the permission for this action. |
 | <a id="not-found"></a>`not-found`                             | 404    | The record does not exist, or it is in a scope the caller cannot see.   |
 | <a id="record-version-conflict"></a>`record-version-conflict` | 409    | The record changed after the caller read it.                            |

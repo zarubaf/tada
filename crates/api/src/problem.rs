@@ -18,7 +18,8 @@ pub const fn status(code: ProblemCode) -> StatusCode {
     match code {
         ProblemCode::MalformedRequest => StatusCode::BAD_REQUEST,
         ProblemCode::Unauthenticated => StatusCode::UNAUTHORIZED,
-        ProblemCode::Forbidden => StatusCode::FORBIDDEN,
+        // The member is signed in but must choose an organization first.
+        ProblemCode::Forbidden | ProblemCode::OrganizationRequired => StatusCode::FORBIDDEN,
         ProblemCode::NotFound => StatusCode::NOT_FOUND,
         ProblemCode::RecordVersionConflict | ProblemCode::InvalidTransition => StatusCode::CONFLICT,
         ProblemCode::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,

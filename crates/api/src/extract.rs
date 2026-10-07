@@ -81,6 +81,9 @@ impl FromRequestParts<ApiState> for Caller {
             Err(AuthenticationError::Unauthenticated) => {
                 Err(ApiError::new(ProblemCode::Unauthenticated))
             }
+            Err(AuthenticationError::OrganizationRequired) => {
+                Err(ApiError::new(ProblemCode::OrganizationRequired))
+            }
             Err(AuthenticationError::Store(error)) => Err(ApiError::store(&error)),
         }
     }

@@ -150,6 +150,12 @@ impl MemberCaller {
 pub struct OrgScope(OrganizationId);
 
 impl OrgScope {
+    /// The scope of the membership check of a session (ADR 0056).
+    /// The check runs before a `MemberCaller` exists, because it decides if one exists.
+    pub(crate) fn for_session(organization_id: OrganizationId) -> Self {
+        Self(organization_id)
+    }
+
     pub fn organization_id(self) -> OrganizationId {
         self.0
     }
