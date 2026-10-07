@@ -1,5 +1,7 @@
 //! The port for users and memberships (ADR 0008, ADR 0052).
 
+use std::fmt::Debug;
+
 use async_trait::async_trait;
 use tada_domain::identity::{DisplayName, Email, EventRole, OrganizationRole};
 use tada_domain::ids::{EventId, OrganizationId, UserId};
@@ -24,7 +26,7 @@ pub struct Membership {
 }
 
 #[async_trait]
-pub trait IdentityStore: Send + Sync {
+pub trait IdentityStore: Debug + Send + Sync {
     /// The user with the ID `id`. This query has no scope: a session names a user, not an organization.
     async fn user(&self, id: UserId) -> Result<Option<UserRef>, StoreError>;
 
@@ -42,6 +44,9 @@ pub trait IdentityStore: Send + Sync {
         scope: OrgScope,
         user: UserId,
     ) -> Result<Option<OrganizationRole>, StoreError>;
+
+    /// True if the event `event` is in the organization of `scope`.
+    async fn event_exists(&self, scope: OrgScope, event: EventId) -> Result<bool, StoreError>;
 
     /// The event role of a user in one event, or `None` if the user has none.
     async fn event_role(

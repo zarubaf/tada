@@ -144,6 +144,20 @@ impl MemberCaller {
     }
 }
 
+impl crate::access::Principal for MemberCaller {
+    fn user_id(&self) -> UserId {
+        self.user_id
+    }
+
+    fn scope(&self) -> OrgScope {
+        OrgScope(self.organization_id)
+    }
+
+    fn organization_role(&self) -> OrganizationRole {
+        self.role
+    }
+}
+
 /// The organization boundary of a repository call (ADR 0006). Only a caller can give one,
 /// so a repository method that takes it cannot run without a scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

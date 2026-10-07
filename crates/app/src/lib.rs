@@ -1,5 +1,6 @@
 //! Domain commands, queries and ports. The only way to change accepted state.
 
+pub mod access;
 pub mod audit;
 pub mod auth;
 pub mod blobs;

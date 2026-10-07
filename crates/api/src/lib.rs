@@ -168,6 +168,16 @@ mod tests {
         ) -> Result<Vec<tada_app::domain::events::Event>, tada_app::store::StoreError> {
             unreachable!()
         }
+
+        async fn list_of_member(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+            _: Option<&tada_app::events::EventCursor>,
+            _: u32,
+        ) -> Result<Vec<tada_app::domain::events::Event>, tada_app::store::StoreError> {
+            unreachable!()
+        }
     }
 
     #[derive(Debug)]
