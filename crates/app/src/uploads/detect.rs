@@ -18,6 +18,9 @@ const MAX_FILE_NAME_CHARS: usize = 200;
 /// The signature of a local file header in a ZIP container.
 const ZIP_LOCAL_HEADER: &[u8; 4] = b"PK\x03\x04";
 
+/// Flag bit 3: the sizes follow the entry data and the header holds none.
+const ZIP_DATA_DESCRIPTOR: usize = 1 << 3;
+
 /// The size of the fixed part of a local file header.
 const ZIP_LOCAL_HEADER_LEN: usize = 30;
 
@@ -84,10 +87,14 @@ pub fn detect(
     text_valid: bool,
 ) -> Result<FileType, Rejected> {
     if let Some(kind) = infer::get(head) {
-        return match kind.mime_type() {
-            "application/zip" => detect_office_zip(head),
-            other => from_media_type(other).ok_or(Rejected),
-        };
+        if kind.mime_type() == "application/zip" {
+            return detect_office_zip(head);
+        }
+        if let Some(file_type) = from_media_type(kind.mime_type()) {
+            return Ok(file_type);
+        }
+        // A short magic number, such as "BM", can match a text file.
+        // The text path decides, with the whole-stream check.
     }
     let text_type = match extension.map(str::to_ascii_lowercase).as_deref() {
         Some("txt") => FileType::Text,
@@ -121,16 +128,25 @@ fn from_media_type(media_type: &str) -> Option<FileType> {
     })
 }
 
-/// Reads the names of the local file headers in `head` and never unpacks an entry (ADR 0055).
+/// Walks the local file headers from the start of `head` and reads the entry names (ADR 0055).
+/// It never unpacks an entry.
+/// It steps from header to header by the sizes in the header.
+/// An entry with a data descriptor (flag bit 3) has no size in its header.
+/// The walk then stops after that entry, so only the first names decide.
+/// A header inside entry data is never read.
 fn detect_office_zip(head: &[u8]) -> Result<FileType, Rejected> {
-    let mut offset = 0;
-    while let Some(found) = find(&head[offset..], ZIP_LOCAL_HEADER) {
-        let start = offset + found;
-        offset = start + ZIP_LOCAL_HEADER.len();
+    let mut start = 0;
+    while head.get(start..start + ZIP_LOCAL_HEADER.len()) == Some(ZIP_LOCAL_HEADER) {
         let Some(fixed) = head.get(start..start + ZIP_LOCAL_HEADER_LEN) else {
             break;
         };
-        let name_len = usize::from(u16::from_le_bytes([fixed[26], fixed[27]]));
+        let u16_at = |at: usize| usize::from(u16::from_le_bytes([fixed[at], fixed[at + 1]]));
+        let flags = u16_at(6);
+        let compressed_size = usize::try_from(u32::from_le_bytes([
+            fixed[18], fixed[19], fixed[20], fixed[21],
+        ]))
+        .unwrap_or(usize::MAX);
+        let (name_len, extra_len) = (u16_at(26), u16_at(28));
         let name_start = start + ZIP_LOCAL_HEADER_LEN;
         let Some(name) = head.get(name_start..name_start + name_len) else {
             break;
@@ -144,23 +160,30 @@ fn detect_office_zip(head: &[u8]) -> Result<FileType, Rejected> {
         if name.starts_with(b"xl/") {
             return Ok(FileType::Xlsx);
         }
+        if flags & ZIP_DATA_DESCRIPTOR != 0 {
+            break;
+        }
+        start = name_start
+            .saturating_add(name_len)
+            .saturating_add(extra_len)
+            .saturating_add(compressed_size);
     }
     Err(Rejected)
 }
 
-fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|window| window == needle)
-}
-
 /// Checks incrementally that a stream is UTF-8 without control characters.
 /// Newline, carriage return and tab are allowed.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TextValidator {
     valid: bool,
     /// The start of a multi-byte character that a chunk boundary split.
     pending: Vec<u8>,
+}
+
+impl Default for TextValidator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TextValidator {
@@ -210,12 +233,29 @@ fn no_control_chars(text: &str) -> bool {
         .all(|c| !c.is_control() || matches!(c, '\n' | '\r' | '\t'))
 }
 
-/// Removes control characters and path separators and limits the name to 200 characters.
+/// The name that replaces an empty name, `.` or `..`.
+const FALLBACK_FILE_NAME: &str = "file";
+
+/// Removes control characters, bidirectional controls and path separators.
+/// Limits the name to 200 characters.
+/// Never returns an empty name, `.` or `..`.
 pub fn sanitize_file_name(name: &str) -> String {
-    name.chars()
-        .filter(|c| !c.is_control() && !matches!(c, '/' | '\\'))
+    let clean: String = name
+        .chars()
+        .filter(|c| {
+            !c.is_control()
+                && !matches!(
+                    c,
+                    '/' | '\\' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
+                )
+        })
         .take(MAX_FILE_NAME_CHARS)
-        .collect()
+        .collect();
+    if matches!(clean.as_str(), "" | "." | "..") {
+        FALLBACK_FILE_NAME.to_owned()
+    } else {
+        clean
+    }
 }
 
 #[cfg(test)]
@@ -371,5 +411,85 @@ mod tests {
     fn sanitizes_file_names() {
         assert_eq!(sanitize_file_name("../a\\b/c\u{0}d\n.pdf"), "..abcd.pdf");
         assert_eq!(sanitize_file_name(&"x".repeat(300)).chars().count(), 200);
+    }
+
+    #[test]
+    fn rejects_a_fake_header_inside_entry_data() {
+        // A stored entry whose data holds a header named "word/x".
+        let fake = zip_entry("word/x");
+        let mut entry = zip_entry("foo/bar.txt");
+        entry[18..22].copy_from_slice(&u32::try_from(fake.len()).unwrap().to_le_bytes());
+        entry.extend_from_slice(&fake);
+        assert_eq!(detect_with(&entry, "docx"), Err(Rejected));
+    }
+
+    #[test]
+    fn steps_over_entry_data_to_the_next_header() {
+        let mut first = zip_entry("_rels/.rels");
+        first[18..22].copy_from_slice(&5u32.to_le_bytes());
+        first.extend_from_slice(b"hello");
+        first.extend_from_slice(&zip_entry("word/document.xml"));
+        assert_eq!(detect_with(&first, "docx"), Ok(FileType::Docx));
+    }
+
+    #[test]
+    fn reads_the_first_name_of_an_entry_with_a_data_descriptor() {
+        let mut first = zip_entry("word/document.xml");
+        first[6] = 8;
+        assert_eq!(detect_with(&first, "docx"), Ok(FileType::Docx));
+        let mut other = zip_entry("foo.txt");
+        other[6] = 8;
+        other.extend_from_slice(&zip_entry("word/document.xml"));
+        assert_eq!(detect_with(&other, "docx"), Err(Rejected));
+    }
+
+    #[test]
+    fn accepts_text_that_starts_like_a_bitmap_header() {
+        let mut validator = TextValidator::new();
+        validator.feed(b"BMW\n");
+        assert_eq!(
+            detect(b"BMW\n", Some("txt"), validator.finish()),
+            Ok(FileType::Text)
+        );
+        assert_eq!(detect(b"BMW\n", Some("png"), true), Err(Rejected));
+    }
+
+    #[test]
+    fn detects_webp_heic_and_opendocument() {
+        let webp = b"RIFF\x24\0\0\0WEBPVP8 ";
+        assert_eq!(detect_with(webp, "webp"), Ok(FileType::Webp));
+        let heic = b"\0\0\0\x18ftypheic\0\0\0\0mif1heic";
+        assert_eq!(detect_with(heic, "heic"), Ok(FileType::Heic));
+        let mut odt = zip_entry("mimetype");
+        let mime = b"application/vnd.oasis.opendocument.text";
+        odt[18..22].copy_from_slice(&u32::try_from(mime.len()).unwrap().to_le_bytes());
+        odt.extend_from_slice(mime);
+        assert_eq!(detect_with(&odt, "odt"), Ok(FileType::Odt));
+    }
+
+    #[test]
+    fn validator_rejects_a_c1_control_completed_from_pending() {
+        let mut validator = TextValidator::new();
+        validator.feed(&[0xC2]);
+        validator.feed(&[0x85]); // U+0085
+        assert!(!validator.finish());
+    }
+
+    #[test]
+    fn validator_accepts_one_byte_at_a_time() {
+        let mut validator = TextValidator::new();
+        for byte in "Zürich €\n".as_bytes() {
+            validator.feed(&[*byte]);
+        }
+        assert!(validator.finish());
+        assert!(TextValidator::default().finish());
+    }
+
+    #[test]
+    fn sanitize_removes_bidi_controls_and_never_returns_a_bare_dot_name() {
+        assert_eq!(sanitize_file_name("a\u{202E}fdp.exe\u{2066}"), "afdp.exe");
+        for name in ["", ".", "..", "/", "\n"] {
+            assert_eq!(sanitize_file_name(name), "file");
+        }
     }
 }
