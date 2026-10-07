@@ -3,6 +3,8 @@ import { type Api, createApi } from "./api/client";
 import { EventsPage } from "./events/EventsPage";
 import { NotFoundPage } from "./NotFoundPage";
 import { Redirect, Route, Router, Routes } from "./router/Router";
+import { SessionProvider } from "./session/SessionProvider";
+import { Shell } from "./shell/Shell";
 
 const defaultApi = createApi();
 
@@ -23,14 +25,22 @@ export function App({ api = defaultApi }: { api?: Api }) {
             </Suspense>
           </Route>
         )}
-        <Route path="/">
-          <Redirect to="/events" />
-        </Route>
-        <Route path="/events">
-          <EventsPage api={api} />
-        </Route>
         <Route path="*">
-          <NotFoundPage />
+          <SessionProvider api={api}>
+            <Shell api={api}>
+              <Routes>
+                <Route path="/">
+                  <Redirect to="/events" />
+                </Route>
+                <Route path="/events">
+                  <EventsPage api={api} />
+                </Route>
+                <Route path="*">
+                  <NotFoundPage />
+                </Route>
+              </Routes>
+            </Shell>
+          </SessionProvider>
         </Route>
       </Routes>
     </Router>
