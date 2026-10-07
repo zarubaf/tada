@@ -67,7 +67,10 @@ run = "cargo clippy --workspace --all-targets --locked -- -D warnings"
 
 [tasks."check:rust-test"]
 description = "Run the Rust tests"
-run = "cargo nextest run --workspace --locked --no-tests=pass"
+run = [
+  "cargo nextest run --workspace --locked --no-tests=pass",
+  "cargo test --doc --workspace --locked",
+]
 
 [tasks."check:deps"]
 description = "Check crate boundaries, licenses and advisories"
