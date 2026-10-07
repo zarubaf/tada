@@ -10,5 +10,6 @@ mod jobs;
 mod telegram;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
+mod token;
 
 pub use database::{Database, MigrationFailed};

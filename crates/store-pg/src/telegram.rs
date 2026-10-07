@@ -1,11 +1,9 @@
 //! The `TelegramLinks` adapter (ADR 0011). Codes are 256 random bits; the table holds their SHA-256 hash (ADR 0008).
 
 use async_trait::async_trait;
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
-use sha2::{Digest, Sha256};
+use secrecy::ExposeSecret;
 use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
 use tada_app::domain::ids::UserId;
@@ -14,10 +12,7 @@ use tada_app::telegram::{Confirmed, LinkRequest, TelegramLinks, TelegramName, Te
 
 use crate::Database;
 use crate::error::store_error;
-
-fn hash(code: &str) -> Vec<u8> {
-    Sha256::digest(code.as_bytes()).to_vec()
-}
+use crate::token::{hash_token, new_token};
 
 #[async_trait]
 impl TelegramLinks for Database {
@@ -27,25 +22,21 @@ impl TelegramLinks for Database {
         user_id: UserId,
         expires_at: Timestamp,
     ) -> Result<String, StoreError> {
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).map_err(|error| {
-            StoreError::Internal(Box::new(std::io::Error::other(error.to_string())))
-        })?;
         // Telegram accepts this alphabet and length in a `/start` parameter of a deep link.
-        let code = URL_SAFE_NO_PAD.encode(bytes);
+        let token = new_token("")?;
         sqlx::query!(
             "INSERT INTO telegram_link_code (id, organization_id, user_id, code_hash, expires_at, created_at)
              VALUES ($1, $2, $3, $4, $5, now())",
             Uuid::now_v7(),
             scope.organization_id().as_uuid(),
             user_id.as_uuid(),
-            hash(&code),
+            token.hash,
             expires_at.to_sqlx() as _,
         )
         .execute(&self.pool)
         .await
         .map_err(store_error)?;
-        Ok(code)
+        Ok(token.secret.expose_secret().to_owned())
     }
 
     async fn claim(
@@ -59,7 +50,7 @@ impl TelegramLinks for Database {
             "UPDATE telegram_link_code
              SET claimed_by = $2, claimed_name = $3, claimed_at = $4
              WHERE code_hash = $1 AND claimed_by IS NULL AND expires_at > $4",
-            hash(code),
+            hash_token(code),
             account.0,
             name.0,
             now.to_sqlx() as _,
