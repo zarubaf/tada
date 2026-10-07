@@ -173,7 +173,7 @@ impl<S: ServiceIdentity> ServiceCaller<S> {
             kind: ActorKind::Service,
             id: S::ID,
             principal: None,
-            channel: Channel::Job,
+            channel: S::CHANNEL,
             request_id: None,
         }
     }
@@ -185,10 +185,12 @@ impl<S> Default for ServiceCaller<S> {
     }
 }
 
-/// The name and the fixed ID of a service identity.
+/// The name, the fixed ID and the channel of a service identity.
 pub trait ServiceIdentity {
     const NAME: &'static str;
     const ID: Uuid;
+    /// The channel of each action of the identity (ADR 0039).
+    const CHANNEL: Channel;
 }
 
 /// The service identity `telegram-gateway`.
@@ -198,6 +200,7 @@ pub struct TelegramGateway;
 impl ServiceIdentity for TelegramGateway {
     const NAME: &'static str = "telegram-gateway";
     const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0001);
+    const CHANNEL: Channel = Channel::Telegram;
 }
 
 /// The service identity `job-runner`: the worker that runs the jobs.
@@ -207,6 +210,7 @@ pub struct JobRunner;
 impl ServiceIdentity for JobRunner {
     const NAME: &'static str = "job-runner";
     const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0002);
+    const CHANNEL: Channel = Channel::Job;
 }
 
 impl ServiceCaller<JobRunner> {
@@ -253,6 +257,14 @@ mod tests {
         assert_eq!(actor.kind(), ActorKind::Service);
         assert_eq!(actor.id(), TelegramGateway::ID);
         assert_eq!(TelegramGateway::NAME, "telegram-gateway");
+    }
+
+    #[test]
+    fn a_service_actor_has_the_channel_of_its_identity() {
+        let telegram = ServiceCaller::<TelegramGateway>::new().actor();
+        assert_eq!(telegram.channel(), Channel::Telegram);
+        let job = ServiceCaller::<JobRunner>::new().actor();
+        assert_eq!(job.channel(), Channel::Job);
     }
 
     #[test]
