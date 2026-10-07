@@ -274,12 +274,7 @@ pub async fn add_event_member(
     }
     let audit = audit(caller, AuditAction::EventMembershipAdd, event, user)
         .with_roles(None, Some(AuditRole::Event(role)));
-    let invalid = |code| {
-        AddEventMemberError::Invalid(vec![FieldError {
-            field: "user_id",
-            code,
-        }])
-    };
+    let invalid = |code| AddEventMemberError::Invalid(vec![FieldError::new("user_id", code)]);
     match store
         .add(caller.scope(), event, user, role, clock.now(), &audit)
         .await?

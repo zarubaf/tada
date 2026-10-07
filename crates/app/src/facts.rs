@@ -3,9 +3,14 @@
 use std::fmt::Debug;
 
 use async_trait::async_trait;
+use jiff::Timestamp;
 use tada_domain::RecordVersion;
 use tada_domain::facts::{DateWindow, FactState, FactValue, FieldDefinition, Valued, core_catalog};
-use tada_domain::ids::{EventId, FactId, FactVersionId, FieldDefinitionId, SourceVersionId};
+use tada_domain::ids::{
+    ChangesetId, EventId, FactId, FactVersionId, FieldDefinitionId, OpenQuestionId, ProposalId,
+    SourceVersionId, UserId,
+};
+use tada_domain::proposals::QuestionText;
 use tada_domain::sources::Passage;
 
 use crate::access::{self, AccessError, Principal};
@@ -13,11 +18,39 @@ use crate::caller::OrgScope;
 use crate::identity::IdentityStore;
 use crate::store::StoreError;
 
-/// The current fact versions of one event, with their fields and evidence.
+/// The current fact versions of one event, with their fields and evidence,
+/// and apart from them the open fact proposals and the open questions of the event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventProfile {
     /// One entry for each fact of the event, in the order of the field keys.
     pub fields: Vec<ProfileEntry>,
+    /// The fact proposals of the event without a review result, oldest first.
+    /// They are not accepted state (ADR 0050). A proposal can name a field that has no fact yet.
+    pub proposals: Vec<OpenProposalRef>,
+    /// The open questions of the event, in the order of their event-local numbers.
+    pub open_questions: Vec<OpenQuestionRef>,
+}
+
+/// An open proposal that sets the fact of a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenProposalRef {
+    pub proposal_id: ProposalId,
+    pub changeset_id: ChangesetId,
+    pub field_id: FieldDefinitionId,
+    pub state: FactState<Valued>,
+    /// The fact version that the proposal expects. `None` means that the field has no fact yet.
+    pub expected_version: Option<RecordVersion>,
+    pub created_at: Timestamp,
+}
+
+/// An open question of an event, with its event-local number `QST-<n>` (ADR 0038).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenQuestionRef {
+    pub id: OpenQuestionId,
+    pub local_number: u64,
+    pub text: QuestionText,
+    pub owner: UserId,
+    pub version: RecordVersion,
 }
 
 /// The current version of one fact.
@@ -58,7 +91,7 @@ pub trait FactStore: Debug + Send + Sync {
         event: EventId,
     ) -> Result<Vec<FieldDefinition>, StoreError>;
 
-    /// The current fact versions of the event with their evidence.
+    /// The current fact versions of the event with their evidence, its open fact proposals and its open questions.
     async fn profile(&self, scope: OrgScope, event: EventId) -> Result<EventProfile, StoreError>;
 
     /// The current version of the fact of `field` in the event, or `None` if the event has no such fact.
@@ -161,7 +194,11 @@ mod tests {
         }
 
         async fn profile(&self, _: OrgScope, _: EventId) -> Result<EventProfile, StoreError> {
-            Ok(EventProfile { fields: Vec::new() })
+            Ok(EventProfile {
+                fields: Vec::new(),
+                proposals: Vec::new(),
+                open_questions: Vec::new(),
+            })
         }
 
         async fn current_version(
@@ -233,7 +270,14 @@ mod tests {
         let memory = Memory::default();
         let owner = caller(OrganizationRole::Owner);
         let profile = get_event_profile(&owner, open_day(), &memory, &memory).await;
-        assert_eq!(profile.unwrap(), EventProfile { fields: Vec::new() });
+        assert_eq!(
+            profile.unwrap(),
+            EventProfile {
+                fields: Vec::new(),
+                proposals: Vec::new(),
+                open_questions: Vec::new(),
+            }
+        );
     }
 
     #[tokio::test]

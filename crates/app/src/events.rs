@@ -178,10 +178,7 @@ fn validate(
     let mut errors = Vec::new();
     let id = match input.id {
         Some(id) if !ids::is_record_id(id) => {
-            errors.push(FieldError {
-                field: "id",
-                code: "not-uuid-v7",
-            });
+            errors.push(FieldError::new("id", "not-uuid-v7"));
             None
         }
         Some(id) => Some(EventId::from_uuid(id)),
@@ -189,35 +186,19 @@ fn validate(
     };
     let key = EventKey::parse(&input.key)
         .map_err(|error| {
-            errors.push(FieldError {
-                field: "key",
-                code: match error {
-                    EventKeyError::Length => "length",
-                    EventKeyError::Characters => "characters",
-                },
-            });
+            errors.push(FieldError::new("key", key_error_code(error)));
         })
         .ok();
     let name = EventName::parse(&input.name)
         .map_err(|error| {
-            errors.push(FieldError {
-                field: "name",
-                code: match error {
-                    NameError::Empty => "empty",
-                    NameError::TooLong => "too-long",
-                    NameError::ControlCharacter => "control-character",
-                },
-            });
+            errors.push(FieldError::new("name", name_error_code(error)));
         })
         .ok();
     let time_zone = match input.time_zone {
         None => Some(EventTimeZone::default_zone()),
         Some(name) => EventTimeZone::parse(&name)
             .map_err(|_| {
-                errors.push(FieldError {
-                    field: "time_zone",
-                    code: "unknown",
-                });
+                errors.push(FieldError::new("time_zone", "unknown"));
             })
             .ok(),
     };
@@ -240,8 +221,25 @@ fn same_content(existing: &Event, new: &Event) -> bool {
     existing.key == new.key && existing.name == new.name && existing.time_zone == new.time_zone
 }
 
+/// The entry code of an invalid event key.
+pub(crate) fn key_error_code(error: EventKeyError) -> &'static str {
+    match error {
+        EventKeyError::Length => "length",
+        EventKeyError::Characters => "characters",
+    }
+}
+
+/// The entry code of an invalid name.
+pub(crate) fn name_error_code(error: NameError) -> &'static str {
+    match error {
+        NameError::Empty => "empty",
+        NameError::TooLong => "too-long",
+        NameError::ControlCharacter => "control-character",
+    }
+}
+
 fn invalid(field: &'static str, code: &'static str) -> CreateEventError {
-    CreateEventError::Invalid(vec![FieldError { field, code }])
+    CreateEventError::Invalid(vec![FieldError::new(field, code)])
 }
 
 /// The position after the last event of a page: the sort key and the ID (ADR 0044).
@@ -507,7 +505,7 @@ mod tests {
         };
         let fields: Vec<_> = errors
             .iter()
-            .map(|error| (error.field, error.code))
+            .map(|error| (error.field.as_ref(), error.code))
             .collect();
         assert_eq!(
             fields,
@@ -547,13 +545,7 @@ mod tests {
         else {
             panic!("not invalid");
         };
-        assert_eq!(
-            errors,
-            [FieldError {
-                field: "id",
-                code: "taken"
-            }]
-        );
+        assert_eq!(errors, [FieldError::new("id", "taken")]);
     }
 
     #[tokio::test]
@@ -567,13 +559,7 @@ mod tests {
         else {
             panic!("not invalid");
         };
-        assert_eq!(
-            errors,
-            [FieldError {
-                field: "key",
-                code: "taken"
-            }]
-        );
+        assert_eq!(errors, [FieldError::new("key", "taken")]);
 
         let other = caller(200, OrganizationRole::Admin);
         assert!(

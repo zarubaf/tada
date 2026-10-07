@@ -81,6 +81,8 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | provenance          | The set of evidence links and fact versions behind a record or a generated draft.                                                    |                          |
 | proposal            | A suggested change to accepted state, with its source, its author and the target record version. A proposal is never accepted state. | suggestion               |
 | review              | The act in which the owner accepts, edits or rejects a proposal. Silence is never acceptance.                                        | approval (of a proposal) |
+| operation           | The one typed change of a proposal, for example "set a fact" or "add a field definition" (ADR 0050).                                 | patch                    |
+| review result       | One append-only record of a review of a proposal: accepted, accepted with edit, rejected, conflict or withdrawn (ADR 0050).          | status (of the record)   |
 | conflict            | The state of a proposal when its target record changed after the proposal was created.                                               |                          |
 | changeset           | The proposals of one intake, reviewed together. A proposal can depend on another proposal of its changeset.                          | batch                    |
 | provenance manifest | The list of fact versions and source passages that one document version uses, extracted from its `tada:` links.                      | citations list           |

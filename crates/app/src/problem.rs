@@ -1,5 +1,7 @@
 //! Problem codes (ADR 0037). The `app` crate owns them, so that the API and the Telegram gateway use the same codes.
 
+use std::borrow::Cow;
+
 use jiff::SignedDuration;
 
 use crate::store::StoreError;
@@ -83,11 +85,22 @@ impl ProblemCode {
     }
 }
 
-/// One invalid input value of a command. `field` is the name of the input field, for example `key`.
+/// One invalid input value of a command.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldError {
-    pub field: &'static str,
+    /// The path of the input field, without a leading `/`, for example `key` or `proposals/0/evidence`.
+    /// The API makes a JSON pointer of it (ADR 0037).
+    pub field: Cow<'static, str>,
     pub code: &'static str,
+}
+
+impl FieldError {
+    pub fn new(field: impl Into<Cow<'static, str>>, code: &'static str) -> Self {
+        Self {
+            field: field.into(),
+            code,
+        }
+    }
 }
 
 /// An error of a command or query (ADR 0037).

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO proposal_dependency (organization_id, changeset_id, proposal_id, depends_on)\n                 VALUES ($1, $2, $3, $4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6433c8e6a1759d42a5a40d5b004a5ecfbb80158536039442c7bc1135d349fb35"
+}

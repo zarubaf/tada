@@ -17,6 +17,7 @@ pub enum AuditAction {
     EventMembershipAdd,
     EventMembershipChangeRole,
     EventMembershipRemove,
+    ChangesetCreate,
 }
 
 impl AuditAction {
@@ -31,6 +32,7 @@ impl AuditAction {
             Self::EventMembershipAdd => "event_membership.add",
             Self::EventMembershipChangeRole => "event_membership.change_role",
             Self::EventMembershipRemove => "event_membership.remove",
+            Self::ChangesetCreate => "changeset.create",
         }
     }
 
@@ -47,6 +49,7 @@ impl AuditAction {
             Self::EventMembershipAdd
             | Self::EventMembershipChangeRole
             | Self::EventMembershipRemove => "event_membership",
+            Self::ChangesetCreate => "changeset",
         }
     }
 }
