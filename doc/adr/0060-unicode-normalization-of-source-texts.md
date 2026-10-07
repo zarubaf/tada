@@ -1,4 +1,4 @@
-# 0059. Unicode normalization of source texts
+# 0060. Unicode normalization of source texts
 
 - Status: Proposed
 - Date: 2026-10-07
@@ -27,6 +27,9 @@ The Rust standard library has no Unicode normalization.
 
 - The same text from two clients gets the same hash and the same passage offsets.
 - A client that computes passage offsets must use the normalized text that tada returns, not its own input.
+- Passage offsets count Unicode scalar values, not bytes and not UTF-16 code units.
+  JavaScript strings and many MCP clients count UTF-16 code units, so these clients convert their offsets before they send a passage.
+  For example, an emoji outside the Basic Multilingual Plane is one scalar value but two UTF-16 code units.
 - The domain crate has one more dependency.
 
 ## Alternatives

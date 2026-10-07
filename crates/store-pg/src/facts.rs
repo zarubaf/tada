@@ -28,6 +28,9 @@ pub enum SyncCatalogError {
     ValueTypeChanged(String),
     #[error("the key of the shipped field {0} changed")]
     KeyChanged(String),
+    /// A newer binary wrote the catalog. An older binary never downgrades it.
+    #[error("the stored catalog version {stored} is newer than the catalog version {given}")]
+    NewerCatalog { stored: u32, given: u32 },
     #[error("the database failed")]
     Database(#[from] sqlx::Error),
 }
@@ -35,13 +38,25 @@ pub enum SyncCatalogError {
 impl Database {
     /// Writes the shipped fields of `catalog` (ADR 0049): it inserts the missing fields and updates the labels,
     /// descriptions, modules and statuses of the others. The Rust catalog is the one authority for shipped fields.
-    /// It fails and changes nothing if a field has another key or another value type than its stored row.
+    /// It fails and changes nothing if a field has another key or another value type than its stored row,
+    /// or if the stored catalog is newer than `catalog_version`.
     pub async fn sync_catalog(
         &self,
         catalog: &[FieldDefinition],
         catalog_version: u32,
     ) -> Result<(), SyncCatalogError> {
         let mut tx = self.pool.begin().await?;
+        let stored = sqlx::query_scalar!(
+            "SELECT max(catalog_version) FROM field_definition WHERE event_id IS NULL",
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if let Some(stored) = stored.filter(|stored| *stored > i64::from(catalog_version)) {
+            return Err(SyncCatalogError::NewerCatalog {
+                stored: u32::try_from(stored).unwrap_or(u32::MAX),
+                given: catalog_version,
+            });
+        }
         for field in catalog {
             let key = field.key.as_str();
             if field.scope != FieldScope::Shipped {
@@ -573,6 +588,39 @@ mod tests {
             .scalar("SELECT value_type FROM field_definition WHERE key = 'venue'")
             .await;
         assert_eq!(value_type, values::value_type_to_json(&ValueType::Text));
+    }
+
+    /// An older binary never downgrades a catalog that a newer binary wrote.
+    #[tokio::test]
+    async fn the_sync_rejects_an_older_catalog_version_and_changes_nothing() {
+        let test = TestDatabase::start().await;
+        let db = &test.database;
+        db.sync_catalog(&core_catalog(), CORE_CATALOG_VERSION + 1)
+            .await
+            .unwrap();
+        let mut older = core_catalog();
+        older
+            .iter_mut()
+            .find(|field| field.key.as_str() == "venue")
+            .unwrap()
+            .description = Description::parse("An old description.").unwrap();
+        let error = db
+            .sync_catalog(&older, CORE_CATALOG_VERSION)
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            SyncCatalogError::NewerCatalog { stored, given }
+                if stored == CORE_CATALOG_VERSION + 1 && given == CORE_CATALOG_VERSION
+        ));
+        let description: String = test
+            .scalar("SELECT description FROM field_definition WHERE key = 'venue'")
+            .await;
+        assert_eq!(description, core("venue").description.as_str());
+        let versions: i64 = test
+            .scalar("SELECT max(catalog_version) FROM field_definition")
+            .await;
+        assert_eq!(versions, i64::from(CORE_CATALOG_VERSION + 1));
     }
 
     #[tokio::test]

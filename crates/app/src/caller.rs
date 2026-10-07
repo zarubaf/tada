@@ -82,6 +82,7 @@ pub struct Actor {
 impl Actor {
     /// For store adapters only: restores the author of a stored record.
     /// Other code gets an actor from a caller.
+    #[doc(hidden)]
     pub fn restore(
         kind: ActorKind,
         id: Uuid,
