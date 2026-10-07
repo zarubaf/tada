@@ -15,8 +15,6 @@ use crate::Database;
 use crate::error::store_error;
 
 /// Adds a job inside the transaction of a command. A rollback removes the job with the change.
-// The first command with a job, the owner invitation of ADR 0036, calls this in Slice 1.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) async fn enqueue(conn: &mut PgConnection, job: &NewJob) -> Result<Uuid, sqlx::Error> {
     let id = Uuid::now_v7();
     sqlx::query!(

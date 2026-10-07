@@ -1,6 +1,7 @@
 //! A PostgreSQL container with the tada schema, for tests (ADR 0003).
 
 use secrecy::SecretString;
+use sqlx::AssertSqlSafe;
 use sqlx::types::Uuid;
 use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
 use tada_app::domain::ids::{OrganizationId, UserId};
@@ -89,6 +90,42 @@ impl TestDatabase {
         .unwrap();
         tx.commit().await.unwrap();
         UserId::from_uuid(id)
+    }
+
+    /// Fails if any text, `jsonb` or `bytea` column of any table contains `secret` (ADR 0008).
+    ///
+    /// # Panics
+    ///
+    /// If a table contains the secret, or a query fails.
+    #[allow(clippy::unwrap_used)]
+    pub async fn assert_no_plaintext(&self, secret: &str) {
+        let columns: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT quote_ident(table_name), quote_ident(column_name), data_type::text
+             FROM information_schema.columns
+             WHERE table_schema = 'public' AND data_type IN ('text', 'character varying', 'jsonb', 'bytea')",
+        )
+        .fetch_all(&self.database.pool)
+        .await
+        .unwrap();
+        assert!(!columns.is_empty(), "the schema has no columns to search");
+        for (table, column, data_type) in columns {
+            let value = match data_type.as_str() {
+                "bytea" => column.clone(),
+                _ => format!("convert_to({column}::text, 'UTF8')"),
+            };
+            // The names come from the catalog, quoted by `quote_ident`. The secret is a bind parameter.
+            let found: bool = sqlx::query_scalar(AssertSqlSafe(format!(
+                "SELECT EXISTS (SELECT 1 FROM {table} WHERE position(convert_to($1, 'UTF8') IN {value}) > 0)"
+            )))
+            .bind(secret)
+            .fetch_one(&self.database.pool)
+            .await
+            .unwrap();
+            assert!(
+                !found,
+                "the column {table}.{column} holds the secret in plain text"
+            );
+        }
     }
 
     /// Adds a membership of a user in an organization.

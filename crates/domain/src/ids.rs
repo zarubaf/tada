@@ -41,6 +41,10 @@ id_type!(
     /// The ID of an event.
     EventId
 );
+id_type!(
+    /// The ID of an invitation to an organization.
+    InvitationId
+);
 
 /// Returns true if `uuid` can be the ID of a new record: a UUIDv7 (ADR 0038).
 pub fn is_record_id(uuid: Uuid) -> bool {

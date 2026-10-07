@@ -3561,6 +3561,7 @@ dependencies = [
  "bytes",
  "futures",
  "jiff",
+ "secrecy",
  "serde_json",
  "tada-domain",
  "thiserror",
