@@ -70,6 +70,7 @@ The ADRs are the authority for the decisions in this project.
 | [0053](0053-development-authenticator.md)          | Development authenticator for the walking skeleton       | Accepted           |
 | [0054](0054-job-queue-implementation.md)           | Job queue in store-pg                                    | Accepted           |
 | [0055](0055-office-format-detection.md)            | Detection of office formats in ZIP containers            | Proposed           |
+| [0056](0056-sign-in-details.md)                    | Sign-in: organization, invitations and rate limits       | Proposed           |
 
 ## New ADR
 
