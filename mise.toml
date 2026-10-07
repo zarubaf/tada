@@ -86,6 +86,10 @@ description = "Fail on a breaking change of the API contract against main"
 run = "uv run --quiet scripts/check_contract.py"
 
 [tasks."check:web"]
+description = "Type-check, lint, test and build the web client; skipped when no web file changed"
+run = "uv run --quiet scripts/run_when_web_changed.py check:web mise run check:web-always"
+
+[tasks."check:web-always"]
 description = "Type-check, lint, test and build the web client"
 dir = "apps/web"
 run = [
@@ -97,10 +101,10 @@ run = [
 ]
 
 [tasks."check:browser"]
-description = "Run the browser checks of ADR 0024 in the pinned Playwright container"
+description = "Run the browser checks of ADR 0024; skipped when no web file changed"
 # After the Rust tests: their PostgreSQL and Garage containers time out while Docker pulls this image.
 depends = ["check:web", "check:rust-test"]
-run = "uv run --quiet scripts/check_browser.py"
+run = "uv run --quiet scripts/run_when_web_changed.py check:browser uv run --quiet scripts/check_browser.py"
 
 [tasks."gen:screenshots"]
 description = "Write the screenshot baselines again, after an intended design change"
@@ -111,8 +115,13 @@ description = "Run all Rust checks"
 depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps", "check:generated", "check:contract"]
 
 [tasks.check]
-description = "Run every check that CI runs"
+description = "Run every check that CI runs; skips the web and browser checks when no web file changed"
 depends = ["check:docs", "check:secrets", "check:scripts", "check:rust", "check:browser"]
+
+[tasks."check:all"]
+description = "Run every check, including the web and browser checks, whatever changed"
+env = { TADA_CHECK_ALL = "1" }
+run = "mise run check"
 
 [tasks.gen]
 description = "Write the files that the code generates: settings, problem codes and the API contract"

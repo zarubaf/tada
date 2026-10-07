@@ -52,7 +52,7 @@ Do not commit it, and do not link to it from tracked files.
 3. Add an ADR when a change affects a public contract, a dependency, the data model or the operations.
 4. Run `mise run gen` after a change of the settings, the problem codes or the API. Commit the generated files.
 5. Run `mise run gen:screenshots` after an intended change of the design. The pull request shows the image difference (ADR 0024).
-6. Run `mise run check` before you push.
+6. Run `mise run check:all` before you push.
 
 Do not change an accepted ADR to reverse its decision.
 Write a new ADR and set the old one to "Superseded by NNNN".
@@ -61,13 +61,21 @@ Write a new ADR and set the old one to "Superseded by NNNN".
 
 The product owner chose this way of work for LLM agents:
 
-1. A controller session plans the work and keeps its own context small.
-2. The controller gives all implementation work to new subagents, one task to each subagent.
-3. The controller selects the least capable model that can do the task.
-4. A subagent does not start subagents of its own.
-5. After each task, a task review checks the compliance with the specification and the code quality.
-6. After every few tasks and at the end of a slice, a principles review checks the principles in [AGENTS.md](../AGENTS.md), the compliance with the ADRs and the drift of the architecture.
-7. Before a merge, a final review checks the whole branch.
+01. A controller session plans the work and keeps its own context small.
+02. The controller gives all implementation work to new subagents, one task to each subagent.
+03. The controller selects the least capable model that can do the task.
+04. A subagent does not start subagents of its own.
+05. After each task, a task review checks the compliance with the specification and the code quality.
+06. After every few tasks and at the end of a slice, a principles review checks the principles in [AGENTS.md](../AGENTS.md), the compliance with the ADRs and the drift of the architecture.
+07. Before a merge, a final review checks the whole branch.
+08. Independent tasks run in parallel.
+    Each task has its own Git worktree and branch.
+09. The controller merges each lane after its review.
+10. A lane reserves its migration number before it starts.
+11. `mise run check` checks the uncommitted change.
+    It skips the web and browser checks when no web file changed.
+    `mise run check:all` runs every check, as CI does.
+    Run it before a hand-off or a push.
 
 Private plans are private notes that stay out of the repository.
 Tool state stays outside the repository.
