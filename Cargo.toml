@@ -31,6 +31,7 @@ clap = { version = "4.6.7", features = ["derive"] }
 fluent-bundle = "0.16.0"
 frankenstein = { version = "0.52.1", default-features = false, features = ["client-reqwest", "trait-async"] }
 futures = { version = "0.3.34", default-features = false, features = ["std"] }
+infer = "0.22.0"
 getrandom = "0.4.3"
 ipnet = "2.12.2"
 jiff = { version = "0.2.37", features = ["serde", "tzdb-bundle-always"] }

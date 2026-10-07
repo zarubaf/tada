@@ -16,5 +16,6 @@ pub mod problem;
 pub mod public_url;
 pub mod store;
 pub mod telegram;
+pub mod uploads;
 
 pub use tada_domain as domain;
