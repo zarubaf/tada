@@ -119,7 +119,7 @@ description = "Run every check that CI runs; skips the web and browser checks wh
 depends = ["check:docs", "check:secrets", "check:scripts", "check:rust", "check:browser"]
 
 [tasks."check:all"]
-description = "Run every check, also the web checks when no web file changed"
+description = "Run every check, including the web and browser checks, whatever changed"
 env = { TADA_CHECK_ALL = "1" }
 run = "mise run check"
 

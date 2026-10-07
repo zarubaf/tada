@@ -52,7 +52,7 @@ Do not commit it, and do not link to it from tracked files.
 3. Add an ADR when a change affects a public contract, a dependency, the data model or the operations.
 4. Run `mise run gen` after a change of the settings, the problem codes or the API. Commit the generated files.
 5. Run `mise run gen:screenshots` after an intended change of the design. The pull request shows the image difference (ADR 0024).
-6. Run `mise run check` before you push.
+6. Run `mise run check:all` before you push.
 
 Do not change an accepted ADR to reverse its decision.
 Write a new ADR and set the old one to "Superseded by NNNN".
@@ -72,9 +72,10 @@ The product owner chose this way of work for LLM agents:
     Each task has its own Git worktree and branch.
 09. The controller merges each lane after its review.
 10. A lane reserves its migration number before it starts.
-11. `mise run check` skips the web and browser checks when no web file changed.
-    CI always runs all checks.
-    `mise run check:all` does the same on your machine.
+11. `mise run check` checks the uncommitted change.
+    It skips the web and browser checks when no web file changed.
+    `mise run check:all` runs every check, as CI does.
+    Run it before a hand-off or a push.
 
 Private plans are private notes that stay out of the repository.
 Tool state stays outside the repository.

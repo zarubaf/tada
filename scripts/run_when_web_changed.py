@@ -5,8 +5,7 @@
 # ///
 """Run a command only when the change can affect the web client.
 
-The change is the staged, unstaged and untracked files against HEAD,
-plus the commits of the branch since its merge base with main.
+The change is the uncommitted work: staged and unstaged files against HEAD, and untracked files.
 The command runs always when TADA_CHECK_ALL is set (CI and `mise run check:all`),
 and when Git cannot tell what changed.
 Otherwise the script prints one line and skips the command.
@@ -26,12 +25,9 @@ WEB_PATHS = (
     "locales/",
     # The API contract that the web client consumes.
     "contracts/openapi.json",
-    # The pins of Node and pnpm.
-    "mise.toml",
     # The browser-check script holds the Playwright container pin.
     "scripts/check_browser.py",
     "scripts/check_bundle_size.py",
-    "scripts/run_when_web_changed.py",
 )
 
 
@@ -49,14 +45,7 @@ def git(*args: str) -> list[str]:
 def changed_files() -> set[str]:
     files = set(git("diff", "--name-only", "HEAD"))
     files.update(git("ls-files", "--others", "--exclude-standard"))
-    for main in ("main", "origin/main"):
-        try:
-            base = git("merge-base", main, "HEAD")[0]
-        except (subprocess.CalledProcessError, IndexError):
-            continue
-        files.update(git("diff", "--name-only", f"{base}..HEAD"))
-        return files
-    raise LookupError("no main branch to compare with")
+    return files
 
 
 def main(label: str, command: list[str]) -> int:
@@ -64,7 +53,7 @@ def main(label: str, command: list[str]) -> int:
         return subprocess.run(command).returncode  # noqa: S603
     try:
         web_files = sorted(f for f in changed_files() if f.startswith(WEB_PATHS))
-    except (subprocess.CalledProcessError, LookupError):
+    except subprocess.CalledProcessError:
         return subprocess.run(command).returncode  # noqa: S603
     if web_files:
         return subprocess.run(command).returncode  # noqa: S603
