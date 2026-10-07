@@ -192,6 +192,8 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: &tada_app::domain::events::Event,
+            _: tada_app::domain::ids::UserId,
+            _: &[tada_app::audit::AuditEvent],
         ) -> Result<tada_app::events::Inserted, tada_app::store::StoreError> {
             unreachable!()
         }

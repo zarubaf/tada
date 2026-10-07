@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 use jiff_sqlx::ToSqlx;
 use sqlx::types::Uuid;
+use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::events::{Event, EventKey, EventName, EventTimeZone};
@@ -11,6 +12,7 @@ use tada_app::events::{EventCursor, EventStore, Inserted};
 use tada_app::store::StoreError;
 
 use crate::Database;
+use crate::audit;
 use crate::error::{InvalidRow, store_error};
 
 struct EventRow {
@@ -42,8 +44,15 @@ impl TryFrom<EventRow> for Event {
 
 #[async_trait]
 impl EventStore for Database {
-    async fn insert(&self, scope: OrgScope, event: &Event) -> Result<Inserted, StoreError> {
+    async fn insert(
+        &self,
+        scope: OrgScope,
+        event: &Event,
+        manager: UserId,
+        audit: &[AuditEvent],
+    ) -> Result<Inserted, StoreError> {
         debug_assert_eq!(scope.organization_id(), event.organization_id);
+        let mut tx = self.pool.begin().await.map_err(store_error)?;
         let result = sqlx::query!(
             "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7)",
@@ -55,18 +64,36 @@ impl EventStore for Database {
             event.version.get(),
             event.created_at.to_sqlx() as _,
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await;
         match result {
-            Ok(_) => Ok(Inserted::Inserted),
+            Ok(_) => {}
             Err(sqlx::Error::Database(error)) if error.constraint() == Some("event_pkey") => {
-                Ok(Inserted::IdTaken)
+                return Ok(Inserted::IdTaken);
             }
             Err(sqlx::Error::Database(error)) if error.constraint() == Some("event_key_unique") => {
-                Ok(Inserted::KeyTaken)
+                return Ok(Inserted::KeyTaken);
             }
-            Err(error) => Err(store_error(error)),
+            Err(error) => return Err(store_error(error)),
         }
+        // An event has at least one event manager: its creator (ADR 0052).
+        sqlx::query!(
+            "INSERT INTO event_membership
+                 (organization_id, event_id, user_id, event_role, version, created_at)
+             VALUES ($1, $2, $3, 'event-manager', 1, $4)",
+            scope.organization_id().as_uuid(),
+            event.id.as_uuid(),
+            manager.as_uuid(),
+            event.created_at.to_sqlx() as _,
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        for entry in audit {
+            audit::record(&mut tx, entry).await.map_err(store_error)?;
+        }
+        tx.commit().await.map_err(store_error)?;
+        Ok(Inserted::Inserted)
     }
 
     async fn get(&self, scope: OrgScope, id: EventId) -> Result<Option<Event>, StoreError> {
@@ -151,15 +178,37 @@ impl EventStore for Database {
 #[cfg(test)]
 mod tests {
     use jiff::Timestamp;
+    use tada_app::audit::{AuditAction, AuditRole};
     use tada_app::caller::MemberCaller;
     use tada_app::caller::OrganizationRole::{Member, Owner};
-    use tada_app::domain::identity::{DisplayName, Email};
+    use tada_app::domain::identity::{DisplayName, Email, EventRole};
 
     use super::*;
     use crate::testing::TestDatabase;
 
     fn scope(organization: OrganizationId) -> OrgScope {
         MemberCaller::new(UserId::from_uuid(Uuid::now_v7()), organization, Owner).scope()
+    }
+
+    /// A new owner of the organization, with a user and a membership: the creator of events.
+    async fn owner(test: &TestDatabase, organization: OrganizationId) -> MemberCaller {
+        let number = Uuid::now_v7().simple();
+        let user = test
+            .create_user(
+                &DisplayName::parse("Olivia Owner").unwrap(),
+                &Email::parse(&format!("owner-{number}@example.org")).unwrap(),
+            )
+            .await;
+        test.add_membership(organization, user, Owner).await;
+        MemberCaller::new(user, organization, Owner)
+    }
+
+    /// Inserts an event of `owner` without audit events.
+    async fn insert(test: &TestDatabase, owner: &MemberCaller, event: &Event) -> Inserted {
+        test.database
+            .insert(owner.scope(), event, owner.user_id(), &[])
+            .await
+            .unwrap()
     }
 
     fn event(organization: OrganizationId, key: &str) -> Event {
@@ -180,11 +229,7 @@ mod tests {
         let organization = test.create_organization("testwil").await;
         let event = event(organization, "TEST30");
 
-        let inserted = test
-            .database
-            .insert(scope(organization), &event)
-            .await
-            .unwrap();
+        let inserted = insert(&test, &owner(&test, organization).await, &event).await;
         assert_eq!(inserted, Inserted::Inserted);
         let read = test
             .database
@@ -194,33 +239,91 @@ mod tests {
         assert_eq!(read, Some(event));
     }
 
+    /// The creator of an event becomes its event manager in the transaction of the insert, with
+    /// the audit events of both (ADR 0052, ADR 0061).
+    #[tokio::test]
+    async fn the_creator_becomes_the_event_manager_of_a_new_event() {
+        let test = TestDatabase::start().await;
+        let organization = test.create_organization("testwil").await;
+        let owner = owner(&test, organization).await;
+        let event = event(organization, "TEST30");
+        let audit = [
+            AuditEvent::new(
+                owner.actor(),
+                AuditAction::EventCreate,
+                Some(event.id.as_uuid()),
+                Some(owner.scope()),
+            ),
+            AuditEvent::new(
+                owner.actor(),
+                AuditAction::EventMembershipAdd,
+                Some(event.id.as_uuid()),
+                Some(owner.scope()),
+            )
+            .about(owner.user_id())
+            .with_roles(None, Some(AuditRole::Event(EventRole::EventManager))),
+        ];
+        let db = &test.database;
+        let inserted = db
+            .insert(owner.scope(), &event, owner.user_id(), &audit)
+            .await
+            .unwrap();
+        assert_eq!(inserted, Inserted::Inserted);
+        // A retry with the same ID and a new event with the same key add nothing.
+        let retry = db
+            .insert(owner.scope(), &event, owner.user_id(), &audit)
+            .await
+            .unwrap();
+        assert_eq!(retry, Inserted::IdTaken);
+        let same_key = Event {
+            id: EventId::from_uuid(Uuid::now_v7()),
+            ..event.clone()
+        };
+        let taken = db
+            .insert(owner.scope(), &same_key, owner.user_id(), &audit)
+            .await
+            .unwrap();
+        assert_eq!(taken, Inserted::KeyTaken);
+
+        let members: Vec<(Uuid, Uuid, String, i64)> =
+            sqlx::query_as("SELECT event_id, user_id, event_role, version FROM event_membership")
+                .fetch_all(&db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            members,
+            [(
+                event.id.as_uuid(),
+                owner.user_id().as_uuid(),
+                "event-manager".to_owned(),
+                1
+            )]
+        );
+        let actions: Vec<String> = sqlx::query_scalar("SELECT action FROM audit_event ORDER BY id")
+            .fetch_all(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(actions, ["event.create", "event_membership.add"]);
+    }
+
     #[tokio::test]
     async fn reports_a_taken_id_and_a_taken_key() {
         let test = TestDatabase::start().await;
         let organization = test.create_organization("testwil").await;
         let first = event(organization, "TEST30");
-        test.database
-            .insert(scope(organization), &first)
-            .await
-            .unwrap();
+        insert(&test, &owner(&test, organization).await, &first).await;
 
         let same_id = Event {
             key: EventKey::parse("OTHER").unwrap(),
             ..first.clone()
         };
         assert_eq!(
-            test.database
-                .insert(scope(organization), &same_id)
-                .await
-                .unwrap(),
+            insert(&test, &owner(&test, organization).await, &same_id).await,
             Inserted::IdTaken
         );
         let same_key = event(organization, "TEST30");
         assert_eq!(
-            test.database
-                .insert(scope(organization), &same_key)
-                .await
-                .unwrap(),
+            insert(&test, &owner(&test, organization).await, &same_key).await,
             Inserted::KeyTaken
         );
     }
@@ -233,11 +336,8 @@ mod tests {
         let musterhausen = test.create_organization("musterhausen").await;
         let theirs = event(testwil, "TEST30");
         let ours = event(musterhausen, "TEST30");
-        test.database.insert(scope(testwil), &theirs).await.unwrap();
-        test.database
-            .insert(scope(musterhausen), &ours)
-            .await
-            .unwrap();
+        insert(&test, &owner(&test, testwil).await, &theirs).await;
+        insert(&test, &owner(&test, musterhausen).await, &ours).await;
 
         let listed = test
             .database
@@ -259,10 +359,12 @@ mod tests {
         let test = TestDatabase::start().await;
         let organization = test.create_organization("testwil").await;
         for key in ["CC", "AA", "BB", "DD"] {
-            test.database
-                .insert(scope(organization), &event(organization, key))
-                .await
-                .unwrap();
+            insert(
+                &test,
+                &owner(&test, organization).await,
+                &event(organization, key),
+            )
+            .await;
         }
         let first = test
             .database
@@ -299,10 +401,7 @@ mod tests {
         let mut events = Vec::new();
         for key in ["CC", "AA", "BB"] {
             let event = event(organization, key);
-            test.database
-                .insert(scope(organization), &event)
-                .await
-                .unwrap();
+            insert(&test, &owner(&test, organization).await, &event).await;
             events.push(event);
         }
         for event in events.iter().filter(|event| event.key.as_str() != "AA") {

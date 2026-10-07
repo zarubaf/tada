@@ -149,7 +149,11 @@ async fn an_owner_adds_a_manager_who_adds_a_contributor_who_cannot_add_anyone() 
         .map(|member| member["event_role"].as_str().unwrap())
         .collect();
     roles.sort_unstable();
-    assert_eq!(roles, ["event-contributor", "event-manager"]);
+    // The owner is the event manager as the creator of the event.
+    assert_eq!(
+        roles,
+        ["event-contributor", "event-manager", "event-manager"]
+    );
 
     let (status, event_body) = api
         .get(&ben_cookie, &format!("/api/v1/events/{event}"))

@@ -5,11 +5,13 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use tada_domain::RecordVersion;
 use tada_domain::events::{Event, EventKey, EventKeyError, EventName, EventTimeZone};
+use tada_domain::identity::EventRole;
 use tada_domain::ids::{self, EventId, UserId};
 use tada_domain::name::NameError;
 use uuid::Uuid;
 
 use crate::access::{self, AccessError, Principal};
+use crate::audit::{AuditAction, AuditEvent, AuditRole};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::IdentityStore;
@@ -20,8 +22,16 @@ use crate::store::StoreError;
 /// The repository port for events. Each method stays inside `scope`.
 #[async_trait]
 pub trait EventStore: Debug + Send + Sync {
-    /// Inserts a new event. The store checks that its ID and its key are free.
-    async fn insert(&self, scope: OrgScope, event: &Event) -> Result<Inserted, StoreError>;
+    /// Inserts a new event with `manager` as its event manager, and records `audit` in order, all in
+    /// one transaction (ADR 0052). The store checks that the ID and the key are free; if one is
+    /// taken, it changes nothing.
+    async fn insert(
+        &self,
+        scope: OrgScope,
+        event: &Event,
+        manager: UserId,
+        audit: &[AuditEvent],
+    ) -> Result<Inserted, StoreError>;
 
     async fn get(&self, scope: OrgScope, id: EventId) -> Result<Option<Event>, StoreError>;
 
@@ -118,7 +128,8 @@ impl CommandError for CreateEventError {
 
 /// Creates an event in the caller's organization.
 ///
-/// Only owners and admins create events. They can act as event manager in each event (ADR 0052).
+/// Only owners and admins create events. They can act as event manager in each event, and the
+/// creator also becomes the event manager of the new event (ADR 0052).
 pub async fn create_event(
     caller: &MemberCaller,
     input: NewEvent,
@@ -131,7 +142,25 @@ pub async fn create_event(
     let scope = caller.scope();
     let event = validate(scope, input, clock)?;
 
-    match store.insert(scope, &event).await? {
+    let created = AuditEvent::new(
+        caller.actor(),
+        AuditAction::EventCreate,
+        Some(event.id.as_uuid()),
+        Some(scope),
+    );
+    let manager = AuditEvent::new(
+        caller.actor(),
+        AuditAction::EventMembershipAdd,
+        Some(event.id.as_uuid()),
+        Some(scope),
+    )
+    .about(caller.user_id())
+    .with_roles(None, Some(AuditRole::Event(EventRole::EventManager)));
+
+    match store
+        .insert(scope, &event, caller.user_id(), &[created, manager])
+        .await?
+    {
         Inserted::Inserted => Ok(Created::New(event)),
         Inserted::KeyTaken => Err(invalid("key", "taken")),
         Inserted::IdTaken => match store.get(scope, event.id).await? {
@@ -302,15 +331,26 @@ mod tests {
     use tada_domain::ids::OrganizationId;
 
     use super::*;
+    use crate::audit::RoleChange;
     use crate::caller::OrganizationRole;
 
-    /// The events and the event memberships (event, user).
+    /// The events, the event memberships (event, user) and the audit events of the inserts.
     #[derive(Debug, Default)]
-    struct MemoryStore(Mutex<Vec<Event>>, Mutex<Vec<(EventId, UserId)>>);
+    struct MemoryStore(
+        Mutex<Vec<Event>>,
+        Mutex<Vec<(EventId, UserId)>>,
+        Mutex<Vec<AuditEvent>>,
+    );
 
     #[async_trait]
     impl EventStore for MemoryStore {
-        async fn insert(&self, scope: OrgScope, event: &Event) -> Result<Inserted, StoreError> {
+        async fn insert(
+            &self,
+            scope: OrgScope,
+            event: &Event,
+            manager: UserId,
+            audit: &[AuditEvent],
+        ) -> Result<Inserted, StoreError> {
             assert_eq!(scope.organization_id(), event.organization_id);
             let mut events = self.0.lock().unwrap();
             if events.iter().any(|known| known.id == event.id) {
@@ -322,6 +362,8 @@ mod tests {
                 return Ok(Inserted::KeyTaken);
             }
             events.push(event.clone());
+            self.1.lock().unwrap().push((event.id, manager));
+            self.2.lock().unwrap().extend_from_slice(audit);
             Ok(Inserted::Inserted)
         }
 
@@ -414,6 +456,39 @@ mod tests {
         assert_eq!(event.version, RecordVersion::FIRST);
         assert_eq!(event.organization_id, owner().scope().organization_id());
         assert!(ids::is_record_id(event.id.as_uuid()));
+    }
+
+    #[tokio::test]
+    async fn the_creator_becomes_the_event_manager_with_an_audit_event_for_each() {
+        let store = MemoryStore::default();
+        let Created::New(event) = create_event(&owner(), new_event("TEST30"), &store, &FixedClock)
+            .await
+            .unwrap()
+        else {
+            panic!("not a new event");
+        };
+        let creator = owner().user_id();
+        assert_eq!(*store.1.lock().unwrap(), [(event.id, creator)]);
+        let audit = store.2.lock().unwrap();
+        let actions: Vec<_> = audit.iter().map(AuditEvent::action).collect();
+        assert_eq!(
+            actions,
+            [AuditAction::EventCreate, AuditAction::EventMembershipAdd]
+        );
+        assert!(
+            audit
+                .iter()
+                .all(|audit| audit.record_id() == Some(event.id.as_uuid()))
+        );
+        assert_eq!(audit[0].subject(), None);
+        assert_eq!(audit[1].subject(), Some(creator));
+        assert_eq!(
+            audit[1].roles(),
+            Some(RoleChange {
+                old: None,
+                new: Some(AuditRole::Event(EventRole::EventManager)),
+            })
+        );
     }
 
     #[tokio::test]
@@ -569,7 +644,12 @@ mod tests {
                 .await
                 .unwrap();
         }
-        let member = caller(100, OrganizationRole::Member);
+        // Another user than the owner, who is the event manager of each event as its creator.
+        let member = MemberCaller::new(
+            UserId::from_uuid(Uuid::from_u128(2)),
+            owner().scope().organization_id(),
+            OrganizationRole::Member,
+        );
         let page = list_events(&member, None, PageLimit::DEFAULT, &store)
             .await
             .unwrap();

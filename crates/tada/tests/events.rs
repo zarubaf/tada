@@ -11,7 +11,7 @@ use axum::body::Body;
 use axum::http::{Method, Request, Response, StatusCode, header};
 use serde_json::{Value, json};
 use tada_adapters::clock::SystemClock;
-use tada_store_pg::dev::DevAuthenticator;
+use tada_store_pg::dev::{DEV_USER_ID, DevAuthenticator};
 use tada_store_pg::testing::TestDatabase;
 use tower::ServiceExt;
 
@@ -78,6 +78,14 @@ async fn creates_an_event_and_lists_it() {
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(page["items"], json!([event]));
     assert!(page.get("next_cursor").is_none());
+
+    // The creator becomes the event manager of the new event (ADR 0052).
+    let (response, members) = api.get(&format!("/api/v1/events/{id}/memberships")).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let members = members["items"].as_array().unwrap();
+    assert_eq!(members.len(), 1);
+    assert_eq!(members[0]["user_id"], json!(DEV_USER_ID.as_uuid()));
+    assert_eq!(members[0]["event_role"], "event-manager");
 }
 
 #[tokio::test]
