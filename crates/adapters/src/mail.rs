@@ -126,9 +126,9 @@ impl Mailer for SmtpMailer {
 /// Maps an SMTP error to a send error.
 /// The reason has the status code only, because the server text can repeat the address.
 ///
-/// Only an answer of the server or a failed TLS handshake proves that the server did not take
-/// the message. Any other error can also happen after DATA, so its outcome is unknown, and the
-/// worker must not retry it blindly (ADR 0042).
+/// Only an answer of the server, a failed TLS handshake or a connection that never opened proves that
+/// the server did not take the message. Any other error can also happen after DATA, so its outcome
+/// is unknown, and the worker must not retry it blindly (ADR 0042).
 fn classify(error: &lettre::transport::smtp::Error) -> SendError {
     if let Some(code) = error.status() {
         let reason = format!("SMTP status {code}");
@@ -141,7 +141,19 @@ fn classify(error: &lettre::transport::smtp::Error) -> SendError {
     if error.is_tls() {
         return SendError::Temporary("the TLS connection failed".to_owned());
     }
+    if is_connection_failure(error) {
+        return SendError::Temporary("cannot connect to the mail server".to_owned());
+    }
     SendError::Unknown
+}
+
+/// True if the transport could not open the connection: a failed name lookup, a refused or timed out
+/// TCP connect, or a failed TLS setup. No SMTP command went out, so the server has no message.
+///
+/// `lettre` 0.11 has no public test for this kind of error, so this reads the start of its
+/// `Display` text. The test `a_refused_connection_is_temporary` fails if a new version changes it.
+fn is_connection_failure(error: &lettre::transport::smtp::Error) -> bool {
+    error.to_string().starts_with("Connection error")
 }
 
 /// Records the messages instead of sending them.
@@ -480,6 +492,19 @@ mod tests {
     #[tokio::test]
     async fn a_temporary_refusal_is_temporary() {
         let port = fake_server("421 try again later\r\n");
+        let mailer = SmtpMailer::new(config(port, Duration::from_secs(2))).unwrap();
+        let error = mailer.send(&message("<1@example.org>")).await.unwrap_err();
+        assert!(matches!(&error, SendError::Temporary(_)), "{error:?}");
+    }
+
+    #[tokio::test]
+    async fn a_refused_connection_is_temporary() {
+        let port = TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        // The listener is dropped, so the port is closed.
         let mailer = SmtpMailer::new(config(port, Duration::from_secs(2))).unwrap();
         let error = mailer.send(&message("<1@example.org>")).await.unwrap_err();
         assert!(matches!(&error, SendError::Temporary(_)), "{error:?}");
