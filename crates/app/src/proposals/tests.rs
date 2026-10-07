@@ -746,6 +746,36 @@ async fn a_request_that_loses_a_race_for_its_id_returns_the_winner_if_it_is_the_
 }
 
 #[tokio::test]
+async fn a_dependency_named_twice_is_rejected() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let (a, b) = (Uuid::now_v7(), Uuid::now_v7());
+    let input = changeset(
+        Some(open_day()),
+        vec![
+            proposal(
+                a,
+                visitors(core_field("visitor_estimate"), quantity("20000")),
+                &[],
+                "20000",
+            ),
+            proposal(
+                b,
+                visitors(core_field("duration_days"), quantity("2")),
+                &[a, a],
+                "Open Day",
+            ),
+        ],
+    );
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/1/depends_on".to_owned(), "duplicate")]
+    );
+    assert!(memory.inserted.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn a_dependency_outside_the_changeset_is_rejected() {
     let memory = Memory::default();
     let anna = contributor(&memory);

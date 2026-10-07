@@ -15,7 +15,7 @@ use tada_domain::facts::{
     ChoiceValue, FactState, FieldKey, FieldScope, FieldStatus, Label, ValueType,
 };
 use tada_domain::ids::{
-    self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId, UserId,
+    self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId,
 };
 use tada_domain::proposals::{DependencyError, Operation, Proposal, Reason, check_dependencies};
 use tada_domain::sources::{Passage, PassageError, SourceText};
@@ -427,6 +427,10 @@ fn check_structure(event_id: Option<EventId>, proposals: &[Proposal]) -> Result<
     for (index, proposal) in proposals.iter().enumerate() {
         let operation = &proposal.operation;
         let creates_event = matches!(operation, Operation::CreateEvent { .. });
+        let mut dependencies = HashSet::new();
+        if !proposal.depends_on.iter().all(|id| dependencies.insert(id)) {
+            errors.push(FieldError::new(path(index, "depends_on"), "duplicate"));
+        }
         // A changeset of an event works in that event only. A changeset of the organization works in its new events only.
         let in_scope = match event_id {
             Some(event) => !creates_event && operation.event_id() == event,
@@ -629,26 +633,13 @@ async fn check_catalog(
         }
     }
     for (index, event, owner) in owners {
-        if !is_event_member(scope, event, owner, stores.identity).await? {
+        // The owner of a work record is a member of its event (ADR 0052).
+        let access = access::member_access(scope, event, owner, stores.identity).await?;
+        if access.is_none() {
             errors.push(FieldError::new(path(index, "owner"), "unknown-member"));
         }
     }
     finish(errors)
-}
-
-/// True if `user` is a member of the event (ADR 0052): an owner or admin of the organization, who acts as event
-/// manager in each event, or a member with an event role. A new event has no event roles yet.
-async fn is_event_member(
-    scope: OrgScope,
-    event: EventId,
-    user: UserId,
-    identity: &dyn IdentityStore,
-) -> Result<bool, StoreError> {
-    Ok(match identity.membership(scope, user).await? {
-        None => false,
-        Some(role) if role.is_owner_or_admin() => true,
-        Some(_) => identity.event_role(scope, event, user).await?.is_some(),
-    })
 }
 
 /// The field of the event `event` that a proposal changes. Shipped fields change only with the catalog in code (ADR 0049).
