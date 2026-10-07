@@ -260,7 +260,7 @@ impl InviteMemberError {
     ];
 
     fn invalid(field: &'static str, code: &'static str) -> Self {
-        Self::Invalid(vec![FieldError { field, code }])
+        Self::Invalid(vec![FieldError::new(field, code)])
     }
 }
 
@@ -484,7 +484,7 @@ pub async fn invite_member(
 
 fn validate(input: NewInvitation, clock: &dyn Clock) -> Result<Invitation, InviteMemberError> {
     let mut errors = Vec::new();
-    let mut error = |field, code| errors.push(FieldError { field, code });
+    let mut error = |field, code| errors.push(FieldError::new(field, code));
     let id = match input.id {
         Some(id) if !ids::is_record_id(id) => {
             error("id", "not-uuid-v7");
@@ -892,7 +892,7 @@ mod tests {
         let fields: Vec<_> = error
             .field_errors()
             .iter()
-            .map(|e| (e.field, e.code))
+            .map(|e| (e.field.as_ref(), e.code))
             .collect();
         assert_eq!(
             fields,
@@ -912,10 +912,7 @@ mod tests {
         assert_eq!(error.code(), ProblemCode::ValidationFailed);
         assert_eq!(
             error.field_errors(),
-            [FieldError {
-                field: "email",
-                code: "already-member"
-            }]
+            [FieldError::new("email", "already-member")]
         );
     }
 
@@ -948,13 +945,7 @@ mod tests {
         let Err(error) = invite_member(&caller(Owner), other, &store, &FixedClock).await else {
             panic!("accepted");
         };
-        assert_eq!(
-            error.field_errors(),
-            [FieldError {
-                field: "id",
-                code: "taken"
-            }]
-        );
+        assert_eq!(error.field_errors(), [FieldError::new("id", "taken")]);
     }
 
     #[tokio::test]
