@@ -13,7 +13,7 @@ use crate::audit::AuditEvent;
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::IdentityStore;
-use crate::problem::{FieldError, ProblemCode};
+use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
 
 /// The record kind of the audit events: a membership change is a change of the event.
@@ -104,12 +104,21 @@ impl ListEventMembersError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for ListEventMembersError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
             Self::Forbidden => ProblemCode::Forbidden,
             Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
         }
     }
 }
@@ -135,13 +144,29 @@ impl AddEventMemberError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for AddEventMemberError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
             Self::Forbidden => ProblemCode::Forbidden,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
             Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
+        }
+    }
+
+    fn field_errors(&self) -> &[FieldError] {
+        match self {
+            Self::Invalid(errors) => errors,
+            _ => &[],
         }
     }
 }
@@ -169,13 +194,22 @@ impl ChangeEventMemberError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for ChangeEventMemberError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
             Self::Forbidden => ProblemCode::Forbidden,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
             Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
         }
     }
 }

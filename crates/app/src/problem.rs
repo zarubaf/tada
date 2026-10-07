@@ -1,5 +1,9 @@
 //! Problem codes (ADR 0037). The `app` crate owns them, so that the API and the Telegram gateway use the same codes.
 
+use jiff::SignedDuration;
+
+use crate::store::StoreError;
+
 /// A stable problem code. A code never changes its meaning; a code that is no longer used stays reserved.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ProblemCode {
@@ -84,4 +88,26 @@ impl ProblemCode {
 pub struct FieldError {
     pub field: &'static str,
     pub code: &'static str,
+}
+
+/// An error of a command or query (ADR 0037).
+/// The API builds its problem response from these methods only.
+pub trait CommandError {
+    /// The problem code. It is one of the `CODES` of the error enum.
+    fn code(&self) -> ProblemCode;
+
+    /// The store failure, if this is one. The API logs it.
+    fn store_error(&self) -> Option<&StoreError> {
+        None
+    }
+
+    /// The invalid fields of a `validation-failed` error.
+    fn field_errors(&self) -> &[FieldError] {
+        &[]
+    }
+
+    /// The wait before the next try of a `rate-limited` error.
+    fn retry_after(&self) -> Option<SignedDuration> {
+        None
+    }
 }

@@ -4,8 +4,7 @@ use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use jiff::SignedDuration;
 use serde::Serialize;
-use tada_app::problem::{FieldError, ProblemCode};
-use tada_app::store::StoreError;
+use tada_app::problem::{CommandError, ProblemCode};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -83,41 +82,39 @@ impl ApiError {
         }
     }
 
-    /// A `rate-limited` problem. `Retry-After` has the wait in whole seconds, rounded up.
-    pub fn rate_limited(retry_after: SignedDuration) -> Self {
-        let seconds = retry_after.as_secs() + i64::from(retry_after.subsec_nanos() > 0);
-        Self {
-            retry_after: Some(seconds.max(1)),
-            ..Self::new(ProblemCode::RateLimited)
-        }
-    }
-
     pub fn with_detail(mut self, detail: &'static str) -> Self {
         self.detail = Some(detail);
         self
     }
+}
 
-    /// A `validation-failed` problem. Each field of the command input is a member of the request body.
-    pub fn invalid(errors: Vec<FieldError>) -> Self {
+/// Each error of a command or query becomes a problem with the code of the error (ADR 0037).
+/// A store failure goes to the log with its cause; the response does not show the cause.
+impl<E: CommandError> From<E> for ApiError {
+    fn from(error: E) -> Self {
+        if let Some(store_error) = error.store_error() {
+            tracing::error!(error = %error_chain(store_error), "the store failed");
+        }
         Self {
-            code: ProblemCode::ValidationFailed,
+            code: error.code(),
             detail: None,
-            errors: errors
-                .into_iter()
+            errors: error
+                .field_errors()
+                .iter()
                 .map(|error| ProblemError {
                     pointer: format!("/{}", error.field),
                     code: error.code.to_owned(),
                 })
                 .collect(),
-            retry_after: None,
+            retry_after: error.retry_after().map(retry_after_seconds),
         }
     }
+}
 
-    /// A store failure. The log gets the cause; the response does not.
-    pub fn store(error: &StoreError) -> Self {
-        tracing::error!(error = %error_chain(error), "the store failed");
-        Self::new(error.code())
-    }
+/// The wait in whole seconds for `Retry-After`, rounded up, and at least one second.
+fn retry_after_seconds(wait: SignedDuration) -> i64 {
+    let seconds = wait.as_secs() + i64::from(wait.subsec_nanos() > 0);
+    seconds.max(1)
 }
 
 /// The error and all its sources in one line, for logs.

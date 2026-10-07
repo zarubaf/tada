@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use crate::problem::ProblemCode;
+use crate::problem::{CommandError, ProblemCode};
 
 /// A repository call failed for a reason that is not a domain rule.
 #[derive(Debug, thiserror::Error)]
@@ -18,13 +18,18 @@ pub enum StoreError {
 impl StoreError {
     /// All codes of a store failure, for the API contract (ADR 0037).
     pub const CODES: &[ProblemCode] = &[ProblemCode::Unavailable, ProblemCode::Internal];
+}
 
-    /// The problem code of the failure (ADR 0037).
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for StoreError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::Unavailable(_) => ProblemCode::Unavailable,
             Self::Internal(_) => ProblemCode::Internal,
         }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        Some(self)
     }
 }
 

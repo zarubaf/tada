@@ -58,9 +58,8 @@ async fn create_link_code(
     State(state): State<ApiState>,
     Caller(caller): Caller,
 ) -> Result<Response, ApiError> {
-    let code = app::create_link_code(&caller, state.telegram.as_ref(), state.clock.as_ref())
-        .await
-        .map_err(|error| ApiError::store(&error))?;
+    let code =
+        app::create_link_code(&caller, state.telegram.as_ref(), state.clock.as_ref()).await?;
     let body = TelegramLinkCode {
         code: code.code,
         expires_at: code.expires_at,
@@ -114,9 +113,8 @@ async fn list_link_requests(
     State(state): State<ApiState>,
     Caller(caller): Caller,
 ) -> Result<axum::Json<TelegramLinkRequestPage>, ApiError> {
-    let requests = app::list_link_requests(&caller, state.telegram.as_ref(), state.clock.as_ref())
-        .await
-        .map_err(|error| ApiError::store(&error))?;
+    let requests =
+        app::list_link_requests(&caller, state.telegram.as_ref(), state.clock.as_ref()).await?;
     Ok(axum::Json(TelegramLinkRequestPage {
         items: requests
             .into_iter()
@@ -148,19 +146,14 @@ async fn confirm_link(
     Caller(caller): Caller,
     Path(request_id): Path<Uuid>,
 ) -> Result<axum::Json<TelegramLink>, ApiError> {
-    match app::confirm_link(
+    let account = app::confirm_link(
         &caller,
         request_id,
         state.telegram.as_ref(),
         state.clock.as_ref(),
     )
-    .await
-    {
-        Ok(account) => Ok(axum::Json(TelegramLink {
-            telegram_user_id: account.0,
-        })),
-        Err(LinkError::NotFound) => Err(ApiError::new(ProblemCode::NotFound)),
-        Err(LinkError::AlreadyLinked) => Err(ApiError::new(ProblemCode::InvalidTransition)),
-        Err(LinkError::Store(error)) => Err(ApiError::store(&error)),
-    }
+    .await?;
+    Ok(axum::Json(TelegramLink {
+        telegram_user_id: account.0,
+    }))
 }

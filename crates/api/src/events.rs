@@ -118,12 +118,9 @@ async fn create_event(
         name: request.name,
         time_zone: request.time_zone,
     };
-    match app::create_event(&caller, input, state.events.as_ref(), state.clock.as_ref()).await {
-        Ok(Created::New(event)) => Ok((StatusCode::CREATED, axum::Json(event.into()))),
-        Ok(Created::Existing(event)) => Ok((StatusCode::OK, axum::Json(event.into()))),
-        Err(CreateEventError::Invalid(errors)) => Err(ApiError::invalid(errors)),
-        Err(CreateEventError::Forbidden) => Err(ApiError::new(ProblemCode::Forbidden)),
-        Err(CreateEventError::Store(error)) => Err(ApiError::store(&error)),
+    match app::create_event(&caller, input, state.events.as_ref(), state.clock.as_ref()).await? {
+        Created::New(event) => Ok((StatusCode::CREATED, axum::Json(event.into()))),
+        Created::Existing(event) => Ok((StatusCode::OK, axum::Json(event.into()))),
     }
 }
 
@@ -171,11 +168,7 @@ async fn list_events(
         })?,
     };
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
-    let page = app::list_events(&caller, after, limit, state.events.as_ref())
-        .await
-        .map_err(|error| match error {
-            ListEventsError::Store(error) => ApiError::store(&error),
-        })?;
+    let page = app::list_events(&caller, after, limit, state.events.as_ref()).await?;
     Ok(axum::Json(EventPage {
         items: page.items.into_iter().map(Event::from).collect(),
         next_cursor: page.next.as_ref().map(encode_cursor),
@@ -205,11 +198,7 @@ async fn get_event(
         state.events.as_ref(),
         state.identity.as_ref(),
     )
-    .await
-    .map_err(|error| match error {
-        AccessError::NotFound => ApiError::new(ProblemCode::NotFound),
-        AccessError::Store(error) => ApiError::store(&error),
-    })?;
+    .await?;
     Ok(axum::Json(event.into()))
 }
 

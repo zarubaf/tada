@@ -173,21 +173,15 @@ async fn request_sign_in(
     ClientIp(client_ip): ClientIp,
     Json(body): Json<SignInRequest>,
 ) -> Result<StatusCode, ApiError> {
-    match app::request_magic_link(
+    app::request_magic_link(
         &body.email,
         client_ip,
         request_id(),
         state.sign_in_requests.as_ref(),
         state.clock.as_ref(),
     )
-    .await
-    {
-        Ok(()) => Ok(StatusCode::ACCEPTED),
-        Err(RequestSignInError::RateLimited { retry_after }) => {
-            Err(ApiError::rate_limited(retry_after))
-        }
-        Err(RequestSignInError::Store(error)) => Err(ApiError::store(&error)),
-    }
+    .await?;
+    Ok(StatusCode::ACCEPTED)
 }
 
 /// The input of a sign-in with a magic link.
@@ -244,13 +238,7 @@ async fn new_session(
     state: &ApiState,
     result: Result<SecretString, SignInError>,
 ) -> Result<Response, ApiError> {
-    let token = match result {
-        Ok(token) => token,
-        Err(SignInError::Unauthenticated) => {
-            return Err(ApiError::new(ProblemCode::Unauthenticated));
-        }
-        Err(SignInError::Store(error)) => return Err(ApiError::store(&error)),
-    };
+    let token = result?;
     let info = read_session(state, token.expose_secret()).await?;
     let mut response = uncached(info);
     response
@@ -269,18 +257,14 @@ fn uncached(body: impl Serialize) -> Response {
 }
 
 async fn read_session(state: &ApiState, token: &str) -> Result<SessionInfo, ApiError> {
-    match session::session_info(
+    let info = session::session_info(
         token,
         state.sessions.as_ref(),
         state.identity.as_ref(),
         state.clock.as_ref(),
     )
-    .await
-    {
-        Ok(info) => Ok(info.into()),
-        Err(SessionError::Unauthenticated) => Err(ApiError::new(ProblemCode::Unauthenticated)),
-        Err(SessionError::Store(error)) => Err(ApiError::store(&error)),
-    }
+    .await?;
+    Ok(info.into())
 }
 
 /// Reads the session of the request. A session without an organization also gets its information.
@@ -324,22 +308,14 @@ async fn choose_organization(
     token: SessionToken,
     Json(body): Json<ChooseOrganizationRequest>,
 ) -> Result<Response, ApiError> {
-    match session::choose_organization(
+    session::choose_organization(
         token.as_str(),
         OrganizationId::from_uuid(body.organization_id),
         state.sessions.as_ref(),
         state.identity.as_ref(),
         state.clock.as_ref(),
     )
-    .await
-    {
-        Ok(()) => {}
-        Err(ChooseOrganizationError::Unauthenticated) => {
-            return Err(ApiError::new(ProblemCode::Unauthenticated));
-        }
-        Err(ChooseOrganizationError::NotFound) => return Err(ApiError::new(ProblemCode::NotFound)),
-        Err(ChooseOrganizationError::Store(error)) => return Err(ApiError::store(&error)),
-    }
+    .await?;
     Ok(uncached(read_session(&state, token.as_str()).await?))
 }
 
@@ -359,9 +335,7 @@ async fn sign_out(
     token: Option<SessionToken>,
 ) -> Result<Response, ApiError> {
     if let Some(token) = token {
-        session::sign_out(token.as_str(), state.sessions.as_ref())
-            .await
-            .map_err(|error| ApiError::store(&error))?;
+        session::sign_out(token.as_str(), state.sessions.as_ref()).await?;
     }
     let mut response = StatusCode::NO_CONTENT.into_response();
     response
@@ -419,11 +393,9 @@ async fn preview_invitation(
     State(state): State<ApiState>,
     Json(body): Json<InvitationTokenRequest>,
 ) -> Result<Response, ApiError> {
-    match app::preview_invitation(&body.token, state.sign_in.as_ref(), state.clock.as_ref()).await {
-        Ok(preview) => Ok(uncached(InvitationPreview::from(preview))),
-        Err(SignInError::Unauthenticated) => Err(ApiError::new(ProblemCode::Unauthenticated)),
-        Err(SignInError::Store(error)) => Err(ApiError::store(&error)),
-    }
+    let preview =
+        app::preview_invitation(&body.token, state.sign_in.as_ref(), state.clock.as_ref()).await?;
+    Ok(uncached(InvitationPreview::from(preview)))
 }
 
 /// Accepts an invitation. The token works once. The response sets the cookie of a new session

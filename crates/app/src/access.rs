@@ -5,7 +5,7 @@ use tada_domain::ids::{EventId, UserId};
 
 use crate::caller::OrgScope;
 use crate::identity::IdentityStore;
-use crate::problem::ProblemCode;
+use crate::problem::{CommandError, ProblemCode};
 use crate::store::StoreError;
 
 /// A caller that acts for a member: the member itself, or an AI client of the member.
@@ -76,11 +76,20 @@ impl AccessError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for AccessError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
             Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
         }
     }
 }

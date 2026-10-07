@@ -16,7 +16,7 @@ use crate::auth::{AuthenticationError, Authenticator, Credential};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::{IdentityStore, Membership};
-use crate::problem::ProblemCode;
+use crate::problem::{CommandError, ProblemCode};
 use crate::store::StoreError;
 
 /// A session that nobody used for this time ends (ADR 0008).
@@ -123,11 +123,20 @@ impl SessionError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for SessionError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::Unauthenticated => ProblemCode::Unauthenticated,
             Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
         }
     }
 }
@@ -181,12 +190,21 @@ impl ChooseOrganizationError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for ChooseOrganizationError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::Unauthenticated => ProblemCode::Unauthenticated,
             Self::NotFound => ProblemCode::NotFound,
             Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
         }
     }
 }

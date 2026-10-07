@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 
 use crate::caller::MemberCaller;
+use crate::problem::{CommandError, ProblemCode};
 use crate::store::StoreError;
 
 /// The secret that a request shows to prove who sends it.
@@ -44,6 +45,33 @@ pub enum AuthenticationError {
     OrganizationRequired,
     #[error(transparent)]
     Store(#[from] StoreError),
+}
+
+impl AuthenticationError {
+    /// All codes of a failed authentication, for the API contract (ADR 0037).
+    pub const CODES: &[ProblemCode] = &[
+        ProblemCode::Unauthenticated,
+        ProblemCode::OrganizationRequired,
+        ProblemCode::Unavailable,
+        ProblemCode::Internal,
+    ];
+}
+
+impl CommandError for AuthenticationError {
+    fn code(&self) -> ProblemCode {
+        match self {
+            Self::Unauthenticated => ProblemCode::Unauthenticated,
+            Self::OrganizationRequired => ProblemCode::OrganizationRequired,
+            Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

@@ -14,7 +14,7 @@ use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
-use crate::problem::{FieldError, ProblemCode};
+use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
 
 /// The repository port for events. Each method stays inside `scope`.
@@ -90,12 +90,28 @@ impl CreateEventError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for CreateEventError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::Forbidden => ProblemCode::Forbidden,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
             Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
+        }
+    }
+
+    fn field_errors(&self) -> &[FieldError] {
+        match self {
+            Self::Invalid(errors) => errors,
+            _ => &[],
         }
     }
 }
@@ -215,11 +231,18 @@ pub enum ListEventsError {
 impl ListEventsError {
     /// All codes that this query can return, for the API contract (ADR 0037).
     pub const CODES: &[ProblemCode] = &[ProblemCode::Unavailable, ProblemCode::Internal];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for ListEventsError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::Store(error) => error.code(),
         }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        let Self::Store(error) = self;
+        Some(error)
     }
 }
 

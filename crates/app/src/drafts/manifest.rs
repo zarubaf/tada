@@ -8,7 +8,7 @@ use tada_domain::RecordVersion;
 use uuid::Uuid;
 
 use super::{TADA_SCHEME, normalize_line_endings, parser, scheme};
-use crate::problem::ProblemCode;
+use crate::problem::{CommandError, ProblemCode};
 
 /// The fact versions and source passages that a draft cites, in the order of their first link.
 /// Each target is in the list once.
@@ -67,10 +67,6 @@ impl DraftError {
     /// All codes that this error can give, for the API contract (ADR 0037).
     pub const CODES: &[ProblemCode] = &[ProblemCode::ValidationFailed];
 
-    pub fn code(&self) -> ProblemCode {
-        ProblemCode::ValidationFailed
-    }
-
     /// The code of the entry in the `errors` list of the problem.
     pub fn entry_code(&self) -> &'static str {
         match self {
@@ -79,6 +75,12 @@ impl DraftError {
             Self::SchemeNotAllowed => "scheme-not-allowed",
             Self::ImageNotAllowed => "image-not-allowed",
         }
+    }
+}
+
+impl CommandError for DraftError {
+    fn code(&self) -> ProblemCode {
+        ProblemCode::ValidationFailed
     }
 }
 

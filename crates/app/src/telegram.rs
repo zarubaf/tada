@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use crate::caller::{MemberCaller, OrgScope, ServiceCaller, TelegramGateway};
 use crate::clock::Clock;
-use crate::problem::ProblemCode;
+use crate::problem::{CommandError, ProblemCode};
 use crate::store::StoreError;
 
 /// A link code expires after 10 minutes (ADR 0011).
@@ -134,13 +134,21 @@ impl LinkError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for LinkError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
             Self::AlreadyLinked => ProblemCode::InvalidTransition,
-            Self::Store(StoreError::Unavailable(_)) => ProblemCode::Unavailable,
-            Self::Store(StoreError::Internal(_)) => ProblemCode::Internal,
+            Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
         }
     }
 }

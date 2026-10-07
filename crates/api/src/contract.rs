@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use tada_app::auth::AuthenticationError;
 use tada_app::problem::ProblemCode;
 use utoipa::openapi::extensions::Extensions;
 use utoipa::openapi::{Info, License, OpenApi};
@@ -12,12 +13,7 @@ use crate::problem;
 pub const PROBLEM_CODES_EXTENSION: &str = "x-tada-problem-codes";
 
 /// The codes of each operation that needs a member caller.
-pub(crate) const AUTHENTICATED: &[ProblemCode] = &[
-    ProblemCode::Unauthenticated,
-    ProblemCode::OrganizationRequired,
-    ProblemCode::Unavailable,
-    ProblemCode::Internal,
-];
+pub(crate) const AUTHENTICATED: &[ProblemCode] = AuthenticationError::CODES;
 /// The codes of each operation with a JSON body.
 pub(crate) const JSON_BODY: &[ProblemCode] = &[
     ProblemCode::MalformedRequest,

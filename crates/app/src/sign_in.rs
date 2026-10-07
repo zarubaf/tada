@@ -18,7 +18,7 @@ use tada_domain::ids::OrganizationId;
 use uuid::Uuid;
 
 use crate::clock::Clock;
-use crate::problem::ProblemCode;
+use crate::problem::{CommandError, ProblemCode};
 use crate::rate_limit::{RateDecision, RateLimit, sign_in_limits};
 use crate::store::StoreError;
 
@@ -117,11 +117,27 @@ impl RequestSignInError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for RequestSignInError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::RateLimited { .. } => ProblemCode::RateLimited,
             Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
+        }
+    }
+
+    fn retry_after(&self) -> Option<SignedDuration> {
+        match self {
+            Self::RateLimited { retry_after } => Some(*retry_after),
+            Self::Store(_) => None,
         }
     }
 }
@@ -168,11 +184,20 @@ impl SignInError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for SignInError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::Unauthenticated => ProblemCode::Unauthenticated,
             Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
         }
     }
 }

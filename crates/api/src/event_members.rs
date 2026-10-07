@@ -150,13 +150,6 @@ fn record_version(value: i64) -> Result<RecordVersion, ApiError> {
     })
 }
 
-fn change_error(error: ChangeEventMemberError) -> ApiError {
-    match error {
-        ChangeEventMemberError::Store(error) => ApiError::store(&error),
-        error => ApiError::new(error.code()),
-    }
-}
-
 /// Lists the event memberships of an event. Only its event managers see them.
 #[utoipa::path(
     get,
@@ -180,11 +173,7 @@ async fn list_event_memberships(
         state.identity.as_ref(),
         state.event_members.as_ref(),
     )
-    .await
-    .map_err(|error| match error {
-        ListEventMembersError::Store(error) => ApiError::store(&error),
-        error => ApiError::new(error.code()),
-    })?;
+    .await?;
     Ok(axum::Json(EventMembershipPage {
         items: members.into_iter().map(EventMembership::from).collect(),
     }))
@@ -218,12 +207,7 @@ async fn add_event_membership(
         state.event_members.as_ref(),
         state.clock.as_ref(),
     )
-    .await
-    .map_err(|error| match error {
-        AddEventMemberError::Invalid(errors) => ApiError::invalid(errors),
-        AddEventMemberError::Store(error) => ApiError::store(&error),
-        error => ApiError::new(error.code()),
-    })?;
+    .await?;
     Ok((StatusCode::CREATED, axum::Json(member.into())))
 }
 
@@ -258,8 +242,7 @@ async fn change_event_role(
         state.identity.as_ref(),
         state.event_members.as_ref(),
     )
-    .await
-    .map_err(change_error)?;
+    .await?;
     Ok(axum::Json(member.into()))
 }
 
@@ -293,7 +276,6 @@ async fn remove_event_membership(
         state.identity.as_ref(),
         state.event_members.as_ref(),
     )
-    .await
-    .map_err(change_error)?;
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }
