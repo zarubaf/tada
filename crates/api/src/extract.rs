@@ -6,11 +6,12 @@ use axum::http::header;
 use axum::http::request::Parts;
 use serde::de::DeserializeOwned;
 use tada_app::auth::AuthenticationError;
-use tada_app::caller::MemberCaller;
+use tada_app::caller::{Channel, MemberCaller};
 use tada_app::problem::ProblemCode;
 
 use crate::ApiState;
 use crate::problem::ApiError;
+use crate::request_id;
 
 /// The session cookie (ADR 0008).
 const SESSION_COOKIE: &str = "__Host-tada-session";
@@ -75,13 +76,18 @@ impl FromRequestParts<ApiState> for Caller {
     async fn from_request_parts(parts: &mut Parts, state: &ApiState) -> Result<Self, ApiError> {
         let token = session_token(parts);
         match state.authenticator.authenticate(token).await {
-            Ok(caller) => Ok(Self(caller)),
+            Ok(caller) => Ok(Self(caller.with_request(Channel::Web, request_id()))),
             Err(AuthenticationError::Unauthenticated) => {
                 Err(ApiError::new(ProblemCode::Unauthenticated))
             }
             Err(AuthenticationError::Store(error)) => Err(ApiError::store(&error)),
         }
     }
+}
+
+/// The ID of the current request. Outside a request it is the nil UUID, which is no ID.
+fn request_id() -> Option<uuid::Uuid> {
+    Some(request_id::current()).filter(|id| !id.is_nil())
 }
 
 fn session_token(parts: &Parts) -> Option<&str> {

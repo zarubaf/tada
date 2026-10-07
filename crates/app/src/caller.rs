@@ -3,6 +3,7 @@
 use std::marker::PhantomData;
 
 use tada_domain::ids::{OrganizationId, UserId};
+use uuid::Uuid;
 
 /// The organization role of a member (glossary).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,12 +13,80 @@ pub enum OrganizationRole {
     Member,
 }
 
+/// The way a request reached tada (ADR 0039).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Channel {
+    Web,
+    Telegram,
+    Job,
+    ApiToken,
+    Cli,
+}
+
+impl Channel {
+    /// The name that audit records and the database use.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Web => "web",
+            Self::Telegram => "telegram",
+            Self::Job => "job",
+            Self::ApiToken => "api-token",
+            Self::Cli => "cli",
+        }
+    }
+}
+
+/// The kind of party that acts (ADR 0039).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActorKind {
+    Member,
+    Service,
+    Ai,
+}
+
+/// Who did something, for which member and through which channel (ADR 0039).
+/// A caller gives its actor, so a record author or an audit event cannot name someone else.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Actor {
+    kind: ActorKind,
+    id: Uuid,
+    principal: Option<Uuid>,
+    channel: Channel,
+    request_id: Option<Uuid>,
+}
+
+impl Actor {
+    pub fn kind(&self) -> ActorKind {
+        self.kind
+    }
+
+    /// The user ID of a member or an AI client, or the fixed ID of a service identity.
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+
+    /// The member for whom the actor acts, if the actor is not that member.
+    pub fn principal(&self) -> Option<Uuid> {
+        self.principal
+    }
+
+    pub fn channel(&self) -> Channel {
+        self.channel
+    }
+
+    pub fn request_id(&self) -> Option<Uuid> {
+        self.request_id
+    }
+}
+
 /// A signed-in member. Only an `Authenticator` creates it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemberCaller {
     user_id: UserId,
     organization_id: OrganizationId,
     role: OrganizationRole,
+    channel: Channel,
+    request_id: Option<Uuid>,
 }
 
 impl MemberCaller {
@@ -27,6 +96,32 @@ impl MemberCaller {
             user_id,
             organization_id,
             role,
+            channel: Channel::Web,
+            request_id: None,
+        }
+    }
+
+    /// Names the channel and the request of this caller, for the actor of audit records.
+    #[must_use]
+    pub fn with_request(self, channel: Channel, request_id: Option<Uuid>) -> Self {
+        Self {
+            channel,
+            request_id,
+            ..self
+        }
+    }
+
+    pub fn channel(&self) -> Channel {
+        self.channel
+    }
+
+    pub fn actor(&self) -> Actor {
+        Actor {
+            kind: ActorKind::Member,
+            id: self.user_id.as_uuid(),
+            principal: None,
+            channel: self.channel,
+            request_id: self.request_id,
         }
     }
 
@@ -68,12 +163,88 @@ impl<S> ServiceCaller<S> {
     }
 }
 
+impl<S: ServiceIdentity> ServiceCaller<S> {
+    pub fn actor(&self) -> Actor {
+        Actor {
+            kind: ActorKind::Service,
+            id: S::ID,
+            principal: None,
+            channel: Channel::Job,
+            request_id: None,
+        }
+    }
+}
+
 impl<S> Default for ServiceCaller<S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
+/// The name and the fixed ID of a service identity.
+pub trait ServiceIdentity {
+    const NAME: &'static str;
+    const ID: Uuid;
+}
+
 /// The service identity `telegram-gateway`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TelegramGateway;
+
+impl ServiceIdentity for TelegramGateway {
+    const NAME: &'static str = "telegram-gateway";
+    const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0001);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn member() -> MemberCaller {
+        MemberCaller::new(
+            UserId::from_uuid(Uuid::from_u128(1)),
+            OrganizationId::from_uuid(Uuid::from_u128(2)),
+            OrganizationRole::Member,
+        )
+    }
+
+    #[test]
+    fn a_member_actor_names_the_member_the_channel_and_the_request() {
+        let request = Uuid::from_u128(3);
+        let actor = member()
+            .with_request(Channel::Telegram, Some(request))
+            .actor();
+        assert_eq!(actor.kind(), ActorKind::Member);
+        assert_eq!(actor.id(), Uuid::from_u128(1));
+        assert_eq!(actor.principal(), None);
+        assert_eq!(actor.channel(), Channel::Telegram);
+        assert_eq!(actor.request_id(), Some(request));
+    }
+
+    #[test]
+    fn a_new_member_caller_uses_the_web_channel() {
+        assert_eq!(member().channel(), Channel::Web);
+        assert_eq!(member().actor().request_id(), None);
+    }
+
+    #[test]
+    fn a_service_actor_has_the_fixed_id_of_its_identity() {
+        let actor = ServiceCaller::<TelegramGateway>::new().actor();
+        assert_eq!(actor.kind(), ActorKind::Service);
+        assert_eq!(actor.id(), TelegramGateway::ID);
+        assert_eq!(TelegramGateway::NAME, "telegram-gateway");
+    }
+
+    #[test]
+    fn channels_have_stable_names() {
+        let names = [
+            Channel::Web,
+            Channel::Telegram,
+            Channel::Job,
+            Channel::ApiToken,
+            Channel::Cli,
+        ]
+        .map(Channel::as_str);
+        assert_eq!(names, ["web", "telegram", "job", "api-token", "cli"]);
+    }
+}
