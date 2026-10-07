@@ -129,3 +129,23 @@ problem-not-found = Das gibt es nicht, oder Sie dürfen es nicht sehen.
 problem-validation-failed = Die Eingabe ist ungültig.
 problem-record-version-conflict = Jemand hat diesen Eintrag inzwischen geändert. Laden Sie die Seite neu.
 problem-invalid-transition = Ein Anlass braucht mindestens eine Anlassleitung. Geben Sie zuerst jemand anderem diese Rolle.
+
+## Event memberships
+
+event-members-title = Mitglieder des Anlasses
+event-members-column-name = Name
+event-members-column-role = Rolle
+event-members-column-actions = Aktionen
+event-members-loading = Mitglieder werden geladen
+# $name: the display name of the member.
+event-members-role-of = Rolle von { $name }
+event-members-remove = Entfernen
+event-members-remove-of = { $name } entfernen
+event-members-add-title = Rolle vergeben
+event-members-add-member = Mitglied
+event-members-add-placeholder = Mitglied wählen
+event-members-add-submit = Mitglied hinzufügen
+event-members-add-none = Alle Mitglieder der Organisation haben schon eine Rolle in diesem Anlass.
+role-event-manager = Anlassleitung
+role-event-contributor = Mitarbeit
+role-event-viewer = Lesezugriff

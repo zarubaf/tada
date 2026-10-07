@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { type Api, createApi } from "./api/client";
 import { CreateEventForm } from "./events/CreateEventForm";
+import { EventMembersPage } from "./events/EventMembersPage";
 import { EventPage } from "./events/EventPage";
 import { EventsPage } from "./events/EventsPage";
 import { t } from "./i18n";
@@ -64,6 +65,11 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 <Route path="/events/:eventId">
                   <EventPage api={api}>
                     <p>{t("event-overview-placeholder")}</p>
+                  </EventPage>
+                </Route>
+                <Route path="/events/:eventId/members">
+                  <EventPage api={api}>
+                    <EventMembersPage api={api} />
                   </EventPage>
                 </Route>
                 <Route path="*">

@@ -68,7 +68,34 @@ describe("EventPage", () => {
       "aria-current",
       "page",
     );
+    expect(within(nav).getByRole("link", { name: "Mitglieder" })).not.toHaveAttribute(
+      "aria-current",
+    );
     expect(within(nav).queryByRole("link", { name: "Personen" })).not.toBeInTheDocument();
+  });
+
+  it("marks only Mitglieder as current on the members path", async () => {
+    const { api } = fakeApi(json(200, event));
+    renderAt(`/events/${event.id}/members`, api);
+
+    await screen.findByText("Mitgliederliste");
+    const nav = screen.getByRole("navigation", { name: "Anlass" });
+    expect(within(nav).getByRole("link", { name: "Mitglieder" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("opens the members page from the sub-navigation", async () => {
+    const { api } = fakeApi(json(200, event));
+    renderAt(`/events/${event.id}`, api);
+
+    await userEvent.click(await screen.findByRole("link", { name: "Mitglieder" }));
+    expect(window.location.pathname).toBe(`/events/${event.id}/members`);
+    expect(await screen.findByText("Mitgliederliste")).toBeInTheDocument();
   });
 
   it("shows the message of a not-found problem and retries", async () => {
