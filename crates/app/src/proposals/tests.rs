@@ -24,12 +24,27 @@ fn anna() -> UserId {
     UserId::from_uuid(Uuid::from_u128(1))
 }
 
+/// Bruno: a member of the organization without an event role.
+fn bruno() -> UserId {
+    UserId::from_uuid(Uuid::from_u128(2))
+}
+
+/// Carla: an owner of the organization.
+fn carla() -> UserId {
+    UserId::from_uuid(Uuid::from_u128(3))
+}
+
 /// One event of one organization with the shipped catalog. It records each insert.
+/// Anna has the event role `role`.
 #[derive(Debug, Default)]
 struct Memory {
     role: Mutex<Option<EventRole>>,
     taken: Mutex<Vec<Uuid>>,
     inserted: Mutex<Vec<(Changeset, SourceText, AuditEvent)>>,
+    /// The stored changesets, also the ones of a concurrent request.
+    stored: Mutex<Vec<(Changeset, SourceText)>>,
+    /// The next insert loses a race: a concurrent request stores this changeset first.
+    race: Mutex<Option<Changeset>>,
 }
 
 #[async_trait]
@@ -51,8 +66,16 @@ impl IdentityStore for Memory {
         scope: OrgScope,
         user: UserId,
     ) -> Result<Option<OrganizationRole>, StoreError> {
-        Ok((scope.organization_id() == testwil() && user == anna())
-            .then_some(OrganizationRole::Member))
+        if scope.organization_id() != testwil() {
+            return Ok(None);
+        }
+        Ok(if user == anna() || user == bruno() {
+            Some(OrganizationRole::Member)
+        } else if user == carla() {
+            Some(OrganizationRole::Owner)
+        } else {
+            None
+        })
     }
 
     async fn event_exists(&self, scope: OrgScope, event: EventId) -> Result<bool, StoreError> {
@@ -63,9 +86,9 @@ impl IdentityStore for Memory {
         &self,
         scope: OrgScope,
         event: EventId,
-        _: UserId,
+        user: UserId,
     ) -> Result<Option<EventRole>, StoreError> {
-        let found = self.event_exists(scope, event).await?;
+        let found = self.event_exists(scope, event).await? && user == anna();
         Ok(found.then(|| *self.role.lock().unwrap()).flatten())
     }
 }
@@ -109,11 +132,43 @@ impl ProposalStore for Memory {
         audit: &AuditEvent,
     ) -> Result<Inserted, StoreError> {
         assert_eq!(scope.organization_id(), testwil());
+        if let Some(winner) = self.race.lock().unwrap().take() {
+            self.stored.lock().unwrap().push((winner, source.clone()));
+            return Ok(Inserted::IdTaken);
+        }
         self.inserted
             .lock()
             .unwrap()
             .push((changeset.clone(), source.clone(), audit.clone()));
+        self.stored
+            .lock()
+            .unwrap()
+            .push((changeset.clone(), source.clone()));
         Ok(Inserted::Inserted)
+    }
+
+    async fn get(
+        &self,
+        scope: OrgScope,
+        id: ChangesetId,
+    ) -> Result<Option<(Changeset, SourceText)>, StoreError> {
+        assert_eq!(scope.organization_id(), testwil());
+        let stored = self.stored.lock().unwrap();
+        Ok(stored
+            .iter()
+            .find(|(changeset, _)| changeset.id == id)
+            .map(|(changeset, source)| {
+                let mut changeset = changeset.clone();
+                changeset.proposals.sort_by_key(|proposal| proposal.id);
+                (changeset, source.clone())
+            }))
+    }
+}
+
+/// The changeset of a successful create, new or existing.
+fn changeset_of(created: Created) -> Changeset {
+    match created {
+        Created::New(changeset) | Created::Existing(changeset) => changeset,
     }
 }
 
@@ -205,7 +260,7 @@ fn one_fact() -> NewChangeset {
     )
 }
 
-fn invalid_fields(result: Result<Changeset, ProposeError>) -> Vec<(String, &'static str)> {
+fn invalid_fields(result: Result<Created, ProposeError>) -> Vec<(String, &'static str)> {
     let Err(ProposeError::Invalid(errors)) = result else {
         panic!("not invalid: {result:?}");
     };
@@ -222,6 +277,7 @@ async fn a_contributor_creates_a_changeset_with_its_source_and_an_audit_event() 
     let changeset = create_changeset(&anna, one_fact(), stores(&memory), &FixedClock)
         .await
         .unwrap();
+    let changeset = changeset_of(changeset);
 
     let inserted = memory.inserted.lock().unwrap();
     let (stored, source, audit) = &inserted[0];
@@ -365,6 +421,7 @@ async fn a_fact_on_a_new_field_of_the_changeset_has_the_value_type_of_the_new_fi
     let changeset = create_changeset(&anna, right, stores(&memory), &FixedClock)
         .await
         .unwrap();
+    let changeset = changeset_of(changeset);
     assert_eq!(
         changeset.proposals[1].depends_on,
         [ProposalId::from_uuid(define)]
@@ -485,6 +542,7 @@ async fn only_owners_and_admins_propose_a_new_event() {
     let changeset = create_changeset(&admin, input(), stores(&memory), &FixedClock)
         .await
         .unwrap();
+    let changeset = changeset_of(changeset);
     assert_eq!(changeset.event_id, None);
     assert_eq!(changeset.proposals.len(), 2);
 }
@@ -513,7 +571,7 @@ async fn a_changeset_of_an_event_works_in_that_event_only() {
 }
 
 #[tokio::test]
-async fn an_open_question_needs_an_owner_of_the_organization() {
+async fn an_open_question_needs_an_owner_who_is_a_member_of_the_event() {
     let memory = Memory::default();
     let anna = contributor(&memory);
     let question = |owner: UserId| {
@@ -533,22 +591,19 @@ async fn an_open_question_needs_an_owner_of_the_organization() {
             )],
         )
     };
-    let stranger = UserId::from_uuid(Uuid::from_u128(99));
-    let result = create_changeset(&anna, question(stranger), stores(&memory), &FixedClock).await;
-    assert_eq!(
-        invalid_fields(result),
-        [("proposals/0/operation/owner".to_owned(), "unknown-member")]
-    );
-    assert!(
-        create_changeset(
-            &anna,
-            question(anna.user_id()),
-            stores(&memory),
-            &FixedClock
-        )
-        .await
-        .is_ok()
-    );
+    // A stranger, and a member of the organization without an event role (ADR 0052).
+    for owner in [UserId::from_uuid(Uuid::from_u128(99)), bruno()] {
+        let result = create_changeset(&anna, question(owner), stores(&memory), &FixedClock).await;
+        assert_eq!(
+            invalid_fields(result),
+            [("proposals/0/operation/owner".to_owned(), "unknown-member")]
+        );
+    }
+    // A member with an event role, and an owner, who acts as event manager in each event.
+    for owner in [anna.user_id(), carla()] {
+        let result = create_changeset(&anna, question(owner), stores(&memory), &FixedClock).await;
+        assert!(result.is_ok(), "{result:?}");
+    }
 }
 
 #[tokio::test]
@@ -564,7 +619,7 @@ async fn a_choice_of_the_changeset_counts_and_a_shipped_field_does_not_change() 
             proposal(define, new_field(field, value_type.take()), &[], "Open Day"),
             proposal(
                 choice,
-                json!({"kind": "add_choice_value", "field_id": field, "key": "asphalt", "label": "Asphalt"}),
+                json!({"kind": "add_choice_value", "event_id": open_day().as_uuid(), "field_id": field, "key": "asphalt", "label": "Asphalt"}),
                 &[define],
                 "Open Day",
             ),
@@ -576,7 +631,7 @@ async fn a_choice_of_the_changeset_counts_and_a_shipped_field_does_not_change() 
             ),
             proposal(
                 Uuid::now_v7(),
-                json!({"kind": "deprecate_field", "field_id": core_field("audience")}),
+                json!({"kind": "deprecate_field", "event_id": open_day().as_uuid(), "field_id": core_field("audience")}),
                 &[],
                 "Open Day",
             ),
@@ -614,5 +669,161 @@ fn each_error_gives_a_code_of_its_list() {
         ProposeError::Store(StoreError::Unavailable("test".into())),
     ] {
         assert!(ProposeError::CODES.contains(&error.code()), "{error:?}");
+    }
+}
+
+/// `one_fact` with a changeset ID, as a client that retries sends it.
+fn with_id(id: Uuid) -> NewChangeset {
+    NewChangeset {
+        id: Some(id),
+        ..one_fact()
+    }
+}
+
+#[tokio::test]
+async fn a_retry_with_the_same_content_returns_the_stored_changeset() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let input = with_id(Uuid::now_v7());
+    let Created::New(first) = create_changeset(&anna, input.clone(), stores(&memory), &FixedClock)
+        .await
+        .unwrap()
+    else {
+        panic!("not new");
+    };
+    // The retry comes through another request.
+    let retry_caller = anna
+        .clone()
+        .with_request(crate::caller::Channel::Web, Some(Uuid::now_v7()));
+    let retry = create_changeset(&retry_caller, input.clone(), stores(&memory), &FixedClock)
+        .await
+        .unwrap();
+    let mut expected = first;
+    expected.proposals.sort_by_key(|proposal| proposal.id);
+    assert_eq!(retry, Created::Existing(expected));
+    assert_eq!(
+        memory.inserted.lock().unwrap().len(),
+        1,
+        "one insert, one audit event"
+    );
+
+    let mut changed = input;
+    changed.proposals[0].reason = "Another reason.".to_owned();
+    let result = create_changeset(&anna, changed, stores(&memory), &FixedClock).await;
+    assert_eq!(invalid_fields(result), [("id".to_owned(), "taken")]);
+}
+
+#[tokio::test]
+async fn a_request_that_loses_a_race_for_its_id_returns_the_winner_if_it_is_the_same() {
+    let input = with_id(Uuid::now_v7());
+    // The concurrent winner: the same intake, stored by the other request.
+    let other = Memory::default();
+    let winner = changeset_of(
+        create_changeset(
+            &contributor(&other),
+            input.clone(),
+            stores(&other),
+            &FixedClock,
+        )
+        .await
+        .unwrap(),
+    );
+
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    *memory.race.lock().unwrap() = Some(winner.clone());
+    let result = create_changeset(&anna, input.clone(), stores(&memory), &FixedClock).await;
+    assert_eq!(result.unwrap(), Created::Existing(winner.clone()));
+    assert!(memory.inserted.lock().unwrap().is_empty());
+
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let mut different = winner;
+    different.proposals[0].reason = Reason::parse("Another reason.").unwrap();
+    *memory.race.lock().unwrap() = Some(different);
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(invalid_fields(result), [("id".to_owned(), "taken")]);
+}
+
+#[tokio::test]
+async fn a_dependency_outside_the_changeset_is_rejected() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let mut input = one_fact();
+    input.proposals[0].depends_on = vec![Uuid::now_v7()];
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/0/depends_on".to_owned(), "outside-changeset")]
+    );
+}
+
+#[tokio::test]
+async fn an_organization_changeset_works_only_in_its_new_events() {
+    let memory = Memory::default();
+    let admin = caller(OrganizationRole::Admin);
+    let (event, create, field, define) = (
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+    );
+    let mut add_field = new_field(field, json!({"type": "boolean"}));
+    add_field["event_id"] = json!(event);
+    // The event of the fact is the ID of the new field, not of a new event.
+    let mut set_fact = visitors(core_field("visitor_estimate"), quantity("20000"));
+    set_fact["event_id"] = json!(field);
+    let input = changeset(
+        None,
+        vec![
+            proposal(create, new_event(event), &[], "Open Day"),
+            proposal(define, add_field, &[create], "Besuchern"),
+            proposal(Uuid::now_v7(), set_fact, &[define], "20000"),
+        ],
+    );
+    let result = create_changeset(&admin, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/2/operation".to_owned(), "event-mismatch")]
+    );
+}
+
+#[tokio::test]
+async fn a_fact_of_a_new_event_expects_no_version() {
+    let memory = Memory::default();
+    let admin = caller(OrganizationRole::Admin);
+    let (event, create) = (Uuid::now_v7(), Uuid::now_v7());
+    let mut set_fact = visitors(core_field("visitor_estimate"), quantity("20000"));
+    set_fact["event_id"] = json!(event);
+    set_fact["expected_version"] = json!(1);
+    let input = changeset(
+        None,
+        vec![
+            proposal(create, new_event(event), &[], "Open Day"),
+            proposal(Uuid::now_v7(), set_fact, &[create], "20000"),
+        ],
+    );
+    let result = create_changeset(&admin, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [(
+            "proposals/1/operation/expected_version".to_owned(),
+            "invalid"
+        )]
+    );
+}
+
+#[tokio::test]
+async fn a_passage_of_a_member_text_has_no_page() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    for page in [1, u32::MAX] {
+        let mut input = one_fact();
+        input.proposals[0].evidence[0].page = Some(page);
+        let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+        assert_eq!(
+            invalid_fields(result),
+            [("proposals/0/evidence/0".to_owned(), "page")]
+        );
     }
 }

@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.proposal_id, e.start_offset, e.end_offset, e.quote, e.page\n             FROM proposal_evidence e\n             JOIN proposal p ON p.organization_id = e.organization_id AND p.id = e.proposal_id\n             WHERE e.organization_id = $1 AND p.changeset_id = $2\n             ORDER BY e.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "proposal_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "proposal_evidence",
+            "name": "proposal_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "start_offset",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "proposal_evidence",
+            "name": "start_offset"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "end_offset",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "proposal_evidence",
+            "name": "end_offset"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "quote",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "proposal_evidence",
+            "name": "quote"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "page",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "proposal_evidence",
+            "name": "page"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "7a81013c771e6db5f37bea8863497374d5d5d9189ee6b05a9b0cff277653f105"
+}

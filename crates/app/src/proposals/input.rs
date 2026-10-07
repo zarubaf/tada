@@ -115,6 +115,8 @@ pub enum OperationInput {
     },
     /// Add a choice to a choice field of the event.
     AddChoiceValue {
+        event_id: Uuid,
+        /// A field of the event, or a new field of the same changeset.
         field_id: Uuid,
         /// The `snake_case` key of the choice.
         key: String,
@@ -122,7 +124,7 @@ pub enum OperationInput {
         label: String,
     },
     /// Close a field of the event for new facts.
-    DeprecateField { field_id: Uuid },
+    DeprecateField { event_id: Uuid, field_id: Uuid },
     /// Create an open question with its owner.
     CreateOpenQuestion {
         /// The UUIDv7 of the new open question.
@@ -430,6 +432,7 @@ impl TryFrom<OperationInput> for Operation {
                 })()
             }
             OperationInput::AddChoiceValue {
+                event_id,
                 field_id,
                 key,
                 label,
@@ -438,15 +441,19 @@ impl TryFrom<OperationInput> for Operation {
                 let label = errors.take("label", ShortText::parse(&label), value_error_code);
                 (|| {
                     Some(Operation::AddChoiceValue {
+                        event_id: EventId::from_uuid(event_id),
                         field_id: FieldDefinitionId::from_uuid(field_id),
                         key: key?,
                         label: label?,
                     })
                 })()
             }
-            OperationInput::DeprecateField { field_id } => Some(Operation::DeprecateField {
-                field_id: FieldDefinitionId::from_uuid(field_id),
-            }),
+            OperationInput::DeprecateField { event_id, field_id } => {
+                Some(Operation::DeprecateField {
+                    event_id: EventId::from_uuid(event_id),
+                    field_id: FieldDefinitionId::from_uuid(field_id),
+                })
+            }
             OperationInput::CreateOpenQuestion {
                 id,
                 event_id,
@@ -772,7 +779,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_input_fields() {
-        let input = serde_json::json!({"kind": "deprecate_field", "field_id": Uuid::from_u128(1), "force": true});
+        let input = serde_json::json!({"kind": "deprecate_field", "event_id": Uuid::from_u128(2), "field_id": Uuid::from_u128(1), "force": true});
         assert!(serde_json::from_value::<OperationInput>(input).is_err());
     }
 

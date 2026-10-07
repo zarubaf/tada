@@ -31,13 +31,6 @@ pub(crate) fn to_json(actor: &Actor) -> serde_json::Value {
     serde_json::to_value(record).expect("an actor record is valid JSON")
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the review of proposals reads the authors of records"
-    )
-)]
 pub(crate) fn from_json(value: &serde_json::Value) -> Result<Actor, StoreError> {
     let invalid = || InvalidRow("actor");
     let record = ActorRecord::deserialize(value).map_err(|_| invalid())?;

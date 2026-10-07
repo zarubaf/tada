@@ -15,7 +15,7 @@ use tada_domain::facts::{
     ChoiceValue, FactState, FieldKey, FieldScope, FieldStatus, Label, ValueType,
 };
 use tada_domain::ids::{
-    self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId,
+    self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId, UserId,
 };
 use tada_domain::proposals::{DependencyError, Operation, Proposal, Reason, check_dependencies};
 use tada_domain::sources::{Passage, PassageError, SourceText};
@@ -86,6 +86,22 @@ pub trait ProposalStore: Debug + Send + Sync {
         source: &SourceText,
         audit: &AuditEvent,
     ) -> Result<Inserted, StoreError>;
+
+    /// The changeset `id` of the organization with the normalized text of its source version, or `None`.
+    /// Its proposals are in the order of their IDs.
+    async fn get(
+        &self,
+        scope: OrgScope,
+        id: ChangesetId,
+    ) -> Result<Option<(Changeset, SourceText)>, StoreError>;
+}
+
+/// The result of a successful `create_changeset`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Created {
+    New(Changeset),
+    /// A retry (ADR 0038): the changeset with this ID and the same content exists, and nothing changed.
+    Existing(Changeset),
 }
 
 /// The ports that `create_changeset` reads and writes.
@@ -166,18 +182,29 @@ impl CommandError for ProposeError {
 ///
 /// It stores the source text as a source version, the changeset and an audit event in one transaction.
 /// If a check fails, it stores nothing.
+/// A retry with the ID of a stored changeset and the same content returns the stored changeset (ADR 0038).
 pub async fn create_changeset(
     caller: &impl MayPropose,
     input: NewChangeset,
     stores: ProposeStores<'_>,
     clock: &dyn Clock,
-) -> Result<Changeset, ProposeError> {
+) -> Result<Created, ProposeError> {
     let scope = caller.scope();
     let event_id = input.event_id.map(EventId::from_uuid);
     authorize(caller, event_id, stores.identity).await?;
 
     let source = SourceText::normalize(&input.source_text);
+    let retry = input.id.is_some();
     let (id, proposals) = parse(input, &source)?;
+    let intake = Intake {
+        event_id,
+        author: caller.actor(),
+        source: &source,
+        proposals: &proposals,
+    };
+    if retry && let Some(stored) = stores.proposals.get(scope, id).await? {
+        return intake.existing(stored);
+    }
     check_structure(event_id, &proposals)?;
     check_catalog(scope, event_id, &proposals, stores).await?;
     check_free_ids(id, &proposals, stores.proposals).await?;
@@ -188,7 +215,7 @@ pub async fn create_changeset(
         author: caller.actor(),
         source_version_id: SourceVersionId::from_uuid(Uuid::now_v7()),
         created_at: clock.now(),
-        proposals,
+        proposals: proposals.clone(),
     };
     let audit = AuditEvent::new(
         caller.actor(),
@@ -201,8 +228,49 @@ pub async fn create_changeset(
         .insert(scope, &changeset, &source, &audit)
         .await?
     {
-        Inserted::Inserted => Ok(changeset),
-        Inserted::IdTaken => Err(invalid("id", "taken")),
+        Inserted::Inserted => Ok(Created::New(changeset)),
+        // A concurrent request stored a changeset with one of the IDs first.
+        Inserted::IdTaken => match stores.proposals.get(scope, id).await? {
+            Some(stored) => intake.existing(stored),
+            None => Err(invalid("id", "taken")),
+        },
+    }
+}
+
+/// The content of a new changeset, to compare it with a stored changeset of the same ID.
+struct Intake<'a> {
+    event_id: Option<EventId>,
+    author: Actor,
+    source: &'a SourceText,
+    proposals: &'a [Proposal],
+}
+
+impl Intake<'_> {
+    /// The stored changeset if it has the same content, else `id` `taken`.
+    /// The same author is the same party for the same principal; the channel and the request can differ on a retry.
+    fn existing(&self, (stored, source): (Changeset, SourceText)) -> Result<Created, ProposeError> {
+        let author = |actor: &Actor| (actor.kind(), actor.id(), actor.principal());
+        let mut proposals = self.proposals.to_vec();
+        proposals.sort_by_key(|proposal| proposal.id);
+        let normalized = |mut proposal: Proposal| {
+            proposal.depends_on.sort();
+            proposal
+        };
+        let same = stored.event_id == self.event_id
+            && author(&stored.author) == author(&self.author)
+            && &source == self.source
+            && stored.proposals.len() == proposals.len()
+            && stored
+                .proposals
+                .iter()
+                .cloned()
+                .map(normalized)
+                .eq(proposals.into_iter().map(normalized));
+        if same {
+            Ok(Created::Existing(stored))
+        } else {
+            Err(invalid("id", "taken"))
+        }
     }
 }
 
@@ -276,7 +344,12 @@ fn parse(
                 quote: passage.quote,
                 page: passage.page,
             };
-            match passage.check(source.as_str()) {
+            // The source of a changeset is a member text, which has no pages (ADR 0050).
+            let checked = match passage.page {
+                Some(_) => Err(PassageError::Page),
+                None => passage.check(source.as_str()),
+            };
+            match checked {
                 Ok(()) => evidence.push(passage),
                 Err(error) => errors.push(FieldError::new(
                     path(&format!("evidence/{number}")),
@@ -344,26 +417,27 @@ fn check_structure(event_id: Option<EventId>, proposals: &[Proposal]) -> Result<
         }
     }
 
+    let new_events: HashSet<EventId> = proposals
+        .iter()
+        .filter_map(|proposal| match proposal.operation {
+            Operation::CreateEvent { id, .. } => Some(id),
+            _ => None,
+        })
+        .collect();
     for (index, proposal) in proposals.iter().enumerate() {
         let operation = &proposal.operation;
+        let creates_event = matches!(operation, Operation::CreateEvent { .. });
         // A changeset of an event works in that event only. A changeset of the organization works in its new events only.
-        let in_scope = match (event_id, operation) {
-            (Some(_), Operation::CreateEvent { .. }) => false,
-            (None, Operation::CreateEvent { .. }) => true,
-            (Some(event), _) => operation.event_id().is_none_or(|own| own == event),
-            (None, _) => operation
-                .event_id()
-                .is_none_or(|own| creators.contains_key(&own.as_uuid())),
+        let in_scope = match event_id {
+            Some(event) => !creates_event && operation.event_id() == event,
+            None => new_events.contains(&operation.event_id()),
         };
         if !in_scope {
             errors.push(FieldError::new(path(index, "operation"), "event-mismatch"));
         }
         // A proposal that uses a new record of the changeset depends on the proposal that creates it.
         let uses = [
-            operation
-                .event_id()
-                .filter(|_| !matches!(operation, Operation::CreateEvent { .. }))
-                .map(EventId::as_uuid),
+            (!creates_event).then(|| operation.event_id().as_uuid()),
             operation
                 .field_id()
                 .filter(|_| !matches!(operation, Operation::AddFieldDefinition { .. }))
@@ -409,7 +483,7 @@ struct CatalogField {
 }
 
 /// Checks each operation against the field catalog, with the new fields and choices of the changeset,
-/// and checks that the owner of each new open question is a member of the organization.
+/// and checks that the owner of each new open question is a member of its event.
 async fn check_catalog(
     scope: OrgScope,
     event_id: Option<EventId>,
@@ -448,6 +522,7 @@ async fn check_catalog(
 
     // The owners of new open questions, checked after the loop.
     let mut owners = Vec::new();
+    let mut new_fields = HashSet::new();
     // The new fields first, then their new choices, then the facts that use them.
     for (index, proposal) in proposals.iter().enumerate() {
         if let Operation::AddFieldDefinition {
@@ -466,6 +541,7 @@ async fn check_catalog(
             if taken {
                 errors.push(FieldError::new(path(index, "key"), "taken"));
             }
+            new_fields.insert(*id);
             fields.insert(
                 *id,
                 CatalogField {
@@ -480,10 +556,11 @@ async fn check_catalog(
     for (index, proposal) in proposals.iter().enumerate() {
         match &proposal.operation {
             Operation::AddChoiceValue {
+                event_id,
                 field_id,
                 key,
                 label,
-            } => match event_field(&mut fields, *field_id) {
+            } => match event_field(&mut fields, *event_id, *field_id) {
                 Err(code) => errors.push(FieldError::new(path(index, "field_id"), code)),
                 Ok(CatalogField {
                     value_type: ValueType::Choice { values, .. },
@@ -499,8 +576,8 @@ async fn check_catalog(
                 }
                 Ok(_) => errors.push(FieldError::new(path(index, "field_id"), "not-choice")),
             },
-            Operation::DeprecateField { field_id } => {
-                if let Err(code) = event_field(&mut fields, *field_id) {
+            Operation::DeprecateField { event_id, field_id } => {
+                if let Err(code) = event_field(&mut fields, *event_id, *field_id) {
                     errors.push(FieldError::new(path(index, "field_id"), code));
                 }
             }
@@ -510,11 +587,17 @@ async fn check_catalog(
     for (index, proposal) in proposals.iter().enumerate() {
         match &proposal.operation {
             Operation::SetFact {
-                event_id,
+                event_id: fact_event,
                 field_id,
                 state,
-                ..
+                expected_version,
             } => {
+                // A new event or a new field has no fact yet, so a proposal cannot expect a version of it.
+                let new_fact = event_id.is_none() || new_fields.contains(field_id);
+                if new_fact && expected_version.is_some() {
+                    errors.push(FieldError::new(path(index, "expected_version"), "invalid"));
+                }
+                let event_id = fact_event;
                 let field = fields.get(field_id).filter(|field| {
                     field.scope == FieldScope::Shipped
                         || field.scope == FieldScope::Event(*event_id)
@@ -539,27 +622,45 @@ async fn check_catalog(
                     ));
                 }
             }
-            Operation::CreateOpenQuestion { owner, .. } => owners.push((index, *owner)),
+            Operation::CreateOpenQuestion {
+                event_id, owner, ..
+            } => owners.push((index, *event_id, *owner)),
             _ => {}
         }
     }
-    for (index, owner) in owners {
-        if stores.identity.membership(scope, owner).await?.is_none() {
+    for (index, event, owner) in owners {
+        if !is_event_member(scope, event, owner, stores.identity).await? {
             errors.push(FieldError::new(path(index, "owner"), "unknown-member"));
         }
     }
     finish(errors)
 }
 
-/// The field of an event that a proposal changes. Shipped fields change only with the catalog in code (ADR 0049).
+/// True if `user` is a member of the event (ADR 0052): an owner or admin of the organization, who acts as event
+/// manager in each event, or a member with an event role. A new event has no event roles yet.
+async fn is_event_member(
+    scope: OrgScope,
+    event: EventId,
+    user: UserId,
+    identity: &dyn IdentityStore,
+) -> Result<bool, StoreError> {
+    Ok(match identity.membership(scope, user).await? {
+        None => false,
+        Some(role) if role.is_owner_or_admin() => true,
+        Some(_) => identity.event_role(scope, event, user).await?.is_some(),
+    })
+}
+
+/// The field of the event `event` that a proposal changes. Shipped fields change only with the catalog in code (ADR 0049).
 fn event_field(
     fields: &mut HashMap<FieldDefinitionId, CatalogField>,
+    event: EventId,
     id: FieldDefinitionId,
 ) -> Result<&mut CatalogField, &'static str> {
     match fields.get_mut(&id) {
-        None => Err("unknown-field"),
         Some(field) if field.scope == FieldScope::Shipped => Err("shipped-field"),
-        Some(field) => Ok(field),
+        Some(field) if field.scope == FieldScope::Event(event) => Ok(field),
+        _ => Err("unknown-field"),
     }
 }
 

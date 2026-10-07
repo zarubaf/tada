@@ -23,10 +23,13 @@ CREATE INDEX changeset_event ON changeset (organization_id, event_id, created_at
 -- `target_kind` and `target_id` name the record that the operation creates or changes.
 -- A fact has no ID before its first version, so the target of a fact is its field, in the event of the operation.
 -- `expected_version` is the version of the target that the operation expects; NULL means that the target does not exist yet.
+-- `event_id` is the event that the operation works in; for a new event, it is that event.
+-- It has no foreign key, because the event of a proposal in an organization changeset exists only after its `CreateEvent` applies, or never.
 CREATE TABLE proposal (
     id uuid PRIMARY KEY,
     organization_id uuid NOT NULL,
     changeset_id uuid NOT NULL,
+    event_id uuid NOT NULL,
     operation jsonb NOT NULL,
     operation_version int NOT NULL CHECK (operation_version >= 1),
     target_kind text NOT NULL CHECK (target_kind IN ('event', 'fact', 'field_definition', 'open_question')),
@@ -39,7 +42,7 @@ CREATE TABLE proposal (
     FOREIGN KEY (organization_id, changeset_id) REFERENCES changeset (organization_id, id)
 );
 
-CREATE INDEX proposal_target ON proposal (organization_id, target_kind, target_id);
+CREATE INDEX proposal_target ON proposal (organization_id, event_id, target_kind, target_id);
 
 -- A dependency between two proposals of the same changeset.
 CREATE TABLE proposal_dependency (
@@ -73,8 +76,8 @@ CREATE TABLE proposal_evidence (
 
 CREATE INDEX proposal_evidence_proposal ON proposal_evidence (organization_id, proposal_id);
 
--- The proposals, their dependencies and their evidence never change (ADR 0050).
--- The application never updates or deletes them; this trigger is the second line of defense.
+-- Changesets, proposals, their dependencies and their evidence never change, and review results are append-only (ADR 0050).
+-- The application never updates or deletes them; these triggers are the second line of defense.
 CREATE FUNCTION reject_proposal_change() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -83,6 +86,12 @@ BEGIN
 END;
 $$;
 
+CREATE TRIGGER changeset_immutable
+    BEFORE UPDATE OR DELETE ON changeset
+    FOR EACH ROW EXECUTE FUNCTION reject_proposal_change();
+CREATE TRIGGER changeset_no_truncate
+    BEFORE TRUNCATE ON changeset
+    FOR EACH STATEMENT EXECUTE FUNCTION reject_proposal_change();
 CREATE TRIGGER proposal_immutable
     BEFORE UPDATE OR DELETE ON proposal
     FOR EACH ROW EXECUTE FUNCTION reject_proposal_change();
@@ -120,6 +129,13 @@ CREATE TABLE review_result (
 );
 
 CREATE INDEX review_result_proposal ON review_result (organization_id, proposal_id, created_at);
+
+CREATE TRIGGER review_result_immutable
+    BEFORE UPDATE OR DELETE ON review_result
+    FOR EACH ROW EXECUTE FUNCTION reject_proposal_change();
+CREATE TRIGGER review_result_no_truncate
+    BEFORE TRUNCATE ON review_result
+    FOR EACH STATEMENT EXECUTE FUNCTION reject_proposal_change();
 
 -- The next event-local number of each kind of record in each scope, for example `QST` in an event (ADR 0038).
 CREATE TABLE local_id_counter (

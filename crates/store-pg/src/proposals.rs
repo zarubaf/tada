@@ -15,10 +15,10 @@ use tada_app::domain::RecordVersion;
 use tada_app::domain::events::{EventKey, EventName, EventTimeZone};
 use tada_app::domain::facts::{ChoiceKey, Description, FieldKey, ModuleKey, ShortText};
 use tada_app::domain::ids::{
-    ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, UserId,
+    ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, SourceVersionId, UserId,
 };
-use tada_app::domain::proposals::{Operation, QuestionText};
-use tada_app::domain::sources::SourceText;
+use tada_app::domain::proposals::{Operation, Proposal, QuestionText, Reason};
+use tada_app::domain::sources::{Passage, SourceText};
 use tada_app::facts::{OpenProposalRef, OpenQuestionRef};
 use tada_app::proposals::{Changeset, Inserted, ProposalStore};
 use tada_app::store::StoreError;
@@ -59,11 +59,13 @@ enum OperationRecord {
         module: String,
     },
     AddChoiceValue {
+        event_id: Uuid,
         field_id: Uuid,
         key: String,
         label: String,
     },
     DeprecateField {
+        event_id: Uuid,
         field_id: Uuid,
     },
     CreateOpenQuestion {
@@ -121,15 +123,18 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             module: module.as_str().to_owned(),
         },
         Operation::AddChoiceValue {
+            event_id,
             field_id,
             key,
             label,
         } => OperationRecord::AddChoiceValue {
+            event_id: event_id.as_uuid(),
             field_id: field_id.as_uuid(),
             key: key.as_str().to_owned(),
             label: label.as_str().to_owned(),
         },
-        Operation::DeprecateField { field_id } => OperationRecord::DeprecateField {
+        Operation::DeprecateField { event_id, field_id } => OperationRecord::DeprecateField {
+            event_id: event_id.as_uuid(),
             field_id: field_id.as_uuid(),
         },
         Operation::CreateOpenQuestion {
@@ -202,15 +207,18 @@ pub(crate) fn operation_from_json(
             module: ModuleKey::parse(&module).map_err(|_| invalid())?,
         },
         OperationRecord::AddChoiceValue {
+            event_id,
             field_id,
             key,
             label,
         } => Operation::AddChoiceValue {
+            event_id: EventId::from_uuid(event_id),
             field_id: FieldDefinitionId::from_uuid(field_id),
             key: ChoiceKey::parse(&key).map_err(|_| invalid())?,
             label: ShortText::parse(&label).map_err(|_| invalid())?,
         },
-        OperationRecord::DeprecateField { field_id } => Operation::DeprecateField {
+        OperationRecord::DeprecateField { event_id, field_id } => Operation::DeprecateField {
+            event_id: EventId::from_uuid(event_id),
             field_id: FieldDefinitionId::from_uuid(field_id),
         },
         OperationRecord::CreateOpenQuestion {
@@ -242,7 +250,7 @@ fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>) {
             expected_version.map(RecordVersion::get),
         ),
         Operation::AddFieldDefinition { id, .. } => ("field_definition", id.as_uuid(), None),
-        Operation::AddChoiceValue { field_id, .. } | Operation::DeprecateField { field_id } => {
+        Operation::AddChoiceValue { field_id, .. } | Operation::DeprecateField { field_id, .. } => {
             ("field_definition", field_id.as_uuid(), None)
         }
         Operation::CreateOpenQuestion { id, .. } => ("open_question", id.as_uuid(), None),
@@ -252,8 +260,8 @@ fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>) {
 #[async_trait]
 impl ProposalStore for Database {
     async fn taken_ids(&self, ids: &[Uuid]) -> Result<Vec<Uuid>, StoreError> {
-        // A named infrastructure query (ADR 0039): IDs are unique in the whole installation (ADR 0038),
-        // so the check reads each organization. It returns the taken IDs only.
+        // A cross-organization uniqueness check (ADR 0038): IDs are unique in the whole installation.
+        // It returns only the given IDs that exist, and never an organization.
         sqlx::query_scalar!(
             r#"SELECT id AS "id!" FROM changeset WHERE id = ANY($1)
                UNION SELECT id FROM proposal WHERE id = ANY($1)
@@ -299,6 +307,101 @@ impl ProposalStore for Database {
         tx.commit().await.map_err(store_error)?;
         Ok(Inserted::Inserted)
     }
+
+    async fn get(
+        &self,
+        scope: OrgScope,
+        id: ChangesetId,
+    ) -> Result<Option<(Changeset, SourceText)>, StoreError> {
+        let organization = scope.organization_id().as_uuid();
+        let Some(changeset) = sqlx::query!(
+            r#"SELECT c.event_id, c.author, c.source_version_id,
+                      c.created_at AS "created_at: jiff_sqlx::Timestamp", v.text AS "text!"
+               FROM changeset c
+               JOIN source_version v ON v.organization_id = c.organization_id AND v.id = c.source_version_id
+               WHERE c.organization_id = $1 AND c.id = $2"#,
+            organization,
+            id.as_uuid(),
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?
+        else {
+            return Ok(None);
+        };
+        let rows = sqlx::query!(
+            "SELECT id, operation, operation_version, reason
+             FROM proposal
+             WHERE organization_id = $1 AND changeset_id = $2
+             ORDER BY id",
+            organization,
+            id.as_uuid(),
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        let dependencies = sqlx::query!(
+            "SELECT proposal_id, depends_on
+             FROM proposal_dependency
+             WHERE organization_id = $1 AND changeset_id = $2
+             ORDER BY proposal_id, depends_on",
+            organization,
+            id.as_uuid(),
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        // The evidence IDs are UUIDv7 in the order of the insert, so this keeps the order of the passages.
+        let evidence = sqlx::query!(
+            "SELECT e.proposal_id, e.start_offset, e.end_offset, e.quote, e.page
+             FROM proposal_evidence e
+             JOIN proposal p ON p.organization_id = e.organization_id AND p.id = e.proposal_id
+             WHERE e.organization_id = $1 AND p.changeset_id = $2
+             ORDER BY e.id",
+            organization,
+            id.as_uuid(),
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        let offset = |value: i32| u32::try_from(value).map_err(|_| InvalidRow("proposal_evidence"));
+        let mut proposals = Vec::new();
+        for row in rows {
+            proposals.push(Proposal {
+                id: ProposalId::from_uuid(row.id),
+                operation: operation_from_json(row.operation_version, &row.operation)?,
+                depends_on: dependencies
+                    .iter()
+                    .filter(|dependency| dependency.proposal_id == row.id)
+                    .map(|dependency| ProposalId::from_uuid(dependency.depends_on))
+                    .collect(),
+                evidence: evidence
+                    .iter()
+                    .filter(|passage| passage.proposal_id == row.id)
+                    .map(|passage| {
+                        Ok(Passage {
+                            start: offset(passage.start_offset)?,
+                            end: offset(passage.end_offset)?,
+                            quote: passage.quote.clone(),
+                            page: passage.page.map(offset).transpose()?,
+                        })
+                    })
+                    .collect::<Result<_, InvalidRow>>()?,
+                reason: Reason::parse(&row.reason).map_err(|_| InvalidRow("proposal.reason"))?,
+            });
+        }
+        Ok(Some((
+            Changeset {
+                id,
+                event_id: changeset.event_id.map(EventId::from_uuid),
+                author: actor::from_json(&changeset.author)?,
+                source_version_id: SourceVersionId::from_uuid(changeset.source_version_id),
+                created_at: changeset.created_at.to_jiff(),
+                proposals,
+            },
+            SourceText::normalize(&changeset.text),
+        )))
+    }
 }
 
 async fn insert_changeset(
@@ -323,12 +426,13 @@ async fn insert_changeset(
     for proposal in &changeset.proposals {
         let (target_kind, target_id, expected_version) = target(&proposal.operation);
         sqlx::query!(
-            "INSERT INTO proposal (id, organization_id, changeset_id, operation, operation_version,
+            "INSERT INTO proposal (id, organization_id, changeset_id, event_id, operation, operation_version,
                                    target_kind, target_id, expected_version, reason, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
             proposal.id.as_uuid(),
             organization,
             changeset.id.as_uuid(),
+            proposal.operation.event_id().as_uuid(),
             operation_to_json(&proposal.operation),
             OPERATION_VERSION,
             target_kind,
@@ -388,8 +492,7 @@ pub(crate) async fn open_fact_proposals(
         r#"SELECT p.id, p.changeset_id, p.operation, p.operation_version,
                   p.created_at AS "created_at: jiff_sqlx::Timestamp"
            FROM proposal p
-           JOIN changeset c ON c.organization_id = p.organization_id AND c.id = p.changeset_id
-           WHERE p.organization_id = $1 AND c.event_id = $2 AND p.target_kind = 'fact'
+           WHERE p.organization_id = $1 AND p.event_id = $2 AND p.target_kind = 'fact'
              AND NOT EXISTS (
                  SELECT 1 FROM review_result r
                  WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id
@@ -471,7 +574,9 @@ mod tests {
     use tada_app::domain::ids::OrganizationId;
     use tada_app::domain::proposals::Proposal;
     use tada_app::facts::FactStore;
-    use tada_app::proposals::{NewChangeset, ProposeError, ProposeStores, create_changeset};
+    use tada_app::proposals::{
+        Created, NewChangeset, ProposeError, ProposeStores, create_changeset,
+    };
 
     use super::*;
     use crate::testing::{TestDatabase, sqlstate};
@@ -576,6 +681,14 @@ mod tests {
         (input, ids)
     }
 
+    /// The changeset of a create that stored a new one.
+    fn new(created: Result<Created, ProposeError>) -> Changeset {
+        match created.unwrap() {
+            Created::New(changeset) => changeset,
+            Created::Existing(_) => panic!("not new"),
+        }
+    }
+
     async fn count(test: &TestDatabase, table: &str) -> i64 {
         test.scalar(&format!("SELECT count(*) FROM {table}")).await
     }
@@ -605,9 +718,7 @@ mod tests {
         let test = TestDatabase::start().await;
         let (_, event, anna) = open_day(&test).await;
         let (input, ids) = intake(event);
-        let changeset = create_changeset(&anna, input, stores(&test), &FixedClock)
-            .await
-            .unwrap();
+        let changeset = new(create_changeset(&anna, input, stores(&test), &FixedClock).await);
 
         let (text, kind, channel): (String, String, String) = sqlx::query_as(
             "SELECT v.text, v.kind, v.channel FROM source_version v
@@ -729,17 +840,31 @@ mod tests {
     async fn proposals_never_change() {
         let test = TestDatabase::start().await;
         let (_, event, anna) = open_day(&test).await;
-        create_changeset(&anna, intake(event).0, stores(&test), &FixedClock)
-            .await
-            .unwrap();
+        new(create_changeset(&anna, intake(event).0, stores(&test), &FixedClock).await);
+        sqlx::query(
+            "INSERT INTO review_result (id, organization_id, proposal_id, result, reviewer, created_at)
+             SELECT $1, organization_id, id, 'rejected', '{}'::jsonb, now() FROM proposal LIMIT 1",
+        )
+        .bind(Uuid::now_v7())
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
         for statement in [
+            "UPDATE changeset SET created_at = now()",
+            "DELETE FROM changeset",
+            "TRUNCATE changeset CASCADE",
             "UPDATE proposal SET reason = 'changed'",
             "DELETE FROM proposal",
             "TRUNCATE proposal CASCADE",
             "UPDATE proposal_dependency SET depends_on = proposal_id",
             "DELETE FROM proposal_dependency",
+            "TRUNCATE proposal_dependency",
             "UPDATE proposal_evidence SET quote = 'changed'",
             "DELETE FROM proposal_evidence",
+            "TRUNCATE proposal_evidence",
+            "UPDATE review_result SET result = 'accepted'",
+            "DELETE FROM review_result",
+            "TRUNCATE review_result",
         ] {
             let error = sqlx::query(sqlx::AssertSqlSafe(statement))
                 .execute(&test.database.pool)
@@ -747,8 +872,15 @@ mod tests {
                 .unwrap_err();
             assert_eq!(sqlstate(&error), "23001", "{statement}");
         }
-        assert_eq!(count(&test, "proposal").await, 3);
-        assert_eq!(count(&test, "proposal_evidence").await, 3);
+        for (table, rows) in [
+            ("changeset", 1),
+            ("proposal", 3),
+            ("proposal_dependency", 1),
+            ("proposal_evidence", 3),
+            ("review_result", 1),
+        ] {
+            assert_eq!(count(&test, table).await, rows, "{table}");
+        }
     }
 
     #[tokio::test]
@@ -757,9 +889,8 @@ mod tests {
         let (_, event, anna) = open_day(&test).await;
         let other = test.create_organization("musterhausen").await;
         let other_event = test.create_event(other, "FLY31").await;
-        let changeset = create_changeset(&anna, intake(event).0, stores(&test), &FixedClock)
-            .await
-            .unwrap();
+        let changeset =
+            new(create_changeset(&anna, intake(event).0, stores(&test), &FixedClock).await);
         let free = Uuid::now_v7();
         let wanted = [
             free,
@@ -779,9 +910,8 @@ mod tests {
     async fn the_profile_shows_open_fact_proposals_apart_from_the_facts() {
         let test = TestDatabase::start().await;
         let (organization, event, anna) = open_day(&test).await;
-        let changeset = create_changeset(&anna, intake(event).0, stores(&test), &FixedClock)
-            .await
-            .unwrap();
+        let changeset =
+            new(create_changeset(&anna, intake(event).0, stores(&test), &FixedClock).await);
         let other = test.create_organization("musterhausen").await;
         let profile = test.database.profile(anna.scope(), event).await.unwrap();
         assert!(profile.fields.is_empty(), "a proposal is not a fact");
@@ -891,6 +1021,154 @@ mod tests {
         );
     }
 
+    /// An organization changeset of an owner: a new event and a fact of the new event.
+    fn new_event_intake(event: Uuid) -> (NewChangeset, [Uuid; 2]) {
+        let ids = [Uuid::now_v7(), Uuid::now_v7()];
+        let input = serde_json::from_value(json!({
+            "source_text": SOURCE,
+            "proposals": [
+                {
+                    "id": ids[0],
+                    "operation": {"kind": "create_event", "id": event, "key": "OPEN31", "name": "Open Day Testwil"},
+                    "evidence": [passage("Das Open Day")],
+                    "reason": "The member names a new event.",
+                },
+                {
+                    "id": ids[1],
+                    "operation": {
+                        "kind": "set_fact", "event_id": event, "field_id": core_field("date_window"),
+                        "state": {"state": "assumption",
+                                  "value": {"type": "date_window", "start": "2030-05-01",
+                                            "end": "2030-05-31", "granularity": "month"}},
+                    },
+                    "depends_on": [ids[0]],
+                    "evidence": [passage("im Mai 2030")],
+                    "reason": "The member names the month.",
+                },
+            ],
+        }))
+        .unwrap();
+        (input, ids)
+    }
+
+    #[tokio::test]
+    async fn the_fact_proposals_of_a_new_event_reach_its_profile_after_the_event_applies() {
+        let test = TestDatabase::start().await;
+        let (organization, _, _) = open_day(&test).await;
+        let owner = MemberCaller::new(
+            UserId::from_uuid(Uuid::now_v7()),
+            organization,
+            OrganizationRole::Owner,
+        )
+        .with_request(tada_app::caller::Channel::Telegram, None);
+        let event = Uuid::now_v7();
+        let (input, ids) = new_event_intake(event);
+        let changeset = new(create_changeset(&owner, input, stores(&test), &FixedClock).await);
+        assert_eq!(changeset.event_id, None);
+
+        let (changeset_event, item_event, channel): (Option<Uuid>, Option<Uuid>, String) =
+            sqlx::query_as(
+                "SELECT c.event_id, i.event_id, v.channel FROM changeset c
+                 JOIN source_version v ON v.id = c.source_version_id
+                 JOIN source_item i ON i.id = v.source_item_id
+                 WHERE c.id = $1",
+            )
+            .bind(changeset.id.as_uuid())
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            (changeset_event, item_event, channel.as_str()),
+            (None, None, "telegram")
+        );
+        let events: Vec<Uuid> = sqlx::query_scalar("SELECT event_id FROM proposal ORDER BY id")
+            .fetch_all(&test.database.pool)
+            .await
+            .unwrap();
+        assert_eq!(events, [event, event]);
+
+        // Task 27 applies the event alone and records the result; this test writes both directly.
+        sqlx::query(
+            "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)
+             VALUES ($1, $2, 'OPEN31', 'Open Day Testwil', 'Europe/Zurich', 1, now())",
+        )
+        .bind(event)
+        .bind(organization.as_uuid())
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO review_result (id, organization_id, proposal_id, result, reviewer, created_at)
+             VALUES ($1, $2, $3, 'accepted', $4, now())",
+        )
+        .bind(Uuid::now_v7())
+        .bind(organization.as_uuid())
+        .bind(ids[0])
+        .bind(actor::to_json(&owner.actor()))
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
+        let profile = test
+            .database
+            .profile(owner.scope(), EventId::from_uuid(event))
+            .await
+            .unwrap();
+        let open: Vec<_> = profile
+            .proposals
+            .iter()
+            .map(|open| open.proposal_id.as_uuid())
+            .collect();
+        assert_eq!(open, [ids[1]]);
+    }
+
+    #[tokio::test]
+    async fn a_retry_returns_the_stored_changeset_and_stores_nothing_new() {
+        let test = TestDatabase::start().await;
+        let (_, event, anna) = open_day(&test).await;
+        let (mut input, _) = intake(event);
+        input.id = Some(Uuid::now_v7());
+        let first = new(create_changeset(&anna, input.clone(), stores(&test), &FixedClock).await);
+        let retry = create_changeset(&anna, input.clone(), stores(&test), &FixedClock)
+            .await
+            .unwrap();
+        let Created::Existing(stored) = retry else {
+            panic!("not existing");
+        };
+        let mut expected = first.clone();
+        expected.proposals.sort_by_key(|proposal| proposal.id);
+        assert_eq!(stored, expected);
+        for table in ["changeset", "source_version", "audit_event"] {
+            assert_eq!(count(&test, table).await, 1, "{table}");
+        }
+
+        let mut changed = input;
+        changed.source_text.push_str(" Und Bier.");
+        let result = create_changeset(&anna, changed, stores(&test), &FixedClock).await;
+        let Err(ProposeError::Invalid(errors)) = result else {
+            panic!("not invalid: {result:?}");
+        };
+        assert_eq!((errors[0].field.as_ref(), errors[0].code), ("id", "taken"));
+
+        // A concurrent request with the same IDs loses the race at the primary key and changes nothing.
+        let audit = AuditEvent::new(
+            anna.actor(),
+            tada_app::audit::AuditAction::ChangesetCreate,
+            Some(first.id.as_uuid()),
+            Some(anna.scope()),
+        );
+        let mut again = first;
+        again.source_version_id = SourceVersionId::from_uuid(Uuid::now_v7());
+        let inserted = test
+            .database
+            .insert(anna.scope(), &again, &SourceText::normalize(SOURCE), &audit)
+            .await
+            .unwrap();
+        assert_eq!(inserted, Inserted::IdTaken);
+        for table in ["changeset", "source_version", "audit_event"] {
+            assert_eq!(count(&test, table).await, 1, "{table}");
+        }
+    }
+
     #[test]
     fn restores_each_operation() {
         let event = EventId::from_uuid(Uuid::now_v7());
@@ -933,11 +1211,15 @@ mod tests {
                 module: ModuleKey::parse("aviation").unwrap(),
             },
             Operation::AddChoiceValue {
+                event_id: event,
                 field_id: field,
                 key: ChoiceKey::parse("asphalt").unwrap(),
                 label: ShortText::parse("Asphalt").unwrap(),
             },
-            Operation::DeprecateField { field_id: field },
+            Operation::DeprecateField {
+                event_id: event,
+                field_id: field,
+            },
             Operation::CreateOpenQuestion {
                 id: OpenQuestionId::from_uuid(Uuid::now_v7()),
                 event_id: event,
@@ -953,7 +1235,10 @@ mod tests {
                 "{json}"
             );
         }
-        let json = operation_to_json(&Operation::DeprecateField { field_id: field });
+        let json = operation_to_json(&Operation::DeprecateField {
+            event_id: event,
+            field_id: field,
+        });
         assert!(operation_from_json(OPERATION_VERSION + 1, &json).is_err());
         assert!(operation_from_json(OPERATION_VERSION, &json!({"kind": "set_fact"})).is_err());
     }

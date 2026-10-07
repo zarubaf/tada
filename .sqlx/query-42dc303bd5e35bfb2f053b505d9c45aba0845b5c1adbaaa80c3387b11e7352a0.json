@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT p.id, p.changeset_id, p.operation, p.operation_version,\n                  p.created_at AS \"created_at: jiff_sqlx::Timestamp\"\n           FROM proposal p\n           JOIN changeset c ON c.organization_id = p.organization_id AND c.id = p.changeset_id\n           WHERE p.organization_id = $1 AND c.event_id = $2 AND p.target_kind = 'fact'\n             AND NOT EXISTS (\n                 SELECT 1 FROM review_result r\n                 WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id\n             )\n           ORDER BY p.created_at, p.id",
+  "query": "SELECT p.id, p.changeset_id, p.operation, p.operation_version,\n                  p.created_at AS \"created_at: jiff_sqlx::Timestamp\"\n           FROM proposal p\n           WHERE p.organization_id = $1 AND p.event_id = $2 AND p.target_kind = 'fact'\n             AND NOT EXISTS (\n                 SELECT 1 FROM review_result r\n                 WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id\n             )\n           ORDER BY p.created_at, p.id",
   "describe": {
     "columns": [
       {
@@ -73,5 +73,5 @@
       false
     ]
   },
-  "hash": "b2f19e36c3abda19f71c86af2c7957b2559349fcbe2d17ac26b6c271eb2727c8"
+  "hash": "42dc303bd5e35bfb2f053b505d9c45aba0845b5c1adbaaa80c3387b11e7352a0"
 }

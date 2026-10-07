@@ -45,12 +45,16 @@ pub enum Operation {
     },
     /// Add a choice to a choice field of an event.
     AddChoiceValue {
+        event_id: EventId,
         field_id: FieldDefinitionId,
         key: ChoiceKey,
         label: ShortText,
     },
     /// Close a field of an event for new facts. The field stays readable.
-    DeprecateField { field_id: FieldDefinitionId },
+    DeprecateField {
+        event_id: EventId,
+        field_id: FieldDefinitionId,
+    },
     /// Create an open question with its owner.
     CreateOpenQuestion {
         id: OpenQuestionId,
@@ -91,15 +95,16 @@ impl Operation {
         }
     }
 
-    /// The event that the operation works in, if the operation names it.
-    /// The other operations work in the event of their field.
-    pub fn event_id(&self) -> Option<EventId> {
+    /// The event that the operation works in. Each operation names it, so each proposal belongs to one event.
+    /// For `CreateEvent`, it is the new event.
+    pub fn event_id(&self) -> EventId {
         match self {
-            Self::CreateEvent { id, .. } => Some(*id),
+            Self::CreateEvent { id, .. } => *id,
             Self::SetFact { event_id, .. }
             | Self::AddFieldDefinition { event_id, .. }
-            | Self::CreateOpenQuestion { event_id, .. } => Some(*event_id),
-            Self::AddChoiceValue { .. } | Self::DeprecateField { .. } => None,
+            | Self::AddChoiceValue { event_id, .. }
+            | Self::DeprecateField { event_id, .. }
+            | Self::CreateOpenQuestion { event_id, .. } => *event_id,
         }
     }
 
@@ -108,7 +113,7 @@ impl Operation {
         match self {
             Self::SetFact { field_id, .. }
             | Self::AddChoiceValue { field_id, .. }
-            | Self::DeprecateField { field_id } => Some(*field_id),
+            | Self::DeprecateField { field_id, .. } => Some(*field_id),
             Self::AddFieldDefinition { id, .. } => Some(*id),
             Self::CreateEvent { .. } | Self::CreateOpenQuestion { .. } => None,
         }
