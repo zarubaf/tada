@@ -136,7 +136,7 @@ async fn a_second_run_revokes_the_first_invitation_and_queues_a_new_one() {
     };
 
     assert_ne!(first, second);
-    assert_eq!(counts(&test).await, [1, 2, 1, 2, 2, 3]);
+    assert_eq!(counts(&test).await, [1, 2, 1, 2, 2, 4]);
     let status: String = test
         .scalar(&format!(
             "SELECT status FROM invitation WHERE id = '{first}'"
@@ -236,4 +236,33 @@ async fn the_worker_sends_the_invitation_of_the_first_owner_only() {
     assert_eq!(sent.len(), 1, "the revoked invitation sends nothing");
     assert_eq!(sent[0].to, Email::parse("owner@example.org").unwrap());
     assert!(sent[0].text.contains(LINK));
+}
+
+#[tokio::test]
+async fn a_revoked_invitation_keeps_no_token_and_its_revocation_is_audited() {
+    let test = TestDatabase::start().await;
+    let mut output = Vec::new();
+    let BootstrapOutcome::InvitationQueued {
+        invitation_id: first,
+        organization_id,
+    } = run(&test, Some(&mut output as &mut dyn Write)).await
+    else {
+        panic!("no invitation was queued");
+    };
+    let tokens = format!("SELECT count(*) FROM invitation_token WHERE invitation_id = '{first}'");
+    assert_eq!(count(&test, &tokens).await, 1);
+
+    run(&test, None).await;
+
+    assert_eq!(count(&test, &tokens).await, 0, "the printed link is dead");
+    let revoked: String = test
+        .scalar(
+            "SELECT concat_ws(' ', actor_id, channel, record_kind, record_id, organization_id)
+             FROM audit_event WHERE action = 'invitation.revoke'",
+        )
+        .await;
+    assert_eq!(
+        revoked,
+        format!("{} cli invitation {first} {organization_id}", Bootstrap::ID)
+    );
 }

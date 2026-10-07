@@ -85,14 +85,15 @@ pub struct OrganizationSlug(String);
 
 impl OrganizationSlug {
     pub fn parse(value: &str) -> Result<Self, OrganizationSlugError> {
-        if !(2..=SLUG_MAX_CHARS).contains(&value.len()) {
-            return Err(OrganizationSlugError::Length);
-        }
         if !value
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
         {
             return Err(OrganizationSlugError::Characters);
+        }
+        // All characters are ASCII now, so the byte length is the number of characters.
+        if !(2..=SLUG_MAX_CHARS).contains(&value.len()) {
+            return Err(OrganizationSlugError::Length);
         }
         Ok(Self(value.to_owned()))
     }

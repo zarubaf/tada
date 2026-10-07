@@ -47,7 +47,6 @@ impl BootstrapStore for Database {
         .await
         .map_err(store_error)?;
         let organization_id = OrganizationId::from_uuid(organization_id);
-        let scope = caller.scope(organization_id);
 
         let has_owner = sqlx::query_scalar!(
             r#"SELECT EXISTS (
@@ -63,12 +62,22 @@ impl BootstrapStore for Database {
             return Ok(BootstrapOutcome::OwnerExists);
         }
 
-        sqlx::query!(
+        let revoked = sqlx::query_scalar!(
             "UPDATE invitation SET status = 'revoked', revoked_at = $3
-             WHERE organization_id = $1 AND role = $2 AND status = 'pending'",
+             WHERE organization_id = $1 AND role = $2 AND status = 'pending'
+             RETURNING id",
             organization_id.as_uuid(),
             OrganizationRole::Owner.as_str(),
             now as _,
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        // A revoked invitation keeps no token, so no mailed or printed link of it works any more.
+        sqlx::query!(
+            "DELETE FROM invitation_token WHERE organization_id = $1 AND invitation_id = ANY($2)",
+            organization_id.as_uuid(),
+            &revoked,
         )
         .execute(&mut *tx)
         .await
@@ -98,25 +107,21 @@ impl BootstrapStore for Database {
         .await
         .map_err(store_error)?;
 
-        let actor = caller.actor();
+        let mut events = Vec::new();
         if let Some(id) = created {
-            let event = AuditEvent::new(
-                actor,
-                "organization.create",
-                "organization",
-                Some(id),
-                Some(scope),
-            );
+            events.push(("organization.create", "organization", id));
+        }
+        events.extend(
+            revoked
+                .into_iter()
+                .map(|id| ("invitation.revoke", "invitation", id)),
+        );
+        events.push(("invitation.create", "invitation", invitation_id.as_uuid()));
+        for (action, record_kind, record_id) in events {
+            let event =
+                AuditEvent::by_bootstrap(caller, action, record_kind, record_id, organization_id);
             record(&mut tx, &event).await.map_err(store_error)?;
         }
-        let event = AuditEvent::new(
-            actor,
-            "invitation.create",
-            "invitation",
-            Some(invitation_id.as_uuid()),
-            Some(scope),
-        );
-        record(&mut tx, &event).await.map_err(store_error)?;
 
         tx.commit().await.map_err(store_error)?;
         Ok(BootstrapOutcome::InvitationQueued {

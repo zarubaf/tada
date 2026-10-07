@@ -53,11 +53,10 @@ pub async fn run(
     (database, public_url): BootstrapSettings,
     command: BootstrapCommand,
 ) -> anyhow::Result<()> {
-    let stderr = std::io::stderr();
+    let mut stderr = std::io::stderr();
     let print = link_output(command.print_link, stderr.is_terminal())?;
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
-    let mut stderr = stderr.lock();
     let link = print.then_some(&mut stderr as &mut dyn Write);
     let result = execute(&db, &public_url, &SystemClock, command, link).await;
     db.close().await;
@@ -99,6 +98,9 @@ pub async fn execute(
         },
     ) = (link, outcome)
     {
+        // The invitation is committed. A new run revokes it and queues a new one.
+        const QUEUED: &str = "the invitation is queued and the worker sends it, but the link \
+            could not be printed; a new run is safe: it revokes this invitation and queues a new one";
         let link = printed_link(
             &caller,
             organization_id,
@@ -107,8 +109,9 @@ pub async fn execute(
             clock,
             public_url,
         )
-        .await?;
-        writeln!(out, "{}", link.expose_secret()).context("cannot write the link")?;
+        .await
+        .context(QUEUED)?;
+        writeln!(out, "{}", link.expose_secret()).context(QUEUED)?;
     }
     Ok(outcome)
 }

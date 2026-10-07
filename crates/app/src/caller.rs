@@ -232,10 +232,17 @@ impl ServiceIdentity for Bootstrap {
 }
 
 impl ServiceCaller<Bootstrap> {
-    /// The scope of the organization that the slug of the operator names. `bootstrap` can only
-    /// create an organization and invite its first owner, so the store that does this takes the
-    /// scope here, after its infrastructure query by slug (ADR 0039).
-    pub fn scope(&self, organization_id: OrganizationId) -> OrgScope {
+    /// The scope of the organization that the slug of the operator names (ADR 0039).
+    /// Only this crate calls it. Other crates cannot get a scope from a service caller:
+    ///
+    /// ```compile_fail
+    /// use tada_app::caller::{Bootstrap, ServiceCaller};
+    /// use tada_app::domain::ids::OrganizationId;
+    ///
+    /// let organization = OrganizationId::from_uuid(Default::default());
+    /// let _ = ServiceCaller::<Bootstrap>::new().scope(organization);
+    /// ```
+    pub(crate) fn scope(&self, organization_id: OrganizationId) -> OrgScope {
         OrgScope(organization_id)
     }
 }
