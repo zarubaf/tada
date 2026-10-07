@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.user_id FROM email_identity e\n             WHERE e.email = $1\n               AND EXISTS (SELECT 1 FROM organization_membership m WHERE m.user_id = e.user_id)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "email_identity",
+            "name": "user_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3da1427a99e5b89f47eb156cc70b4134856ac6f1ff3891671707b9fd4e3af877"
+}

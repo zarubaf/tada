@@ -213,6 +213,11 @@ pub async fn choose_organization(
     Ok(())
 }
 
+/// Ends the session of `token`: the sign-out of ADR 0008. An unknown token changes nothing.
+pub async fn sign_out(token: &str, sessions: &dyn SessionStore) -> Result<(), StoreError> {
+    sessions.delete(token).await
+}
+
 /// The `Authenticator` of sessions (ADR 0008, ADR 0056).
 pub struct SessionAuthenticator {
     sessions: Arc<dyn SessionStore>,
@@ -688,6 +693,19 @@ mod tests {
         assert!(matches!(result, Err(ChooseOrganizationError::NotFound)));
         let caller = fixture.authenticate(&token).await.unwrap();
         assert_eq!(caller.scope().organization_id(), testwil());
+    }
+
+    #[tokio::test]
+    async fn sign_out_ends_the_session() {
+        let fixture = Fixture::new();
+        let token = fixture.sign_in(Some(testwil())).await;
+
+        sign_out(&token, &*fixture.sessions).await.unwrap();
+        assert!(matches!(
+            fixture.authenticate(&token).await,
+            Err(AuthenticationError::Unauthenticated)
+        ));
+        sign_out("unknown", &*fixture.sessions).await.unwrap();
     }
 
     #[test]
