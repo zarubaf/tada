@@ -864,6 +864,49 @@ mod tests {
         assert_eq!(removals, 1);
     }
 
+    /// An owner of another organization neither sees nor removes a membership (ADR 0006).
+    #[tokio::test]
+    async fn a_removal_stays_inside_the_organization() {
+        let f = Fixture::start().await;
+        let anna = f.member("Anna Muster", OrganizationRole::Member).await;
+        let musterhausen = f.test.create_organization("musterhausen").await;
+        let stranger = f
+            .test
+            .create_user(
+                &DisplayName::parse("Otto Fremd").unwrap(),
+                &Email::parse("otto@example.org").unwrap(),
+            )
+            .await;
+        f.test
+            .add_membership(musterhausen, stranger, OrganizationRole::Owner)
+            .await;
+        let other = MemberCaller::new(stranger, musterhausen, OrganizationRole::Owner);
+        let audit = AuditEvent::new(
+            other.actor(),
+            AuditAction::OrganizationMembershipRemove,
+            Some(musterhausen.as_uuid()),
+            Some(other.scope()),
+        )
+        .about(anna);
+        let removed = f
+            .db()
+            .remove(
+                other.scope(),
+                Remover::of(&other),
+                anna,
+                RecordVersion::FIRST,
+                &audit,
+            )
+            .await
+            .unwrap();
+        assert_eq!(removed, Some(Refusal::NotFound));
+        assert_eq!(
+            f.count("SELECT count(*) FROM organization_membership WHERE role = 'member'")
+                .await,
+            1
+        );
+    }
+
     /// The role of the remover counts as it is in the database, not as the session saw it.
     #[tokio::test]
     async fn a_demoted_or_removed_admin_cannot_remove() {
