@@ -26,3 +26,26 @@ problem-unavailable = Der Dienst ist im Moment nicht erreichbar. Versuchen Sie e
 problem-general-4xx = Die Anfrage ist ungültig.
 problem-general-5xx = Ein unerwarteter Fehler ist aufgetreten.
 problem-network = Keine Verbindung zum Server. Prüfen Sie Ihre Internetverbindung.
+
+## Fields of the core catalog (ADR 0049). The ID is field-<key>, and field-<key>-<choice> for a choice.
+
+field-date_window = Zeitfenster
+field-exact_dates = Genaue Daten
+field-duration_days = Dauer in Tagen
+field-audience = Publikum
+field-audience-public = Öffentlich
+field-audience-members = Mitglieder
+field-audience-invited = Geladene Gäste
+field-visitor_estimate = Erwartete Besucher pro Tag
+field-entry_fee_policy = Eintrittspolitik
+field-entry_fee_policy-free = Gratis
+field-entry_fee_policy-low = Tiefer Eintritt
+field-entry_fee_policy-regular = Normaler Eintritt
+field-entry_fee_adult = Eintritt Erwachsene
+field-components = Programmteile
+field-components-airshow = Flugshow
+field-components-static_display = Flugzeugausstellung
+field-components-catering = Verpflegung
+field-components-passenger_flights = Passagierflüge
+field-components-exhibition = Ausstellung
+field-venue = Ort
