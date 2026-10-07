@@ -181,11 +181,6 @@ impl MemberCaller {
     pub fn scope(&self) -> OrgScope {
         OrgScope(self.organization_id)
     }
-
-    /// Owners and admins can act as event manager in each event of the organization (ADR 0052).
-    pub(crate) fn is_owner_or_admin(&self) -> bool {
-        matches!(self.role, OrganizationRole::Owner | OrganizationRole::Admin)
-    }
 }
 
 impl crate::access::Principal for MemberCaller {
@@ -194,7 +189,7 @@ impl crate::access::Principal for MemberCaller {
     }
 
     fn scope(&self) -> OrgScope {
-        OrgScope(self.organization_id)
+        MemberCaller::scope(self)
     }
 
     fn organization_role(&self) -> OrganizationRole {

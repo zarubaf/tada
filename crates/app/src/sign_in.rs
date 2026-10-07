@@ -72,17 +72,7 @@ pub fn accepted_role(
     existing: Option<OrganizationRole>,
     invited: OrganizationRole,
 ) -> OrganizationRole {
-    fn rank(role: OrganizationRole) -> u8 {
-        match role {
-            OrganizationRole::Owner => 2,
-            OrganizationRole::Admin => 1,
-            OrganizationRole::Member => 0,
-        }
-    }
-    match existing {
-        Some(existing) if rank(existing) > rank(invited) => existing,
-        _ => invited,
-    }
+    existing.map_or(invited, |existing| existing.max(invited))
 }
 
 /// The repository port of sign-in requests (ADR 0056).

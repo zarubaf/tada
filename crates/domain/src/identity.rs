@@ -12,14 +12,22 @@ const EMAIL_MAX_CHARS: usize = 254;
 const DISPLAY_NAME_MAX_CHARS: usize = 100;
 
 /// The organization role of a member (glossary).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// The order of the variants is the rank of the roles: `Member < Admin < Owner`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OrganizationRole {
-    Owner,
-    Admin,
     Member,
+    Admin,
+    Owner,
 }
 
 impl OrganizationRole {
+    /// True for owners and admins. They act as event manager in each event of the organization
+    /// (ADR 0052).
+    pub fn is_owner_or_admin(self) -> bool {
+        self >= Self::Admin
+    }
+
     /// The kebab-case name that the database and the API use.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -215,6 +223,14 @@ impl fmt::Debug for DisplayName {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ranks_organization_roles() {
+        use OrganizationRole::{Admin, Member, Owner};
+        assert!(Member < Admin && Admin < Owner);
+        assert!(Owner.is_owner_or_admin() && Admin.is_owner_or_admin());
+        assert!(!Member.is_owner_or_admin());
+    }
 
     #[test]
     fn roles_have_stable_kebab_case_names() {

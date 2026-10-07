@@ -87,10 +87,7 @@ impl AccessError {
 
 /// True if the caller acts as event manager in each event of its organization (ADR 0052).
 pub(crate) fn sees_all_events(caller: &impl Principal) -> bool {
-    matches!(
-        caller.organization_role(),
-        OrganizationRole::Owner | OrganizationRole::Admin
-    )
+    caller.organization_role().is_owner_or_admin()
 }
 
 /// The access of `caller` to the event `event_id` at the time of the call (ADR 0039, ADR 0052).

@@ -109,7 +109,7 @@ pub async fn create_event(
     store: &dyn EventStore,
     clock: &dyn Clock,
 ) -> Result<Created, CreateEventError> {
-    if !caller.is_owner_or_admin() {
+    if !access::sees_all_events(caller) {
         return Err(CreateEventError::Forbidden);
     }
     let scope = caller.scope();
