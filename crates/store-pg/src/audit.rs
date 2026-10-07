@@ -53,15 +53,14 @@ mod tests {
         let user = UserId::from_uuid(Uuid::now_v7());
         let request = Uuid::now_v7();
         let record_id = Uuid::now_v7();
-        let actor = MemberCaller::new(user, organization, OrganizationRole::Owner)
-            .with_request(tada_app::caller::Channel::Telegram, Some(request))
-            .actor();
+        let caller = MemberCaller::new(user, organization, OrganizationRole::Owner)
+            .with_request(tada_app::caller::Channel::Telegram, Some(request));
         let event = AuditEvent::new(
-            actor,
+            caller.actor(),
             "event.create",
             "event",
             Some(record_id),
-            Some(organization),
+            Some(caller.scope()),
         );
 
         let mut tx = test.database.pool.begin().await.unwrap();
@@ -100,5 +99,11 @@ mod tests {
                 Some(record_id)
             )
         );
+        let organization_id: Option<Uuid> =
+            sqlx::query_scalar("SELECT organization_id FROM audit_event")
+                .fetch_one(&test.database.pool)
+                .await
+                .unwrap();
+        assert_eq!(organization_id, Some(organization.as_uuid()));
     }
 }
