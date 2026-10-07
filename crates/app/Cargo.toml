@@ -27,3 +27,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
+
+[features]
+# Constructors for the tests of other crates.
+testing = []

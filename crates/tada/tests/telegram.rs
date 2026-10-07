@@ -16,13 +16,13 @@ use axum::routing::post;
 use axum::{Json, Router};
 use serde_json::{Value, json};
 use tada_adapters::clock::SystemClock;
+use tada_app::auth::{Authenticator, Credential};
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::caller::{ServiceCaller, TelegramGateway};
+use tada_app::session::SessionAuthenticator;
 use tada_app::telegram::{
     TelegramName, TelegramUserId, claim_link_code, create_link_code, list_link_requests,
 };
-use tada_store_pg::dev::DevAuthenticator;
-use tada_store_pg::dev::{DEV_ORGANIZATION_ID, DEV_USER_ID};
 use tada_store_pg::testing::TestDatabase;
 use tada_telegram::Gateway;
 use tokio::sync::Notify;
@@ -67,8 +67,8 @@ fn update(update_id: u32, text: &str) -> Value {
 #[tokio::test]
 async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
     let test = TestDatabase::start().await;
-    test.database.ensure_dev_organization().await.unwrap();
-    let member = MemberCaller::new(DEV_USER_ID, DEV_ORGANIZATION_ID, OrganizationRole::Owner);
+    let (_, _, cookie) = test.member("testwil", OrganizationRole::Owner).await;
+    let member = authenticate(&test, &cookie).await;
     let code = create_link_code(&member, &test.database, &SystemClock)
         .await
         .unwrap();
@@ -126,8 +126,28 @@ async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
     assert_eq!(requests[0].telegram_name.0, "Testperson Muster");
 }
 
-async fn call(router: &Router, method: Method, path: &str) -> (StatusCode, Option<String>, Value) {
-    let request = support::request(method, path).body(Body::empty()).unwrap();
+/// The member of a session cookie, as the session authenticator finds it.
+async fn authenticate(test: &TestDatabase, cookie: &str) -> MemberCaller {
+    let database = Arc::new(test.database.clone());
+    SessionAuthenticator::new(database.clone(), database, Arc::new(SystemClock))
+        .authenticate(Some(Credential::Session(cookie)))
+        .await
+        .unwrap()
+}
+
+async fn call(
+    router: &Router,
+    cookie: &str,
+    method: Method,
+    path: &str,
+) -> (StatusCode, Option<String>, Value) {
+    let request = support::request(method, path)
+        .header(
+            header::COOKIE,
+            format!("{}={cookie}", support::SESSION_COOKIE),
+        )
+        .body(Body::empty())
+        .unwrap();
     let response = router.clone().oneshot(request).await.unwrap();
     let status = response.status();
     let cache = response
@@ -147,13 +167,16 @@ async fn call(router: &Router, method: Method, path: &str) -> (StatusCode, Optio
 #[tokio::test]
 async fn the_member_confirms_the_link_in_the_web_client() {
     let test = TestDatabase::start().await;
-    test.database.ensure_dev_organization().await.unwrap();
-    let router = tada_api::router(
-        support::api_state(&test, Arc::new(DevAuthenticator), Arc::new(SystemClock)),
-        None,
-    );
+    let (_, _, cookie) = test.member("testwil", OrganizationRole::Owner).await;
+    let router = support::session_router(&test, Arc::new(SystemClock));
 
-    let (status, cache, code) = call(&router, Method::POST, "/api/v1/telegram/link-codes").await;
+    let (status, cache, code) = call(
+        &router,
+        &cookie,
+        Method::POST,
+        "/api/v1/telegram/link-codes",
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(
         cache.as_deref(),
@@ -177,7 +200,13 @@ async fn the_member_confirms_the_link_in_the_web_client() {
         .unwrap()
     );
 
-    let (_, _, page) = call(&router, Method::GET, "/api/v1/telegram/link-requests").await;
+    let (_, _, page) = call(
+        &router,
+        &cookie,
+        Method::GET,
+        "/api/v1/telegram/link-requests",
+    )
+    .await;
     let request = &page["items"][0];
     assert_eq!(request["telegram_name"], "Testperson");
     let path = format!(
@@ -185,10 +214,10 @@ async fn the_member_confirms_the_link_in_the_web_client() {
         request["id"].as_str().unwrap()
     );
 
-    let (status, _, link) = call(&router, Method::POST, &path).await;
+    let (status, _, link) = call(&router, &cookie, Method::POST, &path).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(link["telegram_user_id"], 4242);
-    let (status, _, problem) = call(&router, Method::POST, &path).await;
+    let (status, _, problem) = call(&router, &cookie, Method::POST, &path).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(problem["code"], "not-found");
 }

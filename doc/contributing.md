@@ -26,7 +26,9 @@ The file [compose.yaml](../compose.yaml) is not a deployment ([ADR 0033](adr/003
 6. Run `mise run dev:down` to stop the services. The data volumes stay.
 
 Do not remove `.dev/secrets/` while the volumes exist. The database and the storage keep the first secrets.
-A debug build acts as the owner of a development organization for each request ([ADR 0053](adr/0053-development-authenticator.md)).
+Each request needs a session ([ADR 0056](adr/0056-sign-in-details.md)).
+To sign in, create the organization with the `bootstrap` command of step 4, run the worker, and open the invitation mail in Mailpit.
+Later sign-ins use the sign-in link that tada sends to the same address.
 
 ## Sources of truth
 

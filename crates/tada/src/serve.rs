@@ -7,7 +7,7 @@ use anyhow::Context;
 use tada_adapters::clock::SystemClock;
 use tada_adapters::storage::{S3Config, S3Storage};
 use tada_api::ApiState;
-use tada_app::auth::Authenticator;
+use tada_app::session::SessionAuthenticator;
 use tada_store_pg::rate_limit::PgRateLimiter;
 use tada_store_pg::{Database, PgSignInRequestStore};
 use tokio::net::TcpListener;
@@ -31,7 +31,11 @@ pub async fn run(
     let router = tada_api::router(
         ApiState {
             dependencies: vec![Arc::new(db.clone()), Arc::new(storage)],
-            authenticator: authenticator(&db).await?,
+            authenticator: Arc::new(SessionAuthenticator::new(
+                Arc::new(db.clone()),
+                Arc::new(db.clone()),
+                Arc::new(SystemClock),
+            )),
             events: Arc::new(db.clone()),
             telegram: Arc::new(db.clone()),
             identity: Arc::new(db.clone()),
@@ -72,35 +76,4 @@ pub async fn run(
     }
     db.close().await;
     Ok(())
-}
-
-/// The development authenticator in debug builds (ADR 0053).
-#[cfg(debug_assertions)]
-async fn authenticator(db: &Database) -> anyhow::Result<Arc<dyn Authenticator>> {
-    db.ensure_dev_organization()
-        .await
-        .context("cannot create the development organization; did `tada migrate` run?")?;
-    tracing::warn!("debug build: each request acts as the development owner (ADR 0053)");
-    Ok(Arc::new(tada_store_pg::dev::DevAuthenticator))
-}
-
-/// Sign-in comes in Slice 1. Until then, a release build rejects each request (ADR 0053).
-#[cfg(not(debug_assertions))]
-async fn authenticator(_db: &Database) -> anyhow::Result<Arc<dyn Authenticator>> {
-    Ok(Arc::new(NoSignIn))
-}
-
-#[cfg(not(debug_assertions))]
-#[derive(Debug)]
-struct NoSignIn;
-
-#[cfg(not(debug_assertions))]
-#[async_trait::async_trait]
-impl Authenticator for NoSignIn {
-    async fn authenticate(
-        &self,
-        _credential: Option<tada_app::auth::Credential<'_>>,
-    ) -> Result<tada_app::caller::MemberCaller, tada_app::auth::AuthenticationError> {
-        Err(tada_app::auth::AuthenticationError::Unauthenticated)
-    }
 }

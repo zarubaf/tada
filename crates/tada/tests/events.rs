@@ -11,24 +11,29 @@ use axum::body::Body;
 use axum::http::{Method, Request, Response, StatusCode, header};
 use serde_json::{Value, json};
 use tada_adapters::clock::SystemClock;
-use tada_store_pg::dev::{DEV_USER_ID, DevAuthenticator};
+use tada_app::caller::OrganizationRole;
+use tada_app::domain::ids::UserId;
 use tada_store_pg::testing::TestDatabase;
 use tower::ServiceExt;
 
 struct Api {
     router: axum::Router,
     test: TestDatabase,
+    user: UserId,
+    cookie: String,
 }
 
 impl Api {
     async fn start() -> Self {
         let test = TestDatabase::start().await;
-        test.database.ensure_dev_organization().await.unwrap();
-        let router = tada_api::router(
-            support::api_state(&test, Arc::new(DevAuthenticator), Arc::new(SystemClock)),
-            None,
-        );
-        Self { router, test }
+        let (_, user, cookie) = test.member("testwil", OrganizationRole::Owner).await;
+        let router = support::session_router(&test, Arc::new(SystemClock));
+        Self {
+            router,
+            test,
+            user,
+            cookie: format!("{}={cookie}", support::SESSION_COOKIE),
+        }
     }
 
     async fn send(&self, request: Request<Body>) -> (Response<Body>, Value) {
@@ -45,6 +50,7 @@ impl Api {
 
     async fn post(&self, path: &str, body: &Value) -> (Response<Body>, Value) {
         let request = support::request(Method::POST, path)
+            .header(header::COOKIE, &self.cookie)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(body.to_string()))
             .unwrap();
@@ -52,8 +58,11 @@ impl Api {
     }
 
     async fn get(&self, path: &str) -> (Response<Body>, Value) {
-        self.send(Request::get(path).body(Body::empty()).unwrap())
-            .await
+        let request = Request::get(path)
+            .header(header::COOKIE, &self.cookie)
+            .body(Body::empty())
+            .unwrap();
+        self.send(request).await
     }
 }
 
@@ -84,7 +93,7 @@ async fn creates_an_event_and_lists_it() {
     assert_eq!(response.status(), StatusCode::OK);
     let members = members["items"].as_array().unwrap();
     assert_eq!(members.len(), 1);
-    assert_eq!(members[0]["user_id"], json!(DEV_USER_ID.as_uuid()));
+    assert_eq!(members[0]["user_id"], json!(api.user.as_uuid()));
     assert_eq!(members[0]["event_role"], "event-manager");
 }
 
@@ -154,6 +163,7 @@ async fn a_taken_key_gives_a_problem() {
 async fn a_body_that_is_not_json_gives_a_problem_without_its_content() {
     let api = Api::start().await;
     let request = support::request(Method::POST, "/api/v1/events")
+        .header(header::COOKIE, &api.cookie)
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(r#"{"key": "secret-value""#))
         .unwrap();
@@ -163,6 +173,7 @@ async fn a_body_that_is_not_json_gives_a_problem_without_its_content() {
     assert!(!problem.to_string().contains("secret-value"));
 
     let request = support::request(Method::POST, "/api/v1/events")
+        .header(header::COOKIE, &api.cookie)
         .body(Body::from("{}"))
         .unwrap();
     let (response, problem) = api.send(request).await;
@@ -225,6 +236,7 @@ async fn a_state_change_from_another_origin_changes_nothing() {
     let http = Request::post("/api/v1/events").header(header::ORIGIN, "http://tada.example.org");
     for request in [foreign, missing, http] {
         let request = request
+            .header(header::COOKIE, &api.cookie)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(body.to_string()))
             .unwrap();
@@ -247,9 +259,19 @@ async fn a_state_change_from_another_origin_changes_nothing() {
 async fn a_read_needs_no_origin() {
     let api = Api::start().await;
     let request = Request::get("/api/v1/events")
+        .header(header::COOKIE, &api.cookie)
         .header(header::ORIGIN, "https://evil.example.com")
         .body(Body::empty())
         .unwrap();
     let (response, _) = api.send(request).await;
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_request_without_a_session_gets_401() {
+    let api = Api::start().await;
+    let request = Request::get("/api/v1/events").body(Body::empty()).unwrap();
+    let (response, problem) = api.send(request).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(problem["code"], "unauthenticated");
 }
