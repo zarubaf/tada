@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT user_id, role, version FROM organization_membership\n         WHERE organization_id = $1 AND (user_id = $2 OR role = 'owner')\n         ORDER BY user_id\n         FOR UPDATE",
+  "query": "SELECT user_id, role, version FROM organization_membership\n         WHERE organization_id = $1 AND (user_id = $2 OR user_id = $3 OR role = 'owner')\n         ORDER BY user_id\n         FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -40,6 +40,7 @@
     "parameters": {
       "Left": [
         "Uuid",
+        "Uuid",
         "Uuid"
       ]
     },
@@ -49,5 +50,5 @@
       false
     ]
   },
-  "hash": "b87282bbffd5a706f4f98e86806b81ce7909c599ee9a53c15d4ed6c97cbd99f2"
+  "hash": "0922b48b015d27fd75c19ddabed9b2eb36ae6174df28d4b7f34e0e3fa87ab39d"
 }

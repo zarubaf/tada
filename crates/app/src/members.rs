@@ -104,6 +104,9 @@ pub struct LockedMembership {
     pub owners: usize,
     /// True if the member is the only event manager of at least one event.
     pub only_manager: bool,
+    /// The role of the remover, locked in the same transaction. `None` if the remover is no
+    /// longer a member. The role of the session can be out of date.
+    pub remover_role: Option<OrganizationRole>,
 }
 
 /// The member who removes an organization membership.
@@ -111,20 +114,23 @@ pub struct LockedMembership {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Remover {
     user_id: UserId,
-    role: OrganizationRole,
 }
 
 impl Remover {
     pub fn of(caller: &MemberCaller) -> Self {
         Self {
             user_id: caller.user_id(),
-            role: caller.organization_role(),
         }
+    }
+
+    /// The store locks the membership of this user too, for `LockedMembership::remover_role`.
+    pub fn user_id(self) -> UserId {
+        self.user_id
     }
 
     /// `None` if this member can remove the locked membership of `member`.
     ///
-    /// Each member can leave. Owners and admins remove members up to their own role.
+    /// Each member can leave. Owners and admins remove members up to their own locked role.
     /// The last owner and the only event manager of an event stay.
     pub fn refusal(
         self,
@@ -132,7 +138,10 @@ impl Remover {
         expected_version: RecordVersion,
         locked: &LockedMembership,
     ) -> Option<Refusal> {
-        if member != self.user_id && !manages(self.role, locked.role) {
+        let Some(remover_role) = locked.remover_role else {
+            return Some(Refusal::Forbidden);
+        };
+        if member != self.user_id && !manages(remover_role, locked.role) {
             Some(Refusal::Forbidden)
         } else if locked.version != expected_version {
             Some(Refusal::VersionConflict)
@@ -618,18 +627,24 @@ mod tests {
         )
     }
 
-    fn locked(role: OrganizationRole) -> LockedMembership {
+    /// The locked membership with the role `target`, removed by a member with the role `remover`.
+    fn locked(remover: OrganizationRole, target: OrganizationRole) -> LockedMembership {
         LockedMembership {
-            role,
+            role: target,
             version: RecordVersion::FIRST,
             owners: 2,
             only_manager: false,
+            remover_role: Some(remover),
         }
     }
 
     /// The refusal of a removal of the member `2` with the role `target` by `remover`.
     fn removal(remover: OrganizationRole, target: OrganizationRole) -> Option<Refusal> {
-        Remover::of(&caller(remover)).refusal(user(2), RecordVersion::FIRST, &locked(target))
+        Remover::of(&caller(remover)).refusal(
+            user(2),
+            RecordVersion::FIRST,
+            &locked(remover, target),
+        )
     }
 
     #[test]
@@ -649,14 +664,14 @@ mod tests {
         for role in [Owner, Admin, Member] {
             let remover = Remover::of(&caller(role));
             assert_eq!(
-                remover.refusal(user(1), RecordVersion::FIRST, &locked(role)),
+                remover.refusal(user(1), RecordVersion::FIRST, &locked(role, role)),
                 None,
                 "{role:?} leaves"
             );
         }
         let last = LockedMembership {
             owners: 1,
-            ..locked(Owner)
+            ..locked(Owner, Owner)
         };
         let owner = Remover::of(&caller(Owner));
         assert_eq!(
@@ -670,7 +685,7 @@ mod tests {
         // The last owner rule is about owners only.
         let admin = LockedMembership {
             owners: 1,
-            ..locked(Admin)
+            ..locked(Owner, Admin)
         };
         assert_eq!(owner.refusal(user(2), RecordVersion::FIRST, &admin), None);
     }
@@ -680,12 +695,12 @@ mod tests {
         let owner = Remover::of(&caller(Owner));
         let second = RecordVersion::new(2).unwrap();
         assert_eq!(
-            owner.refusal(user(2), second, &locked(Member)),
+            owner.refusal(user(2), second, &locked(Owner, Member)),
             Some(Refusal::VersionConflict)
         );
         let manager = LockedMembership {
             only_manager: true,
-            ..locked(Member)
+            ..locked(Owner, Member)
         };
         assert_eq!(
             owner.refusal(user(2), RecordVersion::FIRST, &manager),
@@ -695,10 +710,29 @@ mod tests {
         let admin = Remover::of(&caller(Admin));
         let owner_target = LockedMembership {
             only_manager: true,
-            ..locked(Owner)
+            ..locked(Admin, Owner)
         };
         assert_eq!(
             admin.refusal(user(2), second, &owner_target),
+            Some(Refusal::Forbidden)
+        );
+    }
+
+    /// The locked role of the remover decides, not the role of the session.
+    #[test]
+    fn a_demoted_or_removed_remover_cannot_remove() {
+        let admin = Remover::of(&caller(Admin));
+        let demoted = locked(Member, Member);
+        assert_eq!(
+            admin.refusal(user(2), RecordVersion::FIRST, &demoted),
+            Some(Refusal::Forbidden)
+        );
+        let gone = LockedMembership {
+            remover_role: None,
+            ..locked(Admin, Member)
+        };
+        assert_eq!(
+            admin.refusal(user(2), RecordVersion::FIRST, &gone),
             Some(Refusal::Forbidden)
         );
     }

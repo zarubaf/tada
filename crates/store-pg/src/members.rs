@@ -116,20 +116,28 @@ async fn lock_membership(
     conn: &mut PgConnection,
     scope: OrgScope,
     member: UserId,
+    remover: Remover,
 ) -> Result<Option<LockedMembership>, StoreError> {
     let organization = scope.organization_id().as_uuid();
+    // The row of the remover is locked too, so the removal uses the current role of the remover.
     let rows = sqlx::query!(
         "SELECT user_id, role, version FROM organization_membership
-         WHERE organization_id = $1 AND (user_id = $2 OR role = 'owner')
+         WHERE organization_id = $1 AND (user_id = $2 OR user_id = $3 OR role = 'owner')
          ORDER BY user_id
          FOR UPDATE",
         organization,
         member.as_uuid(),
+        remover.user_id().as_uuid(),
     )
     .fetch_all(&mut *conn)
     .await
     .map_err(store_error)?;
     let owners = rows.iter().filter(|row| row.role == "owner").count();
+    let remover_role = rows
+        .iter()
+        .find(|row| row.user_id == remover.user_id().as_uuid())
+        .map(|row| organization_role(&row.role))
+        .transpose()?;
     let Some(row) = rows.into_iter().find(|row| row.user_id == member.as_uuid()) else {
         return Ok(None);
     };
@@ -161,6 +169,7 @@ async fn lock_membership(
             .ok_or(InvalidRow("organization_membership.version"))?,
         owners,
         only_manager,
+        remover_role,
     }))
 }
 
@@ -366,7 +375,7 @@ impl MemberStore for Database {
         audit: &AuditEvent,
     ) -> Result<Option<Refusal>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let Some(locked) = lock_membership(&mut tx, scope, member).await? else {
+        let Some(locked) = lock_membership(&mut tx, scope, member, remover).await? else {
             return Ok(Some(Refusal::NotFound));
         };
         if let Some(refusal) = remover.refusal(member, expected_version, &locked) {
@@ -820,6 +829,32 @@ mod tests {
         assert_eq!(removals, 1);
     }
 
+    /// The role of the remover counts as it is in the database, not as the session saw it.
+    #[tokio::test]
+    async fn a_demoted_or_removed_admin_cannot_remove() {
+        let f = Fixture::start().await;
+        let anna = f.member("Anna Muster", OrganizationRole::Member).await;
+        let adam = f.member("Adam Admin", OrganizationRole::Admin).await;
+        let admin = MemberCaller::new(adam, f.scope().organization_id(), OrganizationRole::Admin);
+        sqlx::query("UPDATE organization_membership SET role = 'member' WHERE user_id = $1")
+            .bind(adam.as_uuid())
+            .execute(&f.db().pool)
+            .await
+            .unwrap();
+        assert_eq!(f.remove_as(&admin, anna).await, Some(Refusal::Forbidden));
+        sqlx::query("DELETE FROM organization_membership WHERE user_id = $1")
+            .bind(adam.as_uuid())
+            .execute(&f.db().pool)
+            .await
+            .unwrap();
+        assert_eq!(f.remove_as(&admin, anna).await, Some(Refusal::Forbidden));
+        assert_eq!(
+            f.count("SELECT count(*) FROM organization_membership")
+                .await,
+            2
+        );
+    }
+
     /// Two owners who remove each other at the same time: the lock on the owner rows lets exactly
     /// one of them go.
     #[tokio::test]
@@ -835,11 +870,10 @@ mod tests {
             f.remove_as(&olga, otto.user_id()),
             f.remove_as(&otto, olga.user_id())
         );
-        let refused = [first, second]
-            .iter()
-            .filter(|refusal| **refusal == Some(Refusal::LastOwner))
-            .count();
-        assert_eq!(refused, 1, "{first:?} {second:?}");
+        // The second one finds that the remover is no longer a member.
+        let mut results = [first, second];
+        results.sort_by_key(Option::is_some);
+        assert_eq!(results, [None, Some(Refusal::Forbidden)]);
         assert_eq!(
             f.count("SELECT count(*) FROM organization_membership WHERE role = 'owner'")
                 .await,
