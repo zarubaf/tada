@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE session SET last_used_at = greatest(last_used_at, $2) WHERE token_hash = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "450aa7ffc96d5aadf53ec0f3814d5ed82fd600f70da837fc7b1b0271def55dd6"
+}
