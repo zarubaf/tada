@@ -9,29 +9,39 @@ pub struct PublicUrl {
     host: String,
 }
 
-/// The public URL is not an `http` or `https` URL without a path, a query and a user.
+/// Why a text is not a valid public URL.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[error("the public URL must be an http or https URL without a path")]
-pub struct InvalidPublicUrl;
+pub enum InvalidPublicUrl {
+    #[error("the public URL is not a URL: {0}")]
+    Syntax(url::ParseError),
+    #[error("the public URL must start with http:// or https://")]
+    Scheme,
+    #[error("the public URL must have no path, query or fragment")]
+    Path,
+    #[error("the public URL must not contain a user name or a password")]
+    Credentials,
+}
 
 impl PublicUrl {
-    pub fn parse(url: &str) -> Result<Self, InvalidPublicUrl> {
-        let authority = ["https://", "http://"]
-            .iter()
-            .find_map(|scheme| url.strip_prefix(scheme))
-            .ok_or(InvalidPublicUrl)?;
-        let authority = authority.strip_suffix('/').unwrap_or(authority);
-        if authority.is_empty() || authority.contains(['/', '?', '#', '@']) {
-            return Err(InvalidPublicUrl);
+    /// Parses the URL and normalizes it as a browser does: the scheme and the host in lowercase,
+    /// and no default port. So the origin is equal to the `Origin` header of a browser.
+    pub fn parse(text: &str) -> Result<Self, InvalidPublicUrl> {
+        let url = url::Url::parse(text).map_err(InvalidPublicUrl::Syntax)?;
+        if !matches!(url.scheme(), "http" | "https") {
+            return Err(InvalidPublicUrl::Scheme);
         }
-        // An IPv6 address keeps its brackets, as a `Message-ID` domain literal needs them.
-        let host = match authority.find(']') {
-            Some(end) if authority.starts_with('[') => &authority[..=end],
-            _ => authority.split(':').next().unwrap_or(authority),
-        };
+        if url.path() != "/" || url.query().is_some() || url.fragment().is_some() {
+            return Err(InvalidPublicUrl::Path);
+        }
+        if !url.username().is_empty() || url.password().is_some() {
+            return Err(InvalidPublicUrl::Credentials);
+        }
+        // An `http` or `https` URL always has a host. An IPv6 host keeps its brackets,
+        // as a `Message-ID` domain literal needs them.
+        let host = url.host_str().ok_or(InvalidPublicUrl::Scheme)?.to_owned();
         Ok(Self {
-            origin: url.strip_suffix('/').unwrap_or(url).to_owned(),
-            host: host.to_owned(),
+            origin: url.origin().ascii_serialization(),
+            host,
         })
     }
 
@@ -65,6 +75,13 @@ mod tests {
                 "localhost",
             ),
             ("http://[::1]:8080/", "http://[::1]:8080", "[::1]"),
+            // A browser sends this origin, so the Origin check can compare it (ADR 0025).
+            (
+                "HTTPS://Tada.Example.org:443/",
+                "https://tada.example.org",
+                "tada.example.org",
+            ),
+            ("http://LOCALHOST:80", "http://localhost", "localhost"),
         ] {
             let parsed = PublicUrl::parse(url).unwrap();
             assert_eq!((parsed.origin(), parsed.host()), (origin, host));
@@ -78,8 +95,12 @@ mod tests {
             "ftp://tada.example.org",
             "https://",
             "https://anna@tada.example.org",
+            "https://anna:secret@tada.example.org",
+            "https://tada.example.org/?a=1",
+            "https://tada.example.org/#x",
+            "tada.example.org",
         ] {
-            assert_eq!(PublicUrl::parse(url), Err(InvalidPublicUrl), "{url}");
+            assert!(PublicUrl::parse(url).is_err(), "{url}");
         }
     }
 }

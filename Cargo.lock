@@ -3566,6 +3566,7 @@ dependencies = [
  "tada-domain",
  "thiserror",
  "tokio",
+ "url",
  "uuid",
 ]
 
