@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { type Api, problemMessage } from "../api/client";
+import type { Api } from "../api/client";
 import { t } from "../i18n";
 import { useNavigate } from "../router/Router";
 import { useRefreshSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { InlineError } from "../ui/InlineError";
+import { type Failure, failureOf, invalidFailure, useWaiting } from "./failure";
 import { takeFragmentToken } from "./fragment";
 import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
 
@@ -15,48 +16,57 @@ import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
 export function MagicLinkPage({ api }: { api: Api }) {
   // The first render reads and removes the fragment. A later render must keep the token.
   const [token] = useState(takeFragmentToken);
-  const [failure, setFailure] = useState<{ message: string; requestId?: string } | null>(
-    token ? null : { message: t("magic-link-invalid") },
+  const [failure, setFailure] = useState<Failure | undefined>(() =>
+    token ? undefined : invalidFailure(t("magic-link-invalid")),
   );
   const [busy, setBusy] = useState(false);
+  const waiting = useWaiting(failure);
   const refresh = useRefreshSession();
   const navigate = useNavigate();
 
   const signIn = async () => {
-    if (!token) {
+    if (!token || busy || waiting) {
       return;
     }
     setBusy(true);
     try {
-      const { error } = await api.POST("/api/v1/sign-in/magic-link", { body: { token } });
-      if (!error) {
+      const result = await api.POST("/api/v1/sign-in/magic-link", { body: { token } });
+      if (!result.error) {
         await refresh();
         navigate("/events", { replace: true });
         return;
       }
-      setFailure({
-        message: error.status < 500 ? t("magic-link-invalid") : problemMessage(error),
-        requestId: error.status < 500 ? undefined : error.request_id,
-      });
+      setFailure(failureOf(result, t("magic-link-invalid")));
     } catch {
-      setFailure({ message: problemMessage(undefined) });
+      setFailure(failureOf({}));
     }
     setBusy(false);
   };
 
   return (
     <PublicPage title={t("magic-link-title")}>
-      {failure ? (
-        <InlineError message={failure.message} requestId={failure.requestId}>
-          <ToSignInLink />
-        </InlineError>
-      ) : (
+      {!failure?.final && (
         <>
           <PublicText>{t("magic-link-text")}</PublicText>
-          <Button variant="primary" isDisabled={busy} onPress={() => void signIn()}>
+          <Button
+            variant="primary"
+            isPending={busy}
+            isDisabled={waiting}
+            onPress={() => void signIn()}
+          >
             {t("magic-link-submit")}
           </Button>
         </>
+      )}
+      {failure && (
+        <InlineError
+          key={failure.id}
+          message={failure.message}
+          requestId={failure.requestId}
+          takeFocus
+        >
+          {failure.final && <ToSignInLink />}
+        </InlineError>
       )}
     </PublicPage>
   );

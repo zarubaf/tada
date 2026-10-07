@@ -74,5 +74,6 @@ describe("ChooseOrganizationPage", () => {
       "Sie haben keine Berechtigung für diese Aktion.",
     );
     expect(screen.getByTestId("where")).toHaveTextContent("/choose-organization");
+    expect(screen.getByRole("alert")).toHaveFocus();
   });
 });

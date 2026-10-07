@@ -1,32 +1,15 @@
 import { useEffect, useState } from "react";
-import { type Api, type InvitationPreview, type Problem, problemMessage } from "../api/client";
+import type { Api, InvitationPreview } from "../api/client";
 import { t } from "../i18n";
 import { useNavigate } from "../router/Router";
 import { useRefreshSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { InlineError } from "../ui/InlineError";
-import { Skeleton } from "../ui/Skeleton";
+import { type Failure, failureOf, invalidFailure, useWaiting } from "./failure";
 import { takeFragmentToken } from "./fragment";
 import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
 
-type State =
-  | { kind: "loading" }
-  | { kind: "ready"; preview: InvitationPreview }
-  | { kind: "failed"; message: string; requestId: string | undefined };
-
-const INVALID: State = {
-  kind: "failed",
-  message: t("invitation-invalid"),
-  requestId: undefined,
-};
-
-function failed(error: Problem | undefined): State {
-  // A 4xx means that the invitation does not work. Only the failures of the server are worth a note.
-  if (error && error.status < 500) {
-    return INVALID;
-  }
-  return { kind: "failed", message: problemMessage(error), requestId: error?.request_id };
-}
+type Preview = { kind: "loading" } | { kind: "ready"; preview: InvitationPreview };
 
 /**
  * The page that an invitation link opens. The preview shows the organization and the role without
@@ -35,11 +18,18 @@ function failed(error: Problem | undefined): State {
 export function InvitationPage({ api }: { api: Api }) {
   // The first render reads and removes the fragment. A later render must keep the token.
   const [token] = useState(takeFragmentToken);
-  const [state, setState] = useState<State>(token ? { kind: "loading" } : INVALID);
+  const [preview, setPreview] = useState<Preview>({ kind: "loading" });
+  // The failure of the preview or of the click. A final failure replaces the page content.
+  const [failure, setFailure] = useState<Failure | undefined>(() =>
+    token ? undefined : invalidFailure(t("invitation-invalid")),
+  );
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
+  const waiting = useWaiting(failure);
   const refresh = useRefreshSession();
   const navigate = useNavigate();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` loads the preview again
   useEffect(() => {
     if (!token) {
       return;
@@ -47,60 +37,81 @@ export function InvitationPage({ api }: { api: Api }) {
     let current = true;
     api
       .POST("/api/v1/invitations/preview", { body: { token } })
-      .then(({ data, error }) => {
-        if (current) {
-          setState(data ? { kind: "ready", preview: data } : failed(error));
+      .then((result) => {
+        if (!current) {
+          return;
+        }
+        if (result.data) {
+          setFailure(undefined);
+          setPreview({ kind: "ready", preview: result.data });
+        } else {
+          setFailure(failureOf(result, t("invitation-invalid")));
         }
       })
-      .catch(() => current && setState(failed(undefined)));
+      .catch(() => current && setFailure(failureOf({})));
     return () => {
       current = false;
     };
-  }, [api, token]);
+  }, [api, token, attempt]);
 
   const accept = async () => {
-    if (!token) {
+    if (!token || busy || waiting) {
       return;
     }
     setBusy(true);
     try {
-      const { error } = await api.POST("/api/v1/invitations/accept", { body: { token } });
-      if (!error) {
+      const result = await api.POST("/api/v1/invitations/accept", { body: { token } });
+      if (!result.error) {
         await refresh();
         navigate("/events", { replace: true });
         return;
       }
-      setState(failed(error));
+      setFailure(failureOf(result, t("invitation-invalid")));
     } catch {
-      setState(failed(undefined));
+      setFailure(failureOf({}));
     }
     setBusy(false);
   };
 
   return (
     <PublicPage title={t("invitation-title")}>
-      {state.kind === "loading" && (
-        <div role="status" aria-label={t("invitation-loading")}>
-          <Skeleton />
-        </div>
-      )}
-      {state.kind === "failed" && (
-        <InlineError message={state.message} requestId={state.requestId}>
-          <ToSignInLink />
-        </InlineError>
-      )}
-      {state.kind === "ready" && (
+      {/* The live region exists before its text, so that screen readers announce the change. */}
+      <p role="status">{preview.kind === "loading" && !failure ? t("invitation-loading") : ""}</p>
+      {preview.kind === "ready" && !failure?.final && (
         <>
           <PublicText>
             {t("invitation-text", {
-              organization: state.preview.organization_name,
-              role: t(`role-${state.preview.role}`),
+              organization: preview.preview.organization_name,
+              role: t(`role-${preview.preview.role}`),
             })}
           </PublicText>
-          <Button variant="primary" isDisabled={busy} onPress={() => void accept()}>
+          <Button
+            variant="primary"
+            isPending={busy}
+            isDisabled={waiting}
+            onPress={() => void accept()}
+          >
             {t("invitation-accept")}
           </Button>
         </>
+      )}
+      {failure && (
+        <InlineError
+          key={failure.id}
+          message={failure.message}
+          requestId={failure.requestId}
+          onRetry={
+            !failure.final && preview.kind === "loading" && !waiting
+              ? () => {
+                  setFailure(undefined);
+                  setAttempt(attempt + 1);
+                }
+              : undefined
+          }
+          takeFocus
+        >
+          {failure.final && <ToSignInLink />}
+        </InlineError>
       )}
     </PublicPage>
   );

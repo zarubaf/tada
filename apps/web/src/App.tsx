@@ -41,7 +41,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 <Route path="/events">
                   <EventsPage api={api} />
                 </Route>
-                {/* Sign-in pages (Task 19) */}
+                {/* The pages of the sign-in */}
                 <Route path="/sign-in">
                   <SignInPage api={api} />
                 </Route>

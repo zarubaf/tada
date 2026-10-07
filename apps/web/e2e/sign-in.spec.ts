@@ -86,7 +86,7 @@ for (const viewport of viewports) {
         await setTheme(page, theme);
         await expect(page.getByRole("heading", { name: entry.heading })).toBeVisible();
         await expect(page.getByText(entry.ready)).toBeVisible();
-        await expect(page.getByRole("status")).toHaveCount(0);
+        await expect(page.getByRole("status").filter({ hasText: /\S/ })).toHaveCount(0);
 
         const results = await new AxeBuilder({ page })
           .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
@@ -173,7 +173,7 @@ for (const viewport of viewports) {
       await entry.prepare(page);
       await page.goto(`${entry.path}?pseudo${entry.hash}`);
       await expect(page.getByRole("heading", { name: /^\[/ })).toBeVisible();
-      await expect(page.getByRole("status")).toHaveCount(0);
+      await expect(page.getByRole("status").filter({ hasText: /\S/ })).toHaveCount(0);
       expect(await textOverflows(page)).toEqual([]);
     });
   }

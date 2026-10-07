@@ -2,14 +2,19 @@
 import { vi } from "vitest";
 import { createApi } from "../api/client";
 
-export function json(status: number, body?: unknown, contentType = "application/json") {
+export function json(
+  status: number,
+  body?: unknown,
+  contentType = "application/json",
+  headers: Record<string, string> = {},
+) {
   return new Response(body === undefined ? null : JSON.stringify(body), {
     status,
-    headers: { "Content-Type": contentType },
+    headers: { "Content-Type": contentType, ...headers },
   });
 }
 
-export function problem(status: number, code: string) {
+export function problem(status: number, code: string, headers: Record<string, string> = {}) {
   return json(
     status,
     {
@@ -21,6 +26,7 @@ export function problem(status: number, code: string) {
       request_id: "01a11165-c361-77e9-a636-584f1ee6643c",
     },
     "application/problem+json",
+    headers,
   );
 }
 

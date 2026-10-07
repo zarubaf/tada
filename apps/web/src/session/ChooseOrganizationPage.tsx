@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "react-aria-components";
-import { type Api, problemMessage } from "../api/client";
+import type { Api } from "../api/client";
 import { t } from "../i18n";
 import { useNavigate } from "../router/Router";
+import { type Failure, failureOf, useWaiting } from "../sign-in/failure";
 import { PublicPage, PublicText } from "../sign-in/PublicPage";
 import { EmptyState } from "../ui/EmptyState";
 import { InlineError } from "../ui/InlineError";
@@ -17,23 +18,27 @@ export function ChooseOrganizationPage({ api }: { api: Api }) {
   const { memberships } = useSession();
   const refresh = useRefreshSession();
   const navigate = useNavigate();
-  const [failure, setFailure] = useState<{ message: string; requestId: string | undefined }>();
+  const [failure, setFailure] = useState<Failure>();
   const [busy, setBusy] = useState(false);
+  const waiting = useWaiting(failure);
 
   const choose = async (organizationId: string) => {
+    if (busy || waiting) {
+      return;
+    }
     setBusy(true);
     try {
-      const { error } = await api.POST("/api/v1/session/organization", {
+      const result = await api.POST("/api/v1/session/organization", {
         body: { organization_id: organizationId },
       });
-      if (!error) {
+      if (!result.error) {
         await refresh();
         navigate("/events", { replace: true });
         return;
       }
-      setFailure({ message: problemMessage(error), requestId: error.request_id });
+      setFailure(failureOf(result));
     } catch {
-      setFailure({ message: problemMessage(undefined), requestId: undefined });
+      setFailure(failureOf({}));
     }
     setBusy(false);
   };
@@ -53,7 +58,8 @@ export function ChooseOrganizationPage({ api }: { api: Api }) {
               <li key={membership.organization_id}>
                 <Button
                   className={styles.choice}
-                  isDisabled={busy}
+                  isDisabled={waiting}
+                  isPending={busy}
                   onPress={() => void choose(membership.organization_id)}
                 >
                   <span className={styles.name}>{membership.name}</span>
@@ -64,7 +70,14 @@ export function ChooseOrganizationPage({ api }: { api: Api }) {
           </ul>
         </>
       )}
-      {failure && <InlineError message={failure.message} requestId={failure.requestId} />}
+      {failure && (
+        <InlineError
+          key={failure.id}
+          message={failure.message}
+          requestId={failure.requestId}
+          takeFocus
+        />
+      )}
     </PublicPage>
   );
 }

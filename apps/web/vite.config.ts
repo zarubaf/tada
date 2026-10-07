@@ -13,7 +13,5 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/test/setup.ts"],
-    // The first test of a file is slow while the machine runs the other checks.
-    testTimeout: 15_000,
   },
 });
