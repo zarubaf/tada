@@ -129,6 +129,7 @@ Scope: AI intake inside tada (web and Telegram) through the model adapter, actio
 The Telegram work adds the webhook mode and the health endpoints of the `telegram` process role (ADR 0011).
 The person features of ADR 0045 come in this slice: the export of one person, correction, legal redaction and retention jobs.
 The scheduled checks use the job queue of [ADR 0054](adr/0054-job-queue-implementation.md).
+Inbound email uses the modular adapters and the webhook of [ADR 0057](adr/0057-modular-mail-and-inbound-webhook.md) (proposed).
 
 Acceptance:
 

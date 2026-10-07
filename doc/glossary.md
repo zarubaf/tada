@@ -124,6 +124,8 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | MCP server       | The `/mcp` endpoint of tada. AI clients of members use it to read data and create proposals.                                                      | AI API                                           |
 | API token        | A personal token with the prefix `tada_pat_`, bound to one member and one organization, with the scope `read` or `propose`.                       | API key                                          |
 | outbound intent  | A stored record of a message that tada will send, written in the same transaction as the change that causes it.                                   | queue entry                                      |
+| inbound delivery | One received mail message from one inbound adapter, with a delivery key that is unique for the adapter (ADR 0057).                                |                                                  |
+| webhook dialect  | The provider-specific part of the inbound webhook adapter: it reads the message ID and fetches the raw message (ADR 0057).                        |                                                  |
 | cursor           | An opaque value that a list response returns to get the next page. Clients never build it.                                                        | offset, page number                              |
 
 ## Design

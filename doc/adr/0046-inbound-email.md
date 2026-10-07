@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-06
+- Amended by: [0057](0057-modular-mail-and-inbound-webhook.md) (proposed): the webhook adapter, the inbound delivery and the setting names.
 
 ## Context
 
