@@ -17,8 +17,8 @@ use crate::ApiState;
 use crate::problem::ApiError;
 use crate::request_id;
 
-/// The session cookie (ADR 0008).
-const SESSION_COOKIE: &str = "__Host-tada-session";
+/// The name of the session cookie (ADR 0008).
+pub const SESSION_COOKIE: &str = "__Host-tada-session";
 
 /// A JSON request body.
 #[derive(Debug)]

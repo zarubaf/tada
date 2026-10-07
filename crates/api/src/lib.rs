@@ -63,6 +63,7 @@ pub struct ApiState {
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
+pub use extract::SESSION_COOKIE;
 
 /// The versioned API: its routes and its OpenAPI document.
 fn api() -> (Router<ApiState>, OpenApi) {

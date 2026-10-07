@@ -6,78 +6,34 @@
 mod support;
 
 use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::ops::Deref;
 
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Method, Request, Response, StatusCode, header};
-use jiff::{SignedDuration, Timestamp};
+use jiff::SignedDuration;
 use serde_json::{Value, json};
-use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
-use tada_app::clock::Clock;
+use support::{MailApp, SESSION_COOKIE, session_cookie};
 use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
 use tada_app::domain::ids::OrganizationId;
-use tada_app::jobs::{Handlers, Ran, run_next};
-use tada_app::outbound::SendOutbound;
-use tada_app::session::SessionAuthenticator;
-use tada_store_pg::testing::TestDatabase;
-use tower::ServiceExt;
-use uuid::Uuid;
 
-const LEASE: Duration = Duration::from_secs(60);
 const LINK: &str = "https://tada.example.org/sign-in/link#token=";
-const COOKIE: &str = "__Host-tada-session";
 const SECOND: SignedDuration = SignedDuration::from_secs(1);
 
-/// A clock that the test moves. The API, the authenticator and the worker share it.
-#[derive(Debug)]
-struct TestClock(Mutex<Timestamp>);
+/// The shared test application with the steps of a sign-in.
+struct App(MailApp);
 
-impl TestClock {
-    fn advance(&self, duration: SignedDuration) {
-        let mut now = self.0.lock().unwrap();
-        *now += duration;
+impl Deref for App {
+    type Target = MailApp;
+
+    fn deref(&self) -> &MailApp {
+        &self.0
     }
-}
-
-impl Clock for TestClock {
-    fn now(&self) -> Timestamp {
-        *self.0.lock().unwrap()
-    }
-}
-
-struct App {
-    router: Router,
-    test: TestDatabase,
-    mailer: Arc<MemoryMailer>,
-    handlers: Handlers,
-    clock: Arc<TestClock>,
 }
 
 impl App {
     async fn start() -> Self {
-        let test = TestDatabase::start().await;
-        let database = Arc::new(test.database.clone());
-        let clock = Arc::new(TestClock(Mutex::new(
-            "2030-05-18T08:00:00Z".parse().unwrap(),
-        )));
-        let router = serve(&test, clock.clone());
-        let mailer = Arc::new(MemoryMailer::new());
-        let handler = SendOutbound::new(
-            database,
-            mailer.clone(),
-            Arc::new(FluentMailTexts::new().unwrap()),
-            clock.clone(),
-            support::public_url(),
-        );
-        Self {
-            router,
-            test,
-            mailer,
-            handlers: Handlers::default().with(Arc::new(handler)),
-            clock,
-        }
+        Self(MailApp::start().await)
     }
 
     /// Creates a user with a membership in each of `organizations`.
@@ -96,11 +52,6 @@ impl App {
         }
     }
 
-    /// Sends a request. Each response must forbid the referrer (ADR 0008).
-    async fn send(&self, request: Request<Body>) -> (Response<Body>, Value) {
-        send_to(&self.router, request).await
-    }
-
     async fn post(
         &self,
         path: &str,
@@ -111,7 +62,7 @@ impl App {
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::USER_AGENT, "Firefox");
         if let Some(cookie) = cookie {
-            request = request.header(header::COOKIE, format!("{COOKIE}={cookie}"));
+            request = request.header(header::COOKIE, format!("{SESSION_COOKIE}={cookie}"));
         }
         self.send(request.body(Body::from(body.to_string())).unwrap())
             .await
@@ -120,7 +71,7 @@ impl App {
     async fn get(&self, path: &str, cookie: Option<&str>) -> (Response<Body>, Value) {
         let mut request = Request::get(path);
         if let Some(cookie) = cookie {
-            request = request.header(header::COOKIE, format!("{COOKIE}={cookie}"));
+            request = request.header(header::COOKIE, format!("{SESSION_COOKIE}={cookie}"));
         }
         self.send(request.body(Body::empty()).unwrap()).await
     }
@@ -130,27 +81,11 @@ impl App {
             .await
     }
 
-    /// Runs the worker until no job is left.
-    async fn run_jobs(&self) {
-        while run_next(&self.test.database, &self.handlers, Uuid::now_v7(), LEASE)
-            .await
-            .unwrap()
-            != Ran::Idle
-        {}
-    }
-
     /// Requests a magic link for `email`, sends it and reads the token from the link fragment.
     async fn magic_link(&self, email: &str) -> String {
         let (response, _) = self.request_link(email).await;
         assert_eq!(response.status(), StatusCode::ACCEPTED);
-        self.run_jobs().await;
-        let sent = self.mailer.sent();
-        let text = &sent.last().unwrap().text;
-        let start = text.find(LINK).unwrap() + LINK.len();
-        text[start..]
-            .chars()
-            .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
-            .collect()
+        self.mailed_token(LINK).await
     }
 
     async fn redeem(&self, token: &str) -> (Response<Body>, Value) {
@@ -167,53 +102,13 @@ impl App {
     }
 }
 
-/// The router of one `serve` process on the test database.
-fn serve(test: &TestDatabase, clock: Arc<TestClock>) -> Router {
-    let database = Arc::new(test.database.clone());
-    let authenticator = Arc::new(SessionAuthenticator::new(
-        database.clone(),
-        database,
-        clock.clone(),
-    ));
-    tada_api::router(support::api_state(test, authenticator, clock), None)
-}
-
-/// Sends a request. Each response must forbid the referrer (ADR 0008).
-async fn send_to(router: &Router, request: Request<Body>) -> (Response<Body>, Value) {
-    let response = router.clone().oneshot(request).await.unwrap();
-    assert_eq!(
-        response.headers()[header::REFERRER_POLICY],
-        "no-referrer",
-        "each response forbids the referrer"
-    );
-    let (parts, body) = response.into_parts();
-    let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-    let value = if bytes.is_empty() {
-        Value::Null
-    } else {
-        serde_json::from_slice(&bytes).unwrap()
-    };
-    (Response::from_parts(parts, Body::empty()), value)
-}
-
 /// A sign-in request for `email` from the client `peer`.
 async fn request_link_from(router: &Router, peer: IpAddr, email: &str) -> (Response<Body>, Value) {
     let request = support::request_from(peer, Method::POST, "/api/v1/sign-in/requests")
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(json!({"email": email}).to_string()))
         .unwrap();
-    send_to(router, request).await
-}
-
-/// The value of the session cookie that the response sets.
-fn session_cookie(response: &Response<Body>) -> Option<String> {
-    let cookie = response
-        .headers()
-        .get(header::SET_COOKIE)?
-        .to_str()
-        .unwrap();
-    let value = cookie.strip_prefix(&format!("{COOKIE}="))?;
-    Some(value.split(';').next().unwrap().to_owned())
+    support::send(router, request).await
 }
 
 #[tokio::test]
@@ -255,7 +150,9 @@ async fn a_member_signs_in_with_the_magic_link_in_the_organization() {
     let cookie = session_cookie(&response).unwrap();
     assert_eq!(
         set_cookie,
-        format!("{COOKIE}={cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000")
+        format!(
+            "{SESSION_COOKIE}={cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000"
+        )
     );
     app.test.assert_no_plaintext(&cookie).await;
     app.test.assert_no_plaintext(&token).await;
@@ -419,7 +316,7 @@ async fn after_sign_out_the_old_cookie_is_unauthenticated() {
     assert_eq!(body, Value::Null);
     assert_eq!(
         response.headers()[header::SET_COOKIE],
-        format!("{COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0")
+        format!("{SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0")
     );
 
     for path in ["/api/v1/session", "/api/v1/events"] {
@@ -452,7 +349,7 @@ async fn the_sixth_request_for_one_address_is_rate_limited_also_with_two_process
     let app = App::start().await;
     let testwil = app.test.create_organization("testwil").await;
     app.user("anna@example.org", &[testwil]).await;
-    let other_process = serve(&app.test, app.clock.clone());
+    let other_process = support::session_router(&app.test, app.clock.clone());
     let processes = [&app.router, &other_process];
 
     for n in 0..5 {

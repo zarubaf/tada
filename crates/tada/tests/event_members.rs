@@ -10,14 +10,12 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
+use support::SESSION_COOKIE;
 use tada_adapters::clock::SystemClock;
 use tada_app::caller::OrganizationRole;
 use tada_app::domain::ids::UserId;
 use tada_app::session::SessionAuthenticator;
 use tada_store_pg::testing::TestDatabase;
-use tower::ServiceExt;
-
-const SESSION_COOKIE: &str = "__Host-tada-session";
 
 struct Api {
     router: axum::Router,
@@ -52,17 +50,8 @@ impl Api {
                 .body(Body::from(body.to_string())),
             None => request.body(Body::empty()),
         };
-        let response = self.router.clone().oneshot(request.unwrap()).await.unwrap();
-        let status = response.status();
-        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let value = if bytes.is_empty() {
-            Value::Null
-        } else {
-            serde_json::from_slice(&bytes).unwrap()
-        };
-        (status, value)
+        let (response, value) = support::send(&self.router, request.unwrap()).await;
+        (response.status(), value)
     }
 
     async fn get(&self, cookie: &str, path: &str) -> (StatusCode, Value) {

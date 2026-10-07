@@ -5,106 +5,36 @@
 
 mod support;
 
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::ops::Deref;
 
 use axum::body::Body;
-use axum::http::{Method, Request, Response, StatusCode, header};
-use jiff::{SignedDuration, Timestamp};
+use axum::http::{Method, Response, StatusCode, header};
+use jiff::SignedDuration;
 use serde_json::{Value, json};
+use support::{MailApp, SESSION_COOKIE, session_cookie};
 use tada::bootstrap::{BootstrapCommand, execute};
-use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
-use tada_app::clock::Clock;
 use tada_app::domain::identity::{
     DisplayName, Email, OrganizationName, OrganizationRole, OrganizationSlug,
 };
 use tada_app::domain::ids::{OrganizationId, UserId};
-use tada_app::jobs::{Handlers, Ran, run_next};
-use tada_app::outbound::SendOutbound;
-use tada_app::session::SessionAuthenticator;
-use tada_store_pg::testing::TestDatabase;
-use tower::ServiceExt;
-use uuid::Uuid;
 
-const LEASE: Duration = Duration::from_secs(60);
 const LINK: &str = "https://tada.example.org/invitation#token=";
-const COOKIE: &str = "__Host-tada-session";
 const SECOND: SignedDuration = SignedDuration::from_secs(1);
 
-/// A clock that the test moves. The API, the worker and the bootstrap command share it.
-#[derive(Debug)]
-struct TestClock(Mutex<Timestamp>);
+/// The shared test application with the steps of an invitation.
+struct App(MailApp);
 
-impl TestClock {
-    fn advance(&self, duration: SignedDuration) {
-        let mut now = self.0.lock().unwrap();
-        *now += duration;
+impl Deref for App {
+    type Target = MailApp;
+
+    fn deref(&self) -> &MailApp {
+        &self.0
     }
-}
-
-impl Clock for TestClock {
-    fn now(&self) -> Timestamp {
-        *self.0.lock().unwrap()
-    }
-}
-
-struct App {
-    router: axum::Router,
-    test: TestDatabase,
-    mailer: Arc<MemoryMailer>,
-    handlers: Handlers,
-    clock: Arc<TestClock>,
 }
 
 impl App {
     async fn start() -> Self {
-        let test = TestDatabase::start().await;
-        let database = Arc::new(test.database.clone());
-        let clock = Arc::new(TestClock(Mutex::new(
-            "2030-05-18T08:00:00Z".parse().unwrap(),
-        )));
-        let authenticator = Arc::new(SessionAuthenticator::new(
-            database.clone(),
-            database.clone(),
-            clock.clone(),
-        ));
-        let router = tada_api::router(
-            support::api_state(&test, authenticator, clock.clone()),
-            None,
-        );
-        let mailer = Arc::new(MemoryMailer::new());
-        let handler = SendOutbound::new(
-            database,
-            mailer.clone(),
-            Arc::new(FluentMailTexts::new().unwrap()),
-            clock.clone(),
-            support::public_url(),
-        );
-        Self {
-            router,
-            test,
-            mailer,
-            handlers: Handlers::default().with(Arc::new(handler)),
-            clock,
-        }
-    }
-
-    /// Sends a request. Each response must forbid the referrer (ADR 0008).
-    async fn send(&self, request: Request<Body>) -> (Response<Body>, Value) {
-        let response = self.router.clone().oneshot(request).await.unwrap();
-        assert_eq!(
-            response.headers()[header::REFERRER_POLICY],
-            "no-referrer",
-            "each response forbids the referrer"
-        );
-        let (parts, body) = response.into_parts();
-        let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-        let value = if bytes.is_empty() {
-            Value::Null
-        } else {
-            serde_json::from_slice(&bytes).unwrap()
-        };
-        (Response::from_parts(parts, Body::empty()), value)
+        Self(MailApp::start().await)
     }
 
     async fn post(&self, path: &str, body: &Value) -> (Response<Body>, Value) {
@@ -117,7 +47,7 @@ impl App {
 
     async fn get(&self, path: &str, cookie: &str) -> (Response<Body>, Value) {
         let request = support::request(Method::GET, path)
-            .header(header::COOKIE, format!("{COOKIE}={cookie}"));
+            .header(header::COOKIE, format!("{SESSION_COOKIE}={cookie}"));
         self.send(request.body(Body::empty()).unwrap()).await
     }
 
@@ -129,22 +59,6 @@ impl App {
     async fn accept(&self, token: &str) -> (Response<Body>, Value) {
         self.post("/api/v1/invitations/accept", &json!({"token": token}))
             .await
-    }
-
-    /// Runs the worker until no job is left, and reads the token from the fragment of the last link.
-    async fn mailed_token(&self) -> String {
-        while run_next(&self.test.database, &self.handlers, Uuid::now_v7(), LEASE)
-            .await
-            .unwrap()
-            != Ran::Idle
-        {}
-        let sent = self.mailer.sent();
-        let text = &sent.last().unwrap().text;
-        let start = text.find(LINK).unwrap() + LINK.len();
-        text[start..]
-            .chars()
-            .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
-            .collect()
     }
 
     /// Invites `email` into `organization` with `role` and returns the token of the mail.
@@ -162,7 +76,7 @@ impl App {
                 role,
             )
             .await;
-        self.mailed_token().await
+        self.mailed_token(LINK).await
     }
 
     async fn user(&self, email: &str) -> UserId {
@@ -177,17 +91,6 @@ impl App {
     async fn count(&self, sql: &str) -> i64 {
         self.test.scalar(sql).await
     }
-}
-
-/// The value of the session cookie that the response sets.
-fn session_cookie(response: &Response<Body>) -> Option<String> {
-    let cookie = response
-        .headers()
-        .get(header::SET_COOKIE)?
-        .to_str()
-        .unwrap();
-    let value = cookie.strip_prefix(&format!("{COOKIE}="))?;
-    Some(value.split(';').next().unwrap().to_owned())
 }
 
 /// A problem without the fields that differ for each request.
@@ -220,7 +123,7 @@ async fn the_first_owner_previews_and_accepts_the_bootstrap_invitation() {
     else {
         panic!("no invitation: {outcome:?}");
     };
-    let token = app.mailed_token().await;
+    let token = app.mailed_token(LINK).await;
 
     let (response, preview) = app.preview(&token).await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -238,7 +141,9 @@ async fn the_first_owner_previews_and_accepts_the_bootstrap_invitation() {
     let cookie = session_cookie(&response).unwrap();
     assert_eq!(
         set_cookie,
-        format!("{COOKIE}={cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000")
+        format!(
+            "{SESSION_COOKIE}={cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000"
+        )
     );
     app.test.assert_no_plaintext(&cookie).await;
     app.test.assert_no_plaintext(&token).await;
