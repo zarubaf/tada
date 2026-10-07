@@ -7,7 +7,7 @@ use anyhow::Context;
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
 use tada_app::jobs::{Handlers, Ran, run_next};
-use tada_app::outbound::SendOutbound;
+use tada_app::outbound::{PublicUrl, SendOutbound};
 use tada_store_pg::Database;
 use uuid::Uuid;
 
@@ -34,17 +34,13 @@ pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::
     })
     .context("invalid mail settings")?;
     let texts = FluentMailTexts::new().context("invalid mail texts")?;
-    let host = public_url
-        .url
-        .host_str()
-        .context("the public URL has no host")?;
+    let public_url = PublicUrl::parse(public_url.url.as_str()).context("invalid public URL")?;
     let send = SendOutbound::new(
         Arc::new(db.clone()),
         Arc::new(mailer),
         Arc::new(texts),
         Arc::new(SystemClock),
-        public_url.url.as_str(),
-        host,
+        public_url,
     );
     let handlers = Handlers::default().with(Arc::new(send));
     let worker_id = Uuid::now_v7();

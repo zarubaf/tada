@@ -10,7 +10,7 @@ use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
 use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::jobs::{Handlers, Ran, run_next};
-use tada_app::outbound::{Purpose, SendOutbound};
+use tada_app::outbound::{PublicUrl, Purpose, SendOutbound};
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
@@ -32,8 +32,7 @@ impl Worker {
             mailer.clone(),
             Arc::new(FluentMailTexts::new().unwrap()),
             Arc::new(SystemClock),
-            "https://tada.example.org",
-            "tada.example.org",
+            PublicUrl::parse("https://tada.example.org").unwrap(),
         );
         Self {
             test,
