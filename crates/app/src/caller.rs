@@ -2,16 +2,9 @@
 
 use std::marker::PhantomData;
 
+pub use tada_domain::identity::OrganizationRole;
 use tada_domain::ids::{OrganizationId, UserId};
 use uuid::Uuid;
-
-/// The organization role of a member (glossary).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OrganizationRole {
-    Owner,
-    Admin,
-    Member,
-}
 
 /// The way a request reached tada (ADR 0039).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

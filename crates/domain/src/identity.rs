@@ -8,6 +8,14 @@ use std::fmt;
 const EMAIL_MAX_CHARS: usize = 254;
 const DISPLAY_NAME_MAX_CHARS: usize = 100;
 
+/// The organization role of a member (glossary).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrganizationRole {
+    Owner,
+    Admin,
+    Member,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum EmailError {
     #[error("the email address has no single @ with text on both sides")]
