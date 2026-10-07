@@ -5,6 +5,9 @@ import { NotFoundPage } from "./NotFoundPage";
 import { Redirect, Route, Router, Routes } from "./router/Router";
 import { SessionProvider } from "./session/SessionProvider";
 import { Shell } from "./shell/Shell";
+import { InvitationPage } from "./sign-in/InvitationPage";
+import { MagicLinkPage } from "./sign-in/MagicLinkPage";
+import { SignInPage } from "./sign-in/SignInPage";
 import { SkipLink } from "./ui/SkipLink";
 
 const defaultApi = createApi();
@@ -36,6 +39,16 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 </Route>
                 <Route path="/events">
                   <EventsPage api={api} />
+                </Route>
+                {/* Sign-in pages (Task 19) */}
+                <Route path="/sign-in">
+                  <SignInPage api={api} />
+                </Route>
+                <Route path="/sign-in/link">
+                  <MagicLinkPage api={api} />
+                </Route>
+                <Route path="/invitation">
+                  <InvitationPage api={api} />
                 </Route>
                 <Route path="*">
                   <NotFoundPage />

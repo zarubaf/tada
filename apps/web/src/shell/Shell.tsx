@@ -15,16 +15,18 @@ import {
 } from "react-aria-components";
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
-import { Link } from "../router/Router";
+import { Link, usePathname } from "../router/Router";
+import { isPublicPath } from "../session/paths";
 import { useOptionalSession } from "../session/SessionProvider";
 import styles from "./Shell.module.css";
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const session = useOptionalSession();
   const [failure, setFailure] = useState<string>();
+  const publicPage = isPublicPath(usePathname());
 
-  // Without a session (public pages) or an organization (the choice page) there is no frame.
-  if (!session?.organization) {
+  // Without a session or an organization (the choice page), and on public pages, there is no frame.
+  if (publicPage || !session?.organization) {
     return children;
   }
   const { user, organization, memberships, refresh, signOut } = session;

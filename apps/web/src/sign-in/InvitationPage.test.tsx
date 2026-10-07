@@ -1,0 +1,81 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it } from "vitest";
+import { Router, usePathname } from "../router/Router";
+import { SessionProvider } from "../session/SessionProvider";
+import { InvitationPage } from "./InvitationPage";
+import { fakeApi, json, problem } from "./testing";
+
+const membership = {
+  organization_id: "0199b8e0-0000-7000-8000-0000000000a1",
+  name: "Fliegergruppe Testwil",
+  role: "admin",
+};
+const session = {
+  user_id: "0199b8e0-0000-7000-8000-0000000000b1",
+  display_name: "Anna Muster",
+  organization: membership,
+  memberships: [membership],
+};
+
+function Where() {
+  return <p data-testid="where">{usePathname()}</p>;
+}
+
+function renderAt(hash: string, ...responses: Response[]) {
+  window.history.replaceState(null, "", `/invitation${hash}`);
+  const { api, calls } = fakeApi(problem(401, "unauthenticated"), ...responses);
+  render(
+    <Router>
+      <SessionProvider api={api}>
+        <InvitationPage api={api} />
+        <Where />
+      </SessionProvider>
+    </Router>,
+  );
+  return calls;
+}
+
+afterEach(() => window.history.replaceState(null, "", "/"));
+
+describe("InvitationPage", () => {
+  it("previews the invitation with the token in the body and removes the fragment", async () => {
+    const calls = renderAt(
+      "#token=invite-token",
+      json(200, { organization_name: "Fliegergruppe Testwil", role: "admin" }),
+    );
+    expect(await screen.findByText(/Fliegergruppe Testwil/)).toBeInTheDocument();
+    expect(screen.getByText(/Administration/)).toBeInTheDocument();
+    expect(window.location.hash).toBe("");
+    expect(calls[1]).toEqual({
+      method: "POST",
+      path: "/api/v1/invitations/preview",
+      body: JSON.stringify({ token: "invite-token" }),
+    });
+  });
+
+  it("accepts only after the click, then opens the events", async () => {
+    const calls = renderAt(
+      "#token=invite-token",
+      json(200, { organization_name: "Fliegergruppe Testwil", role: "member" }),
+      json(200, session),
+      json(200, session),
+    );
+    const button = await screen.findByRole("button", { name: "Einladung annehmen" });
+    expect(calls.some((call) => call.path.endsWith("/accept"))).toBe(false);
+    await userEvent.click(button);
+
+    expect(await screen.findByText("/events")).toBeInTheDocument();
+    expect(calls.find((call) => call.path.endsWith("/accept"))?.body).toBe(
+      JSON.stringify({ token: "invite-token" }),
+    );
+  });
+
+  it("shows the invalid-invitation message for a rejected token", async () => {
+    renderAt("#token=old", problem(401, "unauthenticated"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Diese Einladung ist ungültig oder abgelaufen.",
+    );
+    expect(screen.getByRole("link", { name: "Zur Anmeldung" })).toHaveAttribute("href", "/sign-in");
+  });
+});

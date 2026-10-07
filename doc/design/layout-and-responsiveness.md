@@ -83,6 +83,7 @@ Each screen uses one of these templates. A new template needs a change to this d
 | Overview         | A header with the key facts, then sections in one column                                                    | Event overview                                       |
 | Portfolio        | A filter bar, then a table of events with readiness columns                                                 | Portfolio                                            |
 | Form             | One column, at most 40rem wide, the actions at the bottom                                                   | Create and edit pages                                |
+| Public page      | No shell. The app name, one heading and a form column of at most 40rem                                      | Sign-in, magic link, invitation                      |
 | Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                          |
 
 ## Widths

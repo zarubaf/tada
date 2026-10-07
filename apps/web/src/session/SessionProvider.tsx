@@ -41,6 +41,19 @@ type State =
   | { kind: "ready"; info: SessionInfo };
 
 const SessionContext = createContext<Session | null>(null);
+const RefreshContext = createContext<(() => Promise<void>) | null>(null);
+
+/**
+ * Loads the session again. A public page calls it after it created a session, for example after
+ * the click on a magic link. It works without a session.
+ */
+export function useRefreshSession(): () => Promise<void> {
+  const refresh = useContext(RefreshContext);
+  if (!refresh) {
+    throw new Error("useRefreshSession needs a <SessionProvider>");
+  }
+  return refresh;
+}
 
 /** The session, or nothing on a public page where nobody has signed in. */
 export function useOptionalSession(): Session | null {
@@ -122,37 +135,43 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
     [state, refresh, signOut],
   );
 
+  return <RefreshContext value={refresh}>{view()}</RefreshContext>;
+
   // A public page works without a session. A member who has one leaves the sign-in page.
-  if (isPublic && !session) {
-    return children;
+  function view() {
+    if (isPublic && !session) {
+      // The same element as the last return: a page that created the session (a magic link) must
+      // not mount again, or it would lose the token that it read from the address.
+      return <SessionContext value={null}>{children}</SessionContext>;
+    }
+    if (session && pathname === SIGN_IN_PATH) {
+      return <Redirect to="/events" />;
+    }
+    if (state.kind === "failed") {
+      return (
+        <InlineError
+          message={state.message}
+          requestId={state.requestId}
+          onRetry={() => {
+            setState({ kind: "loading" });
+            void refresh();
+          }}
+        />
+      );
+    }
+    if (state.kind === "signed-out") {
+      return pathname === SIGN_IN_PATH ? null : <Redirect to={SIGN_IN_PATH} />;
+    }
+    if (!session) {
+      return (
+        <div role="status" aria-label={t("session-loading")}>
+          <Skeleton />
+        </div>
+      );
+    }
+    if (!session.organization && !isPublic && pathname !== CHOOSE_ORGANIZATION_PATH) {
+      return <Redirect to={CHOOSE_ORGANIZATION_PATH} />;
+    }
+    return <SessionContext value={session}>{children}</SessionContext>;
   }
-  if (session && pathname === SIGN_IN_PATH) {
-    return <Redirect to="/events" />;
-  }
-  if (state.kind === "failed") {
-    return (
-      <InlineError
-        message={state.message}
-        requestId={state.requestId}
-        onRetry={() => {
-          setState({ kind: "loading" });
-          void refresh();
-        }}
-      />
-    );
-  }
-  if (state.kind === "signed-out") {
-    return pathname === SIGN_IN_PATH ? null : <Redirect to={SIGN_IN_PATH} />;
-  }
-  if (!session) {
-    return (
-      <div role="status" aria-label={t("session-loading")}>
-        <Skeleton />
-      </div>
-    );
-  }
-  if (!session.organization && !isPublic && pathname !== CHOOSE_ORGANIZATION_PATH) {
-    return <Redirect to={CHOOSE_ORGANIZATION_PATH} />;
-  }
-  return <SessionContext value={session}>{children}</SessionContext>;
 }
