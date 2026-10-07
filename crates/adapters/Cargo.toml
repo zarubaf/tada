@@ -8,6 +8,10 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[features]
+# Test doubles for the tests of other crates.
+testing = []
+
 [lints]
 workspace = true
 
@@ -16,12 +20,16 @@ tada-app.workspace = true
 async-trait.workspace = true
 aws-sdk-s3.workspace = true
 bytes.workspace = true
+fluent-bundle.workspace = true
 futures.workspace = true
 jiff.workspace = true
+lettre.workspace = true
 secrecy.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 testcontainers-modules.workspace = true
-tokio.workspace = true
 uuid.workspace = true
