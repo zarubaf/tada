@@ -70,6 +70,9 @@ pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::
             match ran {
                 Ok(Ran::Idle) => break,
                 Ok(Ran::Completed(job_id)) => tracing::info!(%job_id, "the job completed"),
+                Ok(Ran::CompletedWithWarning(job_id, warning)) => {
+                    tracing::warn!(%job_id, warning = warning.0, "the job completed with a warning")
+                }
                 Ok(Ran::Failed(job_id)) => tracing::warn!(%job_id, "the job failed"),
                 Ok(Ran::LeaseLost(job_id)) => {
                     tracing::warn!(%job_id, "the lease expired before the job completed")

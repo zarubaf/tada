@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use crate::caller::{JobRunner, OrgScope, ServiceCaller};
 use crate::clock::Clock;
-use crate::jobs::{Job, JobFailed, JobHandler};
+use crate::jobs::{Job, JobFailed, JobHandler, JobWarning};
 use crate::mail::{MailTexts, Mailer, OutgoingMessage, SendError};
 use crate::store::StoreError;
 
@@ -230,7 +230,7 @@ impl JobHandler for SendOutbound {
         SEND_JOB
     }
 
-    async fn run(&self, job: &Job) -> Result<(), JobFailed> {
+    async fn run(&self, job: &Job) -> Result<Option<JobWarning>, JobFailed> {
         let intent_id = intent_id(job)?;
         let Some(intent) = self
             .store
@@ -239,7 +239,7 @@ impl JobHandler for SendOutbound {
             .map_err(store_failed)?
         else {
             // An earlier attempt recorded the outcome already.
-            return Ok(());
+            return Ok(None);
         };
         let message = self.message(intent).await?;
         let outcome = match self.mailer.send(&message).await {
@@ -252,7 +252,8 @@ impl JobHandler for SendOutbound {
         self.store
             .finish(intent_id, outcome)
             .await
-            .map_err(store_failed)
+            .map_err(store_failed)?;
+        Ok(None)
     }
 }
 
@@ -485,7 +486,7 @@ mod tests {
     #[tokio::test]
     async fn an_unknown_outcome_is_recorded_and_completes_the_job() {
         let setup = setup(magic_link(), Err(SendError::Unknown));
-        assert_eq!(setup.handler.run(&job(1)).await, Ok(()));
+        assert_eq!(setup.handler.run(&job(1)).await, Ok(None));
         assert_eq!(finished(&setup), [Outcome::Unknown]);
     }
 
@@ -495,7 +496,7 @@ mod tests {
             magic_link(),
             Err(SendError::Rejected("SMTP status 550".into())),
         );
-        assert_eq!(setup.handler.run(&job(1)).await, Ok(()));
+        assert_eq!(setup.handler.run(&job(1)).await, Ok(None));
         assert_eq!(finished(&setup), [Outcome::Failed]);
     }
 
@@ -522,7 +523,7 @@ mod tests {
     async fn a_finished_intent_sends_nothing() {
         let setup = setup(magic_link(), Ok(()));
         setup.store.pending.lock().unwrap().take();
-        assert_eq!(setup.handler.run(&job(2)).await, Ok(()));
+        assert_eq!(setup.handler.run(&job(2)).await, Ok(None));
         assert!(sent(&setup).is_empty());
     }
 

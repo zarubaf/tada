@@ -62,8 +62,14 @@ pub trait JobQueue: Debug + Send + Sync {
 pub trait JobHandler: Debug + Send + Sync {
     fn kind(&self) -> &'static str;
 
-    async fn run(&self, job: &Job) -> Result<(), JobFailed>;
+    /// Runs the job. `Ok(Some(warning))` completes the job, and the worker logs the warning.
+    async fn run(&self, job: &Job) -> Result<Option<JobWarning>, JobFailed>;
 }
+
+/// A completed job that the operator must know about, for example a mail that the server rejected.
+/// The text goes into the log, so it contains no direct identifiers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobWarning(pub String);
 
 /// A failed attempt. The reason goes into the job row and the log, so it contains no direct identifiers.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -87,6 +93,8 @@ pub enum Ran {
     /// No job was due.
     Idle,
     Completed(Uuid),
+    /// The job completed, and its handler reported a warning.
+    CompletedWithWarning(Uuid, JobWarning),
     Failed(Uuid),
     /// The lease expired and another worker holds the job now. The result of this attempt is lost.
     LeaseLost(Uuid),
@@ -110,12 +118,13 @@ pub async fn run_next(
         ))),
     };
     let held = match &result {
-        Ok(()) => queue.complete(&job, worker_id).await?,
+        Ok(_) => queue.complete(&job, worker_id).await?,
         Err(failure) => queue.fail(&job, worker_id, &failure.0).await?,
     };
     Ok(match (held, result) {
         (false, _) => Ran::LeaseLost(job.id),
-        (true, Ok(())) => Ran::Completed(job.id),
+        (true, Ok(None)) => Ran::Completed(job.id),
+        (true, Ok(Some(warning))) => Ran::CompletedWithWarning(job.id, warning),
         (true, Err(_)) => Ran::Failed(job.id),
     })
 }

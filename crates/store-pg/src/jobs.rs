@@ -106,7 +106,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use serde_json::json;
-    use tada_app::jobs::{Handlers, JobFailed, JobHandler, Ran, run_next};
+    use tada_app::jobs::{Handlers, JobFailed, JobHandler, JobWarning, Ran, run_next};
 
     use super::*;
     use crate::testing::TestDatabase;
@@ -266,10 +266,10 @@ mod tests {
             "count"
         }
 
-        async fn run(&self, job: &Job) -> Result<(), JobFailed> {
+        async fn run(&self, job: &Job) -> Result<Option<JobWarning>, JobFailed> {
             assert_eq!(job.version, 1);
-            self.0.fetch_add(1, Ordering::SeqCst);
-            Ok(())
+            let count = self.0.fetch_add(1, Ordering::SeqCst);
+            Ok((count > 0).then(|| JobWarning("counted again".into())))
         }
     }
 
@@ -282,6 +282,7 @@ mod tests {
 
         let counted = add(&test, &job("count")).await;
         let unknown = add(&test, &job("unknown")).await;
+        let again = add(&test, &job("count")).await;
         assert_eq!(
             run_next(&test.database, &handlers, worker, LEASE)
                 .await
@@ -298,9 +299,15 @@ mod tests {
             run_next(&test.database, &handlers, worker, LEASE)
                 .await
                 .unwrap(),
+            Ran::CompletedWithWarning(again, JobWarning("counted again".into()))
+        );
+        assert_eq!(
+            run_next(&test.database, &handlers, worker, LEASE)
+                .await
+                .unwrap(),
             Ran::Idle
         );
-        assert_eq!(counter.0.load(Ordering::SeqCst), 1);
+        assert_eq!(counter.0.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]
