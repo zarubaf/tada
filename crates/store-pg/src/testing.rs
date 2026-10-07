@@ -120,22 +120,28 @@ impl TestDatabase {
         UserId::from_uuid(id)
     }
 
-    /// Starts a session of a user and returns the value of its session cookie.
+    /// Starts a session of a user at the time `now` and returns the value of its session cookie.
+    /// A test with a moved clock passes the time of that clock, so the session is not idle.
     ///
     /// # Panics
     ///
     /// If the insert fails, for example because the user does not exist.
     #[allow(clippy::unwrap_used)]
-    pub async fn sign_in(&self, user: UserId, organization: Option<OrganizationId>) -> String {
+    pub async fn sign_in(
+        &self,
+        user: UserId,
+        organization: Option<OrganizationId>,
+        now: Timestamp,
+    ) -> String {
         let mut conn = self.database.pool.acquire().await.unwrap();
-        let token =
-            crate::session::insert_session(&mut conn, user, organization, None, Timestamp::now())
-                .await
-                .unwrap();
+        let token = crate::session::insert_session(&mut conn, user, organization, None, now)
+            .await
+            .unwrap();
         token.expose_secret().to_owned()
     }
 
     /// Creates a new member of the organization `slug` with a session in that organization.
+    /// The session starts at the wall-clock time; it suits tests with the system clock.
     /// It creates the organization if the slug is free. The user has an invented name and email address.
     /// Returns the organization, the user and the value of the session cookie.
     ///
@@ -170,7 +176,9 @@ impl TestDatabase {
             )
             .await;
         self.add_membership(organization, user, role).await;
-        let cookie = self.sign_in(user, Some(organization)).await;
+        let cookie = self
+            .sign_in(user, Some(organization), Timestamp::now())
+            .await;
         (organization, user, cookie)
     }
 

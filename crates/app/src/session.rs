@@ -92,11 +92,6 @@ async fn use_session(
     Ok(Some(session))
 }
 
-/// The organization boundary of a membership check. No `MemberCaller` exists yet at this point.
-fn scope(organization_id: OrganizationId) -> OrgScope {
-    OrgScope::for_session(organization_id)
-}
-
 /// The signed-in user, the memberships and the organization of a session.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionInfo {
@@ -222,7 +217,7 @@ pub async fn choose_organization(
         .await?
         .ok_or(ChooseOrganizationError::Unauthenticated)?;
     identity
-        .membership(scope(organization_id), session.user_id)
+        .membership(OrgScope::for_session(organization_id), session.user_id)
         .await?
         .ok_or(ChooseOrganizationError::NotFound)?;
     sessions
@@ -284,7 +279,7 @@ impl Authenticator for SessionAuthenticator {
         // The membership can change between two requests, so each request reads it.
         let Some(role) = self
             .identity
-            .membership(scope(organization_id), session.user_id)
+            .membership(OrgScope::for_session(organization_id), session.user_id)
             .await?
         else {
             self.sessions.set_organization(token, None).await?;

@@ -29,7 +29,9 @@ impl Debug for Credential<'_> {
 
 #[async_trait]
 pub trait Authenticator: Debug + Send + Sync {
-    /// Returns the member of `credential`, or `Unauthenticated` if it is missing or invalid.
+    /// Returns the member of `credential`. It returns `Unauthenticated` if the credential is missing
+    /// or invalid, and `OrganizationRequired` if the session has no organization or the membership
+    /// in it no longer exists.
     async fn authenticate(
         &self,
         credential: Option<Credential<'_>>,

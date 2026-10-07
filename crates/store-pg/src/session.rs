@@ -336,7 +336,7 @@ mod tests {
         assert_eq!(session.user_id, user);
         assert_eq!(session.organization_id, Some(testwil));
 
-        let cookie = test.sign_in(user, None).await;
+        let cookie = test.sign_in(user, None, Timestamp::now()).await;
         let session = test
             .database
             .find(&cookie, Timestamp::now())

@@ -57,7 +57,8 @@ pub trait BootstrapStore: Send + Sync {
     /// and records the audit events.
     ///
     /// The organization comes from an infrastructure query by slug (ADR 0039). The store continues
-    /// in it with `ServiceCaller::<Bootstrap>::scope`.
+    /// with the organization ID of its own query, and records the audit events with
+    /// `AuditEvent::by_bootstrap`.
     async fn invite_first_owner(
         &self,
         caller: &ServiceCaller<Bootstrap>,

@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Method, StatusCode, header};
+use jiff::Timestamp;
 use serde_json::{Value, json};
 use support::SESSION_COOKIE;
 use tada_adapters::clock::SystemClock;
@@ -299,7 +300,10 @@ async fn an_event_manager_does_not_see_the_event_with_a_session_of_another_organ
     api.test
         .add_membership(musterhausen, anna, OrganizationRole::Owner)
         .await;
-    let anna_musterhausen = api.test.sign_in(anna, Some(musterhausen)).await;
+    let anna_musterhausen = api
+        .test
+        .sign_in(anna, Some(musterhausen), Timestamp::now())
+        .await;
 
     let (status, _) = api
         .get(&anna_testwil, &format!("/api/v1/events/{event}"))
