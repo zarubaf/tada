@@ -1,4 +1,4 @@
-//! `/api/v1/events`: the `CreateEvent` command and the `ListEvents` query.
+//! `/api/v1/events`: the `CreateEvent` command and the `ListEvents` and `GetEvent` queries.
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -6,6 +6,7 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
+use tada_app::access::AccessError;
 use tada_app::domain::events::{self as domain, EventKey};
 use tada_app::domain::ids::EventId;
 use tada_app::events::{
@@ -19,12 +20,14 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::ApiState;
-use crate::contract::{AUTHENTICATED, JSON_BODY, QUERY, codes};
-use crate::extract::{Caller, Json, Query};
+use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
+use crate::extract::{Caller, Json, Path, Query};
 use crate::problem::{ApiError, Problem};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
-    OpenApiRouter::new().routes(routes!(list_events, create_event))
+    OpenApiRouter::new()
+        .routes(routes!(list_events, create_event))
+        .routes(routes!(get_event))
 }
 
 /// The problem codes of each operation (ADR 0037). They come from the error types of the `app` crate
@@ -38,6 +41,10 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         (
             "list_events",
             codes(&[AUTHENTICATED, QUERY, ListEventsError::CODES]),
+        ),
+        (
+            "get_event",
+            codes(&[AUTHENTICATED, PATH, AccessError::CODES]),
         ),
     ]
 }
@@ -173,6 +180,37 @@ async fn list_events(
         items: page.items.into_iter().map(Event::from).collect(),
         next_cursor: page.next.as_ref().map(encode_cursor),
     }))
+}
+
+/// Reads one event. The caller needs an event role in it, or the organization role owner or admin.
+#[utoipa::path(
+    get,
+    path = "/events/{event_id}",
+    operation_id = "get_event",
+    tag = "events",
+    params(("event_id" = Uuid, Path, description = "The ID of the event.")),
+    responses(
+        (status = OK, description = "The event.", body = Event),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn get_event(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+    Path(event_id): Path<Uuid>,
+) -> Result<axum::Json<Event>, ApiError> {
+    let event = app::get_event(
+        &caller,
+        EventId::from_uuid(event_id),
+        state.events.as_ref(),
+        state.identity.as_ref(),
+    )
+    .await
+    .map_err(|error| match error {
+        AccessError::NotFound => ApiError::new(ProblemCode::NotFound),
+        AccessError::Store(error) => ApiError::store(&error),
+    })?;
+    Ok(axum::Json(event.into()))
 }
 
 /// The cursor is opaque for clients (ADR 0044): the key and the ID, in Base64.

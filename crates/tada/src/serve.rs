@@ -33,6 +33,8 @@ pub async fn run((database, http, storage): ServeSettings) -> anyhow::Result<()>
             telegram: Arc::new(db.clone()),
             clock: Arc::new(SystemClock),
             trusted_proxies: http.trusted_proxies,
+            identity: Arc::new(db.clone()),
+            event_members: Arc::new(db.clone()),
         },
         http.web_root.as_deref(),
     );

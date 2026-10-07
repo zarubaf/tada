@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO event_membership (organization_id, event_id, user_id, event_role, version, created_at)\n             VALUES ($1, $2, $3, $4, 1, $5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ef07cf81501309e15d44b214a1b4162f435bcfd40a559e2688d01a98e189db80"
+}

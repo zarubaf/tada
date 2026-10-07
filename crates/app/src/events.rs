@@ -1,4 +1,4 @@
-//! The `CreateEvent` command and the `ListEvents` query.
+//! The `CreateEvent` command and the `ListEvents` and `GetEvent` queries.
 
 use std::fmt::Debug;
 
@@ -10,9 +10,10 @@ use tada_domain::events::{
 use tada_domain::ids::{self, EventId, UserId};
 use uuid::Uuid;
 
-use crate::access::{self, Principal};
+use crate::access::{self, AccessError, Principal};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
+use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{FieldError, ProblemCode};
 use crate::store::StoreError;
@@ -253,6 +254,22 @@ pub async fn list_events(
             id: last.id,
         });
     Ok(Page { items, next })
+}
+
+/// The event `id`, if the caller can read it (ADR 0052).
+pub async fn get_event(
+    caller: &impl Principal,
+    id: EventId,
+    store: &dyn EventStore,
+    identity: &dyn IdentityStore,
+) -> Result<Event, AccessError> {
+    if !access::event_access(caller, id, identity).await?.can_read() {
+        return Err(AccessError::NotFound);
+    }
+    store
+        .get(caller.scope(), id)
+        .await?
+        .ok_or(AccessError::NotFound)
 }
 
 fn store_code(error: &StoreError) -> ProblemCode {

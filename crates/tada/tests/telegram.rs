@@ -159,6 +159,8 @@ async fn the_member_confirms_the_link_in_the_web_client() {
             telegram: Arc::new(test.database.clone()),
             clock: Arc::new(SystemClock),
             trusted_proxies: Vec::new(),
+            identity: Arc::new(test.database.clone()),
+            event_members: Arc::new(test.database.clone()),
         },
         None,
     );

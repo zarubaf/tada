@@ -31,6 +31,8 @@ impl Api {
                 telegram: Arc::new(test.database.clone()),
                 clock: Arc::new(SystemClock),
                 trusted_proxies: Vec::new(),
+                identity: Arc::new(test.database.clone()),
+                event_members: Arc::new(test.database.clone()),
             },
             None,
         );

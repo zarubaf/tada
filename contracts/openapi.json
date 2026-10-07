@@ -131,6 +131,57 @@
         ]
       }
     },
+    "/api/v1/events/{event_id}": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Reads one event. The caller needs an event role in it, or the organization role owner or admin.",
+        "operationId": "get_event",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/telegram/link-codes": {
       "post": {
         "tags": [
@@ -255,10 +306,304 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/events/{event_id}/memberships": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Lists the event memberships of an event. Only its event managers see them.",
+        "operationId": "list_event_memberships",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All event memberships of the event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventMembershipPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Gives a member of the organization an event role. Only event managers can do this.",
+        "operationId": "add_event_membership",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddEventMembershipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new event membership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventMembership"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/memberships/{user_id}/change-role": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Changes the event role of a member. Only event managers can do this.",
+        "operationId": "change_event_role",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The ID of the member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeEventRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed event membership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventMembership"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/memberships/{user_id}/remove": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Removes the event role of a member. The member loses access to the event with the next request.",
+        "operationId": "remove_event_membership",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The ID of the member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveEventMembershipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "The event membership is removed."
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AddEventMembershipRequest": {
+        "type": "object",
+        "description": "The input of `AddEventMembership`.",
+        "required": [
+          "user_id",
+          "event_role"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A member of the caller's organization."
+          },
+          "event_role": {
+            "$ref": "#/components/schemas/EventRole"
+          }
+        }
+      },
+      "ChangeEventRoleRequest": {
+        "type": "object",
+        "description": "The input of `ChangeEventRole`.",
+        "required": [
+          "event_role",
+          "expected_version"
+        ],
+        "properties": {
+          "event_role": {
+            "$ref": "#/components/schemas/EventRole"
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
       "CreateEventRequest": {
         "type": "object",
         "description": "The input of `CreateEvent`.",
@@ -332,6 +677,53 @@
           }
         }
       },
+      "EventMembership": {
+        "type": "object",
+        "description": "The event role of one member in one event.",
+        "required": [
+          "user_id",
+          "display_name",
+          "event_role",
+          "version",
+          "created_at"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "event_role": {
+            "$ref": "#/components/schemas/EventRole"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. A command that changes the event membership needs it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EventMembershipPage": {
+        "type": "object",
+        "description": "The event memberships of an event. An event has few, so the list has one page.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventMembership"
+            }
+          }
+        }
+      },
       "EventPage": {
         "type": "object",
         "description": "One page of events.",
@@ -353,6 +745,15 @@
             "description": "The cursor of the next page. It is absent on the last page."
           }
         }
+      },
+      "EventRole": {
+        "type": "string",
+        "description": "The role of a member in one event.",
+        "enum": [
+          "event-manager",
+          "event-contributor",
+          "event-viewer"
+        ]
       },
       "Problem": {
         "type": "object",
@@ -422,6 +823,20 @@
           "code": {
             "type": "string",
             "description": "The reason, for example `taken`. The list of codes is open."
+          }
+        }
+      },
+      "RemoveEventMembershipRequest": {
+        "type": "object",
+        "description": "The input of `RemoveEventMembership`.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
           }
         }
       },

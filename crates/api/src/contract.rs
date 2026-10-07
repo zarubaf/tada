@@ -26,6 +26,8 @@ pub(crate) const JSON_BODY: &[ProblemCode] = &[
 ];
 /// The codes of each operation with query parameters.
 pub(crate) const QUERY: &[ProblemCode] = &[ProblemCode::MalformedRequest];
+/// The codes of each operation with path parameters.
+pub(crate) const PATH: &[ProblemCode] = &[ProblemCode::MalformedRequest];
 
 /// The sorted union of code lists.
 pub(crate) fn codes(lists: &[&[ProblemCode]]) -> Vec<ProblemCode> {
@@ -140,7 +142,9 @@ mod tests {
         }
         assert_eq!(
             operations,
-            crate::events::problem_codes().len() + crate::telegram::problem_codes().len(),
+            crate::events::problem_codes().len()
+                + crate::event_members::problem_codes().len()
+                + crate::telegram::problem_codes().len(),
             "a code list without an operation"
         );
     }
