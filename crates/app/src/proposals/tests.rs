@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use serde_json::{Value, json};
 use tada_domain::facts::{FieldDefinition, core_catalog};
-use tada_domain::identity::{Email, EventRole, OrganizationRole};
+use tada_domain::identity::{EventRole, OrganizationRole};
 use tada_domain::ids::{OrganizationId, UserId};
 
 use super::*;
@@ -50,10 +50,6 @@ struct Memory {
 #[async_trait]
 impl IdentityStore for Memory {
     async fn user(&self, _: UserId) -> Result<Option<UserRef>, StoreError> {
-        unreachable!()
-    }
-
-    async fn user_by_email(&self, _: &Email) -> Result<Option<UserRef>, StoreError> {
         unreachable!()
     }
 

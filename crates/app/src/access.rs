@@ -167,7 +167,6 @@ mod tests {
     use std::sync::Mutex;
 
     use async_trait::async_trait;
-    use tada_domain::identity::Email;
     use tada_domain::ids::OrganizationId;
     use uuid::Uuid;
 
@@ -187,10 +186,6 @@ mod tests {
     #[async_trait]
     impl IdentityStore for MemoryIdentity {
         async fn user(&self, _: UserId) -> Result<Option<UserRef>, StoreError> {
-            unreachable!()
-        }
-
-        async fn user_by_email(&self, _: &Email) -> Result<Option<UserRef>, StoreError> {
             unreachable!()
         }
 

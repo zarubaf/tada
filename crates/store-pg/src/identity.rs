@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use tada_app::caller::OrgScope;
-use tada_app::domain::identity::{DisplayName, Email, EventRole, OrganizationRole};
+use tada_app::domain::identity::{DisplayName, EventRole, OrganizationRole};
 use tada_app::domain::ids::{EventId, OrganizationId, UserId};
 use tada_app::identity::{IdentityStore, Membership, UserRef};
 use tada_app::store::StoreError;
@@ -27,27 +27,6 @@ impl IdentityStore for Database {
         row.map(|row| {
             Ok(UserRef {
                 id,
-                display_name: DisplayName::parse(&row.display_name)
-                    .map_err(|_| InvalidRow("display_name"))?,
-                locale: row.locale,
-            })
-        })
-        .transpose()
-    }
-
-    async fn user_by_email(&self, email: &Email) -> Result<Option<UserRef>, StoreError> {
-        let row = sqlx::query!(
-            "SELECT u.id, u.display_name, u.locale
-             FROM email_identity e JOIN app_user u ON u.id = e.user_id
-             WHERE e.email = $1",
-            email.as_str(),
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(store_error)?;
-        row.map(|row| {
-            Ok(UserRef {
-                id: UserId::from_uuid(row.id),
                 display_name: DisplayName::parse(&row.display_name)
                     .map_err(|_| InvalidRow("display_name"))?,
                 locale: row.locale,
@@ -130,11 +109,11 @@ impl IdentityStore for Database {
 
 #[cfg(test)]
 mod tests {
-    use sqlx::types::Uuid;
-    use tada_app::caller::MemberCaller;
-
     use super::*;
     use crate::testing::{TestDatabase, sqlstate};
+    use sqlx::types::Uuid;
+    use tada_app::caller::MemberCaller;
+    use tada_app::domain::identity::Email;
 
     fn name(text: &str) -> DisplayName {
         DisplayName::parse(text).unwrap()
@@ -190,26 +169,8 @@ mod tests {
     #[tokio::test]
     async fn one_email_address_belongs_to_one_user() {
         let test = TestDatabase::start().await;
-        let anna = test
-            .create_user(&name("Anna Muster"), &email("anna@example.org"))
+        test.create_user(&name("Anna Muster"), &email("anna@example.org"))
             .await;
-
-        let found = test
-            .database
-            .user_by_email(&email(" Anna@Example.org "))
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(found.id, anna);
-        assert_eq!(found.display_name, name("Anna Muster"));
-        assert_eq!(found.locale, "de-CH");
-        assert_eq!(
-            test.database
-                .user_by_email(&email("ben@example.org"))
-                .await
-                .unwrap(),
-            None
-        );
 
         let second = Uuid::now_v7();
         sqlx::query(

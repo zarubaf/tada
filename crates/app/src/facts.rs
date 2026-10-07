@@ -160,7 +160,7 @@ mod tests {
 
     use jiff::civil::date;
     use tada_domain::facts::Granularity;
-    use tada_domain::identity::{Email, EventRole, OrganizationRole};
+    use tada_domain::identity::{EventRole, OrganizationRole};
     use tada_domain::ids::{OrganizationId, UserId};
     use uuid::Uuid;
 
@@ -215,10 +215,6 @@ mod tests {
     #[async_trait]
     impl IdentityStore for Memory {
         async fn user(&self, _: UserId) -> Result<Option<UserRef>, StoreError> {
-            unreachable!()
-        }
-
-        async fn user_by_email(&self, _: &Email) -> Result<Option<UserRef>, StoreError> {
             unreachable!()
         }
 

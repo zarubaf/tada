@@ -293,13 +293,6 @@ mod tests {
             unreachable!()
         }
 
-        async fn user_by_email(
-            &self,
-            _: &tada_app::domain::identity::Email,
-        ) -> Result<Option<tada_app::identity::UserRef>, tada_app::store::StoreError> {
-            unreachable!()
-        }
-
         async fn memberships_of(
             &self,
             _: tada_app::domain::ids::UserId,
@@ -337,16 +330,6 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SessionStore for NoSignIn {
-        async fn create(
-            &self,
-            _: tada_app::domain::ids::UserId,
-            _: Option<tada_app::domain::ids::OrganizationId>,
-            _: Option<&str>,
-            _: jiff::Timestamp,
-        ) -> Result<secrecy::SecretString, tada_app::store::StoreError> {
-            unreachable!()
-        }
-
         async fn find(
             &self,
             _: &str,
@@ -372,13 +355,6 @@ mod tests {
         }
 
         async fn delete(&self, _: &str) -> Result<(), tada_app::store::StoreError> {
-            unreachable!()
-        }
-
-        async fn delete_all_of(
-            &self,
-            _: tada_app::domain::ids::UserId,
-        ) -> Result<(), tada_app::store::StoreError> {
             unreachable!()
         }
     }

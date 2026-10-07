@@ -3,7 +3,7 @@
 use std::fmt::Debug;
 
 use async_trait::async_trait;
-use tada_domain::identity::{DisplayName, Email, EventRole, OrganizationRole};
+use tada_domain::identity::{DisplayName, EventRole, OrganizationRole};
 use tada_domain::ids::{EventId, OrganizationId, UserId};
 
 use crate::caller::OrgScope;
@@ -29,10 +29,6 @@ pub struct Membership {
 pub trait IdentityStore: Debug + Send + Sync {
     /// The user with the ID `id`. This query has no scope: a session names a user, not an organization.
     async fn user(&self, id: UserId) -> Result<Option<UserRef>, StoreError>;
-
-    /// Finds the user of an email address. This is an infrastructure query without a scope:
-    /// sign-in has no organization yet, and one address belongs to one user (ADR 0056).
-    async fn user_by_email(&self, email: &Email) -> Result<Option<UserRef>, StoreError>;
 
     /// All memberships of a user, in the order of the organization names.
     /// This query has no scope for the same reason.

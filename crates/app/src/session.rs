@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
-use secrecy::SecretString;
 use tada_domain::identity::DisplayName;
 use tada_domain::ids::{OrganizationId, UserId};
 
@@ -47,15 +46,6 @@ impl SessionRow {
 /// Only the store hashes it; no table holds the token (ADR 0008).
 #[async_trait]
 pub trait SessionStore: Debug + Send + Sync {
-    /// Starts a session and returns its new token.
-    async fn create(
-        &self,
-        user_id: UserId,
-        organization_id: Option<OrganizationId>,
-        user_agent: Option<&str>,
-        now: Timestamp,
-    ) -> Result<SecretString, StoreError>;
-
     /// The session of `token`. An expired session (`SessionRow::is_expired`) gives `None`,
     /// and the store deletes it.
     async fn find(&self, token: &str, now: Timestamp) -> Result<Option<SessionRow>, StoreError>;
@@ -72,9 +62,6 @@ pub trait SessionStore: Debug + Send + Sync {
 
     /// Ends the session, for example at sign-out.
     async fn delete(&self, token: &str) -> Result<(), StoreError>;
-
-    /// Ends all sessions of a user: the revocation of ADR 0008.
-    async fn delete_all_of(&self, user_id: UserId) -> Result<(), StoreError>;
 }
 
 /// The session of `token` at `now`, after it counts as used.
@@ -294,8 +281,8 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Mutex;
 
-    use secrecy::ExposeSecret;
-    use tada_domain::identity::{Email, EventRole, OrganizationRole};
+    use secrecy::{ExposeSecret, SecretString};
+    use tada_domain::identity::{EventRole, OrganizationRole};
     use tada_domain::ids::EventId;
     use uuid::Uuid;
 
@@ -333,8 +320,8 @@ mod tests {
         touches: Mutex<usize>,
     }
 
-    #[async_trait]
-    impl SessionStore for MemorySessions {
+    impl MemorySessions {
+        /// Starts a session and returns its token.
         async fn create(
             &self,
             user_id: UserId,
@@ -354,7 +341,10 @@ mod tests {
             );
             Ok(SecretString::from(token))
         }
+    }
 
+    #[async_trait]
+    impl SessionStore for MemorySessions {
         async fn find(
             &self,
             token: &str,
@@ -393,14 +383,6 @@ mod tests {
             self.rows.lock().unwrap().remove(token);
             Ok(())
         }
-
-        async fn delete_all_of(&self, user_id: UserId) -> Result<(), StoreError> {
-            self.rows
-                .lock()
-                .unwrap()
-                .retain(|_, row| row.user_id != user_id);
-            Ok(())
-        }
     }
 
     /// One user, Anna, and her memberships.
@@ -432,10 +414,6 @@ mod tests {
                 display_name: DisplayName::parse("Anna Muster").unwrap(),
                 locale: "de-CH".to_owned(),
             }))
-        }
-
-        async fn user_by_email(&self, _: &Email) -> Result<Option<UserRef>, StoreError> {
-            unreachable!()
         }
 
         async fn memberships_of(&self, user: UserId) -> Result<Vec<Membership>, StoreError> {

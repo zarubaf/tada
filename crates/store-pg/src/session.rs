@@ -18,7 +18,7 @@ use crate::error::store_error;
 use crate::token::{hash_token, new_token};
 
 /// Starts a session and returns its new token. This is the only code that writes a session row,
-/// so that `SessionStore::create` and the sign-in transactions make the same row.
+/// so that the sign-in transactions and the tests make the same row.
 pub(crate) async fn insert_session(
     conn: &mut PgConnection,
     user_id: UserId,
@@ -44,17 +44,6 @@ pub(crate) async fn insert_session(
 
 #[async_trait]
 impl SessionStore for Database {
-    async fn create(
-        &self,
-        user_id: UserId,
-        organization_id: Option<OrganizationId>,
-        user_agent: Option<&str>,
-        now: Timestamp,
-    ) -> Result<SecretString, StoreError> {
-        let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        insert_session(&mut conn, user_id, organization_id, user_agent, now).await
-    }
-
     async fn find(&self, token: &str, now: Timestamp) -> Result<Option<SessionRow>, StoreError> {
         let hash = hash_token(token);
         let row = sqlx::query!(
@@ -121,14 +110,6 @@ impl SessionStore for Database {
         .map_err(store_error)?;
         Ok(())
     }
-
-    async fn delete_all_of(&self, user_id: UserId) -> Result<(), StoreError> {
-        sqlx::query!("DELETE FROM session WHERE user_id = $1", user_id.as_uuid())
-            .execute(&self.pool)
-            .await
-            .map_err(store_error)?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -153,6 +134,19 @@ mod tests {
         .await
     }
 
+    async fn create(
+        test: &TestDatabase,
+        user: UserId,
+        organization: Option<OrganizationId>,
+        user_agent: Option<&str>,
+        now: Timestamp,
+    ) -> SecretString {
+        let mut conn = test.database.pool.acquire().await.unwrap();
+        insert_session(&mut conn, user, organization, user_agent, now)
+            .await
+            .unwrap()
+    }
+
     async fn count(test: &TestDatabase) -> i64 {
         sqlx::query_scalar("SELECT count(*) FROM session")
             .fetch_one(&test.database.pool)
@@ -164,11 +158,7 @@ mod tests {
     async fn stores_only_the_hash_of_a_session_token() {
         let test = TestDatabase::start().await;
         let user = anna(&test).await;
-        let token = test
-            .database
-            .create(user, None, Some("Firefox"), now())
-            .await
-            .unwrap();
+        let token = create(&test, user, None, Some("Firefox"), now()).await;
 
         test.assert_no_plaintext(token.expose_secret()).await;
         let hash: Vec<u8> = sqlx::query_scalar("SELECT token_hash FROM session")
@@ -183,11 +173,7 @@ mod tests {
         let test = TestDatabase::start().await;
         let testwil = test.create_organization("testwil").await;
         let user = anna(&test).await;
-        let token = test
-            .database
-            .create(user, Some(testwil), None, now())
-            .await
-            .unwrap();
+        let token = create(&test, user, Some(testwil), None, now()).await;
 
         let session = test
             .database
@@ -210,7 +196,7 @@ mod tests {
     async fn find_deletes_an_expired_session() {
         let test = TestDatabase::start().await;
         let user = anna(&test).await;
-        let token = test.database.create(user, None, None, now()).await.unwrap();
+        let token = create(&test, user, None, None, now()).await;
 
         let later = now() + IDLE_TIMEOUT;
         assert_eq!(
@@ -228,7 +214,7 @@ mod tests {
         let test = TestDatabase::start().await;
         let testwil = test.create_organization("testwil").await;
         let user = anna(&test).await;
-        let token = test.database.create(user, None, None, now()).await.unwrap();
+        let token = create(&test, user, None, None, now()).await;
         let token = token.expose_secret();
 
         let later = now() + SignedDuration::from_hours(1);
@@ -250,7 +236,7 @@ mod tests {
     async fn delete_ends_the_session() {
         let test = TestDatabase::start().await;
         let user = anna(&test).await;
-        let token = test.database.create(user, None, None, now()).await.unwrap();
+        let token = create(&test, user, None, None, now()).await;
 
         test.database.delete(token.expose_secret()).await.unwrap();
         assert_eq!(
@@ -263,38 +249,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn delete_all_of_removes_all_sessions_of_a_user() {
-        let test = TestDatabase::start().await;
-        let user = anna(&test).await;
-        let ben = test
-            .create_user(
-                &DisplayName::parse("Ben Beispiel").unwrap(),
-                &Email::parse("ben@example.org").unwrap(),
-            )
-            .await;
-        for _ in 0..2 {
-            test.database.create(user, None, None, now()).await.unwrap();
-        }
-        let other = test.database.create(ben, None, None, now()).await.unwrap();
-
-        test.database.delete_all_of(user).await.unwrap();
-        assert_eq!(count(&test).await, 1);
-        assert!(
-            test.database
-                .find(other.expose_secret(), now())
-                .await
-                .unwrap()
-                .is_some()
-        );
-    }
-
-    #[tokio::test]
     async fn two_sessions_of_one_user_are_independent() {
         let test = TestDatabase::start().await;
         let testwil = test.create_organization("testwil").await;
         let user = anna(&test).await;
-        let first = test.database.create(user, None, None, now()).await.unwrap();
-        let second = test.database.create(user, None, None, now()).await.unwrap();
+        let first = create(&test, user, None, None, now()).await;
+        let second = create(&test, user, None, None, now()).await;
         assert_ne!(first.expose_secret(), second.expose_secret());
 
         test.database
@@ -350,7 +310,7 @@ mod tests {
     async fn deleting_a_user_deletes_the_sessions() {
         let test = TestDatabase::start().await;
         let user = anna(&test).await;
-        test.database.create(user, None, None, now()).await.unwrap();
+        create(&test, user, None, None, now()).await;
         sqlx::query("DELETE FROM email_identity WHERE user_id = $1")
             .bind(user.as_uuid())
             .execute(&test.database.pool)
