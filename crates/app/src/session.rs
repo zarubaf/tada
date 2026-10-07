@@ -236,7 +236,8 @@ pub async fn sign_out(token: &str, sessions: &dyn SessionStore) -> Result<(), St
     sessions.delete(token).await
 }
 
-/// The `Authenticator` of sessions (ADR 0008, ADR 0056).
+/// The `Authenticator` of sessions (ADR 0008, ADR 0056). It lives in `app` because it only
+/// composes ports and needs the private scope constructor (ADR 0062).
 pub struct SessionAuthenticator {
     sessions: Arc<dyn SessionStore>,
     identity: Arc<dyn IdentityStore>,

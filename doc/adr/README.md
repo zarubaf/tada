@@ -76,6 +76,7 @@ The ADRs are the authority for the decisions in this project.
 | [0058](0058-markdown-renderer-for-drafts.md)          | Markdown parser and renderer for drafts                  | Proposed                  |
 | [0060](0060-unicode-normalization-of-source-texts.md) | Unicode normalization of source texts                    | Proposed                  |
 | [0061](0061-audit-subject-and-role-detail.md)         | Audit subject and role detail                            | Proposed                  |
+| [0062](0062-authenticators-in-app.md)                 | Authenticators in `app`                                  | Proposed                  |
 
 ## New ADR
 
