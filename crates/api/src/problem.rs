@@ -2,6 +2,7 @@
 
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use jiff::SignedDuration;
 use serde::Serialize;
 use tada_app::problem::{FieldError, ProblemCode};
 use tada_app::store::StoreError;
@@ -68,6 +69,8 @@ pub struct ApiError {
     code: ProblemCode,
     detail: Option<&'static str>,
     errors: Vec<ProblemError>,
+    /// The seconds of the `Retry-After` header.
+    retry_after: Option<i64>,
 }
 
 impl ApiError {
@@ -76,6 +79,16 @@ impl ApiError {
             code,
             detail: None,
             errors: Vec::new(),
+            retry_after: None,
+        }
+    }
+
+    /// A `rate-limited` problem. `Retry-After` has the wait in whole seconds, rounded up.
+    pub fn rate_limited(retry_after: SignedDuration) -> Self {
+        let seconds = retry_after.as_secs() + i64::from(retry_after.subsec_nanos() > 0);
+        Self {
+            retry_after: Some(seconds.max(1)),
+            ..Self::new(ProblemCode::RateLimited)
         }
     }
 
@@ -96,6 +109,7 @@ impl ApiError {
                     code: error.code.to_owned(),
                 })
                 .collect(),
+            retry_after: None,
         }
     }
 
@@ -137,6 +151,11 @@ impl IntoResponse for ApiError {
             header::CONTENT_TYPE,
             HeaderValue::from_static("application/problem+json"),
         );
+        if let Some(seconds) = self.retry_after {
+            response
+                .headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from(seconds));
+        }
         response
     }
 }

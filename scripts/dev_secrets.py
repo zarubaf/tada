@@ -25,6 +25,7 @@ GENERATORS: dict[str, Callable[[], str]] = {
     "garage_admin_token": lambda: secrets.token_urlsafe(32),
     "s3_access_key_id": lambda: "GK" + secrets.token_hex(12),
     "s3_secret_access_key": lambda: secrets.token_hex(32),
+    "rate_limit_key": lambda: secrets.token_urlsafe(32),
 }
 
 

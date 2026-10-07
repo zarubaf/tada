@@ -5,9 +5,11 @@
 
 mod support;
 
+use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use axum::Router;
 use axum::body::Body;
 use axum::http::{Method, Request, Response, StatusCode, header};
 use jiff::{SignedDuration, Timestamp};
@@ -46,7 +48,7 @@ impl Clock for TestClock {
 }
 
 struct App {
-    router: axum::Router,
+    router: Router,
     test: TestDatabase,
     mailer: Arc<MemoryMailer>,
     handlers: Handlers,
@@ -60,15 +62,7 @@ impl App {
         let clock = Arc::new(TestClock(Mutex::new(
             "2030-05-18T08:00:00Z".parse().unwrap(),
         )));
-        let authenticator = Arc::new(SessionAuthenticator::new(
-            database.clone(),
-            database.clone(),
-            clock.clone(),
-        ));
-        let router = tada_api::router(
-            support::api_state(&test, authenticator, clock.clone()),
-            None,
-        );
+        let router = serve(&test, clock.clone());
         let mailer = Arc::new(MemoryMailer::new());
         let handler = SendOutbound::new(
             database,
@@ -104,20 +98,7 @@ impl App {
 
     /// Sends a request. Each response must forbid the referrer (ADR 0008).
     async fn send(&self, request: Request<Body>) -> (Response<Body>, Value) {
-        let response = self.router.clone().oneshot(request).await.unwrap();
-        assert_eq!(
-            response.headers()[header::REFERRER_POLICY],
-            "no-referrer",
-            "each response forbids the referrer"
-        );
-        let (parts, body) = response.into_parts();
-        let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-        let value = if bytes.is_empty() {
-            Value::Null
-        } else {
-            serde_json::from_slice(&bytes).unwrap()
-        };
-        (Response::from_parts(parts, Body::empty()), value)
+        send_to(&self.router, request).await
     }
 
     async fn post(
@@ -184,6 +165,44 @@ impl App {
         assert_eq!(response.status(), StatusCode::OK);
         session_cookie(&response).unwrap()
     }
+}
+
+/// The router of one `serve` process on the test database.
+fn serve(test: &TestDatabase, clock: Arc<TestClock>) -> Router {
+    let database = Arc::new(test.database.clone());
+    let authenticator = Arc::new(SessionAuthenticator::new(
+        database.clone(),
+        database,
+        clock.clone(),
+    ));
+    tada_api::router(support::api_state(test, authenticator, clock), None)
+}
+
+/// Sends a request. Each response must forbid the referrer (ADR 0008).
+async fn send_to(router: &Router, request: Request<Body>) -> (Response<Body>, Value) {
+    let response = router.clone().oneshot(request).await.unwrap();
+    assert_eq!(
+        response.headers()[header::REFERRER_POLICY],
+        "no-referrer",
+        "each response forbids the referrer"
+    );
+    let (parts, body) = response.into_parts();
+    let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+    let value = if bytes.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap()
+    };
+    (Response::from_parts(parts, Body::empty()), value)
+}
+
+/// A sign-in request for `email` from the client `peer`.
+async fn request_link_from(router: &Router, peer: IpAddr, email: &str) -> (Response<Body>, Value) {
+    let request = support::request_from(peer, Method::POST, "/api/v1/sign-in/requests")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(json!({"email": email}).to_string()))
+        .unwrap();
+    send_to(router, request).await
 }
 
 /// The value of the session cookie that the response sets.
@@ -426,4 +445,59 @@ async fn each_response_forbids_the_referrer() {
     }
     app.request_link("nobody@example.org").await;
     app.redeem("unknown").await;
+}
+
+#[tokio::test]
+async fn the_sixth_request_for_one_address_is_rate_limited_also_with_two_processes() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let other_process = serve(&app.test, app.clock.clone());
+    let processes = [&app.router, &other_process];
+
+    for n in 0..5 {
+        let (response, _) =
+            request_link_from(processes[n % 2], support::PEER, "anna@example.org").await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED, "request {}", n + 1);
+    }
+    let (response, problem) =
+        request_link_from(processes[1], support::PEER, "Anna@Example.org").await;
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(problem["code"], "rate-limited");
+    // The window started at the time of the test clock and lasts one hour.
+    assert_eq!(response.headers()[header::RETRY_AFTER], "3600");
+
+    let other_ip: IpAddr = "198.51.100.1".parse().unwrap();
+    let (response, _) = request_link_from(processes[0], other_ip, "ben@example.org").await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+    app.run_jobs().await;
+    assert_eq!(
+        app.mailer.sent().len(),
+        5,
+        "the limited request sends no mail"
+    );
+
+    app.clock.advance(SignedDuration::from_hours(1));
+    let (response, _) = request_link_from(processes[0], support::PEER, "anna@example.org").await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED, "a new window");
+}
+
+#[tokio::test]
+async fn the_31st_request_from_one_ip_address_is_rate_limited() {
+    let app = App::start().await;
+    for n in 0..30 {
+        let (response, _) = request_link_from(
+            &app.router,
+            support::PEER,
+            &format!("person{n}@example.org"),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED, "request {}", n + 1);
+    }
+    let (response, problem) =
+        request_link_from(&app.router, support::PEER, "person30@example.org").await;
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(problem["code"], "rate-limited");
+    assert!(response.headers().contains_key(header::RETRY_AFTER));
 }

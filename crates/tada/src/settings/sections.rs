@@ -16,7 +16,7 @@ use super::{Section, Setting, Source};
 // Each command also reads `Logging`; see `crate::main`.
 
 /// The settings of `tada serve`.
-pub type ServeSettings = (Database, Http, Storage, PublicUrl);
+pub type ServeSettings = (Database, Http, Storage, PublicUrl, SignIn);
 /// The settings of `tada worker`.
 pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp);
 /// The settings of `tada telegram`.
@@ -126,7 +126,7 @@ const TRUSTED_PROXIES: Setting = Setting {
     kind: "list of network ranges",
     default: Some(""),
     secret: false,
-    description: "The ranges of the reverse proxies, separated by commas, for example `10.0.0.0/8`. The server accepts `X-Request-Id` only from them.",
+    description: "The ranges of the reverse proxies, separated by commas, for example `10.0.0.0/8`. The server accepts `X-Request-Id` and `X-Forwarded-For` only from them.",
 };
 
 const WEB_ROOT: Setting = Setting {
@@ -317,6 +317,32 @@ impl Section for PublicUrl {
                 None
             }
         }
+    }
+}
+
+/// The sign-in of `tada serve` (ADR 0056).
+#[derive(Debug)]
+pub struct SignIn {
+    pub rate_limit_key: SecretString,
+}
+
+const RATE_LIMIT_KEY: Setting = Setting {
+    name: "TADA_RATE_LIMIT_KEY_FILE",
+    kind: "file path",
+    default: None,
+    secret: true,
+    description: "The file that contains the key of the rate-limit counters. The counters keep an HMAC of each address with it. All `serve` processes need the same key.",
+};
+
+impl Section for SignIn {
+    fn settings() -> Vec<&'static Setting> {
+        vec![&RATE_LIMIT_KEY]
+    }
+
+    fn read(source: &mut Source<'_>) -> Option<Self> {
+        Some(Self {
+            rate_limit_key: source.secret(&RATE_LIMIT_KEY)?,
+        })
     }
 }
 

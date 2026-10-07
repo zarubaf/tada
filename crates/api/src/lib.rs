@@ -29,7 +29,7 @@ use tada_app::identity::IdentityStore;
 use tada_app::problem::ProblemCode;
 use tada_app::public_url::PublicUrl;
 use tada_app::session::SessionStore;
-use tada_app::sign_in::SignInStore;
+use tada_app::sign_in::{SignInRequestStore, SignInStore};
 use tada_app::telegram::TelegramLinks;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa::openapi::OpenApi;
@@ -51,8 +51,9 @@ pub struct ApiState {
     pub identity: Arc<dyn IdentityStore>,
     pub sessions: Arc<dyn SessionStore>,
     pub sign_in: Arc<dyn SignInStore>,
+    pub sign_in_requests: Arc<dyn SignInRequestStore>,
     pub clock: Arc<dyn Clock>,
-    /// The proxies whose `X-Request-Id` the server accepts (ADR 0035).
+    /// The proxies whose `X-Request-Id` and `X-Forwarded-For` the server accepts (ADR 0008, ADR 0035).
     pub trusted_proxies: Vec<IpNet>,
     /// `TADA_PUBLIC_URL`. Its origin is the only `Origin` of a state-changing request (ADR 0008).
     pub public_url: PublicUrl,
@@ -352,20 +353,25 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SignInStore for NoSignIn {
-        async fn queue_magic_link(
-            &self,
-            _: &tada_app::domain::identity::Email,
-            _: Option<uuid::Uuid>,
-        ) -> Result<(), tada_app::store::StoreError> {
-            unreachable!()
-        }
-
         async fn redeem_magic_link(
             &self,
             _: &str,
             _: Option<&str>,
             _: jiff::Timestamp,
         ) -> Result<Option<secrecy::SecretString>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl SignInRequestStore for NoSignIn {
+        async fn queue_magic_link(
+            &self,
+            _: &tada_app::domain::identity::Email,
+            _: &[tada_app::rate_limit::RateLimit<'_>],
+            _: Option<uuid::Uuid>,
+            _: jiff::Timestamp,
+        ) -> Result<tada_app::rate_limit::RateDecision, tada_app::store::StoreError> {
             unreachable!()
         }
     }
@@ -379,6 +385,7 @@ mod tests {
             identity: Arc::new(NoSignIn),
             sessions: Arc::new(NoSignIn),
             sign_in: Arc::new(NoSignIn),
+            sign_in_requests: Arc::new(NoSignIn),
             clock: Arc::new(NoClock),
             trusted_proxies: Vec::new(),
             public_url: PublicUrl::parse("https://tada.example.org").unwrap(),

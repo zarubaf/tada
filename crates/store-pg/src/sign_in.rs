@@ -24,8 +24,8 @@ use crate::token::hash_token;
 
 /// Queues a magic-link intent for the user of `email` if that user has a membership.
 ///
-/// One statement for both cases, so a member and an unknown address cost one round trip each
-/// (ADR 0008). It writes the rows of `queue_outbound` for a magic link: the intent and its send
+/// One statement for both cases, so a member and an unknown address cost the same (ADR 0008).
+/// It writes the rows of `queue_outbound` for a magic link: the intent and its send
 /// job, whose payload names the intent only (ADR 0042).
 async fn queue_magic_link_intent(
     executor: impl PgExecutor<'_>,
@@ -97,14 +97,6 @@ impl SignInRequestStore for PgSignInRequestStore {
 
 #[async_trait]
 impl SignInStore for Database {
-    async fn queue_magic_link(
-        &self,
-        email: &Email,
-        request_id: Option<Uuid>,
-    ) -> Result<(), StoreError> {
-        queue_magic_link_intent(&self.pool, email, request_id).await
-    }
-
     async fn redeem_magic_link(
         &self,
         token: &str,
@@ -189,6 +181,24 @@ mod tests {
             .unwrap()
     }
 
+    fn request_store(test: &TestDatabase) -> PgSignInRequestStore {
+        PgSignInRequestStore::new(
+            test.database.clone(),
+            PgRateLimiter::new(SecretString::from("test rate limit key")),
+        )
+    }
+
+    /// A sign-in request for `address` that the limits allow.
+    async fn queue(test: &TestDatabase, address: &str, request_id: Option<Uuid>) {
+        let email = email(address);
+        let limits = sign_in_limits(&email, "203.0.113.7".parse().unwrap());
+        let decision = request_store(test)
+            .queue_magic_link(&email, &limits, request_id, now())
+            .await
+            .unwrap();
+        assert_eq!(decision, RateDecision::Allowed);
+    }
+
     #[tokio::test]
     async fn queues_a_magic_link_for_a_member_only() {
         let test = TestDatabase::start().await;
@@ -199,19 +209,13 @@ mod tests {
         user(&test, "ben@example.org").await;
 
         for address in ["nobody@example.org", "ben@example.org"] {
-            test.database
-                .queue_magic_link(&email(address), None)
-                .await
-                .unwrap();
+            queue(&test, address, None).await;
         }
         assert_eq!(count(&test, "outbound_intent").await, 0);
         assert_eq!(count(&test, "job").await, 0);
 
         let request = Uuid::now_v7();
-        test.database
-            .queue_magic_link(&email("anna@example.org"), Some(request))
-            .await
-            .unwrap();
+        queue(&test, "anna@example.org", Some(request)).await;
         assert_eq!(count(&test, "outbound_intent").await, 1);
 
         // The job is the one that `queue_outbound` writes: it names the intent only (ADR 0042).
@@ -234,13 +238,6 @@ mod tests {
         assert_eq!(pending.to, email("anna@example.org"));
     }
 
-    fn request_store(test: &TestDatabase) -> PgSignInRequestStore {
-        PgSignInRequestStore::new(
-            test.database.clone(),
-            PgRateLimiter::new(SecretString::from("test rate limit key")),
-        )
-    }
-
     #[tokio::test]
     async fn a_request_counts_and_queues_in_one_transaction() {
         let test = TestDatabase::start().await;
@@ -248,16 +245,8 @@ mod tests {
         let anna = user(&test, "anna@example.org").await;
         test.add_membership(testwil, anna, OrganizationRole::Member)
             .await;
-        let store = request_store(&test);
-        let ip = "203.0.113.7".parse().unwrap();
-
         for address in ["nobody@example.org", "anna@example.org"] {
-            let email = email(address);
-            let decision = store
-                .queue_magic_link(&email, &sign_in_limits(&email, ip), None, now())
-                .await
-                .unwrap();
-            assert_eq!(decision, RateDecision::Allowed);
+            queue(&test, address, None).await;
         }
         assert_eq!(count(&test, "outbound_intent").await, 1);
         assert_eq!(count(&test, "rate_limit_counter").await, 3);

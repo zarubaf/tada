@@ -64,6 +64,7 @@ tuple_section!(A);
 tuple_section!(A, B);
 tuple_section!(A, B, C);
 tuple_section!(A, B, C, D);
+tuple_section!(A, B, C, D, E);
 
 /// Reads the section `S` from the environment.
 pub fn load<S: Section>(
@@ -242,6 +243,7 @@ mod tests {
                 "TADA_S3_ACCESS_KEY_ID_FILE",
                 "TADA_S3_SECRET_ACCESS_KEY_FILE",
                 "TADA_PUBLIC_URL",
+                "TADA_RATE_LIMIT_KEY_FILE",
             ]
         );
     }

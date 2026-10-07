@@ -263,7 +263,7 @@
         "tags": [
           "sign-in"
         ],
-        "summary": "Asks for a magic link. The answer is the same for each address (ADR 0008).\nOnly a member gets a mail.",
+        "summary": "Asks for a magic link. The answer is the same for each address (ADR 0008).\nOnly a member gets a mail. Too many requests for one address or from one client get\n`rate-limited` with `Retry-After` (ADR 0056).",
         "operationId": "request_sign_in",
         "requestBody": {
           "content": {
@@ -295,6 +295,7 @@
           "forbidden",
           "payload-too-large",
           "unsupported-media-type",
+          "rate-limited",
           "unavailable",
           "internal"
         ]

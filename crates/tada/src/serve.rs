@@ -8,14 +8,17 @@ use tada_adapters::clock::SystemClock;
 use tada_adapters::storage::{S3Config, S3Storage};
 use tada_api::ApiState;
 use tada_app::auth::Authenticator;
-use tada_store_pg::Database;
+use tada_store_pg::rate_limit::PgRateLimiter;
+use tada_store_pg::{Database, PgSignInRequestStore};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
 use crate::settings::ServeSettings;
 use crate::shutdown;
 
-pub async fn run((database, http, storage, public_url): ServeSettings) -> anyhow::Result<()> {
+pub async fn run(
+    (database, http, storage, public_url, sign_in): ServeSettings,
+) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
     let storage = S3Storage::new(S3Config {
@@ -34,6 +37,10 @@ pub async fn run((database, http, storage, public_url): ServeSettings) -> anyhow
             identity: Arc::new(db.clone()),
             sessions: Arc::new(db.clone()),
             sign_in: Arc::new(db.clone()),
+            sign_in_requests: Arc::new(PgSignInRequestStore::new(
+                db.clone(),
+                PgRateLimiter::new(sign_in.rate_limit_key),
+            )),
             clock: Arc::new(SystemClock),
             trusted_proxies: http.trusted_proxies,
             public_url,
