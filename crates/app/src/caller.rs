@@ -60,6 +60,17 @@ pub struct Actor {
 }
 
 impl Actor {
+    /// A member who acts for themselves.
+    pub(crate) fn member(user_id: UserId, channel: Channel, request_id: Option<Uuid>) -> Self {
+        Self {
+            kind: ActorKind::Member,
+            id: user_id.as_uuid(),
+            principal: None,
+            channel,
+            request_id,
+        }
+    }
+
     pub fn kind(&self) -> ActorKind {
         self.kind
     }
@@ -120,13 +131,7 @@ impl MemberCaller {
     }
 
     pub fn actor(&self) -> Actor {
-        Actor {
-            kind: ActorKind::Member,
-            id: self.user_id.as_uuid(),
-            principal: None,
-            channel: self.channel,
-            request_id: self.request_id,
-        }
+        Actor::member(self.user_id, self.channel, self.request_id)
     }
 
     pub fn user_id(&self) -> UserId {

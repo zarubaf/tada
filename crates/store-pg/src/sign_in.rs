@@ -12,9 +12,8 @@ use serde_json::json;
 use sqlx::PgConnection;
 use sqlx::types::{Json, Uuid};
 use tada_app::audit::AuditEvent;
-use tada_app::caller::{Channel, MemberCaller};
 use tada_app::domain::identity::{Email, OrganizationRole};
-use tada_app::domain::ids::{OrganizationId, UserId};
+use tada_app::domain::ids::{InvitationId, OrganizationId, UserId};
 use tada_app::outbound::SEND_JOB;
 use tada_app::sign_in::{InvitationPreview, SignInStore, accepted_role, initial_organization};
 use tada_app::store::StoreError;
@@ -169,7 +168,7 @@ impl SignInStore for Database {
         let organization_id = OrganizationId::from_uuid(invitation.organization_id);
         let user_id =
             find_or_create_user(&mut tx, &invitation.email, &invitation.display_name, now).await?;
-        let role = add_membership(
+        add_membership(
             &mut tx,
             organization_id,
             user_id,
@@ -198,15 +197,11 @@ impl SignInStore for Database {
         .await
         .map_err(store_error)?;
 
-        // The token authenticates the invitee, so the new member is the actor of the acceptance.
-        let caller = MemberCaller::new(user_id, organization_id, role)
-            .with_request(Channel::Web, request_id);
-        let event = AuditEvent::new(
-            caller.actor(),
-            "invitation.accept",
-            "invitation",
-            Some(invitation.id),
-            Some(caller.scope()),
+        let event = AuditEvent::by_invitee(
+            user_id,
+            organization_id,
+            InvitationId::from_uuid(invitation.id),
+            request_id,
         );
         record(&mut tx, &event).await.map_err(store_error)?;
 
@@ -220,6 +215,10 @@ impl SignInStore for Database {
 
 /// The user of `email`, or a new user with `display_name` if no user has this address.
 /// One address belongs to one user (ADR 0056).
+///
+/// Known limit: two acceptances for one new address at the same moment both find no user.
+/// The UNIQUE email constraint then fails the second transaction, which rolls back with a 500.
+/// It never makes a second user for the address.
 async fn find_or_create_user(
     conn: &mut PgConnection,
     email: &str,
@@ -257,14 +256,17 @@ async fn find_or_create_user(
 }
 
 /// Adds the membership of an invitee, or raises the role of an existing one to `accepted_role`.
-/// Returns the role of the membership.
+///
+/// Known limit: two acceptances that add the first membership of one user in one organization at
+/// the same moment both find none. The primary key then fails the second transaction, which rolls
+/// back with a 500. It never makes a second membership.
 async fn add_membership(
     conn: &mut PgConnection,
     organization_id: OrganizationId,
     user_id: UserId,
     invited: OrganizationRole,
     now: Timestamp,
-) -> Result<OrganizationRole, StoreError> {
+) -> Result<(), StoreError> {
     let existing = sqlx::query_scalar!(
         "SELECT role FROM organization_membership
          WHERE organization_id = $1 AND user_id = $2
@@ -307,15 +309,15 @@ async fn add_membership(
         }
         Some(_) => {}
     }
-    Ok(accepted)
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use jiff::SignedDuration;
     use secrecy::ExposeSecret;
+    use tada_app::caller::MemberCaller;
     use tada_app::domain::identity::{DisplayName, OrganizationRole};
-    use tada_app::domain::ids::InvitationId;
     use tada_app::outbound::{OutboundStore, Purpose};
     use tada_app::session::SessionStore;
 
