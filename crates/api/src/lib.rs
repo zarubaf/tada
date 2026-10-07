@@ -1,5 +1,6 @@
 //! HTTP handlers, DTOs and the OpenAPI document.
 
+mod client_ip;
 mod contract;
 mod events;
 mod extract;

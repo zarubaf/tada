@@ -1,9 +1,8 @@
 //! The request ID and the request log (ADR 0035).
 
-use std::net::SocketAddr;
 use std::time::Instant;
 
-use axum::extract::{ConnectInfo, MatchedPath, Request, State};
+use axum::extract::{MatchedPath, Request, State};
 use axum::http::HeaderValue;
 use axum::middleware::Next;
 use axum::response::Response;
@@ -11,6 +10,7 @@ use tracing::Instrument;
 use uuid::Uuid;
 
 use crate::ApiState;
+use crate::client_ip;
 
 pub const HEADER: &str = "x-request-id";
 
@@ -59,16 +59,8 @@ pub async fn track(State(state): State<ApiState>, request: Request, next: Next) 
 
 /// The `X-Request-Id` of a trusted proxy, if it is a UUID.
 fn forwarded_id(state: &ApiState, request: &Request) -> Option<Uuid> {
-    let peer = request
-        .extensions()
-        .get::<ConnectInfo<SocketAddr>>()?
-        .0
-        .ip();
-    if !state
-        .trusted_proxies
-        .iter()
-        .any(|range| range.contains(&peer))
-    {
+    let peer = client_ip::peer(request.extensions())?;
+    if !client_ip::is_trusted_proxy(&state.trusted_proxies, peer) {
         return None;
     }
     request.headers().get(HEADER)?.to_str().ok()?.parse().ok()
