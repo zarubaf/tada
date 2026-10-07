@@ -1,9 +1,13 @@
 //! The `worker` process role: jobs and schedules (ADRs 0007 and 0054).
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
+use tada_adapters::clock::SystemClock;
+use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
 use tada_app::jobs::{Handlers, Ran, run_next};
+use tada_app::outbound::SendOutbound;
 use tada_store_pg::Database;
 use uuid::Uuid;
 
@@ -14,12 +18,35 @@ use crate::shutdown;
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 /// Another worker can take a job over after this time. A handler must complete within it.
 const LEASE: Duration = Duration::from_secs(300);
+/// The time limit of one SMTP send. A send that exceeds it has an unknown outcome (ADR 0042).
+const MAIL_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub async fn run((database, ..): WorkerSettings) -> anyhow::Result<()> {
+pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
-    // The first job kinds come with Slice 1, for example the owner invitation of ADR 0036.
-    let handlers = Handlers::default();
+    let mailer = SmtpMailer::new(SmtpConfig {
+        host: smtp.host,
+        port: smtp.port,
+        tls: smtp.tls,
+        credentials: smtp.credentials,
+        from: mail.from,
+        timeout: MAIL_TIMEOUT,
+    })
+    .context("invalid mail settings")?;
+    let texts = FluentMailTexts::new().context("invalid mail texts")?;
+    let host = public_url
+        .url
+        .host_str()
+        .context("the public URL has no host")?;
+    let send = SendOutbound::new(
+        Arc::new(db.clone()),
+        Arc::new(mailer),
+        Arc::new(texts),
+        Arc::new(SystemClock),
+        public_url.url.as_str(),
+        host,
+    );
+    let handlers = Handlers::default().with(Arc::new(send));
     let worker_id = Uuid::now_v7();
     tracing::info!(%worker_id, "worker started");
 

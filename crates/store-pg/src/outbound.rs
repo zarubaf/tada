@@ -25,7 +25,7 @@ use crate::token::new_token;
 /// Stores an outbound intent and its send job inside the transaction of a command.
 /// A rollback removes both, so a rolled-back command never sends mail (ADR 0042).
 // The sign-in request and the invitation commands call this in Slice 1.
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg_attr(not(any(test, feature = "testing")), allow(dead_code))]
 pub(crate) async fn queue_outbound(
     conn: &mut PgConnection,
     purpose: &Purpose,

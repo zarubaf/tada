@@ -5,6 +5,7 @@ use sqlx::AssertSqlSafe;
 use sqlx::types::Uuid;
 use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
 use tada_app::domain::ids::{OrganizationId, UserId};
+use tada_app::outbound::Purpose;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use testcontainers_modules::testcontainers::{ContainerAsync, ImageExt};
@@ -126,6 +127,26 @@ impl TestDatabase {
                 "the column {table}.{column} holds the secret in plain text"
             );
         }
+    }
+
+    /// Queues an outbound intent in a transaction that commits if `commit` is true and rolls back
+    /// otherwise.
+    ///
+    /// # Panics
+    ///
+    /// If the insert fails.
+    #[allow(clippy::unwrap_used)]
+    pub async fn queue_outbound(&self, purpose: &Purpose, commit: bool) -> Uuid {
+        let mut tx = self.database.pool.begin().await.unwrap();
+        let id = crate::outbound::queue_outbound(&mut tx, purpose, Some(Uuid::now_v7()))
+            .await
+            .unwrap();
+        if commit {
+            tx.commit().await.unwrap();
+        } else {
+            tx.rollback().await.unwrap();
+        }
+        id
     }
 
     /// Adds a membership of a user in an organization.
