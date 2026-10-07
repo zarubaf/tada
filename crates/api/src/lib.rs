@@ -6,6 +6,7 @@ mod event_members;
 mod events;
 mod extract;
 mod health;
+mod members;
 mod origin;
 mod problem;
 mod request_id;
@@ -28,6 +29,7 @@ use tada_app::event_members::EventMemberStore;
 use tada_app::events::EventStore;
 use tada_app::health::DependencyCheck;
 use tada_app::identity::IdentityStore;
+use tada_app::members::MemberStore;
 use tada_app::problem::ProblemCode;
 use tada_app::public_url::PublicUrl;
 use tada_app::session::SessionStore;
@@ -58,6 +60,7 @@ pub struct ApiState {
     /// The proxies whose `X-Request-Id` and `X-Forwarded-For` the server accepts (ADR 0008, ADR 0035).
     pub trusted_proxies: Vec<IpNet>,
     pub event_members: Arc<dyn EventMemberStore>,
+    pub members: Arc<dyn MemberStore>,
     /// `TADA_PUBLIC_URL`. Its origin is the only `Origin` of a state-changing request (ADR 0008).
     pub public_url: PublicUrl,
 }
@@ -73,7 +76,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
             events::routes()
                 .merge(telegram::routes())
                 .merge(sign_in::routes())
-                .merge(event_members::routes()),
+                .merge(event_members::routes())
+                .merge(members::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -87,6 +91,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(telegram::problem_codes())
         .chain(sign_in::problem_codes())
         .chain(event_members::problem_codes())
+        .chain(members::problem_codes())
         .collect()
 }
 
@@ -461,6 +466,68 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct NoMembers;
+
+    #[async_trait::async_trait]
+    impl MemberStore for NoMembers {
+        async fn list(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: Option<tada_app::members::MemberCursor>,
+            _: u32,
+        ) -> Result<Vec<tada_app::members::OrganizationMember>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn invite(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::members::Invitation,
+            _: tada_app::domain::ids::UserId,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::members::InvitationInsert, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn invitation(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::InvitationId,
+        ) -> Result<Option<tada_app::members::Invitation>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn pending_invitations(
+            &self,
+            _: tada_app::caller::OrgScope,
+        ) -> Result<Vec<tada_app::members::Invitation>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn revoke(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::InvitationId,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn remove(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::members::Remover,
+            _: tada_app::domain::ids::UserId,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<Option<tada_app::members::Refusal>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
     #[async_trait::async_trait]
     impl SignInRequestStore for NoSignIn {
         async fn queue_magic_link(
@@ -487,6 +554,7 @@ mod tests {
             clock: Arc::new(NoClock),
             trusted_proxies: Vec::new(),
             event_members: Arc::new(NoEventMembers),
+            members: Arc::new(NoMembers),
             public_url: PublicUrl::parse("https://tada.example.org").unwrap(),
         }
     }

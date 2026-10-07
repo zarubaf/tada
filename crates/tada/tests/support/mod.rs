@@ -68,6 +68,7 @@ pub fn api_state(
         clock,
         trusted_proxies: Vec::new(),
         event_members: database.clone(),
+        members: database.clone(),
         public_url: public_url(),
     }
 }

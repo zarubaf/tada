@@ -69,7 +69,7 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
 }
 
 /// The role of a member in an organization.
-#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum OrganizationRole {
     Owner,
@@ -83,6 +83,16 @@ impl From<Role> for OrganizationRole {
             Role::Owner => Self::Owner,
             Role::Admin => Self::Admin,
             Role::Member => Self::Member,
+        }
+    }
+}
+
+impl From<OrganizationRole> for Role {
+    fn from(role: OrganizationRole) -> Self {
+        match role {
+            OrganizationRole::Owner => Self::Owner,
+            OrganizationRole::Admin => Self::Admin,
+            OrganizationRole::Member => Self::Member,
         }
     }
 }

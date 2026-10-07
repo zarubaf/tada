@@ -44,6 +44,7 @@ pub async fn run(
             clock: Arc::new(SystemClock),
             trusted_proxies: http.trusted_proxies,
             event_members: Arc::new(db.clone()),
+            members: Arc::new(db.clone()),
             public_url,
         },
         http.web_root.as_deref(),
