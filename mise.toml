@@ -30,6 +30,12 @@ TADA_S3_REGION = "garage"
 TADA_S3_BUCKET = "tada"
 TADA_S3_ACCESS_KEY_ID_FILE = "{{config_root}}/.dev/secrets/s3_access_key_id"
 TADA_S3_SECRET_ACCESS_KEY_FILE = "{{config_root}}/.dev/secrets/s3_secret_access_key"
+# Mailpit of compose.yaml takes mail without TLS and without a login. Release builds reject `none`.
+TADA_PUBLIC_URL = "http://localhost:5173"
+TADA_MAIL_FROM = "tada@example.org"
+TADA_MAIL_SMTP_HOST = "127.0.0.1"
+TADA_MAIL_SMTP_PORT = "1025"
+TADA_MAIL_SMTP_TLS = "none"
 
 [tasks."check:docs-format"]
 description = "Check Markdown formatting"

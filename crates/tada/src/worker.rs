@@ -15,7 +15,7 @@ const POLL_INTERVAL: Duration = Duration::from_secs(2);
 /// Another worker can take a job over after this time. A handler must complete within it.
 const LEASE: Duration = Duration::from_secs(300);
 
-pub async fn run((database,): WorkerSettings) -> anyhow::Result<()> {
+pub async fn run((database, ..): WorkerSettings) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
     // The first job kinds come with Slice 1, for example the owner invitation of ADR 0036.

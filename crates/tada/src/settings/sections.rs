@@ -5,6 +5,8 @@ use std::str::FromStr;
 
 use ipnet::IpNet;
 use secrecy::SecretString;
+use tada_adapters::mail::SmtpTls;
+use tada_app::domain::identity::Email;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -15,7 +17,7 @@ use super::{Section, Setting, Source};
 /// The settings of `tada serve`.
 pub type ServeSettings = (Database, Http, Storage);
 /// The settings of `tada worker`.
-pub type WorkerSettings = (Database,);
+pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp);
 /// The settings of `tada telegram`.
 pub type TelegramSettings = (Database, Telegram);
 /// The settings of `tada migrate`.
@@ -285,5 +287,186 @@ impl Section for Telegram {
             bot_token: bot_token?,
             api_url: api_url?,
         })
+    }
+}
+
+/// The public URL of this installation (ADRs 0025 and 0042).
+/// All links in mails and in the web client start with it.
+#[derive(Debug)]
+pub struct PublicUrl {
+    pub url: Url,
+}
+
+const PUBLIC_URL: Setting = Setting {
+    name: "TADA_PUBLIC_URL",
+    kind: "URL",
+    default: None,
+    secret: false,
+    description: "The URL that members use, without a path, for example `https://tada.example.org`. All links in mails start with it.",
+};
+
+impl Section for PublicUrl {
+    fn settings() -> Vec<&'static Setting> {
+        vec![&PUBLIC_URL]
+    }
+
+    fn read(source: &mut Source<'_>) -> Option<Self> {
+        let url: Url = source.value(&PUBLIC_URL)?;
+        if !matches!(url.scheme(), "http" | "https") || url.host().is_none() {
+            source.error(&PUBLIC_URL, "must start with http:// or https://");
+            return None;
+        }
+        if url.path() != "/" || url.query().is_some() || url.fragment().is_some() {
+            source.error(&PUBLIC_URL, "must have no path, query or fragment");
+            return None;
+        }
+        if !url.username().is_empty() || url.password().is_some() {
+            source.error(&PUBLIC_URL, "must not contain a user name or a password");
+            return None;
+        }
+        Some(Self { url })
+    }
+}
+
+/// The settings that all mail adapters share (ADR 0057).
+#[derive(Debug)]
+pub struct Mail {
+    pub from: Email,
+}
+
+const MAIL_FROM: Setting = Setting {
+    name: "TADA_MAIL_FROM",
+    kind: "email address",
+    default: None,
+    secret: false,
+    description: "The sender address of all mails that tada sends.",
+};
+
+impl Section for Mail {
+    fn settings() -> Vec<&'static Setting> {
+        vec![&MAIL_FROM]
+    }
+
+    fn read(source: &mut Source<'_>) -> Option<Self> {
+        let from: String = source.value(&MAIL_FROM)?;
+        match Email::parse(&from) {
+            Ok(from) => Some(Self { from }),
+            Err(error) => {
+                source.error(&MAIL_FROM, &format!("is not a valid address: {error}"));
+                None
+            }
+        }
+    }
+}
+
+/// The SMTP adapter for outbound mail (ADRs 0042 and 0057).
+#[derive(Debug)]
+pub struct MailSmtp {
+    pub host: String,
+    pub port: u16,
+    pub tls: SmtpTls,
+    pub credentials: Option<(String, SecretString)>,
+}
+
+const SMTP_HOST: Setting = Setting {
+    name: "TADA_MAIL_SMTP_HOST",
+    kind: "host name",
+    default: None,
+    secret: false,
+    description: "The host name of the SMTP server. It must match the certificate of the server.",
+};
+
+const SMTP_PORT: Setting = Setting {
+    name: "TADA_MAIL_SMTP_PORT",
+    kind: "port number",
+    default: Some("465"),
+    secret: false,
+    description: "The TCP port of the SMTP server. Use 465 for `implicit` TLS and 587 for `starttls`.",
+};
+
+const SMTP_USERNAME: Setting = Setting {
+    name: "TADA_MAIL_SMTP_USERNAME",
+    kind: "text",
+    default: Some(""),
+    secret: false,
+    description: "The user name for the SMTP server. If it is empty, tada sends without a login. Set it together with `TADA_MAIL_SMTP_PASSWORD_FILE`.",
+};
+
+const SMTP_PASSWORD: Setting = Setting {
+    name: "TADA_MAIL_SMTP_PASSWORD_FILE",
+    kind: "file path",
+    default: None,
+    secret: true,
+    description: "The file that contains the SMTP password. Optional; set it together with `TADA_MAIL_SMTP_USERNAME`.",
+};
+
+const SMTP_TLS: Setting = Setting {
+    name: "TADA_MAIL_SMTP_TLS",
+    kind: "`implicit`, `starttls` or `none`",
+    default: Some("implicit"),
+    secret: false,
+    description: "How tada secures the connection. `implicit` uses TLS from the start, and `starttls` requires an upgrade. `none` is only for a local development server; release builds reject it.",
+};
+
+impl Section for MailSmtp {
+    fn settings() -> Vec<&'static Setting> {
+        vec![
+            &SMTP_HOST,
+            &SMTP_PORT,
+            &SMTP_USERNAME,
+            &SMTP_PASSWORD,
+            &SMTP_TLS,
+        ]
+    }
+
+    fn read(source: &mut Source<'_>) -> Option<Self> {
+        let host: Option<String> = source.value(&SMTP_HOST);
+        let port = source.value(&SMTP_PORT);
+        let username: Option<String> = source.value(&SMTP_USERNAME);
+        let password = source.optional_secret(&SMTP_PASSWORD);
+        let tls = Self::read_tls(source);
+        let credentials = match (username?, password?) {
+            (username, None) if username.is_empty() => None,
+            (username, Some(password)) if !username.is_empty() => Some((username, password)),
+            (username, _) if username.is_empty() => {
+                source.error(
+                    &SMTP_USERNAME,
+                    "must be set together with TADA_MAIL_SMTP_PASSWORD_FILE",
+                );
+                return None;
+            }
+            _ => {
+                source.error(
+                    &SMTP_PASSWORD,
+                    "must be set together with TADA_MAIL_SMTP_USERNAME",
+                );
+                return None;
+            }
+        };
+        Some(Self {
+            host: host?,
+            port: port?,
+            tls: tls?,
+            credentials,
+        })
+    }
+}
+
+impl MailSmtp {
+    fn read_tls(source: &mut Source<'_>) -> Option<SmtpTls> {
+        let mode: String = source.value(&SMTP_TLS)?;
+        match mode.as_str() {
+            "implicit" => Some(SmtpTls::Implicit),
+            "starttls" => Some(SmtpTls::StartTls),
+            "none" if cfg!(debug_assertions) => Some(SmtpTls::None),
+            "none" => {
+                source.error(&SMTP_TLS, "must not be `none` in a release build");
+                None
+            }
+            _ => {
+                source.error(&SMTP_TLS, "must be `implicit`, `starttls` or `none`");
+                None
+            }
+        }
     }
 }
