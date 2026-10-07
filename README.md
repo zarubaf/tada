@@ -15,7 +15,7 @@ The mise tasks find `cargo` in `~/.cargo/bin`. To use `cargo` directly in your s
 4. Run `mise run dev:web` in a second terminal.
 5. Open `http://localhost:5173`.
 
-Each request needs a session.
+You must sign in to use tada.
 Create an organization and read the sign-in mail in Mailpit as the [contributing guide](doc/contributing.md#local-runtime) describes.
 
 Run `mise run dev:down` to stop the services. The data stays in the Docker volumes.
