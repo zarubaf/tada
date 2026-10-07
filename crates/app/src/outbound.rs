@@ -179,8 +179,8 @@ impl SendOutbound {
                     .issue_magic_link(user_id, now + MAGIC_LINK_LIFETIME)
                     .await
                     .map_err(store_failed)?;
-                let link = self.link("/sign-in/link", &token);
-                self.texts.magic_link(&intent.locale, &link)
+                let link = self.public_url.magic_link(&token);
+                self.texts.magic_link(&intent.locale, link.expose_secret())
             }
             Purpose::Invitation {
                 organization_id,
@@ -197,9 +197,9 @@ impl SendOutbound {
                     .issue_invitation_token(scope, invitation_id, now + INVITATION_LIFETIME)
                     .await
                     .map_err(store_failed)?;
-                let link = self.link("/invitation", &token);
+                let link = self.public_url.invitation_link(&token);
                 self.texts
-                    .invitation(&intent.locale, organization_name, &link)
+                    .invitation(&intent.locale, organization_name, link.expose_secret())
             }
         };
         Ok(OutgoingMessage {
@@ -209,15 +209,6 @@ impl SendOutbound {
             html: rendered.html,
             message_id: format!("<{}@{}>", intent.message_id, self.public_url.host()),
         })
-    }
-
-    /// The token goes into the fragment, so that the browser never sends it in a GET request (ADR 0008).
-    fn link(&self, path: &str, token: &SecretString) -> String {
-        format!(
-            "{}{path}#token={}",
-            self.public_url.origin(),
-            token.expose_secret()
-        )
     }
 
     /// Records the outcome of the claimed intent.

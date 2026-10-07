@@ -1,4 +1,13 @@
 //! `TADA_PUBLIC_URL` (ADRs 0025 and 0042): the only base of each link that tada sends.
+//!
+//! This module is the only place that knows the form of a link: its path and its token.
+
+use secrecy::{ExposeSecret, SecretString};
+
+/// The path of the web page that signs in with the token of a magic link.
+pub const MAGIC_LINK_PATH: &str = "/sign-in/link";
+/// The path of the web page that accepts an invitation with the token of an invitation link.
+pub const INVITATION_PATH: &str = "/invitation";
 
 /// `TADA_PUBLIC_URL`. Each link starts with it, and its host is the right part of each
 /// `Message-ID`.
@@ -55,6 +64,26 @@ impl PublicUrl {
     pub fn host(&self) -> &str {
         &self.host
     }
+
+    /// The link of a magic link with its token.
+    pub fn magic_link(&self, token: &SecretString) -> SecretString {
+        self.link(MAGIC_LINK_PATH, token)
+    }
+
+    /// The link of an invitation with its token.
+    pub fn invitation_link(&self, token: &SecretString) -> SecretString {
+        self.link(INVITATION_PATH, token)
+    }
+
+    /// The token goes into the fragment, so that the browser never sends it in a GET request
+    /// (ADR 0008). The link holds the token, so it is a secret too.
+    fn link(&self, path: &str, token: &SecretString) -> SecretString {
+        SecretString::from(format!(
+            "{}{path}#token={}",
+            self.origin,
+            token.expose_secret()
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -86,6 +115,20 @@ mod tests {
             let parsed = PublicUrl::parse(url).unwrap();
             assert_eq!((parsed.origin(), parsed.host()), (origin, host));
         }
+    }
+
+    #[test]
+    fn a_link_has_its_path_and_the_token_in_the_fragment() {
+        let url = PublicUrl::parse("https://tada.example.org/").unwrap();
+        let token = SecretString::from("abc");
+        assert_eq!(
+            url.magic_link(&token).expose_secret(),
+            "https://tada.example.org/sign-in/link#token=abc"
+        );
+        assert_eq!(
+            url.invitation_link(&token).expose_secret(),
+            "https://tada.example.org/invitation#token=abc"
+        );
     }
 
     #[test]
