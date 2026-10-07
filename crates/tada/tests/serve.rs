@@ -50,7 +50,10 @@ async fn get(port: u16, path: &str) -> Option<String> {
     let request = format!("GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
     stream.write_all(request.as_bytes()).await.ok()?;
     let mut response = String::new();
-    stream.read_to_string(&mut response).await.ok()?;
+    tokio::time::timeout(Duration::from_secs(5), stream.read_to_string(&mut response))
+        .await
+        .ok()?
+        .ok()?;
     Some(response)
 }
 
@@ -68,7 +71,7 @@ async fn the_serve_process_rejects_a_request_without_a_session() {
     let password = password.path().to_str().unwrap();
     let secret = secret.path().to_str().unwrap();
     let port_text = port.to_string();
-    let _serve = Serve(
+    let mut serve = Serve(
         Command::new(env!("CARGO_BIN_EXE_tada"))
             .arg("serve")
             .env_clear()
@@ -94,6 +97,8 @@ async fn the_serve_process_rejects_a_request_without_a_session() {
         if response.is_some() {
             break;
         }
+        let status = serve.0.try_wait().unwrap();
+        assert!(status.is_none(), "serve exited early: {status:?}");
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     let response = response.expect("serve did not start");
