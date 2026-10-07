@@ -73,6 +73,7 @@ The ADRs are the authority for the decisions in this project.
 | [0055](0055-office-format-detection.md)            | Detection of office formats in ZIP containers            | Accepted                  |
 | [0056](0056-sign-in-details.md)                    | Sign-in: organization, invitations and rate limits       | Accepted                  |
 | [0057](0057-modular-mail-and-inbound-webhook.md)   | Modular mail adapters and an inbound webhook             | Accepted                  |
+| [0058](0058-markdown-renderer-for-drafts.md)       | Markdown parser and renderer for drafts                  | Proposed                  |
 
 ## New ADR
 
