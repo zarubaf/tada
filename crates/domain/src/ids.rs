@@ -70,6 +70,19 @@ id_type!(
     SourceVersionId
 );
 
+id_type!(
+    /// The ID of a changeset: the proposals of one intake.
+    ChangesetId
+);
+id_type!(
+    /// The ID of a proposal.
+    ProposalId
+);
+id_type!(
+    /// The ID of an open question.
+    OpenQuestionId
+);
+
 /// Returns true if `uuid` can be the ID of a new record: a UUIDv7 (ADR 0038).
 pub fn is_record_id(uuid: Uuid) -> bool {
     uuid.get_version_num() == 7

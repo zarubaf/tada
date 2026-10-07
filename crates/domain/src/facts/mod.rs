@@ -65,7 +65,7 @@ fn check_snake_case(value: &str) -> Result<(), KeyError> {
 }
 
 /// Removes the spaces at the ends, then checks for 1 to `max_chars` characters without control characters.
-fn checked_text(input: &str, max_chars: usize) -> Result<String, TextError> {
+pub(crate) fn checked_text(input: &str, max_chars: usize) -> Result<String, TextError> {
     let text = input.trim();
     if text.is_empty() {
         return Err(TextError::Empty);
