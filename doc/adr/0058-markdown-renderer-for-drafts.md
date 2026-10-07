@@ -11,7 +11,7 @@ The server must read each draft for three jobs: the provenance manifest, the lin
 The web client must show a draft to a reader with the rules of ADR 0051:
 
 - Raw HTML shows as text.
-- Only the link schemes `https`, `mailto` and `tada` are allowed.
+- The renderer allows only the link schemes `https`, `mailto` and `tada`.
 - A fact link shows the formatted value of the cited fact version, „Annahme“, „unbekannt“ or „entfernt“.
 
 The comparison of two versions needs a text difference by line (ADR 0051).
@@ -27,20 +27,27 @@ Server:
 - The server never makes HTML from a draft.
   A raw HTML block or inline HTML is an event of the parser that the server keeps as text.
   It never gives a link or a manifest entry, and the lint gives a `RawHtml` warning for it.
-- The manifest extraction checks the destination of each link and each image:
-  - A destination needs the scheme `https`, `mailto` or `tada`.
+- The manifest extraction checks each link and rejects each image:
+  - A link destination needs the scheme `https`, `mailto` or `tada`.
     The extraction rejects other schemes and relative destinations.
-  - The extraction rejects an image with a `tada:` destination, because a `tada:` target is not an image.
+  - A draft cannot contain images, with any destination.
+    The extraction rejects an image with the entry code `image-not-allowed`.
   - A fact link must have empty text, and its URI must be `tada:fact/<uuid>?v=<n>` with `n` of 1 or more.
   - A source link URI must be `tada:source/<uuid>#<start>-<end>` with `start` less than `end`.
+  - A `tada:` link must use the canonical form: the scheme in lowercase, the UUID in lowercase with hyphens, and numbers without leading zeros.
+    The extraction rejects other spellings as malformed.
+    The client can then find each link in the map of the server by its exact text.
 - The server normalizes the line endings of a draft to LF before it parses the draft.
 - The export (ADR 0051) uses the same parser.
 - The text difference by line uses `similar`.
+  The task that builds the difference adds the dependency.
 
 Web client:
 
 - The web client renders drafts with `react-markdown` and `remark-gfm`.
 - It sets `skipHtml`, so that raw HTML never becomes elements.
+- It renders an image as its alternative text, and it never loads the image.
+- The Content Security Policy of the web client must contain `img-src 'self'`, as a second defense.
 - Its `urlTransform` keeps only `https`, `mailto` and `tada` destinations and removes all others.
 - A custom link component resolves each `tada:` link from a map that the server sends with the draft.
   The map holds the rendered value and state of each target for this reader.
@@ -59,12 +66,16 @@ Export:
 - `remark-gfm` also enables other extensions of GitHub Flavored Markdown in the client, for example task lists and bare web addresses as links.
   The server ignores them.
   They change only the presentation, and the `urlTransform` checks each link.
+- Drafts cannot show images.
+  An agent writes drafts from sources that tada does not trust.
+  A remote image loads when a reviewer opens the draft, so its address could send draft content to a third party.
 - No sanitizer of HTML is necessary, because no component makes HTML from draft text.
 - We own a small parser of the `tada:` links and its tests.
 
 ## Alternatives
 
 - HTML from the server with `pulldown-cmark` and `ammonia` as the sanitizer: the client would insert server HTML, and a sanitizer configuration would be the only defense.
-- `comrak` on the server: it follows GitHub Flavored Markdown more closely, but the three jobs need only CommonMark with tables, and a pull parser is enough for them.
+- `comrak` on the server: it follows GitHub Flavored Markdown more closely.
+  But the three jobs need only CommonMark with tables, and a pull parser is enough for them.
 - A Markdown renderer of our own in the client: more code for us, and no gain over `react-markdown` with a strict `urlTransform`.
 - `diff` or `dissimilar` for the text difference: `similar` has a line mode and is widely used.
