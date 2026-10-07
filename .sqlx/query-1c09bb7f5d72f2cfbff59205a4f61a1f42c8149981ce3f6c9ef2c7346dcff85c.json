@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO source_version\n                 (id, organization_id, source_item_id, kind, channel, author_actor, text, sha256, captured_at)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+  "query": "INSERT INTO source_version\n             (id, organization_id, source_item_id, kind, channel, author_actor, text, sha256, captured_at)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
   "describe": {
     "columns": [],
     "parameters": {
@@ -18,5 +18,5 @@
     },
     "nullable": []
   },
-  "hash": "8238c0562030346c65ce3c57d38075cd9ff3259540ea28eeab3d3477da49c4cd"
+  "hash": "1c09bb7f5d72f2cfbff59205a4f61a1f42c8149981ce3f6c9ef2c7346dcff85c"
 }

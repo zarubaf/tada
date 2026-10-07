@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
 use sha2::{Digest, Sha256};
+use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::caller::{Actor, OrgScope};
 use tada_app::domain::ids::{EventId, SourceItemId, SourceVersionId};
@@ -31,47 +32,13 @@ impl SourceStore for Database {
         actor: &Actor,
         now: Timestamp,
     ) -> Result<SourceVersionRef, StoreError> {
-        let organization = scope.organization_id().as_uuid();
-        let item = Uuid::now_v7();
-        let version = Uuid::now_v7();
-        let sha256: [u8; 32] = Sha256::digest(text.as_str().as_bytes()).into();
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        sqlx::query!(
-            "INSERT INTO source_item (id, organization_id, event_id, kind, created_at)
-             VALUES ($1, $2, $3, $4, $5)",
-            item,
-            organization,
-            event.as_uuid(),
-            MEMBER_TEXT,
-            now.to_sqlx() as _,
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(store_error)?;
-        sqlx::query!(
-            "INSERT INTO source_version
-                 (id, organization_id, source_item_id, kind, channel, author_actor, text, sha256, captured_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-            version,
-            organization,
-            item,
-            MEMBER_TEXT,
-            actor.channel().as_str(),
-            actor::to_json(actor),
-            text.as_str(),
-            &sha256[..],
-            now.to_sqlx() as _,
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(store_error)?;
+        let version = SourceVersionId::from_uuid(Uuid::now_v7());
+        let stored = insert_member_text(&mut tx, scope, Some(event), version, text, actor, now)
+            .await
+            .map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
-        Ok(SourceVersionRef {
-            id: SourceVersionId::from_uuid(version),
-            source_item_id: SourceItemId::from_uuid(item),
-            sha256,
-            captured_at: now,
-        })
+        Ok(stored)
     }
 
     async fn search(
@@ -118,6 +85,55 @@ impl SourceStore for Database {
             })
             .collect()
     }
+}
+
+/// Stores the text of a member as a new source item with the one source version `version`, inside the
+/// transaction of the caller. An item without an event belongs to the organization.
+pub(crate) async fn insert_member_text(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    event: Option<EventId>,
+    version: SourceVersionId,
+    text: &SourceText,
+    actor: &Actor,
+    now: Timestamp,
+) -> Result<SourceVersionRef, sqlx::Error> {
+    let organization = scope.organization_id().as_uuid();
+    let item = Uuid::now_v7();
+    let sha256: [u8; 32] = Sha256::digest(text.as_str().as_bytes()).into();
+    sqlx::query!(
+        "INSERT INTO source_item (id, organization_id, event_id, kind, created_at)
+         VALUES ($1, $2, $3, $4, $5)",
+        item,
+        organization,
+        event.map(EventId::as_uuid),
+        MEMBER_TEXT,
+        now.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!(
+        "INSERT INTO source_version
+             (id, organization_id, source_item_id, kind, channel, author_actor, text, sha256, captured_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        version.as_uuid(),
+        organization,
+        item,
+        MEMBER_TEXT,
+        actor.channel().as_str(),
+        actor::to_json(actor),
+        text.as_str(),
+        &sha256[..],
+        now.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(SourceVersionRef {
+        id: version,
+        source_item_id: SourceItemId::from_uuid(item),
+        sha256,
+        captured_at: now,
+    })
 }
 
 /// The character range of the snippet of `text`: the first word of `query` in `text`, with up to
