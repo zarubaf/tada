@@ -1,27 +1,27 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT organization_id, role FROM organization_membership WHERE user_id = $1",
+  "query": "SELECT display_name, locale FROM app_user WHERE id = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "organization_id",
-        "type_info": "Uuid",
+        "name": "display_name",
+        "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "organization_membership",
-            "name": "organization_id"
+            "table": "app_user",
+            "name": "display_name"
           }
         }
       },
       {
         "ordinal": 1,
-        "name": "role",
+        "name": "locale",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "organization_membership",
-            "name": "role"
+            "table": "app_user",
+            "name": "locale"
           }
         }
       }
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "4861fd4db246210cc4f62afbd3dd7d9b97230fdb175dca1bea7684b962476219"
+  "hash": "3acc9edf1ae0cc8e6ec78793969972202438243bac2caebf93db0ab0e5a230b7"
 }

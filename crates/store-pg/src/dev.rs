@@ -85,7 +85,14 @@ mod tests {
         test.database.ensure_dev_organization().await.unwrap();
         test.database.ensure_dev_organization().await.unwrap();
 
-        let memberships = test.database.memberships_of(DEV_USER_ID).await.unwrap();
+        let memberships: Vec<_> = test
+            .database
+            .memberships_of(DEV_USER_ID)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|membership| (membership.organization_id, membership.role))
+            .collect();
         assert_eq!(
             memberships,
             vec![(DEV_ORGANIZATION_ID, OrganizationRole::Owner)]

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tada_app::caller::OrgScope;
 use tada_app::domain::identity::{DisplayName, Email, EventRole, OrganizationRole};
 use tada_app::domain::ids::{EventId, OrganizationId, UserId};
-use tada_app::identity::{IdentityStore, UserRef};
+use tada_app::identity::{IdentityStore, Membership, UserRef};
 use tada_app::store::StoreError;
 
 use crate::Database;
@@ -16,6 +16,25 @@ fn organization_role(name: &str) -> Result<OrganizationRole, InvalidRow> {
 
 #[async_trait]
 impl IdentityStore for Database {
+    async fn user(&self, id: UserId) -> Result<Option<UserRef>, StoreError> {
+        let row = sqlx::query!(
+            "SELECT display_name, locale FROM app_user WHERE id = $1",
+            id.as_uuid(),
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        row.map(|row| {
+            Ok(UserRef {
+                id,
+                display_name: DisplayName::parse(&row.display_name)
+                    .map_err(|_| InvalidRow("display_name"))?,
+                locale: row.locale,
+            })
+        })
+        .transpose()
+    }
+
     async fn user_by_email(&self, email: &Email) -> Result<Option<UserRef>, StoreError> {
         let row = sqlx::query!(
             "SELECT u.id, u.display_name, u.locale
@@ -37,12 +56,12 @@ impl IdentityStore for Database {
         .transpose()
     }
 
-    async fn memberships_of(
-        &self,
-        user: UserId,
-    ) -> Result<Vec<(OrganizationId, OrganizationRole)>, StoreError> {
+    async fn memberships_of(&self, user: UserId) -> Result<Vec<Membership>, StoreError> {
         let rows = sqlx::query!(
-            "SELECT organization_id, role FROM organization_membership WHERE user_id = $1",
+            "SELECT m.organization_id, o.name, m.role
+             FROM organization_membership m JOIN organization o ON o.id = m.organization_id
+             WHERE m.user_id = $1
+             ORDER BY o.name, o.id",
             user.as_uuid(),
         )
         .fetch_all(&self.pool)
@@ -50,10 +69,11 @@ impl IdentityStore for Database {
         .map_err(store_error)?;
         rows.into_iter()
             .map(|row| {
-                Ok((
-                    OrganizationId::from_uuid(row.organization_id),
-                    organization_role(&row.role)?,
-                ))
+                Ok(Membership {
+                    organization_id: OrganizationId::from_uuid(row.organization_id),
+                    organization_name: row.name,
+                    role: organization_role(&row.role)?,
+                })
             })
             .collect()
     }
@@ -201,6 +221,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn reads_a_user_by_id() {
+        let test = TestDatabase::start().await;
+        let anna = test
+            .create_user(&name("Anna Muster"), &email("anna@example.org"))
+            .await;
+
+        let user = test.database.user(anna).await.unwrap().unwrap();
+        assert_eq!(user.id, anna);
+        assert_eq!(user.display_name, name("Anna Muster"));
+        assert_eq!(user.locale, "de-CH");
+        let unknown = UserId::from_uuid(Uuid::now_v7());
+        assert_eq!(test.database.user(unknown).await.unwrap(), None);
+    }
+
+    #[tokio::test]
     async fn lists_the_memberships_of_a_user_in_two_organizations() {
         let test = TestDatabase::start().await;
         let testwil = test.create_organization("testwil").await;
@@ -213,14 +248,23 @@ mod tests {
         test.add_membership(musterhausen, anna, OrganizationRole::Member)
             .await;
 
-        let mut memberships = test.database.memberships_of(anna).await.unwrap();
-        memberships.sort_by_key(|(organization, _)| *organization);
-        let mut expected = vec![
-            (testwil, OrganizationRole::Owner),
-            (musterhausen, OrganizationRole::Member),
-        ];
-        expected.sort_by_key(|(organization, _)| *organization);
-        assert_eq!(memberships, expected);
+        let memberships = test.database.memberships_of(anna).await.unwrap();
+        assert_eq!(
+            memberships,
+            vec![
+                Membership {
+                    organization_id: musterhausen,
+                    organization_name: "musterhausen".to_owned(),
+                    role: OrganizationRole::Member,
+                },
+                Membership {
+                    organization_id: testwil,
+                    organization_name: "testwil".to_owned(),
+                    role: OrganizationRole::Owner,
+                },
+            ],
+            "in the order of the organization names"
+        );
 
         assert_eq!(
             test.database
