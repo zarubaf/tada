@@ -200,6 +200,22 @@ impl ServiceIdentity for TelegramGateway {
     const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0001);
 }
 
+/// The service identity `job-runner`: the worker that runs the jobs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JobRunner;
+
+impl ServiceIdentity for JobRunner {
+    const NAME: &'static str = "job-runner";
+    const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0002);
+}
+
+impl ServiceCaller<JobRunner> {
+    /// The scope of the organization that an infrastructure query gave for a job (ADR 0039).
+    pub(crate) fn scope(&self, organization_id: OrganizationId) -> OrgScope {
+        OrgScope(organization_id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,6 +253,12 @@ mod tests {
         assert_eq!(actor.kind(), ActorKind::Service);
         assert_eq!(actor.id(), TelegramGateway::ID);
         assert_eq!(TelegramGateway::NAME, "telegram-gateway");
+    }
+
+    #[test]
+    fn service_identities_have_distinct_ids() {
+        assert_ne!(JobRunner::ID, TelegramGateway::ID);
+        assert_eq!(JobRunner::NAME, "job-runner");
     }
 
     #[test]
