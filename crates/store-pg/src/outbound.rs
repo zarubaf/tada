@@ -77,7 +77,7 @@ impl OutboundStore for Database {
             r#"SELECT i.organization_id, i.user_id, i.invitation_id, i.message_id,
                       coalesce(e.email, inv.email) AS "email!",
                       coalesce(u.locale, invited.locale, 'de-CH') AS "locale!",
-                      o.name AS "organization_name?"
+                      o.name AS "organization_name?", inv.status AS "invitation_status?"
                FROM outbound_intent i
                LEFT JOIN email_identity e ON e.user_id = i.user_id
                LEFT JOIN app_user u ON u.id = i.user_id
@@ -114,6 +114,9 @@ impl OutboundStore for Database {
             locale: row.locale,
             organization_name: row.organization_name,
             message_id: row.message_id,
+            obsolete: row
+                .invitation_status
+                .is_some_and(|status| status != "pending"),
         }))
     }
 
@@ -157,13 +160,38 @@ impl OutboundStore for Database {
         Ok(token.secret)
     }
 
-    async fn finish(&self, intent_id: Uuid, outcome: Outcome) -> Result<(), StoreError> {
-        // An infrastructure query by intent ID. Only a pending intent changes.
-        sqlx::query!(
-            "UPDATE outbound_intent SET status = $2, finished_at = now()
+    async fn claim(&self, intent_id: Uuid) -> Result<bool, StoreError> {
+        // An infrastructure query by intent ID, like the others below.
+        let result = sqlx::query!(
+            "UPDATE outbound_intent SET status = 'unknown', finished_at = now()
              WHERE id = $1 AND status = 'pending'",
             intent_id,
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn finish(&self, intent_id: Uuid, outcome: Outcome) -> Result<(), StoreError> {
+        // A claimed intent is `unknown` until the outcome.
+        sqlx::query!(
+            "UPDATE outbound_intent SET status = $2, finished_at = now()
+             WHERE id = $1 AND status = 'unknown'",
+            intent_id,
             outcome.as_str(),
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(())
+    }
+
+    async fn release(&self, intent_id: Uuid) -> Result<(), StoreError> {
+        sqlx::query!(
+            "UPDATE outbound_intent SET status = 'pending', finished_at = NULL
+             WHERE id = $1 AND status = 'unknown'",
+            intent_id,
         )
         .execute(&self.pool)
         .await
@@ -234,6 +262,7 @@ mod tests {
         assert_eq!(pending.to, email("anna@example.org"));
         assert_eq!(pending.locale, "de-CH");
         assert_eq!(pending.organization_name, None);
+        assert!(!pending.obsolete);
         assert!(!pending.message_id.is_empty());
     }
 
@@ -254,20 +283,96 @@ mod tests {
         assert_eq!(pending.organization_name.as_deref(), Some("testwil"));
     }
 
+    async fn status(test: &TestDatabase, id: Uuid) -> String {
+        sqlx::query_scalar("SELECT status FROM outbound_intent WHERE id = $1")
+            .bind(id)
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap()
+    }
+
+    /// The SQLSTATE of a database error.
+    fn sqlstate(error: &sqlx::Error) -> String {
+        error
+            .as_database_error()
+            .and_then(|error| error.code())
+            .unwrap_or_default()
+            .into_owned()
+    }
+
     #[tokio::test]
-    async fn a_finished_intent_is_no_longer_pending() {
+    async fn a_claimed_intent_is_unknown_until_its_outcome_and_is_not_claimed_again() {
         let test = TestDatabase::start().await;
         let user_id = user(&test).await;
         let id = queue(&test, &Purpose::MagicLink { user_id }).await.unwrap();
 
-        test.database.finish(id, Outcome::Unknown).await.unwrap();
+        assert!(test.database.claim(id).await.unwrap());
+        // A worker that stops here leaves the intent unknown, and no later attempt sends it.
+        assert_eq!(status(&test, id).await, "unknown");
         assert_eq!(test.database.load_pending(id).await.unwrap(), None);
-        let status: String = sqlx::query_scalar("SELECT status FROM outbound_intent WHERE id = $1")
-            .bind(id)
-            .fetch_one(&test.database.pool)
+        assert!(!test.database.claim(id).await.unwrap());
+
+        test.database.finish(id, Outcome::Sent).await.unwrap();
+        assert_eq!(status(&test, id).await, "sent");
+        test.database.release(id).await.unwrap();
+        assert_eq!(status(&test, id).await, "sent", "a recorded outcome stays");
+    }
+
+    #[tokio::test]
+    async fn a_released_intent_is_pending_again() {
+        let test = TestDatabase::start().await;
+        let user_id = user(&test).await;
+        let id = queue(&test, &Purpose::MagicLink { user_id }).await.unwrap();
+
+        assert!(test.database.claim(id).await.unwrap());
+        test.database.release(id).await.unwrap();
+        assert!(test.database.load_pending(id).await.unwrap().is_some());
+        let open: bool =
+            sqlx::query_scalar("SELECT finished_at IS NULL FROM outbound_intent WHERE id = $1")
+                .bind(id)
+                .fetch_one(&test.database.pool)
+                .await
+                .unwrap();
+        assert!(open);
+    }
+
+    #[tokio::test]
+    async fn an_intent_of_a_revoked_invitation_is_obsolete() {
+        let test = TestDatabase::start().await;
+        let organization_id = test.create_organization("testwil").await;
+        let invitation_id = invitation(&test, organization_id).await;
+        let id = queue(
+            &test,
+            &Purpose::Invitation {
+                organization_id,
+                invitation_id,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(
+            !test
+                .database
+                .load_pending(id)
+                .await
+                .unwrap()
+                .unwrap()
+                .obsolete
+        );
+
+        sqlx::query("UPDATE invitation SET status = 'revoked', revoked_at = now() WHERE id = $1")
+            .bind(invitation_id.as_uuid())
+            .execute(&test.database.pool)
             .await
             .unwrap();
-        assert_eq!(status, "unknown");
+        assert!(
+            test.database
+                .load_pending(id)
+                .await
+                .unwrap()
+                .unwrap()
+                .obsolete
+        );
     }
 
     #[tokio::test]
@@ -349,7 +454,11 @@ mod tests {
             },
         )
         .await;
-        assert!(other.is_err(), "the composite foreign key rejects it");
+        assert_eq!(
+            sqlstate(&other.unwrap_err()),
+            "23503",
+            "the composite foreign key rejects it"
+        );
 
         let without_organization = sqlx::query(
             "INSERT INTO outbound_intent (id, invitation_id, purpose, message_id, created_at)
@@ -359,7 +468,11 @@ mod tests {
         .bind(invitation_id.as_uuid())
         .execute(&test.database.pool)
         .await;
-        assert!(without_organization.is_err(), "the CHECK rejects it");
+        assert_eq!(
+            sqlstate(&without_organization.unwrap_err()),
+            "23514",
+            "the CHECK rejects it"
+        );
     }
 
     #[tokio::test]

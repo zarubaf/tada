@@ -63,6 +63,8 @@ pub struct PendingIntent {
     pub organization_name: Option<String>,
     /// The left part of the `Message-ID` header. It stays the same for each attempt.
     pub message_id: String,
+    /// True if the message must not go out any more: its invitation is accepted or revoked.
+    pub obsolete: bool,
 }
 
 /// The result of a send.
@@ -94,6 +96,10 @@ pub trait OutboundStore: Send + Sync {
     /// in its purpose.
     async fn load_pending(&self, intent_id: Uuid) -> Result<Option<PendingIntent>, StoreError>;
 
+    /// Moves a pending intent to `unknown` before its send. Returns false if it is not pending.
+    /// From then on, no attempt sends it again unless `release` returns it.
+    async fn claim(&self, intent_id: Uuid) -> Result<bool, StoreError>;
+
     /// Stores the hash of a new magic-link token and returns the token.
     async fn issue_magic_link(
         &self,
@@ -109,8 +115,11 @@ pub trait OutboundStore: Send + Sync {
         expires_at: Timestamp,
     ) -> Result<SecretString, StoreError>;
 
-    /// Records the outcome of a pending intent.
+    /// Records the outcome of a claimed intent.
     async fn finish(&self, intent_id: Uuid, outcome: Outcome) -> Result<(), StoreError>;
+
+    /// Returns a claimed intent to pending, after a send that certainly did not deliver the message.
+    async fn release(&self, intent_id: Uuid) -> Result<(), StoreError>;
 }
 
 /// `TADA_PUBLIC_URL` (ADR 0042). Each link starts with it, and its host is the right part of each
@@ -153,6 +162,13 @@ impl PublicUrl {
 ///
 /// Each attempt creates a new token, because the store keeps only the hash of the old one.
 /// The old token expires unused.
+///
+/// The handler claims the intent before it creates the token: the intent is then `unknown`.
+/// It returns the intent to `pending` only after a temporary failure, which certainly delivered
+/// nothing. So a mail is never sent twice (ADR 0042).
+/// The remaining window: if the worker stops after the claim, or the store cannot record the
+/// outcome, the intent stays `unknown`, and a mail that went out unrecorded, or did not go out at
+/// all, is not sent again.
 pub struct SendOutbound {
     store: Arc<dyn OutboundStore>,
     mailer: Arc<dyn Mailer>,
@@ -238,6 +254,14 @@ impl SendOutbound {
             token.expose_secret()
         )
     }
+
+    /// Records the outcome of the claimed intent.
+    async fn finish(&self, intent_id: Uuid, outcome: Outcome) -> Result<(), JobFailed> {
+        self.store
+            .finish(intent_id, outcome)
+            .await
+            .map_err(store_failed)
+    }
 }
 
 /// The intent ID of a version 1 payload.
@@ -273,22 +297,49 @@ impl JobHandler for SendOutbound {
             .await
             .map_err(store_failed)?
         else {
-            // An earlier attempt recorded the outcome already.
+            // An earlier attempt claimed the intent already.
             return Ok(None);
         };
-        let message = self.message(intent).await?;
-        let outcome = match self.mailer.send(&message).await {
-            Ok(()) => Outcome::Sent,
-            Err(SendError::Rejected(_)) => Outcome::Failed,
-            Err(SendError::Unknown) => Outcome::Unknown,
-            // The queue retries with a backoff, and the intent stays pending.
-            Err(error @ SendError::Temporary(_)) => return Err(JobFailed(error.to_string())),
+        if !self.store.claim(intent_id).await.map_err(store_failed)? {
+            return Ok(None);
+        }
+        if intent.obsolete {
+            self.finish(intent_id, Outcome::Failed).await?;
+            return Ok(Some(JobWarning(format!(
+                "the invitation of the intent {intent_id} is no longer pending, so nothing was sent"
+            ))));
+        }
+        let message = match self.message(intent).await {
+            Ok(message) => message,
+            Err(failure) => {
+                // Nothing went out, so a retry is safe.
+                self.store.release(intent_id).await.map_err(store_failed)?;
+                return Err(failure);
+            }
         };
-        self.store
-            .finish(intent_id, outcome)
-            .await
-            .map_err(store_failed)?;
-        Ok(None)
+        match self.mailer.send(&message).await {
+            Ok(()) => {
+                self.finish(intent_id, Outcome::Sent).await?;
+                Ok(None)
+            }
+            Err(error @ SendError::Rejected(_)) => {
+                self.finish(intent_id, Outcome::Failed).await?;
+                Ok(Some(JobWarning(format!("intent {intent_id}: {error}"))))
+            }
+            Err(error @ SendError::Unknown) => {
+                self.finish(intent_id, Outcome::Unknown).await?;
+                Ok(Some(JobWarning(format!("intent {intent_id}: {error}"))))
+            }
+            Err(error @ SendError::Temporary(_)) => {
+                if job.is_last_attempt() {
+                    self.finish(intent_id, Outcome::Failed).await?;
+                } else {
+                    // The queue retries with a backoff.
+                    self.store.release(intent_id).await.map_err(store_failed)?;
+                }
+                Err(JobFailed(error.to_string()))
+            }
+        }
     }
 }
 
@@ -314,20 +365,29 @@ mod tests {
         }
     }
 
-    /// One pending intent. Each issued token is `token-<n>`.
-    #[derive(Default)]
+    /// One intent with its status. Each issued token is `token-<n>`.
     struct MemoryStore {
-        pending: Mutex<Option<PendingIntent>>,
+        intent: PendingIntent,
+        status: Mutex<&'static str>,
         issued: Mutex<Vec<(String, Timestamp)>>,
         finished: Mutex<Vec<Outcome>>,
+        /// Simulates a database failure when the handler records the outcome.
+        finish_fails: bool,
     }
 
     impl MemoryStore {
         fn with(intent: PendingIntent) -> Self {
             Self {
-                pending: Mutex::new(Some(intent)),
-                ..Self::default()
+                intent,
+                status: Mutex::new("pending"),
+                issued: Mutex::default(),
+                finished: Mutex::default(),
+                finish_fails: false,
             }
+        }
+
+        fn status(&self) -> &'static str {
+            *self.status.lock().unwrap()
         }
 
         fn issue(&self, expires_at: Timestamp) -> SecretString {
@@ -336,12 +396,25 @@ mod tests {
             issued.push((token.clone(), expires_at));
             SecretString::from(token)
         }
+
+        fn failure() -> StoreError {
+            StoreError::Internal("the database failed".into())
+        }
     }
 
     #[async_trait]
     impl OutboundStore for MemoryStore {
         async fn load_pending(&self, _: Uuid) -> Result<Option<PendingIntent>, StoreError> {
-            Ok(self.pending.lock().unwrap().clone())
+            Ok((self.status() == "pending").then(|| self.intent.clone()))
+        }
+
+        async fn claim(&self, _: Uuid) -> Result<bool, StoreError> {
+            let mut status = self.status.lock().unwrap();
+            let claimed = *status == "pending";
+            if claimed {
+                *status = "unknown";
+            }
+            Ok(claimed)
         }
 
         async fn issue_magic_link(
@@ -362,8 +435,22 @@ mod tests {
         }
 
         async fn finish(&self, _: Uuid, outcome: Outcome) -> Result<(), StoreError> {
-            self.pending.lock().unwrap().take();
-            self.finished.lock().unwrap().push(outcome);
+            if self.finish_fails {
+                return Err(Self::failure());
+            }
+            let mut status = self.status.lock().unwrap();
+            if *status == "unknown" {
+                *status = outcome.as_str();
+                self.finished.lock().unwrap().push(outcome);
+            }
+            Ok(())
+        }
+
+        async fn release(&self, _: Uuid) -> Result<(), StoreError> {
+            let mut status = self.status.lock().unwrap();
+            if *status == "unknown" {
+                *status = "pending";
+            }
             Ok(())
         }
     }
@@ -421,6 +508,7 @@ mod tests {
             locale: "de-CH".into(),
             organization_name: None,
             message_id: "abc".into(),
+            obsolete: false,
         }
     }
 
@@ -455,7 +543,11 @@ mod tests {
     }
 
     fn setup(intent: PendingIntent, result: Result<(), SendError>) -> Setup {
-        let store = Arc::new(MemoryStore::with(intent));
+        setup_with(MemoryStore::with(intent), result)
+    }
+
+    fn setup_with(store: MemoryStore, result: Result<(), SendError>) -> Setup {
+        let store = Arc::new(store);
         let mailer = Arc::new(TestMailer::answering(result));
         let handler = SendOutbound::new(
             store.clone(),
@@ -553,20 +645,28 @@ mod tests {
         assert_eq!(MAGIC_LINK_LIFETIME, SignedDuration::from_mins(15));
     }
 
+    /// The intent ID of `job`.
+    const INTENT: Uuid = Uuid::from_u128(4);
+
     #[tokio::test]
-    async fn an_unknown_outcome_is_recorded_and_completes_the_job() {
+    async fn an_unknown_outcome_is_recorded_and_completes_the_job_with_a_warning() {
         let setup = setup(magic_link(), Err(SendError::Unknown));
-        assert_eq!(setup.handler.run(&job(1)).await, Ok(None));
+        let warning = setup.handler.run(&job(1)).await.unwrap().unwrap();
+        assert!(warning.0.contains(&INTENT.to_string()), "{warning:?}");
         assert_eq!(finished(&setup), [Outcome::Unknown]);
+        assert_eq!(setup.store.status(), "unknown");
     }
 
     #[tokio::test]
-    async fn a_rejected_message_is_recorded_as_failed_and_completes_the_job() {
+    async fn a_rejected_message_is_recorded_as_failed_and_reported_without_the_address() {
         let setup = setup(
             magic_link(),
             Err(SendError::Rejected("SMTP status 550".into())),
         );
-        assert_eq!(setup.handler.run(&job(1)).await, Ok(None));
+        let warning = setup.handler.run(&job(1)).await.unwrap().unwrap();
+        assert!(warning.0.contains("SMTP status 550"), "{warning:?}");
+        assert!(warning.0.contains(&INTENT.to_string()), "{warning:?}");
+        assert!(!warning.0.contains("anna"), "{warning:?}");
         assert_eq!(finished(&setup), [Outcome::Failed]);
     }
 
@@ -577,6 +677,7 @@ mod tests {
             Err(SendError::Temporary("SMTP status 421".into())),
         );
         assert!(setup.handler.run(&job(1)).await.is_err());
+        assert_eq!(setup.store.status(), "pending");
         assert!(setup.handler.run(&job(2)).await.is_err());
         assert_eq!(finished(&setup), []);
         let tokens: Vec<String> = sent(&setup).into_iter().map(|m| m.text).collect();
@@ -590,9 +691,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_temporary_failure_of_the_last_attempt_records_failed() {
+        let setup = setup(
+            magic_link(),
+            Err(SendError::Temporary("SMTP status 421".into())),
+        );
+        assert!(setup.handler.run(&job(10)).await.is_err());
+        assert_eq!(finished(&setup), [Outcome::Failed]);
+    }
+
+    #[tokio::test]
+    async fn a_send_whose_outcome_was_not_recorded_is_not_sent_again() {
+        let store = MemoryStore {
+            finish_fails: true,
+            ..MemoryStore::with(magic_link())
+        };
+        let setup = setup_with(store, Ok(()));
+        assert!(setup.handler.run(&job(1)).await.is_err());
+        assert_eq!(setup.handler.run(&job(2)).await, Ok(None));
+        assert_eq!(sent(&setup).len(), 1);
+        assert_eq!(setup.store.status(), "unknown");
+    }
+
+    #[tokio::test]
+    async fn an_obsolete_invitation_is_recorded_as_failed_without_a_token_or_a_mail() {
+        let setup = setup(
+            PendingIntent {
+                obsolete: true,
+                ..invitation()
+            },
+            Ok(()),
+        );
+        let warning = setup.handler.run(&job(1)).await.unwrap().unwrap();
+        assert!(warning.0.contains(&INTENT.to_string()), "{warning:?}");
+        assert!(sent(&setup).is_empty());
+        assert!(setup.store.issued.lock().unwrap().is_empty());
+        assert_eq!(finished(&setup), [Outcome::Failed]);
+    }
+
+    #[tokio::test]
     async fn a_finished_intent_sends_nothing() {
         let setup = setup(magic_link(), Ok(()));
-        setup.store.pending.lock().unwrap().take();
+        *setup.store.status.lock().unwrap() = "sent";
         assert_eq!(setup.handler.run(&job(2)).await, Ok(None));
         assert!(sent(&setup).is_empty());
     }
