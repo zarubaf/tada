@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO app_user (id, display_name, created_at) VALUES ($1, $2, now())",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9f4fc04d9bcf0bf7a49badcb0d878b6c70a832cc9a7e8dfbae35c885c412d580"
+}

@@ -1,0 +1,14 @@
+# Data inventory
+
+This file lists each category of personal data that tada stores (ADR 0045).
+Each new table or column with personal data updates this file in the same pull request.
+Logs hold no personal data (ADR 0035).
+
+| Category                 | Table and columns                                    | Purpose                                               | Retention                                                           |
+| ------------------------ | ---------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------- |
+| Display name             | `app_user.display_name`                              | Shows the member to other members                     | While the user exists. Slice 1 has no user deletion.                |
+| Email address            | `email_identity.email`                               | Signs the member in and receives mail                 | While the user exists. Slice 1 has no user deletion.                |
+| Memberships              | `organization_membership`, `event_membership`        | Decide what a member can see and do                   | Until an owner or admin removes the membership.                     |
+| Telegram user ID         | `telegram_identity.telegram_user_id`                 | Links a Telegram account to a user                    | Until the link is removed. Slice 1 cannot remove a link.            |
+| Telegram name            | `telegram_link_code.claimed_name`                    | Shows the account to the member who confirms the link | Until the code row is deleted. No job deletes it in Slice 1.        |
+| Audit log (pseudonymous) | `audit_event.actor_id`, `principal_id`, `request_id` | Records who did what (ADR 0039). It holds IDs only.   | No deletion in Slice 1. A legal redaction keeps the IDs (ADR 0045). |

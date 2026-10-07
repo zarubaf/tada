@@ -37,6 +37,17 @@ pub enum ActorKind {
     Ai,
 }
 
+impl ActorKind {
+    /// The name that audit records and the database use.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Member => "member",
+            Self::Service => "service",
+            Self::Ai => "ai",
+        }
+    }
+}
+
 /// Who did something, for which member and through which channel (ADR 0039).
 /// A caller gives its actor, so a record author or an audit event cannot name someone else.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

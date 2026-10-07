@@ -27,15 +27,16 @@ A debug build acts as the owner of a development organization for each request (
 
 ## Sources of truth
 
-| Topic                       | File                                   |
-| --------------------------- | -------------------------------------- |
-| Product scope and users     | [doc/PRODUCT.md](PRODUCT.md)           |
-| Architecture                | [doc/ARCHITECTURE.md](ARCHITECTURE.md) |
-| Decisions and their reasons | [doc/adr/](adr/README.md)              |
-| Terms                       | [doc/glossary.md](glossary.md)         |
-| Slices and acceptance       | [doc/roadmap.md](roadmap.md)           |
-| Design system and UI rules  | [doc/design/](design/README.md)        |
-| Tool versions and tasks     | [mise.toml](../mise.toml)              |
+| Topic                       | File                                       |
+| --------------------------- | ------------------------------------------ |
+| Product scope and users     | [doc/PRODUCT.md](PRODUCT.md)               |
+| Architecture                | [doc/ARCHITECTURE.md](ARCHITECTURE.md)     |
+| Decisions and their reasons | [doc/adr/](adr/README.md)                  |
+| Terms                       | [doc/glossary.md](glossary.md)             |
+| Personal data we store      | [doc/data-inventory.md](data-inventory.md) |
+| Slices and acceptance       | [doc/roadmap.md](roadmap.md)               |
+| Design system and UI rules  | [doc/design/](design/README.md)            |
+| Tool versions and tasks     | [mise.toml](../mise.toml)                  |
 
 Do not keep project state only in chat or in LLM memory.
 If a decision or a fact matters later, write it into one of these files.

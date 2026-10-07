@@ -2,7 +2,8 @@
 
 use secrecy::SecretString;
 use sqlx::types::Uuid;
-use tada_app::domain::ids::OrganizationId;
+use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
+use tada_app::domain::ids::{OrganizationId, UserId};
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use testcontainers_modules::testcontainers::{ContainerAsync, ImageExt};
@@ -59,5 +60,58 @@ impl TestDatabase {
         .await
         .unwrap();
         OrganizationId::from_uuid(id)
+    }
+
+    /// Creates a user with an email identity.
+    ///
+    /// # Panics
+    ///
+    /// If the insert fails, for example because the email address is taken.
+    #[allow(clippy::unwrap_used)]
+    pub async fn create_user(&self, display_name: &DisplayName, email: &Email) -> UserId {
+        let id = Uuid::now_v7();
+        let mut tx = self.database.pool.begin().await.unwrap();
+        sqlx::query!(
+            "INSERT INTO app_user (id, display_name, created_at) VALUES ($1, $2, now())",
+            id,
+            display_name.as_str(),
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query!(
+            "INSERT INTO email_identity (user_id, email, created_at) VALUES ($1, $2, now())",
+            id,
+            email.as_str(),
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        UserId::from_uuid(id)
+    }
+
+    /// Adds a membership of a user in an organization.
+    ///
+    /// # Panics
+    ///
+    /// If the insert fails.
+    #[allow(clippy::unwrap_used)]
+    pub async fn add_membership(
+        &self,
+        organization: OrganizationId,
+        user: UserId,
+        role: OrganizationRole,
+    ) {
+        sqlx::query!(
+            "INSERT INTO organization_membership (organization_id, user_id, role, created_at)
+             VALUES ($1, $2, $3, now())",
+            organization.as_uuid(),
+            user.as_uuid(),
+            role.as_str(),
+        )
+        .execute(&self.database.pool)
+        .await
+        .unwrap();
     }
 }

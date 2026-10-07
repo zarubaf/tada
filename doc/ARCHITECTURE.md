@@ -103,6 +103,7 @@ tada does not copy every tool into PostgreSQL.
 - A link to a source is not evidence, because documents change and messages disappear.
   Evidence is the exact source version or a snapshot, with its hash, capture time and a locator such as a page or a passage.
 - Audit messages contain no raw personal data.
+- [doc/data-inventory.md](data-inventory.md) lists each category of personal data that tada stores.
 - Retention and deletion rules cover originals, snapshots, extracted facts, embeddings and backups.
 
 ### Permissions and isolation

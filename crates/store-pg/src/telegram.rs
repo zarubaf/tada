@@ -151,12 +151,21 @@ mod tests {
     use jiff::SignedDuration;
     use tada_app::caller::MemberCaller;
     use tada_app::caller::OrganizationRole::Member;
+    use tada_app::domain::identity::{DisplayName, Email};
 
     use super::*;
     use crate::testing::TestDatabase;
 
-    fn member(test_org: tada_app::domain::ids::OrganizationId) -> MemberCaller {
-        MemberCaller::new(UserId::from_uuid(Uuid::now_v7()), test_org, Member)
+    /// A member with a user row, because the Telegram tables refer to the user.
+    async fn member(
+        test: &TestDatabase,
+        organization: tada_app::domain::ids::OrganizationId,
+    ) -> MemberCaller {
+        let name = DisplayName::parse("Anna Muster").unwrap();
+        let email = Email::parse(&format!("{}@example.org", Uuid::now_v7())).unwrap();
+        let user = test.create_user(&name, &email).await;
+        test.add_membership(organization, user, Member).await;
+        MemberCaller::new(user, organization, Member)
     }
 
     fn name(text: &str) -> TelegramName {
@@ -166,7 +175,8 @@ mod tests {
     #[tokio::test]
     async fn links_an_account_after_the_claim_and_the_confirmation() {
         let test = TestDatabase::start().await;
-        let alice = member(test.create_organization("testwil").await);
+        let organization = test.create_organization("testwil").await;
+        let alice = member(&test, organization).await;
         let db = &test.database;
         let now = Timestamp::now();
         let code = db
@@ -224,7 +234,10 @@ mod tests {
     async fn another_member_cannot_see_or_confirm_a_request() {
         let test = TestDatabase::start().await;
         let organization = test.create_organization("testwil").await;
-        let (alice, bob) = (member(organization), member(organization));
+        let (alice, bob) = (
+            member(&test, organization).await,
+            member(&test, organization).await,
+        );
         let db = &test.database;
         let now = Timestamp::now();
         let code = db
@@ -261,7 +274,8 @@ mod tests {
     #[tokio::test]
     async fn an_expired_code_cannot_be_claimed_or_confirmed() {
         let test = TestDatabase::start().await;
-        let alice = member(test.create_organization("testwil").await);
+        let organization = test.create_organization("testwil").await;
+        let alice = member(&test, organization).await;
         let db = &test.database;
         let now = Timestamp::now();
         let code = db
@@ -313,7 +327,10 @@ mod tests {
     async fn an_account_links_to_one_user_only() {
         let test = TestDatabase::start().await;
         let organization = test.create_organization("testwil").await;
-        let (alice, bob) = (member(organization), member(organization));
+        let (alice, bob) = (
+            member(&test, organization).await,
+            member(&test, organization).await,
+        );
         let db = &test.database;
         let now = Timestamp::now();
         for caller in [&alice, &bob] {

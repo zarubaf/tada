@@ -13,7 +13,7 @@ use crate::error::store_error;
 /// The development organization, slug `dev`.
 pub const DEV_ORGANIZATION_ID: OrganizationId =
     OrganizationId::from_uuid(Uuid::from_u128(0x0199_b8e0_0000_7000_8000_0000_0000_0001));
-/// The development member, an owner of the development organization. It has no database row.
+/// The development member, an owner of the development organization.
 pub const DEV_USER_ID: UserId =
     UserId::from_uuid(Uuid::from_u128(0x0199_b8e0_0000_7000_8000_0000_0000_0002));
 
@@ -36,17 +36,59 @@ impl Authenticator for DevAuthenticator {
 }
 
 impl Database {
-    /// Creates the development organization if it does not exist.
+    /// Creates the development organization, the development member and its owner membership
+    /// if they do not exist. The Telegram tables refer to the user.
     pub async fn ensure_dev_organization(&self) -> Result<(), StoreError> {
+        let mut tx = self.pool.begin().await.map_err(store_error)?;
         sqlx::query!(
             "INSERT INTO organization (id, slug, name, created_at)
              VALUES ($1, 'dev', 'Development', now())
              ON CONFLICT DO NOTHING",
             DEV_ORGANIZATION_ID.as_uuid(),
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
-        .map(|_| ())
-        .map_err(store_error)
+        .map_err(store_error)?;
+        sqlx::query!(
+            "INSERT INTO app_user (id, display_name, created_at)
+             VALUES ($1, 'Development', now())
+             ON CONFLICT DO NOTHING",
+            DEV_USER_ID.as_uuid(),
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        sqlx::query!(
+            "INSERT INTO organization_membership (organization_id, user_id, role, created_at)
+             VALUES ($1, $2, 'owner', now())
+             ON CONFLICT DO NOTHING",
+            DEV_ORGANIZATION_ID.as_uuid(),
+            DEV_USER_ID.as_uuid(),
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        tx.commit().await.map_err(store_error)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tada_app::identity::IdentityStore;
+
+    use super::*;
+    use crate::testing::TestDatabase;
+
+    #[tokio::test]
+    async fn the_development_member_owns_the_development_organization() {
+        let test = TestDatabase::start().await;
+        test.database.ensure_dev_organization().await.unwrap();
+        test.database.ensure_dev_organization().await.unwrap();
+
+        let memberships = test.database.memberships_of(DEV_USER_ID).await.unwrap();
+        assert_eq!(
+            memberships,
+            vec![(DEV_ORGANIZATION_ID, OrganizationRole::Owner)]
+        );
     }
 }

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO organization_membership (organization_id, user_id, role, created_at)\n             VALUES ($1, $2, 'owner', now())\n             ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ec14e4385127a78a599d66962b46120833523f8be7261a2b88dbe7b61dca0211"
+}

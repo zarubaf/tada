@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT event_role FROM event_membership\n             WHERE organization_id = $1 AND event_id = $2 AND user_id = $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_membership",
+            "name": "event_role"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d170be8f0b373ca6a27493373164919c673fa0543955a2e58fcfedaf2248489e"
+}

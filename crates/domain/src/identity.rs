@@ -16,6 +16,54 @@ pub enum OrganizationRole {
     Member,
 }
 
+impl OrganizationRole {
+    /// The kebab-case name that the database and the API use.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Owner => "owner",
+            Self::Admin => "admin",
+            Self::Member => "member",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "owner" => Some(Self::Owner),
+            "admin" => Some(Self::Admin),
+            "member" => Some(Self::Member),
+            _ => None,
+        }
+    }
+}
+
+/// The role of a member in one event (glossary, ADR 0052).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventRole {
+    EventManager,
+    EventContributor,
+    EventViewer,
+}
+
+impl EventRole {
+    /// The kebab-case name that the database and the API use.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::EventManager => "event-manager",
+            Self::EventContributor => "event-contributor",
+            Self::EventViewer => "event-viewer",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "event-manager" => Some(Self::EventManager),
+            "event-contributor" => Some(Self::EventContributor),
+            "event-viewer" => Some(Self::EventViewer),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum EmailError {
     #[error("the email address has no single @ with text on both sides")]
@@ -104,6 +152,27 @@ impl fmt::Debug for DisplayName {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn roles_have_stable_kebab_case_names() {
+        for role in [
+            OrganizationRole::Owner,
+            OrganizationRole::Admin,
+            OrganizationRole::Member,
+        ] {
+            assert_eq!(OrganizationRole::parse(role.as_str()), Some(role));
+        }
+        for role in [
+            EventRole::EventManager,
+            EventRole::EventContributor,
+            EventRole::EventViewer,
+        ] {
+            assert_eq!(EventRole::parse(role.as_str()), Some(role));
+        }
+        assert_eq!(EventRole::EventViewer.as_str(), "event-viewer");
+        assert_eq!(OrganizationRole::parse("Owner"), None);
+        assert_eq!(EventRole::parse("owner"), None);
+    }
 
     #[test]
     fn normalizes_an_email_address() {
