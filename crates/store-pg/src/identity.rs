@@ -10,7 +10,7 @@ use tada_app::store::StoreError;
 use crate::Database;
 use crate::error::{InvalidRow, store_error};
 
-fn organization_role(name: &str) -> Result<OrganizationRole, InvalidRow> {
+pub(crate) fn organization_role(name: &str) -> Result<OrganizationRole, InvalidRow> {
     OrganizationRole::parse(name).ok_or(InvalidRow("role"))
 }
 

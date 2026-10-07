@@ -362,6 +362,25 @@ mod tests {
         ) -> Result<Option<secrecy::SecretString>, tada_app::store::StoreError> {
             unreachable!()
         }
+
+        async fn preview_invitation(
+            &self,
+            _: &str,
+            _: jiff::Timestamp,
+        ) -> Result<Option<tada_app::sign_in::InvitationPreview>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn accept_invitation(
+            &self,
+            _: &str,
+            _: Option<&str>,
+            _: Option<uuid::Uuid>,
+            _: jiff::Timestamp,
+        ) -> Result<Option<secrecy::SecretString>, tada_app::store::StoreError> {
+            unreachable!()
+        }
     }
 
     fn state() -> ApiState {
