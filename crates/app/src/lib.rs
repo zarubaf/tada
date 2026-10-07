@@ -16,6 +16,7 @@ pub mod outbound;
 pub mod paging;
 pub mod problem;
 pub mod public_url;
+pub mod rate_limit;
 pub mod session;
 pub mod sign_in;
 pub mod store;

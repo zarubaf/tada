@@ -15,6 +15,7 @@ use uuid::Uuid;
 
 use crate::clock::Clock;
 use crate::problem::ProblemCode;
+use crate::rate_limit::{RateDecision, RateLimit};
 use crate::store::StoreError;
 
 /// The repository port of sign-in. Each method takes a token as the holder sends it.
@@ -40,6 +41,22 @@ pub trait SignInStore: Debug + Send + Sync {
         user_agent: Option<&str>,
         now: Timestamp,
     ) -> Result<Option<SecretString>, StoreError>;
+}
+
+/// The repository port of sign-in requests (ADR 0056).
+#[async_trait]
+pub trait SignInRequestStore: Debug + Send + Sync {
+    /// Counts the request against each of `limits` in the window of `now`. If each limit allows
+    /// it, the same transaction queues a magic-link intent for the user of `email` if that user has
+    /// a membership. A known and an unknown address both write the counters in one commit, so that
+    /// the time of the request does not show if the address is known (ADR 0008).
+    async fn queue_magic_link(
+        &self,
+        email: &Email,
+        limits: &[RateLimit<'_>],
+        request_id: Option<Uuid>,
+        now: Timestamp,
+    ) -> Result<RateDecision, StoreError>;
 }
 
 /// The organization of a new session: the only organization of a user with one membership.

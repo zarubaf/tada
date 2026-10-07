@@ -7,17 +7,93 @@ use async_trait::async_trait;
 use jiff::Timestamp;
 use secrecy::SecretString;
 use serde_json::json;
+use sqlx::PgExecutor;
 use sqlx::types::{Json, Uuid};
 use tada_app::domain::identity::Email;
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::outbound::SEND_JOB;
-use tada_app::sign_in::{SignInStore, initial_organization};
+use tada_app::rate_limit::{RateDecision, RateLimit};
+use tada_app::sign_in::{SignInRequestStore, SignInStore, initial_organization};
 use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::error::store_error;
+use crate::rate_limit::PgRateLimiter;
 use crate::session::insert_session;
 use crate::token::hash_token;
+
+/// Queues a magic-link intent for the user of `email` if that user has a membership.
+///
+/// One statement for both cases, so a member and an unknown address cost one round trip each
+/// (ADR 0008). It writes the rows of `queue_outbound` for a magic link: the intent and its send
+/// job, whose payload names the intent only (ADR 0042).
+async fn queue_magic_link_intent(
+    executor: impl PgExecutor<'_>,
+    email: &Email,
+    request_id: Option<Uuid>,
+) -> Result<(), StoreError> {
+    let intent_id = Uuid::now_v7();
+    sqlx::query!(
+        "WITH member AS (
+             SELECT e.user_id FROM email_identity e
+             WHERE e.email = $1
+               AND EXISTS (SELECT 1 FROM organization_membership m WHERE m.user_id = e.user_id)
+         ), intent AS (
+             INSERT INTO outbound_intent (id, user_id, purpose, message_id, request_id, created_at)
+             SELECT $2, user_id, 'magic-link', $3, $4, now() FROM member
+             RETURNING id
+         )
+         INSERT INTO job (id, kind, version, payload, request_id, run_at, created_at)
+         SELECT $5, $6, 1, $7, $4, now(), now() FROM intent",
+        email.as_str(),
+        intent_id,
+        intent_id.simple().to_string(),
+        request_id,
+        Uuid::now_v7(),
+        SEND_JOB,
+        Json(json!({"intent_id": intent_id})) as _,
+    )
+    .execute(executor)
+    .await
+    .map_err(store_error)?;
+    Ok(())
+}
+
+/// The `SignInRequestStore` adapter: the rate limits and the magic-link intent in one transaction.
+#[derive(Debug)]
+pub struct PgSignInRequestStore {
+    database: Database,
+    rate_limiter: PgRateLimiter,
+}
+
+impl PgSignInRequestStore {
+    pub fn new(database: Database, rate_limiter: PgRateLimiter) -> Self {
+        Self {
+            database,
+            rate_limiter,
+        }
+    }
+}
+
+#[async_trait]
+impl SignInRequestStore for PgSignInRequestStore {
+    async fn queue_magic_link(
+        &self,
+        email: &Email,
+        limits: &[RateLimit<'_>],
+        request_id: Option<Uuid>,
+        now: Timestamp,
+    ) -> Result<RateDecision, StoreError> {
+        let mut tx = self.database.pool.begin().await.map_err(store_error)?;
+        let decision = self.rate_limiter.hit(&mut tx, limits, now).await?;
+        if decision == RateDecision::Allowed {
+            queue_magic_link_intent(&mut *tx, email, request_id).await?;
+        }
+        // The counters are written in each case, so each request ends with one write commit.
+        tx.commit().await.map_err(store_error)?;
+        Ok(decision)
+    }
+}
 
 #[async_trait]
 impl SignInStore for Database {
@@ -26,34 +102,7 @@ impl SignInStore for Database {
         email: &Email,
         request_id: Option<Uuid>,
     ) -> Result<(), StoreError> {
-        // One statement for both cases, so a member and an unknown address cost one round trip each
-        // (ADR 0008). It writes the rows of `queue_outbound` for a magic link: the intent and its
-        // send job, whose payload names the intent only (ADR 0042).
-        let intent_id = Uuid::now_v7();
-        sqlx::query!(
-            "WITH member AS (
-                 SELECT e.user_id FROM email_identity e
-                 WHERE e.email = $1
-                   AND EXISTS (SELECT 1 FROM organization_membership m WHERE m.user_id = e.user_id)
-             ), intent AS (
-                 INSERT INTO outbound_intent (id, user_id, purpose, message_id, request_id, created_at)
-                 SELECT $2, user_id, 'magic-link', $3, $4, now() FROM member
-                 RETURNING id
-             )
-             INSERT INTO job (id, kind, version, payload, request_id, run_at, created_at)
-             SELECT $5, $6, 1, $7, $4, now(), now() FROM intent",
-            email.as_str(),
-            intent_id,
-            intent_id.simple().to_string(),
-            request_id,
-            Uuid::now_v7(),
-            SEND_JOB,
-            Json(json!({"intent_id": intent_id})) as _,
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(store_error)?;
-        Ok(())
+        queue_magic_link_intent(&self.pool, email, request_id).await
     }
 
     async fn redeem_magic_link(
@@ -114,6 +163,7 @@ mod tests {
     use secrecy::ExposeSecret;
     use tada_app::domain::identity::{DisplayName, OrganizationRole};
     use tada_app::outbound::{OutboundStore, Purpose};
+    use tada_app::rate_limit::{SIGN_IN_PER_EMAIL, sign_in_limits};
     use tada_app::session::SessionStore;
 
     use super::*;
@@ -182,6 +232,63 @@ mod tests {
             .unwrap();
         assert_eq!(pending.purpose, Purpose::MagicLink { user_id: anna });
         assert_eq!(pending.to, email("anna@example.org"));
+    }
+
+    fn request_store(test: &TestDatabase) -> PgSignInRequestStore {
+        PgSignInRequestStore::new(
+            test.database.clone(),
+            PgRateLimiter::new(SecretString::from("test rate limit key")),
+        )
+    }
+
+    #[tokio::test]
+    async fn a_request_counts_and_queues_in_one_transaction() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let anna = user(&test, "anna@example.org").await;
+        test.add_membership(testwil, anna, OrganizationRole::Member)
+            .await;
+        let store = request_store(&test);
+        let ip = "203.0.113.7".parse().unwrap();
+
+        for address in ["nobody@example.org", "anna@example.org"] {
+            let email = email(address);
+            let decision = store
+                .queue_magic_link(&email, &sign_in_limits(&email, ip), None, now())
+                .await
+                .unwrap();
+            assert_eq!(decision, RateDecision::Allowed);
+        }
+        assert_eq!(count(&test, "outbound_intent").await, 1);
+        assert_eq!(count(&test, "rate_limit_counter").await, 3);
+    }
+
+    #[tokio::test]
+    async fn a_limited_request_queues_nothing() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let anna = user(&test, "anna@example.org").await;
+        test.add_membership(testwil, anna, OrganizationRole::Member)
+            .await;
+        let store = request_store(&test);
+        let anna = email("anna@example.org");
+        let limits = sign_in_limits(&anna, "203.0.113.7".parse().unwrap());
+
+        for _ in 0..SIGN_IN_PER_EMAIL {
+            store
+                .queue_magic_link(&anna, &limits, None, now())
+                .await
+                .unwrap();
+        }
+        let decision = store
+            .queue_magic_link(&anna, &limits, None, now())
+            .await
+            .unwrap();
+        assert!(matches!(decision, RateDecision::Limited { .. }));
+        assert_eq!(
+            count(&test, "outbound_intent").await,
+            i64::from(SIGN_IN_PER_EMAIL)
+        );
     }
 
     async fn magic_link(test: &TestDatabase, user: UserId, expires_at: Timestamp) -> String {

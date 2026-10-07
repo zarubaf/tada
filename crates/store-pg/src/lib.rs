@@ -11,6 +11,7 @@ mod heartbeat;
 mod identity;
 mod jobs;
 mod outbound;
+pub mod rate_limit;
 mod session;
 mod sign_in;
 mod telegram;
@@ -19,3 +20,4 @@ pub mod testing;
 mod token;
 
 pub use database::{Database, MigrationFailed};
+pub use sign_in::PgSignInRequestStore;
