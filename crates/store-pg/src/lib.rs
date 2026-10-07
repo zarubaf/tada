@@ -13,6 +13,7 @@ mod facts;
 mod heartbeat;
 mod identity;
 mod jobs;
+mod members;
 mod outbound;
 pub mod rate_limit;
 mod session;

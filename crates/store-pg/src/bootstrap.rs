@@ -14,6 +14,7 @@ use tada_app::store::StoreError;
 use crate::Database;
 use crate::audit::record;
 use crate::error::store_error;
+use crate::members::revoke_invitations;
 use crate::outbound::queue_outbound;
 
 #[async_trait]
@@ -62,26 +63,18 @@ impl BootstrapStore for Database {
             return Ok(BootstrapOutcome::OwnerExists);
         }
 
-        let revoked = sqlx::query_scalar!(
-            "UPDATE invitation SET status = 'revoked', revoked_at = $3
-             WHERE organization_id = $1 AND role = $2 AND status = 'pending'
-             RETURNING id",
+        let pending = sqlx::query_scalar!(
+            "SELECT id FROM invitation
+             WHERE organization_id = $1 AND role = $2 AND status = 'pending'",
             organization_id.as_uuid(),
             OrganizationRole::Owner.as_str(),
-            now as _,
         )
         .fetch_all(&mut *tx)
         .await
         .map_err(store_error)?;
-        // A revoked invitation keeps no token, so no mailed or printed link of it works any more.
-        sqlx::query!(
-            "DELETE FROM invitation_token WHERE organization_id = $1 AND invitation_id = ANY($2)",
-            organization_id.as_uuid(),
-            &revoked,
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(store_error)?;
+        let revoked = revoke_invitations(&mut tx, organization_id, &pending, invitation.now)
+            .await
+            .map_err(store_error)?;
         let invitation_id = InvitationId::from_uuid(Uuid::now_v7());
         sqlx::query!(
             "INSERT INTO invitation (id, organization_id, email, display_name, role, created_at)
