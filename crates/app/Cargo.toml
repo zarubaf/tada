@@ -16,6 +16,7 @@ tada-domain.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
 futures.workspace = true
+infer.workspace = true
 jiff.workspace = true
 secrecy.workspace = true
 serde_json.workspace = true

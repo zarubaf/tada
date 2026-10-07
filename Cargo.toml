@@ -33,6 +33,7 @@ frankenstein = { version = "0.52.1", default-features = false, features = ["clie
 futures = { version = "0.3.34", default-features = false, features = ["std"] }
 getrandom = "0.4.3"
 ipnet = "2.12.2"
+infer = "0.22.0"
 jiff = { version = "0.2.37", features = ["serde", "tzdb-bundle-always"] }
 jiff-sqlx = { version = "0.2.0", features = ["postgres"] }
 json-subscriber = "0.3.0"
