@@ -3,18 +3,19 @@
 // The helpers of this test file are not `#[test]` functions, so clippy.toml does not cover them.
 #![allow(clippy::unwrap_used)]
 
+mod support;
+
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{Request, StatusCode, header};
+use axum::http::{Method, StatusCode, header};
 use axum::routing::post;
 use axum::{Json, Router};
 use serde_json::{Value, json};
 use tada_adapters::clock::SystemClock;
-use tada_api::ApiState;
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::caller::{ServiceCaller, TelegramGateway};
 use tada_app::telegram::{
@@ -125,12 +126,8 @@ async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
     assert_eq!(requests[0].telegram_name.0, "Testperson Muster");
 }
 
-async fn call(router: &Router, method: &str, path: &str) -> (StatusCode, Option<String>, Value) {
-    let request = Request::builder()
-        .method(method)
-        .uri(path)
-        .body(Body::empty())
-        .unwrap();
+async fn call(router: &Router, method: Method, path: &str) -> (StatusCode, Option<String>, Value) {
+    let request = support::request(method, path).body(Body::empty()).unwrap();
     let response = router.clone().oneshot(request).await.unwrap();
     let status = response.status();
     let cache = response
@@ -152,21 +149,11 @@ async fn the_member_confirms_the_link_in_the_web_client() {
     let test = TestDatabase::start().await;
     test.database.ensure_dev_organization().await.unwrap();
     let router = tada_api::router(
-        ApiState {
-            dependencies: Vec::new(),
-            authenticator: Arc::new(DevAuthenticator),
-            events: Arc::new(test.database.clone()),
-            telegram: Arc::new(test.database.clone()),
-            identity: Arc::new(test.database.clone()),
-            sessions: Arc::new(test.database.clone()),
-            sign_in: Arc::new(test.database.clone()),
-            clock: Arc::new(SystemClock),
-            trusted_proxies: Vec::new(),
-        },
+        support::api_state(&test, Arc::new(DevAuthenticator), Arc::new(SystemClock)),
         None,
     );
 
-    let (status, cache, code) = call(&router, "POST", "/api/v1/telegram/link-codes").await;
+    let (status, cache, code) = call(&router, Method::POST, "/api/v1/telegram/link-codes").await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(
         cache.as_deref(),
@@ -190,7 +177,7 @@ async fn the_member_confirms_the_link_in_the_web_client() {
         .unwrap()
     );
 
-    let (_, _, page) = call(&router, "GET", "/api/v1/telegram/link-requests").await;
+    let (_, _, page) = call(&router, Method::GET, "/api/v1/telegram/link-requests").await;
     let request = &page["items"][0];
     assert_eq!(request["telegram_name"], "Testperson");
     let path = format!(
@@ -198,10 +185,10 @@ async fn the_member_confirms_the_link_in_the_web_client() {
         request["id"].as_str().unwrap()
     );
 
-    let (status, _, link) = call(&router, "POST", &path).await;
+    let (status, _, link) = call(&router, Method::POST, &path).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(link["telegram_user_id"], 4242);
-    let (status, _, problem) = call(&router, "POST", &path).await;
+    let (status, _, problem) = call(&router, Method::POST, &path).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(problem["code"], "not-found");
 }

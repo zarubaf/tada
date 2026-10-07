@@ -5,6 +5,7 @@ mod contract;
 mod events;
 mod extract;
 mod health;
+mod origin;
 mod problem;
 mod request_id;
 mod sign_in;
@@ -26,6 +27,7 @@ use tada_app::events::EventStore;
 use tada_app::health::DependencyCheck;
 use tada_app::identity::IdentityStore;
 use tada_app::problem::ProblemCode;
+use tada_app::public_url::PublicUrl;
 use tada_app::session::SessionStore;
 use tada_app::sign_in::SignInStore;
 use tada_app::telegram::TelegramLinks;
@@ -52,6 +54,8 @@ pub struct ApiState {
     pub clock: Arc<dyn Clock>,
     /// The proxies whose `X-Request-Id` the server accepts (ADR 0035).
     pub trusted_proxies: Vec<IpNet>,
+    /// `TADA_PUBLIC_URL`. Its origin is the only `Origin` of a state-changing request (ADR 0008).
+    pub public_url: PublicUrl,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -95,6 +99,7 @@ pub fn router(state: ApiState, web_root: Option<&Path>) -> Router {
         None => router.fallback(not_found),
     };
     router
+        .layer(middleware::from_fn_with_state(state.clone(), origin::check))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             request_id::track,
@@ -376,6 +381,7 @@ mod tests {
             sign_in: Arc::new(NoSignIn),
             clock: Arc::new(NoClock),
             trusted_proxies: Vec::new(),
+            public_url: PublicUrl::parse("https://tada.example.org").unwrap(),
         }
     }
 

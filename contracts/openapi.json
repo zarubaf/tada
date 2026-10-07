@@ -163,6 +163,7 @@
         "x-tada-problem-codes": [
           "unauthenticated",
           "organization-required",
+          "forbidden",
           "unavailable",
           "internal"
         ]
@@ -249,6 +250,7 @@
         "x-tada-problem-codes": [
           "unauthenticated",
           "organization-required",
+          "forbidden",
           "not-found",
           "invalid-transition",
           "unavailable",
@@ -290,6 +292,7 @@
         },
         "x-tada-problem-codes": [
           "malformed-request",
+          "forbidden",
           "payload-too-large",
           "unsupported-media-type",
           "unavailable",
@@ -339,6 +342,7 @@
         "x-tada-problem-codes": [
           "malformed-request",
           "unauthenticated",
+          "forbidden",
           "payload-too-large",
           "unsupported-media-type",
           "unavailable",
@@ -424,6 +428,7 @@
         "x-tada-problem-codes": [
           "malformed-request",
           "unauthenticated",
+          "forbidden",
           "not-found",
           "payload-too-large",
           "unsupported-media-type",
@@ -455,6 +460,7 @@
           }
         },
         "x-tada-problem-codes": [
+          "forbidden",
           "unavailable",
           "internal"
         ]
