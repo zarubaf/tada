@@ -54,6 +54,7 @@ tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["fs"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt", "registry", "std"] }
+unicode-normalization = "0.1.25"
 url = "2.5.8"
 utoipa = { version = "6.0.0", features = ["jiff_0_2", "uuid", "preserve_order", "preserve_path_order"] }
 utoipa-axum = "0.3.0"

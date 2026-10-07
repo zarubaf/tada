@@ -7,6 +7,7 @@ pub mod facts;
 pub mod identity;
 pub mod ids;
 pub mod name;
+pub mod sources;
 
 mod version;
 

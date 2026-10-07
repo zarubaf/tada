@@ -4,8 +4,9 @@ use jiff::Timestamp;
 use secrecy::{ExposeSecret, SecretString};
 use sqlx::AssertSqlSafe;
 use sqlx::types::Uuid;
+use tada_app::domain::facts::{CORE_CATALOG_VERSION, core_catalog};
 use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
-use tada_app::domain::ids::{InvitationId, OrganizationId, UserId};
+use tada_app::domain::ids::{EventId, InvitationId, OrganizationId, UserId};
 use tada_app::outbound::Purpose;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -24,7 +25,7 @@ pub struct TestDatabase {
 }
 
 impl TestDatabase {
-    /// Starts a new container and applies all migrations.
+    /// Starts a new container, applies all migrations and writes the shipped core catalog, as `tada migrate` does.
     ///
     /// # Panics
     ///
@@ -40,6 +41,10 @@ impl TestDatabase {
         let url = format!("postgres://postgres@127.0.0.1:{port}/postgres");
         let database = Database::connect_lazy(&url, &SecretString::from("postgres")).unwrap();
         database.migrate().await.unwrap();
+        database
+            .sync_catalog(&core_catalog(), CORE_CATALOG_VERSION)
+            .await
+            .unwrap();
         Self {
             database,
             _container: container,
@@ -63,6 +68,27 @@ impl TestDatabase {
         .await
         .unwrap();
         OrganizationId::from_uuid(id)
+    }
+
+    /// Creates an event with the key `key` in the organization.
+    ///
+    /// # Panics
+    ///
+    /// If the insert fails, for example because the key is taken.
+    #[allow(clippy::unwrap_used)]
+    pub async fn create_event(&self, organization: OrganizationId, key: &str) -> EventId {
+        let id = Uuid::now_v7();
+        sqlx::query!(
+            "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)
+             VALUES ($1, $2, $3, 'Open Day Testwil', 'Europe/Zurich', 1, now())",
+            id,
+            organization.as_uuid(),
+            key,
+        )
+        .execute(&self.database.pool)
+        .await
+        .unwrap();
+        EventId::from_uuid(id)
     }
 
     /// Creates a user with an email identity.

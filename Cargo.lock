@@ -3611,6 +3611,7 @@ version = "0.1.0"
 dependencies = [
  "jiff",
  "thiserror",
+ "unicode-normalization",
  "uuid",
 ]
 
@@ -3625,6 +3626,7 @@ dependencies = [
  "jiff",
  "jiff-sqlx",
  "secrecy",
+ "serde",
  "serde_json",
  "sha2 0.11.0",
  "sqlx",
