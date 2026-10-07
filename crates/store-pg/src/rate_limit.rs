@@ -12,7 +12,7 @@ use jiff_sqlx::ToSqlx;
 use secrecy::{ExposeSecret, SecretString};
 use sha2::Sha256;
 use sqlx::PgConnection;
-use tada_app::rate_limit::{RateDecision, RateLimit, RateSubject, RateWindow};
+use tada_app::rate_limit::{RateDecision, RateLimit, RateSubject, RateWindow, WINDOW};
 use tada_app::store::StoreError;
 
 use crate::error::store_error;
@@ -34,8 +34,13 @@ impl PgRateLimiter {
         Self { key }
     }
 
-    /// Deletes the counters of the windows that ended and counts one request against each of
-    /// `limits` in the window of `now`. The caller commits the transaction of `conn`.
+    /// Deletes the counters of the windows that ended more than one window ago and counts one
+    /// request against each of `limits` in the window of `now`. The caller commits the transaction
+    /// of `conn`.
+    ///
+    /// The cleanup keeps the previous window, so a process whose clock is up to one window behind
+    /// never writes a counter that another process deletes. It skips locked rows, so two processes
+    /// at a window boundary never wait for each other, and cannot deadlock (ADR 0025, ADR 0056).
     pub(crate) async fn hit(
         &self,
         conn: &mut PgConnection,
@@ -43,9 +48,18 @@ impl PgRateLimiter {
         now: Timestamp,
     ) -> Result<RateDecision, StoreError> {
         let window = RateWindow::containing(now);
+        let ended = window
+            .start
+            .saturating_sub(WINDOW)
+            .unwrap_or(Timestamp::MIN);
         sqlx::query!(
-            "DELETE FROM rate_limit_counter WHERE window_start < $1",
-            window.start.to_sqlx() as _,
+            "DELETE FROM rate_limit_counter
+             WHERE (key, window_start) IN (
+                 SELECT key, window_start FROM rate_limit_counter
+                 WHERE window_start < $1
+                 FOR UPDATE SKIP LOCKED
+             )",
+            ended.to_sqlx() as _,
         )
         .execute(&mut *conn)
         .await
@@ -175,33 +189,79 @@ mod tests {
         assert_eq!(rows, 4);
     }
 
+    /// The window starts of all counters, in order.
+    async fn windows(test: &TestDatabase) -> Vec<Timestamp> {
+        let windows: Vec<jiff_sqlx::Timestamp> =
+            sqlx::query_scalar("SELECT window_start FROM rate_limit_counter ORDER BY window_start")
+                .fetch_all(&test.database.pool)
+                .await
+                .unwrap();
+        windows.into_iter().map(|window| window.to_jiff()).collect()
+    }
+
+    /// A hit deletes the counters of the windows that ended more than one window ago, and keeps the
+    /// previous window: a process with a clock up to one window behind still writes there.
     #[tokio::test]
-    async fn each_hit_deletes_the_counters_of_ended_windows() {
+    async fn each_hit_deletes_the_counters_of_windows_that_ended_one_window_ago() {
         let test = TestDatabase::start().await;
         let anna = Email::parse("anna@example.org").unwrap();
         let ben = Email::parse("ben@example.org").unwrap();
-        let earlier = now() - SignedDuration::from_hours(1);
-        hit(
-            &test,
-            &limiter(),
-            &sign_in_limits(&anna, IP.parse().unwrap()),
-            earlier,
-        )
-        .await;
+        let at = |time: &str| time.parse::<Timestamp>().unwrap();
+        let limits = sign_in_limits(&anna, IP.parse().unwrap());
+        hit(&test, &limiter(), &limits, at("2030-05-18T07:30:00Z")).await;
+        hit(&test, &limiter(), &limits, at("2030-05-18T08:30:00Z")).await;
         hit(
             &test,
             &limiter(),
             &sign_in_limits(&ben, "198.51.100.1".parse().unwrap()),
-            now(),
+            at("2030-05-18T09:00:01Z"),
         )
         .await;
-        let windows: Vec<jiff_sqlx::Timestamp> =
-            sqlx::query_scalar("SELECT window_start FROM rate_limit_counter")
+        let eight = at("2030-05-18T08:00:00Z");
+        let nine = at("2030-05-18T09:00:00Z");
+        assert_eq!(windows(&test).await, [eight, eight, nine, nine]);
+    }
+
+    /// Two processes at the hour boundary: the one with the later clock does not wait for the
+    /// uncommitted counters of the previous window (ADR 0056).
+    #[tokio::test]
+    async fn a_hit_in_a_new_window_does_not_wait_for_a_hit_in_the_previous_window() {
+        let test = TestDatabase::start().await;
+        let anna = Email::parse("anna@example.org").unwrap();
+        let limits = sign_in_limits(&anna, IP.parse().unwrap());
+        // The counters of the previous window exist, so the next hit there locks them.
+        hit(
+            &test,
+            &limiter(),
+            &limits,
+            "2030-05-18T08:30:00Z".parse().unwrap(),
+        )
+        .await;
+        let mut before = test.database.pool.begin().await.unwrap();
+        limiter()
+            .hit(
+                &mut before,
+                &limits,
+                "2030-05-18T08:59:59Z".parse().unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let mut after = test.database.pool.begin().await.unwrap();
+        let limiter = limiter();
+        let later = limiter.hit(&mut after, &limits, "2030-05-18T09:00:01Z".parse().unwrap());
+        let decision = tokio::time::timeout(std::time::Duration::from_secs(2), later)
+            .await
+            .expect("the hit waits for the other transaction")
+            .unwrap();
+        assert_eq!(decision, RateDecision::Allowed);
+        after.commit().await.unwrap();
+        before.commit().await.unwrap();
+        let counts: Vec<i32> =
+            sqlx::query_scalar("SELECT count FROM rate_limit_counter ORDER BY window_start")
                 .fetch_all(&test.database.pool)
                 .await
                 .unwrap();
-        let start = RateWindow::containing(now()).start;
-        assert_eq!(windows.len(), 2);
-        assert!(windows.iter().all(|window| window.to_jiff() == start));
+        assert_eq!(counts, [2, 2, 1, 1]);
     }
 }
