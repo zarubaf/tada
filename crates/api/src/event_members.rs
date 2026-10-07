@@ -4,7 +4,6 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
-use tada_app::domain::RecordVersion;
 use tada_app::domain::identity::EventRole as DomainEventRole;
 use tada_app::domain::ids::{EventId, UserId};
 use tada_app::event_members::{
@@ -18,7 +17,7 @@ use uuid::Uuid;
 
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, codes};
-use crate::extract::{Caller, Json, Path};
+use crate::extract::{Caller, Json, Path, record_version};
 use crate::problem::{ApiError, Problem};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
@@ -141,13 +140,6 @@ pub struct ChangeEventRoleRequest {
 pub struct RemoveEventMembershipRequest {
     #[schema(minimum = 1)]
     pub expected_version: i64,
-}
-
-fn record_version(value: i64) -> Result<RecordVersion, ApiError> {
-    RecordVersion::new(value).ok_or_else(|| {
-        ApiError::new(ProblemCode::MalformedRequest)
-            .with_detail("The expected version must be 1 or more.")
-    })
 }
 
 /// Lists the event memberships of an event. Only its event managers see them.
