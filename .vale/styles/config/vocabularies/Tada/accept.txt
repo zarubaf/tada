@@ -161,3 +161,4 @@ Testwil
 trixie
 (?i)redactions?
 (?i)participations?
+worktree
