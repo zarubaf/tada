@@ -1,6 +1,6 @@
 # 0057. Modular mail adapters and an inbound webhook
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-07
 
 ## Context
