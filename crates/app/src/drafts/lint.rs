@@ -75,6 +75,9 @@ impl LineIndex {
 }
 
 /// Text outside `tada:` links that the parser gives in several parts, joined for the check.
+///
+/// Formatting, a line break or HTML ends a run. So `CHF *80'000*` gives `Number`, not `Money`:
+/// the lint still warns, and the reviewer decides.
 #[derive(Default)]
 struct TextRun {
     start: usize,
@@ -455,5 +458,12 @@ mod tests {
         let warnings = lint("```\nText\n42\n```\n");
 
         assert_eq!(warnings, vec![warning(3, LintKind::Number)]);
+    }
+
+    #[test]
+    fn formatting_splits_the_text_so_an_emphasized_amount_is_a_number() {
+        let warnings = lint("Das Budget beträgt CHF *80'000*.\n");
+
+        assert_eq!(warnings, vec![warning(1, LintKind::Number)]);
     }
 }

