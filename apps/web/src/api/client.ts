@@ -8,6 +8,7 @@ export type Api = ReturnType<typeof createApi>;
 export type Event = components["schemas"]["Event"];
 export type Problem = components["schemas"]["Problem"];
 export type SessionInfo = components["schemas"]["SessionInfo"];
+export type InvitationPreview = components["schemas"]["InvitationPreview"];
 export type Membership = components["schemas"]["MembershipSummary"];
 
 /** The problem codes that the session handles for every call (ADR 0037). */

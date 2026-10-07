@@ -66,3 +66,45 @@ nav-events = Anlässe
 organization-switcher = Organisation
 member-menu = Mitgliedermenü
 sign-out = Abmelden
+
+## Sign-in, magic link and invitation (ADR 0008, ADR 0056)
+
+sign-in-title = Anmelden
+sign-in-text = Wir senden Ihnen einen Link per E-Mail. Mit dem Link melden Sie sich an.
+sign-in-email = E-Mail-Adresse (Pflichtfeld)
+sign-in-submit = Anmeldelink senden
+sign-in-sent = Wenn die Adresse bekannt ist, erhalten Sie in Kürze eine E-Mail.
+problem-rate-limited = Zu viele Anfragen. Versuchen Sie es in einigen Minuten erneut.
+# $seconds: the wait that the server asks for (Retry-After).
+problem-rate-limited-seconds =
+    Zu viele Anfragen. Versuchen Sie es in { $seconds } { $seconds ->
+        [one] Sekunde
+       *[other] Sekunden
+    } erneut.
+# $minutes: the wait that the server asks for, rounded up.
+problem-rate-limited-minutes =
+    Zu viele Anfragen. Versuchen Sie es in { $minutes } { $minutes ->
+        [one] Minute
+       *[other] Minuten
+    } erneut.
+magic-link-title = Anmelden
+magic-link-text = Mit dem Klick melden Sie sich in tada an.
+magic-link-submit = Anmelden
+magic-link-invalid = Dieser Link ist ungültig oder abgelaufen.
+to-sign-in = Zur Anmeldung
+invitation-title = Einladung
+# $organization: the name of the organization. $role: the role, for example „Mitglied“.
+invitation-text = Sie sind eingeladen: Organisation { $organization }, Rolle { $role }.
+invitation-accept = Einladung annehmen
+invitation-invalid = Diese Einladung ist ungültig oder abgelaufen.
+invitation-loading = Einladung wird geladen
+role-owner = Organisationsleitung
+role-admin = Administration
+role-member = Mitglied
+
+## Choice of the organization (ADR 0056)
+
+choose-organization-title = Organisation wählen
+choose-organization-text = Wählen Sie die Organisation, mit der Sie arbeiten.
+choose-organization-empty-title = Keine Organisation
+choose-organization-empty-text = Sie sind noch in keiner Organisation Mitglied. Bitten Sie eine Administration um eine Einladung.

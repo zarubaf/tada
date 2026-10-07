@@ -46,6 +46,12 @@ describe("App", () => {
     expect(await screen.findByText("Seite nicht gefunden")).toBeInTheDocument();
   });
 
+  it("shows a page without a session without the sidebar, even for a signed-in member", async () => {
+    renderAt("/sign-in/link");
+    expect(await screen.findByRole("heading", { name: "Anmelden" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Hauptnavigation" })).not.toBeInTheDocument();
+  });
+
   it("has the skip link as its first focusable element, and it targets main", async () => {
     renderAt("/events");
     await screen.findByRole("heading", { name: "Anlässe" });

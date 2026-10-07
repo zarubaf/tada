@@ -61,6 +61,42 @@ export const unavailable = {
   request_id: "01a1118e-3359-73dd-a500-feed65806a9d",
 };
 
+/** A problem body for the fake API. */
+export function problemBody(code: string, status: number) {
+  return { ...unavailable, code, status };
+}
+
+// The fake API of the sign-in pages (Task 19).
+
+/** A client without a session: the answer of `GET /api/v1/session`. */
+export async function fakeSignedOut(page: Page): Promise<void> {
+  await page.route("**/api/v1/session", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/problem+json",
+      body: JSON.stringify(problemBody("unauthenticated", 401)),
+    }),
+  );
+}
+
+/** Answers a POST to `path` with the given status and JSON body. */
+export async function fakePost(
+  page: Page,
+  path: string,
+  status: number,
+  body?: unknown,
+): Promise<void> {
+  await page.route(`**${path}`, (route) =>
+    route.fulfill({
+      status,
+      contentType: status < 400 ? "application/json" : "application/problem+json",
+      body: body === undefined ? "" : JSON.stringify(body),
+    }),
+  );
+}
+
+export const invitationPreview = { organization_name: "Fliegergruppe Testwil", role: "member" };
+
 export const viewports = [
   { name: "375", width: 375, height: 812 },
   { name: "1440", width: 1440, height: 900 },
@@ -86,5 +122,34 @@ export async function fontsLoaded(page: Page): Promise<void> {
       document.fonts.load('400 1rem "JetBrains Mono Variable"', "Aä"),
     ]);
     await document.fonts.ready;
+  });
+}
+
+/**
+ * The elements whose text overflows its box, for the pseudo-locale check (ADR 0024). A scroll
+ * container, for example the table at 375 px, is not an overflow.
+ */
+export async function textOverflows(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const found: string[] = [];
+    for (const element of document.querySelectorAll<HTMLElement>("body *")) {
+      const style = getComputedStyle(element);
+      const scrolls = ["auto", "scroll"].includes(style.overflowX);
+      if (
+        scrolls ||
+        element.title ||
+        element.childElementCount > 0 ||
+        !element.textContent?.trim()
+      ) {
+        continue;
+      }
+      if (element.scrollWidth > element.clientWidth + 1 && element.clientWidth > 0) {
+        found.push(`${element.tagName}: ${element.textContent.trim().slice(0, 40)}`);
+      }
+    }
+    if (document.documentElement.scrollWidth > window.innerWidth) {
+      found.push("the page scrolls horizontally");
+    }
+    return found;
   });
 }
