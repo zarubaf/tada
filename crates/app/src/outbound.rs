@@ -409,6 +409,7 @@ mod tests {
             organization_id: None,
             request_id: None,
             attempt,
+            max_attempts: 10,
         }
     }
 

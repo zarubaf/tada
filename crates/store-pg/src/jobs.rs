@@ -47,7 +47,7 @@ impl JobQueue for Database {
                    LIMIT 1
                )
                RETURNING id, kind, version, payload AS "payload: Json<serde_json::Value>", organization_id,
-                         request_id, attempts"#,
+                         request_id, attempts, max_attempts"#,
             worker_id,
             lease.as_secs_f64(),
         )
@@ -62,6 +62,7 @@ impl JobQueue for Database {
             organization_id: row.organization_id.map(OrganizationId::from_uuid),
             request_id: row.request_id,
             attempt: row.attempts,
+            max_attempts: row.max_attempts,
         }))
     }
 
@@ -222,6 +223,7 @@ mod tests {
         let worker = Uuid::now_v7();
 
         let first = test.database.claim(worker, LEASE).await.unwrap().unwrap();
+        assert!(!first.is_last_attempt());
         assert!(
             test.database
                 .fail(&first, worker, "the provider refused")
@@ -239,6 +241,7 @@ mod tests {
             .await
             .unwrap();
         let last = test.database.claim(worker, LEASE).await.unwrap().unwrap();
+        assert!(last.is_last_attempt());
         assert!(
             test.database
                 .fail(&last, worker, "the provider refused")

@@ -41,6 +41,15 @@ pub struct Job {
     pub request_id: Option<Uuid>,
     /// 1 for the first attempt.
     pub attempt: i32,
+    /// After a failed attempt with this number, the job fails for good.
+    pub max_attempts: i32,
+}
+
+impl Job {
+    /// True if a failure of this attempt fails the job for good.
+    pub fn is_last_attempt(&self) -> bool {
+        self.attempt >= self.max_attempts
+    }
 }
 
 /// The queue, as the worker sees it. The database clock gives due times and leases (ADR 0038).
