@@ -458,7 +458,9 @@ impl MailSmtp {
         match mode.as_str() {
             "implicit" => Some(SmtpTls::Implicit),
             "starttls" => Some(SmtpTls::StartTls),
-            "none" if cfg!(debug_assertions) => Some(SmtpTls::None),
+            #[cfg(debug_assertions)]
+            "none" => Some(SmtpTls::None),
+            #[cfg(not(debug_assertions))]
             "none" => {
                 source.error(&SMTP_TLS, "must not be `none` in a release build");
                 None

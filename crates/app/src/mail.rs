@@ -49,11 +49,18 @@ pub trait Mailer: Send + Sync {
 }
 
 /// The subject and the two bodies of one mail text.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The bodies hold the link with its token, so `Debug` hides them (ADRs 0008 and 0035).
+#[derive(Clone, PartialEq, Eq)]
 pub struct Rendered {
     pub subject: String,
     pub text: String,
     pub html: String,
+}
+
+impl fmt::Debug for Rendered {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Rendered").finish_non_exhaustive()
+    }
 }
 
 /// The texts of the mails that tada sends.
@@ -81,5 +88,15 @@ mod tests {
         assert!(!shown.contains("anna"), "{shown}");
         assert!(!shown.contains("geheimer"), "{shown}");
         assert!(shown.contains("<id@tada.example.org>"), "{shown}");
+    }
+
+    #[test]
+    fn debug_of_a_rendered_text_hides_the_link() {
+        let rendered = Rendered {
+            subject: "Anmeldung".into(),
+            text: "https://tada.example.org/#token=geheim".into(),
+            html: "<a>geheim</a>".into(),
+        };
+        assert!(!format!("{rendered:?}").contains("geheim"));
     }
 }

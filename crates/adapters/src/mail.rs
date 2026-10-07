@@ -23,7 +23,8 @@ pub enum SmtpTls {
     Implicit,
     /// A plain connection that upgrades with `STARTTLS`. The upgrade is required.
     StartTls,
-    /// No TLS. Only for a local development server.
+    /// No TLS. Only for a local development server, so release builds have no such variant.
+    #[cfg(any(debug_assertions, test))]
     None,
 }
 
@@ -67,6 +68,7 @@ impl SmtpMailer {
             SmtpTls::StartTls => {
                 AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.host)?
             }
+            #[cfg(any(debug_assertions, test))]
             SmtpTls::None => AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.host),
         };
         let mut builder = builder.port(config.port).timeout(Some(config.timeout));
@@ -123,20 +125,23 @@ impl Mailer for SmtpMailer {
 
 /// Maps an SMTP error to a send error.
 /// The reason has the status code only, because the server text can repeat the address.
+///
+/// Only an answer of the server or a failed TLS handshake proves that the server did not take
+/// the message. Any other error can also happen after DATA, so its outcome is unknown, and the
+/// worker must not retry it blindly (ADR 0042).
 fn classify(error: &lettre::transport::smtp::Error) -> SendError {
-    if error.is_timeout() {
-        return SendError::Unknown;
+    if let Some(code) = error.status() {
+        let reason = format!("SMTP status {code}");
+        return if error.is_permanent() {
+            SendError::Rejected(reason)
+        } else {
+            SendError::Temporary(reason)
+        };
     }
-    let reason = match error.status() {
-        Some(code) => format!("SMTP status {code}"),
-        None if error.is_tls() => "the TLS connection failed".to_owned(),
-        None => "the connection failed".to_owned(),
-    };
-    if error.is_permanent() {
-        SendError::Rejected(reason)
-    } else {
-        SendError::Temporary(reason)
+    if error.is_tls() {
+        return SendError::Temporary("the TLS connection failed".to_owned());
     }
+    SendError::Unknown
 }
 
 /// Records the messages instead of sending them.
@@ -186,23 +191,45 @@ impl std::fmt::Debug for FluentMailTexts {
     }
 }
 
-impl Default for FluentMailTexts {
-    fn default() -> Self {
-        Self::new()
-    }
+/// The messages that the mail texts need.
+const REQUIRED_MESSAGES: [&str; 4] = [
+    "magic-link-subject",
+    "magic-link-body",
+    "invitation-subject",
+    "invitation-body",
+];
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum MailTextsError {
+    #[error("the mail text file does not parse")]
+    Parse,
+    #[error("the mail text file has no message {0}")]
+    Missing(&'static str),
 }
 
 impl FluentMailTexts {
-    pub fn new() -> Self {
-        let resource =
-            FluentResource::try_new(DE_CH.to_owned()).unwrap_or_else(|(resource, _)| resource);
-        let mut bundle = FluentBundle::new_concurrent(vec!["de-CH".parse().unwrap_or_default()]);
-        bundle.set_use_isolating(false);
-        let _ = bundle.add_resource(resource);
-        Self { bundle }
+    /// Loads the German texts. It fails at startup, not at the first send.
+    pub fn new() -> Result<Self, MailTextsError> {
+        Self::from_source(DE_CH)
     }
 
-    /// The text of the message `id`. A missing message shows its ID, so that the gap is visible.
+    fn from_source(source: &str) -> Result<Self, MailTextsError> {
+        let resource =
+            FluentResource::try_new(source.to_owned()).map_err(|_| MailTextsError::Parse)?;
+        let mut bundle = FluentBundle::new_concurrent(vec!["de-CH".parse().unwrap_or_default()]);
+        bundle.set_use_isolating(false);
+        bundle
+            .add_resource(resource)
+            .map_err(|_| MailTextsError::Parse)?;
+        for id in REQUIRED_MESSAGES {
+            if bundle.get_message(id).and_then(|m| m.value()).is_none() {
+                return Err(MailTextsError::Missing(id));
+            }
+        }
+        Ok(Self { bundle })
+    }
+
+    /// The text of the message `id`. `from_source` checked that the required messages exist.
     fn get(&self, id: &str, args: &FluentArgs<'_>) -> String {
         let Some(pattern) = self
             .bundle
@@ -276,7 +303,7 @@ fn escape_html(text: &str) -> String {
 }
 #[cfg(test)]
 mod tests {
-    use std::io::{Read, Write};
+    use std::io::{BufRead, Read, Write};
     use std::net::{TcpListener, TcpStream};
 
     use testcontainers_modules::testcontainers::core::{IntoContainerPort, WaitFor};
@@ -292,7 +319,7 @@ mod tests {
 
     #[test]
     fn renders_each_text_with_the_link() {
-        let texts = FluentMailTexts::new();
+        let texts = FluentMailTexts::new().unwrap();
         let magic = texts.magic_link("de-CH", LINK);
         let invitation = texts.invitation("de-CH", "Fliegerclub Musterhausen", LINK);
         for rendered in [&magic, &invitation] {
@@ -314,8 +341,11 @@ mod tests {
 
     #[test]
     fn escapes_the_organization_name_in_the_html() {
-        let rendered =
-            FluentMailTexts::new().invitation("de-CH", "<script>alert(1)</script> & Co", LINK);
+        let rendered = FluentMailTexts::new().unwrap().invitation(
+            "de-CH",
+            "<script>alert(1)</script> & Co",
+            LINK,
+        );
         assert!(!rendered.html.contains("<script>"), "{}", rendered.html);
         assert!(rendered.html.contains("&lt;script&gt;"));
         assert!(rendered.html.contains("&amp; Co"));
@@ -323,7 +353,7 @@ mod tests {
 
     #[test]
     fn html_has_no_remote_content() {
-        let rendered = FluentMailTexts::new().magic_link("de-CH", LINK);
+        let rendered = FluentMailTexts::new().unwrap().magic_link("de-CH", LINK);
         assert!(!rendered.html.contains("<img"));
         assert!(!rendered.html.contains("src="));
     }
@@ -461,5 +491,55 @@ mod tests {
         let mailer = SmtpMailer::new(config(port, Duration::from_millis(300))).unwrap();
         let error = mailer.send(&message("<1@example.org>")).await.unwrap_err();
         assert_eq!(error, SendError::Unknown);
+    }
+
+    /// An SMTP server that accepts the whole message and then drops the connection.
+    fn dropping_server() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+            let _ = stream.write_all(b"220 hello\r\n");
+            let mut line = String::new();
+            let mut in_data = false;
+            while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                let reply: &[u8] = if in_data {
+                    if line == ".\r\n" {
+                        return; // Drop the connection before the answer to DATA.
+                    }
+                    b""
+                } else if line.starts_with("DATA") {
+                    in_data = true;
+                    b"354 go on\r\n"
+                } else {
+                    b"250 ok\r\n"
+                };
+                let _ = stream.write_all(reply);
+                line.clear();
+            }
+        });
+        port
+    }
+
+    #[tokio::test]
+    async fn a_connection_that_drops_after_data_gives_an_unknown_outcome() {
+        let mailer = SmtpMailer::new(config(dropping_server(), Duration::from_secs(5))).unwrap();
+        let error = mailer.send(&message("<1@example.org>")).await.unwrap_err();
+        assert_eq!(error, SendError::Unknown);
+    }
+
+    #[test]
+    fn rejects_a_text_file_that_does_not_parse() {
+        let error = FluentMailTexts::from_source("magic-link-subject = { \n").unwrap_err();
+        assert!(matches!(error, MailTextsError::Parse), "{error:?}");
+    }
+
+    #[test]
+    fn rejects_a_text_file_without_a_required_message() {
+        let error = FluentMailTexts::from_source("magic-link-subject = Hallo\n").unwrap_err();
+        assert!(matches!(error, MailTextsError::Missing(_)), "{error:?}");
     }
 }
