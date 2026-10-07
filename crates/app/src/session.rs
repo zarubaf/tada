@@ -127,7 +127,7 @@ impl SessionError {
     pub fn code(&self) -> ProblemCode {
         match self {
             Self::Unauthenticated => ProblemCode::Unauthenticated,
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
     }
 }
@@ -186,7 +186,7 @@ impl ChooseOrganizationError {
         match self {
             Self::Unauthenticated => ProblemCode::Unauthenticated,
             Self::NotFound => ProblemCode::NotFound,
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
     }
 }
@@ -267,13 +267,6 @@ impl Authenticator for SessionAuthenticator {
             return Err(AuthenticationError::OrganizationRequired);
         };
         Ok(MemberCaller::new(session.user_id, organization_id, role))
-    }
-}
-
-fn store_code(error: &StoreError) -> ProblemCode {
-    match error {
-        StoreError::Unavailable(_) => ProblemCode::Unavailable,
-        StoreError::Internal(_) => ProblemCode::Internal,
     }
 }
 
