@@ -66,12 +66,6 @@ async function fakeMembers(page: Page, memberships_: unknown, status = 200): Pro
 
 const states = [
   { name: "manager", role: "member", status: 200, items: memberships },
-  {
-    name: "read-only",
-    role: "member",
-    status: 200,
-    items: [{ ...memberships[0], event_role: "event-viewer" }, memberships[1]],
-  },
   { name: "forbidden", role: "member", status: 403, items: forbidden },
 ] as const;
 

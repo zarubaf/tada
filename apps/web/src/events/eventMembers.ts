@@ -1,5 +1,5 @@
 // The rules of the event memberships screen that need no React.
-import type { Api, EventMembership, EventRole, Membership, Problem } from "../api/client";
+import type { Api, EventMembership, EventRole, Problem } from "../api/client";
 
 /** The event roles in the order of their rights, most rights first. */
 export const EVENT_ROLES: EventRole[] = ["event-manager", "event-contributor", "event-viewer"];
@@ -8,22 +8,6 @@ export const EVENT_ROLES: EventRole[] = ["event-manager", "event-contributor", "
 export interface OrganizationMember {
   user_id: string;
   display_name: string;
-}
-
-/**
- * Whether the member manages the event memberships: an organization owner or admin acts as event
- * manager in each event (ADR 0052), and so does an event manager. The server decides anyway.
- */
-export function canManageMembers(
-  organizationRole: Membership["role"],
-  userId: string,
-  items: EventMembership[],
-): boolean {
-  return (
-    organizationRole === "owner" ||
-    organizationRole === "admin" ||
-    items.some((item) => item.user_id === userId && item.event_role === "event-manager")
-  );
 }
 
 /** The members of the organization that have no event role in the event yet. */

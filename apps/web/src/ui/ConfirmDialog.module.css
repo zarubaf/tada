@@ -1,0 +1,42 @@
+@layer components {
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-toast);
+    display: grid;
+    place-items: center;
+    padding: var(--space-4);
+    background: var(--color-scrim);
+  }
+
+  .modal {
+    width: min(100%, 28rem);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    box-shadow: var(--shadow-2);
+  }
+
+  .dialog {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-5);
+    outline: none;
+  }
+
+  .title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .warning {
+    color: var(--color-danger);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+}

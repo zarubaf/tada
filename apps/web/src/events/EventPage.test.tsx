@@ -90,12 +90,14 @@ describe("EventPage", () => {
   });
 
   it("opens the members page from the sub-navigation", async () => {
-    const { api } = fakeApi(json(200, event));
+    const { api, urls } = fakeApi(json(200, event));
     renderAt(`/events/${event.id}`, api);
 
     await userEvent.click(await screen.findByRole("link", { name: "Mitglieder" }));
     expect(window.location.pathname).toBe(`/events/${event.id}/members`);
     expect(await screen.findByText("Mitgliederliste")).toBeInTheDocument();
+    // The page stays mounted: no skeleton, and the event is not loaded a second time.
+    expect(urls).toHaveLength(1);
   });
 
   it("shows the message of a not-found problem and retries", async () => {

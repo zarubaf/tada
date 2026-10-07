@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createApi, type EventMembership } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
+import { SLOW } from "../test/timeouts";
 import { EventMembersPage } from "./EventMembersPage";
 
 const EVENT_ID = "0199b8e0-0000-7000-8000-000000000001";
@@ -36,7 +37,7 @@ interface Setup {
   organizationRole?: string;
   items?: EventMembership[];
   /** Answers by `METHOD /path-suffix`, for example `POST /remove`. */
-  answers?: Record<string, () => Response>;
+  answers?: Record<string, () => Response | Promise<Response>>;
 }
 
 /** A fake server. It records `METHOD path` and the JSON body of each call. */
@@ -110,16 +111,6 @@ describe("EventMembersPage", () => {
     ).toHaveTextContent("Mitarbeit");
   });
 
-  it("shows no actions to a member who cannot manage", async () => {
-    setup({ items: [membership(ME, "Anna Muster", "event-contributor"), bernd] });
-
-    const table = await screen.findByRole("table", { name: "Mitglieder des Anlasses" });
-    expect(within(table).getAllByText("Mitarbeit")).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: /Entfernen/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Mitglied hinzufügen" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Rolle von/ })).not.toBeInTheDocument();
-  });
-
   it("shows the actions to an organization admin who has no event role", async () => {
     setup({ organizationRole: "admin", items: [bernd] });
 
@@ -134,78 +125,164 @@ describe("EventMembersPage", () => {
     );
   });
 
-  it("offers only the members without an event role, and adds one", async () => {
-    const cäcilia = membership("u3", "Cäcilia Probst", "event-viewer");
-    const { calls } = setup({
+  it("shows the message of a rate-limited action, not the general 4xx text", async () => {
+    setup({
       items: [anna, bernd],
-      answers: { "POST /memberships": () => json(201, cäcilia) },
-    });
-
-    await user.click(await screen.findByRole("button", { name: /Mitglied wählen/ }));
-    expect(screen.queryByRole("option", { name: "Bernd Beispiel" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Anna Muster" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("option", { name: "Cäcilia Probst" }));
-
-    await user.click(screen.getByRole("button", { name: /Rolle$/ }));
-    await user.click(screen.getByRole("option", { name: "Lesezugriff" }));
-    await user.click(screen.getByRole("button", { name: "Mitglied hinzufügen" }));
-
-    const table = await screen.findByRole("table", { name: "Mitglieder des Anlasses" });
-    expect(await within(table).findByText("Cäcilia Probst")).toBeInTheDocument();
-    expect(calls.find((c) => c.call.startsWith("POST"))?.body).toEqual({
-      user_id: "u3",
-      event_role: "event-viewer",
-    });
-  });
-
-  it("changes a role with the record version", async () => {
-    const { calls } = setup({
-      items: [anna, { ...bernd, version: 4 }],
-      answers: {
-        "POST /change-role": () => json(200, { ...bernd, event_role: "event-viewer", version: 5 }),
-      },
+      answers: { "POST /change-role": () => problem(429, "rate-limited") },
     });
 
     await user.click(await screen.findByRole("button", { name: /Rolle von Bernd Beispiel/ }));
     await user.click(screen.getByRole("option", { name: "Lesezugriff" }));
 
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Rolle von Bernd Beispiel/ })).toHaveTextContent(
-        "Lesezugriff",
-      ),
-    );
-    const call = calls.find((c) => c.call.endsWith("/change-role"));
-    expect(call?.call).toBe(`POST /api/v1/events/${EVENT_ID}/memberships/u2/change-role`);
-    expect(call?.body).toEqual({ event_role: "event-viewer", expected_version: 4 });
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Zu viele Anfragen."));
   });
 
-  it("removes a member", async () => {
-    const { calls } = setup({
-      items: [anna, bernd],
-      answers: { "POST /remove": () => new Response(null, { status: 204 }) },
-    });
+  it(
+    "offers only the members without an event role, and adds one",
+    async () => {
+      const cäcilia = membership("u3", "Cäcilia Probst", "event-viewer");
+      const { calls } = setup({
+        items: [anna, bernd],
+        answers: { "POST /memberships": () => json(201, cäcilia) },
+      });
 
-    await user.click(await screen.findByRole("button", { name: "Bernd Beispiel entfernen" }));
+      await user.click(await screen.findByRole("button", { name: /Mitglied wählen/ }));
+      expect(screen.queryByRole("option", { name: "Bernd Beispiel" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: "Anna Muster" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("option", { name: "Cäcilia Probst" }));
 
-    const table = screen.getByRole("table", { name: "Mitglieder des Anlasses" });
-    await waitFor(() =>
-      expect(within(table).queryByText("Bernd Beispiel")).not.toBeInTheDocument(),
-    );
-    const call = calls.find((c) => c.call.endsWith("/remove"));
-    expect(call?.body).toEqual({ expected_version: 1 });
+      await user.click(screen.getByRole("button", { name: /Rolle$/ }));
+      await user.click(screen.getByRole("option", { name: "Lesezugriff" }));
+      await user.click(screen.getByRole("button", { name: "Mitglied hinzufügen" }));
+
+      const table = await screen.findByRole("table", { name: "Mitglieder des Anlasses" });
+      expect(await within(table).findByText("Cäcilia Probst")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByRole("heading", { name: "Rolle vergeben" })).toHaveFocus(),
+      );
+      expect(calls.find((c) => c.call.startsWith("POST"))?.body).toEqual({
+        user_id: "u3",
+        event_role: "event-viewer",
+      });
+    },
+    SLOW,
+  );
+
+  it(
+    "changes a role with the record version",
+    async () => {
+      const { calls } = setup({
+        items: [anna, { ...bernd, version: 4 }],
+        answers: {
+          "POST /change-role": () =>
+            json(200, { ...bernd, event_role: "event-viewer", version: 5 }),
+        },
+      });
+
+      await user.click(await screen.findByRole("button", { name: /Rolle von Bernd Beispiel/ }));
+      await user.click(screen.getByRole("option", { name: "Lesezugriff" }));
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: /Rolle von Bernd Beispiel/ })).toHaveTextContent(
+          "Lesezugriff",
+        ),
+      );
+      const call = calls.find((c) => c.call.endsWith("/change-role"));
+      expect(call?.call).toBe(`POST /api/v1/events/${EVENT_ID}/memberships/u2/change-role`);
+      expect(call?.body).toEqual({ event_role: "event-viewer", expected_version: 4 });
+    },
+    SLOW,
+  );
+
+  it("asks before it removes a member, and does nothing on cancel", async () => {
+    const { calls } = setup({ items: [anna, bernd] });
+
+    const button = await screen.findByRole("button", { name: "Bernd Beispiel entfernen" });
+    await user.click(button);
+    const dialog = await screen.findByRole("alertdialog", { name: "Bernd Beispiel entfernen?" });
+    expect(dialog).not.toHaveTextContent("Sie entfernen Ihre eigene Rolle");
+    await user.click(within(dialog).getByRole("button", { name: "Abbrechen" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(calls.some((c) => c.call.endsWith("/remove"))).toBe(false);
+    await waitFor(() => expect(button).toHaveFocus());
   });
 
-  it("shows the refusal to remove the last event manager", async () => {
+  it(
+    "removes a member after the confirmation and moves focus to the list heading",
+    async () => {
+      const { calls } = setup({
+        items: [anna, bernd],
+        answers: { "POST /remove": () => new Response(null, { status: 204 }) },
+      });
+
+      await user.click(await screen.findByRole("button", { name: "Bernd Beispiel entfernen" }));
+      const dialog = await screen.findByRole("alertdialog");
+      await user.click(within(dialog).getByRole("button", { name: "Entfernen" }));
+
+      const table = screen.getByRole("table", { name: "Mitglieder des Anlasses" });
+      await waitFor(() =>
+        expect(within(table).queryByText("Bernd Beispiel")).not.toBeInTheDocument(),
+      );
+      const call = calls.find((c) => c.call.endsWith("/remove"));
+      expect(call?.body).toEqual({ expected_version: 1 });
+      await waitFor(() =>
+        expect(screen.getByRole("heading", { name: "Mitglieder des Anlasses" })).toHaveFocus(),
+      );
+    },
+    SLOW,
+  );
+
+  it(
+    "sends one request for a double press on the confirmation",
+    async () => {
+      let release: (response: Response) => void = () => {};
+      const gate = new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+      const { calls } = setup({ items: [anna, bernd], answers: { "POST /remove": () => gate } });
+
+      await user.click(await screen.findByRole("button", { name: "Bernd Beispiel entfernen" }));
+      const confirm = within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Entfernen",
+      });
+      await user.click(confirm);
+      await user.click(confirm);
+      release(new Response(null, { status: 204 }));
+
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+      expect(calls.filter((c) => c.call.endsWith("/remove"))).toHaveLength(1);
+    },
+    SLOW,
+  );
+
+  it("warns a manager who removes their own role", async () => {
+    setup({ items: [anna, bernd] });
+
+    await user.click(await screen.findByRole("button", { name: "Anna Muster entfernen" }));
+
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
+      "Sie entfernen Ihre eigene Rolle als Anlassleitung.",
+    );
+  });
+
+  it("announces the refusal to remove the last event manager in a live region that was there", async () => {
     setup({
       items: [anna],
       answers: { "POST /remove": () => problem(409, "invalid-transition") },
     });
 
+    const region = await screen.findByRole("alert");
+    expect(region).toBeEmpty();
     await user.click(await screen.findByRole("button", { name: "Anna Muster entfernen" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Ein Anlass braucht mindestens eine Anlassleitung.",
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Entfernen" }),
     );
+
+    await waitFor(() =>
+      expect(region).toHaveTextContent("Ein Anlass braucht mindestens eine Anlassleitung."),
+    );
+    expect(screen.getByRole("alert")).toBe(region);
     expect(screen.getByText("Anna Muster")).toBeInTheDocument();
   });
 
@@ -215,14 +292,32 @@ describe("EventMembersPage", () => {
       answers: { "POST /change-role": () => problem(409, "invalid-transition") },
     });
 
+    const region = await screen.findByRole("alert");
     await user.click(await screen.findByRole("button", { name: /Rolle von Anna Muster/ }));
     await user.click(screen.getByRole("option", { name: "Mitarbeit" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Ein Anlass braucht mindestens eine Anlassleitung.",
+    await waitFor(() =>
+      expect(region).toHaveTextContent("Ein Anlass braucht mindestens eine Anlassleitung."),
     );
     expect(screen.getByRole("button", { name: /Rolle von Anna Muster/ })).toHaveTextContent(
       "Anlassleitung",
     );
+  });
+
+  it("loads the list again after a version conflict and says so", async () => {
+    const { calls } = setup({
+      items: [anna, bernd],
+      answers: { "POST /change-role": () => problem(409, "record-version-conflict") },
+    });
+
+    await user.click(await screen.findByRole("button", { name: /Rolle von Bernd Beispiel/ }));
+    await user.click(screen.getByRole("option", { name: "Lesezugriff" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("Die Liste ist neu geladen."),
+    );
+    expect(
+      calls.filter((c) => c.call === `GET /api/v1/events/${EVENT_ID}/memberships`),
+    ).toHaveLength(2);
   });
 });

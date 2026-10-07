@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EventMembership } from "../api/client";
-import { addableMembers, canManageMembers } from "./eventMembers";
+import { addableMembers } from "./eventMembers";
 
 function membership(userId: string, role: EventMembership["event_role"]): EventMembership {
   return {
@@ -11,24 +11,6 @@ function membership(userId: string, role: EventMembership["event_role"]): EventM
     created_at: "2030-05-18T08:00:00Z",
   };
 }
-
-describe("canManageMembers", () => {
-  const items = [membership("u1", "event-manager"), membership("u2", "event-contributor")];
-
-  it("lets an organization owner or admin manage", () => {
-    expect(canManageMembers("owner", "u9", items)).toBe(true);
-    expect(canManageMembers("admin", "u9", items)).toBe(true);
-  });
-
-  it("lets an event manager manage", () => {
-    expect(canManageMembers("member", "u1", items)).toBe(true);
-  });
-
-  it("does not let a contributor or an outsider manage", () => {
-    expect(canManageMembers("member", "u2", items)).toBe(false);
-    expect(canManageMembers("member", "u9", items)).toBe(false);
-  });
-});
 
 describe("addableMembers", () => {
   it("leaves out the members that already have an event role", () => {

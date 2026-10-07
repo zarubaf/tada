@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { type Api, type Problem, problemMessage } from "../api/client";
 import { uuidv7 } from "../api/uuid";
 import { hasMessage, t } from "../i18n";
@@ -38,6 +38,15 @@ export function CreateEventForm({ api }: { api: Api }) {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [failure, setFailure] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+  // Counts the failed submits: after each one, focus goes to the first invalid field.
+  const [failedSubmits, setFailedSubmits] = useState(0);
+
+  useEffect(() => {
+    if (failedSubmits > 0) {
+      form.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
+    }
+  }, [failedSubmits]);
 
   const edit = (set: (value: string) => void) => (value: string) => {
     set(value);
@@ -57,6 +66,10 @@ export function CreateEventForm({ api }: { api: Api }) {
     setErrors(local);
     setFailure(undefined);
     if (Object.keys(local).length > 0) {
+      setFailedSubmits((count) => count + 1);
+      return;
+    }
+    if (busy) {
       return;
     }
 
@@ -73,6 +86,8 @@ export function CreateEventForm({ api }: { api: Api }) {
       setErrors(invalid);
       if (Object.keys(invalid).length === 0) {
         setFailure(problemMessage(error));
+      } else {
+        setFailedSubmits((count) => count + 1);
       }
     } catch {
       setFailure(problemMessage(undefined));
@@ -83,7 +98,7 @@ export function CreateEventForm({ api }: { api: Api }) {
   return (
     <main id="main" className={styles.page}>
       <h1 className={styles.title}>{t("event-create-title")}</h1>
-      <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
+      <form ref={form} className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
         <TextField
           label={t("events-column-key")}
           help={t("event-create-key-help")}
@@ -111,13 +126,11 @@ export function CreateEventForm({ api }: { api: Api }) {
           autoComplete="off"
           isRequired
         />
-        {failure && (
-          <p className={styles.failure} role="alert">
-            {failure}
-          </p>
-        )}
+        <p className={styles.failure} role="alert">
+          {failure}
+        </p>
         <div className={styles.actions}>
-          <Button type="submit" variant="primary" isDisabled={busy}>
+          <Button type="submit" variant="primary" isPending={busy}>
             {t("event-create-submit")}
           </Button>
         </div>

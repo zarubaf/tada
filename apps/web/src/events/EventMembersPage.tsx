@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type Api,
   type EventMembership,
@@ -10,6 +10,7 @@ import { t } from "../i18n";
 import { useParams } from "../router/Router";
 import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { type Column, DataTable } from "../ui/DataTable";
 import { InlineError } from "../ui/InlineError";
 import { Select } from "../ui/Select";
@@ -17,7 +18,6 @@ import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventMembersPage.module.css";
 import {
   addableMembers,
-  canManageMembers,
   EVENT_ROLES,
   loadOrganizationMembers,
   type OrganizationMember,
@@ -35,9 +35,20 @@ type State =
 
 const roleOptions = EVENT_ROLES.map((role) => ({ id: role, label: t(`role-${role}`) }));
 
+/** The message of a failed action. Two codes have a text that is true only on this page. */
+function actionMessage(error: Problem | undefined): string {
+  if (error?.code === "invalid-transition") {
+    return t("event-members-last-manager");
+  }
+  if (error?.code === "record-version-conflict") {
+    return t("event-members-conflict");
+  }
+  return problemMessage(error);
+}
+
 /**
- * „Mitglieder“ of an event: the event memberships. Only a member who manages them sees the
- * actions; the server decides anyway.
+ * „Mitglieder“ of an event: the event memberships. The server lists them only for a member who
+ * manages them, so a loaded list always has the actions; the server decides each action anyway.
  */
 export function EventMembersPage({ api }: { api: Api }) {
   const { eventId = "" } = useParams();
@@ -47,6 +58,20 @@ export function EventMembersPage({ api }: { api: Api }) {
   const [failure, setFailure] = useState<string>();
   const [organization, setOrganization] = useState<OrganizationMember[]>();
   const [organizationFailure, setOrganizationFailure] = useState<Failure>();
+  const [removing, setRemoving] = useState<EventMembership>();
+  // A request runs: a second press does nothing.
+  const [busy, setBusy] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const focusHeading = useRef(false);
+
+  // The pressed button leaves with its row. When the dialog has closed and given its focus back,
+  // focus goes to the heading of the list.
+  useEffect(() => {
+    if (removing === undefined && focusHeading.current) {
+      focusHeading.current = false;
+      setTimeout(() => heading.current?.focus(), 0);
+    }
+  }, [removing]);
 
   const load = useCallback(async () => {
     try {
@@ -68,9 +93,7 @@ export function EventMembersPage({ api }: { api: Api }) {
   }, [load]);
 
   const items = state.kind === "loaded" ? state.items : [];
-  const canManage =
-    state.kind === "loaded" &&
-    canManageMembers(session.organization?.role ?? "member", session.user.id, items);
+  const loaded = state.kind === "loaded";
 
   const loadOrganization = useCallback(async () => {
     try {
@@ -90,27 +113,28 @@ export function EventMembersPage({ api }: { api: Api }) {
   }, [api]);
 
   useEffect(() => {
-    if (canManage) {
+    if (loaded) {
       void loadOrganization();
     }
-  }, [canManage, loadOrganization]);
+  }, [loaded, loadOrganization]);
 
   const replace = (items: EventMembership[], changed: EventMembership) =>
     items.map((item) => (item.user_id === changed.user_id ? changed : item));
 
   /** A failed action: a version conflict also loads the list again. */
   const fail = (error: Problem | undefined) => {
-    setFailure(problemMessage(error));
+    setFailure(actionMessage(error));
     if (error?.code === "record-version-conflict") {
       void load();
     }
   };
 
   const changeRole = async (item: EventMembership, role: EventRole) => {
-    if (role === item.event_role) {
+    if (role === item.event_role || busy) {
       return;
     }
     setFailure(undefined);
+    setBusy(true);
     try {
       const { data, error } = await api.POST(
         "/api/v1/events/{event_id}/memberships/{user_id}/change-role",
@@ -131,10 +155,15 @@ export function EventMembersPage({ api }: { api: Api }) {
     } catch {
       fail(undefined);
     }
+    setBusy(false);
   };
 
   const remove = async (item: EventMembership) => {
+    if (busy) {
+      return;
+    }
     setFailure(undefined);
+    setBusy(true);
     try {
       const { response, error } = await api.POST(
         "/api/v1/events/{event_id}/memberships/{user_id}/remove",
@@ -144,6 +173,7 @@ export function EventMembersPage({ api }: { api: Api }) {
         },
       );
       if (response.ok) {
+        focusHeading.current = true;
         setState((current) =>
           current.kind === "loaded"
             ? { kind: "loaded", items: current.items.filter((i) => i.user_id !== item.user_id) }
@@ -155,6 +185,8 @@ export function EventMembersPage({ api }: { api: Api }) {
     } catch {
       fail(undefined);
     }
+    setBusy(false);
+    setRemoving(undefined);
   };
 
   const columns: Column<EventMembership>[] = [
@@ -162,35 +194,28 @@ export function EventMembersPage({ api }: { api: Api }) {
     {
       id: "role",
       header: t("event-members-column-role"),
-      cell: (item) =>
-        canManage ? (
-          <Select
-            label={t("event-members-role-of", { name: item.display_name })}
-            labelHidden
-            options={roleOptions}
-            value={item.event_role}
-            onChange={(role) => void changeRole(item, role as EventRole)}
-          />
-        ) : (
-          t(`role-${item.event_role}`)
-        ),
+      cell: (item) => (
+        <Select
+          label={t("event-members-role-of", { name: item.display_name })}
+          labelHidden
+          options={roleOptions}
+          value={item.event_role}
+          onChange={(role) => void changeRole(item, role as EventRole)}
+        />
+      ),
     },
-    ...(canManage
-      ? [
-          {
-            id: "actions",
-            header: t("event-members-column-actions"),
-            cell: (item: EventMembership) => (
-              <Button
-                aria-label={t("event-members-remove-of", { name: item.display_name })}
-                onPress={() => void remove(item)}
-              >
-                {t("event-members-remove")}
-              </Button>
-            ),
-          },
-        ]
-      : []),
+    {
+      id: "actions",
+      header: t("event-members-column-actions"),
+      cell: (item) => (
+        <Button
+          aria-label={t("event-members-remove-of", { name: item.display_name })}
+          onPress={() => setRemoving(item)}
+        >
+          {t("event-members-remove")}
+        </Button>
+      ),
+    },
   ];
 
   if (state.kind === "loading") {
@@ -217,35 +242,50 @@ export function EventMembersPage({ api }: { api: Api }) {
 
   return (
     <div className={styles.members}>
-      <h2 className={styles.heading}>{t("event-members-title")}</h2>
-      {failure && (
-        <p className={styles.failure} role="alert">
-          {failure}
-        </p>
-      )}
+      <h2 ref={heading} tabIndex={-1} className={styles.heading}>
+        {t("event-members-title")}
+      </h2>
+      {/* A live region that is always in the page: a text that is set later is announced. */}
+      <p className={styles.failure} role="alert">
+        {failure}
+      </p>
       <DataTable
         label={t("event-members-title")}
         columns={columns}
         rows={items}
         rowKey={(item) => item.user_id}
       />
-      {canManage && (
-        <AddMember
-          api={api}
-          eventId={eventId}
-          candidates={organization && addableMembers(organization, items)}
-          organizationFailure={organizationFailure}
-          onRetry={() => void loadOrganization()}
-          onAdded={(added) =>
-            setState((current) =>
-              current.kind === "loaded"
-                ? { kind: "loaded", items: [...current.items, added] }
-                : current,
-            )
-          }
-          onFailed={fail}
-        />
-      )}
+      <AddMember
+        api={api}
+        eventId={eventId}
+        candidates={organization && addableMembers(organization, items)}
+        organizationFailure={organizationFailure}
+        onRetry={() => void loadOrganization()}
+        onAdded={(added) =>
+          setState((current) =>
+            current.kind === "loaded"
+              ? { kind: "loaded", items: [...current.items, added] }
+              : current,
+          )
+        }
+        onFailed={fail}
+        onStart={() => setFailure(undefined)}
+      />
+      <ConfirmDialog
+        isOpen={removing !== undefined}
+        title={t("event-members-remove-title", { name: removing?.display_name ?? "" })}
+        text={t("event-members-remove-text", { name: removing?.display_name ?? "" })}
+        warning={
+          removing?.user_id === session.user.id && removing.event_role === "event-manager"
+            ? t("event-members-remove-self")
+            : undefined
+        }
+        confirmLabel={t("event-members-remove")}
+        cancelLabel={t("event-members-remove-cancel")}
+        isPending={busy}
+        onConfirm={() => removing && void remove(removing)}
+        onCancel={() => !busy && setRemoving(undefined)}
+      />
     </div>
   );
 }
@@ -258,6 +298,7 @@ function AddMember({
   onRetry,
   onAdded,
   onFailed,
+  onStart,
 }: {
   api: Api;
   eventId: string;
@@ -267,9 +308,24 @@ function AddMember({
   onRetry: () => void;
   onAdded: (added: EventMembership) => void;
   onFailed: (error: Problem | undefined) => void;
+  onStart: () => void;
 }) {
   const [userId, setUserId] = useState<string>();
   const [role, setRole] = useState<EventRole>("event-contributor");
+  const [pending, setPending] = useState(false);
+  const section = useRef<HTMLElement>(null);
+  const [added, setAdded] = useState(0);
+
+  // After an add, the button is disabled again, so focus moves to the first control of the form,
+  // or to the heading if no member is left to add.
+  useEffect(() => {
+    if (added > 0) {
+      (
+        section.current?.querySelector<HTMLElement>("button") ??
+        section.current?.querySelector<HTMLElement>("h2")
+      )?.focus();
+    }
+  }, [added]);
 
   if (organizationFailure) {
     return (
@@ -285,9 +341,11 @@ function AddMember({
   }
 
   const add = async () => {
-    if (!userId) {
+    if (!userId || pending) {
       return;
     }
+    onStart();
+    setPending(true);
     try {
       const { data, error } = await api.POST("/api/v1/events/{event_id}/memberships", {
         params: { path: { event_id: eventId } },
@@ -296,17 +354,19 @@ function AddMember({
       if (data) {
         setUserId(undefined);
         onAdded(data);
+        setAdded((count) => count + 1);
       } else {
         onFailed(error);
       }
     } catch {
       onFailed(undefined);
     }
+    setPending(false);
   };
 
   return (
-    <section className={styles.add} aria-labelledby="members-add-title">
-      <h2 id="members-add-title" className={styles.heading}>
+    <section ref={section} className={styles.add} aria-labelledby="members-add-title">
+      <h2 id="members-add-title" tabIndex={-1} className={styles.heading}>
         {t("event-members-add-title")}
       </h2>
       {candidates.length === 0 ? (
@@ -329,7 +389,12 @@ function AddMember({
             value={role}
             onChange={(id) => setRole(id as EventRole)}
           />
-          <Button variant="primary" isDisabled={!userId} onPress={() => void add()}>
+          <Button
+            variant="primary"
+            isDisabled={!userId}
+            isPending={pending}
+            onPress={() => void add()}
+          >
             {t("event-members-add-submit")}
           </Button>
         </div>

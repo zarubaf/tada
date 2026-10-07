@@ -68,7 +68,7 @@ export function EventPage({ api, children }: { api: Api; children: ReactNode }) 
             <Link to={base} className={styles.link} exact>
               {t("event-nav-overview")}
             </Link>
-            <Link to={`${base}/members`} className={styles.link} exact>
+            <Link to={`${base}/members`} className={styles.link}>
               {t("event-nav-members")}
             </Link>
           </nav>

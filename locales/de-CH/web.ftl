@@ -127,8 +127,9 @@ event-overview-placeholder = Hier erscheint die Übersicht des Anlasses.
 event-loading = Anlass wird geladen
 problem-not-found = Das gibt es nicht, oder Sie dürfen es nicht sehen.
 problem-validation-failed = Die Eingabe ist ungültig.
-problem-record-version-conflict = Jemand hat diesen Eintrag inzwischen geändert. Laden Sie die Seite neu.
-problem-invalid-transition = Ein Anlass braucht mindestens eine Anlassleitung. Geben Sie zuerst jemand anderem diese Rolle.
+problem-rate-limited = Zu viele Anfragen. Versuchen Sie es in einigen Minuten erneut.
+problem-record-version-conflict = Jemand hat diesen Eintrag inzwischen geändert. Versuchen Sie es erneut.
+problem-invalid-transition = Diese Änderung ist im aktuellen Zustand nicht möglich.
 
 ## Event memberships
 
@@ -149,3 +150,11 @@ event-members-add-none = Alle Mitglieder der Organisation haben schon eine Rolle
 role-event-manager = Anlassleitung
 role-event-contributor = Mitarbeit
 role-event-viewer = Lesezugriff
+# The refusal to remove or demote the last event manager (`invalid-transition` on this page).
+event-members-last-manager = Ein Anlass braucht mindestens eine Anlassleitung. Geben Sie zuerst jemand anderem diese Rolle.
+event-members-conflict = Jemand hat diese Mitglieder inzwischen geändert. Die Liste ist neu geladen. Versuchen Sie es erneut.
+# $name: the display name of the member.
+event-members-remove-title = { $name } entfernen?
+event-members-remove-text = { $name } verliert die Rolle in diesem Anlass und sieht den Anlass nicht mehr.
+event-members-remove-self = Sie entfernen Ihre eigene Rolle als Anlassleitung. Danach können Sie die Mitglieder dieses Anlasses womöglich nicht mehr verwalten.
+event-members-remove-cancel = Abbrechen

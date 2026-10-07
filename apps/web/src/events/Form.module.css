@@ -31,6 +31,14 @@
     color: var(--color-danger);
   }
 
+  /* The live region stays in the page: empty, it is hidden from the eye but not from the tree. */
+  .failure:empty {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
   /* The primary action is full width on narrow layouts and on the right on wide layouts. */
   .actions {
     display: grid;

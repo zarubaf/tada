@@ -13,7 +13,5 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/test/setup.ts"],
-    // React Aria forms are slow in jsdom on a busy machine.
-    testTimeout: 20_000,
   },
 });
