@@ -33,8 +33,18 @@ const memberships = [
 ];
 
 const organizationMembers = [
-  ...memberships,
-  { user_id: "0199b8e0-0000-7000-8000-0000000000b3", display_name: "Cäcilia Probst" },
+  ...memberships.map(({ user_id, display_name }) => ({
+    user_id,
+    display_name,
+    role: "member",
+    version: 1,
+  })),
+  {
+    user_id: "0199b8e0-0000-7000-8000-0000000000b3",
+    display_name: "Cäcilia Probst",
+    role: "member",
+    version: 1,
+  },
 ];
 
 const forbidden = {

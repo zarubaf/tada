@@ -19,28 +19,14 @@ export function addableMembers(
   return organization.filter((member) => !taken.has(member.user_id));
 }
 
-// `GET /api/v1/members` (Task 13) is not in the contract yet. This is its shape, so that the
-// screen works against it; use the generated client when the contract has the operation.
-interface MembersPage {
-  items: OrganizationMember[];
-  next_cursor?: string | null;
-}
-type MembersClient = {
-  GET(
-    path: "/api/v1/members",
-    init: { params: { query: { cursor?: string } } },
-  ): Promise<{ data?: MembersPage; error?: Problem }>;
-};
-
 /** All members of the organization, page after page. */
 export async function loadOrganizationMembers(
   api: Api,
 ): Promise<{ members: OrganizationMember[] } | { error: Problem | undefined }> {
-  const client = api as unknown as MembersClient;
   const members: OrganizationMember[] = [];
   let cursor: string | undefined;
   do {
-    const { data, error } = await client.GET("/api/v1/members", {
+    const { data, error } = await api.GET("/api/v1/members", {
       params: { query: cursor === undefined ? {} : { cursor } },
     });
     if (!data) {
