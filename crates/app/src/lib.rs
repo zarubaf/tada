@@ -9,6 +9,7 @@ pub mod events;
 pub mod health;
 pub mod identity;
 pub mod jobs;
+pub mod mail;
 pub mod paging;
 pub mod problem;
 pub mod store;
