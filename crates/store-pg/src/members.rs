@@ -259,7 +259,7 @@ impl MemberStore for Database {
             revoke_invitations(&mut tx, organization_id, &pending, invitation.created_at)
                 .await
                 .map_err(store_error)?;
-        sqlx::query!(
+        let inserted = sqlx::query!(
             "INSERT INTO invitation
                  (id, organization_id, email, display_name, role, invited_by, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7)",
@@ -272,8 +272,16 @@ impl MemberStore for Database {
             invitation.created_at.to_sqlx() as _,
         )
         .execute(&mut *tx)
-        .await
-        .map_err(store_error)?;
+        .await;
+        match inserted {
+            Ok(_) => {}
+            // The check above serializes inside one organization only. Another organization can
+            // take the ID in between; the rollback then also undoes the revocations.
+            Err(sqlx::Error::Database(error)) if error.constraint() == Some("invitation_pkey") => {
+                return Ok(InvitationInsert::IdTaken);
+            }
+            Err(error) => return Err(store_error(error)),
+        }
         queue_outbound(
             &mut tx,
             &Purpose::Invitation {
@@ -455,16 +463,24 @@ mod tests {
         }
 
         async fn invite(&self, invitation: &Invitation) -> InvitationInsert {
+            self.invite_as(&self.owner, invitation).await.unwrap()
+        }
+
+        /// An invitation of `inviter` into the organization of `inviter`.
+        async fn invite_as(
+            &self,
+            inviter: &MemberCaller,
+            invitation: &Invitation,
+        ) -> Result<InvitationInsert, StoreError> {
             let audit = AuditEvent::new(
-                self.owner.actor(),
+                inviter.actor(),
                 AuditAction::InvitationCreate,
                 Some(invitation.id.as_uuid()),
-                Some(self.scope()),
+                Some(inviter.scope()),
             );
             self.db()
-                .invite(self.scope(), invitation, self.owner.user_id(), &audit)
+                .invite(inviter.scope(), invitation, inviter.user_id(), &audit)
                 .await
-                .unwrap()
         }
 
         async fn remove_as(&self, remover: &MemberCaller, member: UserId) -> Option<Refusal> {
@@ -616,6 +632,28 @@ mod tests {
             [first]
         );
         assert_eq!(f.audit_rows().await.len(), 1);
+    }
+
+    /// Two organizations that insert an invitation with the same client ID at the same moment: the
+    /// primary key decides, and the second one gets `IdTaken`, not an error.
+    #[tokio::test]
+    async fn the_same_id_in_two_organizations_at_once_is_taken_once() {
+        let f = Fixture::start().await;
+        let musterhausen = f.test.create_organization("musterhausen").await;
+        let other = MemberCaller::new(f.owner.user_id(), musterhausen, OrganizationRole::Owner);
+        for _ in 0..5 {
+            let invitation = f.invitation("anna@example.org", OrganizationRole::Member);
+            let (first, second) = tokio::join!(
+                f.invite_as(&f.owner, &invitation),
+                f.invite_as(&other, &invitation)
+            );
+            let mut results = [first.unwrap(), second.unwrap()];
+            results.sort_by_key(|result| *result == InvitationInsert::IdTaken);
+            assert_eq!(
+                results,
+                [InvitationInsert::Inserted, InvitationInsert::IdTaken]
+            );
+        }
     }
 
     #[tokio::test]
