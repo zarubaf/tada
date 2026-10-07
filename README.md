@@ -2,7 +2,7 @@
 
 tada is an event-planning workspace for clubs.
 [PRODUCT.md](doc/PRODUCT.md) describes what we build, and [ARCHITECTURE.md](doc/ARCHITECTURE.md) describes how.
-The [roadmap](doc/roadmap.md) shows what is done and what comes next.
+The [roadmap](doc/roadmap.md) shows what comes next.
 
 ## Run it locally
 

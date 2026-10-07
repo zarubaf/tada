@@ -4,22 +4,8 @@ This roadmap divides the work into slices.
 Each slice ends with a demonstration, tests, updated documents and a clean commit series.
 A slice starts only after the previous slice meets its acceptance criteria.
 The numbers in parentheses identify the acceptance criteria; they do not change when criteria move between slices.
-
-## Slice 0: Foundation and walking skeleton
-
-Goal: a repository and a runtime that later slices can build on without rework.
-
-1. Foundation: tools, documentation checks, secret scanning, ADRs and CI. (Done.)
-2. Walking skeleton: Docker Compose with PostgreSQL, Garage and Mailpit; the `tada` binary with `serve`, `worker` and the web client; `CreateEvent` from the API to the web client, with tests; the first migration, the OpenAPI snapshot check and the crate boundary check. (Done.)
-3. Spikes:
-   - The job queue (ADR 0007). (Done. The result is [ADR 0054](adr/0054-job-queue-implementation.md). The queue exists; its schedules come with the scheduled checks of Slice 2.)
-   - Upload, download and versions in object storage (ADR 0009). (Done. The `BlobStore` adapter streams uploads to Garage, also as multipart uploads, and keeps nothing of a failed upload. The type detection of ADR 0043 needs [ADR 0055](adr/0055-office-format-detection.md). Document versions come with the documents of Slice 1.)
-   - Telegram identity linking (ADR 0011). (Done. `tada telegram` claims link codes through long polling, and the member confirms the link through the API. The webhook mode, the health endpoints of the telegram role and the web page for the confirmation come with the Telegram work of Slice 2.)
-4. A first deployment of the walking skeleton, from the operator's deployment repository (ADR 0033). (Done. The demo environment runs the image of CI with invented data only. A release build answers each API call with `unauthenticated` until sign-in exists ([ADR 0053](adr/0053-development-authenticator.md)).)
-5. ADRs for the decisions that the first code needs: observability ([0035](adr/0035-observability.md)), configuration ([0036](adr/0036-configuration.md)), the error model ([0037](adr/0037-error-model.md)), IDs and time ([0038](adr/0038-ids-and-time.md)) and actors ([0039](adr/0039-actors-and-identities.md)). (Done.)
-6. ADRs for Slice 0 and Slice 1: CI build and dependencies ([0041](adr/0041-ci-build-and-dependencies.md)), transactional email ([0042](adr/0042-transactional-email.md)), upload policy ([0043](adr/0043-upload-policy.md)) and API conventions ([0044](adr/0044-api-conventions.md)). (Done.)
-7. ADRs for the core of Slice 1: entities and the fact model ([0049](adr/0049-entities-and-fact-model.md)), proposals and review ([0050](adr/0050-proposals-and-review.md)), document drafts with provenance ([0051](adr/0051-document-drafts-and-provenance.md)), and event roles ([0052](adr/0052-event-roles-and-ownership.md)). (Done.)
-8. ADRs for Slice 2, accepted before Slice 2 starts: data protection ([0045](adr/0045-data-protection.md)), inbound email ([0046](adr/0046-inbound-email.md)), the model adapter ([0047](adr/0047-model-adapter.md)) and the AI evaluation set ([0048](adr/0048-ai-evaluation-set.md)). (Done.) No real personal data goes to a model provider before ADR 0045 is accepted.
+The roadmap shows only the open slices.
+The Git history keeps the done slices.
 
 ## Slice 1: Preliminary event concept
 
@@ -57,6 +43,8 @@ Acceptance:
 Goal: workstream leads own their work directly, and the AI PM follows up without the PM.
 
 Scope: AI intake inside tada (web and Telegram) through the model adapter, actions and commitments, distributed review, durable scheduled checks, internal Telegram reminders, decisions, risks, requirements, templates, portfolio and resource views, and inbound email.
+The Telegram work adds the webhook mode, the health endpoints of the `telegram` process role and the web page that confirms a Telegram link (ADR 0011).
+The scheduled checks use the job queue of [ADR 0054](adr/0054-job-queue-implementation.md).
 
 Acceptance:
 
