@@ -3,7 +3,9 @@ import { expect, test } from "@playwright/test";
 import {
   events,
   fakeEvents,
+  fakeSession,
   fontsLoaded,
+  sessionInfo,
   setTheme,
   themes,
   unavailable,
@@ -23,6 +25,7 @@ for (const viewport of viewports) {
         page,
       }) => {
         await page.setViewportSize(viewport);
+        await fakeSession(page);
         await fakeEvents(page, state.status, state.body);
         await page.goto("/");
         await setTheme(page, theme);
@@ -36,8 +39,27 @@ for (const viewport of viewports) {
       });
     }
 
+    test(`events, two organizations, ${theme}, ${viewport.name} px: no axe violation`, async ({
+      page,
+    }) => {
+      const other = { ...sessionInfo.organization, organization_id: "x", name: "Segelflugclub" };
+      await page.setViewportSize(viewport);
+      await fakeSession(page, { ...sessionInfo, memberships: [sessionInfo.organization, other] });
+      await fakeEvents(page, 200, { items: events });
+      await page.goto("/events");
+      await setTheme(page, theme);
+      await expect(page.getByRole("button", { name: /Organisation/ })).toBeVisible();
+      await expect(page.getByRole("table")).toBeVisible();
+
+      const results = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze();
+      expect(results.violations).toEqual([]);
+    });
+
     test(`events, list, ${theme}, ${viewport.name} px: screenshot`, async ({ page }) => {
       await page.setViewportSize(viewport);
+      await fakeSession(page);
       await fakeEvents(page, 200, { items: events });
       await page.goto("/");
       await setTheme(page, theme);

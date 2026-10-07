@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { events, fakeEvents, unavailable, viewports } from "./fixtures";
+import { events, fakeEvents, fakeSession, unavailable, viewports } from "./fixtures";
 
 // ADR 0024: German text can be 40 % longer than the source. No text may overflow its box or be cut
 // off without a tooltip. A scroll container, for example the table at 375 px, is not an overflow.
@@ -13,6 +13,7 @@ for (const viewport of viewports) {
       page,
     }) => {
       await page.setViewportSize(viewport);
+      await fakeSession(page);
       await fakeEvents(page, state.status, state.body);
       await page.goto("/?pseudo");
       await expect(page.getByRole("heading", { name: /Áñlässé/ })).toBeVisible();

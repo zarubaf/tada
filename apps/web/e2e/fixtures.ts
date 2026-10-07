@@ -20,6 +20,27 @@ export const events = [
   },
 ];
 
+const membership = {
+  organization_id: "0199b8e0-0000-7000-8000-0000000000a1",
+  name: "Fliegergruppe Testwil",
+  role: "member",
+};
+
+/** An invented signed-in member with one organization. */
+export const sessionInfo = {
+  user_id: "0199b8e0-0000-7000-8000-0000000000b1",
+  display_name: "Anna Muster",
+  organization: membership,
+  memberships: [membership],
+};
+
+/** The fake API of the browser checks: the answer of `GET /api/v1/session`. */
+export async function fakeSession(page: Page, info: unknown = sessionInfo): Promise<void> {
+  await page.route("**/api/v1/session", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(info) }),
+  );
+}
+
 /** The fake API of the browser checks: the answer of `GET /api/v1/events`. */
 export async function fakeEvents(page: Page, status: number, body: unknown): Promise<void> {
   await page.route("**/api/v1/events*", (route) =>

@@ -1,8 +1,13 @@
 import { lazy, Suspense } from "react";
-import { createApi } from "./api/client";
+import { type Api, createApi } from "./api/client";
 import { EventsPage } from "./events/EventsPage";
+import { NotFoundPage } from "./NotFoundPage";
+import { Redirect, Route, Router, Routes } from "./router/Router";
+import { SessionProvider } from "./session/SessionProvider";
+import { Shell } from "./shell/Shell";
+import { SkipLink } from "./ui/SkipLink";
 
-const api = createApi();
+const defaultApi = createApi();
 
 // The component gallery exists only in builds that are not production builds (ADR 0024).
 const Gallery =
@@ -10,13 +15,36 @@ const Gallery =
     ? null
     : lazy(() => import("./gallery/Gallery").then((module) => ({ default: module.Gallery })));
 
-export function App() {
-  if (Gallery && window.location.pathname === "/_gallery") {
-    return (
-      <Suspense>
-        <Gallery />
-      </Suspense>
-    );
-  }
-  return <EventsPage api={api} />;
+export function App({ api = defaultApi }: { api?: Api }) {
+  return (
+    <Router>
+      <SkipLink />
+      <Routes>
+        {Gallery && (
+          <Route path="/_gallery">
+            <Suspense>
+              <Gallery />
+            </Suspense>
+          </Route>
+        )}
+        <Route path="*">
+          <SessionProvider api={api}>
+            <Shell api={api}>
+              <Routes>
+                <Route path="/">
+                  <Redirect to="/events" />
+                </Route>
+                <Route path="/events">
+                  <EventsPage api={api} />
+                </Route>
+                <Route path="*">
+                  <NotFoundPage />
+                </Route>
+              </Routes>
+            </Shell>
+          </SessionProvider>
+        </Route>
+      </Routes>
+    </Router>
+  );
 }

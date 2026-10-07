@@ -50,3 +50,19 @@ field-components-catering = Verpflegung
 field-components-passenger_flights = Passagierflüge
 field-components-exhibition = Ausstellung
 field-venue = Ort
+
+## Navigation
+
+not-found-title = Seite nicht gefunden
+not-found-text = Diese Adresse gibt es nicht. Prüfen Sie den Link oder wählen Sie einen Eintrag in der Navigation.
+
+## Session
+
+session-loading = Sitzung wird geladen
+skip-link = Zum Inhalt springen
+shell-side = Seitenleiste
+shell-nav = Hauptnavigation
+nav-events = Anlässe
+organization-switcher = Organisation
+member-menu = Mitgliedermenü
+sign-out = Abmelden
