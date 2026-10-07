@@ -143,11 +143,15 @@ impl OutboundStore for Database {
         scope: OrgScope,
         invitation_id: InvitationId,
         expires_at: Timestamp,
-    ) -> Result<SecretString, StoreError> {
+    ) -> Result<Option<SecretString>, StoreError> {
         let token = new_token("")?;
-        sqlx::query!(
+        // The share lock waits for a revocation or an acceptance of the invitation and then reads
+        // its new status. A revocation that waits for this insert deletes the new token after it.
+        let inserted = sqlx::query!(
             "INSERT INTO invitation_token (token_hash, organization_id, invitation_id, expires_at)
-             VALUES ($1, $2, $3, $4)",
+             SELECT $1, organization_id, id, $4 FROM invitation
+             WHERE organization_id = $2 AND id = $3 AND status = 'pending'
+             FOR SHARE",
             token.hash,
             scope.organization_id().as_uuid(),
             invitation_id.as_uuid(),
@@ -156,7 +160,7 @@ impl OutboundStore for Database {
         .execute(&self.pool)
         .await
         .map_err(store_error)?;
-        Ok(token.secret)
+        Ok((inserted.rows_affected() == 1).then_some(token.secret))
     }
 
     async fn claim(&self, intent_id: Uuid) -> Result<bool, StoreError> {
@@ -419,14 +423,44 @@ mod tests {
             test.database
                 .issue_invitation_token(scope(musterhausen), invitation_id, later())
                 .await
-                .is_err()
+                .unwrap()
+                .is_none()
         );
         let token = test
             .database
             .issue_invitation_token(scope(testwil), invitation_id, later())
             .await
+            .unwrap()
             .unwrap();
         test.assert_no_plaintext(token.expose_secret()).await;
+    }
+
+    /// A revoked or accepted invitation gets no new token, so its mail sends no working link.
+    #[tokio::test]
+    async fn an_invitation_that_is_not_pending_gets_no_token() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let invitation_id = invitation(&test, testwil).await;
+        sqlx::query("UPDATE invitation SET status = 'revoked', revoked_at = now() WHERE id = $1")
+            .bind(invitation_id.as_uuid())
+            .execute(&test.database.pool)
+            .await
+            .unwrap();
+        let scope = MemberCaller::new(
+            UserId::from_uuid(Uuid::now_v7()),
+            testwil,
+            OrganizationRole::Owner,
+        )
+        .scope();
+
+        let token = test
+            .database
+            .issue_invitation_token(scope, invitation_id, later())
+            .await
+            .unwrap();
+        assert!(token.is_none());
+        let tokens: i64 = test.scalar("SELECT count(*) FROM invitation_token").await;
+        assert_eq!(tokens, 0);
     }
 
     #[tokio::test]

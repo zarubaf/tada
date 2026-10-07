@@ -621,6 +621,7 @@ mod tests {
             .issue_invitation_token(scope, invitation, expires_at)
             .await
             .unwrap()
+            .unwrap()
             .expose_secret()
             .to_owned()
     }
