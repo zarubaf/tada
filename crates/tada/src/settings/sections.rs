@@ -7,6 +7,7 @@ use ipnet::IpNet;
 use secrecy::SecretString;
 use tada_adapters::mail::SmtpTls;
 use tada_app::domain::identity::Email;
+use tada_app::public_url::PublicUrl;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -290,13 +291,6 @@ impl Section for Telegram {
     }
 }
 
-/// The public URL of this installation (ADRs 0025 and 0042).
-/// All links in mails and in the web client start with it.
-#[derive(Debug)]
-pub struct PublicUrl {
-    pub url: Url,
-}
-
 const PUBLIC_URL: Setting = Setting {
     name: "TADA_PUBLIC_URL",
     kind: "URL",
@@ -305,26 +299,22 @@ const PUBLIC_URL: Setting = Setting {
     description: "The URL that members use, without a path, for example `https://tada.example.org`. All links in mails start with it.",
 };
 
+/// The public URL of this installation (ADRs 0025 and 0042).
+/// `PublicUrl::parse` is the only validator, so each process role uses the same normalized URL.
 impl Section for PublicUrl {
     fn settings() -> Vec<&'static Setting> {
         vec![&PUBLIC_URL]
     }
 
     fn read(source: &mut Source<'_>) -> Option<Self> {
-        let url: Url = source.value(&PUBLIC_URL)?;
-        if !matches!(url.scheme(), "http" | "https") || url.host().is_none() {
-            source.error(&PUBLIC_URL, "must start with http:// or https://");
-            return None;
+        let text: String = source.value(&PUBLIC_URL)?;
+        match PublicUrl::parse(&text) {
+            Ok(url) => Some(url),
+            Err(error) => {
+                source.error(&PUBLIC_URL, &format!("is not valid: {error}"));
+                None
+            }
         }
-        if url.path() != "/" || url.query().is_some() || url.fragment().is_some() {
-            source.error(&PUBLIC_URL, "must have no path, query or fragment");
-            return None;
-        }
-        if !url.username().is_empty() || url.password().is_some() {
-            source.error(&PUBLIC_URL, "must not contain a user name or a password");
-            return None;
-        }
-        Some(Self { url })
     }
 }
 

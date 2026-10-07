@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn the_worker_reads_the_mail_settings_with_the_smtp_defaults() {
         let (_, public_url, mail, smtp) = worker_with(&[]).unwrap().settings;
-        assert_eq!(public_url.url.as_str(), "https://tada.example.org/");
+        assert_eq!(public_url.origin(), "https://tada.example.org");
         assert_eq!(mail.from.as_str(), "tada@example.org");
         assert_eq!(smtp.host, "mail.example.org");
         assert_eq!(smtp.port, 465);
