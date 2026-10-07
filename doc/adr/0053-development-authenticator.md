@@ -1,6 +1,6 @@
 # 0053. Development authenticator for the walking skeleton
 
-- Status: Accepted
+- Status: Superseded by [0056](0056-sign-in-details.md)
 - Date: 2026-10-06
 
 ## Context
