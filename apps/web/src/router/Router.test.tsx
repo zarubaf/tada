@@ -1,0 +1,87 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it } from "vitest";
+import { Link, Redirect, Route, Router, Routes, useNavigate, useParams } from "./Router";
+
+function Event() {
+  const { eventId } = useParams();
+  return <p>Anlass {eventId}</p>;
+}
+
+function Go() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate("/events/TEST30")}>
+      go
+    </button>
+  );
+}
+
+function renderAt(path: string) {
+  window.history.replaceState(null, "", path);
+  return render(
+    <Router>
+      <nav>
+        <Link to="/events">Anlässe</Link>
+        <Link to="/other">Andere</Link>
+        <Go />
+      </nav>
+      <Routes>
+        <Route path="/">
+          <Redirect to="/events" />
+        </Route>
+        <Route path="/events">
+          <p>Liste</p>
+        </Route>
+        <Route path="/events/:eventId">
+          <Event />
+        </Route>
+        <Route path="*">
+          <p>Seite nicht gefunden</p>
+        </Route>
+      </Routes>
+    </Router>,
+  );
+}
+
+afterEach(() => window.history.replaceState(null, "", "/"));
+
+describe("Router", () => {
+  it("matches a path with a parameter", () => {
+    renderAt("/events/FLY28");
+    expect(screen.getByText("Anlass FLY28")).toBeInTheDocument();
+    expect(screen.queryByText("Liste")).not.toBeInTheDocument();
+  });
+
+  it("shows the not-found route for an unknown path", () => {
+    renderAt("/nowhere/at/all");
+    expect(screen.getByText("Seite nicht gefunden")).toBeInTheDocument();
+  });
+
+  it("redirects and replaces the history entry", () => {
+    renderAt("/");
+    expect(screen.getByText("Liste")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/events");
+  });
+
+  it("navigates with pushState and marks the current link", async () => {
+    renderAt("/events");
+    expect(screen.getByRole("link", { name: "Anlässe" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Andere" })).not.toHaveAttribute("aria-current");
+
+    await userEvent.click(screen.getByRole("link", { name: "Andere" }));
+    expect(window.location.pathname).toBe("/other");
+    expect(screen.getByText("Seite nicht gefunden")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Andere" })).toHaveAttribute("aria-current", "page");
+
+    await userEvent.click(screen.getByRole("button", { name: "go" }));
+    expect(screen.getByText("Anlass TEST30")).toBeInTheDocument();
+  });
+
+  it("follows the back button", async () => {
+    renderAt("/events");
+    await userEvent.click(screen.getByRole("link", { name: "Andere" }));
+    window.history.back();
+    expect(await screen.findByText("Liste")).toBeInTheDocument();
+  });
+});

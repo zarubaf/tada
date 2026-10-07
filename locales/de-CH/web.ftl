@@ -50,3 +50,8 @@ field-components-catering = Verpflegung
 field-components-passenger_flights = Passagierflüge
 field-components-exhibition = Ausstellung
 field-venue = Ort
+
+## Navigation
+
+not-found-title = Seite nicht gefunden
+not-found-text = Diese Adresse gibt es nicht. Prüfen Sie den Link oder wählen Sie einen Eintrag in der Navigation.
