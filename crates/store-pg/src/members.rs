@@ -173,6 +173,8 @@ impl MemberStore for Database {
         limit: u32,
     ) -> Result<Vec<OrganizationMember>, StoreError> {
         // The cursor names the last member of the page before; its display name is the sort key.
+        // The cursor comes from the client, so only a member of the organization counts.
+        // Trade-off: if that member left between two pages, the list ends there.
         let rows = sqlx::query_as!(
             MemberRow,
             r#"SELECT m.user_id, u.display_name, e.email AS "email?", m.role, m.version
@@ -181,7 +183,10 @@ impl MemberStore for Database {
                LEFT JOIN email_identity e ON e.user_id = m.user_id
                WHERE m.organization_id = $1
                  AND ($2::uuid IS NULL OR (u.display_name, u.id) >
-                      (SELECT c.display_name, c.id FROM app_user c WHERE c.id = $2))
+                      (SELECT c.display_name, c.id FROM app_user c
+                       JOIN organization_membership cm
+                           ON cm.user_id = c.id AND cm.organization_id = $1
+                       WHERE c.id = $2))
                ORDER BY u.display_name, u.id
                LIMIT $3"#,
             scope.organization_id().as_uuid(),
@@ -690,6 +695,24 @@ mod tests {
         let musterhausen = f.test.create_organization("musterhausen").await;
         let other = MemberCaller::new(anna, musterhausen, OrganizationRole::Owner).scope();
         assert!(f.db().list(other, None, 10).await.unwrap().is_empty());
+
+        // A cursor with a user of another organization reads nothing of that user.
+        let stranger = f
+            .test
+            .create_user(
+                &DisplayName::parse("Aaron Fremd").unwrap(),
+                &Email::parse("aaron@example.org").unwrap(),
+            )
+            .await;
+        f.test
+            .add_membership(musterhausen, stranger, OrganizationRole::Member)
+            .await;
+        let foreign = f
+            .db()
+            .list(f.scope(), Some(MemberCursor(stranger)), 10)
+            .await
+            .unwrap();
+        assert!(foreign.is_empty(), "{foreign:?}");
     }
 
     #[tokio::test]

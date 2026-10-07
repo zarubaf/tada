@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT m.user_id, u.display_name, e.email AS \"email?\", m.role, m.version\n               FROM organization_membership m\n               JOIN app_user u ON u.id = m.user_id\n               LEFT JOIN email_identity e ON e.user_id = m.user_id\n               WHERE m.organization_id = $1\n                 AND ($2::uuid IS NULL OR (u.display_name, u.id) >\n                      (SELECT c.display_name, c.id FROM app_user c WHERE c.id = $2))\n               ORDER BY u.display_name, u.id\n               LIMIT $3",
+  "query": "SELECT m.user_id, u.display_name, e.email AS \"email?\", m.role, m.version\n               FROM organization_membership m\n               JOIN app_user u ON u.id = m.user_id\n               LEFT JOIN email_identity e ON e.user_id = m.user_id\n               WHERE m.organization_id = $1\n                 AND ($2::uuid IS NULL OR (u.display_name, u.id) >\n                      (SELECT c.display_name, c.id FROM app_user c\n                       JOIN organization_membership cm\n                           ON cm.user_id = c.id AND cm.organization_id = $1\n                       WHERE c.id = $2))\n               ORDER BY u.display_name, u.id\n               LIMIT $3",
   "describe": {
     "columns": [
       {
@@ -74,5 +74,5 @@
       false
     ]
   },
-  "hash": "6900f4c7d63b21f846a41f00683c8bd05c07c34cd9049f769cefb206cbb29877"
+  "hash": "6c2e10b722c20e40ee99e78f59f8d3f17d62aa413304750668c35faf79e02ad6"
 }
