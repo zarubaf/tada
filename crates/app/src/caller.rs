@@ -27,6 +27,19 @@ impl Channel {
             Self::Cli => "cli",
         }
     }
+
+    /// The channel of a name of `as_str`.
+    pub fn parse(name: &str) -> Option<Self> {
+        [
+            Self::Web,
+            Self::Telegram,
+            Self::Job,
+            Self::ApiToken,
+            Self::Cli,
+        ]
+        .into_iter()
+        .find(|channel| channel.as_str() == name)
+    }
 }
 
 /// The kind of party that acts (ADR 0039).
@@ -46,6 +59,13 @@ impl ActorKind {
             Self::Ai => "ai",
         }
     }
+
+    /// The kind of a name of `as_str`.
+    pub fn parse(name: &str) -> Option<Self> {
+        [Self::Member, Self::Service, Self::Ai]
+            .into_iter()
+            .find(|kind| kind.as_str() == name)
+    }
 }
 
 /// Who did something, for which member and through which channel (ADR 0039).
@@ -60,6 +80,24 @@ pub struct Actor {
 }
 
 impl Actor {
+    /// For store adapters only: restores the author of a stored record.
+    /// Other code gets an actor from a caller.
+    pub fn restore(
+        kind: ActorKind,
+        id: Uuid,
+        principal: Option<Uuid>,
+        channel: Channel,
+        request_id: Option<Uuid>,
+    ) -> Self {
+        Self {
+            kind,
+            id,
+            principal,
+            channel,
+            request_id,
+        }
+    }
+
     pub fn kind(&self) -> ActorKind {
         self.kind
     }
@@ -335,5 +373,19 @@ mod tests {
         ]
         .map(Channel::as_str);
         assert_eq!(names, ["web", "telegram", "job", "api-token", "cli"]);
+        for name in names {
+            assert_eq!(Channel::parse(name).map(Channel::as_str), Some(name));
+        }
+        assert_eq!(Channel::parse("mail"), None);
+    }
+
+    #[test]
+    fn actor_kinds_have_stable_names() {
+        let names = [ActorKind::Member, ActorKind::Service, ActorKind::Ai].map(ActorKind::as_str);
+        assert_eq!(names, ["member", "service", "ai"]);
+        for name in names {
+            assert_eq!(ActorKind::parse(name).map(ActorKind::as_str), Some(name));
+        }
+        assert_eq!(ActorKind::parse("robot"), None);
     }
 }

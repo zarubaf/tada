@@ -53,6 +53,22 @@ id_type!(
     /// The ID of a field definition.
     FieldDefinitionId
 );
+id_type!(
+    /// The ID of a fact: one field of one event.
+    FactId
+);
+id_type!(
+    /// The ID of one immutable version of a fact.
+    FactVersionId
+);
+id_type!(
+    /// The ID of a source item.
+    SourceItemId
+);
+id_type!(
+    /// The ID of one immutable version of a source item.
+    SourceVersionId
+);
 
 /// Returns true if `uuid` can be the ID of a new record: a UUIDv7 (ADR 0038).
 pub fn is_record_id(uuid: Uuid) -> bool {

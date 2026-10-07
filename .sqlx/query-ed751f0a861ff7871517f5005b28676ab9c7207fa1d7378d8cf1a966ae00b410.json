@@ -1,0 +1,197 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT f.id AS fact_id, v.id AS version_id, v.number, v.state, v.value, v.approximate,\n                      d.id, d.event_id, d.key, d.label_text, d.label_message, d.value_type, d.description,\n                      d.module, d.status\n               FROM fact f\n               JOIN fact_version v ON v.organization_id = f.organization_id AND v.fact_id = f.id\n                                  AND v.number = f.version\n               JOIN field_definition d ON d.id = f.field_id\n               WHERE f.organization_id = $1 AND f.event_id = $2\n               ORDER BY d.key COLLATE \"C\", d.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fact_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "fact",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "version_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "fact_version",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "fact_version",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "fact_version",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "fact_version",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "approximate",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "fact_version",
+            "name": "approximate"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "label_text",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "label_text"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "label_message",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "label_message"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "value_type",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "value_type"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "module",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "module"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ed751f0a861ff7871517f5005b28676ab9c7207fa1d7378d8cf1a966ae00b410"
+}

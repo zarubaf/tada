@@ -1,0 +1,89 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT fact_version_id, source_version_id, start_offset, end_offset, quote, page\n             FROM evidence_link\n             WHERE organization_id = $1 AND fact_version_id = ANY($2)\n             ORDER BY source_version_id, start_offset, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fact_version_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "evidence_link",
+            "name": "fact_version_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "source_version_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "evidence_link",
+            "name": "source_version_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "start_offset",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "evidence_link",
+            "name": "start_offset"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "end_offset",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "evidence_link",
+            "name": "end_offset"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "quote",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "evidence_link",
+            "name": "quote"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "page",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "evidence_link",
+            "name": "page"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e42aa8b9ba768598cacfeb4a8e911da3e6aeaca3ece985c923c8feeaa7eb7809"
+}

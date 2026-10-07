@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE field_definition\n                 SET label_text = $2, label_message = $3, description = $4, module = $5, status = $6,\n                     catalog_version = $7\n                 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9e95b1144c9ab654c6f25ec6f4b07573902f5206e078395eb462166aacfdbd81"
+}

@@ -1,0 +1,284 @@
+//! Facts (ADR 0049): the field catalog of an event, its event profile and the typed accessors of the reserved core fields.
+
+use std::fmt::Debug;
+
+use async_trait::async_trait;
+use tada_domain::RecordVersion;
+use tada_domain::facts::{DateWindow, FactState, FactValue, FieldDefinition, Valued, core_catalog};
+use tada_domain::ids::{EventId, FactId, FactVersionId, FieldDefinitionId, SourceVersionId};
+use tada_domain::sources::Passage;
+
+use crate::access::{self, AccessError, Principal};
+use crate::caller::OrgScope;
+use crate::identity::IdentityStore;
+use crate::store::StoreError;
+
+/// The current fact versions of one event, with their fields and evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventProfile {
+    /// One entry for each fact of the event, in the order of the field keys.
+    pub fields: Vec<ProfileEntry>,
+}
+
+/// The current version of one fact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProfileEntry {
+    pub field: FieldDefinition,
+    pub fact_id: FactId,
+    /// The number of the current fact version.
+    pub version: RecordVersion,
+    pub state: FactState<Valued>,
+    pub evidence: Vec<EvidenceRef>,
+}
+
+/// One evidence link of a fact version: a passage of a source version.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceRef {
+    pub source_version_id: SourceVersionId,
+    pub passage: Passage,
+}
+
+/// The current version of one fact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FactVersionRef {
+    pub id: FactVersionId,
+    pub fact_id: FactId,
+    pub number: RecordVersion,
+    pub state: FactState<Valued>,
+}
+
+/// The repository port for field definitions and facts. Each method stays inside `scope`.
+/// Shipped field definitions have no organization; each organization reads them (ADR 0049).
+#[async_trait]
+pub trait FactStore: Debug + Send + Sync {
+    /// The field catalog of the event: the shipped fields and the fields of the event, in the order of their keys.
+    async fn catalog(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+    ) -> Result<Vec<FieldDefinition>, StoreError>;
+
+    /// The current fact versions of the event with their evidence.
+    async fn profile(&self, scope: OrgScope, event: EventId) -> Result<EventProfile, StoreError>;
+
+    /// The current version of the fact of `field` in the event, or `None` if the event has no such fact.
+    async fn current_version(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+        field: FieldDefinitionId,
+    ) -> Result<Option<FactVersionRef>, StoreError>;
+}
+
+/// The event profile: the current facts of the event, for each caller who can read the event.
+pub async fn get_event_profile(
+    caller: &impl Principal,
+    event: EventId,
+    identity: &dyn IdentityStore,
+    store: &dyn FactStore,
+) -> Result<EventProfile, AccessError> {
+    let access = access::event_access(caller, event, identity).await?;
+    if !access.can_read() {
+        return Err(AccessError::NotFound);
+    }
+    Ok(store.profile(caller.scope(), event).await?)
+}
+
+/// The value type of a reserved core field does not match its typed accessor.
+#[derive(Debug, thiserror::Error)]
+#[error("the fact of the reserved field {0} holds a value of another value type")]
+struct ReservedFieldMismatch(&'static str);
+
+/// The state of the reserved core field `date_window` of the event (ADR 0049).
+/// An event without this fact gives `Unknown`.
+/// The caller must have access to the event, because this accessor does not check it.
+pub async fn date_window(
+    scope: OrgScope,
+    event: EventId,
+    store: &dyn FactStore,
+) -> Result<FactState<DateWindow>, StoreError> {
+    const KEY: &str = "date_window";
+    let Some(current) = store.current_version(scope, event, core_field(KEY)).await? else {
+        return Ok(FactState::Unknown);
+    };
+    let window = |valued: Valued| match valued.value {
+        FactValue::DateWindow(window) => Ok(window),
+        _ => Err(StoreError::Internal(Box::new(ReservedFieldMismatch(KEY)))),
+    };
+    Ok(match current.state {
+        FactState::Accepted(valued) => FactState::Accepted(window(valued)?),
+        FactState::Assumption(valued) => FactState::Assumption(window(valued)?),
+        FactState::Unknown => FactState::Unknown,
+    })
+}
+
+/// The ID of a field of the shipped core catalog.
+fn core_field(key: &str) -> FieldDefinitionId {
+    core_catalog()
+        .into_iter()
+        .find(|field| field.key.as_str() == key)
+        .map(|field| field.id)
+        .expect("each reserved key is a core field")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use jiff::civil::date;
+    use tada_domain::facts::Granularity;
+    use tada_domain::identity::{Email, EventRole, OrganizationRole};
+    use tada_domain::ids::{OrganizationId, UserId};
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::caller::MemberCaller;
+    use crate::identity::{Membership, UserRef};
+
+    /// One event of one organization. The store answers with `current` and an empty profile.
+    #[derive(Debug, Default)]
+    struct Memory {
+        current: Mutex<Option<FactVersionRef>>,
+        asked_field: Mutex<Option<FieldDefinitionId>>,
+    }
+
+    fn testwil() -> OrganizationId {
+        OrganizationId::from_uuid(Uuid::from_u128(10))
+    }
+
+    fn open_day() -> EventId {
+        EventId::from_uuid(Uuid::from_u128(20))
+    }
+
+    #[async_trait]
+    impl FactStore for Memory {
+        async fn catalog(
+            &self,
+            _: OrgScope,
+            _: EventId,
+        ) -> Result<Vec<FieldDefinition>, StoreError> {
+            unreachable!()
+        }
+
+        async fn profile(&self, _: OrgScope, _: EventId) -> Result<EventProfile, StoreError> {
+            Ok(EventProfile { fields: Vec::new() })
+        }
+
+        async fn current_version(
+            &self,
+            _: OrgScope,
+            _: EventId,
+            field: FieldDefinitionId,
+        ) -> Result<Option<FactVersionRef>, StoreError> {
+            *self.asked_field.lock().unwrap() = Some(field);
+            Ok(self.current.lock().unwrap().clone())
+        }
+    }
+
+    #[async_trait]
+    impl IdentityStore for Memory {
+        async fn user(&self, _: UserId) -> Result<Option<UserRef>, StoreError> {
+            unreachable!()
+        }
+
+        async fn user_by_email(&self, _: &Email) -> Result<Option<UserRef>, StoreError> {
+            unreachable!()
+        }
+
+        async fn memberships_of(&self, _: UserId) -> Result<Vec<Membership>, StoreError> {
+            unreachable!()
+        }
+
+        async fn membership(
+            &self,
+            _: OrgScope,
+            _: UserId,
+        ) -> Result<Option<OrganizationRole>, StoreError> {
+            unreachable!()
+        }
+
+        async fn event_exists(&self, scope: OrgScope, event: EventId) -> Result<bool, StoreError> {
+            Ok(scope.organization_id() == testwil() && event == open_day())
+        }
+
+        async fn event_role(
+            &self,
+            _: OrgScope,
+            _: EventId,
+            _: UserId,
+        ) -> Result<Option<EventRole>, StoreError> {
+            Ok(None)
+        }
+    }
+
+    fn caller(role: OrganizationRole) -> MemberCaller {
+        MemberCaller::new(UserId::from_uuid(Uuid::from_u128(1)), testwil(), role)
+    }
+
+    fn current(state: FactState<Valued>) -> FactVersionRef {
+        FactVersionRef {
+            id: FactVersionId::from_uuid(Uuid::from_u128(30)),
+            fact_id: FactId::from_uuid(Uuid::from_u128(31)),
+            number: RecordVersion::FIRST,
+            state,
+        }
+    }
+
+    fn may_to_june() -> DateWindow {
+        DateWindow::new(date(2030, 5, 1), date(2030, 6, 30), Granularity::Month).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_reader_of_the_event_gets_its_profile() {
+        let memory = Memory::default();
+        let owner = caller(OrganizationRole::Owner);
+        let profile = get_event_profile(&owner, open_day(), &memory, &memory).await;
+        assert_eq!(profile.unwrap(), EventProfile { fields: Vec::new() });
+    }
+
+    #[tokio::test]
+    async fn a_member_without_an_event_role_does_not_find_the_profile() {
+        let memory = Memory::default();
+        let member = caller(OrganizationRole::Member);
+        let profile = get_event_profile(&member, open_day(), &memory, &memory).await;
+        assert!(matches!(profile, Err(AccessError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn the_date_window_reads_the_core_field_and_is_unknown_without_a_fact() {
+        let memory = Memory::default();
+        let scope = caller(OrganizationRole::Owner).scope();
+        let state = date_window(scope, open_day(), &memory).await.unwrap();
+        assert_eq!(state, FactState::Unknown);
+        assert_eq!(
+            *memory.asked_field.lock().unwrap(),
+            Some(core_field("date_window"))
+        );
+    }
+
+    #[tokio::test]
+    async fn the_date_window_keeps_the_state_of_the_fact() {
+        let memory = Memory::default();
+        let scope = caller(OrganizationRole::Owner).scope();
+        let valued = Valued {
+            value: FactValue::DateWindow(may_to_june()),
+            approximate: false,
+        };
+        *memory.current.lock().unwrap() = Some(current(FactState::Assumption(valued)));
+        let state = date_window(scope, open_day(), &memory).await.unwrap();
+        assert_eq!(state, FactState::Assumption(may_to_june()));
+    }
+
+    #[tokio::test]
+    async fn a_date_window_fact_with_another_value_type_is_an_internal_error() {
+        let memory = Memory::default();
+        let scope = caller(OrganizationRole::Owner).scope();
+        let valued = Valued {
+            value: FactValue::Boolean(true),
+            approximate: false,
+        };
+        *memory.current.lock().unwrap() = Some(current(FactState::Accepted(valued)));
+        let state = date_window(scope, open_day(), &memory).await;
+        assert!(matches!(state, Err(StoreError::Internal(_))));
+    }
+}
