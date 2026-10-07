@@ -28,7 +28,7 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
       - name: Run all checks
-        run: mise run check
+        run: mise run check:all
         env:
           # The contract check compares with the previous state of main, or with the base of the pull request.
           CONTRACT_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
