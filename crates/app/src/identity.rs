@@ -15,17 +15,26 @@ pub struct UserRef {
     pub locale: String,
 }
 
+/// The membership of a user in one organization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Membership {
+    pub organization_id: OrganizationId,
+    pub organization_name: String,
+    pub role: OrganizationRole,
+}
+
 #[async_trait]
 pub trait IdentityStore: Send + Sync {
+    /// The user with the ID `id`. This query has no scope: a session names a user, not an organization.
+    async fn user(&self, id: UserId) -> Result<Option<UserRef>, StoreError>;
+
     /// Finds the user of an email address. This is an infrastructure query without a scope:
     /// sign-in has no organization yet, and one address belongs to one user (ADR 0056).
     async fn user_by_email(&self, email: &Email) -> Result<Option<UserRef>, StoreError>;
 
-    /// All organizations of a user, with the role in each. This query has no scope for the same reason.
-    async fn memberships_of(
-        &self,
-        user: UserId,
-    ) -> Result<Vec<(OrganizationId, OrganizationRole)>, StoreError>;
+    /// All memberships of a user, in the order of the organization names.
+    /// This query has no scope for the same reason.
+    async fn memberships_of(&self, user: UserId) -> Result<Vec<Membership>, StoreError>;
 
     /// The role of a user in the organization of `scope`, or `None` for a non-member.
     async fn membership(

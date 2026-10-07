@@ -14,6 +14,7 @@ pub const PROBLEM_CODES_EXTENSION: &str = "x-tada-problem-codes";
 /// The codes of each operation that needs a member caller.
 pub(crate) const AUTHENTICATED: &[ProblemCode] = &[
     ProblemCode::Unauthenticated,
+    ProblemCode::OrganizationRequired,
     ProblemCode::Unavailable,
     ProblemCode::Internal,
 ];

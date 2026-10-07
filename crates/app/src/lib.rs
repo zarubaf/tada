@@ -15,6 +15,7 @@ pub mod outbound;
 pub mod paging;
 pub mod problem;
 pub mod public_url;
+pub mod session;
 pub mod store;
 pub mod telegram;
 pub mod uploads;

@@ -10,6 +10,7 @@ mod heartbeat;
 mod identity;
 mod jobs;
 mod outbound;
+mod session;
 mod telegram;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;

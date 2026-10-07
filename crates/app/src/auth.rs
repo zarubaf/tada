@@ -7,12 +7,31 @@ use async_trait::async_trait;
 use crate::caller::MemberCaller;
 use crate::store::StoreError;
 
+/// The secret that a request shows to prove who sends it.
+#[derive(Clone, Copy)]
+pub enum Credential<'a> {
+    /// The value of the session cookie (ADR 0008).
+    Session(&'a str),
+    /// A personal API token (ADR 0039).
+    ApiToken(&'a str),
+}
+
+impl Debug for Credential<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // The secret never goes to a log (ADR 0035).
+        match self {
+            Self::Session(_) => f.write_str("Session(redacted)"),
+            Self::ApiToken(_) => f.write_str("ApiToken(redacted)"),
+        }
+    }
+}
+
 #[async_trait]
 pub trait Authenticator: Debug + Send + Sync {
-    /// Returns the member of the session `session_token`, or `Unauthenticated` if it is missing or invalid.
+    /// Returns the member of `credential`, or `Unauthenticated` if it is missing or invalid.
     async fn authenticate(
         &self,
-        session_token: Option<&str>,
+        credential: Option<Credential<'_>>,
     ) -> Result<MemberCaller, AuthenticationError>;
 }
 
@@ -20,6 +39,24 @@ pub trait Authenticator: Debug + Send + Sync {
 pub enum AuthenticationError {
     #[error("no valid session")]
     Unauthenticated,
+    /// The session has no organization, or the membership in it no longer exists (ADR 0056).
+    #[error("the session has no organization")]
+    OrganizationRequired,
     #[error(transparent)]
     Store(#[from] StoreError),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_hides_the_secret() {
+        for credential in [
+            Credential::Session("secret"),
+            Credential::ApiToken("secret"),
+        ] {
+            assert!(!format!("{credential:?}").contains("secret"));
+        }
+    }
 }

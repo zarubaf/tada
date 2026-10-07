@@ -1,6 +1,7 @@
 //! A PostgreSQL container with the tada schema, for tests (ADR 0003).
 
-use secrecy::SecretString;
+use jiff::Timestamp;
+use secrecy::{ExposeSecret, SecretString};
 use sqlx::AssertSqlSafe;
 use sqlx::types::Uuid;
 use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
@@ -91,6 +92,60 @@ impl TestDatabase {
         .unwrap();
         tx.commit().await.unwrap();
         UserId::from_uuid(id)
+    }
+
+    /// Starts a session of a user and returns the value of its session cookie.
+    ///
+    /// # Panics
+    ///
+    /// If the insert fails, for example because the user does not exist.
+    #[allow(clippy::unwrap_used)]
+    pub async fn sign_in(&self, user: UserId, organization: Option<OrganizationId>) -> String {
+        let mut conn = self.database.pool.acquire().await.unwrap();
+        let token =
+            crate::session::insert_session(&mut conn, user, organization, None, Timestamp::now())
+                .await
+                .unwrap();
+        token.expose_secret().to_owned()
+    }
+
+    /// Creates a new member of the organization `slug` with a session in that organization.
+    /// It creates the organization if the slug is free. The user has an invented name and email address.
+    /// Returns the organization, the user and the value of the session cookie.
+    ///
+    /// # Panics
+    ///
+    /// If an insert fails.
+    #[allow(clippy::unwrap_used)]
+    pub async fn member(
+        &self,
+        slug: &str,
+        role: OrganizationRole,
+    ) -> (OrganizationId, UserId, String) {
+        sqlx::query!(
+            "INSERT INTO organization (id, slug, name, created_at) VALUES ($1, $2, $2, now())
+             ON CONFLICT (slug) DO NOTHING",
+            Uuid::now_v7(),
+            slug,
+        )
+        .execute(&self.database.pool)
+        .await
+        .unwrap();
+        let organization = sqlx::query_scalar!("SELECT id FROM organization WHERE slug = $1", slug)
+            .fetch_one(&self.database.pool)
+            .await
+            .unwrap();
+        let organization = OrganizationId::from_uuid(organization);
+        let number = Uuid::now_v7().simple();
+        let user = self
+            .create_user(
+                &DisplayName::parse(&format!("Member {number}")).unwrap(),
+                &Email::parse(&format!("member-{number}@example.org")).unwrap(),
+            )
+            .await;
+        self.add_membership(organization, user, role).await;
+        let cookie = self.sign_in(user, Some(organization)).await;
+        (organization, user, cookie)
     }
 
     /// Fails if any text, `jsonb` or `bytea` column of any table contains `secret` (ADR 0008).

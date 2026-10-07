@@ -111,7 +111,7 @@ mod tests {
 
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
-    use tada_app::auth::AuthenticationError;
+    use tada_app::auth::{AuthenticationError, Credential};
     use tada_app::caller::MemberCaller;
     use tower::ServiceExt;
 
@@ -124,7 +124,7 @@ mod tests {
     impl Authenticator for NoCaller {
         async fn authenticate(
             &self,
-            _token: Option<&str>,
+            _credential: Option<Credential<'_>>,
         ) -> Result<MemberCaller, AuthenticationError> {
             Err(AuthenticationError::Unauthenticated)
         }

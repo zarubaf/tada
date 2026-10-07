@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use sqlx::types::Uuid;
-use tada_app::auth::{AuthenticationError, Authenticator};
+use tada_app::auth::{AuthenticationError, Authenticator, Credential};
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::store::StoreError;
@@ -25,7 +25,7 @@ pub struct DevAuthenticator;
 impl Authenticator for DevAuthenticator {
     async fn authenticate(
         &self,
-        _session_token: Option<&str>,
+        _credential: Option<Credential<'_>>,
     ) -> Result<MemberCaller, AuthenticationError> {
         Ok(MemberCaller::new(
             DEV_USER_ID,
@@ -85,7 +85,14 @@ mod tests {
         test.database.ensure_dev_organization().await.unwrap();
         test.database.ensure_dev_organization().await.unwrap();
 
-        let memberships = test.database.memberships_of(DEV_USER_ID).await.unwrap();
+        let memberships: Vec<_> = test
+            .database
+            .memberships_of(DEV_USER_ID)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|membership| (membership.organization_id, membership.role))
+            .collect();
         assert_eq!(
             memberships,
             vec![(DEV_ORGANIZATION_ID, OrganizationRole::Owner)]

@@ -21,6 +21,7 @@ retry = Erneut versuchen
 # $requestId: the ID that an operator needs to find the log lines (ADR 0035).
 problem-request-id = Fehler-ID: { $requestId }
 problem-unauthenticated = Sie sind nicht angemeldet.
+problem-organization-required = Wählen Sie eine Organisation.
 problem-forbidden = Sie haben keine Berechtigung für diese Aktion.
 problem-unavailable = Der Dienst ist im Moment nicht erreichbar. Versuchen Sie es in einigen Minuten erneut.
 problem-general-4xx = Die Anfrage ist ungültig.

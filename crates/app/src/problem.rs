@@ -5,6 +5,7 @@
 pub enum ProblemCode {
     MalformedRequest,
     Unauthenticated,
+    OrganizationRequired,
     Forbidden,
     NotFound,
     RecordVersionConflict,
@@ -18,9 +19,10 @@ pub enum ProblemCode {
 }
 
 impl ProblemCode {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::MalformedRequest,
         Self::Unauthenticated,
+        Self::OrganizationRequired,
         Self::Forbidden,
         Self::NotFound,
         Self::RecordVersionConflict,
@@ -37,6 +39,7 @@ impl ProblemCode {
         match self {
             Self::MalformedRequest => "malformed-request",
             Self::Unauthenticated => "unauthenticated",
+            Self::OrganizationRequired => "organization-required",
             Self::Forbidden => "forbidden",
             Self::NotFound => "not-found",
             Self::RecordVersionConflict => "record-version-conflict",
@@ -55,6 +58,9 @@ impl ProblemCode {
         match self {
             Self::MalformedRequest => "The body is not valid JSON or does not match the schema.",
             Self::Unauthenticated => "No valid session or token.",
+            Self::OrganizationRequired => {
+                "The session has no organization. The client lets the member choose one."
+            }
             Self::Forbidden => {
                 "The caller can see the record but lacks the permission for this action."
             }

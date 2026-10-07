@@ -5,7 +5,7 @@ use axum::extract::{FromRequest, FromRequestParts, Request};
 use axum::http::header;
 use axum::http::request::Parts;
 use serde::de::DeserializeOwned;
-use tada_app::auth::AuthenticationError;
+use tada_app::auth::{AuthenticationError, Credential};
 use tada_app::caller::{Channel, MemberCaller};
 use tada_app::problem::ProblemCode;
 
@@ -74,11 +74,15 @@ impl FromRequestParts<ApiState> for Caller {
     type Rejection = ApiError;
 
     async fn from_request_parts(parts: &mut Parts, state: &ApiState) -> Result<Self, ApiError> {
-        let token = session_token(parts);
-        match state.authenticator.authenticate(token).await {
+        // The REST API accepts only the session cookie (ADR 0039).
+        let credential = session_token(parts).map(Credential::Session);
+        match state.authenticator.authenticate(credential).await {
             Ok(caller) => Ok(Self(caller.with_request(Channel::Web, request_id()))),
             Err(AuthenticationError::Unauthenticated) => {
                 Err(ApiError::new(ProblemCode::Unauthenticated))
+            }
+            Err(AuthenticationError::OrganizationRequired) => {
+                Err(ApiError::new(ProblemCode::OrganizationRequired))
             }
             Err(AuthenticationError::Store(error)) => Err(ApiError::store(&error)),
         }

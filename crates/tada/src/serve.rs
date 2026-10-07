@@ -87,7 +87,7 @@ struct NoSignIn;
 impl Authenticator for NoSignIn {
     async fn authenticate(
         &self,
-        _session_token: Option<&str>,
+        _credential: Option<tada_app::auth::Credential<'_>>,
     ) -> Result<tada_app::caller::MemberCaller, tada_app::auth::AuthenticationError> {
         Err(tada_app::auth::AuthenticationError::Unauthenticated)
     }
