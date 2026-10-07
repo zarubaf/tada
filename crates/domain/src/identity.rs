@@ -1,8 +1,11 @@
-//! Direct identifiers of a person (ADR 0035): the email address and the display name.
+//! Identities: the organization with its slug and name, and the direct identifiers of a person
+//! (ADR 0035), the email address and the display name.
 //!
-//! `Debug` never shows the value, so a log line cannot leak it.
+//! `Debug` of a direct identifier never shows the value, so a log line cannot leak it.
 
 use std::fmt;
+
+use crate::name::{self, NameError};
 
 /// The longest email address that SMTP allows.
 const EMAIL_MAX_CHARS: usize = 254;
@@ -61,6 +64,57 @@ impl EventRole {
             "event-viewer" => Some(Self::EventViewer),
             _ => None,
         }
+    }
+}
+
+/// The longest slug of an organization.
+const SLUG_MAX_CHARS: usize = 32;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum OrganizationSlugError {
+    #[error("a slug has 2 to {SLUG_MAX_CHARS} characters")]
+    Length,
+    #[error("a slug has only lowercase letters a to z, digits and hyphens")]
+    Characters,
+}
+
+/// The unique key of an organization in the installation, for example `testwil`:
+/// 2 to 32 lowercase letters a to z, digits and hyphens.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OrganizationSlug(String);
+
+impl OrganizationSlug {
+    pub fn parse(value: &str) -> Result<Self, OrganizationSlugError> {
+        if !value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        {
+            return Err(OrganizationSlugError::Characters);
+        }
+        // All characters are ASCII now, so the byte length is the number of characters.
+        if !(2..=SLUG_MAX_CHARS).contains(&value.len()) {
+            return Err(OrganizationSlugError::Length);
+        }
+        Ok(Self(value.to_owned()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// The name of an organization, with the rules of `crate::name`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrganizationName(String);
+
+impl OrganizationName {
+    /// Removes the spaces at the ends, then checks the value.
+    pub fn parse(value: &str) -> Result<Self, NameError> {
+        name::parse(value).map(Self)
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -136,6 +190,15 @@ impl DisplayName {
             return Err(DisplayNameError::TooLong);
         }
         Ok(Self(name.to_owned()))
+    }
+
+    /// The local part of an address, for a person who has not given a name yet.
+    /// The person can change it later.
+    pub fn from_email(email: &Email) -> Self {
+        let local = email.as_str().split('@').next().unwrap_or_default();
+        // `Email` has a local part without control characters that starts with no space.
+        let name: String = local.chars().take(DISPLAY_NAME_MAX_CHARS).collect();
+        Self(name.trim_end().to_owned())
     }
 
     pub fn as_str(&self) -> &str {
@@ -228,5 +291,54 @@ mod tests {
     fn debug_of_a_display_name_hides_the_name() {
         let name = DisplayName::parse("Anna Muster").unwrap();
         assert!(!format!("{name:?}").contains("Anna"));
+    }
+
+    #[test]
+    fn accepts_slugs_of_two_to_32_lowercase_letters_digits_and_hyphens() {
+        for slug in ["tw", "testwil", "fly-in-2028", &"a".repeat(32)] {
+            assert_eq!(OrganizationSlug::parse(slug).unwrap().as_str(), slug);
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_slugs() {
+        assert_eq!(
+            OrganizationSlug::parse("t"),
+            Err(OrganizationSlugError::Length)
+        );
+        assert_eq!(
+            OrganizationSlug::parse(&"a".repeat(33)),
+            Err(OrganizationSlugError::Length)
+        );
+        for slug in ["Testwil", "test wil", "test_wil", "zürich", " testwil"] {
+            assert_eq!(
+                OrganizationSlug::parse(slug),
+                Err(OrganizationSlugError::Characters),
+                "{slug:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_organization_name_has_the_rules_of_a_name() {
+        assert_eq!(
+            OrganizationName::parse(" Open Day Testwil ")
+                .unwrap()
+                .as_str(),
+            "Open Day Testwil"
+        );
+        assert_eq!(OrganizationName::parse(""), Err(NameError::Empty));
+        assert_eq!(
+            OrganizationName::parse(&"a".repeat(201)),
+            Err(NameError::TooLong)
+        );
+    }
+
+    #[test]
+    fn the_display_name_of_an_address_is_its_local_part() {
+        let email = Email::parse("Anna.Muster@Example.org").unwrap();
+        assert_eq!(DisplayName::from_email(&email).as_str(), "anna.muster");
+        let long = Email::parse(&format!("{}@example.org", "a".repeat(150))).unwrap();
+        assert_eq!(DisplayName::from_email(&long).as_str(), "a".repeat(100));
     }
 }

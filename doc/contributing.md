@@ -19,8 +19,11 @@ The file [compose.yaml](../compose.yaml) is not a deployment ([ADR 0033](adr/003
 1. Run `mise run dev:up`. This generates the missing secrets into `.dev/secrets/`, starts the services and prepares the storage bucket.
 2. Run `mise run dev:serve`. This applies the migrations and starts the API on port 8080.
 3. Run `mise run dev:web` in a second terminal. It starts the web client and shows its address.
-4. Open Mailpit at `http://127.0.0.1:8025` to read the mail that tada sends.
-5. Run `mise run dev:down` to stop the services. The data volumes stay.
+4. Create an organization and invite its first owner:
+   `cargo run -p tada -- bootstrap --organization-slug testwil --organization-name "Open Day Testwil" --owner-email owner@example.org`.
+   Then run `cargo run -p tada -- worker` to send the invitation.
+5. Open Mailpit at `http://127.0.0.1:8025` to read the mail that tada sends.
+6. Run `mise run dev:down` to stop the services. The data volumes stay.
 
 Do not remove `.dev/secrets/` while the volumes exist. The database and the storage keep the first secrets.
 A debug build acts as the owner of a development organization for each request ([ADR 0053](adr/0053-development-authenticator.md)).

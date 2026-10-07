@@ -6,6 +6,7 @@ pub mod events;
 pub mod facts;
 pub mod identity;
 pub mod ids;
+pub mod name;
 
 mod version;
 

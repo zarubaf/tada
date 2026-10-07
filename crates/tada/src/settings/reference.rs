@@ -1,7 +1,8 @@
 //! The settings reference that `tada settings` prints. `doc/settings.md` is this output (ADR 0036).
 
 use super::{
-    Logging, MigrateSettings, Section, ServeSettings, Setting, TelegramSettings, WorkerSettings,
+    BootstrapSettings, Logging, MigrateSettings, Section, ServeSettings, Setting, TelegramSettings,
+    WorkerSettings,
 };
 
 /// The commands that read settings, and their settings.
@@ -11,6 +12,7 @@ fn commands() -> Vec<(&'static str, Vec<&'static Setting>)> {
         ("worker", <(Logging, WorkerSettings)>::settings()),
         ("telegram", <(Logging, TelegramSettings)>::settings()),
         ("migrate", <(Logging, MigrateSettings)>::settings()),
+        ("bootstrap", <(Logging, BootstrapSettings)>::settings()),
     ]
 }
 

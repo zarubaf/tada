@@ -184,6 +184,24 @@ impl TestDatabase {
         }
     }
 
+    /// The value of a query that returns one row with one column, for the assertions of tests
+    /// outside this crate.
+    ///
+    /// # Panics
+    ///
+    /// If the query fails or returns no row.
+    #[allow(clippy::unwrap_used)]
+    pub async fn scalar<T>(&self, sql: &str) -> T
+    where
+        T: for<'r> sqlx::Decode<'r, sqlx::Postgres> + sqlx::Type<sqlx::Postgres> + Send + Unpin,
+    {
+        // A test writes the query; it holds no input from outside.
+        sqlx::query_scalar(AssertSqlSafe(sql.to_owned()))
+            .fetch_one(&self.database.pool)
+            .await
+            .unwrap()
+    }
+
     /// Queues an outbound intent in a transaction that commits if `commit` is true and rolls back
     /// otherwise.
     ///

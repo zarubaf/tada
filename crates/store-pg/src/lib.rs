@@ -1,6 +1,7 @@
 //! PostgreSQL repositories, migrations, sessions and the job queue.
 
 mod audit;
+mod bootstrap;
 mod database;
 #[cfg(debug_assertions)]
 pub mod dev;

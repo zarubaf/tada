@@ -4,10 +4,9 @@ use std::fmt::Debug;
 
 use async_trait::async_trait;
 use tada_domain::RecordVersion;
-use tada_domain::events::{
-    Event, EventKey, EventKeyError, EventName, EventNameError, EventTimeZone,
-};
+use tada_domain::events::{Event, EventKey, EventKeyError, EventName, EventTimeZone};
 use tada_domain::ids::{self, EventId};
+use tada_domain::name::NameError;
 use uuid::Uuid;
 
 use crate::caller::{MemberCaller, OrgScope};
@@ -148,9 +147,9 @@ fn validate(
             errors.push(FieldError {
                 field: "name",
                 code: match error {
-                    EventNameError::Empty => "empty",
-                    EventNameError::TooLong => "too-long",
-                    EventNameError::ControlCharacter => "control-character",
+                    NameError::Empty => "empty",
+                    NameError::TooLong => "too-long",
+                    NameError::ControlCharacter => "control-character",
                 },
             });
         })
