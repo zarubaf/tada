@@ -5,7 +5,7 @@ use secrecy::{ExposeSecret, SecretString};
 use sqlx::AssertSqlSafe;
 use sqlx::types::Uuid;
 use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
-use tada_app::domain::ids::{OrganizationId, UserId};
+use tada_app::domain::ids::{InvitationId, OrganizationId, UserId};
 use tada_app::outbound::Purpose;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -219,6 +219,47 @@ impl TestDatabase {
         } else {
             tx.rollback().await.unwrap();
         }
+        id
+    }
+
+    /// Creates a pending invitation and queues its mail, as an invitation command does.
+    ///
+    /// # Panics
+    ///
+    /// If an insert fails.
+    #[allow(clippy::unwrap_used)]
+    pub async fn queue_invitation(
+        &self,
+        organization: OrganizationId,
+        email: &Email,
+        display_name: &DisplayName,
+        role: OrganizationRole,
+    ) -> InvitationId {
+        let id = InvitationId::from_uuid(Uuid::now_v7());
+        let mut tx = self.database.pool.begin().await.unwrap();
+        sqlx::query!(
+            "INSERT INTO invitation (id, organization_id, email, display_name, role, created_at)
+             VALUES ($1, $2, $3, $4, $5, now())",
+            id.as_uuid(),
+            organization.as_uuid(),
+            email.as_str(),
+            display_name.as_str(),
+            role.as_str(),
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        crate::outbound::queue_outbound(
+            &mut tx,
+            &Purpose::Invitation {
+                organization_id: organization,
+                invitation_id: id,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
         id
     }
 

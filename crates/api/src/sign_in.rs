@@ -6,7 +6,7 @@
 use axum::extract::State;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use tada_app::caller::OrganizationRole as Role;
 use tada_app::domain::ids::OrganizationId;
@@ -32,6 +32,8 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
         .routes(routes!(get_session))
         .routes(routes!(choose_organization))
         .routes(routes!(sign_out))
+        .routes(routes!(preview_invitation))
+        .routes(routes!(accept_invitation))
 }
 
 pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
@@ -51,6 +53,14 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
             ]),
         ),
         ("sign_out", codes(&[StoreError::CODES])),
+        (
+            "preview_invitation",
+            codes(&[JSON_BODY, SignInError::CODES]),
+        ),
+        (
+            "accept_invitation",
+            codes(&[JSON_BODY, SignInError::CODES, SessionError::CODES]),
+        ),
     ]
 }
 
@@ -195,24 +205,36 @@ async fn redeem_magic_link(
     headers: HeaderMap,
     Json(body): Json<RedeemMagicLinkRequest>,
 ) -> Result<Response, ApiError> {
-    let user_agent = headers
-        .get(header::USER_AGENT)
-        .and_then(|value| value.to_str().ok());
-    let token = match app::redeem_magic_link(
+    let result = app::redeem_magic_link(
         &body.token,
-        user_agent,
+        user_agent(&headers),
         state.sign_in.as_ref(),
         state.clock.as_ref(),
     )
-    .await
-    {
+    .await;
+    new_session(&state, result).await
+}
+
+/// The `User-Agent` of a request, for the list of sessions.
+fn user_agent(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::USER_AGENT)
+        .and_then(|value| value.to_str().ok())
+}
+
+/// The response to a sign-in that started a session: the session and the cookie of its token.
+async fn new_session(
+    state: &ApiState,
+    result: Result<SecretString, SignInError>,
+) -> Result<Response, ApiError> {
+    let token = match result {
         Ok(token) => token,
         Err(SignInError::Unauthenticated) => {
             return Err(ApiError::new(ProblemCode::Unauthenticated));
         }
         Err(SignInError::Store(error)) => return Err(ApiError::store(&error)),
     };
-    let info = read_session(&state, token.expose_secret()).await?;
+    let info = read_session(state, token.expose_secret()).await?;
     let mut response = uncached(info);
     response
         .headers_mut()
@@ -220,9 +242,9 @@ async fn redeem_magic_link(
     Ok(response)
 }
 
-/// A session in a response that no cache keeps: it names the user and the memberships.
-fn uncached(info: SessionInfo) -> Response {
-    let mut response = axum::Json(info).into_response();
+/// A response that no cache keeps, because it holds personal data, for example the session.
+fn uncached(body: impl Serialize) -> Response {
+    let mut response = axum::Json(body).into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
@@ -329,4 +351,89 @@ async fn sign_out(
         .headers_mut()
         .insert(header::SET_COOKIE, expired_session_cookie()?);
     Ok(response)
+}
+
+/// The input of the invitation routes. Like the token of a magic link, the token of an invitation
+/// reaches the server only in the body of a POST request (ADR 0008).
+#[derive(Deserialize, ToSchema)]
+pub struct InvitationTokenRequest {
+    /// The token from the fragment of the invitation link.
+    pub token: String,
+}
+
+impl std::fmt::Debug for InvitationTokenRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // The token never goes to a log (ADR 0035).
+        f.write_str("InvitationTokenRequest(redacted)")
+    }
+}
+
+/// What an invitation is for, before the invitee accepts it.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct InvitationPreview {
+    /// The name of the organization of the invitation.
+    pub organization_name: String,
+    /// The role that the invitation gives.
+    pub role: OrganizationRole,
+}
+
+impl From<app::InvitationPreview> for InvitationPreview {
+    fn from(preview: app::InvitationPreview) -> Self {
+        Self {
+            organization_name: preview.organization_name,
+            role: preview.role.into(),
+        }
+    }
+}
+
+/// Shows the organization and the role of an invitation. It does not use the token.
+#[utoipa::path(
+    post,
+    path = "/invitations/preview",
+    operation_id = "preview_invitation",
+    tag = "sign-in",
+    request_body = InvitationTokenRequest,
+    responses(
+        (status = OK, description = "What the invitation is for.", body = InvitationPreview),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn preview_invitation(
+    State(state): State<ApiState>,
+    Json(body): Json<InvitationTokenRequest>,
+) -> Result<Response, ApiError> {
+    match app::preview_invitation(&body.token, state.sign_in.as_ref(), state.clock.as_ref()).await {
+        Ok(preview) => Ok(uncached(InvitationPreview::from(preview))),
+        Err(SignInError::Unauthenticated) => Err(ApiError::new(ProblemCode::Unauthenticated)),
+        Err(SignInError::Store(error)) => Err(ApiError::store(&error)),
+    }
+}
+
+/// Accepts an invitation. The token works once. The response sets the cookie of a new session
+/// in the organization of the invitation.
+#[utoipa::path(
+    post,
+    path = "/invitations/accept",
+    operation_id = "accept_invitation",
+    tag = "sign-in",
+    request_body = InvitationTokenRequest,
+    responses(
+        (status = OK, description = "The new session. The `Set-Cookie` header holds its token.", body = SessionInfo),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn accept_invitation(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(body): Json<InvitationTokenRequest>,
+) -> Result<Response, ApiError> {
+    let result = app::accept_invitation(
+        &body.token,
+        user_agent(&headers),
+        request_id(),
+        state.sign_in.as_ref(),
+        state.clock.as_ref(),
+    )
+    .await;
+    new_session(&state, result).await
 }

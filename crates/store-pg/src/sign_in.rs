@@ -2,20 +2,26 @@
 //!
 //! Sign-in has no organization yet, so its queries are infrastructure queries without a scope
 //! (ADR 0039). A magic link belongs to a user, not to an organization.
+//! An invitation token names its organization, so the token gives the scope of an acceptance.
 
 use async_trait::async_trait;
 use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use secrecy::SecretString;
 use serde_json::json;
+use sqlx::PgConnection;
 use sqlx::types::{Json, Uuid};
-use tada_app::domain::identity::Email;
-use tada_app::domain::ids::{OrganizationId, UserId};
+use tada_app::audit::AuditEvent;
+use tada_app::domain::identity::{Email, OrganizationRole};
+use tada_app::domain::ids::{InvitationId, OrganizationId, UserId};
 use tada_app::outbound::SEND_JOB;
-use tada_app::sign_in::{SignInStore, initial_organization};
+use tada_app::sign_in::{InvitationPreview, SignInStore, accepted_role, initial_organization};
 use tada_app::store::StoreError;
 
 use crate::Database;
+use crate::audit::record;
 use crate::error::store_error;
+use crate::identity::organization_role;
 use crate::session::insert_session;
 use crate::token::hash_token;
 
@@ -106,12 +112,211 @@ impl SignInStore for Database {
         tx.commit().await.map_err(store_error)?;
         Ok(Some(session))
     }
+
+    async fn preview_invitation(
+        &self,
+        token: &str,
+        now: Timestamp,
+    ) -> Result<Option<InvitationPreview>, StoreError> {
+        let row = sqlx::query!(
+            "SELECT o.name AS organization_name, i.role
+             FROM invitation_token t
+             JOIN invitation i ON i.organization_id = t.organization_id AND i.id = t.invitation_id
+             JOIN organization o ON o.id = i.organization_id
+             WHERE t.token_hash = $1 AND t.expires_at > $2 AND i.status = 'pending'",
+            hash_token(token),
+            now.to_sqlx() as _,
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        row.map(|row| {
+            Ok(InvitationPreview {
+                organization_name: row.organization_name,
+                role: organization_role(&row.role)?,
+            })
+        })
+        .transpose()
+    }
+
+    async fn accept_invitation(
+        &self,
+        token: &str,
+        user_agent: Option<&str>,
+        request_id: Option<Uuid>,
+        now: Timestamp,
+    ) -> Result<Option<SecretString>, StoreError> {
+        let mut tx = self.pool.begin().await.map_err(store_error)?;
+        // The lock on the invitation serializes two acceptances, also with two different tokens of
+        // one invitation. The second one then sees the status `accepted` and finds nothing.
+        // The clock of the caller decides, not the database time (ADR 0038).
+        let invitation = sqlx::query!(
+            "SELECT i.id, i.organization_id, i.email, i.display_name, i.role
+             FROM invitation_token t
+             JOIN invitation i ON i.organization_id = t.organization_id AND i.id = t.invitation_id
+             WHERE t.token_hash = $1 AND t.expires_at > $2 AND i.status = 'pending'
+             FOR UPDATE OF i",
+            hash_token(token),
+            now.to_sqlx() as _,
+        )
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        let Some(invitation) = invitation else {
+            return Ok(None);
+        };
+        let organization_id = OrganizationId::from_uuid(invitation.organization_id);
+        let user_id =
+            find_or_create_user(&mut tx, &invitation.email, &invitation.display_name, now).await?;
+        add_membership(
+            &mut tx,
+            organization_id,
+            user_id,
+            organization_role(&invitation.role)?,
+            now,
+        )
+        .await?;
+
+        sqlx::query!(
+            "UPDATE invitation SET status = 'accepted', accepted_at = $3
+             WHERE organization_id = $1 AND id = $2",
+            organization_id.as_uuid(),
+            invitation.id,
+            now.to_sqlx() as _,
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        // All tokens of the invitation stop working, also a printed one (ADR 0036).
+        sqlx::query!(
+            "DELETE FROM invitation_token WHERE organization_id = $1 AND invitation_id = $2",
+            organization_id.as_uuid(),
+            invitation.id,
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+
+        let event = AuditEvent::by_invitee(
+            user_id,
+            organization_id,
+            InvitationId::from_uuid(invitation.id),
+            request_id,
+        );
+        record(&mut tx, &event).await.map_err(store_error)?;
+
+        // The session starts in the organization of the invitation (ADR 0056).
+        let session =
+            insert_session(&mut tx, user_id, Some(organization_id), user_agent, now).await?;
+        tx.commit().await.map_err(store_error)?;
+        Ok(Some(session))
+    }
+}
+
+/// The user of `email`, or a new user with `display_name` if no user has this address.
+/// One address belongs to one user (ADR 0056).
+///
+/// Known limit: two acceptances for one new address at the same moment both find no user.
+/// The UNIQUE email constraint then fails the second transaction, which rolls back with a 500.
+/// It never makes a second user for the address.
+async fn find_or_create_user(
+    conn: &mut PgConnection,
+    email: &str,
+    display_name: &str,
+    now: Timestamp,
+) -> Result<UserId, StoreError> {
+    let existing =
+        sqlx::query_scalar!("SELECT user_id FROM email_identity WHERE email = $1", email,)
+            .fetch_optional(&mut *conn)
+            .await
+            .map_err(store_error)?;
+    if let Some(id) = existing {
+        return Ok(UserId::from_uuid(id));
+    }
+    let id = Uuid::now_v7();
+    sqlx::query!(
+        "INSERT INTO app_user (id, display_name, created_at) VALUES ($1, $2, $3)",
+        id,
+        display_name,
+        now.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await
+    .map_err(store_error)?;
+    sqlx::query!(
+        "INSERT INTO email_identity (user_id, email, created_at) VALUES ($1, $2, $3)",
+        id,
+        email,
+        now.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await
+    .map_err(store_error)?;
+    Ok(UserId::from_uuid(id))
+}
+
+/// Adds the membership of an invitee, or raises the role of an existing one to `accepted_role`.
+///
+/// Known limit: two acceptances that add the first membership of one user in one organization at
+/// the same moment both find none. The primary key then fails the second transaction, which rolls
+/// back with a 500. It never makes a second membership.
+async fn add_membership(
+    conn: &mut PgConnection,
+    organization_id: OrganizationId,
+    user_id: UserId,
+    invited: OrganizationRole,
+    now: Timestamp,
+) -> Result<(), StoreError> {
+    let existing = sqlx::query_scalar!(
+        "SELECT role FROM organization_membership
+         WHERE organization_id = $1 AND user_id = $2
+         FOR UPDATE",
+        organization_id.as_uuid(),
+        user_id.as_uuid(),
+    )
+    .fetch_optional(&mut *conn)
+    .await
+    .map_err(store_error)?
+    .as_deref()
+    .map(organization_role)
+    .transpose()?;
+    let accepted = accepted_role(existing, invited);
+    match existing {
+        None => {
+            sqlx::query!(
+                "INSERT INTO organization_membership (organization_id, user_id, role, created_at)
+                 VALUES ($1, $2, $3, $4)",
+                organization_id.as_uuid(),
+                user_id.as_uuid(),
+                accepted.as_str(),
+                now.to_sqlx() as _,
+            )
+            .execute(&mut *conn)
+            .await
+            .map_err(store_error)?;
+        }
+        Some(existing) if existing != accepted => {
+            sqlx::query!(
+                "UPDATE organization_membership SET role = $3, version = version + 1
+                 WHERE organization_id = $1 AND user_id = $2",
+                organization_id.as_uuid(),
+                user_id.as_uuid(),
+                accepted.as_str(),
+            )
+            .execute(&mut *conn)
+            .await
+            .map_err(store_error)?;
+        }
+        Some(_) => {}
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use jiff::SignedDuration;
     use secrecy::ExposeSecret;
+    use tada_app::caller::MemberCaller;
     use tada_app::domain::identity::{DisplayName, OrganizationRole};
     use tada_app::outbound::{OutboundStore, Purpose};
     use tada_app::session::SessionStore;
@@ -288,5 +493,156 @@ mod tests {
         assert!(session.is_none());
         assert_eq!(count(&test, "magic_link").await, 0);
         assert_eq!(count(&test, "session").await, 0);
+    }
+
+    async fn invitation(test: &TestDatabase, organization: OrganizationId) -> InvitationId {
+        test.queue_invitation(
+            organization,
+            &email("berta@example.org"),
+            &DisplayName::parse("Berta Beispiel").unwrap(),
+            OrganizationRole::Member,
+        )
+        .await
+    }
+
+    async fn invitation_token(
+        test: &TestDatabase,
+        organization: OrganizationId,
+        invitation: InvitationId,
+        expires_at: Timestamp,
+    ) -> String {
+        let scope = MemberCaller::new(
+            UserId::from_uuid(Uuid::now_v7()),
+            organization,
+            OrganizationRole::Owner,
+        )
+        .scope();
+        test.database
+            .issue_invitation_token(scope, invitation, expires_at)
+            .await
+            .unwrap()
+            .expose_secret()
+            .to_owned()
+    }
+
+    #[tokio::test]
+    async fn an_invitation_that_is_not_pending_cannot_be_previewed_or_accepted() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let id = invitation(&test, testwil).await;
+        let token =
+            invitation_token(&test, testwil, id, now() + SignedDuration::from_mins(1)).await;
+        sqlx::query("UPDATE invitation SET status = 'revoked', revoked_at = now() WHERE id = $1")
+            .bind(id.as_uuid())
+            .execute(&test.database.pool)
+            .await
+            .unwrap();
+
+        let preview = test
+            .database
+            .preview_invitation(&token, now())
+            .await
+            .unwrap();
+        assert!(preview.is_none());
+        let session = test
+            .database
+            .accept_invitation(&token, None, None, now())
+            .await
+            .unwrap();
+        assert!(session.is_none());
+        assert_eq!(count(&test, "app_user").await, 0);
+        assert_eq!(count(&test, "session").await, 0);
+    }
+
+    #[tokio::test]
+    async fn an_invitation_token_is_valid_until_its_expiry_by_the_clock_of_the_caller() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let id = invitation(&test, testwil).await;
+        let token = invitation_token(&test, testwil, id, now()).await;
+
+        let before = now() - SignedDuration::from_secs(1);
+        let preview = test
+            .database
+            .preview_invitation(&token, before)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(preview.organization_name, "testwil");
+        assert_eq!(preview.role, OrganizationRole::Member);
+        assert!(
+            test.database
+                .preview_invitation(&token, now())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let session = test
+            .database
+            .accept_invitation(&token, None, None, now())
+            .await
+            .unwrap();
+        assert!(session.is_none());
+        assert_eq!(count(&test, "organization_membership").await, 0);
+    }
+
+    #[tokio::test]
+    async fn an_acceptance_deletes_all_tokens_of_the_invitation_and_starts_a_session() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let id = invitation(&test, testwil).await;
+        let expires_at = now() + SignedDuration::from_mins(1);
+        let mailed = invitation_token(&test, testwil, id, expires_at).await;
+        let printed = invitation_token(&test, testwil, id, expires_at).await;
+
+        let request = Uuid::now_v7();
+        let session = test
+            .database
+            .accept_invitation(&mailed, Some("Firefox"), Some(request), now())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(count(&test, "invitation_token").await, 0);
+        let row = test
+            .database
+            .find(session.expose_secret(), now())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.organization_id, Some(testwil));
+        assert_eq!(row.created_at, now());
+        let (status, accepted_at): (String, jiff_sqlx::Timestamp) =
+            sqlx::query_as("SELECT status, accepted_at FROM invitation WHERE id = $1")
+                .bind(id.as_uuid())
+                .fetch_one(&test.database.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            (status.as_str(), accepted_at.to_jiff()),
+            ("accepted", now())
+        );
+        let audit: (String, Uuid, Option<Uuid>) = sqlx::query_as(
+            "SELECT action, actor_id, request_id FROM audit_event WHERE record_id = $1",
+        )
+        .bind(id.as_uuid())
+        .fetch_one(&test.database.pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            audit,
+            (
+                "invitation.accept".into(),
+                row.user_id.as_uuid(),
+                Some(request)
+            )
+        );
+
+        let again = test
+            .database
+            .accept_invitation(&printed, None, None, now())
+            .await
+            .unwrap();
+        assert!(again.is_none(), "the printed token stopped working");
+        assert_eq!(count(&test, "session").await, 1);
     }
 }

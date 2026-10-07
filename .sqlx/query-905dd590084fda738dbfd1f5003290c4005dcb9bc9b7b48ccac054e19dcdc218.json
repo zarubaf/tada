@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.name AS organization_name, i.role\n             FROM invitation_token t\n             JOIN invitation i ON i.organization_id = t.organization_id AND i.id = t.invitation_id\n             JOIN organization o ON o.id = i.organization_id\n             WHERE t.token_hash = $1 AND t.expires_at > $2 AND i.status = 'pending'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "organization_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "organization",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "invitation",
+            "name": "role"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "905dd590084fda738dbfd1f5003290c4005dcb9bc9b7b48ccac054e19dcdc218"
+}
