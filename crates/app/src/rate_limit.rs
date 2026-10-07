@@ -1,0 +1,170 @@
+//! The rate limits of sign-in requests (ADR 0008, ADR 0056).
+//!
+//! A limit counts the requests of one subject in a fixed window of one hour.
+//! The counters are in the database, so that all `serve` processes share them (ADR 0025).
+
+use std::fmt;
+use std::net::IpAddr;
+
+use jiff::{SignedDuration, Timestamp};
+use tada_domain::identity::Email;
+
+/// The sign-in requests for one email address in one window.
+pub const SIGN_IN_PER_EMAIL: u32 = 5;
+/// The sign-in requests from one IP address in one window.
+pub const SIGN_IN_PER_IP: u32 = 30;
+/// The length of each window.
+pub const WINDOW: SignedDuration = SignedDuration::from_hours(1);
+
+/// What a limit counts. The store keeps only a keyed hash of it (ADR 0056).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum RateSubject<'a> {
+    Email(&'a Email),
+    Ip(IpAddr),
+}
+
+impl fmt::Debug for RateSubject<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // An IP address never goes to a log (ADR 0035).
+        match self {
+            Self::Email(_) => f.write_str("Email(redacted)"),
+            Self::Ip(_) => f.write_str("Ip(redacted)"),
+        }
+    }
+}
+
+/// The most requests of one subject in one window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RateLimit<'a> {
+    pub subject: RateSubject<'a>,
+    pub limit: u32,
+}
+
+/// The limits of a sign-in request.
+pub fn sign_in_limits(email: &Email, client_ip: IpAddr) -> [RateLimit<'_>; 2] {
+    [
+        RateLimit {
+            subject: RateSubject::Email(email),
+            limit: SIGN_IN_PER_EMAIL,
+        },
+        RateLimit {
+            subject: RateSubject::Ip(client_ip),
+            limit: SIGN_IN_PER_IP,
+        },
+    ]
+}
+
+/// The fixed window that contains a time. The windows start at multiples of `WINDOW` after the
+/// Unix epoch, so all processes count in the same windows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RateWindow {
+    pub start: Timestamp,
+}
+
+impl RateWindow {
+    pub fn containing(now: Timestamp) -> Self {
+        let length = WINDOW.as_secs();
+        let second = now.as_second();
+        let start =
+            Timestamp::from_second(second - second.rem_euclid(length)).unwrap_or(Timestamp::MIN);
+        Self { start }
+    }
+
+    pub fn end(self) -> Timestamp {
+        self.start.saturating_add(WINDOW).unwrap_or(Timestamp::MAX)
+    }
+}
+
+/// If a request may go on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RateDecision {
+    Allowed,
+    /// The client can try again after `retry_after`.
+    Limited {
+        retry_after: SignedDuration,
+    },
+}
+
+impl RateDecision {
+    /// The decision for the request number `count` of a subject in the window of `now`.
+    pub fn of(count: u32, limit: u32, now: Timestamp) -> Self {
+        if count <= limit {
+            Self::Allowed
+        } else {
+            Self::Limited {
+                retry_after: now.duration_until(RateWindow::containing(now).end()),
+            }
+        }
+    }
+
+    /// A request goes on only if each of its limits allows it.
+    #[must_use]
+    pub fn and(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Allowed, decision) | (decision, Self::Allowed) => decision,
+            (Self::Limited { retry_after: a }, Self::Limited { retry_after: b }) => Self::Limited {
+                retry_after: a.max(b),
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at(text: &str) -> Timestamp {
+        text.parse().unwrap()
+    }
+
+    #[test]
+    fn a_window_is_a_full_hour() {
+        let window = RateWindow::containing(at("2030-05-18T08:59:59Z"));
+        assert_eq!(window.start, at("2030-05-18T08:00:00Z"));
+        assert_eq!(window.end(), at("2030-05-18T09:00:00Z"));
+        assert_eq!(
+            RateWindow::containing(at("2030-05-18T09:00:00Z")).start,
+            at("2030-05-18T09:00:00Z")
+        );
+    }
+
+    #[test]
+    fn the_request_after_the_limit_waits_for_the_next_window() {
+        let now = at("2030-05-18T08:45:00Z");
+        assert_eq!(RateDecision::of(5, 5, now), RateDecision::Allowed);
+        assert_eq!(
+            RateDecision::of(6, 5, now),
+            RateDecision::Limited {
+                retry_after: SignedDuration::from_mins(15)
+            }
+        );
+    }
+
+    #[test]
+    fn a_limited_decision_wins_with_the_longest_wait() {
+        let short = RateDecision::Limited {
+            retry_after: SignedDuration::from_mins(1),
+        };
+        let long = RateDecision::Limited {
+            retry_after: SignedDuration::from_mins(2),
+        };
+        assert_eq!(RateDecision::Allowed.and(short), short);
+        assert_eq!(short.and(RateDecision::Allowed), short);
+        assert_eq!(short.and(long), long);
+        assert_eq!(
+            RateDecision::Allowed.and(RateDecision::Allowed),
+            RateDecision::Allowed
+        );
+    }
+
+    #[test]
+    fn the_debug_text_holds_no_address() {
+        let email = Email::parse("anna@example.org").unwrap();
+        let text = format!(
+            "{:?}",
+            sign_in_limits(&email, "203.0.113.7".parse().unwrap())
+        );
+        assert!(!text.contains("anna"), "{text}");
+        assert!(!text.contains("203.0.113.7"), "{text}");
+    }
+}

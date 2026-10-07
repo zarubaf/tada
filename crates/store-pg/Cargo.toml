@@ -16,6 +16,7 @@ tada-app.workspace = true
 async-trait.workspace = true
 base64.workspace = true
 getrandom.workspace = true
+hmac.workspace = true
 jiff.workspace = true
 jiff-sqlx.workspace = true
 secrecy.workspace = true

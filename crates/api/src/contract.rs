@@ -24,6 +24,8 @@ pub(crate) const JSON_BODY: &[ProblemCode] = &[
     ProblemCode::UnsupportedMediaType,
     ProblemCode::PayloadTooLarge,
 ];
+/// The codes of each state-changing operation: the `Origin` check (ADR 0008).
+const STATE_CHANGE: &[ProblemCode] = &[ProblemCode::Forbidden];
 /// The codes of each operation with query parameters.
 pub(crate) const QUERY: &[ProblemCode] = &[ProblemCode::MalformedRequest];
 /// The codes of each operation with path parameters.
@@ -53,18 +55,23 @@ pub(crate) fn complete(
     document.info = info;
 
     for item in document.paths.paths.values_mut() {
+        // The `Origin` check rejects a state change before its handler runs (ADR 0008).
         let operations = [
-            &mut item.get,
-            &mut item.put,
-            &mut item.post,
-            &mut item.delete,
-            &mut item.patch,
+            (&mut item.get, &[][..]),
+            (&mut item.put, STATE_CHANGE),
+            (&mut item.post, STATE_CHANGE),
+            (&mut item.delete, STATE_CHANGE),
+            (&mut item.patch, STATE_CHANGE),
         ];
-        for operation in operations.into_iter().flatten() {
+        for (operation, method_codes) in operations {
+            let Some(operation) = operation else {
+                continue;
+            };
             let id = operation.operation_id.as_deref().unwrap_or_default();
-            let Some(codes) = problem_codes.get(id) else {
+            let Some(handler_codes) = problem_codes.get(id) else {
                 panic!("the operation {id} has no problem codes");
             };
+            let codes = codes(&[handler_codes, method_codes]);
             let names: Vec<&str> = codes.iter().map(|code| code.as_str()).collect();
             let extensions = operation.extensions.get_or_insert_with(Extensions::default);
             extensions.insert(PROBLEM_CODES_EXTENSION.to_owned(), names.into());
@@ -145,6 +152,27 @@ mod tests {
             crate::problem_codes().len(),
             "a code list without an operation"
         );
+    }
+
+    #[test]
+    fn each_state_change_lists_the_origin_check() {
+        let document = crate::openapi();
+        let codes = |operation: &utoipa::openapi::path::Operation| {
+            operation.extensions.as_ref().unwrap()[PROBLEM_CODES_EXTENSION].clone()
+        };
+        for item in document.paths.paths.values() {
+            if let Some(post) = &item.post {
+                assert!(
+                    codes(post)
+                        .as_array()
+                        .unwrap()
+                        .contains(&"forbidden".into())
+                );
+            }
+        }
+        let events = &document.paths.paths["/api/v1/events"];
+        let list = codes(events.get.as_ref().unwrap());
+        assert!(!list.as_array().unwrap().contains(&"forbidden".into()));
     }
 
     #[test]

@@ -13,7 +13,7 @@ use tada_app::domain::ids::OrganizationId;
 use tada_app::identity::Membership;
 use tada_app::problem::ProblemCode;
 use tada_app::session::{self, ChooseOrganizationError, SessionError};
-use tada_app::sign_in::{self as app, SignInError};
+use tada_app::sign_in::{self as app, RequestSignInError, SignInError};
 use tada_app::store::StoreError;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -21,6 +21,7 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::ApiState;
+use crate::client_ip::ClientIp;
 use crate::contract::{JSON_BODY, codes};
 use crate::extract::{Json, SessionToken, expired_session_cookie, request_id, session_cookie};
 use crate::problem::{ApiError, Problem};
@@ -38,7 +39,10 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
 
 pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
     vec![
-        ("request_sign_in", codes(&[JSON_BODY, StoreError::CODES])),
+        (
+            "request_sign_in",
+            codes(&[JSON_BODY, RequestSignInError::CODES]),
+        ),
         (
             "redeem_magic_link",
             codes(&[JSON_BODY, SignInError::CODES, SessionError::CODES]),
@@ -151,7 +155,8 @@ impl std::fmt::Debug for SignInRequest {
 }
 
 /// Asks for a magic link. The answer is the same for each address (ADR 0008).
-/// Only a member gets a mail.
+/// Only a member gets a mail. Too many requests for one address or from one client get
+/// `rate-limited` with `Retry-After` (ADR 0056).
 #[utoipa::path(
     post,
     path = "/sign-in/requests",
@@ -165,12 +170,24 @@ impl std::fmt::Debug for SignInRequest {
 )]
 async fn request_sign_in(
     State(state): State<ApiState>,
+    ClientIp(client_ip): ClientIp,
     Json(body): Json<SignInRequest>,
 ) -> Result<StatusCode, ApiError> {
-    app::request_magic_link(&body.email, request_id(), state.sign_in.as_ref())
-        .await
-        .map_err(|error| ApiError::store(&error))?;
-    Ok(StatusCode::ACCEPTED)
+    match app::request_magic_link(
+        &body.email,
+        client_ip,
+        request_id(),
+        state.sign_in_requests.as_ref(),
+        state.clock.as_ref(),
+    )
+    .await
+    {
+        Ok(()) => Ok(StatusCode::ACCEPTED),
+        Err(RequestSignInError::RateLimited { retry_after }) => {
+            Err(ApiError::rate_limited(retry_after))
+        }
+        Err(RequestSignInError::Store(error)) => Err(ApiError::store(&error)),
+    }
 }
 
 /// The input of a sign-in with a magic link.

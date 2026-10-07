@@ -3,16 +3,17 @@
 // The helpers of this test file are not `#[test]` functions, so clippy.toml does not cover them.
 #![allow(clippy::unwrap_used)]
 
+mod support;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::body::Body;
-use axum::http::{Request, Response, StatusCode, header};
+use axum::http::{Method, Request, Response, StatusCode, header};
 use jiff::{SignedDuration, Timestamp};
 use serde_json::{Value, json};
 use tada::bootstrap::{BootstrapCommand, execute};
 use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
-use tada_api::ApiState;
 use tada_app::clock::Clock;
 use tada_app::domain::identity::{
     DisplayName, Email, OrganizationName, OrganizationRole, OrganizationSlug,
@@ -20,7 +21,6 @@ use tada_app::domain::identity::{
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::outbound::SendOutbound;
-use tada_app::public_url::PublicUrl;
 use tada_app::session::SessionAuthenticator;
 use tada_store_pg::testing::TestDatabase;
 use tower::ServiceExt;
@@ -63,23 +63,13 @@ impl App {
         let clock = Arc::new(TestClock(Mutex::new(
             "2030-05-18T08:00:00Z".parse().unwrap(),
         )));
+        let authenticator = Arc::new(SessionAuthenticator::new(
+            database.clone(),
+            database.clone(),
+            clock.clone(),
+        ));
         let router = tada_api::router(
-            ApiState {
-                dependencies: Vec::new(),
-                authenticator: Arc::new(SessionAuthenticator::new(
-                    database.clone(),
-                    database.clone(),
-                    clock.clone(),
-                )),
-                events: database.clone(),
-                telegram: database.clone(),
-                identity: database.clone(),
-                sessions: database.clone(),
-                sign_in: database.clone(),
-                clock: clock.clone(),
-                trusted_proxies: Vec::new(),
-                event_members: database.clone(),
-            },
+            support::api_state(&test, authenticator, clock.clone()),
             None,
         );
         let mailer = Arc::new(MemoryMailer::new());
@@ -88,7 +78,7 @@ impl App {
             mailer.clone(),
             Arc::new(FluentMailTexts::new().unwrap()),
             clock.clone(),
-            PublicUrl::parse("https://tada.example.org").unwrap(),
+            support::public_url(),
         );
         Self {
             router,
@@ -118,7 +108,7 @@ impl App {
     }
 
     async fn post(&self, path: &str, body: &Value) -> (Response<Body>, Value) {
-        let request = Request::post(path)
+        let request = support::request(Method::POST, path)
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::USER_AGENT, "Firefox");
         self.send(request.body(Body::from(body.to_string())).unwrap())
@@ -126,7 +116,8 @@ impl App {
     }
 
     async fn get(&self, path: &str, cookie: &str) -> (Response<Body>, Value) {
-        let request = Request::get(path).header(header::COOKIE, format!("{COOKIE}={cookie}"));
+        let request = support::request(Method::GET, path)
+            .header(header::COOKIE, format!("{COOKIE}={cookie}"));
         self.send(request.body(Body::empty()).unwrap()).await
     }
 
@@ -211,7 +202,7 @@ async fn the_first_owner_previews_and_accepts_the_bootstrap_invitation() {
     let app = App::start().await;
     let outcome = execute(
         &app.test.database,
-        &PublicUrl::parse("https://tada.example.org").unwrap(),
+        &support::public_url(),
         app.clock.as_ref(),
         BootstrapCommand {
             organization_slug: OrganizationSlug::parse("testwil").unwrap(),

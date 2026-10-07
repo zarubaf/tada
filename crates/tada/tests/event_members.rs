@@ -3,13 +3,14 @@
 // The helpers of this test file are not `#[test]` functions, so clippy.toml does not cover them.
 #![allow(clippy::unwrap_used)]
 
+mod support;
+
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::http::{Request, StatusCode, header};
+use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
 use tada_adapters::clock::SystemClock;
-use tada_api::ApiState;
 use tada_app::caller::OrganizationRole;
 use tada_app::domain::ids::UserId;
 use tada_app::session::SessionAuthenticator;
@@ -26,26 +27,10 @@ struct Api {
 impl Api {
     async fn start() -> Self {
         let test = TestDatabase::start().await;
-        let db = test.database.clone();
-        let router = tada_api::router(
-            ApiState {
-                dependencies: vec![Arc::new(db.clone())],
-                authenticator: Arc::new(SessionAuthenticator::new(
-                    Arc::new(db.clone()),
-                    Arc::new(db.clone()),
-                    Arc::new(SystemClock),
-                )),
-                events: Arc::new(db.clone()),
-                telegram: Arc::new(db.clone()),
-                identity: Arc::new(db.clone()),
-                sessions: Arc::new(db.clone()),
-                sign_in: Arc::new(db.clone()),
-                clock: Arc::new(SystemClock),
-                trusted_proxies: Vec::new(),
-                event_members: Arc::new(db),
-            },
-            None,
-        );
+        let db = Arc::new(test.database.clone());
+        let clock = Arc::new(SystemClock);
+        let authenticator = Arc::new(SessionAuthenticator::new(db.clone(), db, clock.clone()));
+        let router = tada_api::router(support::api_state(&test, authenticator, clock), None);
         Self { router, test }
     }
 
@@ -81,11 +66,13 @@ impl Api {
     }
 
     async fn get(&self, cookie: &str, path: &str) -> (StatusCode, Value) {
-        self.send(cookie, Request::get(path), None).await
+        self.send(cookie, support::request(Method::GET, path), None)
+            .await
     }
 
     async fn post(&self, cookie: &str, path: &str, body: &Value) -> (StatusCode, Value) {
-        self.send(cookie, Request::post(path), Some(body)).await
+        self.send(cookie, support::request(Method::POST, path), Some(body))
+            .await
     }
 
     /// An owner creates an event and returns its ID.
