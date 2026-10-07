@@ -173,3 +173,13 @@ impl TestDatabase {
         .unwrap();
     }
 }
+
+/// The SQLSTATE of a database error, for example `23514` for a violated CHECK.
+/// Empty if the error does not come from the database.
+pub fn sqlstate(error: &sqlx::Error) -> String {
+    error
+        .as_database_error()
+        .and_then(|error| error.code())
+        .unwrap_or_default()
+        .into_owned()
+}

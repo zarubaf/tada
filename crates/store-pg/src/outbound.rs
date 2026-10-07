@@ -211,7 +211,7 @@ mod tests {
     use tada_app::outbound::{OutboundStore, Outcome, Purpose, SEND_JOB};
 
     use super::*;
-    use crate::testing::TestDatabase;
+    use crate::testing::{TestDatabase, sqlstate};
 
     fn email(text: &str) -> Email {
         Email::parse(text).unwrap()
@@ -289,15 +289,6 @@ mod tests {
             .fetch_one(&test.database.pool)
             .await
             .unwrap()
-    }
-
-    /// The SQLSTATE of a database error.
-    fn sqlstate(error: &sqlx::Error) -> String {
-        error
-            .as_database_error()
-            .and_then(|error| error.code())
-            .unwrap_or_default()
-            .into_owned()
     }
 
     #[tokio::test]
