@@ -103,7 +103,7 @@ mod tests {
     use tada_app::caller::MemberCaller;
 
     use super::*;
-    use crate::testing::TestDatabase;
+    use crate::testing::{TestDatabase, sqlstate};
 
     fn name(text: &str) -> DisplayName {
         DisplayName::parse(text).unwrap()
@@ -325,5 +325,28 @@ mod tests {
         .execute(&test.database.pool)
         .await;
         assert!(rejected.is_err());
+    }
+
+    #[tokio::test]
+    async fn an_email_identity_holds_a_normalized_address() {
+        let test = TestDatabase::start().await;
+        let user_id = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO app_user (id, display_name, created_at) VALUES ($1, 'Anna Muster', now())",
+        )
+        .bind(user_id)
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
+        for address in ["Anna@Example.org", " anna@example.org", "anna@example.org "] {
+            let rejected = sqlx::query(
+                "INSERT INTO email_identity (user_id, email, created_at) VALUES ($1, $2, now())",
+            )
+            .bind(user_id)
+            .bind(address)
+            .execute(&test.database.pool)
+            .await;
+            assert_eq!(sqlstate(&rejected.unwrap_err()), "23514", "{address:?}");
+        }
     }
 }

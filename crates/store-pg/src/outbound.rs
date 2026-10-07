@@ -466,6 +466,79 @@ mod tests {
         );
     }
 
+    /// Inserts an invitation of `organization`. `accepted` and `revoked` set the timestamps.
+    async fn insert_invitation(
+        test: &TestDatabase,
+        organization: OrganizationId,
+        email: &str,
+        status: &str,
+        accepted: bool,
+        revoked: bool,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT INTO invitation
+                 (id, organization_id, email, display_name, role, status, created_at,
+                  accepted_at, revoked_at)
+             VALUES ($1, $2, $3, 'Berta Beispiel', 'member', $4, now(),
+                     CASE WHEN $5 THEN now() END, CASE WHEN $6 THEN now() END)",
+        )
+        .bind(Uuid::now_v7())
+        .bind(organization.as_uuid())
+        .bind(email)
+        .bind(status)
+        .bind(accepted)
+        .bind(revoked)
+        .execute(&test.database.pool)
+        .await
+        .map(drop)
+    }
+
+    #[tokio::test]
+    async fn an_invitation_has_the_timestamp_of_its_status_only() {
+        let test = TestDatabase::start().await;
+        let organization = test.create_organization("testwil").await;
+        let address = "berta@example.org";
+        for (status, accepted, revoked) in [
+            ("pending", false, false),
+            ("accepted", true, false),
+            ("revoked", false, true),
+        ] {
+            insert_invitation(&test, organization, address, status, accepted, revoked)
+                .await
+                .unwrap();
+        }
+        for (status, accepted, revoked) in [
+            ("accepted", false, false),
+            ("revoked", false, false),
+            ("pending", true, false),
+            ("pending", false, true),
+            ("accepted", true, true),
+        ] {
+            let rejected =
+                insert_invitation(&test, organization, address, status, accepted, revoked).await;
+            assert_eq!(
+                sqlstate(&rejected.unwrap_err()),
+                "23514",
+                "{status} accepted={accepted} revoked={revoked}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn an_invitation_holds_a_normalized_address() {
+        let test = TestDatabase::start().await;
+        let organization = test.create_organization("testwil").await;
+        for address in [
+            "Berta@Example.org",
+            " berta@example.org",
+            "berta@example.org ",
+        ] {
+            let rejected =
+                insert_invitation(&test, organization, address, "pending", false, false).await;
+            assert_eq!(sqlstate(&rejected.unwrap_err()), "23514", "{address:?}");
+        }
+    }
+
     #[tokio::test]
     async fn finds_a_secret_in_any_text_column() {
         let test = TestDatabase::start().await;
