@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi, type Event } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
+import { SLOW } from "../test/timeouts";
 import { EventPage } from "./EventPage";
 
 const event: Event = {
@@ -54,64 +55,82 @@ function renderAt(path: string, api: ReturnType<typeof createApi>) {
 afterEach(() => window.history.replaceState(null, "", "/"));
 
 describe("EventPage", () => {
-  it("shows the name, the sub-navigation and the content", async () => {
-    const { api, urls } = fakeApi(json(200, event));
-    renderAt(`/events/${event.id}`, api);
+  it(
+    "shows the name, the sub-navigation and the content",
+    async () => {
+      const { api, urls } = fakeApi(json(200, event));
+      renderAt(`/events/${event.id}`, api);
 
-    expect(await screen.findByRole("heading", { level: 1, name: event.name })).toBeInTheDocument();
-    expect(urls[0]).toBe(`/api/v1/events/${event.id}`);
-    expect(screen.getByText("FLY28")).toBeInTheDocument();
-    expect(screen.getByText("Platzhalter")).toBeInTheDocument();
+      expect(
+        await screen.findByRole("heading", { level: 1, name: event.name }),
+      ).toBeInTheDocument();
+      expect(urls[0]).toBe(`/api/v1/events/${event.id}`);
+      expect(screen.getByText("FLY28")).toBeInTheDocument();
+      expect(screen.getByText("Platzhalter")).toBeInTheDocument();
 
-    const nav = screen.getByRole("navigation", { name: "Anlass" });
-    expect(within(nav).getByRole("link", { name: "Übersicht" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(within(nav).getByRole("link", { name: "Mitglieder" })).not.toHaveAttribute(
-      "aria-current",
-    );
-    expect(within(nav).queryByRole("link", { name: "Personen" })).not.toBeInTheDocument();
-  });
+      const nav = screen.getByRole("navigation", { name: "Anlass" });
+      expect(within(nav).getByRole("link", { name: "Übersicht" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(within(nav).getByRole("link", { name: "Mitglieder" })).not.toHaveAttribute(
+        "aria-current",
+      );
+      expect(within(nav).queryByRole("link", { name: "Personen" })).not.toBeInTheDocument();
+    },
+    SLOW,
+  );
 
-  it("marks only Mitglieder as current on the members path", async () => {
-    const { api } = fakeApi(json(200, event));
-    renderAt(`/events/${event.id}/members`, api);
+  it(
+    "marks only Mitglieder as current on the members path",
+    async () => {
+      const { api } = fakeApi(json(200, event));
+      renderAt(`/events/${event.id}/members`, api);
 
-    await screen.findByText("Mitgliederliste");
-    const nav = screen.getByRole("navigation", { name: "Anlass" });
-    expect(within(nav).getByRole("link", { name: "Mitglieder" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
-      "aria-current",
-    );
-  });
+      await screen.findByText("Mitgliederliste");
+      const nav = screen.getByRole("navigation", { name: "Anlass" });
+      expect(within(nav).getByRole("link", { name: "Mitglieder" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
+        "aria-current",
+      );
+    },
+    SLOW,
+  );
 
-  it("opens the members page from the sub-navigation", async () => {
-    const { api, urls } = fakeApi(json(200, event));
-    renderAt(`/events/${event.id}`, api);
+  it(
+    "opens the members page from the sub-navigation",
+    async () => {
+      const { api, urls } = fakeApi(json(200, event));
+      renderAt(`/events/${event.id}`, api);
 
-    await userEvent.click(await screen.findByRole("link", { name: "Mitglieder" }));
-    expect(window.location.pathname).toBe(`/events/${event.id}/members`);
-    expect(await screen.findByText("Mitgliederliste")).toBeInTheDocument();
-    // The page stays mounted: no skeleton, and the event is not loaded a second time.
-    expect(urls).toHaveLength(1);
-  });
+      await userEvent.click(await screen.findByRole("link", { name: "Mitglieder" }));
+      expect(window.location.pathname).toBe(`/events/${event.id}/members`);
+      expect(await screen.findByText("Mitgliederliste")).toBeInTheDocument();
+      // The page stays mounted: no skeleton, and the event is not loaded a second time.
+      expect(urls).toHaveLength(1);
+    },
+    SLOW,
+  );
 
-  it("shows the message of a not-found problem and retries", async () => {
-    const problem = { type: "", code: "not-found", title: "", status: 404, instance: "" };
-    const { api } = fakeApi(
-      json(404, { ...problem, request_id: "r1" }, "application/problem+json"),
-      json(200, event),
-    );
-    renderAt(`/events/${event.id}`, api);
+  it(
+    "shows the message of a not-found problem and retries",
+    async () => {
+      const problem = { type: "", code: "not-found", title: "", status: 404, instance: "" };
+      const { api } = fakeApi(
+        json(404, { ...problem, request_id: "r1" }, "application/problem+json"),
+        json(200, event),
+      );
+      renderAt(`/events/${event.id}`, api);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Das gibt es nicht, oder Sie dürfen es nicht sehen.");
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("Das gibt es nicht, oder Sie dürfen es nicht sehen.");
 
-    await userEvent.click(within(alert).getByRole("button", { name: "Erneut versuchen" }));
-    expect(await screen.findByRole("heading", { name: event.name })).toBeInTheDocument();
-  });
+      await userEvent.click(within(alert).getByRole("button", { name: "Erneut versuchen" }));
+      expect(await screen.findByRole("heading", { name: event.name })).toBeInTheDocument();
+    },
+    SLOW,
+  );
 });

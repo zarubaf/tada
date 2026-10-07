@@ -127,7 +127,6 @@ event-overview-placeholder = Hier erscheint die Übersicht des Anlasses.
 event-loading = Anlass wird geladen
 problem-not-found = Das gibt es nicht, oder Sie dürfen es nicht sehen.
 problem-validation-failed = Die Eingabe ist ungültig.
-problem-rate-limited = Zu viele Anfragen. Versuchen Sie es in einigen Minuten erneut.
 problem-record-version-conflict = Jemand hat diesen Eintrag inzwischen geändert. Versuchen Sie es erneut.
 problem-invalid-transition = Diese Änderung ist im aktuellen Zustand nicht möglich.
 

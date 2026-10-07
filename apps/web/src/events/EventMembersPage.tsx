@@ -6,6 +6,7 @@ import {
   type Problem,
   problemMessage,
 } from "../api/client";
+import { failureOf } from "../api/failure";
 import { t } from "../i18n";
 import { useParams } from "../router/Router";
 import { useSession } from "../session/SessionProvider";
@@ -36,14 +37,15 @@ type State =
 const roleOptions = EVENT_ROLES.map((role) => ({ id: role, label: t(`role-${role}`) }));
 
 /** The message of a failed action. Two codes have a text that is true only on this page. */
-function actionMessage(error: Problem | undefined): string {
+function actionMessage(result: { error?: Problem | undefined; response?: Response }): string {
+  const { error } = result;
   if (error?.code === "invalid-transition") {
     return t("event-members-last-manager");
   }
   if (error?.code === "record-version-conflict") {
     return t("event-members-conflict");
   }
-  return problemMessage(error);
+  return failureOf(result).message;
 }
 
 /**
@@ -122,8 +124,9 @@ export function EventMembersPage({ api }: { api: Api }) {
     items.map((item) => (item.user_id === changed.user_id ? changed : item));
 
   /** A failed action: a version conflict also loads the list again. */
-  const fail = (error: Problem | undefined) => {
-    setFailure(actionMessage(error));
+  const fail = (result: { error?: Problem | undefined; response?: Response }) => {
+    const { error } = result;
+    setFailure(actionMessage(result));
     if (error?.code === "record-version-conflict") {
       void load();
     }
@@ -136,7 +139,7 @@ export function EventMembersPage({ api }: { api: Api }) {
     setFailure(undefined);
     setBusy(true);
     try {
-      const { data, error } = await api.POST(
+      const { data, error, response } = await api.POST(
         "/api/v1/events/{event_id}/memberships/{user_id}/change-role",
         {
           params: { path: { event_id: eventId, user_id: item.user_id } },
@@ -150,10 +153,10 @@ export function EventMembersPage({ api }: { api: Api }) {
             : current,
         );
       } else {
-        fail(error);
+        fail({ error, response });
       }
     } catch {
-      fail(undefined);
+      fail({});
     }
     setBusy(false);
   };
@@ -180,10 +183,10 @@ export function EventMembersPage({ api }: { api: Api }) {
             : current,
         );
       } else {
-        fail(error);
+        fail({ error, response });
       }
     } catch {
-      fail(undefined);
+      fail({});
     }
     setBusy(false);
     setRemoving(undefined);
@@ -307,7 +310,7 @@ function AddMember({
   organizationFailure: Failure | undefined;
   onRetry: () => void;
   onAdded: (added: EventMembership) => void;
-  onFailed: (error: Problem | undefined) => void;
+  onFailed: (result: { error?: Problem | undefined; response?: Response }) => void;
   onStart: () => void;
 }) {
   const [userId, setUserId] = useState<string>();
@@ -347,7 +350,7 @@ function AddMember({
     onStart();
     setPending(true);
     try {
-      const { data, error } = await api.POST("/api/v1/events/{event_id}/memberships", {
+      const { data, error, response } = await api.POST("/api/v1/events/{event_id}/memberships", {
         params: { path: { event_id: eventId } },
         body: { user_id: userId, event_role: role },
       });
@@ -356,10 +359,10 @@ function AddMember({
         onAdded(data);
         setAdded((count) => count + 1);
       } else {
-        onFailed(error);
+        onFailed({ error, response });
       }
     } catch {
-      onFailed(undefined);
+      onFailed({});
     }
     setPending(false);
   };

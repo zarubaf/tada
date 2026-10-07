@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { type Api, type Problem, problemMessage } from "../api/client";
+import { failureOf } from "../api/failure";
 import { uuidv7 } from "../api/uuid";
 import { hasMessage, t } from "../i18n";
 import { useNavigate } from "../router/Router";
@@ -75,7 +76,7 @@ export function CreateEventForm({ api }: { api: Api }) {
 
     setBusy(true);
     try {
-      const { data, error } = await api.POST("/api/v1/events", {
+      const { data, error, response } = await api.POST("/api/v1/events", {
         body: { id, key: normalizedKey, name: name.trim(), time_zone: timeZone.trim() },
       });
       if (data) {
@@ -85,7 +86,7 @@ export function CreateEventForm({ api }: { api: Api }) {
       const invalid = error?.code === "validation-failed" ? fieldErrors(error) : {};
       setErrors(invalid);
       if (Object.keys(invalid).length === 0) {
-        setFailure(problemMessage(error));
+        setFailure(failureOf({ error, response }).message);
       } else {
         setFailedSubmits((count) => count + 1);
       }

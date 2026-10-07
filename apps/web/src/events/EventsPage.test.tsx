@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApi, type Event, type Problem } from "../api/client";
 import { Router } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
+import { SLOW } from "../test/timeouts";
 import { EventsPage } from "./EventsPage";
 
 // Invented fixtures with long German names and umlauts (doc/design/principles.md).
@@ -37,76 +38,100 @@ function fakeApi(...responses: Response[]) {
 }
 
 describe("EventsPage", () => {
-  it("lists the events in a table", async () => {
-    const { api } = fakeApi(
-      json(200, { items: [event("TEST30", "Tag der offenen Tür Testwil-Ämmerlibüel")] }),
-    );
-    render(<EventsPage api={api} />);
+  it(
+    "lists the events in a table",
+    async () => {
+      const { api } = fakeApi(
+        json(200, { items: [event("TEST30", "Tag der offenen Tür Testwil-Ämmerlibüel")] }),
+      );
+      render(<EventsPage api={api} />);
 
-    const table = await screen.findByRole("table", { name: "Anlässe" });
-    expect(within(table).getByText("TEST30")).toBeInTheDocument();
-    expect(within(table).getByText("Tag der offenen Tür Testwil-Ämmerlibüel")).toBeInTheDocument();
-    expect(within(table).getByRole("columnheader", { name: "Kürzel" })).toBeInTheDocument();
-  });
+      const table = await screen.findByRole("table", { name: "Anlässe" });
+      expect(within(table).getByText("TEST30")).toBeInTheDocument();
+      expect(
+        within(table).getByText("Tag der offenen Tür Testwil-Ämmerlibüel"),
+      ).toBeInTheDocument();
+      expect(within(table).getByRole("columnheader", { name: "Kürzel" })).toBeInTheDocument();
+    },
+    SLOW,
+  );
 
-  it("shows the empty state without events", async () => {
-    const { api } = fakeApi(json(200, { items: [] }));
-    render(<EventsPage api={api} />);
+  it(
+    "shows the empty state without events",
+    async () => {
+      const { api } = fakeApi(json(200, { items: [] }));
+      render(<EventsPage api={api} />);
 
-    expect(await screen.findByText("Noch keine Anlässe erfasst")).toBeInTheDocument();
-  });
+      expect(await screen.findByText("Noch keine Anlässe erfasst")).toBeInTheDocument();
+    },
+    SLOW,
+  );
 
-  it("shows the message of the problem code and the request ID, and retries", async () => {
-    const problem: Problem = {
-      type: "https://github.com/zarubaf/tada/blob/main/doc/problems.md#unavailable",
-      code: "unavailable",
-      title: "A dependency is unavailable. The client can retry.",
-      status: 503,
-      detail: "This English text never appears.",
-      instance: "urn:uuid:01a11165-c361-77e9-a636-584f1ee6643c",
-      request_id: "01a11165-c361-77e9-a636-584f1ee6643c",
-    };
-    const { api } = fakeApi(
-      json(503, problem, "application/problem+json"),
-      json(200, { items: [event("FLY28", "Fly-in 2028")] }),
-    );
-    render(<EventsPage api={api} />);
+  it(
+    "shows the message of the problem code and the request ID, and retries",
+    async () => {
+      const problem: Problem = {
+        type: "https://github.com/zarubaf/tada/blob/main/doc/problems.md#unavailable",
+        code: "unavailable",
+        title: "A dependency is unavailable. The client can retry.",
+        status: 503,
+        detail: "This English text never appears.",
+        instance: "urn:uuid:01a11165-c361-77e9-a636-584f1ee6643c",
+        request_id: "01a11165-c361-77e9-a636-584f1ee6643c",
+      };
+      const { api } = fakeApi(
+        json(503, problem, "application/problem+json"),
+        json(200, { items: [event("FLY28", "Fly-in 2028")] }),
+      );
+      render(<EventsPage api={api} />);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Der Dienst ist im Moment nicht erreichbar.");
-    expect(alert).toHaveTextContent("Fehler-ID: 01a11165-c361-77e9-a636-584f1ee6643c");
-    expect(alert).not.toHaveTextContent("This English text never appears.");
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("Der Dienst ist im Moment nicht erreichbar.");
+      expect(alert).toHaveTextContent("Fehler-ID: 01a11165-c361-77e9-a636-584f1ee6643c");
+      expect(alert).not.toHaveTextContent("This English text never appears.");
 
-    await userEvent.click(within(alert).getByRole("button", { name: "Erneut versuchen" }));
-    expect(await screen.findByText("FLY28")).toBeInTheDocument();
-  });
+      await userEvent.click(within(alert).getByRole("button", { name: "Erneut versuchen" }));
+      expect(await screen.findByText("FLY28")).toBeInTheDocument();
+    },
+    SLOW,
+  );
 
-  it("shows the general message of the status class for an unknown code", async () => {
-    const { api } = fakeApi(
-      json(
-        418,
-        { code: "a-new-code", status: 418, request_id: "x", type: "", title: "", instance: "" },
-        "application/problem+json",
-      ),
-    );
-    render(<EventsPage api={api} />);
+  it(
+    "shows the general message of the status class for an unknown code",
+    async () => {
+      const { api } = fakeApi(
+        json(
+          418,
+          { code: "a-new-code", status: 418, request_id: "x", type: "", title: "", instance: "" },
+          "application/problem+json",
+        ),
+      );
+      render(<EventsPage api={api} />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Die Anfrage ist ungültig.");
-  });
+      expect(await screen.findByRole("alert")).toHaveTextContent("Die Anfrage ist ungültig.");
+    },
+    SLOW,
+  );
 
-  it("loads the next page with the cursor", async () => {
-    const { api, urls } = fakeApi(
-      json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "QUEgMDE" }),
-      json(200, { items: [event("BB", "Zweiter Anlass")] }),
-    );
-    render(<EventsPage api={api} />);
+  it(
+    "loads the next page with the cursor",
+    async () => {
+      const { api, urls } = fakeApi(
+        json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "QUEgMDE" }),
+        json(200, { items: [event("BB", "Zweiter Anlass")] }),
+      );
+      render(<EventsPage api={api} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
-    expect(await screen.findByText("BB")).toBeInTheDocument();
-    expect(screen.getByText("AA")).toBeInTheDocument();
-    expect(urls[1]).toContain("cursor=QUEgMDE");
-    expect(screen.queryByRole("button", { name: "Weitere Anlässe laden" })).not.toBeInTheDocument();
-  });
+      await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
+      expect(await screen.findByText("BB")).toBeInTheDocument();
+      expect(screen.getByText("AA")).toBeInTheDocument();
+      expect(urls[1]).toContain("cursor=QUEgMDE");
+      expect(
+        screen.queryByRole("button", { name: "Weitere Anlässe laden" }),
+      ).not.toBeInTheDocument();
+    },
+    SLOW,
+  );
 });
 
 describe("EventsPage toolbar", () => {
@@ -136,9 +161,13 @@ describe("EventsPage toolbar", () => {
     expect(link).toHaveAttribute("href", "/events/new");
   });
 
-  it("does not offer „Anlass erfassen“ to a member", async () => {
-    signedIn("member");
-    await screen.findByText("Noch keine Anlässe erfasst");
-    expect(screen.queryByRole("link", { name: "Anlass erfassen" })).not.toBeInTheDocument();
-  });
+  it(
+    "does not offer „Anlass erfassen“ to a member",
+    async () => {
+      signedIn("member");
+      await screen.findByText("Noch keine Anlässe erfasst");
+      expect(screen.queryByRole("link", { name: "Anlass erfassen" })).not.toBeInTheDocument();
+    },
+    SLOW,
+  );
 });

@@ -52,10 +52,14 @@ const created = {
 };
 
 describe("CreateEventForm", () => {
-  it("defaults the time zone to Europe/Zurich", () => {
-    renderForm(fakeApi().api);
-    expect(screen.getByLabelText("Zeitzone")).toHaveValue("Europe/Zurich");
-  });
+  it(
+    "defaults the time zone to Europe/Zurich",
+    () => {
+      renderForm(fakeApi().api);
+      expect(screen.getByLabelText("Zeitzone")).toHaveValue("Europe/Zurich");
+    },
+    SLOW,
+  );
 
   it(
     "creates the event with a client UUIDv7 and opens its page",

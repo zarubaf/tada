@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Button } from "react-aria-components";
 import type { Api } from "../api/client";
+import { type Failure, failureOf, useWaiting } from "../api/failure";
 import { t } from "../i18n";
 import { useNavigate } from "../router/Router";
-import { type Failure, failureOf, useWaiting } from "../sign-in/failure";
 import { PublicPage, PublicText } from "../sign-in/PublicPage";
 import { EmptyState } from "../ui/EmptyState";
 import { InlineError } from "../ui/InlineError";

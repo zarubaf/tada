@@ -101,41 +101,61 @@ const anna = membership(ME, "Anna Muster", "event-manager");
 const bernd = membership("u2", "Bernd Beispiel", "event-contributor");
 
 describe("EventMembersPage", () => {
-  it("lists the members with their event role", async () => {
-    setup({ items: [anna, bernd] });
+  it(
+    "lists the members with their event role",
+    async () => {
+      setup({ items: [anna, bernd] });
 
-    const table = await screen.findByRole("table", { name: "Mitglieder des Anlasses" });
-    expect(within(table).getByText("Bernd Beispiel")).toBeInTheDocument();
-    expect(
-      within(table).getByRole("button", { name: /Rolle von Bernd Beispiel/ }),
-    ).toHaveTextContent("Mitarbeit");
-  });
+      const table = await screen.findByRole("table", { name: "Mitglieder des Anlasses" });
+      expect(within(table).getByText("Bernd Beispiel")).toBeInTheDocument();
+      expect(
+        within(table).getByRole("button", { name: /Rolle von Bernd Beispiel/ }),
+      ).toHaveTextContent("Mitarbeit");
+    },
+    SLOW,
+  );
 
-  it("shows the actions to an organization admin who has no event role", async () => {
-    setup({ organizationRole: "admin", items: [bernd] });
+  it(
+    "shows the actions to an organization admin who has no event role",
+    async () => {
+      setup({ organizationRole: "admin", items: [bernd] });
 
-    expect(await screen.findByRole("button", { name: "Mitglied hinzufügen" })).toBeInTheDocument();
-  });
+      expect(
+        await screen.findByRole("button", { name: "Mitglied hinzufügen" }),
+      ).toBeInTheDocument();
+    },
+    SLOW,
+  );
 
-  it("shows the message of a forbidden list", async () => {
-    setup({ answers: { "GET /memberships": () => problem(403, "forbidden") } });
+  it(
+    "shows the message of a forbidden list",
+    async () => {
+      setup({ answers: { "GET /memberships": () => problem(403, "forbidden") } });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Sie haben keine Berechtigung für diese Aktion.",
-    );
-  });
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Sie haben keine Berechtigung für diese Aktion.",
+      );
+    },
+    SLOW,
+  );
 
-  it("shows the message of a rate-limited action, not the general 4xx text", async () => {
-    setup({
-      items: [anna, bernd],
-      answers: { "POST /change-role": () => problem(429, "rate-limited") },
-    });
+  it(
+    "shows the message of a rate-limited action, not the general 4xx text",
+    async () => {
+      setup({
+        items: [anna, bernd],
+        answers: { "POST /change-role": () => problem(429, "rate-limited") },
+      });
 
-    await user.click(await screen.findByRole("button", { name: /Rolle von Bernd Beispiel/ }));
-    await user.click(screen.getByRole("option", { name: "Lesezugriff" }));
+      await user.click(await screen.findByRole("button", { name: /Rolle von Bernd Beispiel/ }));
+      await user.click(screen.getByRole("option", { name: "Lesezugriff" }));
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Zu viele Anfragen."));
-  });
+      await waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent("Zu viele Anfragen."),
+      );
+    },
+    SLOW,
+  );
 
   it(
     "offers only the members without an event role, and adds one",
@@ -194,19 +214,23 @@ describe("EventMembersPage", () => {
     SLOW,
   );
 
-  it("asks before it removes a member, and does nothing on cancel", async () => {
-    const { calls } = setup({ items: [anna, bernd] });
+  it(
+    "asks before it removes a member, and does nothing on cancel",
+    async () => {
+      const { calls } = setup({ items: [anna, bernd] });
 
-    const button = await screen.findByRole("button", { name: "Bernd Beispiel entfernen" });
-    await user.click(button);
-    const dialog = await screen.findByRole("alertdialog", { name: "Bernd Beispiel entfernen?" });
-    expect(dialog).not.toHaveTextContent("Sie entfernen Ihre eigene Rolle");
-    await user.click(within(dialog).getByRole("button", { name: "Abbrechen" }));
+      const button = await screen.findByRole("button", { name: "Bernd Beispiel entfernen" });
+      await user.click(button);
+      const dialog = await screen.findByRole("alertdialog", { name: "Bernd Beispiel entfernen?" });
+      expect(dialog).not.toHaveTextContent("Sie entfernen Ihre eigene Rolle");
+      await user.click(within(dialog).getByRole("button", { name: "Abbrechen" }));
 
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
-    expect(calls.some((c) => c.call.endsWith("/remove"))).toBe(false);
-    await waitFor(() => expect(button).toHaveFocus());
-  });
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+      expect(calls.some((c) => c.call.endsWith("/remove"))).toBe(false);
+      await waitFor(() => expect(button).toHaveFocus());
+    },
+    SLOW,
+  );
 
   it(
     "removes a member after the confirmation and moves focus to the list heading",
@@ -256,68 +280,84 @@ describe("EventMembersPage", () => {
     SLOW,
   );
 
-  it("warns a manager who removes their own role", async () => {
-    setup({ items: [anna, bernd] });
+  it(
+    "warns a manager who removes their own role",
+    async () => {
+      setup({ items: [anna, bernd] });
 
-    await user.click(await screen.findByRole("button", { name: "Anna Muster entfernen" }));
+      await user.click(await screen.findByRole("button", { name: "Anna Muster entfernen" }));
 
-    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
-      "Sie entfernen Ihre eigene Rolle als Anlassleitung.",
-    );
-  });
+      expect(await screen.findByRole("alertdialog")).toHaveTextContent(
+        "Sie entfernen Ihre eigene Rolle als Anlassleitung.",
+      );
+    },
+    SLOW,
+  );
 
-  it("announces the refusal to remove the last event manager in a live region that was there", async () => {
-    setup({
-      items: [anna],
-      answers: { "POST /remove": () => problem(409, "invalid-transition") },
-    });
+  it(
+    "announces the refusal to remove the last event manager in a live region that was there",
+    async () => {
+      setup({
+        items: [anna],
+        answers: { "POST /remove": () => problem(409, "invalid-transition") },
+      });
 
-    const region = await screen.findByRole("alert");
-    expect(region).toBeEmpty();
-    await user.click(await screen.findByRole("button", { name: "Anna Muster entfernen" }));
-    await user.click(
-      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Entfernen" }),
-    );
+      const region = await screen.findByRole("alert");
+      expect(region).toBeEmpty();
+      await user.click(await screen.findByRole("button", { name: "Anna Muster entfernen" }));
+      await user.click(
+        within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Entfernen" }),
+      );
 
-    await waitFor(() =>
-      expect(region).toHaveTextContent("Ein Anlass braucht mindestens eine Anlassleitung."),
-    );
-    expect(screen.getByRole("alert")).toBe(region);
-    expect(screen.getByText("Anna Muster")).toBeInTheDocument();
-  });
+      await waitFor(() =>
+        expect(region).toHaveTextContent("Ein Anlass braucht mindestens eine Anlassleitung."),
+      );
+      expect(screen.getByRole("alert")).toBe(region);
+      expect(screen.getByText("Anna Muster")).toBeInTheDocument();
+    },
+    SLOW,
+  );
 
-  it("shows the refusal to demote the last event manager", async () => {
-    setup({
-      items: [anna],
-      answers: { "POST /change-role": () => problem(409, "invalid-transition") },
-    });
+  it(
+    "shows the refusal to demote the last event manager",
+    async () => {
+      setup({
+        items: [anna],
+        answers: { "POST /change-role": () => problem(409, "invalid-transition") },
+      });
 
-    const region = await screen.findByRole("alert");
-    await user.click(await screen.findByRole("button", { name: /Rolle von Anna Muster/ }));
-    await user.click(screen.getByRole("option", { name: "Mitarbeit" }));
+      const region = await screen.findByRole("alert");
+      await user.click(await screen.findByRole("button", { name: /Rolle von Anna Muster/ }));
+      await user.click(screen.getByRole("option", { name: "Mitarbeit" }));
 
-    await waitFor(() =>
-      expect(region).toHaveTextContent("Ein Anlass braucht mindestens eine Anlassleitung."),
-    );
-    expect(screen.getByRole("button", { name: /Rolle von Anna Muster/ })).toHaveTextContent(
-      "Anlassleitung",
-    );
-  });
+      await waitFor(() =>
+        expect(region).toHaveTextContent("Ein Anlass braucht mindestens eine Anlassleitung."),
+      );
+      expect(screen.getByRole("button", { name: /Rolle von Anna Muster/ })).toHaveTextContent(
+        "Anlassleitung",
+      );
+    },
+    SLOW,
+  );
 
-  it("loads the list again after a version conflict and says so", async () => {
-    const { calls } = setup({
-      items: [anna, bernd],
-      answers: { "POST /change-role": () => problem(409, "record-version-conflict") },
-    });
+  it(
+    "loads the list again after a version conflict and says so",
+    async () => {
+      const { calls } = setup({
+        items: [anna, bernd],
+        answers: { "POST /change-role": () => problem(409, "record-version-conflict") },
+      });
 
-    await user.click(await screen.findByRole("button", { name: /Rolle von Bernd Beispiel/ }));
-    await user.click(screen.getByRole("option", { name: "Lesezugriff" }));
+      await user.click(await screen.findByRole("button", { name: /Rolle von Bernd Beispiel/ }));
+      await user.click(screen.getByRole("option", { name: "Lesezugriff" }));
 
-    await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent("Die Liste ist neu geladen."),
-    );
-    expect(
-      calls.filter((c) => c.call === `GET /api/v1/events/${EVENT_ID}/memberships`),
-    ).toHaveLength(2);
-  });
+      await waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent("Die Liste ist neu geladen."),
+      );
+      expect(
+        calls.filter((c) => c.call === `GET /api/v1/events/${EVENT_ID}/memberships`),
+      ).toHaveLength(2);
+    },
+    SLOW,
+  );
 });

@@ -1,10 +1,10 @@
 import { type FormEvent, useState } from "react";
 import type { Api } from "../api/client";
+import { type Failure, failureOf, useWaiting } from "../api/failure";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { InlineError } from "../ui/InlineError";
 import { TextField } from "../ui/TextField";
-import { type Failure, failureOf, useWaiting } from "./failure";
 import { formClass, PublicPage, PublicText } from "./PublicPage";
 
 /**
