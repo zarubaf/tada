@@ -8,7 +8,6 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
-use tada_app::caller::OrganizationRole as Role;
 use tada_app::domain::ids::OrganizationId;
 use tada_app::identity::Membership;
 use tada_app::problem::ProblemCode;
@@ -25,6 +24,7 @@ use crate::client_ip::ClientIp;
 use crate::contract::{JSON_BODY, codes};
 use crate::extract::{Json, SessionToken, expired_session_cookie, request_id, session_cookie};
 use crate::problem::{ApiError, Problem};
+use crate::roles::OrganizationRole;
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
@@ -66,35 +66,6 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
             codes(&[JSON_BODY, SignInError::CODES, SessionError::CODES]),
         ),
     ]
-}
-
-/// The role of a member in an organization.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum OrganizationRole {
-    Owner,
-    Admin,
-    Member,
-}
-
-impl From<Role> for OrganizationRole {
-    fn from(role: Role) -> Self {
-        match role {
-            Role::Owner => Self::Owner,
-            Role::Admin => Self::Admin,
-            Role::Member => Self::Member,
-        }
-    }
-}
-
-impl From<OrganizationRole> for Role {
-    fn from(role: OrganizationRole) -> Self {
-        match role {
-            OrganizationRole::Owner => Self::Owner,
-            OrganizationRole::Admin => Self::Admin,
-            OrganizationRole::Member => Self::Member,
-        }
-    }
 }
 
 /// A membership of the signed-in user.

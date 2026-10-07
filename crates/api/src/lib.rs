@@ -10,6 +10,7 @@ mod members;
 mod origin;
 mod problem;
 mod request_id;
+mod roles;
 mod sign_in;
 mod telegram;
 
