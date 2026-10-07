@@ -5,7 +5,7 @@ use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
-use tada_app::audit::AuditEvent;
+use tada_app::audit::{AuditEvent, AuditRole};
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::identity::{DisplayName, EventRole};
@@ -65,17 +65,32 @@ async fn read_member(
     Ok(row.map(EventMember::try_from).transpose()?)
 }
 
-/// The result of a change that matched no row: the membership is missing or has another version.
-async fn unchanged<T>(
+/// The event role and the version of the membership of `user` in `event`, locked for a change in
+/// the same transaction. `None` if the user has no event role in the event.
+async fn lock_member(
     conn: &mut PgConnection,
     scope: OrgScope,
     event: EventId,
     user: UserId,
-) -> Result<Changed<T>, StoreError> {
-    Ok(match read_member(conn, scope, event, user).await? {
-        None => Changed::NotFound,
-        Some(_) => Changed::VersionConflict,
-    })
+) -> Result<Option<(EventRole, RecordVersion)>, StoreError> {
+    let row = sqlx::query!(
+        "SELECT event_role, version FROM event_membership
+         WHERE organization_id = $1 AND event_id = $2 AND user_id = $3
+         FOR UPDATE",
+        scope.organization_id().as_uuid(),
+        event.as_uuid(),
+        user.as_uuid(),
+    )
+    .fetch_optional(conn)
+    .await
+    .map_err(store_error)?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let role =
+        EventRole::parse(&row.event_role).ok_or(InvalidRow("event_membership.event_role"))?;
+    let version = RecordVersion::new(row.version).ok_or(InvalidRow("event_membership.version"))?;
+    Ok(Some((role, version)))
 }
 
 #[async_trait]
@@ -153,25 +168,30 @@ impl EventMemberStore for Database {
         audit: &AuditEvent,
     ) -> Result<Changed<EventMember>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let updated = sqlx::query!(
+        let Some((old, version)) = lock_member(&mut tx, scope, event, user).await? else {
+            return Ok(Changed::NotFound);
+        };
+        if version != expected_version {
+            return Ok(Changed::VersionConflict);
+        }
+        sqlx::query!(
             "UPDATE event_membership SET event_role = $4, version = version + 1
-             WHERE organization_id = $1 AND event_id = $2 AND user_id = $3 AND version = $5",
+             WHERE organization_id = $1 AND event_id = $2 AND user_id = $3",
             scope.organization_id().as_uuid(),
             event.as_uuid(),
             user.as_uuid(),
             role.as_str(),
-            expected_version.get(),
         )
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
-        if updated.rows_affected() == 0 {
-            return unchanged(&mut tx, scope, event, user).await;
-        }
         let member = read_member(&mut tx, scope, event, user)
             .await?
             .ok_or(InvalidRow("event_membership"))?;
-        audit::record(&mut tx, audit).await.map_err(store_error)?;
+        let audit = audit
+            .clone()
+            .with_roles(Some(AuditRole::Event(old)), Some(AuditRole::Event(role)));
+        audit::record(&mut tx, &audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
         Ok(Changed::Changed(member))
     }
@@ -185,21 +205,24 @@ impl EventMemberStore for Database {
         audit: &AuditEvent,
     ) -> Result<Changed<()>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let deleted = sqlx::query!(
+        let Some((old, version)) = lock_member(&mut tx, scope, event, user).await? else {
+            return Ok(Changed::NotFound);
+        };
+        if version != expected_version {
+            return Ok(Changed::VersionConflict);
+        }
+        sqlx::query!(
             "DELETE FROM event_membership
-             WHERE organization_id = $1 AND event_id = $2 AND user_id = $3 AND version = $4",
+             WHERE organization_id = $1 AND event_id = $2 AND user_id = $3",
             scope.organization_id().as_uuid(),
             event.as_uuid(),
             user.as_uuid(),
-            expected_version.get(),
         )
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
-        if deleted.rows_affected() == 0 {
-            return unchanged(&mut tx, scope, event, user).await;
-        }
-        audit::record(&mut tx, audit).await.map_err(store_error)?;
+        let audit = audit.clone().with_roles(Some(AuditRole::Event(old)), None);
+        audit::record(&mut tx, &audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
         Ok(Changed::Changed(()))
     }
@@ -207,7 +230,8 @@ impl EventMemberStore for Database {
 
 #[cfg(test)]
 mod tests {
-    use tada_app::audit::AuditAction;
+    use serde_json::json;
+    use tada_app::audit::{AuditAction, AuditRole};
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::domain::identity::Email;
 
@@ -261,6 +285,7 @@ mod tests {
             self.owner.scope()
         }
 
+        /// The audit event that the app gives the store: about Anna, without the old role.
         fn audit(&self, action: AuditAction) -> AuditEvent {
             AuditEvent::new(
                 self.owner.actor(),
@@ -268,6 +293,7 @@ mod tests {
                 Some(self.event.as_uuid()),
                 Some(self.scope()),
             )
+            .about(self.anna)
         }
 
         async fn audit_actions(&self) -> Vec<String> {
@@ -275,6 +301,17 @@ mod tests {
                 .fetch_all(&self.test.database.pool)
                 .await
                 .unwrap()
+        }
+
+        /// The record kind, the subject and the role change of each audit event, in order.
+        async fn audit_rows(&self) -> Vec<(String, Option<Uuid>, Option<serde_json::Value>)> {
+            sqlx::query_as(
+                "SELECT record_kind, subject_user_id, detail FROM audit_event
+                 ORDER BY occurred_at, id",
+            )
+            .fetch_all(&self.test.database.pool)
+            .await
+            .unwrap()
         }
 
         async fn add(&self, user: UserId, role: EventRole) -> Added {
@@ -286,7 +323,9 @@ mod tests {
                     user,
                     role,
                     "2030-05-18T08:00:00.123456Z".parse().unwrap(),
-                    &self.audit(AuditAction::EventMembershipAdd),
+                    &self
+                        .audit(AuditAction::EventMembershipAdd)
+                        .with_roles(None, Some(AuditRole::Event(role))),
                 )
                 .await
                 .unwrap()
@@ -349,6 +388,20 @@ mod tests {
                 "event_membership.add",
                 "event_membership.change_role",
                 "event_membership.remove"
+            ]
+        );
+        let anna = Some(f.anna.as_uuid());
+        let kind = || "event_membership".to_owned();
+        assert_eq!(
+            f.audit_rows().await,
+            [
+                (kind(), anna, Some(json!({"new_role": "event-viewer"}))),
+                (
+                    kind(),
+                    anna,
+                    Some(json!({"old_role": "event-viewer", "new_role": "event-manager"}))
+                ),
+                (kind(), anna, Some(json!({"old_role": "event-manager"}))),
             ]
         );
     }

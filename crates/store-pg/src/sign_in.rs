@@ -210,7 +210,7 @@ impl SignInStore for Database {
         let organization_id = OrganizationId::from_uuid(invitation.organization_id);
         let user_id =
             find_or_create_user(&mut tx, &invitation.email, &invitation.display_name, now).await?;
-        add_membership(
+        let (existing, accepted) = add_membership(
             &mut tx,
             organization_id,
             user_id,
@@ -244,6 +244,8 @@ impl SignInStore for Database {
             organization_id,
             InvitationId::from_uuid(invitation.id),
             request_id,
+            existing,
+            accepted,
         );
         record(&mut tx, &event).await.map_err(store_error)?;
 
@@ -298,6 +300,7 @@ async fn find_or_create_user(
 }
 
 /// Adds the membership of an invitee, or raises the role of an existing one to `accepted_role`.
+/// Returns the role before, if the membership existed, and the role after.
 ///
 /// Known limit: two acceptances that add the first membership of one user in one organization at
 /// the same moment both find none. The primary key then fails the second transaction, which rolls
@@ -308,7 +311,7 @@ async fn add_membership(
     user_id: UserId,
     invited: OrganizationRole,
     now: Timestamp,
-) -> Result<(), StoreError> {
+) -> Result<(Option<OrganizationRole>, OrganizationRole), StoreError> {
     let existing = sqlx::query_scalar!(
         "SELECT role FROM organization_membership
          WHERE organization_id = $1 AND user_id = $2
@@ -351,7 +354,7 @@ async fn add_membership(
         }
         Some(_) => {}
     }
-    Ok(())
+    Ok((existing, accepted))
 }
 
 #[cfg(test)]

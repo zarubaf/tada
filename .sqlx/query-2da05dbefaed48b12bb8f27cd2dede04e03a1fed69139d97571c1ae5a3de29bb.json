@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT event_role, version FROM event_membership\n         WHERE organization_id = $1 AND event_id = $2 AND user_id = $3\n         FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_membership",
+            "name": "event_role"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "event_membership",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2da05dbefaed48b12bb8f27cd2dede04e03a1fed69139d97571c1ae5a3de29bb"
+}

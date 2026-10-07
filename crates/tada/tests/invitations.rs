@@ -328,6 +328,20 @@ async fn an_invitation_never_lowers_a_role() {
             .await,
         1
     );
+
+    // The audit log names Anna and records only the raise, with role names (ADR 0061).
+    let details: Value = app
+        .test
+        .scalar(&format!(
+            "SELECT jsonb_agg(detail ORDER BY occurred_at, id) FROM audit_event
+             WHERE action = 'invitation.accept' AND subject_user_id = '{}'",
+            anna.as_uuid()
+        ))
+        .await;
+    assert_eq!(
+        details,
+        json!([null, {"old_role": "admin", "new_role": "owner"}])
+    );
 }
 
 #[tokio::test]

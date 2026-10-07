@@ -1,5 +1,6 @@
 //! The audit log (ADR 0039): who did what to which record. It holds no personal data and no free text.
 
+use tada_domain::identity::{EventRole, OrganizationRole};
 use tada_domain::ids::{InvitationId, OrganizationId, UserId};
 use uuid::Uuid;
 
@@ -40,13 +41,38 @@ impl AuditAction {
             Self::InvitationCreate | Self::InvitationRevoke | Self::InvitationAccept => {
                 "invitation"
             }
-            // An event membership has no ID of its own; the record is its event.
-            Self::EventCreate
-            | Self::EventMembershipAdd
+            Self::EventCreate => "event",
+            // An event membership has no ID of its own: the record ID is its event,
+            // and the subject is its member.
+            Self::EventMembershipAdd
             | Self::EventMembershipChangeRole
-            | Self::EventMembershipRemove => "event",
+            | Self::EventMembershipRemove => "event_membership",
         }
     }
+}
+
+/// A role name in an audit event. Only role names can enter the detail of an event (ADR 0061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditRole {
+    Organization(OrganizationRole),
+    Event(EventRole),
+}
+
+impl AuditRole {
+    /// The kebab-case name of the role.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Organization(role) => role.as_str(),
+            Self::Event(role) => role.as_str(),
+        }
+    }
+}
+
+/// The role of the subject before and after the change. At least one of the two is set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RoleChange {
+    pub old: Option<AuditRole>,
+    pub new: Option<AuditRole>,
 }
 
 /// One entry of the audit log. A command records it in its own transaction.
@@ -56,6 +82,8 @@ pub struct AuditEvent {
     action: AuditAction,
     record_id: Option<Uuid>,
     organization_id: Option<OrganizationId>,
+    subject: Option<UserId>,
+    roles: Option<RoleChange>,
 }
 
 impl AuditEvent {
@@ -73,6 +101,8 @@ impl AuditEvent {
             action,
             record_id,
             organization_id: scope.map(OrgScope::organization_id),
+            subject: None,
+            roles: None,
         }
     }
 
@@ -99,18 +129,59 @@ impl AuditEvent {
     /// user inside its transaction. So the event names the new member as actor and the organization
     /// of the invitation by ID. This gives the store the right to write this one audit row, not a
     /// scope for other reads or writes.
+    ///
+    /// The invitee is also the subject. The event records the role change only if the membership is
+    /// new or its role changed: `existing` is the role before, `accepted` the role after.
     pub fn by_invitee(
         user_id: UserId,
         organization_id: OrganizationId,
         invitation_id: InvitationId,
         request_id: Option<Uuid>,
+        existing: Option<OrganizationRole>,
+        accepted: OrganizationRole,
     ) -> Self {
-        Self {
+        let event = Self {
             actor: Actor::member(user_id, Channel::Web, request_id),
             action: AuditAction::InvitationAccept,
             record_id: Some(invitation_id.as_uuid()),
             organization_id: Some(organization_id),
+            subject: None,
+            roles: None,
         }
+        .about(user_id);
+        if existing == Some(accepted) {
+            event
+        } else {
+            event.with_roles(
+                existing.map(AuditRole::Organization),
+                Some(AuditRole::Organization(accepted)),
+            )
+        }
+    }
+
+    /// The member whom the event is about.
+    #[must_use]
+    pub fn about(self, subject: UserId) -> Self {
+        Self {
+            subject: Some(subject),
+            ..self
+        }
+    }
+
+    /// The role of the subject before and after the change. Two `None` values record no change.
+    /// Neither changes the actor, the organization or the subject.
+    #[must_use]
+    pub fn with_roles(self, old: Option<AuditRole>, new: Option<AuditRole>) -> Self {
+        let roles = (old.is_some() || new.is_some()).then_some(RoleChange { old, new });
+        Self { roles, ..self }
+    }
+
+    pub fn subject(&self) -> Option<UserId> {
+        self.subject
+    }
+
+    pub fn roles(&self) -> Option<RoleChange> {
+        self.roles
     }
 
     pub fn actor(&self) -> &Actor {
@@ -145,7 +216,14 @@ mod tests {
         let organization = OrganizationId::from_uuid(Uuid::from_u128(2));
         let invitation = InvitationId::from_uuid(Uuid::from_u128(3));
         let request = Uuid::from_u128(4);
-        let event = AuditEvent::by_invitee(user, organization, invitation, Some(request));
+        let event = AuditEvent::by_invitee(
+            user,
+            organization,
+            invitation,
+            Some(request),
+            Some(OrganizationRole::Member),
+            OrganizationRole::Admin,
+        );
         let actor = event.actor();
         assert_eq!(
             (actor.kind(), actor.id(), actor.principal()),
@@ -164,5 +242,42 @@ mod tests {
             )
         );
         assert_eq!(event.organization_id(), Some(organization));
+        assert_eq!(event.subject(), Some(user));
+        assert_eq!(
+            event.roles(),
+            Some(RoleChange {
+                old: Some(AuditRole::Organization(OrganizationRole::Member)),
+                new: Some(AuditRole::Organization(OrganizationRole::Admin)),
+            })
+        );
+    }
+
+    #[test]
+    fn an_acceptance_without_a_role_change_records_no_roles() {
+        let id = |n| Uuid::from_u128(n);
+        let event = AuditEvent::by_invitee(
+            UserId::from_uuid(id(1)),
+            OrganizationId::from_uuid(id(2)),
+            InvitationId::from_uuid(id(3)),
+            None,
+            Some(OrganizationRole::Owner),
+            OrganizationRole::Owner,
+        );
+        assert_eq!(event.roles(), None);
+        let new = AuditEvent::by_invitee(
+            UserId::from_uuid(id(1)),
+            OrganizationId::from_uuid(id(2)),
+            InvitationId::from_uuid(id(3)),
+            None,
+            None,
+            OrganizationRole::Member,
+        );
+        assert_eq!(
+            new.roles(),
+            Some(RoleChange {
+                old: None,
+                new: Some(AuditRole::Organization(OrganizationRole::Member)),
+            })
+        );
     }
 }
