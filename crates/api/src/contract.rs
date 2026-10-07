@@ -140,7 +140,7 @@ mod tests {
         }
         assert_eq!(
             operations,
-            crate::events::problem_codes().len() + crate::telegram::problem_codes().len(),
+            crate::problem_codes().len(),
             "a code list without an operation"
         );
     }

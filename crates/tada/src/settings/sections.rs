@@ -16,7 +16,7 @@ use super::{Section, Setting, Source};
 // Each command also reads `Logging`; see `crate::main`.
 
 /// The settings of `tada serve`.
-pub type ServeSettings = (Database, Http, Storage);
+pub type ServeSettings = (Database, Http, Storage, PublicUrl);
 /// The settings of `tada worker`.
 pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp);
 /// The settings of `tada telegram`.

@@ -6,6 +6,7 @@ mod extract;
 mod health;
 mod problem;
 mod request_id;
+mod sign_in;
 mod telegram;
 
 use std::net::SocketAddr;
@@ -13,14 +14,19 @@ use std::path::Path;
 use std::sync::Arc;
 
 use axum::Router;
+use axum::http::{HeaderValue, header};
 use axum::middleware;
+use axum::response::Response;
 use axum::routing::any;
 use ipnet::IpNet;
 use tada_app::auth::Authenticator;
 use tada_app::clock::Clock;
 use tada_app::events::EventStore;
 use tada_app::health::DependencyCheck;
+use tada_app::identity::IdentityStore;
 use tada_app::problem::ProblemCode;
+use tada_app::session::SessionStore;
+use tada_app::sign_in::SignInStore;
 use tada_app::telegram::TelegramLinks;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa::openapi::OpenApi;
@@ -39,6 +45,9 @@ pub struct ApiState {
     pub authenticator: Arc<dyn Authenticator>,
     pub events: Arc<dyn EventStore>,
     pub telegram: Arc<dyn TelegramLinks>,
+    pub identity: Arc<dyn IdentityStore>,
+    pub sessions: Arc<dyn SessionStore>,
+    pub sign_in: Arc<dyn SignInStore>,
     pub clock: Arc<dyn Clock>,
     /// The proxies whose `X-Request-Id` the server accepts (ADR 0035).
     pub trusted_proxies: Vec<IpNet>,
@@ -49,13 +58,24 @@ pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
 /// The versioned API: its routes and its OpenAPI document.
 fn api() -> (Router<ApiState>, OpenApi) {
     let (router, document) = OpenApiRouter::<ApiState>::new()
-        .nest(API_PREFIX, events::routes().merge(telegram::routes()))
+        .nest(
+            API_PREFIX,
+            events::routes()
+                .merge(telegram::routes())
+                .merge(sign_in::routes()),
+        )
         .split_for_parts();
-    let problem_codes = events::problem_codes()
+    let problem_codes = problem_codes().into_iter().collect();
+    (router, contract::complete(document, &problem_codes))
+}
+
+/// The problem codes of each operation of the versioned API (ADR 0037).
+fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
+    events::problem_codes()
         .into_iter()
         .chain(telegram::problem_codes())
-        .collect();
-    (router, contract::complete(document, &problem_codes))
+        .chain(sign_in::problem_codes())
+        .collect()
 }
 
 /// All routes of the `serve` process role.
@@ -79,7 +99,18 @@ pub fn router(state: ApiState, web_root: Option<&Path>) -> Router {
             request_id::track,
         ))
         .merge(health::routes())
+        .layer(middleware::map_response(no_referrer))
         .with_state(state)
+}
+
+/// No response sends its URL as the referrer of the next request (ADR 0008).
+/// The sign-in pages of the web client then never leak a token or a path to another site.
+async fn no_referrer(mut response: Response) -> Response {
+    response.headers_mut().insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
+    response
 }
 
 /// The OpenAPI document of the versioned API.
@@ -218,12 +249,130 @@ mod tests {
         }
     }
 
+    /// The stores of sign-in. The tests of this module never sign in.
+    #[derive(Debug)]
+    struct NoSignIn;
+
+    #[async_trait::async_trait]
+    impl IdentityStore for NoSignIn {
+        async fn user(
+            &self,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<Option<tada_app::identity::UserRef>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn user_by_email(
+            &self,
+            _: &tada_app::domain::identity::Email,
+        ) -> Result<Option<tada_app::identity::UserRef>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn memberships_of(
+            &self,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<Vec<tada_app::identity::Membership>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn membership(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<Option<tada_app::caller::OrganizationRole>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn event_role(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<Option<tada_app::domain::identity::EventRole>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl SessionStore for NoSignIn {
+        async fn create(
+            &self,
+            _: tada_app::domain::ids::UserId,
+            _: Option<tada_app::domain::ids::OrganizationId>,
+            _: Option<&str>,
+            _: jiff::Timestamp,
+        ) -> Result<secrecy::SecretString, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn find(
+            &self,
+            _: &str,
+            _: jiff::Timestamp,
+        ) -> Result<Option<tada_app::session::SessionRow>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn touch(
+            &self,
+            _: &str,
+            _: jiff::Timestamp,
+        ) -> Result<(), tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn set_organization(
+            &self,
+            _: &str,
+            _: Option<tada_app::domain::ids::OrganizationId>,
+        ) -> Result<(), tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn delete(&self, _: &str) -> Result<(), tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn delete_all_of(
+            &self,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<(), tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl SignInStore for NoSignIn {
+        async fn queue_magic_link(
+            &self,
+            _: &tada_app::domain::identity::Email,
+            _: Option<uuid::Uuid>,
+        ) -> Result<(), tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn redeem_magic_link(
+            &self,
+            _: &str,
+            _: Option<&str>,
+            _: jiff::Timestamp,
+        ) -> Result<Option<secrecy::SecretString>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
             authenticator: Arc::new(NoCaller),
             events: Arc::new(NoEvents),
             telegram: Arc::new(NoTelegram),
+            identity: Arc::new(NoSignIn),
+            sessions: Arc::new(NoSignIn),
+            sign_in: Arc::new(NoSignIn),
             clock: Arc::new(NoClock),
             trusted_proxies: Vec::new(),
         }
