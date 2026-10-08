@@ -305,6 +305,19 @@ async fn creation_without_the_notice_confirmation_is_invalid() {
             [("notice_version_confirmed".to_owned(), "not-confirmed")]
         );
     }
+    // The notice error comes with the other field errors, so a form needs one round trip.
+    let request = TokenRequest {
+        name: " ".to_owned(),
+        notice_version_confirmed: 0,
+        ..request(TokenScope::Read)
+    };
+    assert_eq!(
+        invalid_fields(create(&memory, Owner, request).await),
+        [
+            ("notice_version_confirmed".to_owned(), "not-confirmed"),
+            ("name".to_owned(), "empty"),
+        ]
+    );
     assert!(memory.tokens.lock().unwrap().is_empty());
 }
 
@@ -663,6 +676,16 @@ async fn the_last_use_changes_at_most_once_a_minute() {
         fixture.memory.token(secret).token.last_used_at,
         Some(START + TOUCH_INTERVAL)
     );
+}
+
+#[test]
+fn scopes_have_stable_names() {
+    let names = [TokenScope::Read, TokenScope::Propose].map(TokenScope::as_str);
+    assert_eq!(names, ["read", "propose"]);
+    for name in names {
+        assert_eq!(TokenScope::parse(name).map(TokenScope::as_str), Some(name));
+    }
+    assert_eq!(TokenScope::parse("write"), None);
 }
 
 #[test]

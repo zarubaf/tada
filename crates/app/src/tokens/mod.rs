@@ -225,10 +225,6 @@ impl TokenError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
-
-    fn invalid(field: &'static str, code: &'static str) -> Self {
-        Self::Invalid(vec![FieldError::new(field, code)])
-    }
 }
 
 impl CommandError for TokenError {
@@ -289,13 +285,10 @@ async fn tokens_enabled(scope: OrgScope, tokens: &dyn TokenStore) -> Result<bool
 
 /// The checked values of a request, or the errors.
 fn check(request: &TokenRequest, now: Timestamp) -> Result<TokenName, TokenError> {
-    if request.notice_version_confirmed != NOTICE_VERSION {
-        return Err(TokenError::invalid(
-            "notice_version_confirmed",
-            "not-confirmed",
-        ));
-    }
     let mut errors = Vec::new();
+    if request.notice_version_confirmed != NOTICE_VERSION {
+        errors.push(FieldError::new("notice_version_confirmed", "not-confirmed"));
+    }
     let name = TokenName::parse(&request.name)
         .map_err(|error| {
             errors.push(FieldError::new(
