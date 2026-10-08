@@ -346,7 +346,7 @@ export function MembersPage({ api }: { api: Api }) {
         };
 
   return (
-    <main id="main" className={styles.page}>
+    <div className={styles.page}>
       {/* Live regions that are always in the page: a text that is set later is announced. */}
       <p ref={alert} className={styles.failure} role="alert">
         {failure}
@@ -467,6 +467,6 @@ export function MembersPage({ api }: { api: Api }) {
         onConfirm={() => void confirm()}
         onCancel={() => !busy && setConfirming(undefined)}
       />
-    </main>
+    </div>
   );
 }

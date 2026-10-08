@@ -79,7 +79,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           <Link to="/events" className={styles.navLink}>
             {t("nav-events")}
           </Link>
-          <Link to="/settings/members" className={styles.navLink}>
+          <Link to="/settings/members" within="/settings" className={styles.navLink}>
             {t("nav-settings")}
           </Link>
         </nav>

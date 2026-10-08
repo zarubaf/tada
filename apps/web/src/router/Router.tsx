@@ -152,13 +152,17 @@ export interface LinkProps {
   className?: string;
   /** The link is current only for its own path, not for the paths below it. */
   exact?: boolean;
+  /** The link is current for every path below this prefix, for example a whole settings area. */
+  within?: string;
   children: ReactNode;
 }
 
 /** A link that changes the path without a page load. The current page gets `aria-current`. */
-export function Link({ to, className, exact, children }: LinkProps) {
+export function Link({ to, className, exact, within, children }: LinkProps) {
   const { pathname, navigate } = useLocation();
-  const current = pathname === to || (!exact && pathname.startsWith(`${to}/`));
+  const current = within
+    ? pathname.startsWith(`${within}/`)
+    : pathname === to || (!exact && pathname.startsWith(`${to}/`));
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     const plain =
       event.button === 0 &&

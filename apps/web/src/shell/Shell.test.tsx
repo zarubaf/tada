@@ -33,7 +33,7 @@ function json(status: number, body: unknown) {
   });
 }
 
-function renderShell(...responses: Response[]) {
+function renderShellAt(path: string, ...responses: Response[]) {
   const calls: { method: string; path: string; body: string }[] = [];
   const fetch = vi.fn(async (request: Request) => {
     calls.push({
@@ -48,7 +48,7 @@ function renderShell(...responses: Response[]) {
     return response;
   });
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
-  window.history.replaceState(null, "", "/events");
+  window.history.replaceState(null, "", path);
   render(
     <Router>
       <SessionProvider api={api}>
@@ -61,6 +61,10 @@ function renderShell(...responses: Response[]) {
   return calls;
 }
 
+function renderShell(...responses: Response[]) {
+  return renderShellAt("/events", ...responses);
+}
+
 afterEach(() => window.history.replaceState(null, "", "/"));
 
 describe("Shell", () => {
@@ -71,6 +75,19 @@ describe("Shell", () => {
     expect(screen.getByRole("link", { name: "Anlässe" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("button", { name: /Organisation/ })).not.toBeInTheDocument();
   });
+
+  it.each(["/settings/members", "/settings/telegram"])(
+    "marks Einstellungen as current on %s",
+    async (path) => {
+      renderShellAt(path, json(200, info([first], first)));
+
+      expect(await screen.findByRole("link", { name: "Einstellungen" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(screen.getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+    },
+  );
 
   it("switches the organization and loads the session again", async () => {
     const calls = renderShell(
