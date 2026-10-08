@@ -553,6 +553,11 @@ async fn search_never_returns_a_source_of_another_organization_or_of_an_event_wi
     assert_eq!(body["error"]["data"]["code"], "not-found", "{body}");
     let body = mcp.call("search_sources", json!({"query": " "})).await;
     assert_eq!(body["error"]["data"]["code"], "validation-failed", "{body}");
+    assert_eq!(
+        body["error"]["data"]["errors"],
+        json!([{"pointer": "/query", "code": "empty"}]),
+        "a JSON pointer as in the API: {body}"
+    );
 }
 
 #[tokio::test]

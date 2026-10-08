@@ -263,7 +263,8 @@ fn invalid(errors: &[FieldError]) -> ErrorData {
     let code = ProblemCode::ValidationFailed;
     let errors: Vec<_> = errors
         .iter()
-        .map(|error| json!({"field": error.field, "code": error.code}))
+        // A JSON pointer into the arguments of the tool, as in the problems of the API (ADR 0037).
+        .map(|error| json!({"pointer": format!("/{}", error.field), "code": error.code}))
         .collect();
     ErrorData::invalid_params(
         code.meaning(),
