@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT scope_id FROM local_id_counter\n         WHERE organization_id = $1 AND scope_id = ANY($2) AND kind = $3\n         ORDER BY scope_id\n         FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "scope_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "local_id_counter",
+            "name": "scope_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "20e576bee603b31cdf4cd76b0cf5d077dbe38c790ea8bc8e6633e89453c71851"
+}

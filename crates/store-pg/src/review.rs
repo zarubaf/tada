@@ -219,10 +219,12 @@ async fn lock_open(
     Ok(!reviewed)
 }
 
-/// Locks the existing field definitions and facts that the plan uses or changes, before any check.
-/// Each kind is locked in the order of its IDs, fields first, so two applies take their row locks in the same
-/// order and cannot deadlock on them. The plan order follows the dependencies and the client IDs.
-/// Inserts of new rows can still wait on each other; a deadlock there maps to `Unavailable`, so the client retries.
+/// Locks the existing field definitions and facts that the plan uses or changes, and the event-local ID counters
+/// that it moves, before any check. It locks fields, then facts, then counters, each kind in the order of its keys. So two applies take their row locks in the
+/// same order and cannot deadlock on them. The plan order follows the dependencies and the client IDs.
+/// A missing counter row is inserted here, so the lock covers it; a rollback removes it again.
+/// Inserts of other new rows can still wait on each other; a deadlock there maps to `Unavailable`,
+/// so the client retries.
 async fn lock_targets(
     conn: &mut PgConnection,
     scope: OrgScope,
@@ -230,6 +232,7 @@ async fn lock_targets(
 ) -> Result<(), sqlx::Error> {
     let mut fields = Vec::new();
     let (mut fact_events, mut fact_fields) = (Vec::new(), Vec::new());
+    let mut question_events = Vec::new();
     for step in steps {
         match &step.operation {
             Operation::SetFact {
@@ -243,9 +246,10 @@ async fn lock_targets(
             | Operation::DeprecateField { field_id, .. } => {
                 fields.push(field_id.as_uuid());
             }
-            Operation::CreateEvent { .. }
-            | Operation::AddFieldDefinition { .. }
-            | Operation::CreateOpenQuestion { .. } => {}
+            Operation::CreateOpenQuestion { event_id, .. } => {
+                question_events.push(event_id.as_uuid());
+            }
+            Operation::CreateEvent { .. } | Operation::AddFieldDefinition { .. } => {}
         }
     }
     let organization = scope.organization_id().as_uuid();
@@ -267,6 +271,29 @@ async fn lock_targets(
         organization,
         &fact_events,
         &fact_fields,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    // A new counter starts at 1, the value that `next_local_number` would give.
+    sqlx::query!(
+        "INSERT INTO local_id_counter (organization_id, scope_id, kind, next)
+         SELECT DISTINCT $1::uuid, t.scope_id, $3::text, 1::bigint FROM unnest($2::uuid[]) AS t (scope_id)
+         ORDER BY t.scope_id
+         ON CONFLICT (organization_id, scope_id, kind) DO NOTHING",
+        organization,
+        &question_events,
+        OPEN_QUESTION_PREFIX,
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query_scalar!(
+        "SELECT scope_id FROM local_id_counter
+         WHERE organization_id = $1 AND scope_id = ANY($2) AND kind = $3
+         ORDER BY scope_id
+         FOR UPDATE",
+        organization,
+        &question_events,
+        OPEN_QUESTION_PREFIX,
     )
     .fetch_all(&mut *conn)
     .await?;

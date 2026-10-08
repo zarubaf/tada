@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO local_id_counter (organization_id, scope_id, kind, next)\n         SELECT DISTINCT $1::uuid, t.scope_id, $3::text, 1::bigint FROM unnest($2::uuid[]) AS t (scope_id)\n         ORDER BY t.scope_id\n         ON CONFLICT (organization_id, scope_id, kind) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "eca2d2b004e08e79e049e8f42827f7fe282a86c4e25c9ae46b17df494cec7615"
+}
