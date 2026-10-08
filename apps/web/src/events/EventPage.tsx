@@ -16,8 +16,18 @@ type State =
  * `children`. It owns the route `/events/:eventId`. Task 30 adds the `date_window` value to the
  * header and the overview to the first sub-page.
  */
-export function EventPage({ api, children }: { api: Api; children: ReactNode }) {
-  const { eventId = "" } = useParams();
+export function EventPage({
+  api,
+  children,
+  eventId: eventIdProp,
+}: {
+  api: Api;
+  children: ReactNode;
+  /** For a page whose address has no event, for example a document: the event it belongs to. */
+  eventId?: string;
+}) {
+  const params = useParams();
+  const eventId = eventIdProp ?? params.eventId ?? "";
   const [state, setState] = useState<State>({ kind: "loading" });
 
   const load = useCallback(async () => {

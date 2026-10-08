@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Api, type Document, type DocumentVersion, problemMessage } from "../api/client";
+import { EventPage } from "../events/EventPage";
 import { loadOrganizationMembers } from "../events/eventMembers";
 import { LOCALE, t } from "../i18n";
 import { Link, useParams } from "../router/Router";
 import { type Column, DataTable } from "../ui/DataTable";
 import { FileLink } from "../ui/FileLink";
+import { useFocusAfterCommit } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./DocumentPage.module.css";
@@ -14,7 +16,7 @@ const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", tim
 
 type State =
   | { kind: "loading" }
-  | { kind: "failed"; message: string; requestId: string | undefined }
+  | { kind: "failed"; message: string; requestId: string | undefined; retried: boolean }
   | { kind: "loaded"; document: Document; versions: DocumentVersion[] };
 
 /**
@@ -31,10 +33,12 @@ function previewKind(version: DocumentVersion | undefined): "pdf" | "text" | und
   if (version?.kind !== "upload") {
     return undefined;
   }
-  if (version.media_type === "application/pdf") {
+  // The detected type can carry parameters, for example `text/plain; charset=utf-8`.
+  const mediaType = version.media_type?.split(";")[0]?.trim().toLowerCase();
+  if (mediaType === "application/pdf") {
     return "pdf";
   }
-  return version.media_type === "text/plain" ? "text" : undefined;
+  return mediaType === "text/plain" ? "text" : undefined;
 }
 
 /** A version of a document: the file, or the draft status. */
@@ -55,21 +59,33 @@ export function DocumentPage({ api }: { api: Api }) {
   // The names of the uploaders. A member list that fails to load leaves the names unknown.
   const [names, setNames] = useState<Map<string, string>>(new Map());
 
+  // The newest request: the answer of an older one is dropped.
+  const latest = useRef(0);
+  // After a retry the failed message takes focus, because the retry button left.
+  const retried = useRef(false);
+
   const load = useCallback(async () => {
     const path = { document_id: documentId };
+    const request = ++latest.current;
+    const failed = (message: string, requestId: string | undefined) =>
+      request === latest.current &&
+      setState({ kind: "failed", message, requestId, retried: retried.current });
     try {
       const [document, versions] = await Promise.all([
         api.GET("/api/v1/documents/{document_id}", { params: { path } }),
         api.GET("/api/v1/documents/{document_id}/versions", { params: { path } }),
       ]);
+      if (request !== latest.current) {
+        return;
+      }
       if (document.data && versions.data) {
         setState({ kind: "loaded", document: document.data, versions: versions.data.items });
         return;
       }
       const error = document.error ?? versions.error;
-      setState({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
+      failed(problemMessage(error), error?.request_id);
     } catch {
-      setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+      failed(problemMessage(undefined), undefined);
     }
   }, [api, documentId]);
 
@@ -137,12 +153,13 @@ export function DocumentPage({ api }: { api: Api }) {
     },
   ];
 
-  const newest =
-    state.kind === "loaded"
-      ? [...state.versions].sort((a, b) => b.number - a.number).find((v) => v.kind === "upload")
-      : undefined;
-  const preview = previewKind(newest);
-
+  if (state.kind === "loaded") {
+    return (
+      <EventPage api={api} eventId={state.document.event_id}>
+        <DocumentBody document={state.document} versions={state.versions} columns={columns} />
+      </EventPage>
+    );
+  }
   return (
     <main id="main" className={styles.page}>
       {state.kind === "loading" && (
@@ -155,57 +172,82 @@ export function DocumentPage({ api }: { api: Api }) {
         <InlineError
           message={state.message}
           requestId={state.requestId}
+          takeFocus={state.retried}
           onRetry={() => {
+            retried.current = true;
             setState({ kind: "loading" });
             void load();
           }}
         />
       )}
-      {state.kind === "loaded" && (
-        <>
-          <Link to={`/events/${encodeURIComponent(state.document.event_id)}/documents`}>
-            {t("document-back")}
-          </Link>
-          <header className={styles.header}>
-            <p className={styles.key}>{state.document.readable_id}</p>
-            <h1 className={styles.title}>{state.document.name}</h1>
-          </header>
-          <section className={styles.section} aria-labelledby="document-versions-title">
-            <h2 id="document-versions-title" className={styles.heading}>
-              {t("document-versions-title")}
-            </h2>
-            <DataTable
-              label={t("document-versions-title")}
-              columns={columns}
-              rows={state.versions}
-              rowKey={(v) => v.id}
-            />
-            <p className={styles.help}>{t("documents-no-scan")}</p>
-          </section>
-          <section className={styles.section} aria-labelledby="document-preview-title">
-            <h2 id="document-preview-title" className={styles.heading}>
-              {t("document-preview-title")}
-            </h2>
-            {newest && preview === "text" && (
-              <iframe
-                className={styles.frame}
-                title={t("document-preview-of", { name: newest.file_name ?? "" })}
-                src={contentUrl(newest, true)}
-              />
-            )}
-            {newest && preview === "pdf" && (
-              // The server sends a download with `sandbox`, which a browser may refuse to show in a
-              // frame. A link to a new tab keeps the CSP unchanged (ADR 0043).
-              <div>
-                <FileLink newTab href={contentUrl(newest, true)}>
-                  {t("document-preview-open")}
-                </FileLink>
-              </div>
-            )}
-            {!preview && <p>{t("document-preview-none")}</p>}
-          </section>
-        </>
-      )}
     </main>
+  );
+}
+
+/** The content of a loaded document. It sits in the layout of the event. */
+function DocumentBody({
+  document,
+  versions,
+  columns,
+}: {
+  document: Document;
+  versions: DocumentVersion[];
+  columns: Column<DocumentVersion>[];
+}) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
+  // The page arrived: focus goes to the heading of the document.
+  useEffect(() => focusAfterCommit(() => heading.current), [focusAfterCommit]);
+  const newest = useMemo(
+    () => [...versions].sort((a, b) => b.number - a.number).find((v) => v.kind === "upload"),
+    [versions],
+  );
+  const preview = previewKind(newest);
+  return (
+    <>
+      <Link to={`/events/${encodeURIComponent(document.event_id)}/documents`}>
+        {t("document-back")}
+      </Link>
+      <header className={styles.header}>
+        <p className={styles.key}>{document.readable_id}</p>
+        <h2 ref={heading} tabIndex={-1} className={styles.title}>
+          {document.name}
+        </h2>
+      </header>
+      <section className={styles.section} aria-labelledby="document-versions-title">
+        <h3 id="document-versions-title" className={styles.heading}>
+          {t("document-versions-title")}
+        </h3>
+        <DataTable
+          label={t("document-versions-title")}
+          columns={columns}
+          rows={versions}
+          rowKey={(v) => v.id}
+        />
+        <p className={styles.help}>{t("documents-no-scan")}</p>
+      </section>
+      <section className={styles.section} aria-labelledby="document-preview-title">
+        <h3 id="document-preview-title" className={styles.heading}>
+          {t("document-preview-title")}
+        </h3>
+        {newest && preview === "text" && (
+          <iframe
+            className={styles.frame}
+            title={t("document-preview-of", { name: newest.file_name ?? "" })}
+            src={contentUrl(newest, true)}
+          />
+        )}
+        {newest && preview === "pdf" && (
+          // The server sends a download with `sandbox`, which a browser may refuse to show in a
+          // frame. A link to a new tab keeps the CSP unchanged (ADR 0043).
+          <div>
+            <FileLink newTab href={contentUrl(newest, true)}>
+              {t("document-preview-open")}
+            </FileLink>
+          </div>
+        )}
+        {!preview && <p>{t("document-preview-none")}</p>}
+      </section>
+    </>
   );
 }

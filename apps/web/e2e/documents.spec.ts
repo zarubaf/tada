@@ -64,7 +64,7 @@ const documents = [
     "0199b8e0-0000-7000-8000-0000000000d2",
     "DOC-002",
     "Notizen.txt",
-    upload(1, "Notizen.txt", "text/plain"),
+    upload(1, "Notizen.txt", "text/plain; charset=utf-8"),
   ),
 ];
 
@@ -80,6 +80,7 @@ async function fakeDocuments(page: Page, items: unknown[]): Promise<void> {
 }
 
 async function fakeDocument(page: Page, versions: unknown[]): Promise<void> {
+  await fakeEvent(page, event);
   await page.route("**/api/v1/documents/*/versions", (route) =>
     route.fulfill({
       status: 200,
@@ -106,7 +107,11 @@ async function fakeDocument(page: Page, versions: unknown[]): Promise<void> {
     }),
   );
   await page.route("**/api/v1/document-versions/*/content*", (route) =>
-    route.fulfill({ status: 200, contentType: "text/plain", body: "Notizen zum Flugtag" }),
+    route.fulfill({
+      status: 200,
+      contentType: "text/plain; charset=utf-8",
+      body: "Notizen zum Flugtag",
+    }),
   );
 }
 
@@ -139,8 +144,8 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page);
       await fakeDocument(page, [
-        upload(1, "Notizen.txt", "text/plain"),
-        upload(2, "Notizen neu.txt", "text/plain"),
+        upload(1, "Notizen.txt", "text/plain; charset=utf-8"),
+        upload(2, "Notizen neu.txt", "text/plain; charset=utf-8"),
         draft,
       ]);
       await page.goto(`/documents/${DOCUMENT_ID}`);
@@ -212,7 +217,7 @@ for (const viewport of viewports) {
   test(`pseudo-locale, document, ${viewport.name} px: no text overflows`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await fakeSession(page);
-    await fakeDocument(page, [upload(1, "Notizen.txt", "text/plain"), draft]);
+    await fakeDocument(page, [upload(1, "Notizen.txt", "text/plain; charset=utf-8"), draft]);
     await page.goto(`/documents/${DOCUMENT_ID}?pseudo`);
     await expect(page.getByRole("table")).toBeVisible();
     expect(await textOverflows(page)).toEqual([]);

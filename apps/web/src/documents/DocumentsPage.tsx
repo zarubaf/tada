@@ -20,7 +20,7 @@ const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", tim
 
 type State =
   | { kind: "loading" }
-  | { kind: "failed"; message: string; requestId: string | undefined }
+  | { kind: "failed"; message: string; requestId: string | undefined; retried: boolean }
   | { kind: "loaded"; items: Document[]; nextCursor: string | undefined; loadingMore: boolean };
 
 const columns: Column<Document>[] = [
@@ -73,14 +73,25 @@ export function DocumentsPage({ api }: { api: Api }) {
   const [uploaded, setUploaded] = useState<string>();
   const [uploadFailure, setUploadFailure] = useState<string>();
   const heading = useRef<HTMLHeadingElement>(null);
+  // The newest request. The answer of an older one is dropped, so that it cannot replace the list.
+  const latest = useRef(0);
+  // Retries so far. After a retry, focus must not fall to the body when the error leaves.
+  const retries = useRef(0);
+  // A file goes up: a second pick does nothing, also before the next render.
+  const uploadRunning = useRef(false);
   const search = useRef<HTMLDivElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
 
   const load = useCallback(
     async (q: string | undefined, cursor: string | undefined, previous: Document[]) => {
       const params = { path: { event_id: eventId }, query: { q, cursor } };
+      const request = ++latest.current;
+      const retried = retries.current > 0;
       try {
         const { data, error } = await api.GET("/api/v1/events/{event_id}/documents", { params });
+        if (request !== latest.current) {
+          return;
+        }
         if (data) {
           const nextCursor = data.next_cursor ?? undefined;
           setState({
@@ -89,8 +100,10 @@ export function DocumentsPage({ api }: { api: Api }) {
             nextCursor,
             loadingMore: false,
           });
-          if (cursor !== undefined && nextCursor === undefined) {
-            // The last page arrived and the button leaves: focus goes to the heading.
+          if ((cursor !== undefined && nextCursor === undefined) || retried) {
+            // The last page arrived and the button leaves, or the retry button left with the
+            // error: focus goes to the heading.
+            retries.current = 0;
             focusAfterCommit(() => heading.current);
           }
         } else {
@@ -98,10 +111,18 @@ export function DocumentsPage({ api }: { api: Api }) {
             kind: "failed",
             message: problemMessage(error),
             requestId: error?.request_id,
+            retried,
           });
         }
       } catch {
-        setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+        if (request === latest.current) {
+          setState({
+            kind: "failed",
+            message: problemMessage(undefined),
+            requestId: undefined,
+            retried,
+          });
+        }
       }
     },
     [api, eventId, focusAfterCommit],
@@ -129,13 +150,14 @@ export function DocumentsPage({ api }: { api: Api }) {
   };
 
   const upload = async (file: File) => {
-    if (uploading) {
+    if (uploadRunning.current) {
       return;
     }
+    uploadRunning.current = true;
     setUploading(true);
     setUploaded(undefined);
     setUploadFailure(undefined);
-    const result = await uploadDocument(eventId, file);
+    const result = await uploadDocument(api, eventId, file);
     if ("document" in result) {
       setUploaded(t("documents-uploaded", { name: result.document.name }));
       void load(query, undefined, []);
@@ -143,6 +165,7 @@ export function DocumentsPage({ api }: { api: Api }) {
       // The button stays and keeps focus; the alert carries the message.
       setUploadFailure(uploadMessage(result.error, result.response));
     }
+    uploadRunning.current = false;
     setUploading(false);
   };
 
@@ -187,7 +210,9 @@ export function DocumentsPage({ api }: { api: Api }) {
         <InlineError
           message={state.message}
           requestId={state.requestId}
+          takeFocus={state.retried}
           onRetry={() => {
+            retries.current += 1;
             setState({ kind: "loading" });
             void load(query, undefined, []);
           }}

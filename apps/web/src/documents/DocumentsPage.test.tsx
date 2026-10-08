@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createApi, type Document } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
 import { DocumentsPage } from "./DocumentsPage";
@@ -50,12 +50,22 @@ const budget = makeDocument("d2", "DOC-002", "Budget Übersicht.pdf");
 /** A fake server for the list. It records the `q` of each call. */
 function setup(lists: Record<string, Document[]> = { "": [programm, budget] }) {
   const queries: (string | null)[] = [];
+  const hooks: {
+    upload?: () => Response;
+    /** Delays the answer of a list request. */
+    list?: (q: string | null) => Promise<void> | undefined;
+  } = {};
   const fetch = async (request: Request) => {
     const url = new URL(request.url);
+    if (url.pathname.endsWith("/documents") && request.method === "POST") {
+      return hooks.upload?.() ?? problem(500, "internal");
+    }
     if (url.pathname.endsWith("/documents")) {
       const q = url.searchParams.get("q");
       queries.push(q);
-      return json(200, { items: lists[q ?? ""] ?? [] });
+      const items = lists[q ?? ""] ?? [];
+      await hooks.list?.(q);
+      return json(200, { items });
     }
     throw new Error(`unexpected ${request.method} ${url.pathname}`);
   };
@@ -70,7 +80,7 @@ function setup(lists: Record<string, Document[]> = { "": [programm, budget] }) {
       </Routes>
     </Router>,
   );
-  return { queries };
+  return { queries, hooks };
 }
 
 function fileInput(): HTMLInputElement {
@@ -83,10 +93,7 @@ function fileInput(): HTMLInputElement {
 
 const user = userEvent.setup({ delay: null });
 
-afterEach(() => {
-  window.history.replaceState(null, "", "/");
-  vi.unstubAllGlobals();
-});
+afterEach(() => window.history.replaceState(null, "", "/"));
 
 describe("DocumentsPage", () => {
   it("lists the documents with a link to each", async () => {
@@ -128,6 +135,26 @@ describe("DocumentsPage", () => {
     expect(field).toHaveFocus();
   });
 
+  it("ignores an older answer that arrives after a newer one", async () => {
+    let releaseOld: () => void = () => {};
+    const { hooks } = setup({ "": [programm], Alt: [programm], Neu: [budget] });
+    await screen.findByRole("table");
+    hooks.list = (q) =>
+      q === "Alt" ? new Promise<void>((resolve) => (releaseOld = resolve)) : undefined;
+    const field = screen.getByRole("searchbox", { name: "Dokumente suchen" });
+
+    await user.type(field, "Alt");
+    await user.click(screen.getByRole("button", { name: "Suchen" }));
+    await user.clear(field);
+    await user.type(field, "Neu");
+    await user.click(screen.getByRole("button", { name: "Suchen" }));
+    expect(await screen.findByText("DOC-002")).toBeInTheDocument();
+    releaseOld();
+
+    await waitFor(() => expect(screen.getByText("DOC-002")).toBeInTheDocument());
+    expect(screen.queryByText("DOC-001")).not.toBeInTheDocument();
+  });
+
   it("shows the empty state when the event has no document", async () => {
     setup({ "": [] });
 
@@ -136,13 +163,10 @@ describe("DocumentsPage", () => {
 
   it("announces an upload and lists the new document", async () => {
     const lists = { "": [programm] };
-    setup(lists);
+    const { hooks } = setup(lists);
     await screen.findByRole("table");
     lists[""] = [programm, budget];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => json(201, budget)),
-    );
+    hooks.upload = () => json(201, budget);
 
     await user.upload(
       fileInput(),
@@ -156,14 +180,10 @@ describe("DocumentsPage", () => {
   });
 
   it("shows the message of a failed upload in the alert", async () => {
-    setup();
+    const { hooks } = setup();
     await screen.findByRole("table");
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        problem(422, "validation-failed", [{ pointer: "/file", code: "quota-exceeded" }]),
-      ),
-    );
+    hooks.upload = () =>
+      problem(422, "validation-failed", [{ pointer: "/file", code: "quota-exceeded" }]);
     await user.upload(fileInput(), new File(["x"], "gross.pdf", { type: "application/pdf" }));
 
     await waitFor(() =>

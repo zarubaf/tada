@@ -1,10 +1,10 @@
-// The only call to the server that does not go through the generated client.
-// The upload body is the raw file with the media type `application/octet-stream`, not JSON and not
-// a multipart form (ADR 0009, ADR 0043). The client that the build generates types a binary body
-// as a list of numbers and serializes it as JSON, so it cannot send a file. A `fetch` with a
-// `File` body streams the file from the disk and sets `Content-Length`.
+// The upload is the one call with a raw body: the file itself, with the media type
+// `application/octet-stream`, not JSON and not a multipart form (ADR 0009, ADR 0043).
+// The generated client types that body as a list of numbers and would serialize it as JSON, so this
+// call turns the serializer off and passes the `File` through. It still goes through the client,
+// so the session problems (ADR 0037) and the cookie rule apply to it as to every other call.
 import { t } from "../i18n";
-import type { Document, Problem } from "./client";
+import type { Api, Document, Problem } from "./client";
 import { failureOf } from "./failure";
 
 export type UploadResult =
@@ -12,25 +12,19 @@ export type UploadResult =
   | { error: Problem | undefined; response?: Response };
 
 /** Uploads `file` as the first version of a new document in the event. */
-export async function uploadDocument(eventId: string, file: File): Promise<UploadResult> {
+export async function uploadDocument(api: Api, eventId: string, file: File): Promise<UploadResult> {
   try {
-    const response = await fetch(`/api/v1/events/${encodeURIComponent(eventId)}/documents`, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/octet-stream",
+    const { data, error, response } = await api.POST("/api/v1/events/{event_id}/documents", {
+      params: {
+        path: { event_id: eventId },
         // HTTP header values hold no raw non-ASCII text: the server decodes the percent-encoding.
-        "X-File-Name": encodeURIComponent(file.name),
+        header: { "X-File-Name": encodeURIComponent(file.name) },
       },
-      body: file,
+      headers: { "Content-Type": "application/octet-stream" },
+      body: file as unknown as number[],
+      bodySerializer: (body) => body as unknown as BodyInit,
     });
-    if (response.ok) {
-      return { document: (await response.json()) as Document };
-    }
-    const error = response.headers.get("Content-Type")?.includes("problem+json")
-      ? ((await response.json().catch(() => undefined)) as Problem | undefined)
-      : undefined;
-    return { error, response };
+    return data ? { document: data } : { error, response };
   } catch {
     return { error: undefined };
   }

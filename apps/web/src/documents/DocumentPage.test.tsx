@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApi, type DocumentVersion } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
@@ -69,6 +69,16 @@ function setup(versions: DocumentVersion[]) {
     if (pathname.endsWith("/versions")) {
       return json(200, { items: versions });
     }
+    if (pathname.endsWith(`/events/${EVENT_ID}`)) {
+      return json(200, {
+        id: EVENT_ID,
+        key: "FLY28",
+        name: "Fly-in Musterhausen",
+        time_zone: "Europe/Zurich",
+        version: 1,
+        created_at: "2030-05-18T08:00:00Z",
+      });
+    }
     if (pathname.endsWith("/members")) {
       return json(200, {
         items: [{ user_id: "u2", display_name: "Bernd Beispiel", role: "member" }],
@@ -109,7 +119,10 @@ describe("DocumentPage", () => {
     expect(
       within(table).getByRole("link", { name: "Programm v2.pdf herunterladen, Version 2" }),
     ).toHaveAttribute("href", "/api/v1/document-versions/v2/content");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Programm Flugtag.pdf");
+    const heading = screen.getByRole("heading", { level: 2, name: "Programm Flugtag.pdf" });
+    await waitFor(() => expect(heading).toHaveFocus());
+    // The event layout stays around the document.
+    expect(screen.getByRole("link", { name: "Mitglieder" })).toBeInTheDocument();
   });
 
   it("states that files are not scanned for malware", async () => {
@@ -140,6 +153,12 @@ describe("DocumentPage", () => {
 
     const frame = await screen.findByTitle("Vorschau von Notizen.txt");
     expect(frame).toHaveAttribute("src", "/api/v1/document-versions/v1/content?disposition=inline");
+  });
+
+  it("previews a text type that carries a parameter", async () => {
+    setup([version(1, "Notizen.txt", "text/plain; charset=utf-8")]);
+
+    expect(await screen.findByTitle("Vorschau von Notizen.txt")).toBeInTheDocument();
   });
 
   it("offers no preview for another type", async () => {

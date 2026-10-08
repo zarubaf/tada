@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { createApi, watchSessionProblems } from "./client";
 import { uploadDocument, uploadMessage } from "./upload";
 
 function problem(status: number, code: string, errors: unknown[] = []) {
@@ -8,44 +9,50 @@ function problem(status: number, code: string, errors: unknown[] = []) {
   );
 }
 
-afterEach(() => vi.unstubAllGlobals());
-
 describe("uploadDocument", () => {
   it("sends the raw file with the encoded file name", async () => {
-    const fetch = vi.fn(async () => new Response(JSON.stringify({ id: "d1" }), { status: 201 }));
-    vi.stubGlobal("fetch", fetch);
+    const seen: Request[] = [];
+    const api = createApi((async (request: Request) => {
+      seen.push(request);
+      return new Response(JSON.stringify({ id: "d1" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof globalThis.fetch);
     const file = new File(["inhalt"], "Übersicht 2030.txt", { type: "text/plain" });
 
-    const result = await uploadDocument("e1", file);
+    const result = await uploadDocument(api, "e1", file);
 
     expect(result).toEqual({ document: { id: "d1" } });
-    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("/api/v1/events/e1/documents");
-    expect(init.method).toBe("POST");
-    expect(init.body).toBe(file);
-    expect(init.credentials).toBe("same-origin");
-    const headers = new Headers(init.headers);
-    expect(headers.get("Content-Type")).toBe("application/octet-stream");
-    expect(headers.get("X-File-Name")).toBe("%C3%9Cbersicht%202030.txt");
+    const request = seen[0] as Request;
+    expect(new URL(request.url).pathname).toBe("/api/v1/events/e1/documents");
+    expect(request.method).toBe("POST");
+    expect(request.headers.get("Content-Type")).toBe("application/octet-stream");
+    expect(request.headers.get("X-File-Name")).toBe("%C3%9Cbersicht%202030.txt");
+    expect(await request.text()).toBe("inhalt");
   });
 
   it("returns the problem of a failed upload", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => problem(413, "payload-too-large")),
-    );
-    const result = await uploadDocument("e1", new File(["x"], "a.txt"));
+    const api = createApi((async () => problem(413, "payload-too-large")) as never);
+    const result = await uploadDocument(api, "e1", new File(["x"], "a.txt"));
     expect("error" in result && result.error?.code).toBe("payload-too-large");
   });
 
+  it("reports an expired session like every other call", async () => {
+    const api = createApi((async () => problem(401, "unauthenticated")) as never);
+    const seen: string[] = [];
+    api.use(watchSessionProblems((code) => seen.push(code)));
+
+    await uploadDocument(api, "e1", new File(["x"], "a.txt"));
+
+    expect(seen).toEqual(["unauthenticated"]);
+  });
+
   it("returns no problem when the network fails", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        throw new TypeError("network");
-      }),
-    );
-    expect(await uploadDocument("e1", new File(["x"], "a.txt"))).toEqual({ error: undefined });
+    const api = createApi((async () => {
+      throw new TypeError("network");
+    }) as never);
+    expect(await uploadDocument(api, "e1", new File(["x"], "a.txt"))).toEqual({ error: undefined });
   });
 });
 
