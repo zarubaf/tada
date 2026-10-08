@@ -864,6 +864,36 @@ mod tests {
         assert_eq!(removals, 1);
     }
 
+    /// A removal keeps the owner of the records of the member (ADR 0063): the evidence and the audit log refer to it.
+    #[tokio::test]
+    async fn a_removed_member_stays_the_owner_of_an_open_question() {
+        let f = Fixture::start().await;
+        let anna = f.member("Anna Muster", OrganizationRole::Member).await;
+        let event = f.event_with_managers(&[f.owner.user_id()]).await;
+        let question = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO open_question
+                 (id, organization_id, event_id, local_number, text, owner_user_id, status, version, created_at)
+             VALUES ($1, $2, $3, 1, 'Welcher Samstag?', $4, 'open', 1, now())",
+        )
+        .bind(question)
+        .bind(f.scope().organization_id().as_uuid())
+        .bind(event.as_uuid())
+        .bind(anna.as_uuid())
+        .execute(&f.db().pool)
+        .await
+        .unwrap();
+
+        assert_eq!(f.remove(anna).await, None);
+        let owner: Uuid =
+            sqlx::query_scalar("SELECT owner_user_id FROM open_question WHERE id = $1")
+                .bind(question)
+                .fetch_one(&f.db().pool)
+                .await
+                .unwrap();
+        assert_eq!(owner, anna.as_uuid());
+    }
+
     /// An owner of another organization neither sees nor removes a membership (ADR 0006).
     #[tokio::test]
     async fn a_removal_stays_inside_the_organization() {
