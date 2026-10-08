@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Button } from "react-aria-components";
 import type { Api } from "../api/client";
 import { type Failure, failureOf, useWaiting } from "../api/failure";
 import { t } from "../i18n";
 import { useNavigate } from "../router/Router";
 import { PublicPage, PublicText } from "../sign-in/PublicPage";
+import { ChoiceButton } from "../ui/ChoiceButton";
 import { EmptyState } from "../ui/EmptyState";
 import { InlineError } from "../ui/InlineError";
 import styles from "./ChooseOrganizationPage.module.css";
@@ -56,15 +56,13 @@ export function ChooseOrganizationPage({ api }: { api: Api }) {
           <ul className={styles.list}>
             {memberships.map((membership) => (
               <li key={membership.organization_id}>
-                <Button
-                  className={styles.choice}
+                <ChoiceButton
+                  title={membership.name}
+                  detail={t(`role-${membership.role}`)}
                   isDisabled={waiting}
                   isPending={busy}
                   onPress={() => void choose(membership.organization_id)}
-                >
-                  <span className={styles.name}>{membership.name}</span>
-                  <span className={styles.role}>{t(`role-${membership.role}`)}</span>
-                </Button>
+                />
               </li>
             ))}
           </ul>

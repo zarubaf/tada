@@ -35,34 +35,4 @@
     cursor: default;
     opacity: 0.5;
   }
-
-  .popover {
-    min-width: var(--trigger-width);
-    border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-raised);
-    box-shadow: var(--shadow-2);
-  }
-
-  .menu {
-    padding: var(--space-1);
-    outline: none;
-  }
-
-  .item {
-    display: flex;
-    align-items: center;
-    min-height: var(--control-height-md);
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-    cursor: pointer;
-    outline: none;
-  }
-
-  .item[data-focused],
-  .item[data-selected] {
-    background: var(--color-accent-subtle);
-    color: var(--color-accent-text);
-  }
 }
