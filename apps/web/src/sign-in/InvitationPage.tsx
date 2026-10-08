@@ -33,13 +33,21 @@ export function InvitationPage({ api }: { api: Api }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const { retried, retry } = useRetry(() => heading.current);
 
+  // Only the newest preview request may change the page; an older answer arrives late and is stale.
+  const latestPreview = useRef(0);
+
   /** The preview uses no token up. Resolves to true when it loaded. */
   const loadPreview = useCallback(async () => {
     if (!token) {
       return false;
     }
+    const request = ++latestPreview.current;
+    const isStale = () => request !== latestPreview.current;
     try {
       const result = await api.POST("/api/v1/invitations/preview", { body: { token } });
+      if (isStale()) {
+        return false;
+      }
       if (result.data) {
         setFailure(undefined);
         setPreview({ kind: "ready", preview: result.data });
@@ -47,7 +55,9 @@ export function InvitationPage({ api }: { api: Api }) {
       }
       setFailure(failureOf(result, t("invitation-invalid")));
     } catch {
-      setFailure(failureOf({}));
+      if (!isStale()) {
+        setFailure(failureOf({}));
+      }
     }
     return false;
   }, [api, token]);

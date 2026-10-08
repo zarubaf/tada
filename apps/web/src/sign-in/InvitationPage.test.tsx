@@ -1,6 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+import { createApi } from "../api/client";
 import { Router, usePathname } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 import { InvitationPage } from "./InvitationPage";
@@ -125,6 +127,36 @@ describe("InvitationPage", () => {
     await findAlert();
     expect(alerts.stop()).toBe(2);
     expect(button).toHaveFocus();
+  });
+
+  it("ignores a stale answer of the preview that arrives after the newer one", async () => {
+    window.history.replaceState(null, "", "/invitation#token=invite-token");
+    const pending: ((response: Response) => void)[] = [];
+    const fetch = async (request: Request) => {
+      if (new URL(request.url).pathname === "/api/v1/session") {
+        return problem(401, "unauthenticated");
+      }
+      return new Promise<Response>((resolve) => pending.push(resolve));
+    };
+    const api = createApi(fetch as unknown as typeof globalThis.fetch);
+    render(
+      <StrictMode>
+        <Router>
+          <SessionProvider api={api}>
+            <InvitationPage api={api} />
+          </SessionProvider>
+        </Router>
+      </StrictMode>,
+    );
+    await waitFor(() => expect(pending).toHaveLength(2));
+    await act(async () => {
+      pending[1]?.(json(200, { organization_name: "Fliegergruppe Testwil", role: "member" }));
+    });
+    expect(await screen.findByText(/Fliegergruppe Testwil/)).toBeInTheDocument();
+    await act(async () => {
+      pending[0]?.(problem(503, "unavailable"));
+    });
+    expect(queryAlert()).not.toBeInTheDocument();
   });
 
   it("moves focus to the message when the accept fails for good", async () => {
