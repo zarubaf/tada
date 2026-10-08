@@ -369,6 +369,25 @@ impl ServiceIdentity for TelegramGateway {
     const CHANNEL: Channel = Channel::Telegram;
 }
 
+impl ServiceCaller<TelegramGateway> {
+    /// The linked member for whom the gateway acts, through the channel `telegram` (ADR 0039).
+    /// Only `telegram::member_for` calls it, after it read the membership of the user.
+    pub(crate) fn member(
+        &self,
+        user_id: UserId,
+        organization_id: OrganizationId,
+        role: OrganizationRole,
+    ) -> MemberCaller {
+        MemberCaller {
+            user_id,
+            organization_id,
+            role,
+            channel: TelegramGateway::CHANNEL,
+            request_id: None,
+        }
+    }
+}
+
 /// The service identity `job-runner`: the worker that runs the jobs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct JobRunner;

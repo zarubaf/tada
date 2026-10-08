@@ -134,6 +134,17 @@ impl TelegramLinks for Database {
         Ok(Confirmed::Linked(TelegramUserId(account)))
     }
 
+    async fn user_of(&self, account: TelegramUserId) -> Result<Option<UserId>, StoreError> {
+        let user = sqlx::query_scalar!(
+            "SELECT user_id FROM telegram_identity WHERE telegram_user_id = $1",
+            account.0,
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(user.map(UserId::from_uuid))
+    }
+
     async fn record_update(&self, update_id: i64) -> Result<bool, StoreError> {
         let result = sqlx::query!(
             "INSERT INTO telegram_update (update_id, received_at) VALUES ($1, now()) ON CONFLICT DO NOTHING",
@@ -216,6 +227,11 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(confirmed, Confirmed::Linked(TelegramUserId(42)));
+        assert_eq!(
+            db.user_of(TelegramUserId(42)).await.unwrap(),
+            Some(alice.user_id())
+        );
+        assert_eq!(db.user_of(TelegramUserId(43)).await.unwrap(), None);
         assert!(
             db.requests(alice.scope(), alice.user_id(), now)
                 .await
