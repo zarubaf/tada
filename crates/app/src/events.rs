@@ -142,23 +142,13 @@ pub async fn create_event(
     let scope = caller.scope();
     let event = validate(scope, input, clock)?;
 
-    let created = AuditEvent::new(
-        caller.actor(),
-        AuditAction::EventCreate,
-        Some(event.id.as_uuid()),
-        Some(scope),
-    );
-    let manager = AuditEvent::new(
-        caller.actor(),
-        AuditAction::EventMembershipAdd,
-        Some(event.id.as_uuid()),
-        Some(scope),
-    )
-    .about(caller.user_id())
-    .with_roles(None, Some(AuditRole::Event(EventRole::EventManager)));
-
     match store
-        .insert(scope, &event, caller.user_id(), &[created, manager])
+        .insert(
+            scope,
+            &event,
+            caller.user_id(),
+            &creation_audit(caller, event.id),
+        )
         .await?
     {
         Inserted::Inserted => Ok(Created::New(event)),
@@ -168,6 +158,27 @@ pub async fn create_event(
             _ => Err(invalid("id", "taken")),
         },
     }
+}
+
+/// The audit events of a new event: its creation and its first event manager, the caller (ADR 0052, ADR 0061).
+pub(crate) fn creation_audit(caller: &MemberCaller, event: EventId) -> [AuditEvent; 2] {
+    let scope = Some(caller.scope());
+    [
+        AuditEvent::new(
+            caller.actor(),
+            AuditAction::EventCreate,
+            Some(event.as_uuid()),
+            scope,
+        ),
+        AuditEvent::new(
+            caller.actor(),
+            AuditAction::EventMembershipAdd,
+            Some(event.as_uuid()),
+            scope,
+        )
+        .about(caller.user_id())
+        .with_roles(None, Some(AuditRole::Event(EventRole::EventManager))),
+    ]
 }
 
 fn validate(

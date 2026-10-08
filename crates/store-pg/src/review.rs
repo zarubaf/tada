@@ -13,6 +13,7 @@ use sqlx::types::Uuid;
 use tada_app::audit::AuditEvent;
 use tada_app::caller::{Actor, OrgScope};
 use tada_app::domain::RecordVersion;
+use tada_app::domain::events::Event;
 use tada_app::domain::facts::{ChoiceValue, FactState, Label, ValueType, Valued};
 use tada_app::domain::ids::{
     ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, SourceVersionId,
@@ -28,7 +29,7 @@ use tada_app::store::StoreError;
 use crate::Database;
 use crate::error::{InvalidRow, store_error};
 use crate::sources::{TextItem, TextKind};
-use crate::{actor, audit, sources, values};
+use crate::{actor, audit, events, sources, values};
 
 /// The kind of the event-local IDs of open questions (ADR 0038).
 const OPEN_QUESTION_PREFIX: &str = "QST";
@@ -370,29 +371,17 @@ async fn write_step(
             name,
             time_zone,
         } => {
-            sqlx::query!(
-                "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)
-                 VALUES ($1, $2, $3, $4, $5, 1, $6)",
-                id.as_uuid(),
-                organization,
-                key.as_str(),
-                name.as_str(),
-                time_zone.as_str(),
-                now as _,
-            )
-            .execute(&mut *conn)
-            .await?;
-            // An event has at least one event manager: here the reviewer who accepts it (ADR 0052).
-            sqlx::query!(
-                "INSERT INTO event_membership (organization_id, event_id, user_id, event_role, version, created_at)
-                 VALUES ($1, $2, $3, 'event-manager', 1, $4)",
-                organization,
-                id.as_uuid(),
-                plan.manager.as_uuid(),
-                now as _,
-            )
-            .execute(&mut *conn)
-            .await?;
+            let event = Event {
+                id: *id,
+                organization_id: scope.organization_id(),
+                key: key.clone(),
+                name: name.clone(),
+                time_zone: time_zone.clone(),
+                version: RecordVersion::FIRST,
+                created_at: plan.now,
+            };
+            // The reviewer who accepts the new event is its first event manager (ADR 0052).
+            events::insert_event(conn, scope, &event, plan.manager).await?;
         }
         Operation::AddFieldDefinition {
             id,

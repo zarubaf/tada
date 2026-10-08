@@ -10,7 +10,6 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
 use tada_domain::facts::{ChoiceValue, FactState, Label, ValueType, Valued};
-use tada_domain::identity::EventRole;
 use tada_domain::ids::{
     ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, SourceVersionId, UserId,
 };
@@ -18,7 +17,7 @@ use tada_domain::proposals::{Operation, Proposal};
 use tada_domain::sources::Passage;
 
 use crate::access::{self, AccessError};
-use crate::audit::{AuditAction, AuditEvent, AuditRole};
+use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::facts::FactStore;
@@ -925,22 +924,7 @@ fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEvent> {
         scope,
     )];
     if let Operation::CreateEvent { id, .. } = step.operation {
-        events.push(AuditEvent::new(
-            caller.actor(),
-            AuditAction::EventCreate,
-            Some(id.as_uuid()),
-            scope,
-        ));
-        events.push(
-            AuditEvent::new(
-                caller.actor(),
-                AuditAction::EventMembershipAdd,
-                Some(id.as_uuid()),
-                scope,
-            )
-            .about(caller.user_id())
-            .with_roles(None, Some(AuditRole::Event(EventRole::EventManager))),
-        );
+        events.extend(crate::events::creation_audit(caller, id));
     }
     events
 }
