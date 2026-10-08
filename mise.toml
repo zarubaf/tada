@@ -118,9 +118,13 @@ run = "uv run --quiet scripts/check_browser.py --update-snapshots"
 description = "Fail if the Rust sources contain a way around the session authenticator"
 run = "uv run --quiet scripts/check_no_dev_auth.py"
 
+[tasks."check:scoped-ports"]
+description = "Fail if a port method has neither an organization scope nor the infrastructure marker"
+run = "uv run --quiet scripts/check_scoped_ports.py"
+
 [tasks."check:rust"]
 description = "Run all Rust checks"
-depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps", "check:generated", "check:contract", "check:no-dev-auth"]
+depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:deps", "check:generated", "check:contract", "check:no-dev-auth", "check:scoped-ports"]
 
 [tasks.check]
 description = "Run every check that CI runs; skips the web and browser checks when no web file changed"

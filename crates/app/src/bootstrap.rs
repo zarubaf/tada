@@ -56,9 +56,9 @@ pub trait BootstrapStore: Send + Sync {
     /// Otherwise it revokes the pending owner invitations, inserts the new one, queues its mail
     /// and records the audit events.
     ///
-    /// The organization comes from an infrastructure query by slug (ADR 0039). The store continues
-    /// with the organization ID of its own query, and records the audit events with
-    /// `AuditEvent::by_bootstrap`.
+    /// The store continues with the organization ID of its own query, and records the audit events
+    /// with `AuditEvent::by_bootstrap`.
+    /// Infrastructure query (ADR 0039): the slug of the operator names the organization, and it can be new.
     async fn invite_first_owner(
         &self,
         caller: &ServiceCaller<Bootstrap>,

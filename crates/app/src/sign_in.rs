@@ -30,6 +30,7 @@ pub trait SignInStore: Debug + Send + Sync {
     /// transaction starts a session for its user and returns the session token.
     /// The organization of the session is `initial_organization` of the user's memberships.
     /// A user without a membership gets no session, and the link is used up all the same.
+    /// Infrastructure query (ADR 0039): sign-in has no organization yet, and the token names the user.
     async fn redeem_magic_link(
         &self,
         token: &str,
@@ -39,6 +40,7 @@ pub trait SignInStore: Debug + Send + Sync {
 
     /// What the pending invitation of `token` is for, if the token is valid at `now`.
     /// It does not use the token.
+    /// Infrastructure query (ADR 0039): the token names the invitation, and the invitation names its organization.
     async fn preview_invitation(
         &self,
         token: &str,
@@ -50,6 +52,7 @@ pub trait SignInStore: Debug + Send + Sync {
     /// `accepted_role`, marks the invitation accepted, deletes all its tokens, records the audit
     /// event and starts a session in the organization of the invitation.
     /// It returns the session token, or `None` for an unknown, used or expired token.
+    /// Infrastructure query (ADR 0039): the token names the invitation, and the invitation names its organization.
     async fn accept_invitation(
         &self,
         token: &str,
@@ -82,6 +85,7 @@ pub trait SignInRequestStore: Debug + Send + Sync {
     /// it, the same transaction queues a magic-link intent for the user of `email` if that user has
     /// a membership. A known and an unknown address both write the counters in one commit, so that
     /// the time of the request does not show if the address is known (ADR 0008).
+    /// Infrastructure query (ADR 0039): sign-in has no organization yet, and the address names the user.
     async fn queue_magic_link(
         &self,
         email: &Email,

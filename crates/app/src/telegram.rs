@@ -77,7 +77,7 @@ pub trait TelegramLinks: Debug + Send + Sync {
     ) -> Result<String, StoreError>;
 
     /// Marks an unexpired, unclaimed code as claimed by the account. Returns false for any other code.
-    /// An infrastructure query (ADR 0039): the code finds its organization.
+    /// Infrastructure query (ADR 0039): the code finds its organization.
     async fn claim(
         &self,
         code: &str,
@@ -104,6 +104,7 @@ pub trait TelegramLinks: Debug + Send + Sync {
     ) -> Result<Confirmed, StoreError>;
 
     /// Records an update ID. Returns false if the gateway saw it before.
+    /// Infrastructure query (ADR 0039): a Telegram update ID has no organization.
     async fn record_update(&self, update_id: i64) -> Result<bool, StoreError>;
 }
 

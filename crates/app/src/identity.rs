@@ -27,11 +27,11 @@ pub struct Membership {
 
 #[async_trait]
 pub trait IdentityStore: Debug + Send + Sync {
-    /// The user with the ID `id`. This query has no scope: a session names a user, not an organization.
+    /// Infrastructure query (ADR 0039): a session names a user, not an organization.
     async fn user(&self, id: UserId) -> Result<Option<UserRef>, StoreError>;
 
     /// All memberships of a user, in the order of the organization names.
-    /// This query has no scope for the same reason.
+    /// Infrastructure query (ADR 0039): it lists the organizations of one user.
     async fn memberships_of(&self, user: UserId) -> Result<Vec<Membership>, StoreError>;
 
     /// The role of a user in the organization of `scope`, or `None` for a non-member.

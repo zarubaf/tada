@@ -56,13 +56,16 @@ impl Job {
 #[async_trait]
 pub trait JobQueue: Debug + Send + Sync {
     /// Claims the oldest due job for `lease`. Another worker can claim the job again after the lease.
+    /// Infrastructure query (ADR 0039): the worker serves the jobs of all organizations, and the job names its own.
     async fn claim(&self, worker_id: Uuid, lease: Duration) -> Result<Option<Job>, StoreError>;
 
     /// Removes a job that completed. Returns false if the worker no longer holds the job.
+    /// Infrastructure query (ADR 0039): the worker holds the job, and the job names its own organization.
     async fn complete(&self, job: &Job, worker_id: Uuid) -> Result<bool, StoreError>;
 
     /// Records a failed attempt. The job runs again after a backoff, or fails for good after its
     /// last attempt. Returns false if the worker no longer holds the job.
+    /// Infrastructure query (ADR 0039): the worker holds the job, and the job names its own organization.
     async fn fail(&self, job: &Job, worker_id: Uuid, reason: &str) -> Result<bool, StoreError>;
 }
 

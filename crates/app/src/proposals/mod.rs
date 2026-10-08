@@ -74,6 +74,7 @@ pub enum Inserted {
 pub trait ProposalStore: Debug + Send + Sync {
     /// The IDs of `ids` that a changeset, a proposal, an event, a field definition or an open question has,
     /// in any organization. A new record ID must be free in the whole installation (ADR 0038).
+    /// Infrastructure query (ADR 0039): a record ID must be free in the whole installation (ADR 0038).
     async fn taken_ids(&self, ids: &[Uuid]) -> Result<Vec<Uuid>, StoreError>;
 
     /// Stores `source` as a source version of the kind `member-text` with the ID `changeset.source_version_id`,

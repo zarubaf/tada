@@ -48,12 +48,15 @@ impl SessionRow {
 pub trait SessionStore: Debug + Send + Sync {
     /// The session of `token`. An expired session (`SessionRow::is_expired`) gives `None`,
     /// and the store deletes it.
+    /// Infrastructure query (ADR 0039): the token names the session, and a session belongs to a user.
     async fn find(&self, token: &str, now: Timestamp) -> Result<Option<SessionRow>, StoreError>;
 
     /// Sets the last-use time of the session to `now`.
+    /// Infrastructure query (ADR 0039): the token names the session, and a session belongs to a user.
     async fn touch(&self, token: &str, now: Timestamp) -> Result<(), StoreError>;
 
     /// Sets or clears the organization of the session. The token stays the same (ADR 0056).
+    /// Infrastructure query (ADR 0039): the token names the session, and a session belongs to a user.
     async fn set_organization(
         &self,
         token: &str,
@@ -61,6 +64,7 @@ pub trait SessionStore: Debug + Send + Sync {
     ) -> Result<(), StoreError>;
 
     /// Ends the session, for example at sign-out.
+    /// Infrastructure query (ADR 0039): the token names the session, and a session belongs to a user.
     async fn delete(&self, token: &str) -> Result<(), StoreError>;
 }
 

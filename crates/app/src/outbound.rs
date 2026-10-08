@@ -93,15 +93,16 @@ impl Outcome {
 #[async_trait]
 pub trait OutboundStore: Send + Sync {
     /// The intent, if it still waits for its send.
-    /// An infrastructure query without a scope (ADR 0039): it returns the organization of the intent
-    /// in its purpose.
+    /// Infrastructure query (ADR 0039): the intent names its organization in its purpose.
     async fn load_pending(&self, intent_id: Uuid) -> Result<Option<PendingIntent>, StoreError>;
 
     /// Moves a pending intent to `unknown` before its send. Returns false if it is not pending.
     /// From then on, no attempt sends it again unless `release` returns it.
+    /// Infrastructure query (ADR 0039): the intent ID is the key, and `load_pending` gave its organization.
     async fn claim(&self, intent_id: Uuid) -> Result<bool, StoreError>;
 
     /// Stores the hash of a new magic-link token and returns the token.
+    /// Infrastructure query (ADR 0039): sign-in has no organization yet.
     async fn issue_magic_link(
         &self,
         user_id: UserId,
@@ -119,9 +120,11 @@ pub trait OutboundStore: Send + Sync {
     ) -> Result<Option<SecretString>, StoreError>;
 
     /// Records the outcome of a claimed intent.
+    /// Infrastructure query (ADR 0039): the intent ID is the key, and `load_pending` gave its organization.
     async fn finish(&self, intent_id: Uuid, outcome: Outcome) -> Result<(), StoreError>;
 
     /// Returns a claimed intent to pending, after a send that certainly did not deliver the message.
+    /// Infrastructure query (ADR 0039): the intent ID is the key, and `load_pending` gave its organization.
     async fn release(&self, intent_id: Uuid) -> Result<(), StoreError>;
 }
 
