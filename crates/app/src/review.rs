@@ -380,6 +380,24 @@ impl CommandError for ApplyError {
 ///    the review results and the audit events in one transaction.
 ///
 /// The caller is a `MemberCaller`, so an AI client cannot apply (ADR 0039).
+/// Code that has an `AiCaller` does not compile, because the caller type does not match:
+///
+/// ```compile_fail,E0308
+/// use tada_app::caller::AiCaller;
+/// use tada_app::clock::Clock;
+/// use tada_app::domain::ids::ChangesetId;
+/// use tada_app::review::{ApplyInput, ReviewStores, apply_changeset};
+///
+/// async fn apply_as_ai_client(
+///     caller: &AiCaller,
+///     changeset: ChangesetId,
+///     input: ApplyInput,
+///     stores: ReviewStores<'_>,
+///     clock: &dyn Clock,
+/// ) {
+///     let _ = apply_changeset(caller, changeset, input, stores, clock).await;
+/// }
+/// ```
 pub async fn apply_changeset(
     caller: &MemberCaller,
     changeset_id: ChangesetId,
