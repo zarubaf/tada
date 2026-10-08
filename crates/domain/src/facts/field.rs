@@ -57,7 +57,7 @@ impl MessageId {
 }
 
 /// The description of a field: 1 to 2000 characters, without control characters and without spaces at the ends.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Description(String);
 
 impl Description {
@@ -70,6 +70,13 @@ impl Description {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// A description can quote personal data, so `Debug` shows its length only (ADR 0035).
+impl std::fmt::Debug for Description {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Description({} characters)", self.0.chars().count())
     }
 }
 
@@ -92,6 +99,12 @@ pub enum FieldScope {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn debug_of_a_description_hides_the_text() {
+        let description = Description::parse("Call Erika Muster").unwrap();
+        assert!(!format!("{description:?}").contains("Erika"));
+    }
     use crate::facts::KeyError;
 
     #[test]

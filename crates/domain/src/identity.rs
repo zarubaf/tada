@@ -112,7 +112,7 @@ impl OrganizationSlug {
 }
 
 /// The name of an organization, with the rules of `crate::name`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct OrganizationName(String);
 
 impl OrganizationName {
@@ -126,8 +126,15 @@ impl OrganizationName {
     }
 }
 
+/// An organization name can identify a person, so `Debug` shows its length only (ADR 0035).
+impl std::fmt::Debug for OrganizationName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OrganizationName({} characters)", self.0.chars().count())
+    }
+}
+
 /// The name that a member gives a personal API token, for example the name of the client, with the rules of `crate::name`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct TokenName(String);
 
 impl TokenName {
@@ -138,6 +145,13 @@ impl TokenName {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// A token name is free text from a member, so `Debug` shows its length only (ADR 0035).
+impl std::fmt::Debug for TokenName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TokenName({} characters)", self.0.chars().count())
     }
 }
 
@@ -238,6 +252,14 @@ impl fmt::Debug for DisplayName {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn debug_of_an_organization_name_and_a_token_name_hides_the_name() {
+        let organization = OrganizationName::parse("Erika Muster Club").unwrap();
+        let token = TokenName::parse("Erika laptop").unwrap();
+        assert!(!format!("{organization:?}").contains("Erika"));
+        assert!(!format!("{token:?}").contains("Erika"));
+    }
 
     #[test]
     fn ranks_organization_roles() {

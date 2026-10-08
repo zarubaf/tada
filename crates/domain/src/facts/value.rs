@@ -149,7 +149,7 @@ fn check_choice(
 }
 
 /// A short text: 1 to 200 characters, without control characters and without spaces at the ends.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ShortText(String);
 
 impl ShortText {
@@ -162,6 +162,13 @@ impl ShortText {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// A short text can hold a name or contact details, so `Debug` shows its length only (ADR 0035).
+impl std::fmt::Debug for ShortText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ShortText({} characters)", self.0.chars().count())
     }
 }
 
@@ -375,6 +382,26 @@ mod tests {
 
     use super::*;
     use crate::facts::{Label, MessageId};
+
+    #[test]
+    fn debug_of_a_short_text_and_of_the_types_that_wrap_it_hides_the_text() {
+        let text = ShortText::parse("Erika Muster").unwrap();
+        let valued = Valued {
+            value: FactValue::Text(text.clone()),
+            approximate: false,
+        };
+        let choice = ChoiceValue {
+            key: ChoiceKey::parse("pick").unwrap(),
+            label: Label::Text(text.clone()),
+        };
+        assert_eq!(format!("{text:?}"), "ShortText(12 characters)");
+        for shown in [format!("{valued:?}"), format!("{choice:?}")] {
+            assert!(
+                !shown.contains("Erika") && !shown.contains("Muster"),
+                "{shown}"
+            );
+        }
+    }
 
     fn choice_type(keys: &[&str], multiple: bool) -> ValueType {
         ValueType::Choice {

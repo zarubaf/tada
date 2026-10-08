@@ -52,7 +52,7 @@ impl EventKey {
 }
 
 /// The name of an event, with the rules of `crate::name`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct EventName(String);
 
 impl EventName {
@@ -63,6 +63,13 @@ impl EventName {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// An event name can contain a name of a person, so `Debug` shows its length only (ADR 0035).
+impl std::fmt::Debug for EventName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EventName({} characters)", self.0.chars().count())
     }
 }
 
@@ -95,6 +102,12 @@ impl EventTimeZone {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn debug_of_an_event_name_hides_the_name() {
+        let name = EventName::parse("Erika Muster Party").unwrap();
+        assert!(!format!("{name:?}").contains("Erika"));
+    }
 
     #[test]
     fn accepts_keys_of_two_to_eight_capital_letters_and_digits() {
