@@ -6,6 +6,7 @@ import {
   sessionInfo,
   sessionWithRole,
   setTheme,
+  textOverflows,
   themes,
   viewports,
 } from "./fixtures";
@@ -105,3 +106,40 @@ test("the navigation item Einstellungen leads to the members", async ({ page }) 
   await expect(page).toHaveURL(/\/settings\/members$/);
   await expect(page.getByRole("heading", { level: 1, name: "Mitglieder" })).toBeVisible();
 });
+
+// ADR 0024: German text can be 40 % longer than the source. No text may overflow its box.
+for (const viewport of viewports) {
+  for (const role of ["owner", "member"] as const) {
+    test(`members, ${role}, pseudo-locale, ${viewport.name} px: no text overflows`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await fakeSession(page, sessionWithRole(role));
+      await fakeMembers(page, role !== "member");
+      await page.goto("/settings/members?pseudo");
+      await expect(page.getByRole("table").first()).toBeVisible();
+      if (role === "owner") {
+        await expect(page.getByRole("table")).toHaveCount(2);
+      }
+      await expect(page.getByRole("status")).toHaveCount(1);
+
+      expect(await textOverflows(page)).toEqual([]);
+    });
+  }
+}
+
+for (const theme of themes) {
+  test(`members, open confirmation, ${theme}: no axe violation`, async ({ page }) => {
+    await fakeSession(page, sessionWithRole("owner"));
+    await fakeMembers(page, true);
+    await page.goto("/settings/members");
+    await setTheme(page, theme);
+    await page.getByRole("button", { name: /Bernhard.* entfernen/ }).click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(results.violations).toEqual([]);
+  });
+}

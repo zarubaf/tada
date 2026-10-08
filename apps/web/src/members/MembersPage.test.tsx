@@ -43,13 +43,25 @@ interface Setup {
   role?: string;
   members?: unknown[];
   invitations?: unknown[];
+  /** Members pages by the `cursor` query ("" is the first page). */
+  pages?: Record<string, () => Response>;
+  /** The organization of the session from the second `GET /session` on. */
+  organizationAfter?: unknown;
   /** Answers by `METHOD /path-suffix`. */
   answers?: Record<string, () => Response | Promise<Response>>;
 }
 
 /** A fake server. It records `METHOD path` and the JSON body of each call. */
-function setup({ role = "owner", members = [anna, bernd], invitations = [], answers = {} }: Setup) {
+function setup({
+  role = "owner",
+  members = [anna, bernd],
+  invitations = [],
+  pages,
+  organizationAfter,
+  answers = {},
+}: Setup) {
   const calls: { call: string; body: unknown }[] = [];
+  let sessions = 0;
   const own = { organization_id: "o1", name: "Fliegergruppe Testwil", role };
   const session = {
     user_id: ME,
@@ -70,10 +82,13 @@ function setup({ role = "owner", members = [anna, bernd], invitations = [], answ
       return answer[1]();
     }
     if (pathname.endsWith("/session")) {
-      return json(200, session);
+      sessions += 1;
+      const later = sessions > 1 && organizationAfter !== undefined;
+      return json(200, later ? { ...session, organization: organizationAfter } : session);
     }
     if (pathname.endsWith("/api/v1/members")) {
-      return json(200, { items: members });
+      const page = pages?.[new URL(request.url).searchParams.get("cursor") ?? ""];
+      return page ? page() : json(200, { items: members });
     }
     if (pathname.endsWith("/api/v1/invitations")) {
       return json(200, { items: invitations });
@@ -93,7 +108,7 @@ function setup({ role = "owner", members = [anna, bernd], invitations = [], answ
       </SessionProvider>
     </Router>,
   );
-  return { calls };
+  return { calls, count: (call: string) => calls.filter((c) => c.call === call).length };
 }
 
 const user = userEvent.setup({ delay: null });
@@ -282,5 +297,172 @@ describe("MembersPage", () => {
     setup({ answers: { "GET /members": () => problem(503, "unavailable") } });
 
     expect(await screen.findByRole("button", { name: "Erneut versuchen" })).toBeInTheDocument();
+  });
+
+  it("warns the member who removes themselves and leaves the organization afterwards", async () => {
+    const { calls } = setup({
+      organizationAfter: null,
+      answers: { "POST /remove": () => new Response(null, { status: 204 }) },
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Organisation verlassen" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Organisation verlassen?" });
+    expect(dialog).toHaveTextContent("Sie entfernen sich selbst.");
+    await user.click(within(dialog).getByRole("button", { name: "Organisation verlassen" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/choose-organization"));
+    expect(calls.filter((c) => c.call.endsWith("/session")).length).toBeGreaterThan(1);
+    expect(calls.some((c) => c.call === `POST /api/v1/members/${ME}/remove`)).toBe(true);
+  });
+
+  it("offers a plain member to leave, with the same warning, and no removal of others", async () => {
+    setup({ role: "member", members: [{ ...anna, role: "member" }, bernd] });
+
+    const leave = await screen.findByRole("button", { name: "Organisation verlassen" });
+    expect(
+      screen.queryByRole("button", { name: "Bernd Beispiel entfernen" }),
+    ).not.toBeInTheDocument();
+    await user.click(leave);
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Sie entfernen sich selbst.");
+  });
+
+  it("does not warn about leaving when an owner removes someone else", async () => {
+    setup({});
+
+    await user.click(await screen.findByRole("button", { name: "Bernd Beispiel entfernen" }));
+    expect(await screen.findByRole("alertdialog")).not.toHaveTextContent("sich selbst");
+  });
+
+  it("says why the last owner cannot be removed", async () => {
+    setup({ answers: { "POST /remove": () => problem(409, "invalid-transition") } });
+
+    await user.click(await screen.findByRole("button", { name: "Bernd Beispiel entfernen" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Entfernen" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("mindestens eine Organisationsleitung"),
+    );
+  });
+
+  it("loads the list again after a version conflict", async () => {
+    const { count } = setup({
+      answers: { "POST /remove": () => problem(409, "record-version-conflict") },
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Bernd Beispiel entfernen" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Entfernen" }),
+    );
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("neu geladen"));
+    await waitFor(() => expect(count("GET /api/v1/members")).toBe(2));
+  });
+
+  it("loads the next page and moves focus to the heading when the button leaves", async () => {
+    setup({
+      pages: {
+        "": () => json(200, { items: [anna], next_cursor: "c1" }),
+        c1: () => json(200, { items: [bernd] }),
+      },
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Weitere Mitglieder laden" }));
+
+    expect(await screen.findByText("Bernd Beispiel")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Weitere Mitglieder geladen.");
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 1, name: "Mitglieder" })).toHaveFocus(),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Weitere Mitglieder laden" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the button mounted while the next page loads", async () => {
+    let release: (response: Response) => void = () => {};
+    const gate = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    setup({
+      pages: {
+        "": () => json(200, { items: [anna], next_cursor: "c1" }),
+        c1: () => gate as unknown as Response,
+      },
+    });
+
+    const button = await screen.findByRole("button", { name: "Weitere Mitglieder laden" });
+    await user.click(button);
+
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    release(json(200, { items: [bernd] }));
+    expect(await screen.findByText("Bernd Beispiel")).toBeInTheDocument();
+  });
+
+  it("keeps the loaded rows when a later page fails and retries from the same cursor", async () => {
+    let attempts = 0;
+    const { count } = setup({
+      pages: {
+        "": () => json(200, { items: [anna], next_cursor: "c1" }),
+        c1: () => (++attempts === 1 ? problem(503, "unavailable") : json(200, { items: [bernd] })),
+      },
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Weitere Mitglieder laden" }));
+
+    const alerts = await screen.findAllByRole("alert");
+    await waitFor(() => expect(alerts.some((a) => a === document.activeElement)).toBe(true));
+    expect(screen.getByText("Anna Muster")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Weitere Mitglieder laden" }));
+
+    expect(await screen.findByText("Bernd Beispiel")).toBeInTheDocument();
+    expect(count("GET /api/v1/members")).toBe(3);
+  });
+
+  it("disables the invite button while the server asks to wait", async () => {
+    setup({
+      answers: {
+        "POST /invitations": () =>
+          new Response(
+            JSON.stringify({
+              type: "",
+              code: "rate-limited",
+              title: "",
+              status: 429,
+              instance: "",
+              request_id: "r",
+            }),
+            {
+              status: 429,
+              headers: { "Content-Type": "application/problem+json", "Retry-After": "60" },
+            },
+          ),
+      },
+    });
+
+    await user.type(await screen.findByRole("textbox", { name: /Name/ }), "Clara Probst");
+    await user.type(screen.getByRole("textbox", { name: /E-Mail/ }), "clara@example.org");
+    await user.click(screen.getByRole("button", { name: "Einladen" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("60 Sekunden"));
+    expect(screen.getByRole("button", { name: "Einladen" })).toBeDisabled();
+  });
+
+  it("loads the invitations again when a revoked invitation is gone", async () => {
+    const { count } = setup({
+      invitations: [invitation],
+      answers: { "POST /revoke": () => problem(404, "not-found") },
+    });
+
+    await user.click(
+      await screen.findByRole("button", { name: "Einladung an Clara Probst widerrufen" }),
+    );
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Widerrufen" }),
+    );
+
+    await waitFor(() => expect(count("GET /api/v1/invitations")).toBe(2));
   });
 });

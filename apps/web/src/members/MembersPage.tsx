@@ -8,6 +8,8 @@ import {
 } from "../api/client";
 import { failureOf } from "../api/failure";
 import { LOCALE, t } from "../i18n";
+import { useNavigate } from "../router/Router";
+import { CHOOSE_ORGANIZATION_PATH } from "../session/paths";
 import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -33,6 +35,12 @@ interface Loadable<T> {
 
 const loading = <T,>(attempts = 0): Loadable<T> => ({ kind: "loading", items: [], attempts });
 
+/** The state of the request for the next page of members. */
+type More =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "failed"; message: string; requestId: string | undefined };
+
 /** What the member confirms: the removal of a member or the revocation of an invitation. */
 type Confirming = { kind: "member"; item: Member } | { kind: "invitation"; item: Invitation };
 
@@ -46,6 +54,9 @@ export function MembersPage({ api }: { api: Api }) {
   const manages = canManage(role);
   const [members, setMembers] = useState<Loadable<Member>>(loading());
   const [invitations, setInvitations] = useState<Loadable<Invitation>>(loading());
+  // The next page of members: the loaded rows stay while it loads or fails.
+  const [more, setMore] = useState<More>({ kind: "idle" });
+  const navigate = useNavigate();
   // The message of the last failed action. Both live regions are in the page from the start.
   const [failure, setFailure] = useState<string>();
   const [confirmation, setConfirmation] = useState<string>();
@@ -55,6 +66,8 @@ export function MembersPage({ api }: { api: Api }) {
   const membersHeading = useRef<HTMLHeadingElement>(null);
   const invitationsHeading = useRef<HTMLHeadingElement>(null);
   const focusAfterClose = useRef<"member" | "invitation">(undefined);
+  const [headingFocus, setHeadingFocus] = useState(0);
+  const alert = useRef<HTMLParagraphElement>(null);
 
   // The pressed button leaves with its row. When the dialog has closed and given its focus back,
   // focus goes to the heading of the list.
@@ -66,35 +79,36 @@ export function MembersPage({ api }: { api: Api }) {
     }
   }, [confirming]);
 
+  useEffect(() => {
+    if (headingFocus > 0) {
+      membersHeading.current?.focus();
+    }
+  }, [headingFocus]);
+
+  /** The first page. A version conflict and a retry load the list again from here. */
   const loadMembers = useCallback(
-    async (cursor: string | undefined, previous: Member[], attempts: number) => {
+    async (attempts: number) => {
       try {
-        const { data, error } = await api.GET("/api/v1/members", {
-          params: { query: cursor === undefined ? {} : { cursor } },
-        });
+        const { data, error } = await api.GET("/api/v1/members");
         setMembers(
           data
             ? {
                 kind: "loaded",
-                items: [...previous, ...data.items],
+                items: data.items,
                 nextCursor: data.next_cursor ?? undefined,
                 attempts,
               }
             : {
                 kind: "failed",
-                items: previous,
+                items: [],
                 message: problemMessage(error),
                 requestId: error?.request_id,
                 attempts,
               },
         );
+        setMore({ kind: "idle" });
       } catch {
-        setMembers({
-          kind: "failed",
-          items: previous,
-          message: problemMessage(undefined),
-          attempts,
-        });
+        setMembers({ kind: "failed", items: [], message: problemMessage(undefined), attempts });
       }
     },
     [api],
@@ -123,7 +137,7 @@ export function MembersPage({ api }: { api: Api }) {
   );
 
   useEffect(() => {
-    void loadMembers(undefined, [], 0);
+    void loadMembers(0);
   }, [loadMembers]);
 
   useEffect(() => {
@@ -134,9 +148,54 @@ export function MembersPage({ api }: { api: Api }) {
 
   /** A failed action: a version conflict also loads the list again. */
   const fail = (result: { error?: Problem | undefined; response?: Response }) => {
-    setFailure(failureOf(result).message);
-    if (result.error?.code === "record-version-conflict") {
-      void loadMembers(undefined, [], members.attempts);
+    const code = result.error?.code;
+    setFailure(
+      code === "invalid-transition" && confirming?.kind === "member"
+        ? t("members-remove-last")
+        : code === "record-version-conflict"
+          ? t("members-conflict")
+          : failureOf(result).message,
+    );
+    // The failure may be far above the button that the member pressed.
+    alert.current?.scrollIntoView?.({ block: "nearest" });
+    if (code === "record-version-conflict") {
+      void loadMembers(members.attempts);
+    }
+    if (code === "not-found" && confirming?.kind === "invitation") {
+      // The person accepted the invitation in the meantime.
+      void loadInvitations(invitations.attempts);
+    }
+  };
+
+  /** The next page: the loaded rows stay, and a retry continues from the same cursor. */
+  const loadMore = async () => {
+    if (members.kind !== "loaded" || members.nextCursor === undefined || more.kind === "loading") {
+      return;
+    }
+    setMore({ kind: "loading" });
+    setConfirmation(undefined);
+    try {
+      const { data, error } = await api.GET("/api/v1/members", {
+        params: { query: { cursor: members.nextCursor } },
+      });
+      if (data) {
+        const nextCursor = data.next_cursor ?? undefined;
+        setMembers((current) => ({
+          ...current,
+          items: [...current.items, ...data.items],
+          nextCursor,
+        }));
+        setMore({ kind: "idle" });
+        setConfirmation(t("members-loaded-more"));
+        if (nextCursor === undefined) {
+          // The button leaves: focus goes to the heading of the list.
+          setHeadingFocus((count) => count + 1);
+        }
+      } else {
+        setMore({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
+      }
+    } catch {
+      setMore({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
     }
   };
 
@@ -155,6 +214,14 @@ export function MembersPage({ api }: { api: Api }) {
           body: { expected_version: item.version },
         });
         if (response.ok) {
+          if (item.user_id === session.user.id) {
+            // The member left: the organization context is gone, so no manager mode stays.
+            setBusy(false);
+            setConfirming(undefined);
+            await session.refresh();
+            navigate(CHOOSE_ORGANIZATION_PATH, { replace: true });
+            return;
+          }
           focusAfterClose.current = "member";
           setMembers((current) => ({
             ...current,
@@ -191,23 +258,26 @@ export function MembersPage({ api }: { api: Api }) {
       ? [{ id: "email", header: t("members-column-email"), cell: (member: Member) => member.email }]
       : []),
     { id: "role", header: t("members-column-role"), cell: (member) => t(`role-${member.role}`) },
-    ...(manages
-      ? [
-          {
-            id: "actions",
-            header: t("members-column-actions"),
-            cell: (member: Member) =>
-              canRemove(role, member.role) && (
-                <Button
-                  aria-label={t("members-remove-of", { name: member.display_name })}
-                  onPress={() => setConfirming({ kind: "member", item: member })}
-                >
-                  {t("members-remove")}
-                </Button>
-              ),
-          },
-        ]
-      : []),
+    {
+      id: "actions",
+      header: t("members-column-actions"),
+      cell: (member) =>
+        member.user_id === session.user.id ? (
+          // Each member can leave.
+          <Button onPress={() => setConfirming({ kind: "member", item: member })}>
+            {t("members-leave")}
+          </Button>
+        ) : (
+          canRemove(role, member.role) && (
+            <Button
+              aria-label={t("members-remove-of", { name: member.display_name })}
+              onPress={() => setConfirming({ kind: "member", item: member })}
+            >
+              {t("members-remove")}
+            </Button>
+          )
+        ),
+    },
   ];
 
   const invitationColumns: Column<Invitation>[] = [
@@ -245,7 +315,7 @@ export function MembersPage({ api }: { api: Api }) {
   const retryMembers = () => {
     const attempts = members.attempts + 1;
     setMembers(loading(attempts));
-    void loadMembers(undefined, [], attempts);
+    void loadMembers(attempts);
   };
   const retryInvitations = () => {
     const attempts = invitations.attempts + 1;
@@ -255,11 +325,30 @@ export function MembersPage({ api }: { api: Api }) {
 
   const revoking = confirming?.kind === "invitation";
   const name = confirming?.item.display_name ?? "";
+  const leaving = confirming?.kind === "member" && confirming.item.user_id === session.user.id;
+
+  const dialog = revoking
+    ? {
+        title: t("invitations-revoke-title"),
+        text: t("invitations-revoke-text", { name }),
+        confirm: t("invitations-revoke"),
+      }
+    : leaving
+      ? {
+          title: t("members-leave-title"),
+          text: t("members-leave-text"),
+          confirm: t("members-leave"),
+        }
+      : {
+          title: t("members-remove-title"),
+          text: t("members-remove-text", { name }),
+          confirm: t("members-remove"),
+        };
 
   return (
     <main id="main" className={styles.page}>
       {/* Live regions that are always in the page: a text that is set later is announced. */}
-      <p className={styles.failure} role="alert">
+      <p ref={alert} className={styles.failure} role="alert">
         {failure}
       </p>
       <p className={styles.confirmation} role="status">
@@ -293,14 +382,11 @@ export function MembersPage({ api }: { api: Api }) {
               rows={members.items}
               rowKey={(member) => member.user_id}
             />
+            {more.kind === "failed" && (
+              <InlineError message={more.message} requestId={more.requestId} takeFocus />
+            )}
             {members.nextCursor !== undefined && (
-              <Button
-                onPress={() => {
-                  const cursor = members.nextCursor;
-                  setMembers({ ...members, nextCursor: undefined });
-                  void loadMembers(cursor, members.items, members.attempts);
-                }}
-              >
+              <Button isPending={more.kind === "loading"} onPress={() => void loadMore()}>
                 {t("members-load-more")}
               </Button>
             )}
@@ -357,21 +443,25 @@ export function MembersPage({ api }: { api: Api }) {
           onFailed={setFailure}
           onInvited={(invitation) => {
             setConfirmation(t("invite-sent", { name: invitation.display_name }));
-            setInvitations((current) => ({
-              ...current,
-              items: [...current.items.filter((i) => i.id !== invitation.id), invitation],
-            }));
+            // A list that is not loaded yet or failed gets the new invitation with its next load.
+            if (invitations.kind === "loaded") {
+              setInvitations({
+                ...invitations,
+                items: [...invitations.items.filter((i) => i.id !== invitation.id), invitation],
+              });
+            } else {
+              void loadInvitations(invitations.attempts);
+            }
           }}
         />
       )}
 
       <ConfirmDialog
         isOpen={confirming !== undefined}
-        title={revoking ? t("invitations-revoke-title") : t("members-remove-title")}
-        text={
-          revoking ? t("invitations-revoke-text", { name }) : t("members-remove-text", { name })
-        }
-        confirmLabel={revoking ? t("invitations-revoke") : t("members-remove")}
+        title={dialog.title}
+        text={dialog.text}
+        warning={leaving ? t("members-leave-warning") : undefined}
+        confirmLabel={dialog.confirm}
         cancelLabel={t("members-remove-cancel")}
         isPending={busy}
         onConfirm={() => void confirm()}

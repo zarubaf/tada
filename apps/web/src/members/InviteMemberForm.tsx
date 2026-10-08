@@ -6,7 +6,7 @@ import {
   type Problem,
   problemMessage,
 } from "../api/client";
-import { failureOf } from "../api/failure";
+import { type Failure, failureOf, useWaiting } from "../api/failure";
 import { uuidv7 } from "../api/uuid";
 import { hasMessage, t } from "../i18n";
 import { Button } from "../ui/Button";
@@ -55,6 +55,9 @@ export function InviteMemberForm({
   const [id, setId] = useState(() => uuidv7());
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
+  // After a 429 the button waits as long as the server asks.
+  const [waitFor, setWaitFor] = useState<Failure>();
+  const waiting = useWaiting(waitFor);
   const form = useRef<HTMLFormElement>(null);
   // Count the submits that move focus: to the first invalid field, or after a success back to
   // the first field.
@@ -112,7 +115,9 @@ export function InviteMemberForm({
         const invalid = error?.code === "validation-failed" ? fieldErrors(error) : {};
         setErrors(invalid);
         if (Object.keys(invalid).length === 0) {
-          onFailed(failureOf({ error, response }).message);
+          const failure = failureOf({ error, response });
+          setWaitFor(failure);
+          onFailed(failure.message);
         } else {
           setFailedSubmits((count) => count + 1);
         }
@@ -156,7 +161,7 @@ export function InviteMemberForm({
           }}
         />
         <div className={styles.actions}>
-          <Button type="submit" variant="primary" isPending={busy}>
+          <Button type="submit" variant="primary" isPending={busy} isDisabled={waiting}>
             {t("invite-submit")}
           </Button>
         </div>
