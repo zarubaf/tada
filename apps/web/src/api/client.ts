@@ -36,6 +36,7 @@ export type Changeset = components["schemas"]["Changeset"];
 export type Proposal = components["schemas"]["Proposal"];
 export type ProposalEvidence = components["schemas"]["ProposalEvidence"];
 export type Operation = components["schemas"]["Operation"];
+export type ReviewResult = components["schemas"]["ReviewResult"];
 export type ConflictReason = components["schemas"]["ConflictReason"];
 export type ApplyEdit = NonNullable<
   components["schemas"]["ApplyChangesetRequest"]["edits"]

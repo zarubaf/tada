@@ -1,0 +1,118 @@
+@layer components {
+  /* The page title, the frame and the live regions keep the gap of the page. */
+  .page {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .frame {
+    container: inbox / inline-size;
+  }
+
+  .list {
+    display: grid;
+    align-content: start;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .detailPane {
+    display: grid;
+    min-width: 0;
+  }
+
+  /* Narrow: the list, then the item as its own page. */
+  .layout {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .layout[data-detail] .list {
+    display: none;
+  }
+
+  .layout:not([data-detail]) .detailPane {
+    display: none;
+  }
+
+  /* Wide: the list on the left, the item on the right. */
+  @container inbox (width >= 56rem) {
+    .layout {
+      grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+      align-items: start;
+      gap: var(--space-6);
+    }
+
+    .layout[data-detail] .list,
+    .layout:not([data-detail]) .detailPane {
+      display: grid;
+    }
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .items {
+    display: grid;
+    gap: var(--space-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .item {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+    color: var(--color-text);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+
+  .item:hover {
+    background: var(--color-bg-hover);
+  }
+
+  .item[aria-current="page"] {
+    border-color: var(--color-accent);
+    background: var(--color-accent-subtle);
+  }
+
+  .itemTitle {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .itemMeta {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .item[aria-current="page"] .itemMeta {
+    color: var(--color-text);
+  }
+
+  .stale {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--color-warning);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .note,
+  .placeholder {
+    color: var(--color-text-muted);
+  }
+
+  /* Forced colors replace the background: the current item keeps a mark of its own. */
+  @media (forced-colors: active) {
+    .item[aria-current="page"] {
+      border-width: 3px;
+    }
+  }
+}
