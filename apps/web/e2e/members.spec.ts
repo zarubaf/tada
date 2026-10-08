@@ -97,6 +97,23 @@ for (const viewport of viewports) {
   }
 }
 
+test("at 320 px the tables do not scroll sideways and each row action is in reach", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await fakeSession(page, sessionWithRole("owner"));
+  await fakeMembers(page, true);
+  await page.goto("/settings/members");
+  const remove = page.getByRole("button", {
+    name: "Bernhard Beispiel-Schmidlin-Äbischer entfernen",
+  });
+  await expect(remove).toBeVisible();
+
+  const box = await remove.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(320);
+  expect(await textOverflows(page)).toEqual([]);
+});
+
 test("the navigation item Einstellungen leads to the members", async ({ page }) => {
   await fakeSession(page, sessionWithRole("owner"));
   await fakeMembers(page, true);

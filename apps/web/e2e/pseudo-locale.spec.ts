@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { events, fakeEvents, fakeSession, textOverflows, unavailable, viewports } from "./fixtures";
 
 // ADR 0024: German text can be 40 % longer than the source. No text may overflow its box or be cut
-// off without a tooltip. A scroll container, for example the table at 375 px, is not an overflow.
+// off without a tooltip. A table never scrolls sideways (ADR 0023).
 for (const viewport of viewports) {
   for (const state of [
     { name: "list", status: 200, body: { items: events } },
