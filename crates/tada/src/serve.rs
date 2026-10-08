@@ -50,6 +50,9 @@ pub async fn run(
             event_members: Arc::new(db.clone()),
             members: Arc::new(db.clone()),
             public_url,
+            facts: Arc::new(db.clone()),
+            proposals: Arc::new(db.clone()),
+            review: Arc::new(db.clone()),
         },
         http.web_root.as_deref(),
     );

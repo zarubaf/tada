@@ -72,6 +72,9 @@ pub fn api_state(
         event_members: database.clone(),
         members: database.clone(),
         public_url: public_url(),
+        facts: database.clone(),
+        proposals: database.clone(),
+        review: database.clone(),
     }
 }
 

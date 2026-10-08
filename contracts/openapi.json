@@ -1142,10 +1142,543 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/events/{event_id}/profile": {
+      "get": {
+        "tags": [
+          "facts"
+        ],
+        "summary": "Reads the event profile. Each member who can read the event can read it.",
+        "operationId": "get_event_profile",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The event profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/fields": {
+      "get": {
+        "tags": [
+          "facts"
+        ],
+        "summary": "Lists the field catalog of an event: the shipped fields and the fields of the event, in the order of their keys.\nEach field has the JSON Schema of its values.",
+        "operationId": "list_fields",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The field catalog of the event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/changesets": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Lists the changesets of an event with open proposals, oldest first. Only its event managers see them.",
+        "operationId": "list_event_changesets",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only `open` exists: the changesets with at least one open proposal.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The filter of a list of changesets.",
+              "enum": [
+                "open"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of changesets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenChangesetPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Creates a changeset of proposals in an event, with the channel `web`.\nContributors and event managers can propose; a viewer gets `forbidden`.",
+        "description": "If a changeset with the same `id` and the same content exists, the response is this changeset with the\nstatus 200, and nothing changes.",
+        "operationId": "create_changeset",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChangesetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changeset exists with this ID and the same content.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedChangeset"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The new changeset.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedChangeset"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/changesets": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "The Review Inbox: the changesets with open proposals that the caller can review, oldest first.\nThey are the changesets of each event that the caller manages and, for owners and admins,\nthe changesets of the organization, for example one that creates an event.",
+        "operationId": "list_changesets",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only `open` exists: the changesets with at least one open proposal.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The filter of a list of changesets.",
+              "enum": [
+                "open"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of changesets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenChangesetPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/changesets/{changeset_id}": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Reads a changeset with each proposal, its evidence, its status and the current value of its target.\nOnly the reviewers of the changeset can read it.",
+        "operationId": "get_changeset",
+        "parameters": [
+          {
+            "name": "changeset_id",
+            "in": "path",
+            "description": "The ID of the changeset.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The changeset.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Changeset"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/changesets/{changeset_id}/apply": {
+      "post": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Accepts the selected proposals and their dependencies, all or nothing (ADR 0050).\nA changed target gives `record-version-conflict`, and the proposals concerned get the status `conflict`.\nA selected proposal that is not open gives `invalid-transition`.",
+        "operationId": "apply_changeset",
+        "parameters": [
+          {
+            "name": "changeset_id",
+            "in": "path",
+            "description": "The ID of the changeset.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyChangesetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The accepted proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/changesets/{changeset_id}/reject": {
+      "post": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Rejects open proposals and the open proposals that depend on them.\nA proposal that is not open gives `invalid-transition`.",
+        "operationId": "reject_proposals",
+        "parameters": [
+          {
+            "name": "changeset_id",
+            "in": "path",
+            "description": "The ID of the changeset.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectProposalsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The rejected proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActorKind": {
+        "type": "string",
+        "description": "The kind of an author. The list of kinds is open.",
+        "enum": [
+          "member",
+          "service",
+          "ai"
+        ]
+      },
       "AddEventMembershipRequest": {
         "type": "object",
         "description": "The input of `AddEventMembership`.",
@@ -1161,6 +1694,496 @@
           },
           "event_role": {
             "$ref": "#/components/schemas/EventRole"
+          }
+        }
+      },
+      "ApplyChangesetRequest": {
+        "type": "object",
+        "allOf": [
+          {
+            "additionalProperties": false,
+            "description": "The input of `ApplyChangeset`.",
+            "properties": {
+              "edits": {
+                "description": "The values that the reviewer changes before the acceptance. Only a proposal that sets a fact has a value.",
+                "items": {
+                  "additionalProperties": false,
+                  "description": "A value that the reviewer changes before the acceptance.",
+                  "properties": {
+                    "proposal_id": {
+                      "description": "A selected proposal that sets a fact.",
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "state": {
+                      "description": "The state and value that the reviewer accepts instead of the proposed one.",
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "approximate": {
+                              "default": false,
+                              "description": "True for an approximate value, for example \"about 20,000\".",
+                              "type": "boolean"
+                            },
+                            "state": {
+                              "const": "accepted",
+                              "type": "string"
+                            },
+                            "value": {
+                              "description": "A fact value. Its type must match the value type of the field.",
+                              "oneOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "text": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "text",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "text"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "type": {
+                                      "const": "boolean",
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "value"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "A decimal number or range in the unit of the field, as text, for example `\"20000\"` or `\"1.5\"`.\nA single value has `min` equal to `max`.",
+                                  "properties": {
+                                    "max": {
+                                      "type": "string"
+                                    },
+                                    "min": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "quantity",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "min",
+                                    "max"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "An amount or range in the minor unit of the currency of the field, for example 1500 for CHF 15.00.",
+                                  "properties": {
+                                    "max": {
+                                      "format": "int64",
+                                      "type": "integer"
+                                    },
+                                    "min": {
+                                      "format": "int64",
+                                      "type": "integer"
+                                    },
+                                    "type": {
+                                      "const": "money",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "min",
+                                    "max"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "A date as `YYYY-MM-DD`.",
+                                  "properties": {
+                                    "date": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "date",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "date"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "A range of dates as `YYYY-MM-DD`, with the meaning of its dates.",
+                                  "properties": {
+                                    "end": {
+                                      "type": "string"
+                                    },
+                                    "granularity": {
+                                      "enum": [
+                                        "day",
+                                        "week",
+                                        "month"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "start": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "date_window",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "start",
+                                    "end",
+                                    "granularity"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "The keys of the choices.",
+                                  "properties": {
+                                    "keys": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "type": {
+                                      "const": "choice",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "keys"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "id": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "target": {
+                                      "enum": [
+                                        "document",
+                                        "event"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "reference",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "target",
+                                    "id"
+                                  ],
+                                  "type": "object"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "value"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "approximate": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "state": {
+                              "const": "assumption",
+                              "type": "string"
+                            },
+                            "value": {
+                              "description": "A fact value. Its type must match the value type of the field.",
+                              "oneOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "text": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "text",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "text"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "type": {
+                                      "const": "boolean",
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "value"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "A decimal number or range in the unit of the field, as text, for example `\"20000\"` or `\"1.5\"`.\nA single value has `min` equal to `max`.",
+                                  "properties": {
+                                    "max": {
+                                      "type": "string"
+                                    },
+                                    "min": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "quantity",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "min",
+                                    "max"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "An amount or range in the minor unit of the currency of the field, for example 1500 for CHF 15.00.",
+                                  "properties": {
+                                    "max": {
+                                      "format": "int64",
+                                      "type": "integer"
+                                    },
+                                    "min": {
+                                      "format": "int64",
+                                      "type": "integer"
+                                    },
+                                    "type": {
+                                      "const": "money",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "min",
+                                    "max"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "A date as `YYYY-MM-DD`.",
+                                  "properties": {
+                                    "date": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "date",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "date"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "A range of dates as `YYYY-MM-DD`, with the meaning of its dates.",
+                                  "properties": {
+                                    "end": {
+                                      "type": "string"
+                                    },
+                                    "granularity": {
+                                      "enum": [
+                                        "day",
+                                        "week",
+                                        "month"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "start": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "date_window",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "start",
+                                    "end",
+                                    "granularity"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "The keys of the choices.",
+                                  "properties": {
+                                    "keys": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "type": {
+                                      "const": "choice",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "keys"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "id": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "target": {
+                                      "enum": [
+                                        "document",
+                                        "event"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "reference",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "target",
+                                    "id"
+                                  ],
+                                  "type": "object"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "value"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "state": {
+                              "const": "unknown",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "state"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "proposal_id",
+                    "state"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "selected": {
+                "description": "The proposals to accept. tada adds the dependencies of each one that an earlier apply did not accept.",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "selected"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Author": {
+        "type": "object",
+        "description": "Who created a record, for which member and through which channel (ADR 0039).",
+        "required": [
+          "kind",
+          "id",
+          "channel"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The user ID of a member or an AI client, or the ID of a service identity."
+          },
+          "principal_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The member for whom the author acts, if the author is not that member."
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
           }
         }
       },
@@ -1182,6 +2205,77 @@
           }
         }
       },
+      "Changeset": {
+        "type": "object",
+        "description": "A changeset as a reviewer sees it.",
+        "required": [
+          "id",
+          "author",
+          "source_version_id",
+          "created_at",
+          "proposals"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The event of the changeset. It is absent for a changeset of the organization."
+          },
+          "author": {
+            "$ref": "#/components/schemas/Author"
+          },
+          "source_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The source version that holds the text of the intake."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            },
+            "description": "The proposals in the order of their IDs."
+          }
+        }
+      },
+      "Channel": {
+        "type": "string",
+        "description": "The way an author reached tada. The list of channels is open.",
+        "enum": [
+          "web",
+          "telegram",
+          "job",
+          "api-token",
+          "cli"
+        ]
+      },
+      "Choice": {
+        "type": "object",
+        "description": "One choice of a choice field.",
+        "required": [
+          "key",
+          "label"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "$ref": "#/components/schemas/Label"
+          }
+        }
+      },
       "ChooseOrganizationRequest": {
         "type": "object",
         "description": "The input of `choose_organization`.",
@@ -1194,6 +2288,919 @@
             "format": "uuid"
           }
         }
+      },
+      "ConflictReason": {
+        "type": "string",
+        "description": "Why a proposal conflicts. The list of reasons is open.",
+        "enum": [
+          "fact-changed",
+          "target-changed"
+        ]
+      },
+      "CreateChangesetRequest": {
+        "type": "object",
+        "allOf": [
+          {
+            "additionalProperties": false,
+            "description": "The input of `CreateChangeset`: the text of one intake and the proposals that it supports.\nThe event of the path is the event of each proposal.\nThe proposals have the shape of the MCP tools (ADR 0040).",
+            "properties": {
+              "id": {
+                "default": null,
+                "description": "The UUIDv7 of the new changeset. A client that sends it can retry the request safely.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "proposals": {
+                "items": {
+                  "additionalProperties": false,
+                  "description": "One proposal of a new changeset.",
+                  "properties": {
+                    "depends_on": {
+                      "default": [],
+                      "description": "The proposals of the same changeset that must apply before this one,\nfor example the new field definition of a fact.",
+                      "items": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "evidence": {
+                      "description": "The passages of the source text that support the proposal. Each proposal has at least one.",
+                      "items": {
+                        "additionalProperties": false,
+                        "description": "A passage of the source text: a range of characters and its exact quote.",
+                        "properties": {
+                          "end": {
+                            "description": "The offset after the last character.",
+                            "format": "uint32",
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "page": {
+                            "default": null,
+                            "description": "The page of a PDF, from 1.",
+                            "format": "uint32",
+                            "minimum": 0,
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "quote": {
+                            "description": "The exact text from `start` to `end`.",
+                            "type": "string"
+                          },
+                          "start": {
+                            "description": "The offset of the first character.",
+                            "format": "uint32",
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "start",
+                          "end",
+                          "quote"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "id": {
+                      "description": "The UUIDv7 of the proposal. Other proposals of the changeset depend on it by this ID.",
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "operation": {
+                      "description": "The change that a proposal suggests.",
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "description": "Create an event. Only a changeset without an event can create one.",
+                          "properties": {
+                            "id": {
+                              "description": "The UUIDv7 of the new event.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "key": {
+                              "description": "Two to eight capital letters and digits, for example `FLY28`.",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create_event",
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "time_zone": {
+                              "default": null,
+                              "description": "An IANA time zone. The default is `Europe/Zurich`.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "key",
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Set the fact of a field in an event.",
+                          "properties": {
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "default": null,
+                              "description": "The current version of the fact. Leave it out if the event has no fact of the field yet.",
+                              "format": "int64",
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            },
+                            "field_id": {
+                              "description": "A field of the event catalog, or a new field of the same changeset.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "set_fact",
+                              "type": "string"
+                            },
+                            "state": {
+                              "description": "The state of a fact. An unknown fact has no value.",
+                              "oneOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "approximate": {
+                                      "default": false,
+                                      "description": "True for an approximate value, for example \"about 20,000\".",
+                                      "type": "boolean"
+                                    },
+                                    "state": {
+                                      "const": "accepted",
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "description": "A fact value. Its type must match the value type of the field.",
+                                      "oneOf": [
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "text": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "text",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "text"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "type": {
+                                              "const": "boolean",
+                                              "type": "string"
+                                            },
+                                            "value": {
+                                              "type": "boolean"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "value"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "A decimal number or range in the unit of the field, as text, for example `\"20000\"` or `\"1.5\"`.\nA single value has `min` equal to `max`.",
+                                          "properties": {
+                                            "max": {
+                                              "type": "string"
+                                            },
+                                            "min": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "quantity",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "min",
+                                            "max"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "An amount or range in the minor unit of the currency of the field, for example 1500 for CHF 15.00.",
+                                          "properties": {
+                                            "max": {
+                                              "format": "int64",
+                                              "type": "integer"
+                                            },
+                                            "min": {
+                                              "format": "int64",
+                                              "type": "integer"
+                                            },
+                                            "type": {
+                                              "const": "money",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "min",
+                                            "max"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "A date as `YYYY-MM-DD`.",
+                                          "properties": {
+                                            "date": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "date",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "date"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "A range of dates as `YYYY-MM-DD`, with the meaning of its dates.",
+                                          "properties": {
+                                            "end": {
+                                              "type": "string"
+                                            },
+                                            "granularity": {
+                                              "enum": [
+                                                "day",
+                                                "week",
+                                                "month"
+                                              ],
+                                              "type": "string"
+                                            },
+                                            "start": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "date_window",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "start",
+                                            "end",
+                                            "granularity"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "The keys of the choices.",
+                                          "properties": {
+                                            "keys": {
+                                              "items": {
+                                                "type": "string"
+                                              },
+                                              "type": "array"
+                                            },
+                                            "type": {
+                                              "const": "choice",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "keys"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "id": {
+                                              "format": "uuid",
+                                              "type": "string"
+                                            },
+                                            "target": {
+                                              "enum": [
+                                                "document",
+                                                "event"
+                                              ],
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "reference",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "target",
+                                            "id"
+                                          ],
+                                          "type": "object"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "state",
+                                    "value"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "approximate": {
+                                      "default": false,
+                                      "type": "boolean"
+                                    },
+                                    "state": {
+                                      "const": "assumption",
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "description": "A fact value. Its type must match the value type of the field.",
+                                      "oneOf": [
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "text": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "text",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "text"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "type": {
+                                              "const": "boolean",
+                                              "type": "string"
+                                            },
+                                            "value": {
+                                              "type": "boolean"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "value"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "A decimal number or range in the unit of the field, as text, for example `\"20000\"` or `\"1.5\"`.\nA single value has `min` equal to `max`.",
+                                          "properties": {
+                                            "max": {
+                                              "type": "string"
+                                            },
+                                            "min": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "quantity",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "min",
+                                            "max"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "An amount or range in the minor unit of the currency of the field, for example 1500 for CHF 15.00.",
+                                          "properties": {
+                                            "max": {
+                                              "format": "int64",
+                                              "type": "integer"
+                                            },
+                                            "min": {
+                                              "format": "int64",
+                                              "type": "integer"
+                                            },
+                                            "type": {
+                                              "const": "money",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "min",
+                                            "max"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "A date as `YYYY-MM-DD`.",
+                                          "properties": {
+                                            "date": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "date",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "date"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "A range of dates as `YYYY-MM-DD`, with the meaning of its dates.",
+                                          "properties": {
+                                            "end": {
+                                              "type": "string"
+                                            },
+                                            "granularity": {
+                                              "enum": [
+                                                "day",
+                                                "week",
+                                                "month"
+                                              ],
+                                              "type": "string"
+                                            },
+                                            "start": {
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "date_window",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "start",
+                                            "end",
+                                            "granularity"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "description": "The keys of the choices.",
+                                          "properties": {
+                                            "keys": {
+                                              "items": {
+                                                "type": "string"
+                                              },
+                                              "type": "array"
+                                            },
+                                            "type": {
+                                              "const": "choice",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "keys"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "id": {
+                                              "format": "uuid",
+                                              "type": "string"
+                                            },
+                                            "target": {
+                                              "enum": [
+                                                "document",
+                                                "event"
+                                              ],
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "const": "reference",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "target",
+                                            "id"
+                                          ],
+                                          "type": "object"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "state",
+                                    "value"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "state": {
+                                      "const": "unknown",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "state"
+                                  ],
+                                  "type": "object"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "field_id",
+                            "state"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Add a field definition to the field catalog of an event.",
+                          "properties": {
+                            "description": {
+                              "description": "The meaning of the field, in English.",
+                              "type": "string"
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "id": {
+                              "description": "The UUIDv7 of the new field.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "key": {
+                              "description": "A `snake_case` key of 2 to 64 characters.",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "add_field_definition",
+                              "type": "string"
+                            },
+                            "label": {
+                              "description": "The German label that people see.",
+                              "type": "string"
+                            },
+                            "module": {
+                              "description": "A `snake_case` module key, for example `aviation`.",
+                              "type": "string"
+                            },
+                            "value_type": {
+                              "description": "The value type of a new field. It never changes.",
+                              "oneOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "type": {
+                                      "const": "text",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "type": {
+                                      "const": "boolean",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "type": {
+                                      "const": "quantity",
+                                      "type": "string"
+                                    },
+                                    "unit": {
+                                      "description": "The `snake_case` key of the unit, for example `person_per_day`.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "unit"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "currency": {
+                                      "description": "An ISO 4217 code, for example `CHF`.",
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "money",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "currency"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "type": {
+                                      "const": "date",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "granularity": {
+                                      "description": "Leave it out to accept each granularity.",
+                                      "enum": [
+                                        "day",
+                                        "week",
+                                        "month",
+                                        null
+                                      ],
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "type": {
+                                      "const": "date_window",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "multiple": {
+                                      "default": false,
+                                      "description": "True if a fact can hold several choices.",
+                                      "type": "boolean"
+                                    },
+                                    "type": {
+                                      "const": "choice",
+                                      "type": "string"
+                                    },
+                                    "values": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "description": "One choice of a new choice field.",
+                                        "properties": {
+                                          "key": {
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "description": "The German label of the choice.",
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "key",
+                                          "label"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "values"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "target": {
+                                      "enum": [
+                                        "document",
+                                        "event"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "const": "reference",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "target"
+                                  ],
+                                  "type": "object"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "event_id",
+                            "key",
+                            "label",
+                            "value_type",
+                            "description",
+                            "module"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Add a choice to a choice field of the event.",
+                          "properties": {
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "field_id": {
+                              "description": "A field of the event, or a new field of the same changeset.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "key": {
+                              "description": "The `snake_case` key of the choice.",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "add_choice_value",
+                              "type": "string"
+                            },
+                            "label": {
+                              "description": "The German label of the choice.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "field_id",
+                            "key",
+                            "label"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Close a field of the event for new facts.",
+                          "properties": {
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "field_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "deprecate_field",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "field_id"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Create an open question with its owner.",
+                          "properties": {
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "id": {
+                              "description": "The UUIDv7 of the new open question.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create_open_question",
+                              "type": "string"
+                            },
+                            "owner": {
+                              "description": "The user ID of the member who owns the question.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "event_id",
+                            "text",
+                            "owner"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    },
+                    "reason": {
+                      "description": "A short reason for the proposal.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "operation",
+                    "reason"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "source_text": {
+                "description": "The member's own words. tada stores them as a source version.\nThe passages count characters (Unicode scalar values) of this text after normalization: Unicode NFC with `\\n` line ends.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_text",
+              "proposals"
+            ],
+            "type": "object"
+          }
+        ]
       },
       "CreateEventRequest": {
         "type": "object",
@@ -1227,6 +3234,72 @@
               "null"
             ],
             "description": "An IANA time zone. The default is `Europe/Zurich`."
+          }
+        }
+      },
+      "CreatedChangeset": {
+        "type": "object",
+        "description": "A new changeset.",
+        "required": [
+          "id",
+          "source_version_id",
+          "created_at",
+          "proposal_ids"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The event of the changeset. It is absent for a changeset of the organization."
+          },
+          "source_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The source version that holds the text of the intake."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proposal_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The IDs of the proposals, in the order of their IDs."
+          }
+        }
+      },
+      "CurrentFact": {
+        "type": "object",
+        "description": "The current version of a fact.",
+        "required": [
+          "fact_id",
+          "version",
+          "state"
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "state": {
+            "$ref": "#/components/schemas/FactState"
+          },
+          "value": {
+            "description": "The value. It is absent if the state is `unknown`."
           }
         }
       },
@@ -1337,6 +3410,38 @@
           }
         }
       },
+      "EventProfile": {
+        "type": "object",
+        "description": "The event profile: the current facts of the event, its open fact proposals and its open questions.",
+        "required": [
+          "facts",
+          "proposals",
+          "open_questions"
+        ],
+        "properties": {
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "description": "The current version of each fact of the event, in the order of the field keys.\nA field without a fact is absent. An unknown fact is present with the state `unknown`."
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactProposal"
+            },
+            "description": "The fact proposals of the event without a review result, oldest first. They are not accepted state."
+          },
+          "open_questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenQuestion"
+            },
+            "description": "The open questions of the event, in the order of their numbers."
+          }
+        }
+      },
       "EventRole": {
         "type": "string",
         "description": "The role of a member in one event.",
@@ -1344,6 +3449,224 @@
           "event-manager",
           "event-contributor",
           "event-viewer"
+        ]
+      },
+      "Evidence": {
+        "type": "object",
+        "description": "One evidence link: a passage of a source version.",
+        "required": [
+          "source_version_id",
+          "passage"
+        ],
+        "properties": {
+          "source_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passage": {
+            "$ref": "#/components/schemas/Passage"
+          }
+        }
+      },
+      "Excerpt": {
+        "type": "object",
+        "description": "A passage with the text around it: at most 100 characters before and after it.",
+        "required": [
+          "before",
+          "quote",
+          "after"
+        ],
+        "properties": {
+          "before": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          }
+        }
+      },
+      "Fact": {
+        "type": "object",
+        "description": "The current version of one fact.",
+        "required": [
+          "id",
+          "field_id",
+          "field_key",
+          "state",
+          "version",
+          "evidence"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_key": {
+            "type": "string",
+            "description": "The key of the field, for example `date_window`."
+          },
+          "state": {
+            "$ref": "#/components/schemas/FactState"
+          },
+          "value": {
+            "description": "The value. It is absent if the state is `unknown`."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The number of the current fact version. A proposal that changes the fact expects it."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "description": "The passages of source versions that support the current fact version."
+          }
+        }
+      },
+      "FactProposal": {
+        "type": "object",
+        "description": "An open proposal that sets the fact of a field.",
+        "required": [
+          "id",
+          "changeset_id",
+          "field_id",
+          "state",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changeset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/FactState"
+          },
+          "value": {
+            "description": "The proposed value. It is absent if the proposed state is `unknown`."
+          },
+          "expected_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The fact version that the proposal expects. It is absent if the field had no fact."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FactState": {
+        "type": "string",
+        "description": "The status of a fact: `unknown` has no value (ADR 0049).",
+        "enum": [
+          "accepted",
+          "assumption",
+          "unknown"
+        ]
+      },
+      "Field": {
+        "type": "object",
+        "description": "A field definition of the field catalog.",
+        "required": [
+          "id",
+          "key",
+          "label",
+          "value_type",
+          "value_schema",
+          "description",
+          "module",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "description": "The stable `snake_case` key, for example `visitor_estimate`."
+          },
+          "label": {
+            "$ref": "#/components/schemas/Label"
+          },
+          "value_type": {
+            "$ref": "#/components/schemas/ValueType"
+          },
+          "value_schema": {
+            "type": "object",
+            "description": "The JSON Schema of a value of this field: the `value` of a proposal that sets its fact."
+          },
+          "description": {
+            "type": "string",
+            "description": "The meaning of the field, in English."
+          },
+          "module": {
+            "type": "string",
+            "description": "The module of the field, for example `core`."
+          },
+          "status": {
+            "$ref": "#/components/schemas/FieldStatus"
+          },
+          "event_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The event of a field that the event added. It is absent for a shipped field."
+          }
+        }
+      },
+      "FieldPage": {
+        "type": "object",
+        "description": "The field catalog of an event. It has few fields, so the list has one page.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            }
+          }
+        }
+      },
+      "FieldStatus": {
+        "type": "string",
+        "description": "A deprecated field is readable, but takes no new facts.",
+        "enum": [
+          "active",
+          "deprecated"
+        ]
+      },
+      "Granularity": {
+        "type": "string",
+        "description": "The meaning of the dates of a date window.",
+        "enum": [
+          "day",
+          "week",
+          "month"
         ]
       },
       "Invitation": {
@@ -1454,6 +3777,48 @@
           }
         }
       },
+      "Label": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The ID of a Fluent message of the web client, for example `field-date_window`.",
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "message"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "text",
+              "kind"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "The label that people see: a Fluent message of a shipped field, or the German text of a field of an event."
+      },
       "Member": {
         "type": "object",
         "description": "A member of the organization.",
@@ -1532,6 +3897,330 @@
           }
         }
       },
+      "NewOpenQuestion": {
+        "type": "object",
+        "description": "A new open question with its event-local ID.",
+        "required": [
+          "id",
+          "local_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_id": {
+            "type": "string",
+            "description": "The event-local ID, for example `QST-1` (ADR 0038)."
+          }
+        }
+      },
+      "OpenChangeset": {
+        "type": "object",
+        "description": "A changeset with open proposals.",
+        "required": [
+          "id",
+          "author",
+          "created_at",
+          "open_proposals",
+          "stale"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The event of the changeset. It is absent for a changeset of the organization, for example one that creates an event."
+          },
+          "author": {
+            "$ref": "#/components/schemas/Author"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "open_proposals": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The number of its open proposals.",
+            "minimum": 0
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "True if its open proposals are older than 14 days (ADR 0050). A stale proposal does not change."
+          }
+        }
+      },
+      "OpenChangesetPage": {
+        "type": "object",
+        "description": "One page of changesets with open proposals, oldest first.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenChangeset"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page. It is absent on the last page."
+          }
+        }
+      },
+      "OpenQuestion": {
+        "type": "object",
+        "description": "An open question of the event.",
+        "required": [
+          "id",
+          "local_id",
+          "text",
+          "owner_id",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_id": {
+            "type": "string",
+            "description": "The event-local ID, for example `QST-1` (ADR 0038)."
+          },
+          "text": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The user ID of the member who owns the question."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Operation": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "key",
+              "name",
+              "time_zone",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "key": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "time_zone": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create_event"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "field_id",
+              "state",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "field_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "state": {
+                "$ref": "#/components/schemas/FactState"
+              },
+              "value": {
+                "description": "The proposed value. It is absent if the proposed state is `unknown`."
+              },
+              "expected_version": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64",
+                "description": "The fact version that the proposal expects. It is absent if the event had no fact of the field."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "set_fact"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "event_id",
+              "key",
+              "label",
+              "value_type",
+              "description",
+              "module",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "$ref": "#/components/schemas/Label"
+              },
+              "value_type": {
+                "$ref": "#/components/schemas/ValueType"
+              },
+              "description": {
+                "type": "string"
+              },
+              "module": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "add_field_definition"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "field_id",
+              "key",
+              "label",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "field_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "$ref": "#/components/schemas/Label"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "add_choice_value"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "field_id",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "field_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "deprecate_field"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "event_id",
+              "text",
+              "owner",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "text": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The user ID of the member who owns the question."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create_open_question"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "The change that a proposal suggests. `kind` names the operation. The list of kinds is open."
+      },
       "OrganizationRole": {
         "type": "string",
         "description": "The role of a member in an organization.",
@@ -1540,6 +4229,41 @@
           "admin",
           "member"
         ]
+      },
+      "Passage": {
+        "type": "object",
+        "description": "A passage of a source version: a range of characters in its normalized text and the exact quote.",
+        "required": [
+          "start",
+          "end",
+          "quote"
+        ],
+        "properties": {
+          "start": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The offset of the first character, in Unicode scalar values.",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The offset after the last character.",
+            "minimum": 0
+          },
+          "quote": {
+            "type": "string"
+          },
+          "page": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The page of a PDF, from 1.",
+            "minimum": 0
+          }
+        }
       },
       "Problem": {
         "type": "object",
@@ -1612,6 +4336,88 @@
           }
         }
       },
+      "Proposal": {
+        "type": "object",
+        "description": "One proposal with its evidence, its status and the current value of its target.",
+        "required": [
+          "id",
+          "operation",
+          "depends_on",
+          "reason",
+          "evidence",
+          "status",
+          "stale"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/Operation"
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The proposals of the same changeset that must apply before this one."
+          },
+          "reason": {
+            "type": "string",
+            "description": "The short reason of the proposal."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "description": "The passages of the source text that support the proposal, each with the text around it."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProposalStatus"
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "True if the proposal is open and older than 14 days (ADR 0050)."
+          },
+          "conflict_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConflictReason",
+                "description": "Why the proposal conflicts. It is present only if the status is `conflict`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "current": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CurrentFact",
+                "description": "The current version of the fact that a `set_fact` proposal sets. It is absent if the event has no such fact."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ProposalStatus": {
+        "type": "string",
+        "description": "The status of a proposal from its latest review result (ADR 0050). The list of values is open.",
+        "enum": [
+          "open",
+          "accepted",
+          "accepted-with-edit",
+          "rejected",
+          "conflict",
+          "withdrawn"
+        ]
+      },
       "RedeemMagicLinkRequest": {
         "type": "object",
         "description": "The input of a sign-in with a magic link.",
@@ -1624,6 +4430,32 @@
             "description": "The token from the fragment of the magic link."
           }
         }
+      },
+      "ReferenceTarget": {
+        "type": "string",
+        "description": "The kind of record that a reference points to. The list of kinds is open.",
+        "enum": [
+          "document",
+          "event"
+        ]
+      },
+      "RejectProposalsRequest": {
+        "type": "object",
+        "description": "The input of `RejectProposals`.",
+        "required": [
+          "proposal_ids"
+        ],
+        "properties": {
+          "proposal_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The open proposals to reject. tada also rejects the open proposals that depend on them."
+          }
+        },
+        "additionalProperties": false
       },
       "RemoveEventMembershipRequest": {
         "type": "object",
@@ -1650,6 +4482,46 @@
             "type": "integer",
             "format": "int64",
             "minimum": 1
+          }
+        }
+      },
+      "ReviewResult": {
+        "type": "object",
+        "description": "The proposals that a review changed, with their new status.",
+        "required": [
+          "proposals",
+          "open_questions"
+        ],
+        "properties": {
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewedProposal"
+            }
+          },
+          "open_questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewOpenQuestion"
+            },
+            "description": "The new open questions with their event-local IDs."
+          }
+        }
+      },
+      "ReviewedProposal": {
+        "type": "object",
+        "description": "A proposal with its new status.",
+        "required": [
+          "id",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProposalStatus"
           }
         }
       },
@@ -1775,6 +4647,160 @@
             }
           }
         }
+      },
+      "ValueType": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "boolean"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "unit",
+              "type"
+            ],
+            "properties": {
+              "unit": {
+                "type": "string",
+                "description": "The `snake_case` key of the unit, for example `person_per_day`."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "quantity"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "currency",
+              "type"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string",
+                "description": "An ISO 4217 code, for example `CHF`."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "money"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "date"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "granularity": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Granularity",
+                    "description": "Absent if the field accepts each granularity."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "date_window"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "values",
+              "multiple",
+              "type"
+            ],
+            "properties": {
+              "values": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Choice"
+                }
+              },
+              "multiple": {
+                "type": "boolean",
+                "description": "True if a fact can hold several choices."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "choice"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "target",
+              "type"
+            ],
+            "properties": {
+              "target": {
+                "$ref": "#/components/schemas/ReferenceTarget"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "reference"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "The value type of a field, with its unit, currency or choices. The list of types is open."
       }
     }
   }

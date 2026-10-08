@@ -5,14 +5,18 @@ mod contract;
 mod event_members;
 mod events;
 mod extract;
+mod facts;
 mod health;
+mod json_schema;
 mod members;
 mod origin;
 mod problem;
 mod request_id;
+mod review;
 mod roles;
 mod sign_in;
 mod telegram;
+mod values;
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -28,11 +32,14 @@ use tada_app::auth::Authenticator;
 use tada_app::clock::Clock;
 use tada_app::event_members::EventMemberStore;
 use tada_app::events::EventStore;
+use tada_app::facts::FactStore;
 use tada_app::health::DependencyCheck;
 use tada_app::identity::IdentityStore;
 use tada_app::members::MemberStore;
 use tada_app::problem::ProblemCode;
+use tada_app::proposals::ProposalStore;
 use tada_app::public_url::PublicUrl;
+use tada_app::review::ReviewStore;
 use tada_app::session::SessionStore;
 use tada_app::sign_in::{SignInRequestStore, SignInStore};
 use tada_app::telegram::TelegramLinks;
@@ -64,6 +71,10 @@ pub struct ApiState {
     pub members: Arc<dyn MemberStore>,
     /// `TADA_PUBLIC_URL`. Its origin is the only `Origin` of a state-changing request (ADR 0008).
     pub public_url: PublicUrl,
+    // Facts and review (ADR 0049, ADR 0050).
+    pub facts: Arc<dyn FactStore>,
+    pub proposals: Arc<dyn ProposalStore>,
+    pub review: Arc<dyn ReviewStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -78,7 +89,9 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(telegram::routes())
                 .merge(sign_in::routes())
                 .merge(event_members::routes())
-                .merge(members::routes()),
+                .merge(members::routes())
+                .merge(facts::routes())
+                .merge(review::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -93,6 +106,8 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(sign_in::problem_codes())
         .chain(event_members::problem_codes())
         .chain(members::problem_codes())
+        .chain(facts::problem_codes())
+        .chain(review::problem_codes())
         .collect()
 }
 
@@ -553,6 +568,108 @@ mod tests {
         }
     }
 
+    /// The stores of facts and review. The tests of this module never read facts.
+    #[derive(Debug)]
+    struct NoReview;
+
+    #[async_trait::async_trait]
+    impl FactStore for NoReview {
+        async fn catalog(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+        ) -> Result<Vec<tada_app::domain::facts::FieldDefinition>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn profile(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+        ) -> Result<tada_app::facts::EventProfile, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn current_version(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::FieldDefinitionId,
+        ) -> Result<Option<tada_app::facts::FactVersionRef>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ProposalStore for NoReview {
+        async fn taken_ids(
+            &self,
+            _: &[uuid::Uuid],
+        ) -> Result<Vec<uuid::Uuid>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn insert(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::proposals::Changeset,
+            _: &tada_app::domain::sources::SourceText,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::proposals::Inserted, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn get(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::ChangesetId,
+        ) -> Result<
+            Option<(
+                tada_app::proposals::Changeset,
+                tada_app::domain::sources::SourceText,
+            )>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ReviewStore for NoReview {
+        async fn results(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::ChangesetId,
+        ) -> Result<Vec<tada_app::review::ReviewRecord>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn apply(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::review::ApplyPlan,
+        ) -> Result<tada_app::review::ApplyOutcome, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn record(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::review::ReviewBatch,
+        ) -> Result<tada_app::review::Recorded, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn open_changesets(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: Option<tada_app::domain::ids::EventId>,
+        ) -> Result<Vec<tada_app::review::OpenChangeset>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
@@ -568,6 +685,9 @@ mod tests {
             event_members: Arc::new(NoEventMembers),
             members: Arc::new(NoMembers),
             public_url: PublicUrl::parse("https://tada.example.org").unwrap(),
+            facts: Arc::new(NoReview),
+            proposals: Arc::new(NoReview),
+            review: Arc::new(NoReview),
         }
     }
 
