@@ -1,8 +1,11 @@
 //! JSON logs on standard output, one event per line (ADR 0035).
 
 use json_subscriber::JsonLayer;
+use tracing::{Level, Subscriber};
+use tracing_subscriber::filter::{FilterExt, filter_fn};
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::fmt::time::SystemTime;
+use tracing_subscriber::layer::Filter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -18,15 +21,18 @@ pub fn init(process_role: &'static str, filter: &str) {
 /// The filter of `TADA_LOG`, with a fixed cap for crates that log content at lower levels (ADR 0035).
 ///
 /// rmcp logs each MCP request and result at `debug`, and a rejected tool input with the serde message
-/// at `warn`. Both can hold the words of members, for example a search query or a quote. Only its errors
-/// of the transport pass, whatever `TADA_LOG` says.
-pub fn filter(directives: &str) -> EnvFilter {
-    // `add_directive` replaces a directive of the same target, for example `rmcp=trace` in `TADA_LOG`.
-    EnvFilter::new(directives).add_directive(
-        "rmcp=error"
-            .parse()
-            .expect("the cap of rmcp is a valid directive"),
-    )
+/// at `warn`. Both can hold the words of members, for example a search query or a quote. Only the
+/// errors of rmcp pass. The cap is a second filter after `TADA_LOG`, so no directive of `TADA_LOG`,
+/// also not a longer target such as `rmcp::service=trace`, can raise it.
+pub fn filter<S: Subscriber>(directives: &str) -> impl Filter<S> + use<S> {
+    EnvFilter::new(directives).and(filter_fn(|metadata| {
+        !is_capped(metadata.target()) || *metadata.level() == Level::ERROR
+    }))
+}
+
+/// True for the targets of rmcp: `rmcp` and its modules.
+fn is_capped(target: &str) -> bool {
+    target == "rmcp" || target.starts_with("rmcp::")
 }
 
 /// The layer of one line format, for any writer. Tests of other crates use it to read the lines.
@@ -87,7 +93,16 @@ mod tests {
     /// rmcp logs content below `error`, so no `TADA_LOG` value lets those lines through (ADR 0035).
     #[test]
     fn rmcp_logs_only_errors_whatever_the_filter_says() {
-        for directives in ["info", "trace", "trace,rmcp=trace", "rmcp=debug"] {
+        for directives in [
+            "info",
+            "trace",
+            "rmcp=trace",
+            "trace,rmcp=trace",
+            "rmcp=debug",
+            "rmcp::service=trace",
+            "rmcp::transport=debug",
+            "info,rmcp::service::server=trace",
+        ] {
             let buffer = Buffer::default();
             let subscriber = tracing_subscriber::registry().with(
                 layer_for::<Registry, _>("serve", buffer.clone()).with_filter(filter(directives)),
@@ -95,12 +110,46 @@ mod tests {
             tracing::subscriber::with_default(subscriber, || {
                 tracing::debug!(target: "rmcp::service", query = "Flugfeld", "received request");
                 tracing::warn!(target: "rmcp::service", error = "Flugfeld", "response error");
+                tracing::trace!(target: "rmcp::service", query = "Flugfeld", "received request");
+                tracing::debug!(target: "rmcp::transport::streamable_http_server", "Flugfeld");
                 tracing::error!(target: "rmcp::service", "fail to close sink");
+                // A crate whose name starts with `rmcp` but is another crate is not capped.
+                tracing::error!(target: "rmcp_other", "not capped");
             });
             let output = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();
-            assert_eq!(output.lines().count(), 1, "{directives}: {output}");
+            let rmcp_lines = output
+                .lines()
+                .filter(|line| line.contains("\"target\":\"rmcp::"))
+                .count();
+            // The error passes where `TADA_LOG` enables it; `rmcp::transport=debug` enables no `rmcp::service`.
+            let expected = usize::from(directives != "rmcp::transport=debug");
+            assert_eq!(rmcp_lines, expected, "{directives}: {output}");
+            assert!(
+                output
+                    .lines()
+                    .all(|line| !line.contains("\"target\":\"rmcp::")
+                        || line.contains("\"level\":\"ERROR\"")),
+                "{directives}: {output}"
+            );
             assert!(!output.contains("Flugfeld"), "{directives}");
         }
+    }
+
+    /// The cap hides nothing of tada itself.
+    #[test]
+    fn the_logs_of_tada_pass_the_cap() {
+        let buffer = Buffer::default();
+        let subscriber = tracing_subscriber::registry().with(
+            layer_for::<Registry, _>("serve", buffer.clone())
+                .with_filter(filter("info,tada_mcp=debug")),
+        );
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info!(target: "tada_api::request_id", "request completed");
+            tracing::debug!(target: "tada_mcp::tools", "tool called");
+            tracing::debug!(target: "tada_api::request_id", "below info");
+        });
+        let output = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();
+        assert_eq!(output.lines().count(), 2, "{output}");
     }
 
     /// The `json-subscriber` check of the walking skeleton (ADR 0035): all fields at the top level.
