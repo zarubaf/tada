@@ -20,3 +20,30 @@ export function formatSize(bytes: number): string {
 export function hashPrefix(sha256: string): string {
   return sha256.slice(0, 12);
 }
+
+export type MediaTypeKind = "pdf" | "text" | "office" | "image" | "other";
+
+const OFFICE_PREFIXES = [
+  "application/vnd.openxmlformats-officedocument.",
+  "application/vnd.oasis.opendocument.",
+];
+const TEXT_TYPES = ["text/plain", "text/markdown", "text/csv"];
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/heic"];
+
+/** The group of a media type among the upload types that the server allows (ADR 0055). */
+export function mediaTypeKind(mediaType: string): MediaTypeKind {
+  const type = (mediaType.split(";")[0] ?? "").trim().toLowerCase();
+  if (type === "application/pdf") {
+    return "pdf";
+  }
+  if (TEXT_TYPES.includes(type)) {
+    return "text";
+  }
+  if (OFFICE_PREFIXES.some((prefix) => type.startsWith(prefix))) {
+    return "office";
+  }
+  if (IMAGE_TYPES.includes(type)) {
+    return "image";
+  }
+  return "other";
+}
