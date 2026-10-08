@@ -31,18 +31,30 @@ fn random_hex(bytes: usize) -> String {
     hex
 }
 
+/// Runs a `garage` command in the container and returns its standard output.
+/// A node on a loaded machine can answer `node id` before it accepts the other commands,
+/// so a failed command runs again, for up to 60 s.
 #[allow(clippy::unwrap_used)]
 async fn garage(container: &ContainerAsync<GenericImage>, args: &[&str]) -> String {
     let mut command = vec!["/garage"];
     command.extend_from_slice(args);
-    let mut result = container.exec(ExecCommand::new(command)).await.unwrap();
-    let stdout = result.stdout_to_vec().await.unwrap();
-    assert_eq!(
-        result.exit_code().await.unwrap(),
-        Some(0),
-        "garage {args:?} failed"
+    let mut stderr = Vec::new();
+    for _ in 0..300 {
+        let mut result = container
+            .exec(ExecCommand::new(command.clone()))
+            .await
+            .unwrap();
+        let stdout = result.stdout_to_vec().await.unwrap();
+        stderr = result.stderr_to_vec().await.unwrap();
+        if result.exit_code().await.unwrap() == Some(0) {
+            return String::from_utf8(stdout).unwrap();
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+    panic!(
+        "garage {args:?} failed for 60 s: {}",
+        String::from_utf8_lossy(&stderr)
     );
-    String::from_utf8(stdout).unwrap()
 }
 
 impl TestGarage {
