@@ -1,0 +1,88 @@
+@layer components {
+  .page {
+    display: grid;
+    align-content: start;
+    gap: var(--space-6);
+    padding: var(--space-6) var(--space-4);
+  }
+
+  @media (width >= 40rem) {
+    /* --bp-medium */
+    .page {
+      padding: var(--space-8) var(--space-6);
+    }
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 40rem;
+  }
+
+  .title {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--letter-spacing-tight);
+    line-height: var(--line-height-2xl);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .steps {
+    margin: 0;
+    padding-left: var(--space-6);
+  }
+
+  .check {
+    font-weight: var(--font-weight-medium);
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .code {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-sunken);
+  }
+
+  .codeLabel {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .codeValue {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+
+  .failure {
+    padding: var(--space-3);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius-md);
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+
+  /* The live regions stay in the page: empty, they are hidden from the eye but not from the tree. */
+  .failure:empty,
+  .confirmation:empty {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+  }
+}

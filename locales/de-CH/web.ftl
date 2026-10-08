@@ -204,3 +204,38 @@ members-leave-warning = Sie entfernen sich selbst. Danach sehen Sie diese Organi
 members-remove-last = Die Organisation braucht mindestens eine Organisationsleitung, und jeder Anlass braucht eine Anlassleitung. Bestimmen Sie zuerst jemand anderen.
 members-conflict = Jemand hat die Mitglieder inzwischen geändert. Die Liste ist neu geladen. Versuchen Sie es erneut.
 members-loaded-more = Weitere Mitglieder geladen.
+
+## Settings navigation and Telegram link (settings)
+
+settings-nav = Einstellungen
+settings-nav-members = Mitglieder
+settings-nav-telegram = Telegram
+telegram-title = Telegram verknüpfen
+telegram-intro = Verknüpfen Sie Ihr Telegram-Konto mit tada, um tada im Chat zu nutzen.
+telegram-steps-title = So geht es
+telegram-step-create = Erstellen Sie hier einen Code.
+telegram-step-send = Senden Sie den Code dem Bot in Telegram.
+telegram-step-confirm = Bestätigen Sie die Anfrage hier in tada.
+telegram-check = Bestätigen Sie nur, wenn der Name Ihr eigenes Telegram-Konto zeigt. Eine Anfrage, die Sie nicht kennen, ignorieren Sie. Ohne Ihre Bestätigung verknüpft tada nichts.
+telegram-code-create = Code erstellen
+telegram-code-label = Ihr Code
+# $time: the time of the expiry.
+telegram-code-expires = Der Code läuft ab um { $time } Uhr und gilt nur einmal. Sie sehen ihn nur jetzt.
+telegram-requests-title = Offene Anfragen
+telegram-requests-loading = Anfragen werden geladen
+telegram-requests-refresh = Aktualisieren
+telegram-requests-empty-title = Keine offenen Anfragen
+telegram-requests-empty-text = Sobald der Bot Ihren Code erhält, erscheint hier das Telegram-Konto.
+telegram-column-name = Telegram-Name
+telegram-column-claimed = Angefragt um
+telegram-column-actions = Aktionen
+telegram-confirm = Bestätigen
+# $name: the Telegram name of the account.
+telegram-confirm-of = { $name } bestätigen
+telegram-confirm-title = Telegram-Konto verknüpfen?
+# $name: the Telegram name of the account.
+telegram-confirm-text = Verknüpfen Sie { $name } nur, wenn das Ihr eigenes Telegram-Konto ist. Danach handelt dieses Konto in tada als Sie.
+telegram-confirm-submit = Verknüpfen
+telegram-confirm-cancel = Abbrechen
+telegram-linked = Telegram-Konto verknüpft.
+telegram-requests-refreshed = Anfragen aktualisiert.
