@@ -4,13 +4,13 @@
 use std::sync::Arc;
 
 use axum::http::request::Parts;
+use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::Extension;
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
-use rmcp::{ErrorData, ServerHandler, tool, tool_handler, tool_router};
+use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
-use serde_json::json;
 use tada_app::caller::AiCaller;
 use tada_app::clock::Clock;
 use tada_app::documents::DocumentStore;
@@ -20,7 +20,7 @@ use tada_app::events::{self, EventStore};
 use tada_app::facts::{self, FactStore};
 use tada_app::identity::IdentityStore;
 use tada_app::paging::PageLimit;
-use tada_app::problem::{CommandError, FieldError, ProblemCode};
+use tada_app::problem::{FieldError, ProblemCode};
 use tada_app::proposals::ProposalStore;
 use tada_app::search::{self, SearchRequest};
 use tada_app::sources::{self, SourceStore};
@@ -30,6 +30,7 @@ use tada_app::views::{
 use uuid::Uuid;
 
 use crate::McpState;
+use crate::errors::{ToolError, caller};
 
 /// The rules for each agent, in the `initialize` answer.
 const INSTRUCTIONS: &str = "tada holds the planning data of the events of a club. \
@@ -103,7 +104,7 @@ impl Tools {
     async fn list_events(
         &self,
         Extension(parts): Extension<Parts>,
-    ) -> Result<Json<EventList>, ErrorData> {
+    ) -> Result<Json<EventList>, ToolError> {
         let caller = caller(&parts)?;
         let page = events::list_events(
             caller,
@@ -111,8 +112,7 @@ impl Tools {
             PageLimit::new(PageLimit::MAX).unwrap_or_default(),
             &*self.events,
         )
-        .await
-        .map_err(tool_error)?;
+        .await?;
         Ok(Json(EventList {
             events: page.items.iter().map(EventView::from).collect(),
             more: page.next.is_some(),
@@ -129,12 +129,11 @@ Use an existing field first; propose a new field only if no field has the meanin
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(input): Parameters<EventInput>,
-    ) -> Result<Json<EventSchema>, ErrorData> {
+    ) -> Result<Json<EventSchema>, ToolError> {
         let caller = caller(&parts)?;
         let event = self.event(caller, &input.event_key).await?;
-        let catalog = facts::get_field_catalog(caller, event.id, &*self.identity, &*self.facts)
-            .await
-            .map_err(tool_error)?;
+        let catalog =
+            facts::get_field_catalog(caller, event.id, &*self.identity, &*self.facts).await?;
         Ok(Json(EventSchema::new(&event, &catalog)))
     }
 
@@ -150,15 +149,13 @@ Only accepted facts are confirmed. Never fill in an unknown, and never present a
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(input): Parameters<EventInput>,
-    ) -> Result<Json<ProfileView>, ErrorData> {
+    ) -> Result<Json<ProfileView>, ToolError> {
         let caller = caller(&parts)?;
         let event = self.event(caller, &input.event_key).await?;
-        let profile = facts::get_event_profile(caller, event.id, &*self.identity, &*self.facts)
-            .await
-            .map_err(tool_error)?;
-        let catalog = facts::get_field_catalog(caller, event.id, &*self.identity, &*self.facts)
-            .await
-            .map_err(tool_error)?;
+        let profile =
+            facts::get_event_profile(caller, event.id, &*self.identity, &*self.facts).await?;
+        let catalog =
+            facts::get_field_catalog(caller, event.id, &*self.identity, &*self.facts).await?;
         Ok(Json(ProfileView::new(&event, &profile, &catalog)))
     }
 
@@ -172,7 +169,7 @@ Each hit names its source version and a snippet with its offsets. Cite a hit as 
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(input): Parameters<SearchInput>,
-    ) -> Result<Json<SearchResult>, ErrorData> {
+    ) -> Result<Json<SearchResult>, ToolError> {
         let caller = caller(&parts)?;
         let request = SearchRequest {
             event_key: input.event_key,
@@ -186,8 +183,7 @@ Each hit names its source version and a snippet with its offsets. Cite a hit as 
             &*self.identity,
             &*self.sources,
         )
-        .await
-        .map_err(tool_error)?;
+        .await?;
         Ok(Json(SearchResult {
             hits: hits.iter().map(SearchHitView::from).collect(),
         }))
@@ -203,7 +199,7 @@ The offsets count characters, as in the evidence of a fact and in a search hit."
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(input): Parameters<PassageInput>,
-    ) -> Result<Json<PassageView>, ErrorData> {
+    ) -> Result<Json<PassageView>, ToolError> {
         let caller = caller(&parts)?;
         let passage = sources::get_source_passage(
             caller,
@@ -213,72 +209,36 @@ The offsets count characters, as in the evidence of a fact and in a search hit."
             &*self.identity,
             &*self.sources,
         )
-        .await
-        .map_err(tool_error)?;
+        .await?;
         Ok(Json(PassageView::from(&passage)))
     }
 }
 
 impl Tools {
+    /// All tools of the server.
+    fn all_tools() -> ToolRouter<Self> {
+        Self::read_tools() + Self::propose_tools()
+    }
+
     /// The event with the key `key`, if the caller can read it.
     async fn event(
         &self,
         caller: &AiCaller,
         key: &str,
-    ) -> Result<tada_app::domain::events::Event, ErrorData> {
+    ) -> Result<tada_app::domain::events::Event, ToolError> {
         let key = EventKey::parse(key).map_err(|error| {
-            invalid(&[FieldError::new("event_key", events::key_error_code(error))])
+            let error = FieldError::new("event_key", events::key_error_code(error));
+            ToolError::problem(ProblemCode::ValidationFailed, &[error])
         })?;
-        events::find_event(caller, &key, &*self.events, &*self.identity)
-            .await
-            .map_err(tool_error)
+        Ok(events::find_event(caller, &key, &*self.events, &*self.identity).await?)
     }
 }
 
-#[tool_handler(router = (Self::read_tools() + Self::propose_tools()))]
+#[tool_handler(router = Self::all_tools())]
 impl ServerHandler for Tools {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("tada", env!("CARGO_PKG_VERSION")))
             .with_instructions(INSTRUCTIONS)
     }
-}
-
-/// The AI caller that the guard found for the request.
-pub(crate) fn caller(parts: &Parts) -> Result<&AiCaller, ErrorData> {
-    // The guard runs before each request, so a missing caller is a wiring error: fail closed.
-    parts
-        .extensions
-        .get::<AiCaller>()
-        .ok_or_else(|| ErrorData::internal_error(ProblemCode::Internal.meaning(), None))
-}
-
-/// The error of an `app` query as a JSON-RPC error with the problem code (ADR 0037).
-/// A store failure goes to the log; the agent sees the code only.
-pub(crate) fn tool_error(error: impl CommandError) -> ErrorData {
-    if let Some(store_error) = error.store_error() {
-        tracing::error!(error = %crate::guard::error_chain(store_error), "the store failed");
-    }
-    let code = error.code();
-    if code == ProblemCode::ValidationFailed {
-        return invalid(error.field_errors());
-    }
-    let data = Some(json!({"code": code.as_str()}));
-    match code {
-        ProblemCode::NotFound => ErrorData::resource_not_found(code.meaning(), data),
-        _ => ErrorData::internal_error(code.meaning(), data),
-    }
-}
-
-fn invalid(errors: &[FieldError]) -> ErrorData {
-    let code = ProblemCode::ValidationFailed;
-    let errors: Vec<_> = errors
-        .iter()
-        // A JSON pointer into the arguments of the tool, as in the problems of the API (ADR 0037).
-        .map(|error| json!({"pointer": format!("/{}", error.field), "code": error.code}))
-        .collect();
-    ErrorData::invalid_params(
-        code.meaning(),
-        Some(json!({"code": code.as_str(), "errors": errors})),
-    )
 }

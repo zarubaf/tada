@@ -4,6 +4,7 @@
 //! Each request shows a personal API token (ADR 0039). The token authenticator gives an `AiCaller`,
 //! never a member caller, so no tool can call a command that only a member can call.
 
+mod errors;
 mod guard;
 mod propose;
 mod tools;

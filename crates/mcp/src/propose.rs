@@ -4,13 +4,14 @@
 use axum::http::request::Parts;
 use rmcp::handler::server::tool::Extension;
 use rmcp::handler::server::wrapper::{Json, Parameters};
-use rmcp::{ErrorData, tool, tool_router};
+use rmcp::{tool, tool_router};
 use schemars::JsonSchema;
 use serde::Serialize;
 use tada_app::proposals::{self, Created, NewChangeset, ProposeStores};
 use uuid::Uuid;
 
-use crate::tools::{Tools, caller, tool_error};
+use crate::errors::{ToolError, caller};
+use crate::tools::Tools;
 
 /// The changeset that the member reviews.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -49,7 +50,7 @@ If a check fails, tada stores nothing: the error data gives the problem code and
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(input): Parameters<NewChangeset>,
-    ) -> Result<Json<ProposedChangeset>, ErrorData> {
+    ) -> Result<Json<ProposedChangeset>, ToolError> {
         let caller = caller(&parts)?;
         let stores = ProposeStores {
             identity: &*self.identity,
@@ -58,9 +59,7 @@ If a check fails, tada stores nothing: the error data gives the problem code and
             sources: &*self.sources,
             documents: &*self.documents,
         };
-        let created = proposals::create_changeset(caller, input, stores, &*self.clock)
-            .await
-            .map_err(tool_error)?;
+        let created = proposals::create_changeset(caller, input, stores, &*self.clock).await?;
         let (changeset, existing) = match created {
             Created::New(changeset) => (changeset, false),
             Created::Existing(changeset) => (changeset, true),
