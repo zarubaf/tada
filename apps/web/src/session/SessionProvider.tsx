@@ -19,7 +19,9 @@ import {
 } from "../api/client";
 import { t } from "../i18n";
 import { Redirect, useNavigate, usePathname } from "../router/Router";
+import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { Page } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath, SIGN_IN_PATH } from "./paths";
 
@@ -76,20 +78,33 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
   const onPublicPath = useRef(isPublic);
   onPublicPath.current = isPublic;
 
-  const refresh = useCallback(async () => {
+  // After a successful retry, focus goes to the page, as after a route change.
+  const { retried, retry } = useRetry(
+    () => document.querySelector<HTMLElement>("h1") ?? document.querySelector<HTMLElement>("main"),
+  );
+
+  /** Resolves to true when the request got an answer that is not a failure. */
+  const load = useCallback(async () => {
     try {
       const { data, error } = await api.GET("/api/v1/session");
       if (data) {
         setState({ kind: "ready", info: data });
-      } else if (error?.code === "unauthenticated") {
-        setState({ kind: "signed-out" });
-      } else {
-        setState({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
+        return true;
       }
+      if (error?.code === "unauthenticated") {
+        setState({ kind: "signed-out" });
+        return true;
+      }
+      setState({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
     } catch {
       setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
     }
+    return false;
   }, [api]);
+
+  const refresh = useCallback(async () => {
+    await load();
+  }, [load]);
 
   const signOut = useCallback(async () => {
     try {
@@ -113,13 +128,16 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
           navigate(SIGN_IN_PATH, { replace: true });
         }
       } else {
-        navigate(CHOOSE_ORGANIZATION_PATH, { replace: true });
+        // The memberships changed, for example after a removal (ADR 0056). The choice must show the
+        // list of now, so the session loads again before the page opens.
+        setState({ kind: "loading" });
+        void load().then(() => navigate(CHOOSE_ORGANIZATION_PATH, { replace: true }));
       }
     });
     api.use(watcher);
-    void refresh();
+    void load();
     return () => api.eject(watcher);
-  }, [api, navigate, refresh]);
+  }, [api, navigate, load]);
 
   const session = useMemo<Session | null>(
     () =>
@@ -147,26 +165,34 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
     if (session && pathname === SIGN_IN_PATH) {
       return <Redirect to="/events" />;
     }
+    // The loading and the failed state are in `main`, so that the skip link has a target.
     if (state.kind === "failed") {
       return (
-        <InlineError
-          message={state.message}
-          requestId={state.requestId}
-          onRetry={() => {
-            setState({ kind: "loading" });
-            void refresh();
-          }}
-        />
+        <Page>
+          <InlineError
+            message={state.message}
+            requestId={state.requestId}
+            onRetry={() =>
+              retry(() => {
+                setState({ kind: "loading" });
+                return load();
+              })
+            }
+            announce={retried ? "focus" : "alert"}
+          />
+        </Page>
       );
     }
     if (state.kind === "signed-out") {
-      return pathname === SIGN_IN_PATH ? null : <Redirect to={SIGN_IN_PATH} />;
+      return <Redirect to={SIGN_IN_PATH} />;
     }
     if (!session) {
       return (
-        <div role="status" aria-label={t("session-loading")}>
-          <Skeleton />
-        </div>
+        <Page>
+          <div role="status" aria-label={t("session-loading")}>
+            <Skeleton />
+          </div>
+        </Page>
       );
     }
     if (!session.organization && !isPublic && pathname !== CHOOSE_ORGANIZATION_PATH) {

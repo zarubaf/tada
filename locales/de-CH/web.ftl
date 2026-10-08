@@ -14,6 +14,7 @@ events-empty-title = Noch keine Anlässe erfasst
 events-empty-text = Hier erscheinen die Anlässe Ihrer Organisation.
 events-load-more = Weitere Anlässe laden
 events-loading = Anlässe werden geladen
+events-loaded-more = Weitere Anlässe geladen.
 
 ## Errors
 
@@ -60,7 +61,6 @@ not-found-text = Diese Adresse gibt es nicht. Prüfen Sie den Link oder wählen 
 
 session-loading = Sitzung wird geladen
 skip-link = Zum Inhalt springen
-shell-side = Seitenleiste
 shell-nav = Hauptnavigation
 nav-events = Anlässe
 organization-switcher = Organisation
@@ -73,6 +73,7 @@ sign-in-title = Anmelden
 sign-in-text = Wir senden Ihnen einen Link per E-Mail. Mit dem Link melden Sie sich an.
 sign-in-email = E-Mail-Adresse (Pflichtfeld)
 sign-in-submit = Anmeldelink senden
+sign-in-error-email = Das ist keine gültige E-Mail-Adresse. Geben Sie eine Adresse wie name@example.org ein.
 sign-in-sent = Wenn die Adresse bekannt ist, erhalten Sie in Kürze eine E-Mail.
 problem-rate-limited = Zu viele Anfragen. Versuchen Sie es in einigen Minuten erneut.
 # $seconds: the wait that the server asks for (Retry-After).
@@ -114,6 +115,9 @@ choose-organization-empty-text = Sie sind noch in keiner Organisation Mitglied. 
 events-create = Anlass erfassen
 event-create-title = Anlass erfassen
 event-create-submit = Anlass erfassen
+event-create-key-label = Kürzel (Pflichtfeld)
+event-create-name-label = Name (Pflichtfeld)
+event-create-time-zone-label = Zeitzone (Pflichtfeld)
 event-create-key-help = Zwei bis acht Grossbuchstaben oder Ziffern, zum Beispiel FLY28.
 event-create-time-zone-help = Eine IANA-Zeitzone, zum Beispiel Europe/Zurich.
 event-error-key = Das Kürzel hat 2 bis 8 Grossbuchstaben oder Ziffern.
@@ -198,6 +202,8 @@ event-members-add-title = Rolle vergeben
 event-members-add-member = Mitglied
 event-members-add-placeholder = Mitglied wählen
 event-members-add-submit = Mitglied hinzufügen
+# $name: the display name of the member.
+event-members-added = { $name } hat jetzt eine Rolle in diesem Anlass.
 event-members-add-none = Alle Mitglieder der Organisation haben schon eine Rolle in diesem Anlass.
 role-event-manager = Anlassleitung
 role-event-contributor = Mitarbeit
@@ -240,8 +246,8 @@ invitations-revoke-title = Einladung widerrufen?
 # $name: the display name of the invited person.
 invitations-revoke-text = Der Link in der Einladung an { $name } funktioniert danach nicht mehr.
 invite-title = Mitglied einladen
-invite-email = E-Mail
-invite-name = Name
+invite-email = E-Mail-Adresse (Pflichtfeld)
+invite-name = Name (Pflichtfeld)
 invite-role = Rolle
 invite-submit = Einladen
 # $name: the display name of the invited person.

@@ -1,8 +1,21 @@
 @layer components {
-  /* Narrow: a top bar and a fixed bottom bar. Content must clear the bottom bar. */
-  .shell {
-    --bottom-bar-height: calc(var(--control-height-lg) + var(--space-4));
+  /*
+   * Narrow: a top bar and a fixed bottom bar. The content clears the bar, and a focused element
+   * never hides under it (WCAG 2.4.11). The bar grows by the safe area of the home indicator.
+   */
+  :global(html):has(.shell) {
+    --bottom-bar-height: calc(
+      var(--control-height-lg) +
+      var(--space-4) +
+      1px +
+      env(safe-area-inset-bottom)
+    );
 
+    /* Room for the focus ring: 2 px outline with a 2 px offset. */
+    scroll-padding-block-end: calc(var(--bottom-bar-height) + var(--space-1));
+  }
+
+  .shell {
     display: grid;
     padding-block-end: var(--bottom-bar-height);
   }
@@ -22,29 +35,7 @@
   }
 
   .switcher {
-    display: grid;
     min-width: 0;
-  }
-
-  .switcherLabel {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-  }
-
-  .select {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    text-align: start;
-    cursor: pointer;
-    min-height: var(--control-height-md);
-    min-width: 0;
-    padding: 0 var(--space-2);
-    border: 1px solid var(--color-border-control);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-surface);
-    color: var(--color-text);
-    font: inherit;
   }
 
   .nav {
@@ -60,90 +51,21 @@
     background: var(--color-bg-surface);
   }
 
-  .navLink {
-    display: flex;
-    align-items: center;
-    min-height: var(--control-height-lg);
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-md);
-    color: var(--color-text);
-    font-weight: var(--font-weight-medium);
-    text-decoration: none;
-  }
-
-  .navLink:hover {
-    background: var(--color-bg-hover);
-  }
-
-  .navLink[aria-current="page"] {
-    background: var(--color-accent-subtle);
-    color: var(--color-accent-text);
-  }
-
   .member {
+    display: grid;
     grid-column: 3;
-    min-height: var(--control-height-md);
-    padding: 0 var(--space-3);
-    border: 1px solid var(--color-border-control);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-surface);
-    color: var(--color-text);
-    font: inherit;
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-  }
-
-  .member[data-hovered] {
-    background: var(--color-bg-hover);
-  }
-
-  .member[data-focus-visible] {
-    outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
-  }
-
-  .popover {
-    min-width: 12rem;
-    border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-raised);
-    box-shadow: var(--shadow-2);
-  }
-
-  .menu {
-    padding: var(--space-1);
-    outline: none;
-  }
-
-  .item {
-    display: flex;
-    align-items: center;
-    min-height: var(--control-height-md);
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-    cursor: pointer;
-    outline: none;
-  }
-
-  .item[data-focused],
-  .item[data-selected] {
-    background: var(--color-accent-subtle);
-    color: var(--color-accent-text);
   }
 
   .failure {
     grid-column: 1 / -1;
-    color: var(--color-danger);
-  }
-
-  /* The region stays in the page when it is empty, but it takes no grid cell and no gap. */
-  .failure:empty {
-    position: absolute;
   }
 
   /* Medium and wide (--bp-medium): a sidebar of 15rem (240 px). */
   @media (width >= 40rem) {
+    :global(html):has(.shell) {
+      scroll-padding-block-end: 0;
+    }
+
     .shell {
       grid-template-columns: 15rem 1fr;
       align-items: start;
@@ -170,14 +92,9 @@
       background: none;
     }
 
-    .navLink {
-      min-height: var(--control-height-md);
-    }
-
     .member {
       position: absolute;
       inset: auto var(--space-4) var(--space-4);
-      text-align: start;
     }
   }
 }

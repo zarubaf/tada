@@ -7,6 +7,7 @@ import { useNavigate } from "../router/Router";
 import { Button } from "../ui/Button";
 import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { LiveRegion } from "../ui/LiveRegion";
+import { Page, PageTitle } from "../ui/Page";
 import { TextField } from "../ui/TextField";
 import styles from "./Form.module.css";
 
@@ -94,11 +95,11 @@ export function CreateEventForm({ api }: { api: Api }) {
   };
 
   return (
-    <main id="main" className={styles.page}>
-      <h1 className={styles.title}>{t("event-create-title")}</h1>
+    <Page>
+      <PageTitle>{t("event-create-title")}</PageTitle>
       <form ref={form} className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
         <TextField
-          label={t("events-column-key")}
+          label={t("event-create-key-label")}
           help={t("event-create-key-help")}
           value={key}
           onChange={edit(setKey)}
@@ -108,7 +109,7 @@ export function CreateEventForm({ api }: { api: Api }) {
           isRequired
         />
         <TextField
-          label={t("events-column-name")}
+          label={t("event-create-name-label")}
           value={name}
           onChange={edit(setName)}
           error={errors.name}
@@ -116,7 +117,7 @@ export function CreateEventForm({ api }: { api: Api }) {
           isRequired
         />
         <TextField
-          label={t("events-column-time-zone")}
+          label={t("event-create-time-zone-label")}
           help={t("event-create-time-zone-help")}
           value={timeZone}
           onChange={edit(setTimeZone)}
@@ -124,15 +125,13 @@ export function CreateEventForm({ api }: { api: Api }) {
           autoComplete="off"
           isRequired
         />
-        <LiveRegion kind="alert" className={styles.failure}>
-          {failure}
-        </LiveRegion>
+        <LiveRegion kind="alert">{failure}</LiveRegion>
         <div className={styles.actions}>
           <Button type="submit" variant="primary" isPending={busy}>
             {t("event-create-submit")}
           </Button>
         </div>
       </form>
-    </main>
+    </Page>
   );
 }

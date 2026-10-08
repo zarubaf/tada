@@ -121,13 +121,34 @@ describe("SessionProvider", () => {
   });
 
   it("redirects to the organization choice on an organization-required problem", async () => {
-    const { api } = fakeApi(json(200, info), problem(403, "organization-required"));
+    const { api } = fakeApi(
+      json(200, info),
+      problem(403, "organization-required"),
+      json(200, { ...info, organization: null }),
+    );
     renderAt("/events", api);
 
     await userEvent.click(await screen.findByRole("button", { name: "events" }));
     await vi.waitFor(() =>
       expect(screen.getByTestId("path")).toHaveTextContent("/choose-organization"),
     );
+  });
+
+  it("loads the session again on an organization-required problem", async () => {
+    const other = { ...membership, organization_id: "o2", name: "Segelflugclub Musterhausen" };
+    const removed = { ...info, organization: null, memberships: [other] };
+    const { api, calls } = fakeApi(
+      json(200, info),
+      problem(403, "organization-required"),
+      json(200, removed),
+    );
+    renderAt("/events", api);
+
+    await userEvent.click(await screen.findByRole("button", { name: "events" }));
+    await vi.waitFor(() =>
+      expect(screen.getByTestId("path")).toHaveTextContent("/choose-organization"),
+    );
+    expect(calls).toEqual(["GET /api/v1/session", "GET /api/v1/events", "GET /api/v1/session"]);
   });
 
   it("redirects to the sign-in page when a later call gets 401", async () => {

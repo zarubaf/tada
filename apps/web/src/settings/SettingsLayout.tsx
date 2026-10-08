@@ -1,24 +1,20 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
-import { Link } from "../router/Router";
-import styles from "./SettingsLayout.module.css";
+import { NavLink, SubNav } from "../ui/NavLink";
+import { Page } from "../ui/Page";
 
 /**
- * The frame of the `/settings/*` pages: the sub-navigation and the page in `children`.
- * A settings page adds its link here.
+ * The settings template (doc/design/layout-and-responsiveness.md): the sub-navigation of the
+ * `/settings/*` pages, then the page in `children`. A settings page adds its link here.
  */
 export function SettingsLayout({ children }: { children: ReactNode }) {
   return (
-    <main id="main" className={styles.layout}>
-      <nav className={styles.nav} aria-label={t("settings-nav")}>
-        <Link to="/settings/members" className={styles.link}>
-          {t("settings-nav-members")}
-        </Link>
-        <Link to="/settings/telegram" className={styles.link}>
-          {t("settings-nav-telegram")}
-        </Link>
-      </nav>
+    <Page>
+      <SubNav label={t("settings-nav")}>
+        <NavLink to="/settings/members">{t("settings-nav-members")}</NavLink>
+        <NavLink to="/settings/telegram">{t("settings-nav-telegram")}</NavLink>
+      </SubNav>
       {children}
-    </main>
+    </Page>
   );
 }

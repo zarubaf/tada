@@ -7,6 +7,7 @@ import {
   Popover,
   SelectValue,
 } from "react-aria-components";
+import popover from "./Popover.module.css";
 import styles from "./Select.module.css";
 
 export interface SelectProps {
@@ -45,10 +46,10 @@ export function Select({
         <SelectValue />
         <span aria-hidden="true">▾</span>
       </Button>
-      <Popover className={styles.popover}>
-        <ListBox className={styles.menu}>
+      <Popover className={popover.popover}>
+        <ListBox className={popover.list}>
           {options.map((option) => (
-            <ListBoxItem key={option.id} id={option.id} className={styles.item}>
+            <ListBoxItem key={option.id} id={option.id} className={popover.item}>
               {option.label}
             </ListBoxItem>
           ))}

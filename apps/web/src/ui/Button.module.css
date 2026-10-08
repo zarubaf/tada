@@ -32,6 +32,11 @@
     background: var(--color-accent-hover);
   }
 
+  /* Secondary in style, with the danger color (doc/design/components.md). */
+  .button[data-variant="danger"] {
+    color: var(--color-danger);
+  }
+
   .button[data-focus-visible] {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
@@ -40,5 +45,13 @@
   .button[data-disabled] {
     cursor: default;
     opacity: 0.5;
+  }
+
+  /* Forced colors ignore the opacity: a disabled button uses the system color for it. */
+  @media (forced-colors: active) {
+    .button[data-disabled] {
+      border-color: GrayText;
+      color: GrayText;
+    }
   }
 }

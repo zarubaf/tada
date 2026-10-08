@@ -97,6 +97,47 @@ for (const viewport of viewports) {
   }
 }
 
+test("at 320 px the tables do not scroll sideways and each row action is in reach", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await fakeSession(page, sessionWithRole("owner"));
+  await fakeMembers(page, true);
+  await page.goto("/settings/members");
+  const remove = page.getByRole("button", {
+    name: "Bernhard Beispiel-Schmidlin-Äbischer entfernen",
+  });
+  await expect(remove).toBeVisible();
+
+  const box = await remove.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(320);
+  expect(await textOverflows(page)).toEqual([]);
+});
+
+test("at 375 px a focused element never hides under the bottom bar", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 640 });
+  await fakeSession(page, sessionWithRole("owner"));
+  await fakeMembers(page, true);
+  await page.goto("/settings/members");
+  await expect(page.getByRole("table", { name: "Offene Einladungen" })).toBeVisible();
+
+  for (let step = 0; step < 16; step++) {
+    await page.keyboard.press("Tab");
+    const hidden = await page.evaluate(() => {
+      const focused = document.activeElement;
+      const bar = document.querySelector("nav[aria-label='Hauptnavigation']");
+      if (!focused || focused === document.body || !bar || bar.contains(focused)) {
+        return "";
+      }
+      // The focus ring is 2 px wide with a 2 px offset.
+      const bottom = focused.getBoundingClientRect().bottom + 4;
+      const top = bar.getBoundingClientRect().top;
+      return bottom > top ? `${focused.textContent}: ${bottom} > ${top}` : "";
+    });
+    expect(hidden).toBe("");
+  }
+});
+
 test("the navigation item Einstellungen leads to the members", async ({ page }) => {
   await fakeSession(page, sessionWithRole("owner"));
   await fakeMembers(page, true);

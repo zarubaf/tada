@@ -63,7 +63,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 <Route path="/choose-organization">
                   <ChooseOrganizationPage api={api} />
                 </Route>
-                {/* Event screens (Task 21) */}
+                {/* The event screens */}
                 <Route path="/events/new">
                   <CreateEventForm api={api} />
                 </Route>
@@ -85,7 +85,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 <Route path="/documents/:documentId">
                   <DocumentPage api={api} />
                 </Route>
-                {/* Settings (Task 20) */}
+                                {/* The settings */}
                 <Route path="/settings/members">
                   <SettingsLayout>
                     <MembersPage api={api} />

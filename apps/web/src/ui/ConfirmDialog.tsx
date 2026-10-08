@@ -16,7 +16,10 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-/** A destructive confirmation: title, one sentence and two buttons (doc/design/components.md). */
+/**
+ * A destructive confirmation: title, one sentence and two buttons (doc/design/components.md).
+ * An alert dialog closes only with a button or Escape, not with a click outside.
+ */
 export function ConfirmDialog({
   isOpen,
   title,
@@ -37,7 +40,6 @@ export function ConfirmDialog({
           onCancel();
         }
       }}
-      isDismissable
     >
       <Modal className={styles.modal}>
         <Dialog className={styles.dialog} role="alertdialog">
@@ -48,7 +50,7 @@ export function ConfirmDialog({
           {warning && <p className={styles.warning}>{warning}</p>}
           <div className={styles.actions}>
             <Button onPress={onCancel}>{cancelLabel}</Button>
-            <Button variant="primary" isPending={isPending} onPress={onConfirm}>
+            <Button variant="danger" isPending={isPending} onPress={onConfirm}>
               {confirmLabel}
             </Button>
           </div>

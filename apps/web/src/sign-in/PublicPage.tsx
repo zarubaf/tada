@@ -1,20 +1,29 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { t } from "../i18n";
 import { Link } from "../router/Router";
 import { SIGN_IN_PATH } from "../session/paths";
+import { Page, PageTitle } from "../ui/Page";
 import styles from "./PublicPage.module.css";
 
 /**
  * The frame of a page without a session: a narrow column with the name of the app, one heading and
  * the content. It has no sidebar (doc/design/layout-and-responsiveness.md).
  */
-export function PublicPage({ title, children }: { title: string; children: ReactNode }) {
+export function PublicPage({
+  title,
+  titleRef,
+  children,
+}: {
+  title: string;
+  titleRef?: Ref<HTMLHeadingElement>;
+  children: ReactNode;
+}) {
   return (
-    <main id="main" className={styles.page}>
+    <Page width="form">
       <p className={styles.brand}>{t("app-name")}</p>
-      <h1 className={styles.title}>{title}</h1>
+      <PageTitle ref={titleRef}>{title}</PageTitle>
       {children}
-    </main>
+    </Page>
   );
 }
 

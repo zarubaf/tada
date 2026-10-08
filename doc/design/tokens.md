@@ -63,6 +63,7 @@ A change of a color token must keep each pair at or above its minimum.
 | `warning`        | `warning-subtle` | 4.5:1   | 5.50:1  | 7.77:1  |
 | `danger`         | `bg-surface`     | 4.5:1   | 6.55:1  | 6.84:1  |
 | `danger`         | `danger-subtle`  | 4.5:1   | 5.71:1  | 5.62:1  |
+| `danger`         | `bg-hover`       | 4.5:1   | 5.58:1  | 6.13:1  |
 | `text`           | `accent-subtle`  | 4.5:1   | 15.25:1 | 12.51:1 |
 | `text`           | `bg-raised`      | 4.5:1   | 17.31:1 | 13.98:1 |
 | `text-muted`     | `bg-raised`      | 4.5:1   | 6.53:1  | 6.72:1  |

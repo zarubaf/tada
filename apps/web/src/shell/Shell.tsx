@@ -1,24 +1,15 @@
 // The app shell (doc/design/layout-and-responsiveness.md): a sidebar on medium and wide layouts, a
 // top bar and a bottom bar on narrow layouts. It shows only the items that exist.
 import { Fragment, type ReactNode, useState } from "react";
-import {
-  Button,
-  Label,
-  ListBox,
-  ListBoxItem,
-  Menu,
-  MenuItem,
-  MenuTrigger,
-  Popover,
-  Select,
-  SelectValue,
-} from "react-aria-components";
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
-import { Link, usePathname } from "../router/Router";
+import { usePathname } from "../router/Router";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath } from "../session/paths";
 import { useOptionalSession } from "../session/SessionProvider";
 import { LiveRegion } from "../ui/LiveRegion";
+import { Menu } from "../ui/Menu";
+import { NavLink } from "../ui/NavLink";
+import { Select } from "../ui/Select";
 import styles from "./Shell.module.css";
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
@@ -49,57 +40,42 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.side} aria-label={t("shell-side")}>
+      <header className={styles.side}>
         <p className={styles.brand}>{t("app-name")}</p>
         {memberships.length > 1 && (
-          <Select
-            className={styles.switcher}
-            selectedKey={organization.organization_id}
-            onSelectionChange={(key) => void choose(String(key))}
-          >
-            <Label className={styles.switcherLabel}>{t("organization-switcher")}</Label>
-            <Button className={styles.select}>
-              <SelectValue />
-            </Button>
-            <Popover className={styles.popover}>
-              <ListBox className={styles.menu}>
-                {memberships.map((membership) => (
-                  <ListBoxItem
-                    key={membership.organization_id}
-                    id={membership.organization_id}
-                    className={styles.item}
-                  >
-                    {membership.name}
-                  </ListBoxItem>
-                ))}
-              </ListBox>
-            </Popover>
-          </Select>
+          <div className={styles.switcher}>
+            <Select
+              label={t("organization-switcher")}
+              options={memberships.map((membership) => ({
+                id: membership.organization_id,
+                label: membership.name,
+              }))}
+              value={organization.organization_id}
+              onChange={(id) => void choose(id)}
+            />
+          </div>
         )}
         <nav className={styles.nav} aria-label={t("shell-nav")}>
-          <Link to="/events" className={styles.navLink}>
+          <NavLink to="/events" large>
             {t("nav-events")}
-          </Link>
-          <Link to="/settings/members" within="/settings" className={styles.navLink}>
+          </NavLink>
+          <NavLink to="/settings/members" within="/settings" large>
             {t("nav-settings")}
-          </Link>
+          </NavLink>
         </nav>
-        <MenuTrigger>
-          <Button className={styles.member}>{user.displayName}</Button>
-          <Popover className={styles.popover} placement="top end">
-            <Menu
-              className={styles.menu}
-              aria-label={t("member-menu")}
-              onAction={() => void signOut().then(setFailure)}
-            >
-              <MenuItem className={styles.item}>{t("sign-out")}</MenuItem>
-            </Menu>
-          </Popover>
-        </MenuTrigger>
+        <div className={styles.member}>
+          <Menu
+            trigger={user.displayName}
+            label={t("member-menu")}
+            items={[{ id: "sign-out", label: t("sign-out") }]}
+            onAction={() => void signOut().then(setFailure)}
+            placement="top end"
+          />
+        </div>
         <LiveRegion kind="alert" className={styles.failure}>
           {failure}
         </LiveRegion>
-      </aside>
+      </header>
       <Fragment key={organization.organization_id}>{children}</Fragment>
     </div>
   );

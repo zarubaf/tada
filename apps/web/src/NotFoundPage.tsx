@@ -1,11 +1,12 @@
 import { t } from "./i18n";
-import { EmptyState } from "./ui/EmptyState";
+import { Page, PageTitle } from "./ui/Page";
 
 /** The page for a path that no route matches. */
 export function NotFoundPage() {
   return (
-    <main id="main">
-      <EmptyState title={t("not-found-title")} text={t("not-found-text")} />
-    </main>
+    <Page>
+      <PageTitle>{t("not-found-title")}</PageTitle>
+      <p>{t("not-found-text")}</p>
+    </Page>
   );
 }

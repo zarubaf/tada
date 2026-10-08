@@ -1,8 +1,11 @@
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
 import { t } from "../i18n";
-import { Link, useParams } from "../router/Router";
+import { useParams } from "../router/Router";
+import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { NavLink, SubNav } from "../ui/NavLink";
+import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventPage.module.css";
 
@@ -13,8 +16,7 @@ type State =
 
 /**
  * The page of one event: the header with the name, the sub-navigation and the sub-page in
- * `children`. It owns the route `/events/:eventId`. Task 30 adds the `date_window` value to the
- * header and the overview to the first sub-page.
+ * `children`. It owns the route `/events/:eventId`. The header shows the key and the name only.
  */
 export function EventPage({
   api,
@@ -29,7 +31,10 @@ export function EventPage({
   const params = useParams();
   const eventId = eventIdProp ?? params.eventId ?? "";
   const [state, setState] = useState<State>({ kind: "loading" });
+  const heading = useRef<HTMLHeadingElement>(null);
+  const { retried, retry } = useRetry(() => heading.current);
 
+  /** Resolves to true when the event loaded. */
   const load = useCallback(async () => {
     try {
       const { data, error } = await api.GET("/api/v1/events/{event_id}", {
@@ -40,8 +45,10 @@ export function EventPage({
           ? { kind: "loaded", event: data }
           : { kind: "failed", message: problemMessage(error), requestId: error?.request_id },
       );
+      return data !== undefined;
     } catch {
       setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+      return false;
     }
   }, [api, eventId]);
 
@@ -51,7 +58,7 @@ export function EventPage({
 
   const base = `/events/${encodeURIComponent(eventId)}`;
   return (
-    <main id="main" className={styles.page}>
+    <Page>
       {state.kind === "loading" && (
         <div className={styles.skeleton} role="status" aria-label={t("event-loading")}>
           <Skeleton />
@@ -62,32 +69,31 @@ export function EventPage({
         <InlineError
           message={state.message}
           requestId={state.requestId}
-          onRetry={() => {
-            setState({ kind: "loading" });
-            void load();
-          }}
+          onRetry={() =>
+            retry(() => {
+              setState({ kind: "loading" });
+              return load();
+            })
+          }
+          announce={retried ? "focus" : "alert"}
         />
       )}
       {state.kind === "loaded" && (
         <>
           <header className={styles.header}>
             <p className={styles.key}>{state.event.key}</p>
-            <h1 className={styles.title}>{state.event.name}</h1>
+            <PageTitle ref={heading}>{state.event.name}</PageTitle>
           </header>
-          <nav className={styles.nav} aria-label={t("event-nav")}>
-            <Link to={base} className={styles.link} exact>
+          <SubNav label={t("event-nav")}>
+            <NavLink to={base} exact>
               {t("event-nav-overview")}
-            </Link>
-            <Link to={`${base}/members`} className={styles.link}>
-              {t("event-nav-members")}
-            </Link>
-            <Link to={`${base}/documents`} className={styles.link}>
-              {t("event-nav-documents")}
-            </Link>
-          </nav>
+            </NavLink>
+            <NavLink to={`${base}/members`}>{t("event-nav-members")}</NavLink>
+            <NavLink to={`${base}/documents`}>{t("event-nav-documents")}</NavLink>
+          </SubNav>
           {children}
         </>
       )}
-    </main>
+    </Page>
   );
 }

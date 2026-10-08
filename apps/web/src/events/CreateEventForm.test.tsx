@@ -53,15 +53,15 @@ const created = {
 describe("CreateEventForm", () => {
   it("defaults the time zone to Europe/Zurich", () => {
     renderForm(fakeApi().api);
-    expect(screen.getByLabelText("Zeitzone")).toHaveValue("Europe/Zurich");
+    expect(screen.getByLabelText("Zeitzone (Pflichtfeld)")).toHaveValue("Europe/Zurich");
   });
 
   it("creates the event with a client UUIDv7 and opens its page", async () => {
     const { api, bodies } = fakeApi(json(201, created));
     renderForm(api);
 
-    await user.type(screen.getByLabelText("Kürzel"), "test30");
-    await user.type(screen.getByLabelText("Name"), "Tag der offenen Tür Testwil");
+    await user.type(screen.getByLabelText("Kürzel (Pflichtfeld)"), "test30");
+    await user.type(screen.getByLabelText("Name (Pflichtfeld)"), "Tag der offenen Tür Testwil");
     await user.click(screen.getByRole("button", { name: "Anlass erfassen" }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${created.id}`));
@@ -80,12 +80,12 @@ describe("CreateEventForm", () => {
     );
     renderForm(api);
 
-    await user.type(screen.getByLabelText("Kürzel"), "TEST30");
-    await user.type(screen.getByLabelText("Name"), "Testanlass");
+    await user.type(screen.getByLabelText("Kürzel (Pflichtfeld)"), "TEST30");
+    await user.type(screen.getByLabelText("Name (Pflichtfeld)"), "Testanlass");
     await user.click(screen.getByRole("button", { name: "Anlass erfassen" }));
 
     expect(await screen.findByText("Dieses Kürzel ist schon vergeben.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Kürzel")).toBeInvalid();
+    expect(screen.getByLabelText("Kürzel (Pflichtfeld)")).toBeInvalid();
 
     await user.click(screen.getByRole("button", { name: "Anlass erfassen" }));
     await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${created.id}`));
@@ -96,8 +96,8 @@ describe("CreateEventForm", () => {
     const { api } = fakeApi(problem(403, "forbidden"));
     renderForm(api);
 
-    await user.type(screen.getByLabelText("Kürzel"), "TEST30");
-    await user.type(screen.getByLabelText("Name"), "Testanlass");
+    await user.type(screen.getByLabelText("Kürzel (Pflichtfeld)"), "TEST30");
+    await user.type(screen.getByLabelText("Name (Pflichtfeld)"), "Testanlass");
     await user.click(screen.getByRole("button", { name: "Anlass erfassen" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -109,15 +109,15 @@ describe("CreateEventForm", () => {
     const { api, bodies } = fakeApi();
     renderForm(api);
 
-    await user.type(screen.getByLabelText("Kürzel"), "A");
-    await user.type(screen.getByLabelText("Name"), "Testanlass");
+    await user.type(screen.getByLabelText("Kürzel (Pflichtfeld)"), "A");
+    await user.type(screen.getByLabelText("Name (Pflichtfeld)"), "Testanlass");
     await user.click(screen.getByRole("button", { name: "Anlass erfassen" }));
 
     expect(
       await screen.findByText("Das Kürzel hat 2 bis 8 Grossbuchstaben oder Ziffern."),
     ).toBeInTheDocument();
     expect(bodies).toHaveLength(0);
-    expect(screen.getByLabelText("Kürzel")).toHaveFocus();
+    expect(screen.getByLabelText("Kürzel (Pflichtfeld)")).toHaveFocus();
   });
 
   it("moves focus to the first invalid field after the server refuses a value", async () => {
@@ -126,11 +126,11 @@ describe("CreateEventForm", () => {
     );
     renderForm(api);
 
-    await user.type(screen.getByLabelText("Kürzel"), "TEST30");
-    await user.type(screen.getByLabelText("Name"), "Testanlass");
+    await user.type(screen.getByLabelText("Kürzel (Pflichtfeld)"), "TEST30");
+    await user.type(screen.getByLabelText("Name (Pflichtfeld)"), "Testanlass");
     await user.click(screen.getByRole("button", { name: "Anlass erfassen" }));
 
-    await vi.waitFor(() => expect(screen.getByLabelText("Kürzel")).toHaveFocus());
+    await vi.waitFor(() => expect(screen.getByLabelText("Kürzel (Pflichtfeld)")).toHaveFocus());
   });
 
   it("announces a failure in a live region that was there before", async () => {
@@ -139,8 +139,8 @@ describe("CreateEventForm", () => {
 
     const region = screen.getByRole("alert");
     expect(region).toBeEmpty();
-    await user.type(screen.getByLabelText("Kürzel"), "TEST30");
-    await user.type(screen.getByLabelText("Name"), "Testanlass");
+    await user.type(screen.getByLabelText("Kürzel (Pflichtfeld)"), "TEST30");
+    await user.type(screen.getByLabelText("Name (Pflichtfeld)"), "Testanlass");
     await user.click(screen.getByRole("button", { name: "Anlass erfassen" }));
 
     await vi.waitFor(() =>

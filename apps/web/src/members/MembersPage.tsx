@@ -15,9 +15,10 @@ import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
-import { useFocusAfterCommit } from "../ui/focus";
+import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
+import { PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import { InviteMemberForm } from "./InviteMemberForm";
 import styles from "./MembersPage.module.css";
@@ -31,17 +32,9 @@ interface Loadable<T> {
   nextCursor?: string | undefined;
   message?: string;
   requestId?: string | undefined;
-  /** Counts the retries, so that a failure after a retry takes focus. */
-  attempts: number;
 }
 
-const loading = <T,>(attempts = 0): Loadable<T> => ({ kind: "loading", items: [], attempts });
-
-/** The state of the request for the next page of members. */
-type More =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "failed"; message: string; requestId: string | undefined };
+const loading = <T,>(): Loadable<T> => ({ kind: "loading", items: [] });
 
 /** What the member confirms: the removal of a member or the revocation of an invitation. */
 type Confirming = { kind: "member"; item: Member } | { kind: "invitation"; item: Invitation };
@@ -56,8 +49,8 @@ export function MembersPage({ api }: { api: Api }) {
   const manages = canManage(role);
   const [members, setMembers] = useState<Loadable<Member>>(loading());
   const [invitations, setInvitations] = useState<Loadable<Invitation>>(loading());
-  // The next page of members: the loaded rows stay while it loads or fails.
-  const [more, setMore] = useState<More>({ kind: "idle" });
+  // The next page of members loads: the loaded rows stay while it loads or fails.
+  const [loadingMore, setLoadingMore] = useState(false);
   const navigate = useNavigate();
   // The message of the last failed action. Both live regions are in the page from the start.
   const [failure, setFailure] = useState<string>();
@@ -69,65 +62,58 @@ export function MembersPage({ api }: { api: Api }) {
   const invitationsHeading = useRef<HTMLHeadingElement>(null);
   const alert = useRef<HTMLParagraphElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
+  const membersRetry = useRetry(() => membersHeading.current);
+  const invitationsRetry = useRetry(() => invitationsHeading.current);
 
   /** The first page. A version conflict and a retry load the list again from here. */
-  const loadMembers = useCallback(
-    async (attempts: number) => {
-      try {
-        const { data, error } = await api.GET("/api/v1/members");
-        setMembers(
-          data
-            ? {
-                kind: "loaded",
-                items: data.items,
-                nextCursor: data.next_cursor ?? undefined,
-                attempts,
-              }
-            : {
-                kind: "failed",
-                items: [],
-                message: problemMessage(error),
-                requestId: error?.request_id,
-                attempts,
-              },
-        );
-        setMore({ kind: "idle" });
-      } catch {
-        setMembers({ kind: "failed", items: [], message: problemMessage(undefined), attempts });
-      }
-    },
-    [api],
-  );
+  const loadMembers = useCallback(async () => {
+    try {
+      const { data, error } = await api.GET("/api/v1/members");
+      setMembers(
+        data
+          ? { kind: "loaded", items: data.items, nextCursor: data.next_cursor ?? undefined }
+          : {
+              kind: "failed",
+              items: [],
+              message: problemMessage(error),
+              requestId: error?.request_id,
+            },
+      );
+      setLoadingMore(false);
+      return data !== undefined;
+    } catch {
+      setMembers({ kind: "failed", items: [], message: problemMessage(undefined) });
+      return false;
+    }
+  }, [api]);
 
-  const loadInvitations = useCallback(
-    async (attempts: number) => {
-      try {
-        const { data, error } = await api.GET("/api/v1/invitations");
-        setInvitations(
-          data
-            ? { kind: "loaded", items: data.items, attempts }
-            : {
-                kind: "failed",
-                items: [],
-                message: problemMessage(error),
-                requestId: error?.request_id,
-                attempts,
-              },
-        );
-      } catch {
-        setInvitations({ kind: "failed", items: [], message: problemMessage(undefined), attempts });
-      }
-    },
-    [api],
-  );
+  const loadInvitations = useCallback(async () => {
+    try {
+      const { data, error } = await api.GET("/api/v1/invitations");
+      setInvitations(
+        data
+          ? { kind: "loaded", items: data.items }
+          : {
+              kind: "failed",
+              items: [],
+              message: problemMessage(error),
+              requestId: error?.request_id,
+            },
+      );
+      return data !== undefined;
+    } catch {
+      setInvitations({ kind: "failed", items: [], message: problemMessage(undefined) });
+      return false;
+    }
+  }, [api]);
 
   useEffect(() => {
-    void loadMembers(0);
+    void loadMembers();
   }, [loadMembers]);
 
   useEffect(() => {
     if (manages) {
-      void loadInvitations(0);
+      void loadInvitations();
     }
   }, [manages, loadInvitations]);
 
@@ -144,20 +130,21 @@ export function MembersPage({ api }: { api: Api }) {
     // The failure may be far above the button that the member pressed.
     alert.current?.scrollIntoView?.({ block: "nearest" });
     if (code === "record-version-conflict") {
-      void loadMembers(members.attempts);
+      void loadMembers();
     }
     if (code === "not-found" && confirming?.kind === "invitation") {
       // The person accepted the invitation in the meantime.
-      void loadInvitations(invitations.attempts);
+      void loadInvitations();
     }
   };
 
   /** The next page: the loaded rows stay, and a retry continues from the same cursor. */
   const loadMore = async () => {
-    if (members.kind !== "loaded" || members.nextCursor === undefined || more.kind === "loading") {
+    if (members.kind !== "loaded" || members.nextCursor === undefined || loadingMore) {
       return;
     }
-    setMore({ kind: "loading" });
+    setLoadingMore(true);
+    setFailure(undefined);
     setConfirmation(undefined);
     try {
       const { data, error } = await api.GET("/api/v1/members", {
@@ -170,18 +157,19 @@ export function MembersPage({ api }: { api: Api }) {
           items: [...current.items, ...data.items],
           nextCursor,
         }));
-        setMore({ kind: "idle" });
         setConfirmation(t("members-loaded-more"));
         if (nextCursor === undefined) {
           // The button leaves: focus goes to the heading of the list.
           focusAfterCommit(() => membersHeading.current);
         }
       } else {
-        setMore({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
+        // The button stays and keeps focus: the alert region announces the failure.
+        fail({ error });
       }
     } catch {
-      setMore({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+      fail({});
     }
+    setLoadingMore(false);
   };
 
   const confirm = async () => {
@@ -249,12 +237,13 @@ export function MembersPage({ api }: { api: Api }) {
       cell: (member) =>
         member.user_id === session.user.id ? (
           // Each member can leave.
-          <Button onPress={() => setConfirming({ kind: "member", item: member })}>
+          <Button variant="danger" onPress={() => setConfirming({ kind: "member", item: member })}>
             {t("members-leave")}
           </Button>
         ) : (
           canRemove(role, member.role) && (
             <Button
+              variant="danger"
               aria-label={t("members-remove-of", { name: member.display_name })}
               onPress={() => setConfirming({ kind: "member", item: member })}
             >
@@ -288,6 +277,7 @@ export function MembersPage({ api }: { api: Api }) {
       header: t("members-column-actions"),
       cell: (invitation) => (
         <Button
+          variant="danger"
           aria-label={t("invitations-revoke-of", { name: invitation.display_name })}
           onPress={() => setConfirming({ kind: "invitation", item: invitation })}
         >
@@ -297,16 +287,16 @@ export function MembersPage({ api }: { api: Api }) {
     },
   ];
 
-  const retryMembers = () => {
-    const attempts = members.attempts + 1;
-    setMembers(loading(attempts));
-    void loadMembers(attempts);
-  };
-  const retryInvitations = () => {
-    const attempts = invitations.attempts + 1;
-    setInvitations(loading(attempts));
-    void loadInvitations(attempts);
-  };
+  const retryMembers = () =>
+    membersRetry.retry(() => {
+      setMembers(loading());
+      return loadMembers();
+    });
+  const retryInvitations = () =>
+    invitationsRetry.retry(() => {
+      setInvitations(loading());
+      return loadInvitations();
+    });
 
   const revoking = confirming?.kind === "invitation";
   const name = confirming?.item.display_name ?? "";
@@ -332,17 +322,15 @@ export function MembersPage({ api }: { api: Api }) {
 
   return (
     <div className={styles.page}>
-      <LiveRegion ref={alert} kind="alert" className={styles.failure}>
+      <LiveRegion ref={alert} kind="alert">
         {failure}
       </LiveRegion>
-      <LiveRegion kind="status" className={styles.confirmation}>
-        {confirmation}
-      </LiveRegion>
+      <LiveRegion kind="status">{confirmation}</LiveRegion>
 
       <section className={styles.section} aria-labelledby="members-title">
-        <h1 id="members-title" ref={membersHeading} tabIndex={-1} className={styles.title}>
+        <PageTitle id="members-title" ref={membersHeading}>
           {t("members-title")}
-        </h1>
+        </PageTitle>
         {members.kind === "loading" && (
           <div className={styles.skeleton} role="status" aria-label={t("members-loading")}>
             <Skeleton />
@@ -355,7 +343,7 @@ export function MembersPage({ api }: { api: Api }) {
             message={members.message ?? ""}
             requestId={members.requestId}
             onRetry={retryMembers}
-            takeFocus={members.attempts > 0}
+            announce={membersRetry.retried ? "focus" : "alert"}
           />
         )}
         {members.kind === "loaded" && (
@@ -366,11 +354,8 @@ export function MembersPage({ api }: { api: Api }) {
               rows={members.items}
               rowKey={(member) => member.user_id}
             />
-            {more.kind === "failed" && (
-              <InlineError message={more.message} requestId={more.requestId} takeFocus />
-            )}
             {members.nextCursor !== undefined && (
-              <Button isPending={more.kind === "loading"} onPress={() => void loadMore()}>
+              <Button isPending={loadingMore} onPress={() => void loadMore()}>
                 {t("members-load-more")}
               </Button>
             )}
@@ -399,7 +384,7 @@ export function MembersPage({ api }: { api: Api }) {
               message={invitations.message ?? ""}
               requestId={invitations.requestId}
               onRetry={retryInvitations}
-              takeFocus={invitations.attempts > 0}
+              announce={invitationsRetry.retried ? "focus" : "alert"}
             />
           )}
           {invitations.kind === "loaded" && invitations.items.length === 0 && (
@@ -434,7 +419,7 @@ export function MembersPage({ api }: { api: Api }) {
                 items: [...invitations.items.filter((i) => i.id !== invitation.id), invitation],
               });
             } else {
-              void loadInvitations(invitations.attempts);
+              void loadInvitations();
             }
           }}
         />

@@ -5,6 +5,8 @@ export default {
   plugins: ["stylelint-declaration-strict-value"],
   rules: {
     "selector-class-pattern": null,
+    // CSS Modules: `:global(html)` reaches the root element from a component module.
+    "selector-pseudo-class-no-unknown": [true, { ignorePseudoClasses: ["global"] }],
     // Plain numbers, as in doc/design/tokens.md.
     "hue-degree-notation": "number",
     "alpha-value-notation": "number",
@@ -30,6 +32,8 @@ export default {
           "none",
           "transparent",
           "unset",
+          // The system colors of forced colors (ADR 0022, doc/design/accessibility.md).
+          "/^(Canvas|CanvasText|GrayText|Highlight|HighlightText)$/",
         ],
         ignoreFunctions: false,
       },

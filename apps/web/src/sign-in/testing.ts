@@ -1,4 +1,5 @@
 // Helpers of the tests of the pages that a member without a session can open.
+import { screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import { createApi } from "../api/client";
 
@@ -46,4 +47,52 @@ export function fakeApi(...responses: Response[]) {
     return response;
   });
   return { api: createApi(fetch as unknown as typeof globalThis.fetch), calls };
+}
+
+/** The alerts that show a text. An empty live region is in the page before its text. */
+function shownAlerts(): HTMLElement[] {
+  return screen.queryAllByRole("alert").filter((alert) => alert.textContent?.trim());
+}
+
+/** The one alert that shows a text, or nothing. */
+export function queryAlert(): HTMLElement | null {
+  return shownAlerts()[0] ?? null;
+}
+
+/**
+ * Records what the alert regions show over time. A screen reader announces a region when its text
+ * changes, so an identical message needs an empty step before it. `stop` returns how many times
+ * a message appeared after an empty region.
+ */
+export function watchAlerts() {
+  const texts: string[] = [];
+  const read = () => {
+    const text = screen
+      .queryAllByRole("alert")
+      .map((alert) => alert.textContent?.trim() ?? "")
+      .join("");
+    if (text !== texts[texts.length - 1]) {
+      texts.push(text);
+    }
+  };
+  read();
+  const observer = new MutationObserver(read);
+  observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+  return {
+    stop(): number {
+      observer.disconnect();
+      return texts.filter((text, i) => text !== "" && (texts[i - 1] ?? "") === "").length;
+    },
+  };
+}
+
+/** Waits for the one alert that shows a text. */
+export function findAlert(): Promise<HTMLElement> {
+  return waitFor(() => {
+    const shown = shownAlerts();
+    if (shown.length !== 1) {
+      throw new Error(`expected one alert with a text, found ${shown.length}`);
+    }
+    return shown[0] as HTMLElement;
+  });
 }

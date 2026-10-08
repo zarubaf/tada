@@ -11,9 +11,14 @@ function Event() {
 function Go() {
   const navigate = useNavigate();
   return (
-    <button type="button" onClick={() => navigate("/events/TEST30")}>
-      go
-    </button>
+    <>
+      <button type="button" onClick={() => navigate("/events/TEST30")}>
+        go
+      </button>
+      <button type="button" onClick={() => navigate("/events/FLY28", { replace: true })}>
+        replace
+      </button>
+    </>
   );
 }
 
@@ -115,6 +120,26 @@ describe("Router", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "go" }));
     expect(screen.getByRole("heading", { name: "Anlass TEST30" })).toHaveFocus();
+  });
+
+  it("moves focus to the h1 after a replace that a member caused", async () => {
+    renderAt("/events");
+    const length = window.history.length;
+
+    await userEvent.click(screen.getByRole("button", { name: "replace" }));
+    expect(screen.getByRole("heading", { name: "Anlass FLY28" })).toHaveFocus();
+    expect(window.history.length).toBe(length);
+  });
+
+  it("leaves focus alone after a redirect", () => {
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    outside.focus();
+
+    renderAt("/");
+    expect(screen.getByText("Liste")).toBeInTheDocument();
+    expect(outside).toHaveFocus();
+    outside.remove();
   });
 
   it("does not push a duplicate entry for the current path", async () => {

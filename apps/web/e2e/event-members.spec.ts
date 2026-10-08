@@ -8,6 +8,7 @@ import {
   sessionInfo,
   sessionWithRole,
   setTheme,
+  textOverflows,
   themes,
   viewports,
 } from "./fixtures";
@@ -125,3 +126,17 @@ test("an event manager picks the member to add from the organization", async ({ 
   await page.getByRole("option", { name: "Cäcilia Probst" }).click();
   await expect(page.getByRole("button", { name: /Cäcilia Probst/ })).toBeVisible();
 });
+
+// ADR 0024: no text overflows with the 40 % longer pseudo-locale.
+for (const viewport of viewports) {
+  test(`event members, pseudo-locale, ${viewport.name} px: no text overflows`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await fakeSession(page, sessionWithRole("member"));
+    await fakeMembers(page, memberships);
+    await page.goto(`/events/${event?.id}/members?pseudo`);
+    await expect(page.getByRole("table")).toBeVisible();
+    await expect(page.locator("[role=status][aria-label]")).toHaveCount(0);
+
+    expect(await textOverflows(page)).toEqual([]);
+  });
+}

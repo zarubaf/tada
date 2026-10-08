@@ -83,7 +83,7 @@ export function problemBody(code: string, status: number) {
   return { ...unavailable, code, status };
 }
 
-// The fake API of the sign-in pages (Task 19).
+// The fake API of the sign-in pages.
 
 /** A client without a session: the answer of `GET /api/v1/session`. */
 export async function fakeSignedOut(page: Page): Promise<void> {
@@ -144,7 +144,7 @@ export async function fontsLoaded(page: Page): Promise<void> {
 
 /**
  * The elements whose text overflows its box, for the pseudo-locale check (ADR 0024). A scroll
- * container, for example the table at 375 px, is not an overflow.
+ * container is not an overflow, but the page itself must not scroll sideways.
  */
 export async function textOverflows(page: Page): Promise<string[]> {
   return page.evaluate(() => {
@@ -152,8 +152,11 @@ export async function textOverflows(page: Page): Promise<string[]> {
     for (const element of document.querySelectorAll<HTMLElement>("body *")) {
       const style = getComputedStyle(element);
       const scrolls = ["auto", "scroll"].includes(style.overflowX);
+      // Visually hidden text, for example a table caption, has no box to overflow.
+      const visuallyHidden = style.clipPath !== "none";
       if (
         scrolls ||
+        visuallyHidden ||
         element.title ||
         element.childElementCount > 0 ||
         !element.textContent?.trim()

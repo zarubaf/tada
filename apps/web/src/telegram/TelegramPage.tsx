@@ -11,9 +11,10 @@ import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
-import { useFocusAfterCommit } from "../ui/focus";
+import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
+import { PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./TelegramPage.module.css";
 
@@ -21,9 +22,9 @@ const claimedFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", tim
 const expiryFormat = new Intl.DateTimeFormat(LOCALE, { timeStyle: "short" });
 
 type Requests =
-  | { kind: "loading"; attempts: number }
-  | { kind: "failed"; message: string; requestId: string | undefined; attempts: number }
-  | { kind: "loaded"; items: TelegramLinkRequest[]; attempts: number };
+  | { kind: "loading" }
+  | { kind: "failed"; message: string; requestId: string | undefined }
+  | { kind: "loaded"; items: TelegramLinkRequest[] };
 
 /**
  * „Telegram verknüpfen“ in the settings (ADR 0011): the member creates a link code, sends it to
@@ -31,7 +32,9 @@ type Requests =
  * creation, and the page never stores it.
  */
 export function TelegramPage({ api }: { api: Api }) {
-  const [requests, setRequests] = useState<Requests>({ kind: "loading", attempts: 0 });
+  const [requests, setRequests] = useState<Requests>({ kind: "loading" });
+  // „Aktualisieren“ runs: the old list stays until the answer arrives.
+  const [refreshing, setRefreshing] = useState(false);
   const [code, setCode] = useState<TelegramLinkCode>();
   const [confirming, setConfirming] = useState<TelegramLinkRequest>();
   // A request runs: a second press does nothing.
@@ -44,37 +47,30 @@ export function TelegramPage({ api }: { api: Api }) {
   const requestsHeading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
 
-  const load = useCallback(
-    async (attempts: number) => {
-      try {
-        const { data, error } = await api.GET("/api/v1/telegram/link-requests");
-        if (data && attempts > 0) {
-          setConfirmation(t("telegram-requests-refreshed"));
-        }
-        setRequests(
-          data
-            ? { kind: "loaded", items: data.items, attempts }
-            : {
-                kind: "failed",
-                message: problemMessage(error),
-                requestId: error?.request_id,
-                attempts,
-              },
-        );
-      } catch {
-        setRequests({
-          kind: "failed",
-          message: problemMessage(undefined),
-          requestId: undefined,
-          attempts,
-        });
+  const { retried, retry } = useRetry(() => requestsHeading.current);
+
+  /**
+   * Loads the list. A failure keeps a loaded list, so that a refresh does not hide it.
+   * Resolves to the message of a failure, or nothing.
+   */
+  const load = useCallback(async () => {
+    let failed: { message: string; requestId: string | undefined };
+    try {
+      const { data, error } = await api.GET("/api/v1/telegram/link-requests");
+      if (data) {
+        setRequests({ kind: "loaded", items: data.items });
+        return undefined;
       }
-    },
-    [api],
-  );
+      failed = { message: problemMessage(error), requestId: error?.request_id };
+    } catch {
+      failed = { message: problemMessage(undefined), requestId: undefined };
+    }
+    setRequests((current) => (current.kind === "loaded" ? current : { kind: "failed", ...failed }));
+    return failed.message;
+  }, [api]);
 
   useEffect(() => {
-    void load(0);
+    void load();
   }, [load]);
 
   const showFailure = (message: string) => {
@@ -133,7 +129,7 @@ export function TelegramPage({ api }: { api: Api }) {
         if (result.error?.code === "not-found") {
           // The request is gone or taken: the list shows the truth again.
           focusAfterCommit(() => requestsHeading.current);
-          void load(requests.attempts);
+          void load();
         }
       }
     } catch {
@@ -143,27 +139,32 @@ export function TelegramPage({ api }: { api: Api }) {
     setConfirming(undefined);
   };
 
-  const refresh = () => {
-    const attempts = requests.attempts + 1;
+  /** „Aktualisieren“: the button stays and keeps focus, so the live regions announce the result. */
+  const refresh = async () => {
+    if (refreshing) {
+      return;
+    }
     setFailure(undefined);
     setConfirmation(undefined);
-    setRequests({ kind: "loading", attempts });
-    void load(attempts);
+    setRefreshing(true);
+    const message = await load();
+    setRefreshing(false);
+    if (message === undefined) {
+      setConfirmation(t("telegram-requests-refreshed"));
+    } else {
+      showFailure(message);
+    }
   };
 
   return (
     <div className={styles.page}>
-      <LiveRegion ref={alert} kind="alert" className={styles.failure}>
+      <LiveRegion ref={alert} kind="alert">
         {failure}
       </LiveRegion>
-      <LiveRegion kind="status" className={styles.confirmation}>
-        {confirmation}
-      </LiveRegion>
+      <LiveRegion kind="status">{confirmation}</LiveRegion>
 
       <section className={styles.section} aria-labelledby="telegram-title">
-        <h1 id="telegram-title" className={styles.title}>
-          {t("telegram-title")}
-        </h1>
+        <PageTitle id="telegram-title">{t("telegram-title")}</PageTitle>
         <p>{t("telegram-intro")}</p>
         <h2 className={styles.heading}>{t("telegram-steps-title")}</h2>
         <ol className={styles.steps}>
@@ -215,8 +216,14 @@ export function TelegramPage({ api }: { api: Api }) {
           <InlineError
             message={requests.message}
             requestId={requests.requestId}
-            onRetry={refresh}
-            takeFocus={requests.attempts > 0}
+            onRetry={() =>
+              retry(async () => {
+                setFailure(undefined);
+                setRequests({ kind: "loading" });
+                return (await load()) === undefined;
+              })
+            }
+            announce={retried ? "focus" : failure ? "none" : "alert"}
           />
         )}
         {requests.kind === "loaded" && requests.items.length === 0 && (
@@ -269,7 +276,10 @@ export function TelegramPage({ api }: { api: Api }) {
         )}
         {/* The button stays in the page while the list loads, so that it keeps focus. */}
         <div>
-          <Button isPending={requests.kind === "loading"} onPress={refresh}>
+          <Button
+            isPending={requests.kind === "loading" || refreshing}
+            onPress={() => void refresh()}
+          >
             {t("telegram-requests-refresh")}
           </Button>
         </div>

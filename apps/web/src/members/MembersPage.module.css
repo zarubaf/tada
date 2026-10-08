@@ -3,26 +3,11 @@
     display: grid;
     align-content: start;
     gap: var(--space-6);
-    padding: var(--space-6) var(--space-4);
-  }
-
-  @media (width >= 40rem) {
-    /* --bp-medium */
-    .page {
-      padding: var(--space-8) var(--space-6);
-    }
   }
 
   .section {
     display: grid;
     gap: var(--space-3);
-  }
-
-  .title {
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--letter-spacing-tight);
-    line-height: var(--line-height-2xl);
   }
 
   .heading {
@@ -35,25 +20,6 @@
     gap: var(--space-2);
   }
 
-  .failure {
-    padding: var(--space-3);
-    border: 1px solid var(--color-danger);
-    border-radius: var(--radius-md);
-    background: var(--color-danger-subtle);
-    color: var(--color-danger);
-  }
-
-  /* The live regions stay in the page: empty, they are hidden from the eye but not from the tree. */
-  .failure:empty,
-  .confirmation:empty {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    padding: 0;
-    border: 0;
-  }
-
   .invite {
     display: grid;
     gap: var(--space-3);
@@ -61,17 +27,18 @@
 
   /* One column, at most 40rem wide (doc/design/components.md, „Forms“). */
   .form {
+    container-type: inline-size;
     display: grid;
     gap: var(--space-4);
     max-width: 40rem;
   }
 
-  /* The primary action is full width on narrow layouts and on the right on wide layouts. */
+  /* The primary action is full width in a narrow form and on the right in a wide one (ADR 0019). */
   .actions {
     display: grid;
   }
 
-  @media (width >= 40rem) {
+  @container (width >= 28rem) {
     .actions {
       justify-items: end;
     }
