@@ -233,7 +233,7 @@ pub struct ProfileView {
     /// The facts that the team uses for planning but did not confirm.
     pub assumptions: Vec<FactView>,
     /// The facts that nobody knows yet. Never fill in a value for them.
-    /// A field of the schema without any fact is unknown too, but it has no entry here.
+    /// A field without a fact has no entry here; compare the list with `get_event_schema`.
     pub unknowns: Vec<UnknownView>,
     pub open_questions: Vec<OpenQuestionView>,
     /// The proposals without a review. They are not accepted state.

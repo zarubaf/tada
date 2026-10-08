@@ -131,6 +131,7 @@ Use an existing field first; propose a new field only if no field has the meanin
         name = "get_event_profile",
         description = "Get what the team plans for an event: the accepted facts, the assumptions, the unknowns, the open questions and the open proposals, each in its own list. \
 Each fact names its version and the source passages that support it. \
+A field without a fact is not listed: compare with get_event_schema to see which fields nobody has addressed yet. \
 Only accepted facts are confirmed. Never fill in an unknown, and never present an assumption or an open proposal as accepted.",
         annotations(read_only_hint = true)
     )]
