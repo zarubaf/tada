@@ -101,6 +101,12 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
 /// With `web_root`, the server also delivers the built web client from this folder (ADR 0005).
 /// A path outside `/api` that is not a file gets `index.html`, so that the client handles its own routes.
 pub fn router(state: ApiState, web_root: Option<&Path>) -> Router {
+    router_with(state, web_root, Router::new())
+}
+
+/// Like `router`, with the routes of other driving adapters, for example the MCP server (ADR 0040).
+/// They get the request ID, the request log and the referrer policy of the API.
+pub fn router_with(state: ApiState, web_root: Option<&Path>, adapters: Router) -> Router {
     let (api, _) = api();
     let router = Router::new()
         .merge(api)
@@ -112,14 +118,15 @@ pub fn router(state: ApiState, web_root: Option<&Path>) -> Router {
         None => router.fallback(not_found),
     };
     router
+        .with_state(state.clone())
+        .merge(adapters)
         .layer(middleware::from_fn_with_state(state.clone(), origin::check))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             request_id::track,
         ))
-        .merge(health::routes())
+        .merge(health::routes().with_state(state))
         .layer(middleware::map_response(no_referrer))
-        .with_state(state)
 }
 
 /// No response sends its URL as the referrer of the next request (ADR 0008).
@@ -357,8 +364,13 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: tada_app::domain::ids::UserId,
-        ) -> Result<Vec<tada_app::domain::identity::EventRole>, tada_app::store::StoreError>
-        {
+        ) -> Result<
+            Vec<(
+                tada_app::domain::ids::EventId,
+                tada_app::domain::identity::EventRole,
+            )>,
+            tada_app::store::StoreError,
+        > {
             unreachable!()
         }
     }
@@ -632,5 +644,29 @@ mod tests {
         let (status, body) = get(&router, "/events").await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert!(body.contains("\"code\":\"not-found\""));
+    }
+
+    #[tokio::test]
+    async fn the_routes_of_another_adapter_get_the_request_id_and_the_referrer_policy() {
+        let web = tempfile::tempdir().unwrap();
+        fs::write(web.path().join("index.html"), "<html>tada</html>").unwrap();
+        let adapter = Router::new().nest_service("/mcp", any(|| async { "mcp" }));
+        let router = router_with(state(), Some(web.path()), adapter);
+
+        let response = router
+            .clone()
+            .oneshot(Request::get("/mcp").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.headers()[header::REFERRER_POLICY], "no-referrer");
+        assert!(response.headers().contains_key(request_id::HEADER));
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&body[..], b"mcp");
+        assert_eq!(
+            get(&router, "/").await,
+            (StatusCode::OK, "<html>tada</html>".to_owned())
+        );
     }
 }

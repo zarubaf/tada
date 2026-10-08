@@ -94,11 +94,12 @@ impl IdentityStore for Memory {
         &self,
         scope: OrgScope,
         user: UserId,
-    ) -> Result<Vec<EventRole>, StoreError> {
+    ) -> Result<Vec<(EventId, EventRole)>, StoreError> {
         let found = scope.organization_id() == testwil() && user == anna();
         Ok(found
             .then(|| *self.role.lock().unwrap())
             .flatten()
+            .map(|role| (open_day(), role))
             .into_iter()
             .collect())
     }

@@ -247,7 +247,7 @@ mod tests {
             &self,
             _: OrgScope,
             _: UserId,
-        ) -> Result<Vec<EventRole>, StoreError> {
+        ) -> Result<Vec<(EventId, EventRole)>, StoreError> {
             unreachable!()
         }
     }
