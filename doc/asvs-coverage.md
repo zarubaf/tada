@@ -11,11 +11,12 @@ The status "Deviation" means that an ADR decides against the requirement.
 The status "Gap" means that tada does not meet the requirement yet.
 The target is Level 2, so a Level 2 requirement that tada does not meet is a deviation or a gap, never "Not applicable".
 
-This file lists what exists today.
-The rows for API tokens come later.
+The sections after V7 map the controls for API tokens, MCP, rate limits, the `Origin` check, the client IP address and the logs.
+They are outside V6 and V7, but the sign-in code depends on them.
 
 Test paths are relative to the repository root.
 `sign_in.rs` means `crates/tada/tests/sign_in.rs`.
+The same holds for the other files of `crates/tada/tests`: `invitations.rs`, `members.rs`, `events.rs`, `documents.rs`, `mcp.rs`, `tokens.rs` and `serve.rs`.
 
 ## V6 Authentication
 
@@ -92,3 +93,93 @@ These controls are outside V6 and V7, but the sign-in tests also cover them.
 | A response forbids the referrer, so a token in a URL does not leak.                                                 | `sign_in.rs::each_response_forbids_the_referrer` and `invitations.rs::each_invitation_response_forbids_the_referrer`    |
 | A link opened with GET does not sign in.                                                                            | `sign_in.rs::a_get_request_on_the_link_does_not_sign_in`                                                                |
 | No log line holds an email address, a name, a token or a client IP address. The request log has the route template. | `support::logs::assert_clean` at the end of the tests in `sign_in.rs`, `invitations.rs`, `members.rs` and `telegram.rs` |
+
+## API tokens
+
+[ADR 0039](adr/0039-actors-and-identities.md) and [ADR 0040](adr/0040-ai-intake-through-mcp.md) define the personal API tokens.
+A token belongs to one member and one organization, and it has the scope `read` or `propose`.
+The caller of a token is always an AI caller.
+
+| Control                                                                              | Test                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The token starts with `tada_pat_` and the database holds only its hash.              | `crates/store-pg/src/tokens.rs::tokens_start_with_the_prefix_and_the_database_holds_only_the_hash`                                                                                 |
+| The secret shows once, and a revoked token stays in the list.                        | `tokens.rs::the_secret_shows_once_and_a_revoked_token_stays_listed`                                                                                                                |
+| The debug output of a token has no secret.                                           | `crates/api/src/tokens.rs::the_debug_output_has_no_secret`                                                                                                                         |
+| The creation needs the confirmed notice.                                             | `tokens.rs::a_token_needs_the_confirmed_notice`                                                                                                                                    |
+| An expired token and a revoked token are unauthenticated.                            | `crates/app/src/tokens/tests.rs::an_expired_token_is_unauthenticated` and `crates/app/src/tokens/tests.rs::a_revoked_token_is_unauthenticated`                                     |
+| The lifetime and the prefix have the values of the ADRs.                             | `crates/app/src/tokens/tests.rs::constants_have_the_values_of_the_adrs`                                                                                                            |
+| A member lists and revokes only the own tokens.                                      | `crates/store-pg/src/tokens.rs::tokens_list_and_revoke_only_the_own_tokens`                                                                                                        |
+| A token of a removed member is unauthenticated and tada deletes it.                  | `crates/store-pg/src/tokens.rs::tokens_of_a_removed_member_are_unauthenticated_and_deleted` and `crates/app/src/tokens/tests.rs::the_token_of_a_removed_member_is_unauthenticated` |
+| A revocation of a membership deletes the tokens of the member.                       | `crates/store-pg/src/members.rs::a_revocation_deletes_the_tokens_and_works_once`                                                                                                   |
+| A token stays in its organization.                                                   | `crates/store-pg/src/tokens.rs::tokens_stay_in_their_organization`                                                                                                                 |
+| A pure event viewer gets no `propose` token, and the token of a viewer is read only. | `tokens.rs::a_pure_event_viewer_cannot_create_a_propose_token` and `crates/store-pg/src/tokens.rs::tokens_of_a_viewer_are_read_only`                                               |
+| A token gives an AI caller for its member, so an AI never acts as a member.          | `crates/app/src/tokens/tests.rs::a_token_gives_an_ai_caller_for_its_member`                                                                                                        |
+| Only an owner switches the tokens of an organization off, and then no token works.   | `tokens.rs::only_an_owner_switches_the_mcp_tokens` and `crates/app/src/tokens/tests.rs::a_token_is_unauthenticated_while_mcp_tokens_are_off`                                       |
+| A session cookie is not a token, and a token does not open the HTTP API.             | `crates/app/src/tokens/tests.rs::a_missing_unknown_or_session_credential_is_unauthenticated` and `tokens.rs::a_bearer_token_does_not_open_the_http_api`                            |
+| The record of the last use changes at most once a minute.                            | `crates/app/src/tokens/tests.rs::the_last_use_changes_at_most_once_a_minute`                                                                                                       |
+
+## MCP
+
+[ADR 0040](adr/0040-ai-intake-through-mcp.md) decides that the MCP server accepts a bearer token only and offers no tool that accepts, rejects or deletes.
+
+| Control                                                                                   | Test                                                                                                                              |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| A request without a valid token, or with a foreign `Origin`, gets a refusal.              | `mcp.rs::a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected`                                                    |
+| The guard allows no `Origin` or the `Origin` of tada only, and it reads one bearer token. | `crates/mcp/src/guard.rs::allows_no_origin_or_the_origin_of_tada_only` and `crates/mcp/src/guard.rs::reads_only_one_bearer_token` |
+| Only a `propose` token of a member who can propose in the event proposes.                 | `mcp.rs::only_a_propose_token_of_a_member_who_can_propose_in_the_event_proposes`                                                  |
+| A proposal waits in the review inbox with the AI as author.                               | `mcp.rs::a_changeset_through_mcp_waits_in_the_review_inbox_with_the_ai_as_author`                                                 |
+| A proposal without evidence is rejected, and the log does not hold its text.              | `mcp.rs::a_proposal_without_evidence_is_rejected_without_its_text`                                                                |
+| The tools show only the events of the member in its organization.                         | `mcp.rs::list_events_shows_only_the_events_of_the_member_in_its_organization`                                                     |
+| A search never returns a source of another organization or of an event without a role.    | `mcp.rs::search_never_returns_a_source_of_another_organization_or_of_an_event_without_a_role`                                     |
+| A read of a source leaves no text in the log.                                             | `mcp.rs::reads_of_sources_leave_no_text_in_the_log`                                                                               |
+| A refusal of the app is a tool result, and a failure of tada is a JSON-RPC error.         | `crates/mcp/src/errors.rs::a_problem_of_the_app_is_a_tool_result_and_a_failure_of_tada_is_a_json_rpc_error`                       |
+
+## Rate limits
+
+[ADR 0056](adr/0056-sign-in-details.md) decides that the counters live in PostgreSQL and that their keys are HMAC-SHA-256 values.
+
+| Control                                                            | Test                                                                                                                                                                                        |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Two processes share the counters.                                  | `sign_in.rs::the_sixth_request_for_one_address_is_rate_limited_also_with_two_processes`                                                                                                     |
+| The limit for one IP address applies.                              | `sign_in.rs::the_31st_request_from_one_ip_address_is_rate_limited`                                                                                                                          |
+| The request after the limit waits for the end of the window.       | `crates/store-pg/src/rate_limit.rs::the_request_after_the_limit_is_limited_until_the_window_ends` and `crates/app/src/rate_limit.rs::the_request_after_the_limit_waits_for_the_next_window` |
+| A window is a full hour, and the longest wait wins.                | `crates/app/src/rate_limit.rs::a_window_is_a_full_hour` and `crates/app/src/rate_limit.rs::a_limited_decision_wins_with_the_longest_wait`                                                   |
+| Another key has other counters.                                    | `crates/store-pg/src/rate_limit.rs::another_key_gives_other_counters`                                                                                                                       |
+| The counters hold no address, and the debug text holds no address. | `crates/store-pg/src/rate_limit.rs::the_counters_hold_no_address` and `crates/app/src/rate_limit.rs::the_debug_text_holds_no_address`                                                       |
+| Each hit deletes the counters of windows that ended.               | `crates/store-pg/src/rate_limit.rs::each_hit_deletes_the_counters_of_windows_that_ended_one_window_ago`                                                                                     |
+| `serve` without the key of the rate limit stops with exit code 2.  | `serve.rs::serve_without_the_rate_limit_key_stops_with_exit_code_2`                                                                                                                         |
+| A limited request queues no mail.                                  | `crates/store-pg/src/sign_in.rs::a_limited_request_queues_nothing`                                                                                                                          |
+
+## Origin and client IP address
+
+| Control                                                                                               | Test                                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A state change from another origin changes nothing, and a read needs no `Origin`.                     | `events.rs::a_state_change_from_another_origin_changes_nothing` and `events.rs::a_read_needs_no_origin`                                                               |
+| An upload without the `Origin` of tada is refused.                                                    | `documents.rs::refuses_an_upload_without_the_origin_of_tada`                                                                                                          |
+| The API contract lists the `Origin` check for each state change.                                      | `crates/api/src/contract.rs::each_state_change_lists_the_origin_check`                                                                                                |
+| The public URL gives the origin and the host.                                                         | `crates/app/src/public_url.rs::a_public_url_gives_the_origin_and_the_host`                                                                                            |
+| A peer outside the trusted ranges cannot set the client IP address with `X-Forwarded-For`.            | `crates/api/src/client_ip.rs::a_peer_outside_the_trusted_ranges_ignores_x_forwarded_for`                                                                              |
+| A trusted peer gives the rightmost untrusted address, and an entry that is no address stops the walk. | `crates/api/src/client_ip.rs::a_trusted_peer_gives_the_rightmost_untrusted_address` and `crates/api/src/client_ip.rs::an_entry_that_is_not_an_address_stops_the_walk` |
+| A trusted peer without `X-Forwarded-For` is the client.                                               | `crates/api/src/client_ip.rs::a_trusted_peer_without_x_forwarded_for_is_the_client`                                                                                   |
+| The debug text of the client IP address holds no address.                                             | `crates/api/src/client_ip.rs::the_debug_text_holds_no_address`                                                                                                        |
+
+## Log redaction
+
+| Control                                                     | Test                                                                         |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| The log writes one flat JSON object for each event.         | `crates/tada/src/logging.rs::writes_one_flat_json_object_per_event`          |
+| The logs of tada pass the length cap.                       | `crates/tada/src/logging.rs::the_logs_of_tada_pass_the_cap`                  |
+| The MCP library logs only errors, whatever the filter says. | `crates/tada/src/logging.rs::rmcp_logs_only_errors_whatever_the_filter_says` |
+
+## Open items
+
+These items stay open for the review.
+The review brief [sign-in-review.md](sign-in-review.md) lists them with the threats.
+
+| ID    | Status    | What is missing                                                                                                                                               |
+| ----- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 7.2.4 | Gap       | Sign-in does not end a session token that the request already sends. The repository gives no reason.                                                          |
+| 7.4.5 | Gap       | No command ends the sessions of another member.                                                                                                               |
+| 7.5.2 | Gap       | tada does not show the list of sessions.                                                                                                                      |
+| 6.3.3 | Deviation | Email is the single factor ([ADR 0008](adr/0008-authentication.md)). Passkeys come later.                                                                     |
+| 6.5.5 | Deviation | The magic link lives 15 minutes, and ASVS asks for 10 minutes. [ADR 0008](adr/0008-authentication.md) sets 15 minutes and gives no reason for the difference. |
