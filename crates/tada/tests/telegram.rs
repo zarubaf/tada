@@ -451,12 +451,45 @@ async fn a_reviewed_telegram_change_shows_in_web_queries() {
         json!({"type": "date-window", "start": "2030-06-01", "end": "2030-07-31", "granularity": "month"})
     );
 
+    // A second proposal for the field that has a value now must expect version 1.
+    // With a stale version the apply would conflict.
+    let replies = converse(
+        &club.test,
+        vec![update(2, "/vorschlag TEST30 date_window 2030-08..2030-09")],
+        1,
+    )
+    .await;
+    assert!(replies[0].contains("Anlassleitung"), "{replies:?}");
+    let changesets = club.open_changesets().await;
+    assert_eq!(changesets.len(), 1);
+    let id = changesets[0]["id"].as_str().unwrap();
+    let review = club
+        .get(&club.manager, &format!("/api/v1/changesets/{id}"))
+        .await;
+    assert_eq!(review["proposals"][0]["stale"], false);
+    assert_eq!(review["proposals"][0]["operation"]["expected_version"], 1);
+    let (status, applied) = club
+        .post(
+            &club.manager,
+            &format!("/api/v1/changesets/{id}/apply"),
+            &json!({"selected": [review["proposals"][0]["id"]]}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{applied}");
+    let profile = club.get(&club.manager, &profile_path).await;
+    assert_eq!(profile["facts"][0]["version"], 2);
+    assert_eq!(
+        profile["facts"][0]["value"],
+        json!({"type": "date-window", "start": "2030-08-01", "end": "2030-09-30", "granularity": "month"})
+    );
+
     support::logs::assert_clean(&[
         "7130429",
         "Testperson",
         "test-token",
         "/vorschlag",
         "2030-06..2030-07",
+        "2030-08..2030-09",
     ]);
 }
 
@@ -485,15 +518,19 @@ async fn an_unlinked_account_a_viewer_and_a_removed_member_get_a_refusal_and_no_
             update_from(ACCOUNT, 1, command),
             update_from(7130430, 2, command),
             update_from(7130431, 3, command),
+            // A viewer gets the refusal before any hint about the value.
+            update_from(7130430, 4, "/vorschlag TEST30 date_window morgen"),
         ],
-        3,
+        4,
     )
     .await;
-    assert_eq!(replies.len(), 3, "{replies:?}");
+    assert_eq!(replies.len(), 4, "{replies:?}");
+    assert!(replies[3].contains("keine Berechtigung"), "{}", replies[3]);
     assert!(replies[0].contains("nicht verknüpft"), "{}", replies[0]);
     assert!(replies[1].contains("keine Berechtigung"), "{}", replies[1]);
     assert!(replies[2].contains("nicht sehen"), "{}", replies[2]);
     assert!(club.open_changesets().await.is_empty());
+    support::logs::assert_clean(&["7130430", "7130431", "2030-06..2030-07", "morgen"]);
 }
 
 #[tokio::test]

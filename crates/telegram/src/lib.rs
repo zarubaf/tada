@@ -220,6 +220,7 @@ impl Gateway {
                 &acting.caller,
                 &acting.event,
                 message,
+                &self.messages.get("telegram-proposal-reason"),
                 stores,
                 self.clock.as_ref(),
             )

@@ -59,6 +59,7 @@ mod tests {
             "telegram-error",
             "telegram-proposal-usage",
             "telegram-proposal-created",
+            "telegram-proposal-reason",
             "telegram-not-linked",
             "telegram-ambiguous",
             "telegram-unknown-field",

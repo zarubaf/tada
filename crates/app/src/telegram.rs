@@ -324,18 +324,23 @@ pub struct FactMessage<'a> {
     pub value: Range<usize>,
 }
 
-/// The reason that the proposal of a Telegram command gives.
-const REASON: &str = "A member proposed the value in Telegram.";
-
 /// Proposes the value of one field of the event: one changeset with one `SetFact` proposal,
-/// against the current version of the fact. An event manager reviews it in the web client (ADR 0050).
+/// against the current version of the fact. `reason` is the short text for the reviewer. An event manager reviews it in the web client (ADR 0050).
 pub async fn propose_fact(
     caller: &MemberCaller,
     event: &Event,
     message: FactMessage<'_>,
+    reason: &str,
     stores: ProposeStores<'_>,
     clock: &dyn Clock,
 ) -> Result<ChangesetId, TelegramActError> {
+    // Fail fast: a viewer gets the refusal before any hint about the field or the value.
+    if !access::event_access(caller, event.id, stores.identity)
+        .await?
+        .can_propose()
+    {
+        return Err(ProposeError::Forbidden.into());
+    }
     let key = FieldKey::parse(message.field_key).map_err(|_| TelegramActError::UnknownField)?;
     let scope = caller.scope();
     let field = stores
@@ -385,7 +390,7 @@ pub async fn propose_fact(
                 quote,
                 page: None,
             }],
-            reason: REASON.to_owned(),
+            reason: reason.to_owned(),
         }],
     };
     let (Created::New(changeset) | Created::Existing(changeset)) =

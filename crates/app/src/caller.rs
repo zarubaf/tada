@@ -158,11 +158,21 @@ impl MemberCaller {
         organization_id: OrganizationId,
         role: OrganizationRole,
     ) -> Self {
+        Self::build(user_id, organization_id, role, Channel::Web)
+    }
+
+    /// The one place that builds a member caller from its parts. Only this module can call it.
+    fn build(
+        user_id: UserId,
+        organization_id: OrganizationId,
+        role: OrganizationRole,
+        channel: Channel,
+    ) -> Self {
         Self {
             user_id,
             organization_id,
             role,
-            channel: Channel::Web,
+            channel,
             request_id: None,
         }
     }
@@ -378,13 +388,7 @@ impl ServiceCaller<TelegramGateway> {
         organization_id: OrganizationId,
         role: OrganizationRole,
     ) -> MemberCaller {
-        MemberCaller {
-            user_id,
-            organization_id,
-            role,
-            channel: TelegramGateway::CHANNEL,
-            request_id: None,
-        }
+        MemberCaller::build(user_id, organization_id, role, TelegramGateway::CHANNEL)
     }
 }
 

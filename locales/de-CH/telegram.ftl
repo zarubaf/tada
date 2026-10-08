@@ -11,10 +11,11 @@ telegram-error = Ein Fehler ist aufgetreten. Versuchen Sie es in einigen Minuten
 
 telegram-proposal-usage = So schlagen Sie eine Änderung vor: „/vorschlag KÜRZEL FELD WERT“. Zum Beispiel: „/vorschlag FLY28 date_window 2030-05..2030-06“.
 telegram-proposal-created = Danke. Ihr Vorschlag für den Anlass { $event } ist erfasst. Die Anlassleitung prüft ihn in tada.
+telegram-proposal-reason = Per Telegram vorgeschlagen.
 telegram-not-linked = Ihr Telegram-Konto ist nicht verknüpft. Verknüpfen Sie es zuerst in tada unter „Telegram verknüpfen“.
 telegram-ambiguous = Sie haben in mehreren Organisationen einen Anlass mit diesem Kürzel. Machen Sie den Vorschlag in tada.
 telegram-unknown-field = Diesen Anlass gibt es, aber er hat kein offenes Feld mit diesem Schlüssel. Die Felder sehen Sie in tada.
-telegram-value-invalid = Dieser Wert passt nicht zum Feld. Beispiele: Text, ja oder nein, 20000, CHF 80000, 2030-05-18, 2030-05..2030-06.
+telegram-value-invalid = Dieser Wert passt nicht zum Feld. Schreiben Sie Zahlen ohne Apostroph und ohne Leerzeichen. Beispiele: Text, ja oder nein, 20000, CHF 80000, 2030-05-18, 2030-05..2030-06.
 telegram-value-web-only = Dieses Feld verweist auf einen anderen Eintrag. Ändern Sie es in tada.
 
 ## Problem codes (ADR 0037): `problem-<code>`
