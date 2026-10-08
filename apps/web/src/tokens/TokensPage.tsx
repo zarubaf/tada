@@ -64,6 +64,10 @@ function examples(origin: string) {
 export function TokensPage({ api }: { api: Api }) {
   const [list, setList] = useState<List>({ kind: "loading" });
   const [noticeVersion, setNoticeVersion] = useState<number>();
+  const [noticeFailure, setNoticeFailure] = useState<{
+    message: string;
+    requestId: string | undefined;
+  }>();
   const [mcp, setMcp] = useState<McpSwitch>("unknown");
   const [name, setName] = useState("");
   const [scope, setScope] = useState<ApiTokenScope>("read");
@@ -81,7 +85,9 @@ export function TokensPage({ api }: { api: Api }) {
   const secretBox = useRef<HTMLDivElement>(null);
   const listHeading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
+  const noticeHeading = useRef<HTMLHeadingElement>(null);
   const { retried, retry } = useRetry(() => listHeading.current);
+  const noticeRetry = useRetry(() => noticeHeading.current);
 
   /** Resolves to true when the list loaded. A failure keeps a loaded list. */
   const loadList = useCallback(async () => {
@@ -107,14 +113,27 @@ export function TokensPage({ api }: { api: Api }) {
     return feature;
   }, [api]);
 
+  /** Resolves to true when the version of the notice loaded. */
+  const loadNotice = useCallback(async () => {
+    try {
+      const { data, error } = await api.GET("/api/v1/token-notice");
+      if (data) {
+        setNoticeVersion(data.version);
+        setNoticeFailure(undefined);
+        return true;
+      }
+      setNoticeFailure({ message: problemMessage(error), requestId: error?.request_id });
+    } catch {
+      setNoticeFailure({ message: problemMessage(undefined), requestId: undefined });
+    }
+    return false;
+  }, [api]);
+
   useEffect(() => {
     void loadList();
     void loadMcp();
-    api
-      .GET("/api/v1/token-notice")
-      .then(({ data }) => setNoticeVersion(data?.version))
-      .catch(() => setNoticeVersion(undefined));
-  }, [api, loadList, loadMcp]);
+    void loadNotice();
+  }, [loadList, loadMcp, loadNotice]);
 
   const showFailure = (message: string) => {
     setFailure(message);
@@ -128,9 +147,15 @@ export function TokensPage({ api }: { api: Api }) {
     result: Parameters<typeof failureOf>[0],
   ) => {
     if (error?.code === "forbidden") {
-      // Only the switch tells the two reasons of a refusal apart.
+      // Only the switch tells the two reasons of a refusal apart. Without it, the text stays neutral.
       const feature = await loadMcp();
-      showFailure(feature?.enabled === false ? t("tokens-off") : t("tokens-propose-forbidden"));
+      showFailure(
+        feature === undefined
+          ? problemMessage(error)
+          : feature.enabled
+            ? t("tokens-propose-forbidden")
+            : t("tokens-off"),
+      );
       return;
     }
     if (error?.code === "validation-failed") {
@@ -244,10 +269,20 @@ export function TokensPage({ api }: { api: Api }) {
         <PageTitle id="tokens-title">{t("tokens-title")}</PageTitle>
         <p>{t("tokens-intro")}</p>
         <div className={styles.notice}>
-          <h2 className={styles.heading}>{t("token-notice-title")}</h2>
+          <h2 ref={noticeHeading} tabIndex={-1} className={styles.heading}>
+            {t("token-notice-title")}
+          </h2>
           <p>{t("token-notice-access")}</p>
           <p>{t("token-notice-policy")}</p>
         </div>
+        {noticeFailure && (
+          <InlineError
+            message={noticeFailure.message}
+            requestId={noticeFailure.requestId}
+            onRetry={() => noticeRetry.retry(loadNotice)}
+            announce={noticeRetry.retried ? "focus" : failure ? "none" : "alert"}
+          />
+        )}
         {mcp === "off" && <p className={styles.off}>{t("tokens-off")}</p>}
 
         <h2 className={styles.heading}>{t("tokens-create-title")}</h2>

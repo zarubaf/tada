@@ -194,6 +194,40 @@ describe("TokensPage", () => {
     expect(await screen.findByText(/Das Recht, Vorschläge zu machen/)).toBeTruthy();
   });
 
+  it("shows a failed notice call with a retry that loads the version again", async () => {
+    let failing = true;
+    setup({
+      answers: {
+        "GET /api/v1/token-notice": () =>
+          failing ? problem(503, "unavailable") : json(200, { version: 1 }),
+      },
+    });
+
+    const message = await screen.findByText(/nicht erreichbar/);
+    const alert = message.closest("[role=alert]") as HTMLElement;
+    failing = false;
+    await user.click(within(alert).getByRole("button", { name: "Erneut versuchen" }));
+
+    await waitFor(() => expect(screen.queryByText(/nicht erreichbar/)).toBeNull());
+    await user.click(screen.getByRole("checkbox", { name: /Hinweis gelesen/ }));
+    expect(await createButton()).toHaveProperty("disabled", false);
+  });
+
+  it("shows a neutral refusal when a 403 comes and the switch cannot be read", async () => {
+    setup({
+      answers: {
+        "POST /api/v1/tokens": () => problem(403, "forbidden"),
+        "GET /api/v1/organization/features": () => problem(503, "unavailable"),
+      },
+    });
+    await fillAndConfirm();
+
+    await user.click(await createButton());
+
+    expect(await screen.findByText("Sie haben keine Berechtigung für diese Aktion.")).toBeTruthy();
+    expect(screen.queryByText(/Das Recht, Vorschläge zu machen/)).toBeNull();
+  });
+
   it("revokes a token after the member confirms the dialog", async () => {
     const { count } = setup();
     await user.click(await screen.findByRole("button", { name: "Claude Code widerrufen" }));
