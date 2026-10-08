@@ -127,13 +127,16 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
           navigate(SIGN_IN_PATH, { replace: true });
         }
       } else {
-        navigate(CHOOSE_ORGANIZATION_PATH, { replace: true });
+        // The memberships changed, for example after a removal (ADR 0056). The choice must show the
+        // list of now, so the session loads again before the page opens.
+        setState({ kind: "loading" });
+        void load().then(() => navigate(CHOOSE_ORGANIZATION_PATH, { replace: true }));
       }
     });
     api.use(watcher);
-    void refresh();
+    void load();
     return () => api.eject(watcher);
-  }, [api, navigate, refresh]);
+  }, [api, navigate, load]);
 
   const session = useMemo<Session | null>(
     () =>
