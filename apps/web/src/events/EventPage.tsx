@@ -1,8 +1,9 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
 import { t } from "../i18n";
-import { Link, useParams } from "../router/Router";
+import { useParams } from "../router/Router";
 import { InlineError } from "../ui/InlineError";
+import { NavLink, SubNav } from "../ui/NavLink";
 import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventPage.module.css";
@@ -64,14 +65,12 @@ export function EventPage({ api, children }: { api: Api; children: ReactNode }) 
             <p className={styles.key}>{state.event.key}</p>
             <PageTitle>{state.event.name}</PageTitle>
           </header>
-          <nav className={styles.nav} aria-label={t("event-nav")}>
-            <Link to={base} className={styles.link} exact>
+          <SubNav label={t("event-nav")}>
+            <NavLink to={base} exact>
               {t("event-nav-overview")}
-            </Link>
-            <Link to={`${base}/members`} className={styles.link}>
-              {t("event-nav-members")}
-            </Link>
-          </nav>
+            </NavLink>
+            <NavLink to={`${base}/members`}>{t("event-nav-members")}</NavLink>
+          </SubNav>
           {children}
         </>
       )}

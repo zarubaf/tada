@@ -15,10 +15,11 @@ import {
 } from "react-aria-components";
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
-import { Link, usePathname } from "../router/Router";
+import { usePathname } from "../router/Router";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath } from "../session/paths";
 import { useOptionalSession } from "../session/SessionProvider";
 import { LiveRegion } from "../ui/LiveRegion";
+import { NavLink } from "../ui/NavLink";
 import styles from "./Shell.module.css";
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
@@ -77,12 +78,12 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           </Select>
         )}
         <nav className={styles.nav} aria-label={t("shell-nav")}>
-          <Link to="/events" className={styles.navLink}>
+          <NavLink to="/events" large>
             {t("nav-events")}
-          </Link>
-          <Link to="/settings/members" within="/settings" className={styles.navLink}>
+          </NavLink>
+          <NavLink to="/settings/members" within="/settings" large>
             {t("nav-settings")}
-          </Link>
+          </NavLink>
         </nav>
         <MenuTrigger>
           <Button className={styles.member}>{user.displayName}</Button>
