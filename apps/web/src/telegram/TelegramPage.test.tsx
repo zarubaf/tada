@@ -147,12 +147,12 @@ describe("TelegramPage", () => {
   });
 
   it("keeps the request and says why when the confirmation fails", async () => {
-    setup({ answers: { [CONFIRM]: () => problem(404, "not-found") } });
+    setup({ answers: { [CONFIRM]: () => problem(503, "unavailable") } });
     await user.click(await screen.findByRole("button", { name: "Bernd Beispiel bestätigen" }));
     const dialog = await screen.findByRole("alertdialog");
     await user.click(within(dialog).getByRole("button", { name: "Verknüpfen" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Das gibt es nicht");
+    expect(await screen.findByRole("alert")).toHaveTextContent("nicht erreichbar");
     expect(screen.getByText("Bernd Beispiel")).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Bernd Beispiel bestätigen" })).toHaveFocus(),
@@ -163,9 +163,62 @@ describe("TelegramPage", () => {
     setup({ requests: [[], [request]] });
     await screen.findByText("Keine offenen Anfragen");
 
-    await user.click(screen.getByRole("button", { name: "Aktualisieren" }));
+    const refresh = screen.getByRole("button", { name: "Aktualisieren" });
+    await user.click(refresh);
 
     expect(await screen.findByText("Bernd Beispiel")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Aktualisieren" })).toHaveFocus();
+    expect(await screen.findByText("Anfragen aktualisiert.")).toBeInTheDocument();
+  });
+
+  it("shows the Telegram ID in the table and the ID and time in the dialog", async () => {
+    setup();
+    const table = await screen.findByRole("table", { name: "Offene Anfragen" });
+    expect(within(table).getByText("4711")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Bernd Beispiel bestätigen" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("Telegram-ID 4711");
+    expect(dialog).toHaveTextContent("2030");
+  });
+
+  it("opens the dialog with focus on the dialog, not on Verknüpfen", async () => {
+    setup();
+    await user.click(await screen.findByRole("button", { name: "Bernd Beispiel bestätigen" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    await waitFor(() => expect(dialog).toHaveFocus());
+    expect(within(dialog).getByRole("button", { name: "Verknüpfen" })).not.toHaveFocus();
+  });
+
+  it("clears the code after a successful link", async () => {
+    setup();
+    await user.click(await screen.findByRole("button", { name: "Code erstellen" }));
+    await screen.findByText("K7M3-QX92");
+    await user.click(screen.getByRole("button", { name: "Bernd Beispiel bestätigen" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Verknüpfen" }));
+
+    await screen.findByText("Telegram-Konto verknüpft.");
+    expect(screen.queryByText("K7M3-QX92")).not.toBeInTheDocument();
+  });
+
+  it("loads the list again when the request is gone", async () => {
+    const { calls } = setup({
+      requests: [[request], []],
+      answers: { [CONFIRM]: () => problem(404, "not-found") },
+    });
+    await user.click(await screen.findByRole("button", { name: "Bernd Beispiel bestätigen" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Verknüpfen" }));
+
+    await screen.findByText("Keine offenen Anfragen");
+    // The row with the focus is gone: focus goes to the heading of the list.
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Offene Anfragen" })).toHaveFocus(),
+    );
+    expect(calls.filter((c) => c === "GET /api/v1/telegram/link-requests")).toHaveLength(2);
   });
 
   it("shows a failed list with a retry that takes focus", async () => {

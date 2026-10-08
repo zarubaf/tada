@@ -46,6 +46,9 @@ export function TelegramPage({ api }: { api: Api }) {
     async (attempts: number) => {
       try {
         const { data, error } = await api.GET("/api/v1/telegram/link-requests");
+        if (data && attempts > 0) {
+          setConfirmation(t("telegram-requests-refreshed"));
+        }
         setRequests(
           data
             ? { kind: "loaded", items: data.items, attempts }
@@ -129,6 +132,8 @@ export function TelegramPage({ api }: { api: Api }) {
       if (result.response.ok) {
         focusHeadingAfterClose.current = true;
         setConfirmation(t("telegram-linked"));
+        // The code has done its work, and a stale code would mislead.
+        setCode(undefined);
         setRequests((current) =>
           current.kind === "loaded"
             ? { ...current, items: current.items.filter((r) => r.id !== item.id) }
@@ -136,6 +141,11 @@ export function TelegramPage({ api }: { api: Api }) {
         );
       } else {
         showFailure(failureOf(result).message);
+        if (result.error?.code === "not-found") {
+          // The request is gone or taken: the list shows the truth again.
+          focusHeadingAfterClose.current = true;
+          void load(requests.attempts);
+        }
       }
     } catch {
       showFailure(failureOf({}).message);
@@ -236,6 +246,12 @@ export function TelegramPage({ api }: { api: Api }) {
                 cell: (request) => request.telegram_name,
               },
               {
+                id: "telegram-id",
+                header: t("telegram-column-id"),
+                cell: (request) => String(request.telegram_user_id),
+                mono: true,
+              },
+              {
                 id: "claimed",
                 header: t("telegram-column-claimed"),
                 cell: (request) => (
@@ -262,17 +278,22 @@ export function TelegramPage({ api }: { api: Api }) {
             rowKey={(request) => request.id}
           />
         )}
-        {requests.kind !== "loading" && (
-          <div>
-            <Button onPress={refresh}>{t("telegram-requests-refresh")}</Button>
-          </div>
-        )}
+        {/* The button stays in the page while the list loads, so that it keeps focus. */}
+        <div>
+          <Button isPending={requests.kind === "loading"} onPress={refresh}>
+            {t("telegram-requests-refresh")}
+          </Button>
+        </div>
       </section>
 
       <ConfirmDialog
         isOpen={confirming !== undefined}
         title={t("telegram-confirm-title")}
-        text={t("telegram-confirm-text", { name: confirming?.telegram_name ?? "" })}
+        text={t("telegram-confirm-text", {
+          name: confirming?.telegram_name ?? "",
+          id: String(confirming?.telegram_user_id ?? ""),
+          time: confirming ? claimedFormat.format(new Date(confirming.claimed_at)) : "",
+        })}
         confirmLabel={t("telegram-confirm-submit")}
         cancelLabel={t("telegram-confirm-cancel")}
         isPending={busy}

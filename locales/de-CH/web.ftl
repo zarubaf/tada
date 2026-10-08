@@ -227,14 +227,15 @@ telegram-requests-refresh = Aktualisieren
 telegram-requests-empty-title = Keine offenen Anfragen
 telegram-requests-empty-text = Sobald der Bot Ihren Code erhält, erscheint hier das Telegram-Konto.
 telegram-column-name = Telegram-Name
+telegram-column-id = Telegram-ID
 telegram-column-claimed = Angefragt um
 telegram-column-actions = Aktionen
 telegram-confirm = Bestätigen
 # $name: the Telegram name of the account.
 telegram-confirm-of = { $name } bestätigen
 telegram-confirm-title = Telegram-Konto verknüpfen?
-# $name: the Telegram name of the account.
-telegram-confirm-text = Verknüpfen Sie { $name } nur, wenn das Ihr eigenes Telegram-Konto ist. Danach handelt dieses Konto in tada als Sie.
+# $name: the Telegram name of the account. $id: its Telegram ID. $time: the time of the claim.
+telegram-confirm-text = Verknüpfen Sie { $name } (Telegram-ID { $id }, angefragt { $time }) nur, wenn das Ihr eigenes Telegram-Konto ist. Namen können täuschend ähnlich sein, prüfen Sie auch die ID. Danach handelt dieses Konto in tada als Sie.
 telegram-confirm-submit = Verknüpfen
 telegram-confirm-cancel = Abbrechen
 telegram-linked = Telegram-Konto verknüpft.

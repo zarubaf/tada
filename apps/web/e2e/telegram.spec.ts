@@ -102,11 +102,15 @@ for (const viewport of viewports) {
     await fakeTelegram(page, requests);
     await page.goto("/settings/telegram?pseudo");
     await expect(page.getByRole("table")).toBeVisible();
-    // The first button of the page creates the code.
+    // The pseudo-locale changes the names of the buttons, so the first button in the page and the
+    // first button in the table stand for „Code erstellen“ and „Bestätigen“.
     await page.locator("main button").first().click();
     await expect(page.getByText("K7M3-QX92")).toBeVisible();
     await expect(page.getByRole("status")).toHaveCount(1);
+    expect(await textOverflows(page)).toEqual([]);
 
+    await page.locator("table button").first().click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
     expect(await textOverflows(page)).toEqual([]);
   });
 }
