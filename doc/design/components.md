@@ -3,6 +3,7 @@
 Screens use only the components in `apps/web/src/ui/` (ADR 0020).
 This document lists the core components and the patterns for the main screens.
 A new component needs an entry here in the same pull request.
+The gallery (`apps/web/src/gallery/`) is a development tool that shows the components, does not ship, and may keep German literals outside Fluent.
 
 ## Core components
 
