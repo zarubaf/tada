@@ -9,6 +9,7 @@ import { EventPage } from "./events/EventPage";
 import { EventsPage } from "./events/EventsPage";
 import { MembersPage } from "./members/MembersPage";
 import { NotFoundPage } from "./NotFoundPage";
+import { PrivacyPage } from "./privacy/PrivacyPage";
 import { Redirect, Route, Router, Routes } from "./router/Router";
 import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
 import { SessionProvider } from "./session/SessionProvider";
@@ -86,6 +87,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 </Route>
                 <Route path="/documents/:documentId">
                   <DocumentPage api={api} />
+                </Route>
+                <Route path="/privacy">
+                  <PrivacyPage api={api} />
                 </Route>
                 {/* The settings */}
                 <Route path="/settings/members">

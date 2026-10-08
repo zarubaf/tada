@@ -31,6 +31,9 @@ function setup({ role = "owner", answers = {} as Record<string, () => Response> 
     if (pathname.endsWith("/session")) {
       return json(200, session);
     }
+    if (key === "GET /api/v1/organization/privacy-notice") {
+      return json(200, { markdown: null, version: 1 });
+    }
     if (key === "GET /api/v1/organization/features") {
       return json(200, { items: [{ feature: "mcp-tokens", enabled: true, version: 2 }] });
     }
@@ -82,5 +85,19 @@ describe("OrganizationPage", () => {
 
     expect(await mcpSwitch()).toHaveProperty("disabled", true);
     expect(calls.some((c) => c.call.startsWith("POST"))).toBe(false);
+  });
+
+  it("shows an owner the form of the privacy notice and a member only the link", async () => {
+    setup();
+    expect(
+      await screen.findByRole("textbox", { name: "Text der Datenschutzerklärung" }),
+    ).toBeTruthy();
+  });
+
+  it("does not show a member the form of the privacy notice", async () => {
+    setup({ role: "member" });
+    await mcpSwitch();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByRole("link", { name: "Datenschutzerklärung lesen" })).toBeTruthy();
   });
 });

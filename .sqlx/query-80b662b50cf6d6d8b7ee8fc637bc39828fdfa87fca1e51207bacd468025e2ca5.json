@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT privacy_notice, privacy_notice_version FROM organization WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "privacy_notice",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "organization",
+            "name": "privacy_notice"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "privacy_notice_version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "organization",
+            "name": "privacy_notice_version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "80b662b50cf6d6d8b7ee8fc637bc39828fdfa87fca1e51207bacd468025e2ca5"
+}

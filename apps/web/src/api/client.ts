@@ -17,6 +17,7 @@ export type TelegramLinkRequest = components["schemas"]["TelegramLinkRequest"];
 export type ApiToken = components["schemas"]["ApiToken"];
 export type ApiTokenScope = components["schemas"]["ApiTokenScope"];
 export type OrganizationFeature = components["schemas"]["OrganizationFeature"];
+export type PrivacyNotice = components["schemas"]["PrivacyNotice"];
 export type Invitation = components["schemas"]["Invitation"];
 export type OrganizationRole = components["schemas"]["OrganizationRole"];
 export type EventRole = components["schemas"]["EventRole"];

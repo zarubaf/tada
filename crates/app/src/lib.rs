@@ -20,6 +20,7 @@ pub mod mail;
 pub mod members;
 pub mod outbound;
 pub mod paging;
+pub mod privacy;
 pub mod problem;
 pub mod proposals;
 pub mod public_url;

@@ -4,6 +4,7 @@ import {
   Input,
   Label,
   Text,
+  TextArea,
   type TextFieldProps,
 } from "react-aria-components";
 import styles from "./TextField.module.css";
@@ -16,14 +17,23 @@ export interface Props extends Omit<TextFieldProps, "className" | "style" | "chi
   error?: string | undefined;
   /** Monospace text, for keys. */
   mono?: boolean;
+  /** Several lines, for a text such as a notice. The field grows on request. */
+  rows?: number;
 }
 
-/** A text field: label above, help below, error below the help (doc/design/components.md). */
-export function TextField({ label, help, error, mono, ...props }: Props) {
+/**
+ * A text field: label above, help below, error below the help (doc/design/components.md).
+ * With `rows` it is a text area.
+ */
+export function TextField({ label, help, error, mono, rows, ...props }: Props) {
   return (
     <AriaTextField {...props} className={styles.field} isInvalid={error !== undefined || undefined}>
       <Label className={styles.label}>{label}</Label>
-      <Input className={styles.input} data-mono={mono || undefined} />
+      {rows ? (
+        <TextArea className={`${styles.input} ${styles.area}`} rows={rows} />
+      ) : (
+        <Input className={styles.input} data-mono={mono || undefined} />
+      )}
       {help && (
         <Text slot="description" className={styles.help}>
           {help}

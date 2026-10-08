@@ -131,7 +131,7 @@ async fn the_first_owner_previews_and_accepts_the_bootstrap_invitation() {
     assert!(session_cookie(&response).is_none());
     assert_eq!(
         preview,
-        json!({"organization_name": "Open Day Testwil", "role": "owner"})
+        json!({"organization_name": "Open Day Testwil", "privacy_notice": null, "role": "owner"})
     );
 
     let (response, session) = app.accept(&token).await;
@@ -201,7 +201,7 @@ async fn a_preview_does_not_use_the_token() {
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             preview,
-            json!({"organization_name": "testwil", "role": "admin"})
+            json!({"organization_name": "testwil", "privacy_notice": null, "role": "admin"})
         );
     }
     let (response, _) = app.accept(&token).await;

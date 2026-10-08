@@ -12,6 +12,7 @@ mod health;
 mod json_schema;
 mod members;
 mod origin;
+mod privacy;
 mod problem;
 mod request_id;
 mod review;
@@ -42,6 +43,7 @@ use tada_app::facts::FactStore;
 use tada_app::health::DependencyCheck;
 use tada_app::identity::IdentityStore;
 use tada_app::members::MemberStore;
+use tada_app::privacy::PrivacyStore;
 use tada_app::problem::ProblemCode;
 use tada_app::proposals::ProposalStore;
 use tada_app::public_url::PublicUrl;
@@ -92,6 +94,8 @@ pub struct ApiState {
     pub sources: Arc<dyn SourceStore>,
     /// Personal API tokens and the organization switches (ADR 0039, ADR 0045).
     pub tokens: Arc<dyn TokenStore>,
+    /// The privacy notice of the organization (ADR 0045).
+    pub privacy: Arc<dyn PrivacyStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -110,7 +114,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(documents::routes())
                 .merge(facts::routes())
                 .merge(review::routes())
-                .merge(tokens::routes()),
+                .merge(tokens::routes())
+                .merge(privacy::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -129,6 +134,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(facts::problem_codes())
         .chain(review::problem_codes())
         .chain(tokens::problem_codes())
+        .chain(privacy::problem_codes())
         .collect()
 }
 
@@ -960,6 +966,29 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct NoPrivacy;
+
+    #[async_trait::async_trait]
+    impl tada_app::privacy::PrivacyStore for NoPrivacy {
+        async fn get(
+            &self,
+            _: tada_app::caller::OrgScope,
+        ) -> Result<tada_app::privacy::PrivacyNotice, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn set(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: Option<&str>,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<Option<tada_app::privacy::PrivacyNotice>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
@@ -983,6 +1012,7 @@ mod tests {
             review: Arc::new(NoReview),
             sources: Arc::new(NoReview),
             tokens: Arc::new(NoTokens),
+            privacy: Arc::new(NoPrivacy),
         }
     }
 

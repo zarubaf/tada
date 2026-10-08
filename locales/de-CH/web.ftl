@@ -100,6 +100,7 @@ nav-events = Anlässe
 organization-switcher = Organisation
 member-menu = Mitgliedermenü
 sign-out = Abmelden
+nav-privacy = Datenschutz
 
 ## Sign-in, magic link and invitation (ADR 0008, ADR 0056)
 
@@ -133,6 +134,7 @@ invitation-text = Sie sind eingeladen: Organisation { $organization }, Rolle { $
 invitation-accept = Einladung annehmen
 invitation-invalid = Diese Einladung ist ungültig oder abgelaufen.
 invitation-loading = Einladung wird geladen
+invitation-privacy-title = Datenschutz
 role-owner = Organisationsleitung
 role-admin = Administration
 role-member = Mitglied
@@ -416,3 +418,25 @@ org-mcp-help = Nur wenn der Schalter an ist, können Mitglieder API-Token für K
 org-mcp-loading = Einstellungen werden geladen
 org-mcp-on = MCP-Token sind eingeschaltet.
 org-mcp-off = MCP-Token sind ausgeschaltet.
+
+privacy-title = Datenschutz
+privacy-loading = Datenschutzerklärung wird geladen
+
+org-privacy-title = Datenschutzerklärung
+org-privacy-loading = Datenschutzerklärung wird geladen
+org-privacy-label = Text der Datenschutzerklärung
+org-privacy-help = Markdown. Ersetzen Sie jeden Platzhalter in eckigen Klammern. Alle Mitglieder und alle Eingeladenen lesen diesen Text.
+org-privacy-template = Es gilt die Vorlage. Der Text unten ist die Vorlage. Mit „Speichern“ wird er der Text der Organisation.
+org-privacy-save = Speichern
+org-privacy-saved = Datenschutzerklärung gespeichert.
+org-privacy-reset = Vorlage wiederherstellen
+org-privacy-reset-title = Vorlage wiederherstellen?
+org-privacy-reset-text = Der eigene Text wird ersetzt. Danach gilt wieder die Vorlage.
+org-privacy-reset-confirm = Vorlage wiederherstellen
+org-privacy-reset-cancel = Abbrechen
+org-privacy-reset-done = Es gilt wieder die Vorlage.
+org-privacy-error-empty = Geben Sie einen Text ein.
+org-privacy-error-too-long = Der Text ist zu lang. Erlaubt sind 20 000 Zeichen.
+org-privacy-conflict = Jemand hat die Datenschutzerklärung inzwischen geändert. Laden Sie die Seite neu, um den neuen Text zu sehen. Kopieren Sie Ihren Text vorher.
+org-privacy-owner-only = Nur die Organisationsleitung ändert die Datenschutzerklärung.
+org-privacy-read = Datenschutzerklärung lesen

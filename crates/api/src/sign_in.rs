@@ -345,6 +345,10 @@ impl std::fmt::Debug for InvitationTokenRequest {
 pub struct InvitationPreview {
     /// The name of the organization of the invitation.
     pub organization_name: String,
+    /// The privacy notice of the organization in Markdown, or null if the template of the web client applies.
+    /// The invitee reads it before the acceptance (ADR 0045).
+    #[schema(required = true, nullable = true)]
+    pub privacy_notice: Option<String>,
     /// The role that the invitation gives.
     pub role: OrganizationRole,
 }
@@ -353,6 +357,7 @@ impl From<app::InvitationPreview> for InvitationPreview {
     fn from(preview: app::InvitationPreview) -> Self {
         Self {
             organization_name: preview.organization_name,
+            privacy_notice: preview.privacy_notice,
             role: preview.role.into(),
         }
     }

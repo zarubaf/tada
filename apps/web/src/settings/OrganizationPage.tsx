@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type OrganizationFeature, problemMessage } from "../api/client";
 import { failureOf } from "../api/failure";
 import { t } from "../i18n";
+import { PrivacyNoticeSettings } from "../privacy/PrivacyNoticeSettings";
 import { useSession } from "../session/SessionProvider";
 import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
@@ -18,8 +19,9 @@ type State =
   | { kind: "loaded"; feature: OrganizationFeature };
 
 /**
- * The settings of the organization. Today: the switch for MCP tokens (ADR 0045), which only an
- * owner changes. The server decides; the switch of a member is disabled so that it does not fail.
+ * The settings of the organization: the switch for MCP tokens and the privacy notice (ADR 0045).
+ * Only an owner changes them. The server decides; the controls of a member are disabled or absent
+ * so that they do not fail.
  */
 export function OrganizationPage({ api }: { api: Api }) {
   const session = useSession();
@@ -107,6 +109,12 @@ export function OrganizationPage({ api }: { api: Api }) {
           </>
         )}
       </section>
+      <PrivacyNoticeSettings
+        api={api}
+        isOwner={isOwner}
+        onStatus={setConfirmation}
+        onFailure={setFailure}
+      />
     </div>
   );
 }

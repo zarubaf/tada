@@ -56,6 +56,35 @@ describe("InvitationPage", () => {
     });
   });
 
+  it("shows the template of the privacy notice before the accept button", async () => {
+    renderAt(
+      "#token=invite-token",
+      json(200, {
+        organization_name: "Fliegergruppe Testwil",
+        privacy_notice: null,
+        role: "member",
+      }),
+    );
+    const button = await screen.findByRole("button", { name: "Einladung annehmen" });
+    const notice = await screen.findByRole("heading", { name: "Verantwortlich" });
+
+    expect(notice.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Datenschutz" })).toBeVisible();
+  });
+
+  it("shows the own privacy notice of the organization instead of the template", async () => {
+    renderAt(
+      "#token=invite-token",
+      json(200, {
+        organization_name: "Fliegergruppe Testwil",
+        privacy_notice: "## Unser Text",
+        role: "member",
+      }),
+    );
+    expect(await screen.findByRole("heading", { name: "Unser Text" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Verantwortlich" })).not.toBeInTheDocument();
+  });
+
   it("accepts only after the click, then opens the events", async () => {
     const calls = renderAt(
       "#token=invite-token",
@@ -79,7 +108,7 @@ describe("InvitationPage", () => {
       json(200, { organization_name: "Fliegergruppe Testwil", role: "owner" }),
       problem(429, "rate-limited", { "Retry-After": "1" }),
     );
-    expect(await screen.findByText(/Organisationsleitung/)).toBeInTheDocument();
+    expect(await screen.findByText(/Rolle Organisationsleitung/)).toBeInTheDocument();
     const button = screen.getByRole("button", { name: "Einladung annehmen" });
     await userEvent.click(button);
 

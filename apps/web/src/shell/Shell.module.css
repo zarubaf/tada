@@ -60,6 +60,11 @@
     grid-column: 1 / -1;
   }
 
+  /* On narrow layouts the link is in the member menu. */
+  .footer {
+    display: none;
+  }
+
   /* Medium and wide (--bp-medium): a sidebar of 15rem (240 px). */
   @media (width >= 40rem) {
     :global(html):has(.shell) {
@@ -92,9 +97,14 @@
       background: none;
     }
 
+    .footer {
+      display: grid;
+    }
+
     .member {
       position: absolute;
       inset: auto var(--space-4) var(--space-4);
+      gap: var(--space-2);
     }
   }
 }

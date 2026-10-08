@@ -1,11 +1,12 @@
 // User-facing text comes only from the Fluent files in the shared `locales/` folder (ADR 0005).
 import { FluentBundle, FluentResource, type FluentVariable } from "@fluent/bundle";
+import privacy from "../../../../locales/de-CH/privacy.ftl?raw";
 import deCH from "../../../../locales/de-CH/web.ftl?raw";
 
 export const LOCALE = "de-CH";
 
 const bundle = new FluentBundle(LOCALE, { useIsolating: false });
-const errors = bundle.addResource(new FluentResource(deCH));
+const errors = [deCH, privacy].flatMap((source) => bundle.addResource(new FluentResource(source)));
 if (errors.length > 0) {
   throw new Error(`invalid Fluent messages: ${errors.map(String).join("; ")}`);
 }

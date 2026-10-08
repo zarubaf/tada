@@ -18,6 +18,12 @@
     font: inherit;
   }
 
+  .area {
+    padding: var(--space-2);
+    line-height: var(--line-height-base);
+    resize: vertical;
+  }
+
   .input[data-mono] {
     font-family: var(--font-family-mono);
   }

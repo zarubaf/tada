@@ -3,7 +3,7 @@
 import { Fragment, type ReactNode, useState } from "react";
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
-import { usePathname } from "../router/Router";
+import { useNavigate, usePathname } from "../router/Router";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath } from "../session/paths";
 import { useOptionalSession } from "../session/SessionProvider";
 import { LiveRegion } from "../ui/LiveRegion";
@@ -16,6 +16,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const session = useOptionalSession();
   const [failure, setFailure] = useState<string>();
   const pathname = usePathname();
+  const navigate = useNavigate();
   const frameless = isPublicPath(pathname) || pathname === CHOOSE_ORGANIZATION_PATH;
 
   // Without a session or an organization, and on the pages of the sign-in, there is no frame.
@@ -64,11 +65,19 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           </NavLink>
         </nav>
         <div className={styles.member}>
+          <footer className={styles.footer}>
+            <NavLink to="/privacy">{t("nav-privacy")}</NavLink>
+          </footer>
           <Menu
             trigger={user.displayName}
             label={t("member-menu")}
-            items={[{ id: "sign-out", label: t("sign-out") }]}
-            onAction={() => void signOut().then(setFailure)}
+            items={[
+              { id: "privacy", label: t("nav-privacy") },
+              { id: "sign-out", label: t("sign-out") },
+            ]}
+            onAction={(id) =>
+              id === "privacy" ? navigate("/privacy") : void signOut().then(setFailure)
+            }
             placement="top end"
           />
         </div>
