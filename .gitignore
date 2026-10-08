@@ -8,7 +8,7 @@ dist/
 coverage/
 
 # Local environment and secrets
-.dev/
+.dev
 .env
 .env.*
 !.env.example
