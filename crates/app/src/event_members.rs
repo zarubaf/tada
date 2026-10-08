@@ -243,6 +243,16 @@ fn audit(caller: &MemberCaller, action: AuditAction, event: EventId, user: UserI
     .about(user)
 }
 
+/// True if the change takes away the only event manager of an event (ADR 0052).
+///
+/// `role` is the current event role of the member, `new` the role after the change (`None` is a
+/// removal), and `managers` the number of event manager rows of the event, the member included.
+/// Owners and admins act as event manager, but they do not count. The stores call this rule on the
+/// rows that they locked.
+pub fn takes_last_manager(role: EventRole, new: Option<EventRole>, managers: usize) -> bool {
+    role == EventRole::EventManager && new != Some(EventRole::EventManager) && managers == 1
+}
+
 /// The event memberships of an event. Only its event managers see them.
 pub async fn list_event_members(
     caller: &MemberCaller,
@@ -344,6 +354,20 @@ fn changed_or_error<T>(changed: Changed<T>) -> Result<T, ChangeEventMemberError>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_change_of_the_only_event_manager_takes_the_last_manager() {
+        let manager = EventRole::EventManager;
+        assert!(!takes_last_manager(manager, Some(manager), 1));
+        assert!(takes_last_manager(
+            manager,
+            Some(EventRole::EventContributor),
+            1
+        ));
+        assert!(takes_last_manager(manager, None, 1));
+        assert!(!takes_last_manager(manager, None, 2));
+        assert!(!takes_last_manager(EventRole::EventContributor, None, 1));
+    }
 
     #[test]
     fn each_error_gives_a_code_of_its_list() {

@@ -10,6 +10,7 @@ use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::identity::{DisplayName, Email, EventRole};
 use tada_app::domain::ids::{EventId, InvitationId, OrganizationId, UserId};
+use tada_app::event_members::takes_last_manager;
 use tada_app::members::{
     Invitation, InvitationInsert, LockedMembership, MemberCursor, MemberStore, OrganizationMember,
     Refusal, Remover,
@@ -160,10 +161,6 @@ async fn lock_membership(
             .filter(|row| row.event_id == event && row.manager)
             .count()
     };
-    let only_manager = events
-        .iter()
-        .filter(|row| row.member && row.manager)
-        .any(|row| managers_of(row.event_id) == 1);
     let event_roles = events
         .iter()
         .filter(|row| row.member)
@@ -172,7 +169,10 @@ async fn lock_membership(
                 .ok_or(InvalidRow("event_membership.event_role"))?;
             Ok((EventId::from_uuid(row.event_id), role))
         })
-        .collect::<Result<_, InvalidRow>>()?;
+        .collect::<Result<Vec<_>, InvalidRow>>()?;
+    let only_manager = event_roles
+        .iter()
+        .any(|(event, role)| takes_last_manager(*role, None, managers_of(event.as_uuid())));
     Ok(Some(Locked {
         membership: LockedMembership {
             role: organization_role(&row.role)?,

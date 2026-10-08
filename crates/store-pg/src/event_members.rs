@@ -10,7 +10,7 @@ use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::identity::{DisplayName, EventRole};
 use tada_app::domain::ids::{EventId, UserId};
-use tada_app::event_members::{Added, Changed, EventMember, EventMemberStore};
+use tada_app::event_members::{Added, Changed, EventMember, EventMemberStore, takes_last_manager};
 use tada_app::store::StoreError;
 
 use crate::Database;
@@ -70,16 +70,6 @@ struct Locked {
     role: EventRole,
     version: RecordVersion,
     managers: usize,
-}
-
-impl Locked {
-    /// True if the member is the only event manager and `new` is not the event manager role.
-    /// `None` is a removal.
-    fn last_manager_goes(&self, new: Option<EventRole>) -> bool {
-        self.role == EventRole::EventManager
-            && new != Some(EventRole::EventManager)
-            && self.managers == 1
-    }
 }
 
 /// Locks the membership of `user` in `event` and all event manager rows of the event, in the order
@@ -203,7 +193,7 @@ impl EventMemberStore for Database {
         if locked.version != expected_version {
             return Ok(Changed::VersionConflict);
         }
-        if locked.last_manager_goes(Some(role)) {
+        if takes_last_manager(locked.role, Some(role), locked.managers) {
             return Ok(Changed::LastManager);
         }
         sqlx::query!(
@@ -244,7 +234,7 @@ impl EventMemberStore for Database {
         if locked.version != expected_version {
             return Ok(Changed::VersionConflict);
         }
-        if locked.last_manager_goes(None) {
+        if takes_last_manager(locked.role, None, locked.managers) {
             return Ok(Changed::LastManager);
         }
         sqlx::query!(
