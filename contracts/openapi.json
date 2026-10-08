@@ -2078,6 +2078,294 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/tokens": {
+      "get": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Lists the API tokens of the member in this organization, the newest first.\nThe list holds the revoked and expired tokens, and never a secret.",
+        "operationId": "list_tokens",
+        "responses": {
+          "200": {
+            "description": "The tokens of the member.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiTokenList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Creates an API token for an MCP client of the member (ADR 0045).",
+        "description": "The member must confirm the current notice with `notice_version_confirmed`.\nA `propose` token needs the right to propose in an event.\nIf an owner switched off MCP tokens, or the member lacks the right to propose, the response is `forbidden`.\nA client reads `GET /organization/features` to tell a switched-off MCP switch from a missing right.\nThe response holds the secret; the member sees it once.",
+        "operationId": "create_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new token with its secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedApiToken"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/tokens/{token_id}/revoke": {
+      "post": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Revokes a token of the member. The token stops working with the next request.\nA second revocation changes nothing.",
+        "operationId": "revoke_token",
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "description": "The ID of the token.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The token is revoked."
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/token-notice": {
+      "get": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Gives the version of the token notice (ADR 0045). The web client shows the text and sends the version\nwith `CreateToken` when the member confirms.",
+        "operationId": "get_token_notice",
+        "responses": {
+          "200": {
+            "description": "The version of the notice.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenNotice"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/organization/features": {
+      "get": {
+        "tags": [
+          "organization"
+        ],
+        "summary": "Lists the switches of the organization with their values. Each member can read them.",
+        "operationId": "list_organization_features",
+        "responses": {
+          "200": {
+            "description": "The switches.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationFeatureList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/organization/features/{feature}/set": {
+      "post": {
+        "tags": [
+          "organization"
+        ],
+        "summary": "Switches a feature of the organization on or off. Only an owner can do this.",
+        "operationId": "set_organization_feature",
+        "parameters": [
+          {
+            "name": "feature",
+            "in": "path",
+            "description": "The switch.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/OrganizationFeatureName"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetFeatureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new value of the switch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationFeature"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
@@ -2108,6 +2396,83 @@
             "$ref": "#/components/schemas/EventRole"
           }
         }
+      },
+      "ApiToken": {
+        "type": "object",
+        "description": "A token of the member. It never holds the secret.",
+        "required": [
+          "id",
+          "name",
+          "scope",
+          "expires_at",
+          "notice_version",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiTokenScope"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notice_version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The version of the notice that the member confirmed when the member created the token.",
+            "minimum": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The last time a client used the token. It is absent if no client used it."
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The time of the revocation. It is absent for a token that is not revoked."
+          }
+        }
+      },
+      "ApiTokenList": {
+        "type": "object",
+        "description": "The tokens of the member. A member has few, so the list has one page.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiToken"
+            }
+          }
+        }
+      },
+      "ApiTokenScope": {
+        "type": "string",
+        "description": "What a token allows (ADR 0039).",
+        "enum": [
+          "read",
+          "propose"
+        ]
       },
       "ApplyChangesetRequest": {
         "type": "object",
@@ -3735,6 +4100,56 @@
           }
         }
       },
+      "CreateTokenRequest": {
+        "type": "object",
+        "description": "The input of `CreateToken`.",
+        "required": [
+          "name",
+          "scope",
+          "expires_at"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A name that helps the member to find the token again: 1 to 100 characters.",
+            "example": "Claude Code"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiTokenScope"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The expiry. It is in the future and at most one year away."
+          },
+          "notice_version_confirmed": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The version of the notice that the member confirmed: `GetTokenNotice` gives it.\nAny other version than the current one, also a missing one, gives `validation-failed` with the code `not-confirmed`.",
+            "minimum": 0
+          }
+        }
+      },
+      "CreatedApiToken": {
+        "type": "object",
+        "description": "A new token with its secret.",
+        "required": [
+          "token",
+          "secret"
+        ],
+        "properties": {
+          "token": {
+            "$ref": "#/components/schemas/ApiToken"
+          },
+          "secret": {
+            "type": "string",
+            "description": "The secret of the token. It shows once, in this response."
+          }
+        }
+      },
       "CreatedChangeset": {
         "type": "object",
         "description": "A new changeset.",
@@ -5058,6 +5473,50 @@
         ],
         "description": "The change that a proposal suggests. `kind` names the operation. The list of kinds is open."
       },
+      "OrganizationFeature": {
+        "type": "object",
+        "description": "A switch with its value.",
+        "required": [
+          "feature",
+          "enabled",
+          "version"
+        ],
+        "properties": {
+          "feature": {
+            "$ref": "#/components/schemas/OrganizationFeatureName"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. `SetOrganizationFeature` needs it."
+          }
+        }
+      },
+      "OrganizationFeatureList": {
+        "type": "object",
+        "description": "The switches of the organization.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationFeature"
+            }
+          }
+        }
+      },
+      "OrganizationFeatureName": {
+        "type": "string",
+        "description": "A switch of the organization.",
+        "enum": [
+          "mcp-tokens"
+        ]
+      },
       "OrganizationRole": {
         "type": "string",
         "description": "The role of a member in an organization.",
@@ -5428,6 +5887,24 @@
           }
         }
       },
+      "SetFeatureRequest": {
+        "type": "object",
+        "description": "The input of `SetOrganizationFeature`.",
+        "required": [
+          "enabled",
+          "expected_version"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
       "SignInRequest": {
         "type": "object",
         "description": "The input of a sign-in request.",
@@ -5512,6 +5989,20 @@
             "items": {
               "$ref": "#/components/schemas/TelegramLinkRequest"
             }
+          }
+        }
+      },
+      "TokenNotice": {
+        "type": "object",
+        "description": "The version of the token notice. The text of the notice is part of the web client.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },

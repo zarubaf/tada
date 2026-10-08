@@ -82,6 +82,7 @@ pub fn api_state(
         proposals: database.clone(),
         review: database.clone(),
         sources: database.clone(),
+        tokens: database.clone(),
     }
 }
 
