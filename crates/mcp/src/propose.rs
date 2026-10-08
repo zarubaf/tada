@@ -37,7 +37,7 @@ add-choice-value, deprecate-field, create-open-question and create-document-draf
 Each proposal has at least one passage in evidence: start and end count characters of the normalized text (Unicode NFC, \\n line ends), and quote is the exact text. \
 A passage without source_version_id cites source_text. A passage with source_version_id cites another source version that the member can read in the event, for example a hit of search_sources. \
 depends_on lists the proposals of the same changeset that create the records that a proposal uses, for example the new field of a fact. \
-Each id is a new UUIDv7. Send the same changeset with the same id again to retry safely. \
+Always send a new UUIDv7 as the id of the changeset and of each proposal. To retry, send the same changeset with the same ids again. \
 If a check fails, tada stores nothing: the result has isError, the problem code and, for validation-failed, each invalid value as a JSON pointer and a code.",
         annotations(
             read_only_hint = false,

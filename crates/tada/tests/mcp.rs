@@ -717,6 +717,18 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
         assert_eq!(tool["annotations"]["readOnlyHint"], read_only, "{tool}");
         assert_ne!(tool["annotations"]["destructiveHint"], true, "{tool}");
     }
+    // Without the ID of the changeset, a retry after a lost response is refused with `taken`.
+    let propose = tools
+        .iter()
+        .find(|tool| tool["name"] == "propose_changeset")
+        .unwrap();
+    assert!(
+        propose["description"]
+            .as_str()
+            .unwrap()
+            .contains("Always send a new UUIDv7 as the id of the changeset"),
+        "{propose}"
+    );
 
     let call = json!({
         "jsonrpc": "2.0", "id": 2, "method": "tools/call",
