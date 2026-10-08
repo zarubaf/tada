@@ -74,12 +74,18 @@ The product owner chose this way of work for LLM agents:
 07. Before a merge, a final review checks the whole branch.
 08. Independent tasks run in parallel.
     Each task has its own Git worktree and branch.
-09. The controller merges each lane after its review.
+09. The controller merges the approved lanes of a wave as one batch.
+    After the batch it runs `mise run check:all` one time.
 10. A lane reserves its migration number before it starts.
 11. `mise run check` checks the uncommitted change.
     It skips the web and browser checks when no web file changed.
     `mise run check:all` runs every check, as CI does.
     Run it before a hand-off or a push.
+12. The controller sets a limit for heavy jobs that run at the same time.
+    Lanes and full checks are heavy jobs; reviews are not.
+    The limit fits the cores of the machine.
+    Too many jobs make each check slow and cause timeouts in the browser tests.
+13. A lane runs targeted tests while it works and `mise run check` before each commit.
 
 Private plans are private notes that stay out of the repository.
 Tool state stays outside the repository.
