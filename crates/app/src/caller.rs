@@ -220,6 +220,16 @@ impl MemberCaller {
     }
 }
 
+/// Seals the caller traits `Principal` and `MayPropose` (ADR 0039).
+/// Only the callers of this module implement `Sealed`, so no other crate can implement the traits.
+pub(crate) mod sealed {
+    pub trait Sealed {}
+}
+
+impl sealed::Sealed for MemberCaller {}
+
+impl sealed::Sealed for AiCaller {}
+
 impl crate::access::Principal for MemberCaller {
     fn user_id(&self) -> UserId {
         self.user_id
