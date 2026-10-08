@@ -417,3 +417,31 @@ org-mcp-help = Nur wenn der Schalter an ist, können Mitglieder API-Token für K
 org-mcp-loading = Einstellungen werden geladen
 org-mcp-on = MCP-Token sind eingeschaltet.
 org-mcp-off = MCP-Token sind ausgeschaltet.
+
+## The edit form of a value (ADR 0049)
+
+value-error-required = Geben Sie einen Wert ein.
+value-error-number = Das ist keine Zahl. Geben Sie eine Zahl wie 20000 oder 12,5 ein.
+value-error-money = Das ist kein Betrag. Geben Sie einen Betrag wie 15.00 ein.
+value-error-date = Das ist kein gültiges Datum. Geben Sie ein Datum wie 18.05.2030 ein.
+value-error-range = Der obere Wert liegt unter dem unteren. Geben Sie einen Wert ab dem unteren Wert ein.
+value-error-window = Das Ende liegt vor dem Beginn. Wählen Sie ein Datum ab dem Beginn.
+value-error-granularity = Wählen Sie, wie genau das Zeitfenster ist.
+value-error-choice = Wählen Sie mindestens eine Möglichkeit.
+value-error-choice-single = Wählen Sie genau eine Möglichkeit.
+value-input-text = Text
+value-input-flag = Antwort
+value-input-min = Wert
+value-input-min-range = Von
+value-input-max = Bis (leer lassen, wenn es ein einzelner Wert ist)
+value-input-amount = Betrag in { $currency }
+value-input-amount-max = Bis (leer lassen, wenn es ein einzelner Betrag ist)
+value-input-date = Datum
+value-input-start = Beginn
+value-input-end = Ende
+value-input-granularity = Genauigkeit
+value-input-granularity-day = Tag
+value-input-granularity-week = Woche
+value-input-granularity-month = Monat
+value-input-choice = Auswahl
+value-input-approximate = Ungefährer Wert

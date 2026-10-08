@@ -52,7 +52,10 @@ export function useRetry(target: FocusTarget): Retry {
   return { retried, retry };
 }
 
-/** The first field of a form that shows an error, for the focus after a failed submit. */
+/**
+ * The first field of a form that shows an error, for the focus after a failed submit. A select
+ * marks its root, not its button, so the button of an invalid select counts as the field.
+ */
 export function firstInvalidField(form: HTMLElement | null): HTMLElement | null {
-  return form?.querySelector<HTMLElement>("[aria-invalid='true']") ?? null;
+  return form?.querySelector<HTMLElement>("[aria-invalid='true'], [data-invalid] button") ?? null;
 }

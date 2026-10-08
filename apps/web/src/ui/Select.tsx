@@ -1,6 +1,7 @@
 import {
   Select as AriaSelect,
   Button,
+  FieldError,
   Label,
   ListBox,
   ListBoxItem,
@@ -20,6 +21,8 @@ export interface SelectProps {
   isDisabled?: boolean;
   /** Only the accessible name shows the label, for a select in a table row. */
   labelHidden?: boolean;
+  /** The error below the select. It marks the select as invalid. */
+  error?: string | undefined;
 }
 
 /** A select for up to seven options (doc/design/components.md). */
@@ -31,6 +34,7 @@ export function Select({
   placeholder,
   isDisabled,
   labelHidden,
+  error,
 }: SelectProps) {
   return (
     <AriaSelect
@@ -38,6 +42,7 @@ export function Select({
       selectedKey={value ?? null}
       onSelectionChange={(key) => onChange(String(key))}
       isDisabled={isDisabled}
+      isInvalid={error !== undefined || undefined}
       {...(labelHidden ? { "aria-label": label } : {})}
       {...(placeholder === undefined ? {} : { placeholder })}
     >
@@ -46,6 +51,7 @@ export function Select({
         <SelectValue />
         <span aria-hidden="true">▾</span>
       </Button>
+      {error && <FieldError className={styles.error}>{error}</FieldError>}
       <Popover className={popover.popover}>
         <ListBox className={popover.list}>
           {options.map((option) => (
