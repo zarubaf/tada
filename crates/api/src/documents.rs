@@ -15,8 +15,8 @@ use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use tada_app::blobs::ByteStream;
 use tada_app::documents::{
-    self as app, DocumentCursor, DocumentStores, DocumentView, DraftStatus, ReadDocumentError,
-    UploadError, VersionContent, VersionView,
+    self as app, DocumentCursor, DocumentReads, DocumentStores, DocumentView, DraftStatus,
+    ReadDocumentError, UploadError, VersionContent, VersionView,
 };
 use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId};
 use tada_app::problem::ProblemCode;
@@ -409,7 +409,7 @@ async fn list_documents(
         query.q.as_deref(),
         after,
         limit,
-        state.document_stores(),
+        state.document_reads(),
     )
     .await?;
     Ok(axum::Json(DocumentPage {
@@ -438,7 +438,7 @@ async fn get_document(
     let document = app::get_document(
         &caller,
         DocumentId::from_uuid(document_id),
-        state.document_stores(),
+        state.document_reads(),
     )
     .await?;
     Ok(axum::Json(document.into()))
@@ -471,7 +471,7 @@ async fn list_document_versions(
     let versions = app::list_versions(
         &caller,
         DocumentId::from_uuid(document_id),
-        state.document_stores(),
+        state.document_reads(),
     )
     .await?;
     Ok(axum::Json(DocumentVersionList {
@@ -615,6 +615,13 @@ impl ApiState {
             identity: self.identity.as_ref(),
             documents: self.documents.as_ref(),
             blobs: self.blobs.as_ref(),
+        }
+    }
+
+    fn document_reads(&self) -> DocumentReads<'_> {
+        DocumentReads {
+            identity: self.identity.as_ref(),
+            documents: self.documents.as_ref(),
         }
     }
 }

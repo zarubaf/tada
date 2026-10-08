@@ -350,18 +350,18 @@ impl FactStore for Database {
         }))
     }
 
-    async fn existing_versions(
+    async fn fact_versions(
         &self,
         scope: OrgScope,
         event: EventId,
         versions: &[(FactId, RecordVersion)],
-    ) -> Result<Vec<(FactId, RecordVersion)>, StoreError> {
+    ) -> Result<Vec<FactVersionRef>, StoreError> {
         let (facts, numbers): (Vec<Uuid>, Vec<i64>) = versions
             .iter()
             .map(|(fact, number)| (fact.as_uuid(), number.get()))
             .unzip();
         let rows = sqlx::query!(
-            r#"SELECT v.fact_id, v.number
+            r#"SELECT v.id, v.fact_id, v.number, v.state, v.value, v.approximate
                FROM unnest($3::uuid[], $4::bigint[]) AS t (fact_id, number)
                JOIN fact_version v ON v.fact_id = t.fact_id AND v.number = t.number
                JOIN fact f ON f.organization_id = v.organization_id AND f.id = v.fact_id
@@ -375,7 +375,14 @@ impl FactStore for Database {
         .await
         .map_err(store_error)?;
         rows.into_iter()
-            .map(|row| Ok((FactId::from_uuid(row.fact_id), record_version(row.number)?)))
+            .map(|row| {
+                Ok(FactVersionRef {
+                    id: FactVersionId::from_uuid(row.id),
+                    fact_id: FactId::from_uuid(row.fact_id),
+                    number: record_version(row.number)?,
+                    state: values::fact_state_from_columns(&row.state, row.value, row.approximate)?,
+                })
+            })
             .collect()
     }
 }

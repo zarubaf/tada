@@ -64,7 +64,7 @@ impl OpenQuestionRef {
     }
 }
 
-/// The current version of one fact.
+/// One version of a fact with its state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileEntry {
     pub field: FieldDefinition,
@@ -87,7 +87,7 @@ pub struct DatedEvidence {
     pub captured_at: Timestamp,
 }
 
-/// The current version of one fact.
+/// One version of a fact with its state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FactVersionRef {
     pub id: FactVersionId,
@@ -118,13 +118,14 @@ pub trait FactStore: Debug + Send + Sync {
         field: FieldDefinitionId,
     ) -> Result<Option<FactVersionRef>, StoreError>;
 
-    /// The fact versions of `versions` that exist in the event, each as a fact and its version number.
-    async fn existing_versions(
+    /// The fact versions of `versions` that exist in the event, with their states.
+    /// A draft cites exact fact versions (ADR 0051), so this reads a version that is not current too.
+    async fn fact_versions(
         &self,
         scope: OrgScope,
         event: EventId,
         versions: &[(FactId, RecordVersion)],
-    ) -> Result<Vec<(FactId, RecordVersion)>, StoreError>;
+    ) -> Result<Vec<FactVersionRef>, StoreError>;
 }
 
 /// The event profile: the current facts of the event, for each caller who can read the event.
@@ -342,12 +343,12 @@ mod tests {
             Ok(self.current.lock().unwrap().clone())
         }
 
-        async fn existing_versions(
+        async fn fact_versions(
             &self,
             _: OrgScope,
             _: EventId,
             _: &[(FactId, RecordVersion)],
-        ) -> Result<Vec<(FactId, RecordVersion)>, StoreError> {
+        ) -> Result<Vec<FactVersionRef>, StoreError> {
             unreachable!()
         }
     }

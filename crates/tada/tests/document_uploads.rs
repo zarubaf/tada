@@ -18,8 +18,8 @@ use tada_app::blobs::ByteStream;
 use tada_app::caller::OrgScope;
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::documents::{
-    DocumentCursor, DocumentStore, DocumentStores, DocumentView, NewUpload, Published,
-    ReadDocumentError, StoredVersion, UploadError, VersionView, download, get_document,
+    DocumentCursor, DocumentReads, DocumentStore, DocumentStores, DocumentView, NewUpload,
+    Published, ReadDocumentError, StoredVersion, UploadError, VersionView, download, get_document,
     list_documents, list_versions, upload_document, upload_version,
 };
 use tada_app::domain::identity::EventRole;
@@ -63,6 +63,13 @@ impl Fixture {
             identity: &self.test.database,
             documents: &self.test.database,
             blobs: &self.garage.storage,
+        }
+    }
+
+    fn reads(&self) -> DocumentReads<'_> {
+        DocumentReads {
+            identity: &self.test.database,
+            documents: &self.test.database,
         }
     }
 
@@ -182,7 +189,7 @@ async fn a_second_version_keeps_the_first_version_readable_and_unchanged() {
     .unwrap();
 
     assert_eq!(changed.newest_version.number, 2);
-    let versions = list_versions(&f.owner, document.id, f.stores())
+    let versions = list_versions(&f.owner, document.id, f.reads())
         .await
         .unwrap();
     assert_eq!(versions.len(), 2);
@@ -252,7 +259,7 @@ async fn rejects_an_upload_over_the_quota_with_quota_exceeded() {
             .await]
     );
     assert_eq!(
-        get_document(&f.owner, document.id, f.stores())
+        get_document(&f.owner, document.id, f.reads())
             .await
             .unwrap(),
         document
@@ -306,12 +313,12 @@ async fn another_organization_cannot_read_or_change_a_document() {
     let not_found =
         |result: Result<(), ReadDocumentError>| matches!(result, Err(ReadDocumentError::NotFound));
     assert!(not_found(
-        get_document(&stranger, document.id, f.stores())
+        get_document(&stranger, document.id, f.reads())
             .await
             .map(drop)
     ));
     assert!(not_found(
-        list_versions(&stranger, document.id, f.stores())
+        list_versions(&stranger, document.id, f.reads())
             .await
             .map(drop)
     ));
@@ -327,7 +334,7 @@ async fn another_organization_cannot_read_or_change_a_document() {
             None,
             None,
             PageLimit::DEFAULT,
-            f.stores()
+            f.reads()
         )
         .await
         .map(drop)
@@ -355,7 +362,7 @@ async fn a_member_without_an_event_role_cannot_see_the_documents() {
         .unwrap();
     let (_, outsider) = member(&f.test, "testwil", OrganizationRole::Member).await;
     assert!(matches!(
-        get_document(&outsider, document.id, f.stores()).await,
+        get_document(&outsider, document.id, f.reads()).await,
         Err(ReadDocumentError::NotFound)
     ));
     assert!(matches!(
@@ -390,7 +397,7 @@ async fn finds_documents_by_name_and_stores_the_text_of_a_text_file() {
         Some(" notiz "),
         None,
         PageLimit::DEFAULT,
-        f.stores(),
+        f.reads(),
     )
     .await
     .unwrap();
@@ -401,7 +408,7 @@ async fn finds_documents_by_name_and_stores_the_text_of_a_text_file() {
         None,
         None,
         PageLimit::new(1).unwrap(),
-        f.stores(),
+        f.reads(),
     )
     .await
     .unwrap();
@@ -412,7 +419,7 @@ async fn finds_documents_by_name_and_stores_the_text_of_a_text_file() {
         None,
         page.next,
         PageLimit::new(1).unwrap(),
-        f.stores(),
+        f.reads(),
     )
     .await
     .unwrap();
@@ -507,18 +514,11 @@ async fn keeps_the_object_when_the_outcome_of_the_commit_is_unknown() {
     assert!(matches!(error, UploadError::Store(_)), "{error:?}");
 
     // The version was committed, and its object must stay readable.
-    let document = list_documents(
-        &f.owner,
-        f.event,
-        None,
-        None,
-        PageLimit::DEFAULT,
-        f.stores(),
-    )
-    .await
-    .unwrap()
-    .items
-    .remove(0);
+    let document = list_documents(&f.owner, f.event, None, None, PageLimit::DEFAULT, f.reads())
+        .await
+        .unwrap()
+        .items
+        .remove(0);
     assert_eq!(f.read(&f.owner, &document).await, content);
 }
 

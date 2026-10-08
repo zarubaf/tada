@@ -113,10 +113,13 @@ async fn resolve_facts(
     if cited.is_empty() {
         return Ok(Ok(Vec::new()));
     }
-    let existing = stores
+    let existing: Vec<(FactId, RecordVersion)> = stores
         .facts
-        .existing_versions(caller.scope(), event, &cited)
-        .await?;
+        .fact_versions(caller.scope(), event, &cited)
+        .await?
+        .into_iter()
+        .map(|version| (version.fact_id, version.number))
+        .collect();
     if !cited.iter().all(|version| existing.contains(version)) {
         return Ok(Err(LINK_NOT_FOUND));
     }

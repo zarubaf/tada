@@ -332,12 +332,20 @@ impl Inspection {
     }
 }
 
-/// The ports that the document commands and queries use.
+/// The ports of the uploads and downloads: they read and write files.
 #[derive(Debug, Clone, Copy)]
 pub struct DocumentStores<'a> {
     pub identity: &'a dyn IdentityStore,
     pub documents: &'a dyn DocumentStore,
     pub blobs: &'a dyn BlobStore,
+}
+
+/// The ports of the queries of documents and their versions. They never read a file,
+/// so an adapter without the object storage, for example the MCP server, can use them.
+#[derive(Debug, Clone, Copy)]
+pub struct DocumentReads<'a> {
+    pub identity: &'a dyn IdentityStore,
+    pub documents: &'a dyn DocumentStore,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -650,7 +658,7 @@ pub async fn list_documents(
     name: Option<&str>,
     after: Option<DocumentCursor>,
     limit: PageLimit,
-    stores: DocumentStores<'_>,
+    stores: DocumentReads<'_>,
 ) -> Result<Page<DocumentView, DocumentCursor>, ReadDocumentError> {
     check_may_read(caller, event_id, stores.identity).await?;
     let name = name.map(str::trim).filter(|name| !name.is_empty());
@@ -672,7 +680,7 @@ pub async fn list_documents(
 pub async fn get_document(
     caller: &impl Principal,
     id: DocumentId,
-    stores: DocumentStores<'_>,
+    stores: DocumentReads<'_>,
 ) -> Result<DocumentView, ReadDocumentError> {
     let document = stores
         .documents
@@ -687,7 +695,7 @@ pub async fn get_document(
 pub async fn list_versions(
     caller: &impl Principal,
     id: DocumentId,
-    stores: DocumentStores<'_>,
+    stores: DocumentReads<'_>,
 ) -> Result<Vec<VersionView>, ReadDocumentError> {
     get_document(caller, id, stores).await?;
     Ok(stores.documents.versions(caller.scope(), id).await?)

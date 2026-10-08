@@ -741,7 +741,7 @@ mod tests {
             unreachable!()
         }
 
-        async fn existing_versions(
+        async fn fact_versions(
             &self,
             _: tada_app::caller::OrgScope,
             _: tada_app::domain::ids::EventId,
@@ -749,13 +749,7 @@ mod tests {
                 tada_app::domain::ids::FactId,
                 tada_app::domain::RecordVersion,
             )],
-        ) -> Result<
-            Vec<(
-                tada_app::domain::ids::FactId,
-                tada_app::domain::RecordVersion,
-            )>,
-            tada_app::store::StoreError,
-        > {
+        ) -> Result<Vec<tada_app::facts::FactVersionRef>, tada_app::store::StoreError> {
             unreachable!()
         }
     }
