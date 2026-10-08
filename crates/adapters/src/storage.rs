@@ -4,6 +4,7 @@ use std::io;
 
 use async_trait::async_trait;
 use aws_sdk_s3::Client;
+use aws_sdk_s3::config::timeout::TimeoutConfig;
 use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region, RequestChecksumCalculation};
 use aws_sdk_s3::primitives::ByteStream as S3Body;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
@@ -35,6 +36,11 @@ pub struct S3Storage {
 
 impl S3Storage {
     pub fn new(config: S3Config) -> Self {
+        Self::with_timeouts(config, None)
+    }
+
+    /// Like [`Self::new`] with other timeouts. `None` keeps the SDK defaults. Only tests set them.
+    fn with_timeouts(config: S3Config, timeouts: Option<TimeoutConfig>) -> Self {
         let credentials = Credentials::new(
             config.access_key_id.expose_secret(),
             config.secret_access_key.expose_secret(),
@@ -42,15 +48,18 @@ impl S3Storage {
             None,
             "tada-settings",
         );
-        let s3_config = aws_sdk_s3::Config::builder()
+        let mut s3_config = aws_sdk_s3::Config::builder()
             .behavior_version(BehaviorVersion::latest())
             .endpoint_url(config.endpoint)
             .region(Region::new(config.region))
             .credentials_provider(credentials)
             // Garage needs path-style addresses and no checksums on each request (ADR 0009).
             .force_path_style(true)
-            .request_checksum_calculation(RequestChecksumCalculation::WhenRequired)
-            .build();
+            .request_checksum_calculation(RequestChecksumCalculation::WhenRequired);
+        if let Some(timeouts) = timeouts {
+            s3_config = s3_config.timeout_config(timeouts);
+        }
+        let s3_config = s3_config.build();
         Self {
             client: Client::from_conf(s3_config),
             bucket: config.bucket,
@@ -325,18 +334,22 @@ mod tests {
                 .await
                 .expect("cannot start Garage; is Docker running?");
 
+            // Production fails fast; a container on a loaded machine needs up to a minute to answer.
             let mut node = String::new();
-            for _ in 0..50 {
+            let mut ready = false;
+            for _ in 0..300 {
                 let mut result = container
                     .exec(ExecCommand::new(["/garage", "node", "id", "--quiet"]))
                     .await
                     .unwrap();
                 node = String::from_utf8(result.stdout_to_vec().await.unwrap()).unwrap();
                 if result.exit_code().await.unwrap() == Some(0) {
+                    ready = true;
                     break;
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             }
+            assert!(ready, "Garage did not answer within 60 s");
             let node = node.trim().split('@').next().unwrap().to_owned();
             garage(
                 &container,
@@ -369,13 +382,20 @@ mod tests {
             .await;
 
             let port = container.get_host_port_ipv4(3900).await.unwrap();
-            let storage = S3Storage::new(S3Config {
-                endpoint: format!("http://127.0.0.1:{port}"),
-                region: "garage".to_owned(),
-                bucket: BUCKET.to_owned(),
-                access_key_id: SecretString::from(key_id),
-                secret_access_key: SecretString::from(secret),
-            });
+            let timeouts = TimeoutConfig::builder()
+                .connect_timeout(std::time::Duration::from_secs(60))
+                .operation_attempt_timeout(std::time::Duration::from_secs(120))
+                .build();
+            let storage = S3Storage::with_timeouts(
+                S3Config {
+                    endpoint: format!("http://127.0.0.1:{port}"),
+                    region: "garage".to_owned(),
+                    bucket: BUCKET.to_owned(),
+                    access_key_id: SecretString::from(key_id),
+                    secret_access_key: SecretString::from(secret),
+                },
+                Some(timeouts),
+            );
             Self {
                 storage,
                 _container: container,
