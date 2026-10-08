@@ -9,7 +9,7 @@ use tada_domain::proposals::{DraftDocument, Operation, Proposal};
 use tada_domain::sources::{Evidence, Passage};
 
 use super::{MayPropose, ProposeError, ProposeStores, finish};
-use crate::access::{self, AccessError, SourceReach};
+use crate::access::{self, SourceReach};
 use crate::drafts::{self, CitedFact, DraftProvenance, ProvenanceManifest};
 use crate::problem::FieldError;
 use crate::sources::SourceVersionText;
@@ -25,7 +25,7 @@ const LINK_NOT_FOUND: &str = "link-not-found";
 /// 2. An existing document is a document of the event of the proposal.
 /// 3. Each fact link cites a stored fact version of the event: accepted, an assumption or unknown.
 ///    An open proposal has no fact version, so a link to it does not resolve.
-/// 4. Each source link cites a source version of the event of the draft (`access::event_source_reach`),
+/// 4. Each source link cites a source version of the event of the draft (`access::citable_reach`),
 ///    and its range is inside the text of the source version.
 pub(super) async fn check_drafts(
     caller: &impl MayPropose,
@@ -69,7 +69,9 @@ pub(super) async fn check_drafts(
         let facts = resolve_facts(caller, *event_id, &links.facts, stores).await?;
         let reach = match reaches.entry(*event_id) {
             Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => entry.insert(citable_reach(caller, *event_id, stores).await?),
+            Entry::Vacant(entry) => {
+                entry.insert(access::citable_reach(caller, *event_id, stores.identity).await?)
+            }
         };
         let sources = resolve_sources(caller, reach, &links.sources, stores).await?;
         let manifest = match (facts, sources) {
@@ -95,20 +97,6 @@ pub(super) async fn check_drafts(
     }
     finish(errors)?;
     Ok(checked)
-}
-
-/// The sources that a draft of `event` can cite: the sources of the event (`access::event_source_reach`), the same
-/// rule as for the evidence of a proposal. A quote of another event would show its text to the viewers of the draft.
-async fn citable_reach(
-    caller: &impl MayPropose,
-    event: EventId,
-    stores: ProposeStores<'_>,
-) -> Result<SourceReach, ProposeError> {
-    match access::event_source_reach(caller, event, stores.identity).await {
-        Ok(reach) => Ok(reach),
-        Err(AccessError::NotFound) => Ok(SourceReach::Events(Vec::new())),
-        Err(AccessError::Store(error)) => Err(error.into()),
-    }
 }
 
 /// The cited fact versions, or `link-not-found` if one is not a fact version of the event.

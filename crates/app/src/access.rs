@@ -207,6 +207,21 @@ pub async fn event_source_reach(
     Ok(SourceReach::Events(vec![event]))
 }
 
+/// The source versions that a new citation in a record of `event` can name, for example the evidence of a proposal
+/// or a source link of a draft: the sources of the event. A quote of another event would show its text to the members
+/// of `event`. An event that the caller cannot read, or a new event that does not exist yet, has none.
+pub async fn citable_reach(
+    caller: &impl Principal,
+    event: EventId,
+    identity: &dyn IdentityStore,
+) -> Result<SourceReach, StoreError> {
+    match event_source_reach(caller, event, identity).await {
+        Ok(reach) => Ok(reach),
+        Err(AccessError::NotFound) => Ok(SourceReach::Events(Vec::new())),
+        Err(AccessError::Store(error)) => Err(error),
+    }
+}
+
 /// The access of the member `user`, who is not the caller, in the event `event`, or `None` if the user has none.
 /// It also serves an event that a changeset creates and that does not exist yet: there, only owners and admins have access.
 /// For example, the owner of a work record must be a member of its event (ADR 0052).

@@ -16,10 +16,10 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::ApiState;
+use crate::actors::Author;
 use crate::contract::{AUTHENTICATED, PATH, codes};
 use crate::extract::{Caller, Path};
 use crate::problem::{ApiError, Problem};
-use crate::review::Author;
 use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
