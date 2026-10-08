@@ -40,13 +40,31 @@ export function sessionWithRole(role: string) {
   return { ...sessionInfo, organization: own, memberships: [own] };
 }
 
-/** The fake API of the event screens: the answer of `GET /api/v1/events/{id}`. */
+/**
+ * The fake API of the event screens: the answer of `GET /api/v1/events/{id}`. The event has an
+ * empty profile and no fields; `fakeProfile` after it sets a profile.
+ */
 export async function fakeEvent(page: Page, body: unknown, status = 200): Promise<void> {
+  await fakeProfile(page, { facts: [], proposals: [], open_questions: [] }, []);
   await page.route("**/api/v1/events/*", (route) =>
     route.fulfill({
       status,
       contentType: status < 400 ? "application/json" : "application/problem+json",
       body: JSON.stringify(body),
+    }),
+  );
+}
+
+/** The fake API of the event overview: the answers of `GET .../profile` and `GET .../fields`. */
+export async function fakeProfile(page: Page, profile: unknown, fields: unknown[]): Promise<void> {
+  await page.route("**/api/v1/events/*/profile", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(profile) }),
+  );
+  await page.route("**/api/v1/events/*/fields", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: fields }),
     }),
   );
 }

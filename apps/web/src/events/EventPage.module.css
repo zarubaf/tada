@@ -14,4 +14,12 @@
     font-family: var(--font-family-mono);
     font-size: var(--font-size-sm);
   }
+
+  .dates {
+    font-size: var(--font-size-base);
+  }
+
+  .datesLabel {
+    color: var(--color-text-muted);
+  }
 }

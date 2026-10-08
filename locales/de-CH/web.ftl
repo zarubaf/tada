@@ -52,6 +52,36 @@ field-components-passenger_flights = Passagierflüge
 field-components-exhibition = Ausstellung
 field-venue = Ort
 
+## Units, and values as the web client shows them (ADR 0049).
+unit-day = Tage
+unit-person_per_day = Personen pro Tag
+value-yes = Ja
+value-no = Nein
+value-approximate = ca. { $value }
+value-unsupported = Nicht darstellbar
+value-reference-document = Dokument
+value-reference-event = Anlass
+
+## The sheet and the evidence panel.
+sheet-close = Schliessen
+evidence-accepted-by = Angenommen von
+evidence-accepted-at = Angenommen am
+evidence-sources = Belege
+evidence-none = Für diesen Wert gibt es keinen Beleg.
+evidence-captured = erfasst am { $time }
+evidence-page = Seite { $page }
+evidence-source-version = Quellversion { $id }
+evidence-document-version = { $name }, Version { $number }
+evidence-author-unknown = Unbekanntes Mitglied
+evidence-author-ai = KI-Client
+evidence-author-service = Dienst
+
+## The state of knowledge of a value (doc/design/tokens.md).
+knowledge-accepted = Bestätigt
+knowledge-proposed = Vorschlag
+knowledge-assumption = Annahme
+knowledge-unknown = Unbekannt
+
 ## Navigation
 
 not-found-title = Seite nicht gefunden
@@ -128,7 +158,16 @@ event-nav = Anlass
 event-nav-overview = Übersicht
 event-nav-members = Mitglieder
 event-nav-documents = Dokumente
-event-overview-placeholder = Hier erscheint die Übersicht des Anlasses.
+event-overview-loading = Übersicht wird geladen
+event-overview-questions = Offene Fragen
+event-overview-questions-none = Es gibt keine offenen Fragen.
+event-overview-facts = Fakten
+event-overview-evidence = Beleg
+event-overview-evidence-of = Beleg zu { $label }
+event-overview-proposals = Vorschläge
+event-overview-proposals-none = Es gibt keine offenen Vorschläge.
+event-overview-proposals-note = Diese Werte sind noch nicht geprüft. Sie ersetzen keinen bestätigten Wert.
+event-overview-proposed-at = vorgeschlagen am { $time }
 event-loading = Anlass wird geladen
 problem-not-found = Das gibt es nicht, oder Sie dürfen es nicht sehen.
 problem-validation-failed = Die Eingabe ist ungültig.

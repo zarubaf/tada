@@ -1,0 +1,105 @@
+@layer components {
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .overview {
+    display: grid;
+    gap: var(--space-6);
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lg);
+  }
+
+  .subheading {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .questions {
+    display: grid;
+    gap: var(--space-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .id {
+    color: var(--color-text-muted);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-sm);
+  }
+
+  .facts {
+    display: grid;
+    border-block-start: 1px solid var(--color-border-subtle);
+  }
+
+  /* Narrow: the label above the value. Medium and wide: two columns. */
+  .row {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-2) 0;
+    border-block-end: 1px solid var(--color-border-subtle);
+  }
+
+  .row dt {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .row dd {
+    display: flex;
+    margin: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  @media (width >= 40rem) {
+    /* --bp-medium */
+    .row {
+      grid-template-columns: 14rem 1fr;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .row dt {
+      font-size: var(--font-size-md);
+    }
+  }
+
+  .proposals {
+    display: grid;
+    gap: var(--space-2);
+    margin-block-start: var(--space-4);
+  }
+
+  .proposalList {
+    display: grid;
+    gap: var(--space-3);
+    padding: 0;
+    list-style: none;
+  }
+
+  .proposal {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .note {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+}

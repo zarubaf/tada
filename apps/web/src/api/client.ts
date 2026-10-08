@@ -19,6 +19,15 @@ export type OrganizationRole = components["schemas"]["OrganizationRole"];
 export type EventRole = components["schemas"]["EventRole"];
 export type Document = components["schemas"]["Document"];
 export type DocumentVersion = components["schemas"]["DocumentVersion"];
+export type EventProfile = components["schemas"]["EventProfile"];
+export type Fact = components["schemas"]["Fact"];
+export type FactEvidence = components["schemas"]["FactEvidence"];
+export type FactProposal = components["schemas"]["FactProposal"];
+export type OpenQuestion = components["schemas"]["OpenQuestion"];
+export type Field = components["schemas"]["Field"];
+export type Author = components["schemas"]["Author"];
+export type Label = components["schemas"]["Label"];
+export type ValueType = components["schemas"]["ValueType"];
 
 /** The problem codes that the session handles for every call (ADR 0037). */
 export const SESSION_PROBLEMS = ["unauthenticated", "organization-required"] as const;

@@ -18,10 +18,37 @@ function json(status: number, body: unknown, contentType = "application/json") {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": contentType } });
 }
 
+const dateWindowFact = {
+  id: "f1",
+  field_id: "fd1",
+  field_key: "date_window",
+  state: "accepted",
+  value: { type: "date-window", start: "2030-05-01", end: "2030-06-30", granularity: "month" },
+  version: 1,
+  evidence: [],
+  accepted_by: { kind: "member", id: "u1", channel: "web" },
+  accepted_at: "2030-03-01T13:12:00Z",
+};
+
+/** The answer to the profile: the date window is accepted. */
+const profile = { facts: [dateWindowFact], proposals: [], open_questions: [] };
+
+/** `responses` answer the event; the profile and the fields have their own answers. */
 function fakeApi(...responses: Response[]) {
+  return fakeApiWithProfile(() => json(200, profile), ...responses);
+}
+
+function fakeApiWithProfile(answerProfile: () => Response, ...responses: Response[]) {
   const urls: string[] = [];
   const fetch = vi.fn(async (request: Request) => {
-    urls.push(new URL(request.url).pathname);
+    const { pathname } = new URL(request.url);
+    if (pathname.endsWith("/profile")) {
+      return answerProfile();
+    }
+    if (pathname.endsWith("/fields")) {
+      return json(200, { items: [] });
+    }
+    urls.push(pathname);
     const response = responses.shift();
     if (!response) {
       throw new Error("no more responses");
@@ -82,6 +109,37 @@ describe("EventPage", () => {
       "aria-current",
     );
     expect(within(nav).queryByRole("link", { name: "Personen" })).not.toBeInTheDocument();
+  });
+
+  it("shows the date window of the profile in the header with its state", async () => {
+    const { api } = fakeApi(json(200, event));
+    renderAt(`/events/${event.id}`, api);
+
+    const header = (await screen.findByRole("heading", { level: 1 })).closest("header");
+    expect(
+      await within(header as HTMLElement).findByText("Mai 2030 \u2013 Juni 2030"),
+    ).toBeVisible();
+    expect(within(header as HTMLElement).getByText("Bestätigt")).toBeInTheDocument();
+  });
+
+  it("shows Unbekannt in the header when the profile has no date window", async () => {
+    const { api } = fakeApiWithProfile(
+      () => json(200, { facts: [], proposals: [], open_questions: [] }),
+      json(200, event),
+    );
+    renderAt(`/events/${event.id}`, api);
+
+    const header = (await screen.findByRole("heading", { level: 1 })).closest("header");
+    expect(await within(header as HTMLElement).findByText("Unbekannt")).toBeVisible();
+  });
+
+  it("shows the header without dates when the profile fails", async () => {
+    const { api } = fakeApiWithProfile(() => json(500, {}), json(200, event));
+    renderAt(`/events/${event.id}`, api);
+
+    expect(await screen.findByRole("heading", { level: 1, name: event.name })).toBeInTheDocument();
+    expect(screen.queryByText("Unbekannt")).not.toBeInTheDocument();
+    expect(screen.getByText("Platzhalter")).toBeInTheDocument();
   });
 
   it("marks only Mitglieder as current on the members path", async () => {
