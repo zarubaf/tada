@@ -488,6 +488,19 @@ mod review {
             .get(&contributor.cookie, &format!("/api/v1/changesets/{id}"))
             .await;
         assert_eq!(status, StatusCode::FORBIDDEN);
+        // The same rule hides the changeset in the Review Inbox instead of refusing the list.
+        let (status, inbox) = api
+            .get(&contributor.cookie, "/api/v1/changesets?status=open")
+            .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(inbox["items"], json!([]));
+        let (status, _) = api
+            .get(
+                &contributor.cookie,
+                &format!("/api/v1/events/{event}/changesets?status=open"),
+            )
+            .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
         let (status, problem) = api
             .post(
                 &contributor.cookie,
