@@ -7,14 +7,17 @@
 
 Two authenticators are the only ways in: sessions (ADR 0008) and personal API tokens (ADR 0039).
 The token authenticator gives an `AiCaller` only, never a `MemberCaller` to a handler.
+`AiCaller::create` in `caller.rs`, the module of the caller types, builds the member inside the
+`AiCaller`, so the token module never holds a `MemberCaller`.
 The script is a tripwire against an accidental return of development code, not a parser that
 resists a determined bypass. It checks two kinds of rules:
 
 - The names of the removed development code must not return.
-- The structure must stay closed: only the files in CREATORS create a `MemberCaller` with
-  `MemberCaller::create(`, and only the types in ALLOWED_AUTHENTICATORS implement `Authenticator`
-  outside tests. The bodies of `#[cfg(test)] mod name { ... }` blocks and the integration test
-  directories `crates/*/tests/` count as tests.
+- The structure must stay closed outside tests: only `CREATOR` creates a `MemberCaller` with
+  `MemberCaller::create(` and returns it as `Authenticated::Member(...)`, and only the types in
+  ALLOWED_AUTHENTICATORS implement `Authenticator`. Other code can only match
+  `Authenticated::Member(name) =>`. The bodies of `#[cfg(test)] mod name { ... }` blocks and the
+  integration test directories `crates/*/tests/` count as tests.
 
 Out of scope: a trait alias (`use ...Authenticator as A; impl A for X`), and braces inside
 strings or comments.
@@ -28,8 +31,10 @@ from pathlib import Path
 
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent
 FORBIDDEN = ("DevAuthenticator", "dev_authenticator", "ensure_dev_organization")
-CREATORS = ("crates/app/src/session.rs", "crates/app/src/tokens/mod.rs")
+CREATOR = "crates/app/src/session.rs"
 ALLOWED_AUTHENTICATORS = ("SessionAuthenticator", "TokenAuthenticator")
+# `Authenticated::Member(` that is not a match arm `Authenticated::Member(name) =>`.
+MEMBER_RESULT = re.compile(r"Authenticated::Member\((?!\s*\w+\s*\)\s*=>)")
 # The header of an `impl` block, over several lines. Group 1 is the type after `for`.
 IMPL_AUTHENTICATOR = re.compile(r"\bimpl\b[^{;]*?\bAuthenticator\s+for\s+(.*?)\s*(?:\bwhere\b[^{]*)?\{", re.S)
 TEST_MODULE = re.compile(r"#\[cfg\(test\)\]\s*(?:#\[[^\]]*\]\s*)*(?:pub\s+)?mod\s+\w+\s*\{")
@@ -63,9 +68,12 @@ def main(root: Path) -> int:
         text = without_test_modules(path.read_text())
         for number, line in enumerate(text.splitlines(), start=1):
             found.extend(f"{relative}:{number}: {name}" for name in FORBIDDEN if name in line)
-            creator = relative.as_posix() in CREATORS or is_integration_test(relative)
-            if "MemberCaller::create(" in line and not creator:
-                found.append(f"{relative}:{number}: MemberCaller::create outside {', '.join(CREATORS)}")
+            if relative.as_posix() == CREATOR or is_integration_test(relative):
+                continue
+            if "MemberCaller::create(" in line:
+                found.append(f"{relative}:{number}: MemberCaller::create outside {CREATOR}")
+            if MEMBER_RESULT.search(line):
+                found.append(f"{relative}:{number}: Authenticated::Member outside {CREATOR}")
         if is_integration_test(relative):
             continue
         for match in IMPL_AUTHENTICATOR.finditer(text):

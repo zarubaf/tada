@@ -491,9 +491,10 @@ impl Authenticator for TokenAuthenticator {
         {
             self.tokens.touch(scope, token.id, now).await?;
         }
-        let member = MemberCaller::create(stored.user_id, stored.organization_id, role);
         Ok(Authenticated::Ai(AiCaller::create(
-            member,
+            stored.user_id,
+            stored.organization_id,
+            role,
             token.id,
             token.scope,
         )))

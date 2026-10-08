@@ -226,13 +226,33 @@ impl AiCaller {
     /// For tests of other crates only. Production code gets a caller from an authenticator.
     #[cfg(any(test, feature = "testing"))]
     pub fn new(principal: MemberCaller, token_id: ApiTokenId, scope: TokenScope) -> Self {
-        Self::create(principal, token_id, scope)
+        let MemberCaller {
+            user_id,
+            organization_id,
+            role,
+            ..
+        } = principal;
+        Self::create(user_id, organization_id, role, token_id, scope)
     }
 
     /// For the token authenticator of this crate (ADR 0062).
-    pub(crate) fn create(principal: MemberCaller, token_id: ApiTokenId, scope: TokenScope) -> Self {
+    /// It builds the member here, so the token module never holds a `MemberCaller`
+    /// that it could give to a command (`scripts/check_no_dev_auth.py`).
+    pub(crate) fn create(
+        user_id: UserId,
+        organization_id: OrganizationId,
+        role: OrganizationRole,
+        token_id: ApiTokenId,
+        scope: TokenScope,
+    ) -> Self {
         Self {
-            principal: principal.with_request(Channel::ApiToken, None),
+            principal: MemberCaller {
+                user_id,
+                organization_id,
+                role,
+                channel: Channel::ApiToken,
+                request_id: None,
+            },
             token_id,
             scope,
         }
