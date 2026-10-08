@@ -85,7 +85,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 <Route path="/documents/:documentId">
                   <DocumentPage api={api} />
                 </Route>
-                                {/* The settings */}
+                {/* The settings */}
                 <Route path="/settings/members">
                   <SettingsLayout>
                     <MembersPage api={api} />

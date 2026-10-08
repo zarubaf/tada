@@ -89,7 +89,9 @@ export function EventPage({
               {t("event-nav-overview")}
             </NavLink>
             <NavLink to={`${base}/members`}>{t("event-nav-members")}</NavLink>
-            <NavLink to={`${base}/documents`} within="/documents">{t("event-nav-documents")}</NavLink>
+            <NavLink to={`${base}/documents`} within="/documents">
+              {t("event-nav-documents")}
+            </NavLink>
           </SubNav>
           {children}
         </>
