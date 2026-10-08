@@ -22,6 +22,7 @@
 //! A new command that needs the organization lock takes it first, before the lock of a changeset.
 //! The apply of a changeset (`review::lock_targets`) takes kinds 2 to 6 before its checks and writes.
 //! The upload of a document version (`documents::fits_quota`) takes kind 1, then kind 5 or 6.
+//! The approval of a draft version (`DocumentStore::approve`) takes kind 6 only.
 //! An invitation (`members::invite`) takes kind 1, then kind 7. The acceptance of an invitation takes kind 7, then kind 8.
 //! The removal of a member (`members::lock_membership`) takes kind 8, then kind 9, and its cascade deletes rows of kind 10.
 //! A change of an event role (`event_members::lock_member`) takes kind 9.

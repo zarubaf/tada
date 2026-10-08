@@ -9,14 +9,16 @@ use tada_app::audit::AuditEvent;
 use tada_app::blobs::BlobKey;
 use tada_app::caller::OrgScope;
 use tada_app::documents::{
-    DocumentCursor, DocumentStore, DocumentView, DraftStatus, NewUpload, Published, StoredVersion,
-    UploadTarget, UploadedFile, VersionContent, VersionView,
+    Approval, Approved, DocumentCursor, DocumentStore, DocumentView, DraftStatus, NewUpload,
+    Published, StoredDraft, StoredVersion, UploadTarget, UploadedFile, VersionContent, VersionView,
 };
 use tada_app::domain::RecordVersion;
+use tada_app::domain::documents::DraftMarkdown;
 use tada_app::domain::ids::{
-    DocumentId, DocumentVersionId, EventId, LocalIdKind, SourceVersionId, UserId,
+    DocumentId, DocumentVersionId, EventId, FactId, LocalIdKind, SourceVersionId, UserId,
 };
-use tada_app::domain::sources::SourceText;
+use tada_app::domain::sources::{Evidence, Passage, SourceText};
+use tada_app::drafts::{CitedFact, ProvenanceManifest};
 use tada_app::store::StoreError;
 use tada_app::uploads::detect::FileType;
 
@@ -567,6 +569,187 @@ impl DocumentStore for Database {
             Some(row) => Ok(row.stored_upload()?),
             None => Ok(None),
         }
+    }
+
+    async fn draft(
+        &self,
+        scope: OrgScope,
+        id: DocumentVersionId,
+    ) -> Result<Option<StoredDraft>, StoreError> {
+        let mut conn = self.pool.acquire().await.map_err(store_error)?;
+        let Some(row) = versions(&mut conn, scope, None, Some(id)).await?.pop() else {
+            return Ok(None);
+        };
+        if row.kind != DRAFT {
+            return Ok(None);
+        }
+        let organization = scope.organization_id().as_uuid();
+        let markdown = sqlx::query_scalar!(
+            r#"SELECT markdown AS "markdown!" FROM document_version
+               WHERE organization_id = $1 AND id = $2 AND markdown IS NOT NULL"#,
+            organization,
+            id.as_uuid(),
+        )
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(store_error)?;
+        let facts = sqlx::query!(
+            "SELECT fact_id, fact_version_number FROM document_manifest_fact
+             WHERE organization_id = $1 AND document_version_id = $2
+             ORDER BY fact_id, fact_version_number",
+            organization,
+            id.as_uuid(),
+        )
+        .fetch_all(&mut *conn)
+        .await
+        .map_err(store_error)?;
+        // The offsets count characters of the normalized text, and `substr` counts characters too.
+        let sources = sqlx::query!(
+            r#"SELECT m.source_version_id, m.start_offset, m.end_offset,
+                      substr(s.text, m.start_offset + 1, m.end_offset - m.start_offset) AS "quote!"
+               FROM document_manifest_source m
+               JOIN source_version s ON s.organization_id = m.organization_id AND s.id = m.source_version_id
+               WHERE m.organization_id = $1 AND m.document_version_id = $2 AND s.text IS NOT NULL
+               ORDER BY m.source_version_id, m.start_offset, m.end_offset"#,
+            organization,
+            id.as_uuid(),
+        )
+        .fetch_all(&mut *conn)
+        .await
+        .map_err(store_error)?;
+        let offset = |value: i32| {
+            u32::try_from(value).map_err(|_| InvalidRow("document_manifest_source.start_offset"))
+        };
+        let manifest = ProvenanceManifest {
+            facts: facts
+                .into_iter()
+                .map(|row| {
+                    Ok(CitedFact {
+                        fact_id: FactId::from_uuid(row.fact_id),
+                        version: RecordVersion::new(row.fact_version_number)
+                            .ok_or(InvalidRow("document_manifest_fact.fact_version_number"))?,
+                    })
+                })
+                .collect::<Result<_, InvalidRow>>()?,
+            sources: sources
+                .into_iter()
+                .map(|row| {
+                    Ok(Evidence {
+                        source_version_id: SourceVersionId::from_uuid(row.source_version_id),
+                        passage: Passage {
+                            start: offset(row.start_offset)?,
+                            end: offset(row.end_offset)?,
+                            quote: row.quote,
+                            page: None,
+                        },
+                    })
+                })
+                .collect::<Result<_, InvalidRow>>()?,
+        };
+        Ok(Some(StoredDraft {
+            event_id: EventId::from_uuid(row.event_id),
+            markdown: DraftMarkdown::parse(&markdown)
+                .map_err(|_| InvalidRow("document_version.markdown"))?,
+            version: row.view()?,
+            manifest,
+        }))
+    }
+
+    async fn approve(
+        &self,
+        scope: OrgScope,
+        approval: &Approval,
+        audit: &AuditEvent,
+    ) -> Result<Approved, StoreError> {
+        let organization = scope.organization_id().as_uuid();
+        let mut tx = self.pool.begin().await.map_err(store_error)?;
+        // The lock of the document row (kind 6 of the lock order) orders the approval after a new version
+        // of the document and before the next one, because the apply of a draft updates this row too.
+        let Some(target) = sqlx::query!(
+            r#"SELECT d.id, d.version, v.number, v.kind, v.status,
+                      EXISTS (SELECT 1 FROM document_version n
+                              WHERE n.organization_id = v.organization_id AND n.document_id = v.document_id
+                                AND n.number > v.number AND n.status = 'approved') AS "newer_approved!"
+               FROM document_version v
+               JOIN document d ON d.organization_id = v.organization_id AND d.id = v.document_id
+               WHERE v.organization_id = $1 AND v.id = $2
+               FOR UPDATE OF d"#,
+            organization,
+            approval.version_id.as_uuid(),
+        )
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(store_error)?
+        else {
+            return Ok(Approved::NotFound);
+        };
+        if target.kind != DRAFT {
+            return Ok(Approved::NotFound);
+        }
+        if target.version != approval.expected_version.get() {
+            return Ok(Approved::VersionConflict);
+        }
+        let open = target
+            .status
+            .as_deref()
+            .and_then(DraftStatus::parse)
+            .is_some_and(|status| matches!(status, DraftStatus::Draft | DraftStatus::Review));
+        if !open || target.newer_approved {
+            return Ok(Approved::InvalidTransition);
+        }
+        sqlx::query!(
+            "UPDATE document_version SET status = 'superseded'
+             WHERE organization_id = $1 AND document_id = $2 AND status = 'approved'",
+            organization,
+            target.id,
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        sqlx::query!(
+            "UPDATE document_version SET status = 'approved', approved_by = $3, approved_at = $4
+             WHERE organization_id = $1 AND id = $2",
+            organization,
+            approval.version_id.as_uuid(),
+            approval.approved_by.as_uuid(),
+            approval.approved_at.to_sqlx() as _,
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        audit::record(&mut tx, audit).await.map_err(store_error)?;
+        let version = versions(&mut tx, scope, None, Some(approval.version_id))
+            .await?
+            .pop()
+            .ok_or(InvalidRow("document_version"))?
+            .view()?;
+        tx.commit().await.map_err(store_error)?;
+        Ok(Approved::Approved(Box::new(version)))
+    }
+
+    async fn facts_changed(
+        &self,
+        scope: OrgScope,
+        document: DocumentId,
+    ) -> Result<bool, StoreError> {
+        sqlx::query_scalar!(
+            r#"SELECT EXISTS (
+                   SELECT 1 FROM document_manifest_fact m
+                   JOIN fact f ON f.organization_id = m.organization_id AND f.id = m.fact_id
+                   WHERE m.organization_id = $1
+                     AND m.document_version_id = (
+                         SELECT id FROM document_version
+                         WHERE organization_id = $1 AND document_id = $2
+                         ORDER BY number DESC
+                         LIMIT 1)
+                     AND f.version > m.fact_version_number
+               ) AS "changed!""#,
+            scope.organization_id().as_uuid(),
+            document.as_uuid(),
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(store_error)
     }
 }
 

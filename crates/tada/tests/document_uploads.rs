@@ -18,9 +18,9 @@ use tada_app::blobs::ByteStream;
 use tada_app::caller::OrgScope;
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::documents::{
-    DocumentCursor, DocumentReads, DocumentStore, DocumentStores, DocumentView, NewUpload,
-    Published, ReadDocumentError, StoredVersion, UploadError, VersionView, download, get_document,
-    list_documents, list_versions, upload_document, upload_version,
+    Approval, Approved, DocumentCursor, DocumentReads, DocumentStore, DocumentStores, DocumentView,
+    NewUpload, Published, ReadDocumentError, StoredDraft, StoredVersion, UploadError, VersionView,
+    download, get_document, list_documents, list_versions, upload_document, upload_version,
 };
 use tada_app::domain::identity::EventRole;
 use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId, OrganizationId};
@@ -69,6 +69,8 @@ impl Fixture {
     fn reads(&self) -> DocumentReads<'_> {
         DocumentReads {
             identity: &self.test.database,
+            facts: &self.test.database,
+            sources: &self.test.database,
             documents: &self.test.database,
         }
     }
@@ -488,6 +490,31 @@ impl DocumentStore for LostCommit<'_> {
         id: DocumentVersionId,
     ) -> Result<Option<StoredVersion>, StoreError> {
         self.0.version(scope, id).await
+    }
+
+    async fn draft(
+        &self,
+        scope: OrgScope,
+        id: DocumentVersionId,
+    ) -> Result<Option<StoredDraft>, StoreError> {
+        self.0.draft(scope, id).await
+    }
+
+    async fn approve(
+        &self,
+        scope: OrgScope,
+        approval: &Approval,
+        audit: &AuditEvent,
+    ) -> Result<Approved, StoreError> {
+        self.0.approve(scope, approval, audit).await
+    }
+
+    async fn facts_changed(
+        &self,
+        scope: OrgScope,
+        document: DocumentId,
+    ) -> Result<bool, StoreError> {
+        self.0.facts_changed(scope, document).await
     }
 }
 

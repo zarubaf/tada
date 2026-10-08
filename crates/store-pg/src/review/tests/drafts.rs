@@ -11,7 +11,7 @@ use super::*;
 use crate::testing::sqlstate;
 
 /// A draft proposal of the event, for a new document or an existing one.
-fn draft(event: EventId, document: Value, markdown: &str) -> Value {
+pub(super) fn draft(event: EventId, document: Value, markdown: &str) -> Value {
     json!({
         "kind": "create-document-draft",
         "event_id": event.as_uuid(),
@@ -20,12 +20,12 @@ fn draft(event: EventId, document: Value, markdown: &str) -> Value {
     })
 }
 
-fn new_document(id: Uuid) -> Value {
+pub(super) fn new_document(id: Uuid) -> Value {
     json!({"new": {"id": id, "name": "Konzept Open Day"}})
 }
 
 /// Applies a date window to the event and returns the ID of its fact and the changeset with the source text.
-async fn accepted_fact(test: &TestDatabase, open_day: &OpenDay) -> (Uuid, Changeset) {
+pub(super) async fn accepted_fact(test: &TestDatabase, open_day: &OpenDay) -> (Uuid, Changeset) {
     let id = Uuid::now_v7();
     let changeset = propose(
         test,

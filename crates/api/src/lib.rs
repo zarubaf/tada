@@ -671,6 +671,31 @@ mod tests {
         {
             unreachable!()
         }
+
+        async fn draft(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::DocumentVersionId,
+        ) -> Result<Option<tada_app::documents::StoredDraft>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn approve(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::documents::Approval,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::documents::Approved, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn facts_changed(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::DocumentId,
+        ) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
     }
 
     #[derive(Debug)]

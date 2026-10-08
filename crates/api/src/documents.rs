@@ -622,6 +622,8 @@ impl ApiState {
         DocumentReads {
             identity: self.identity.as_ref(),
             documents: self.documents.as_ref(),
+            facts: self.facts.as_ref(),
+            sources: self.sources.as_ref(),
         }
     }
 }

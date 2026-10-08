@@ -286,6 +286,27 @@ impl DocumentStore for Memory {
     ) -> Result<Option<StoredVersion>, StoreError> {
         unreachable!()
     }
+
+    async fn draft(
+        &self,
+        _: OrgScope,
+        _: DocumentVersionId,
+    ) -> Result<Option<crate::documents::StoredDraft>, StoreError> {
+        unreachable!()
+    }
+
+    async fn approve(
+        &self,
+        _: OrgScope,
+        _: &crate::documents::Approval,
+        _: &AuditEvent,
+    ) -> Result<crate::documents::Approved, StoreError> {
+        unreachable!()
+    }
+
+    async fn facts_changed(&self, _: OrgScope, _: DocumentId) -> Result<bool, StoreError> {
+        unreachable!()
+    }
 }
 
 #[async_trait]
