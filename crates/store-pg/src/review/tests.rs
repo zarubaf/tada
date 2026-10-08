@@ -921,3 +921,258 @@ async fn the_new_record_ids_of_proposals_are_taken() {
         ("proposals/0/operation/id", "taken")
     );
 }
+
+/// A field of the event with the key `visitors_total`, written directly, as a concurrent apply would.
+async fn insert_visitors_field(test: &TestDatabase, open_day: &OpenDay) {
+    sqlx::query(
+        "INSERT INTO field_definition (id, organization_id, event_id, key, label_text, value_type,
+                                       description, module, status, created_at)
+         VALUES ($1, $2, $3, 'visitors_total', 'Besucher', '{\"type\": \"boolean\"}', 'Taken.', 'open_day',
+                 'active', now())",
+    )
+    .bind(Uuid::now_v7())
+    .bind(open_day.organization.as_uuid())
+    .bind(open_day.event.as_uuid())
+    .execute(&test.database.pool)
+    .await
+    .unwrap();
+}
+
+fn visitors_field(event: EventId, id: Uuid) -> Value {
+    json!({
+        "kind": "add_field_definition", "id": id, "event_id": event.as_uuid(),
+        "key": "visitors_total", "label": "Besucher total",
+        "value_type": {"type": "quantity", "unit": "person"},
+        "description": "The expected number of visitors of the whole event.",
+        "module": "open_day",
+    })
+}
+
+/// I3: a step that fails after earlier steps wrote leaves nothing: no record, no counter, no result, no audit event.
+#[tokio::test]
+async fn a_step_that_fails_after_earlier_writes_leaves_nothing() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let event = open_day.event;
+    let mia = open_day.manager.user_id();
+    // The proposal IDs give the order of the steps: the question, then the fact, then the field.
+    let (pq, pf, pd) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(event),
+        vec![
+            proposal(
+                pq,
+                question(event, Uuid::now_v7(), mia),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(pf, date_window(event, 5, None), &[], "im Mai 2030"),
+            proposal(pd, visitors_field(event, Uuid::now_v7()), &[], "Besuchern"),
+        ],
+    )
+    .await;
+    insert_visitors_field(&test, &open_day).await;
+
+    let result = apply(&test, &open_day.manager, &changeset, select(&[pq, pf, pd])).await;
+    let Err(ApplyError::Invalid(errors)) = result else {
+        panic!("not invalid: {result:?}");
+    };
+    assert_eq!((errors[0].field.as_ref(), errors[0].code), ("key", "taken"));
+    for table in [
+        "open_question",
+        "local_id_counter",
+        "fact",
+        "fact_version",
+        "evidence_link",
+        "review_result",
+        "audit_event WHERE action <> 'changeset.create'",
+    ] {
+        assert_eq!(count(&test, table).await, 0, "{table}");
+    }
+
+    let applied = apply(&test, &open_day.manager, &changeset, select(&[pq]))
+        .await
+        .unwrap();
+    assert_eq!(applied.local_ids[0].local_number, 1);
+}
+
+/// I3: a fact that a concurrent apply commits between the version check and the write breaks the unique
+/// constraint of the fact; the apply returns a conflict and changes nothing.
+#[tokio::test]
+async fn a_fact_created_by_a_concurrent_apply_after_the_check_is_a_conflict() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let event = open_day.event;
+    let mia = open_day.manager.user_id();
+    let (pq, pf) = (Uuid::now_v7(), Uuid::now_v7());
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(event),
+        vec![
+            proposal(
+                pq,
+                question(event, Uuid::now_v7(), mia),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(pf, date_window(event, 5, None), &[], "im Mai 2030"),
+        ],
+    )
+    .await;
+    // The write of the question, the first step, inserts the fact as the concurrent apply would.
+    let race = format!(
+        "CREATE FUNCTION test_race() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN
+             INSERT INTO fact (id, organization_id, event_id, field_id, version)
+             VALUES (gen_random_uuid(), NEW.organization_id, NEW.event_id, '{}', 1);
+             RETURN NEW;
+         END;
+         $$;
+         CREATE TRIGGER test_race AFTER INSERT ON open_question
+             FOR EACH ROW EXECUTE FUNCTION test_race();",
+        core_field("date_window"),
+    );
+    sqlx::raw_sql(sqlx::AssertSqlSafe(race))
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
+
+    let result = apply(&test, &open_day.manager, &changeset, select(&[pq, pf])).await;
+    let Err(ApplyError::Conflict(conflicts)) = result else {
+        panic!("not a conflict: {result:?}");
+    };
+    assert_eq!(conflicts, [ProposalId::from_uuid(pf)]);
+    for table in ["open_question", "fact", "fact_version"] {
+        assert_eq!(count(&test, table).await, 0, "{table}");
+    }
+    assert_eq!(
+        status_of(&test, &open_day, changeset.id, pf).await,
+        ProposalStatus::Conflict
+    );
+    assert_eq!(
+        status_of(&test, &open_day, changeset.id, pq).await,
+        ProposalStatus::Open
+    );
+}
+
+fn duration(event: EventId, days: &str, expected_version: Option<i64>) -> Value {
+    json!({
+        "kind": "set_fact", "event_id": event.as_uuid(), "field_id": core_field("duration_days"),
+        "state": {"state": "accepted", "value": {"type": "quantity", "min": days, "max": days}},
+        "expected_version": expected_version,
+    })
+}
+
+/// I1: two applies that change the same two facts in opposite orders do not deadlock: one applies, and the other
+/// waits for it and then conflicts. The overlap depends on the scheduler, so a run cannot force it.
+#[tokio::test]
+async fn two_applies_of_the_same_facts_in_opposite_orders_do_not_deadlock() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let event = open_day.event;
+    let (d0, w0) = (Uuid::now_v7(), Uuid::now_v7());
+    let setup = propose(
+        &test,
+        &open_day.contributor,
+        Some(event),
+        vec![
+            proposal(d0, duration(event, "1", None), &[], "Das Open Day"),
+            proposal(w0, date_window(event, 5, None), &[], "im Mai 2030"),
+        ],
+    )
+    .await;
+    apply(&test, &open_day.manager, &setup, select(&[d0, w0]))
+        .await
+        .unwrap();
+
+    // The proposal IDs give the order of the steps: duration then date in A, date then duration in B.
+    let (a1, a2) = (Uuid::now_v7(), Uuid::now_v7());
+    let a = propose(
+        &test,
+        &open_day.contributor,
+        Some(event),
+        vec![
+            proposal(a1, duration(event, "2", Some(1)), &[], "Das Open Day"),
+            proposal(a2, date_window(event, 6, Some(1)), &[], "im Mai 2030"),
+        ],
+    )
+    .await;
+    let (b1, b2) = (Uuid::now_v7(), Uuid::now_v7());
+    let b = propose(
+        &test,
+        &open_day.contributor,
+        Some(event),
+        vec![
+            proposal(b1, date_window(event, 7, Some(1)), &[], "im Mai 2030"),
+            proposal(b2, duration(event, "3", Some(1)), &[], "Das Open Day"),
+        ],
+    )
+    .await;
+    let (first, second) = tokio::join!(
+        apply(&test, &open_day.manager, &a, select(&[a1, a2])),
+        apply(&test, &open_day.manager, &b, select(&[b1, b2])),
+    );
+    let outcomes = [&first, &second].map(|result| match result {
+        Ok(_) => "applied",
+        Err(ApplyError::Conflict(_)) => "conflict",
+        Err(error) => panic!("neither applied nor a conflict: {error:?}"),
+    });
+    let mut sorted = outcomes;
+    sorted.sort_unstable();
+    assert_eq!(sorted, ["applied", "conflict"]);
+    assert_eq!(count(&test, "fact_version").await, 4);
+}
+
+/// A deprecated field takes no new choice, and a second deprecation conflicts (ADR 0049).
+#[tokio::test]
+async fn a_deprecated_field_takes_no_choice_and_no_second_deprecation() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let event = open_day.event.as_uuid();
+    let (field, add) = (Uuid::now_v7(), Uuid::now_v7());
+    let new_field = json!({
+        "kind": "add_field_definition", "id": field, "event_id": event,
+        "key": "runway_surface", "label": "Pistenbelag",
+        "value_type": {"type": "choice", "values": [{"key": "grass", "label": "Gras"}]},
+        "description": "The surface of the runway.", "module": "aviation",
+    });
+    let setup = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(add, new_field, &[], "Das Open Day")],
+    )
+    .await;
+    apply(&test, &open_day.manager, &setup, select(&[add]))
+        .await
+        .unwrap();
+
+    let deprecate = json!({"kind": "deprecate_field", "event_id": event, "field_id": field});
+    let choice = json!({
+        "kind": "add_choice_value", "event_id": event, "field_id": field,
+        "key": "asphalt", "label": "Asphalt",
+    });
+    let mut changesets = Vec::new();
+    for operation in [deprecate.clone(), deprecate, choice] {
+        let id = Uuid::now_v7();
+        let changeset = propose(
+            &test,
+            &open_day.contributor,
+            Some(open_day.event),
+            vec![proposal(id, operation, &[], "Das Open Day")],
+        )
+        .await;
+        changesets.push((changeset, id));
+    }
+    let (first, id) = &changesets[0];
+    apply(&test, &open_day.manager, first, select(&[*id]))
+        .await
+        .unwrap();
+    for (changeset, id) in &changesets[1..] {
+        let result = apply(&test, &open_day.manager, changeset, select(&[*id])).await;
+        assert!(matches!(result, Err(ApplyError::Conflict(_))), "{result:?}");
+    }
+}

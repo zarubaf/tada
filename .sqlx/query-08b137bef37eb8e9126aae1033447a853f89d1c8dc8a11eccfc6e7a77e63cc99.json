@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT f.id FROM fact f\n         JOIN unnest($2::uuid[], $3::uuid[]) AS t (event_id, field_id)\n           ON f.event_id = t.event_id AND f.field_id = t.field_id\n         WHERE f.organization_id = $1\n         ORDER BY f.id\n         FOR UPDATE OF f",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "fact",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "08b137bef37eb8e9126aae1033447a853f89d1c8dc8a11eccfc6e7a77e63cc99"
+}

@@ -13,7 +13,7 @@ use sqlx::types::Uuid;
 use tada_app::caller::{Actor, OrgScope};
 use tada_app::domain::RecordVersion;
 use tada_app::domain::events::Event;
-use tada_app::domain::facts::{ChoiceValue, FactState, Label, ValueType, Valued};
+use tada_app::domain::facts::{ChoiceValue, FactState, FieldStatus, Label, ValueType, Valued};
 use tada_app::domain::ids::{
     ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, SourceVersionId,
 };
@@ -81,6 +81,9 @@ impl ReviewStore for Database {
         if !lock_open(&mut tx, scope, plan.changeset_id, &proposals).await? {
             return Ok(ApplyOutcome::NotOpen);
         }
+        lock_targets(&mut tx, scope, &plan.steps)
+            .await
+            .map_err(store_error)?;
         let conflicts = check_versions(&mut tx, scope, &plan.steps)
             .await
             .map_err(store_error)?;
@@ -104,6 +107,10 @@ impl ReviewStore for Database {
                         .constraint()
                         .is_some_and(|name| RECORD_CONSTRAINTS.contains(&name)) =>
                 {
+                    return Ok(ApplyOutcome::Conflict(vec![step.proposal_id]));
+                }
+                // The target of the step changed after the check.
+                Err(sqlx::Error::RowNotFound) => {
                     return Ok(ApplyOutcome::Conflict(vec![step.proposal_id]));
                 }
                 Err(error) => return Err(store_error(error)),
@@ -212,6 +219,60 @@ async fn lock_open(
     Ok(!reviewed)
 }
 
+/// Locks the existing field definitions and facts that the plan uses or changes, before any check.
+/// Each kind is locked in the order of its IDs, fields first, so two applies take their row locks in the same
+/// order and cannot deadlock on them. The plan order follows the dependencies and the client IDs.
+/// Inserts of new rows can still wait on each other; a deadlock there maps to `Unavailable`, so the client retries.
+async fn lock_targets(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    steps: &[ApplyStep],
+) -> Result<(), sqlx::Error> {
+    let mut fields = Vec::new();
+    let (mut fact_events, mut fact_fields) = (Vec::new(), Vec::new());
+    for step in steps {
+        match &step.operation {
+            Operation::SetFact {
+                event_id, field_id, ..
+            } => {
+                fields.push(field_id.as_uuid());
+                fact_events.push(event_id.as_uuid());
+                fact_fields.push(field_id.as_uuid());
+            }
+            Operation::AddChoiceValue { field_id, .. }
+            | Operation::DeprecateField { field_id, .. } => {
+                fields.push(field_id.as_uuid());
+            }
+            Operation::CreateEvent { .. }
+            | Operation::AddFieldDefinition { .. }
+            | Operation::CreateOpenQuestion { .. } => {}
+        }
+    }
+    let organization = scope.organization_id().as_uuid();
+    // Shipped fields have no organization and change only with `tada migrate`, so they need no lock.
+    sqlx::query_scalar!(
+        "SELECT id FROM field_definition WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+        organization,
+        &fields,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    sqlx::query_scalar!(
+        "SELECT f.id FROM fact f
+         JOIN unnest($2::uuid[], $3::uuid[]) AS t (event_id, field_id)
+           ON f.event_id = t.event_id AND f.field_id = t.field_id
+         WHERE f.organization_id = $1
+         ORDER BY f.id
+         FOR UPDATE OF f",
+        organization,
+        &fact_events,
+        &fact_fields,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// The proposals whose targets do not have the expected versions (ADR 0050).
 /// A record that an earlier step of the plan creates counts as new, and a fact that an earlier step sets
 /// counts with its new version, so the checks of all steps run before the first write.
@@ -225,92 +286,99 @@ async fn check_versions(
     let mut fact_versions: HashMap<(EventId, FieldDefinitionId), Option<i64>> = HashMap::new();
     let mut conflicts = Vec::new();
     for step in steps {
-        let matches =
-            match &step.operation {
-                Operation::CreateEvent { id, .. } => {
-                    // An event ID is unique in the whole installation (ADR 0038).
-                    !sqlx::query_scalar!(
-                        r#"SELECT EXISTS (SELECT 1 FROM event WHERE id = $1) AS "exists!""#,
-                        id.as_uuid(),
-                    )
-                    .fetch_one(&mut *conn)
-                    .await?
-                }
-                Operation::AddFieldDefinition { id, .. } => !sqlx::query_scalar!(
+        let matches = match &step.operation {
+            Operation::CreateEvent { id, .. } => {
+                // An event ID is unique in the whole installation (ADR 0038).
+                !sqlx::query_scalar!(
+                    r#"SELECT EXISTS (SELECT 1 FROM event WHERE id = $1) AS "exists!""#,
+                    id.as_uuid(),
+                )
+                .fetch_one(&mut *conn)
+                .await?
+            }
+            Operation::AddFieldDefinition { id, .. } => {
+                !sqlx::query_scalar!(
                     r#"SELECT EXISTS (SELECT 1 FROM field_definition WHERE id = $1) AS "exists!""#,
                     id.as_uuid(),
                 )
                 .fetch_one(&mut *conn)
-                .await?,
-                Operation::CreateOpenQuestion { id, .. } => {
-                    !sqlx::query_scalar!(
-                        r#"SELECT EXISTS (SELECT 1 FROM open_question WHERE id = $1) AS "exists!""#,
-                        id.as_uuid(),
-                    )
-                    .fetch_one(&mut *conn)
-                    .await?
-                }
-                Operation::SetFact {
-                    event_id,
-                    field_id,
-                    expected_version,
-                    ..
-                } => {
-                    let new_scope = new_records.contains(&event_id.as_uuid())
-                        || new_records.contains(&field_id.as_uuid());
-                    let current = match fact_versions.get(&(*event_id, *field_id)) {
-                        Some(version) => *version,
-                        None if new_scope => None,
-                        None => {
-                            sqlx::query_scalar!(
-                                "SELECT version FROM fact
+                .await?
+            }
+            Operation::CreateOpenQuestion { id, .. } => {
+                !sqlx::query_scalar!(
+                    r#"SELECT EXISTS (SELECT 1 FROM open_question WHERE id = $1) AS "exists!""#,
+                    id.as_uuid(),
+                )
+                .fetch_one(&mut *conn)
+                .await?
+            }
+            Operation::SetFact {
+                event_id,
+                field_id,
+                expected_version,
+                ..
+            } => {
+                let new_scope = new_records.contains(&event_id.as_uuid())
+                    || new_records.contains(&field_id.as_uuid());
+                let current = match fact_versions.get(&(*event_id, *field_id)) {
+                    Some(version) => *version,
+                    None if new_scope => None,
+                    None => {
+                        sqlx::query_scalar!(
+                            "SELECT version FROM fact
                              WHERE organization_id = $1 AND event_id = $2 AND field_id = $3
                              FOR UPDATE",
-                                organization,
-                                event_id.as_uuid(),
-                                field_id.as_uuid(),
-                            )
-                            .fetch_optional(&mut *conn)
-                            .await?
-                        }
-                    };
-                    // A deprecated field takes no new facts (ADR 0049).
-                    let active = new_records.contains(&field_id.as_uuid())
+                            organization,
+                            event_id.as_uuid(),
+                            field_id.as_uuid(),
+                        )
+                        .fetch_optional(&mut *conn)
+                        .await?
+                    }
+                };
+                // A deprecated field takes no new facts (ADR 0049). `lock_targets` locked a field of the event.
+                let active = new_records.contains(&field_id.as_uuid())
                         || sqlx::query_scalar!(
                             r#"SELECT EXISTS (
-                               SELECT 1 FROM field_definition WHERE id = $1 AND status = 'active'
-                           ) AS "active!""#,
+                                   SELECT 1 FROM field_definition
+                                   WHERE id = $1 AND status = 'active'
+                                     AND (event_id IS NULL OR (organization_id = $2 AND event_id = $3))
+                               ) AS "active!""#,
                             field_id.as_uuid(),
+                            organization,
+                            event_id.as_uuid(),
                         )
                         .fetch_one(&mut *conn)
                         .await?;
-                    fact_versions.insert((*event_id, *field_id), Some(current.unwrap_or(0) + 1));
-                    active && current == expected_version.map(RecordVersion::get)
-                }
-                Operation::AddChoiceValue {
-                    event_id,
-                    field_id,
-                    key,
-                    ..
-                } => {
-                    if new_records.contains(&field_id.as_uuid()) {
-                        true
-                    } else {
-                        match field_value_type(conn, scope, *event_id, *field_id).await? {
-                            Some(ValueType::Choice { values, .. }) => {
-                                !values.iter().any(|value| &value.key == key)
-                            }
-                            _ => false,
+                fact_versions.insert((*event_id, *field_id), Some(current.unwrap_or(0) + 1));
+                active && current == expected_version.map(RecordVersion::get)
+            }
+            Operation::AddChoiceValue {
+                event_id,
+                field_id,
+                key,
+                ..
+            } => {
+                // A deprecated field takes no new choices either.
+                if new_records.contains(&field_id.as_uuid()) {
+                    true
+                } else {
+                    match field_of_event(conn, scope, *event_id, *field_id).await? {
+                        Some((ValueType::Choice { values, .. }, FieldStatus::Active)) => {
+                            !values.iter().any(|value| &value.key == key)
                         }
+                        _ => false,
                     }
                 }
-                Operation::DeprecateField { event_id, field_id } => {
-                    new_records.contains(&field_id.as_uuid())
-                        || field_value_type(conn, scope, *event_id, *field_id)
-                            .await?
-                            .is_some()
-                }
-            };
+            }
+            Operation::DeprecateField { event_id, field_id } => {
+                new_records.contains(&field_id.as_uuid())
+                    || matches!(
+                        field_of_event(conn, scope, *event_id, *field_id).await?,
+                        Some((_, FieldStatus::Active))
+                    )
+            }
+        };
         if let Some(record) = step.operation.new_record() {
             new_records.insert(record.as_uuid());
         }
@@ -321,15 +389,15 @@ async fn check_versions(
     Ok(conflicts)
 }
 
-/// The value type of the field of the event, locked for the rest of the transaction, or `None`.
-async fn field_value_type(
+/// The value type and the status of the field of the event, locked for the rest of the transaction, or `None`.
+async fn field_of_event(
     conn: &mut PgConnection,
     scope: OrgScope,
     event: EventId,
     field: FieldDefinitionId,
-) -> Result<Option<ValueType>, sqlx::Error> {
-    let json = sqlx::query_scalar!(
-        "SELECT value_type FROM field_definition
+) -> Result<Option<(ValueType, FieldStatus)>, sqlx::Error> {
+    let row = sqlx::query!(
+        "SELECT value_type, status FROM field_definition
          WHERE organization_id = $1 AND event_id = $2 AND id = $3
          FOR UPDATE",
         scope.organization_id().as_uuid(),
@@ -338,9 +406,19 @@ async fn field_value_type(
     )
     .fetch_optional(&mut *conn)
     .await?;
-    json.map(|json| values::value_type_from_json(&json))
-        .transpose()
-        .map_err(|error| sqlx::Error::Decode(Box::new(error)))
+    let decode = |error: InvalidRow| sqlx::Error::Decode(Box::new(error));
+    row.map(|row| {
+        let status = match row.status.as_str() {
+            "active" => FieldStatus::Active,
+            "deprecated" => FieldStatus::Deprecated,
+            _ => return Err(decode(InvalidRow("field_definition.status"))),
+        };
+        Ok((
+            values::value_type_from_json(&row.value_type).map_err(decode)?,
+            status,
+        ))
+    })
+    .transpose()
 }
 
 /// Writes one step and its review result. Returns the event-local ID of a new open question.
@@ -405,10 +483,13 @@ async fn write_step(
             key,
             label,
         } => {
-            let Some(ValueType::Choice {
-                mut values,
-                multiple,
-            }) = field_value_type(conn, scope, *event_id, *field_id).await?
+            let Some((
+                ValueType::Choice {
+                    mut values,
+                    multiple,
+                },
+                _,
+            )) = field_of_event(conn, scope, *event_id, *field_id).await?
             else {
                 return Err(sqlx::Error::RowNotFound);
             };
@@ -469,7 +550,7 @@ async fn write_step(
             event_id,
             field_id,
             state,
-            ..
+            expected_version,
         } => {
             let (source, passages) = match &step.evidence {
                 StepEvidence::Proposal(passages) => (plan.source_version_id, passages.clone()),
@@ -483,6 +564,7 @@ async fn write_step(
             let fact = FactWrite {
                 event: *event_id,
                 field: *field_id,
+                expected: *expected_version,
                 state,
                 source,
                 passages: &passages,
@@ -530,6 +612,10 @@ async fn next_local_number(
 
 /// Stores an edited state as a source version of the kind `review` with the reviewer as author (ADR 0050).
 /// Returns it with the passage of its whole text, the evidence of the edited value.
+///
+/// The text is the JSON object `{"state", "value", "approximate"}` with the columns of `values::fact_state_to_columns`.
+/// A source version never changes, so this format is a stable contract: a change of the value codec must keep it,
+/// or add a new format next to it that readers tell apart.
 async fn insert_review_text(
     conn: &mut PgConnection,
     scope: OrgScope,
@@ -564,6 +650,8 @@ async fn insert_review_text(
 struct FactWrite<'a> {
     event: EventId,
     field: FieldDefinitionId,
+    /// The current version that the step expects; `None` means that the fact does not exist yet.
+    expected: Option<RecordVersion>,
     state: &'a FactState<Valued>,
     source: SourceVersionId,
     passages: &'a [Passage],
@@ -580,34 +668,32 @@ async fn insert_fact_version(
     let FactWrite {
         event,
         field,
+        expected,
         state,
         source,
         passages,
     } = fact;
     let organization = scope.organization_id().as_uuid();
     let now = plan.now.to_sqlx();
-    let current = sqlx::query!(
-        "SELECT id, version FROM fact
-         WHERE organization_id = $1 AND event_id = $2 AND field_id = $3
-         FOR UPDATE",
-        organization,
-        event.as_uuid(),
-        field.as_uuid(),
-    )
-    .fetch_optional(&mut *conn)
-    .await?;
-    let (fact, number) = match current {
-        Some(fact) => {
-            let number = fact.version + 1;
-            sqlx::query!(
-                "UPDATE fact SET version = $3 WHERE organization_id = $1 AND id = $2",
+    // The write repeats the expected version: a fact that a concurrent apply created after the check breaks the
+    // unique constraint of the insert, and a changed version updates no row (`RowNotFound`). Both are conflicts.
+    let (fact, number) = match expected {
+        Some(expected) => {
+            let number = expected.get() + 1;
+            let fact = sqlx::query_scalar!(
+                "UPDATE fact SET version = $5
+                 WHERE organization_id = $1 AND event_id = $2 AND field_id = $3 AND version = $4
+                 RETURNING id",
                 organization,
-                fact.id,
+                event.as_uuid(),
+                field.as_uuid(),
+                expected.get(),
                 number,
             )
-            .execute(&mut *conn)
-            .await?;
-            (fact.id, number)
+            .fetch_optional(&mut *conn)
+            .await?
+            .ok_or(sqlx::Error::RowNotFound)?;
+            (fact, number)
         }
         None => {
             let id = Uuid::now_v7();
