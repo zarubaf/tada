@@ -13,7 +13,7 @@ import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { type Column, DataTable } from "../ui/DataTable";
-import { useFocusAfterCommit } from "../ui/focus";
+import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Select } from "../ui/Select";
@@ -67,7 +67,9 @@ export function EventMembersPage({ api }: { api: Api }) {
   const [busy, setBusy] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
+  const { retried, retry } = useRetry(() => heading.current);
 
+  /** Resolves to true when the list loaded. */
   const load = useCallback(async () => {
     try {
       const { data, error } = await api.GET("/api/v1/events/{event_id}/memberships", {
@@ -78,8 +80,10 @@ export function EventMembersPage({ api }: { api: Api }) {
           ? { kind: "loaded", items: data.items }
           : { kind: "failed", message: problemMessage(error), requestId: error?.request_id },
       );
+      return data !== undefined;
     } catch {
       setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+      return false;
     }
   }, [api, eventId]);
 
@@ -90,21 +94,23 @@ export function EventMembersPage({ api }: { api: Api }) {
   const items = state.kind === "loaded" ? state.items : [];
   const loaded = state.kind === "loaded";
 
+  /** Resolves to true when the members of the organization loaded. */
   const loadOrganization = useCallback(async () => {
     try {
       const result = await loadOrganizationMembers(api);
       if ("members" in result) {
         setOrganization(result.members);
         setOrganizationFailure(undefined);
-      } else {
-        setOrganizationFailure({
-          message: problemMessage(result.error),
-          requestId: result.error?.request_id,
-        });
+        return true;
       }
+      setOrganizationFailure({
+        message: problemMessage(result.error),
+        requestId: result.error?.request_id,
+      });
     } catch {
       setOrganizationFailure({ message: problemMessage(undefined), requestId: undefined });
     }
+    return false;
   }, [api]);
 
   useEffect(() => {
@@ -229,10 +235,13 @@ export function EventMembersPage({ api }: { api: Api }) {
       <InlineError
         message={state.message}
         requestId={state.requestId}
-        onRetry={() => {
-          setState({ kind: "loading" });
-          void load();
-        }}
+        onRetry={() =>
+          retry(() => {
+            setState({ kind: "loading" });
+            return load();
+          })
+        }
+        announce={retried ? "focus" : "alert"}
       />
     );
   }
@@ -254,7 +263,10 @@ export function EventMembersPage({ api }: { api: Api }) {
         eventId={eventId}
         candidates={organization && addableMembers(organization, items)}
         organizationFailure={organizationFailure}
-        onRetry={() => void loadOrganization()}
+        onRetry={() => {
+          setOrganizationFailure(undefined);
+          return loadOrganization();
+        }}
         onAdded={(added) =>
           setState((current) =>
             current.kind === "loaded"
@@ -299,7 +311,8 @@ function AddMember({
   /** Nothing while the organization members load. */
   candidates: OrganizationMember[] | undefined;
   organizationFailure: Failure | undefined;
-  onRetry: () => void;
+  /** Loads the members of the organization again; resolves to true when they loaded. */
+  onRetry: () => Promise<boolean>;
   onAdded: (added: EventMembership) => void;
   onFailed: (result: { error?: Problem | undefined; response?: Response }) => void;
   onStart: () => void;
@@ -308,14 +321,17 @@ function AddMember({
   const [role, setRole] = useState<EventRole>("event-contributor");
   const [pending, setPending] = useState(false);
   const section = useRef<HTMLElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
+  const { retried, retry } = useRetry(() => heading.current);
 
   if (organizationFailure) {
     return (
       <InlineError
         message={organizationFailure.message}
         requestId={organizationFailure.requestId}
-        onRetry={onRetry}
+        onRetry={() => retry(onRetry)}
+        announce={retried ? "focus" : "alert"}
       />
     );
   }
@@ -355,7 +371,7 @@ function AddMember({
 
   return (
     <section ref={section} className={styles.add} aria-labelledby="members-add-title">
-      <h2 id="members-add-title" tabIndex={-1} className={styles.heading}>
+      <h2 id="members-add-title" ref={heading} tabIndex={-1} className={styles.heading}>
         {t("event-members-add-title")}
       </h2>
       {candidates.length === 0 ? (

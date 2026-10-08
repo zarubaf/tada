@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useRef, useState } from "react";
 import { describe, expect, it } from "vitest";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { firstInvalidField, useFocusAfterCommit } from "./focus";
+import { firstInvalidField, useFocusAfterCommit, useRetry } from "./focus";
 
 /** Two frames: more than the one frame in which React Aria restores focus. */
 const afterRestore = () =>
@@ -120,6 +120,54 @@ describe("useFocusAfterCommit", () => {
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     await afterRestore();
     expect(screen.getByRole("heading", { name: "List" })).toHaveFocus();
+  });
+});
+
+describe("useRetry", () => {
+  function Area({ answers }: { answers: boolean[] }) {
+    const [loaded, setLoaded] = useState(false);
+    const heading = useRef<HTMLHeadingElement>(null);
+    const { retried, retry } = useRetry(() => heading.current);
+    return (
+      <div>
+        <h2 ref={heading} tabIndex={-1}>
+          Area
+        </h2>
+        {!loaded && (
+          <div role="alert" tabIndex={-1} data-retried={retried}>
+            <button
+              type="button"
+              onClick={() =>
+                retry(async () => {
+                  const ok = answers.shift() ?? false;
+                  setLoaded(ok);
+                  return ok;
+                })
+              }
+            >
+              Retry
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  it("marks the next failure as a failure after a retry", async () => {
+    render(<Area answers={[false]} />);
+    expect(screen.getByRole("alert")).toHaveAttribute("data-retried", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(screen.getByRole("alert")).toHaveAttribute("data-retried", "true");
+  });
+
+  it("moves focus to the target when the area loads", async () => {
+    render(<Area answers={[true]} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Area" })).toHaveFocus());
   });
 });
 

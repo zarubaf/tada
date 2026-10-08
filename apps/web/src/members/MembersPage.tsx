@@ -15,7 +15,7 @@ import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
-import { useFocusAfterCommit } from "../ui/focus";
+import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { PageTitle } from "../ui/Page";
@@ -32,11 +32,9 @@ interface Loadable<T> {
   nextCursor?: string | undefined;
   message?: string;
   requestId?: string | undefined;
-  /** Counts the retries, so that a failure after a retry takes focus. */
-  attempts: number;
 }
 
-const loading = <T,>(attempts = 0): Loadable<T> => ({ kind: "loading", items: [], attempts });
+const loading = <T,>(): Loadable<T> => ({ kind: "loading", items: [] });
 
 /** The state of the request for the next page of members. */
 type More =
@@ -70,65 +68,58 @@ export function MembersPage({ api }: { api: Api }) {
   const invitationsHeading = useRef<HTMLHeadingElement>(null);
   const alert = useRef<HTMLParagraphElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
+  const membersRetry = useRetry(() => membersHeading.current);
+  const invitationsRetry = useRetry(() => invitationsHeading.current);
 
   /** The first page. A version conflict and a retry load the list again from here. */
-  const loadMembers = useCallback(
-    async (attempts: number) => {
-      try {
-        const { data, error } = await api.GET("/api/v1/members");
-        setMembers(
-          data
-            ? {
-                kind: "loaded",
-                items: data.items,
-                nextCursor: data.next_cursor ?? undefined,
-                attempts,
-              }
-            : {
-                kind: "failed",
-                items: [],
-                message: problemMessage(error),
-                requestId: error?.request_id,
-                attempts,
-              },
-        );
-        setMore({ kind: "idle" });
-      } catch {
-        setMembers({ kind: "failed", items: [], message: problemMessage(undefined), attempts });
-      }
-    },
-    [api],
-  );
+  const loadMembers = useCallback(async () => {
+    try {
+      const { data, error } = await api.GET("/api/v1/members");
+      setMembers(
+        data
+          ? { kind: "loaded", items: data.items, nextCursor: data.next_cursor ?? undefined }
+          : {
+              kind: "failed",
+              items: [],
+              message: problemMessage(error),
+              requestId: error?.request_id,
+            },
+      );
+      setMore({ kind: "idle" });
+      return data !== undefined;
+    } catch {
+      setMembers({ kind: "failed", items: [], message: problemMessage(undefined) });
+      return false;
+    }
+  }, [api]);
 
-  const loadInvitations = useCallback(
-    async (attempts: number) => {
-      try {
-        const { data, error } = await api.GET("/api/v1/invitations");
-        setInvitations(
-          data
-            ? { kind: "loaded", items: data.items, attempts }
-            : {
-                kind: "failed",
-                items: [],
-                message: problemMessage(error),
-                requestId: error?.request_id,
-                attempts,
-              },
-        );
-      } catch {
-        setInvitations({ kind: "failed", items: [], message: problemMessage(undefined), attempts });
-      }
-    },
-    [api],
-  );
+  const loadInvitations = useCallback(async () => {
+    try {
+      const { data, error } = await api.GET("/api/v1/invitations");
+      setInvitations(
+        data
+          ? { kind: "loaded", items: data.items }
+          : {
+              kind: "failed",
+              items: [],
+              message: problemMessage(error),
+              requestId: error?.request_id,
+            },
+      );
+      return data !== undefined;
+    } catch {
+      setInvitations({ kind: "failed", items: [], message: problemMessage(undefined) });
+      return false;
+    }
+  }, [api]);
 
   useEffect(() => {
-    void loadMembers(0);
+    void loadMembers();
   }, [loadMembers]);
 
   useEffect(() => {
     if (manages) {
-      void loadInvitations(0);
+      void loadInvitations();
     }
   }, [manages, loadInvitations]);
 
@@ -145,11 +136,11 @@ export function MembersPage({ api }: { api: Api }) {
     // The failure may be far above the button that the member pressed.
     alert.current?.scrollIntoView?.({ block: "nearest" });
     if (code === "record-version-conflict") {
-      void loadMembers(members.attempts);
+      void loadMembers();
     }
     if (code === "not-found" && confirming?.kind === "invitation") {
       // The person accepted the invitation in the meantime.
-      void loadInvitations(invitations.attempts);
+      void loadInvitations();
     }
   };
 
@@ -298,16 +289,16 @@ export function MembersPage({ api }: { api: Api }) {
     },
   ];
 
-  const retryMembers = () => {
-    const attempts = members.attempts + 1;
-    setMembers(loading(attempts));
-    void loadMembers(attempts);
-  };
-  const retryInvitations = () => {
-    const attempts = invitations.attempts + 1;
-    setInvitations(loading(attempts));
-    void loadInvitations(attempts);
-  };
+  const retryMembers = () =>
+    membersRetry.retry(() => {
+      setMembers(loading());
+      return loadMembers();
+    });
+  const retryInvitations = () =>
+    invitationsRetry.retry(() => {
+      setInvitations(loading());
+      return loadInvitations();
+    });
 
   const revoking = confirming?.kind === "invitation";
   const name = confirming?.item.display_name ?? "";
@@ -354,7 +345,7 @@ export function MembersPage({ api }: { api: Api }) {
             message={members.message ?? ""}
             requestId={members.requestId}
             onRetry={retryMembers}
-            announce={members.attempts > 0 ? "focus" : "alert"}
+            announce={membersRetry.retried ? "focus" : "alert"}
           />
         )}
         {members.kind === "loaded" && (
@@ -398,7 +389,7 @@ export function MembersPage({ api }: { api: Api }) {
               message={invitations.message ?? ""}
               requestId={invitations.requestId}
               onRetry={retryInvitations}
-              announce={invitations.attempts > 0 ? "focus" : "alert"}
+              announce={invitationsRetry.retried ? "focus" : "alert"}
             />
           )}
           {invitations.kind === "loaded" && invitations.items.length === 0 && (
@@ -433,7 +424,7 @@ export function MembersPage({ api }: { api: Api }) {
                 items: [...invitations.items.filter((i) => i.id !== invitation.id), invitation],
               });
             } else {
-              void loadInvitations(invitations.attempts);
+              void loadInvitations();
             }
           }}
         />

@@ -81,6 +81,52 @@ describe("EventsPage", () => {
     expect(await screen.findByText("FLY28")).toBeInTheDocument();
   });
 
+  it("moves focus to the alert when a retry fails, and to the heading when it works", async () => {
+    const unavailable = () =>
+      json(
+        503,
+        { code: "unavailable", status: 503, request_id: "x", type: "", title: "", instance: "" },
+        "application/problem+json",
+      );
+    const { api } = fakeApi(
+      unavailable(),
+      unavailable(),
+      json(200, { items: [event("FLY28", "Fly-in 2028")] }),
+    );
+    render(<EventsPage api={api} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Erneut versuchen" }));
+    await vi.waitFor(() => expect(screen.getByRole("alert")).toHaveFocus());
+
+    await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
+    expect(await screen.findByText("FLY28")).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Anlässe" })).toHaveFocus());
+  });
+
+  it("keeps the rows and the focus when the next page fails", async () => {
+    const { api, urls } = fakeApi(
+      json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "c1" }),
+      json(
+        503,
+        { code: "unavailable", status: 503, request_id: "x", type: "", title: "", instance: "" },
+        "application/problem+json",
+      ),
+      json(200, { items: [event("BB", "Zweiter Anlass")] }),
+    );
+    render(<EventsPage api={api} />);
+
+    const more = await screen.findByRole("button", { name: "Weitere Anlässe laden" });
+    await userEvent.click(more);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("nicht erreichbar");
+    expect(screen.getByText("AA")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Weitere Anlässe laden" })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "Weitere Anlässe laden" }));
+    expect(await screen.findByText("BB")).toBeInTheDocument();
+    expect(urls[2]).toContain("cursor=c1");
+  });
+
   it("shows the general message of the status class for an unknown code", async () => {
     const { api } = fakeApi(
       json(

@@ -1,7 +1,8 @@
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
 import { t } from "../i18n";
 import { useParams } from "../router/Router";
+import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { NavLink, SubNav } from "../ui/NavLink";
 import { Page, PageTitle } from "../ui/Page";
@@ -20,7 +21,10 @@ type State =
 export function EventPage({ api, children }: { api: Api; children: ReactNode }) {
   const { eventId = "" } = useParams();
   const [state, setState] = useState<State>({ kind: "loading" });
+  const heading = useRef<HTMLHeadingElement>(null);
+  const { retried, retry } = useRetry(() => heading.current);
 
+  /** Resolves to true when the event loaded. */
   const load = useCallback(async () => {
     try {
       const { data, error } = await api.GET("/api/v1/events/{event_id}", {
@@ -31,8 +35,10 @@ export function EventPage({ api, children }: { api: Api; children: ReactNode }) 
           ? { kind: "loaded", event: data }
           : { kind: "failed", message: problemMessage(error), requestId: error?.request_id },
       );
+      return data !== undefined;
     } catch {
       setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+      return false;
     }
   }, [api, eventId]);
 
@@ -53,17 +59,20 @@ export function EventPage({ api, children }: { api: Api; children: ReactNode }) 
         <InlineError
           message={state.message}
           requestId={state.requestId}
-          onRetry={() => {
-            setState({ kind: "loading" });
-            void load();
-          }}
+          onRetry={() =>
+            retry(() => {
+              setState({ kind: "loading" });
+              return load();
+            })
+          }
+          announce={retried ? "focus" : "alert"}
         />
       )}
       {state.kind === "loaded" && (
         <>
           <header className={styles.header}>
             <p className={styles.key}>{state.event.key}</p>
-            <PageTitle>{state.event.name}</PageTitle>
+            <PageTitle ref={heading}>{state.event.name}</PageTitle>
           </header>
           <SubNav label={t("event-nav")}>
             <NavLink to={base} exact>

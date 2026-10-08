@@ -5,9 +5,10 @@ import { useOptionalSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
-import { useFocusAfterCommit } from "../ui/focus";
+import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LinkButton } from "../ui/LinkButton";
+import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventsPage.module.css";
@@ -41,45 +42,61 @@ export function EventsPage({ api }: { api: Api }) {
   const canCreate = role === "owner" || role === "admin";
   const heading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
+  const { retried, retry } = useRetry(() => heading.current);
+  // The failure of „Weitere laden“: the button stays and keeps focus, so the region announces it.
+  const [failure, setFailure] = useState<string>();
 
-  const load = useCallback(
-    async (cursor: string | undefined, previous: Event[]) => {
-      const query = cursor === undefined ? {} : { cursor };
-      try {
-        const { data, error } = await api.GET("/api/v1/events", { params: { query } });
-        if (data) {
-          const nextCursor = data.next_cursor ?? undefined;
-          setState({
-            kind: "loaded",
-            events: [...previous, ...data.items],
-            nextCursor,
-            loadingMore: false,
-          });
-          if (cursor !== undefined && nextCursor === undefined) {
-            // The last page arrived and the button leaves: focus goes to the heading.
-            focusAfterCommit(() => heading.current);
-          }
-        } else {
-          setState({
-            kind: "failed",
-            message: problemMessage(error),
-            requestId: error?.request_id,
-          });
-        }
-      } catch {
-        setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+  /** The first page. Resolves to true when it loaded. */
+  const load = useCallback(async () => {
+    try {
+      const { data, error } = await api.GET("/api/v1/events", { params: { query: {} } });
+      if (data) {
+        setState({
+          kind: "loaded",
+          events: data.items,
+          nextCursor: data.next_cursor ?? undefined,
+          loadingMore: false,
+        });
+        return true;
       }
-    },
-    [api, focusAfterCommit],
-  );
+      setState({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
+    } catch {
+      setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+    }
+    return false;
+  }, [api]);
 
   useEffect(() => {
-    void load(undefined, []);
+    void load();
   }, [load]);
 
-  const retry = () => {
-    setState({ kind: "loading" });
-    void load(undefined, []);
+  /** The next page: the loaded rows stay, and a failure keeps the cursor for the next press. */
+  const loadMore = async (events: Event[], cursor: string) => {
+    setFailure(undefined);
+    setState({ kind: "loaded", events, nextCursor: cursor, loadingMore: true });
+    let message: string;
+    try {
+      const { data, error } = await api.GET("/api/v1/events", { params: { query: { cursor } } });
+      if (data) {
+        const nextCursor = data.next_cursor ?? undefined;
+        setState({
+          kind: "loaded",
+          events: [...events, ...data.items],
+          nextCursor,
+          loadingMore: false,
+        });
+        if (nextCursor === undefined) {
+          // The last page arrived and the button leaves: focus goes to the heading.
+          focusAfterCommit(() => heading.current);
+        }
+        return;
+      }
+      message = problemMessage(error);
+    } catch {
+      message = problemMessage(undefined);
+    }
+    setState({ kind: "loaded", events, nextCursor: cursor, loadingMore: false });
+    setFailure(message);
   };
 
   return (
@@ -100,7 +117,17 @@ export function EventsPage({ api }: { api: Api }) {
         </div>
       )}
       {state.kind === "failed" && (
-        <InlineError message={state.message} requestId={state.requestId} onRetry={retry} />
+        <InlineError
+          message={state.message}
+          requestId={state.requestId}
+          onRetry={() =>
+            retry(() => {
+              setState({ kind: "loading" });
+              return load();
+            })
+          }
+          announce={retried ? "focus" : "alert"}
+        />
       )}
       {state.kind === "loaded" && state.events.length === 0 && (
         <EmptyState title={t("events-empty-title")} text={t("events-empty-text")} />
@@ -113,16 +140,21 @@ export function EventsPage({ api }: { api: Api }) {
             rows={state.events}
             rowKey={(event) => event.id}
           />
+          <LiveRegion kind="alert">{failure}</LiveRegion>
           {state.nextCursor !== undefined && (
-            <Button
-              isPending={state.loadingMore}
-              onPress={() => {
-                setState({ ...state, loadingMore: true });
-                void load(state.nextCursor, state.events);
-              }}
-            >
-              {t("events-load-more")}
-            </Button>
+            <div>
+              <Button
+                isPending={state.loadingMore}
+                onPress={() => {
+                  const { events, nextCursor } = state;
+                  if (!state.loadingMore && nextCursor !== undefined) {
+                    void loadMore(events, nextCursor);
+                  }
+                }}
+              >
+                {t("events-load-more")}
+              </Button>
+            </div>
           )}
         </>
       )}

@@ -19,6 +19,7 @@ import {
 } from "../api/client";
 import { t } from "../i18n";
 import { Redirect, useNavigate, usePathname } from "../router/Router";
+import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { Skeleton } from "../ui/Skeleton";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath, SIGN_IN_PATH } from "./paths";
@@ -76,20 +77,33 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
   const onPublicPath = useRef(isPublic);
   onPublicPath.current = isPublic;
 
-  const refresh = useCallback(async () => {
+  // After a successful retry, focus goes to the page, as after a route change.
+  const { retried, retry } = useRetry(
+    () => document.querySelector<HTMLElement>("h1") ?? document.querySelector<HTMLElement>("main"),
+  );
+
+  /** Resolves to true when the request got an answer that is not a failure. */
+  const load = useCallback(async () => {
     try {
       const { data, error } = await api.GET("/api/v1/session");
       if (data) {
         setState({ kind: "ready", info: data });
-      } else if (error?.code === "unauthenticated") {
-        setState({ kind: "signed-out" });
-      } else {
-        setState({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
+        return true;
       }
+      if (error?.code === "unauthenticated") {
+        setState({ kind: "signed-out" });
+        return true;
+      }
+      setState({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
     } catch {
       setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
     }
+    return false;
   }, [api]);
+
+  const refresh = useCallback(async () => {
+    await load();
+  }, [load]);
 
   const signOut = useCallback(async () => {
     try {
@@ -152,10 +166,13 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
         <InlineError
           message={state.message}
           requestId={state.requestId}
-          onRetry={() => {
-            setState({ kind: "loading" });
-            void refresh();
-          }}
+          onRetry={() =>
+            retry(() => {
+              setState({ kind: "loading" });
+              return load();
+            })
+          }
+          announce={retried ? "focus" : "alert"}
         />
       );
     }
