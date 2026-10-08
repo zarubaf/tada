@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Api, type Document, type DocumentVersion, problemMessage } from "../api/client";
 import { EventPage } from "../events/EventPage";
 import { loadOrganizationMembers } from "../events/eventMembers";
@@ -6,8 +6,9 @@ import { LOCALE, t } from "../i18n";
 import { Link, useParams } from "../router/Router";
 import { type Column, DataTable } from "../ui/DataTable";
 import { FileLink } from "../ui/FileLink";
-import { useFocusAfterCommit } from "../ui/focus";
+import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { Page } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./DocumentPage.module.css";
 import { formatSize, hashPrefix } from "./format";
@@ -16,7 +17,7 @@ const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", tim
 
 type State =
   | { kind: "loading" }
-  | { kind: "failed"; message: string; requestId: string | undefined; retried: boolean }
+  | { kind: "failed"; message: string; requestId: string | undefined }
   | { kind: "loaded"; document: Document; versions: DocumentVersion[] };
 
 /**
@@ -61,31 +62,35 @@ export function DocumentPage({ api }: { api: Api }) {
 
   // The newest request: the answer of an older one is dropped.
   const latest = useRef(0);
-  // After a retry the failed message takes focus, because the retry button left.
-  const retried = useRef(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const { retried, retry } = useRetry(() => heading.current);
 
+  /** Resolves to true when the document loaded. */
   const load = useCallback(async () => {
     const path = { document_id: documentId };
     const request = ++latest.current;
-    const failed = (message: string, requestId: string | undefined) =>
-      request === latest.current &&
-      setState({ kind: "failed", message, requestId, retried: retried.current });
+    const failed = (message: string, requestId: string | undefined) => {
+      if (request === latest.current) {
+        setState({ kind: "failed", message, requestId });
+      }
+      return false;
+    };
     try {
       const [document, versions] = await Promise.all([
         api.GET("/api/v1/documents/{document_id}", { params: { path } }),
         api.GET("/api/v1/documents/{document_id}/versions", { params: { path } }),
       ]);
       if (request !== latest.current) {
-        return;
+        return false;
       }
       if (document.data && versions.data) {
         setState({ kind: "loaded", document: document.data, versions: versions.data.items });
-        return;
+        return true;
       }
       const error = document.error ?? versions.error;
-      failed(problemMessage(error), error?.request_id);
+      return failed(problemMessage(error), error?.request_id);
     } catch {
-      failed(problemMessage(undefined), undefined);
+      return failed(problemMessage(undefined), undefined);
     }
   }, [api, documentId]);
 
@@ -156,12 +161,17 @@ export function DocumentPage({ api }: { api: Api }) {
   if (state.kind === "loaded") {
     return (
       <EventPage api={api} eventId={state.document.event_id}>
-        <DocumentBody document={state.document} versions={state.versions} columns={columns} />
+        <DocumentBody
+          document={state.document}
+          versions={state.versions}
+          columns={columns}
+          heading={heading}
+        />
       </EventPage>
     );
   }
   return (
-    <main id="main" className={styles.page}>
+    <Page>
       {state.kind === "loading" && (
         <div className={styles.skeleton} role="status" aria-label={t("document-loading")}>
           <Skeleton />
@@ -172,15 +182,16 @@ export function DocumentPage({ api }: { api: Api }) {
         <InlineError
           message={state.message}
           requestId={state.requestId}
-          takeFocus={state.retried}
-          onRetry={() => {
-            retried.current = true;
-            setState({ kind: "loading" });
-            void load();
-          }}
+          announce={retried ? "focus" : "alert"}
+          onRetry={() =>
+            retry(() => {
+              setState({ kind: "loading" });
+              return load();
+            })
+          }
         />
       )}
-    </main>
+    </Page>
   );
 }
 
@@ -189,15 +200,16 @@ function DocumentBody({
   document,
   versions,
   columns,
+  heading,
 }: {
   document: Document;
   versions: DocumentVersion[];
   columns: Column<DocumentVersion>[];
+  heading: RefObject<HTMLHeadingElement | null>;
 }) {
-  const heading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   // The page arrived: focus goes to the heading of the document.
-  useEffect(() => focusAfterCommit(() => heading.current), [focusAfterCommit]);
+  useEffect(() => focusAfterCommit(() => heading.current), [focusAfterCommit, heading]);
   const newest = useMemo(
     () => [...versions].sort((a, b) => b.number - a.number).find((v) => v.kind === "upload"),
     [versions],

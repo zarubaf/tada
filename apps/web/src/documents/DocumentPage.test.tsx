@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApi, type DocumentVersion } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
@@ -43,6 +44,9 @@ const draft: DocumentVersion = {
   created_at: "2030-05-19T08:00:00Z",
 };
 
+/** The number of requests for the document that fail before one succeeds. */
+const failures = { documents: 0 };
+
 function setup(versions: DocumentVersion[]) {
   const newest = versions[versions.length - 1] as DocumentVersion;
   const document = {
@@ -85,6 +89,10 @@ function setup(versions: DocumentVersion[]) {
       });
     }
     if (pathname.endsWith(`/documents/${DOCUMENT_ID}`)) {
+      if (failures.documents > 0) {
+        failures.documents -= 1;
+        return json(500, { type: "", code: "internal", title: "", status: 500, instance: "" });
+      }
       return json(200, document);
     }
     throw new Error(`unexpected ${request.method} ${pathname}`);
@@ -102,7 +110,10 @@ function setup(versions: DocumentVersion[]) {
   );
 }
 
-afterEach(() => window.history.replaceState(null, "", "/"));
+afterEach(() => {
+  failures.documents = 0;
+  window.history.replaceState(null, "", "/");
+});
 
 describe("DocumentPage", () => {
   it("lists the versions with hash prefix, uploader and a download link", async () => {
@@ -123,6 +134,31 @@ describe("DocumentPage", () => {
     await waitFor(() => expect(heading).toHaveFocus());
     // The event layout stays around the document.
     expect(screen.getByRole("link", { name: "Mitglieder" })).toBeInTheDocument();
+  });
+
+  it("moves focus to the heading when a retry succeeds", async () => {
+    failures.documents = 1;
+    setup([version(1, "Programm.pdf", "application/pdf")]);
+
+    const retry = await screen.findByRole("button", { name: "Erneut versuchen" });
+    expect(retry.closest("[role=alert]")).not.toHaveFocus();
+    await userEvent.click(retry);
+
+    const heading = await screen.findByRole("heading", { level: 2, name: "Programm Flugtag.pdf" });
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
+  it("moves focus to the message when a retry fails again", async () => {
+    failures.documents = 2;
+    setup([version(1, "Programm.pdf", "application/pdf")]);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Erneut versuchen" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Erneut versuchen" }).closest("[role=alert]"),
+      ).toHaveFocus(),
+    );
   });
 
   it("states that files are not scanned for malware", async () => {
