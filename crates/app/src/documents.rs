@@ -53,15 +53,10 @@ pub struct DocumentView {
     pub newest_version: VersionView,
 }
 
-/// The readable ID of the document with the organization-local number `local_number`, for example `DOC-001`.
-pub fn readable_document_id(local_number: u64) -> String {
-    LocalIdKind::Document.readable_id(local_number)
-}
-
 impl DocumentView {
     /// The readable ID, for example `DOC-001` (ADR 0038).
     pub fn readable_id(&self) -> String {
-        readable_document_id(self.local_number)
+        LocalIdKind::Document.readable_id(self.local_number)
     }
 }
 

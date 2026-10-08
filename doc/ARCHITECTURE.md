@@ -108,6 +108,7 @@ tada does not copy every tool into PostgreSQL.
   A passage of a proposal cites the source text of its changeset by default.
   It can also cite another source version with a text, for example an uploaded text file, if the source version is readable in the event of the proposal (`app::access::event_source_reach`).
   Otherwise the passage could show a text of another event to the members of the event.
+  The source links of a draft follow the same rule: they cite only source versions that are readable in the event of the draft.
   A draft version has no source version, so a passage cannot cite a draft.
 - Audit messages contain no raw personal data.
 - [doc/data-inventory.md](data-inventory.md) lists each category of personal data that tada stores.
@@ -122,7 +123,8 @@ tada does not copy every tool into PostgreSQL.
 - Owners and admins read each source version of their organization.
   Another member reads the source versions of the events in which the member has an event role, and the source versions that the facts and proposals of these events cite as evidence.
   For example, the text of an organization changeset has no event, and the members of the event that it creates read it through the evidence.
-  `app::access::source_reach` holds this rule. Search and citations both use it.
+  `app::access::source_reach` holds this rule. Search and the reads of citations use it.
+  A new citation in a proposal or a draft uses the reach of its own event (`app::access::event_source_reach`).
 - A document copied into an event does not widen access. Both the source access and the event membership must allow disclosure.
 - Unknown event attribution goes to a triage queue. AI can suggest an event, but it never shows a message to more than one event team on its own.
 
@@ -178,7 +180,7 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - The text of an uploaded plain text, Markdown or CSV file is the text of its source version: members can search and cite it ([ADR 0050](adr/0050-proposals-and-review.md)).
   A proposal can cite a passage of such a file as its evidence.
   PDF and office files have no extracted text yet. An agent cites its own source text for facts from such files.
-- tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. A larger text file has no searchable text.
+- tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. tada stores a larger text file without its text: members cannot search or cite it, and the file stays downloadable.
   The PostgreSQL search index of one text is limited to 1 MB, and the index of a text with many unique words can be larger than the text.
   If the index of a text under the cap is too large, tada stores the version without searchable text.
 - The source text of a changeset has at most 100,000 characters after the normalization, else the request fails with `validation-failed`.

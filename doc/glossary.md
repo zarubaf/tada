@@ -74,7 +74,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
 | accepted state      | The records that a member with the correct authority accepted. Only domain commands change it.                                       | truth, master data       |
 | record version      | A number that increases with each change of a record. Commands use it for optimistic concurrency.                                    | revision                 |
-| source item         | An incoming item: a mail message, a document or a Telegram message.                                                                  |                          |
+| source item         | An incoming item: the member text of an intake, a review edit, an uploaded document, a mail message or a Telegram message.           |                          |
 | source version      | One immutable version of a source item, with its hash and capture time.                                                              |                          |
 | evidence link       | A link from a record to an exact location in a source version.                                                                       | citation (in code)       |
 | passage             | A range of characters in the normalized text of a source version, with its exact quote and, for a PDF, its page (ADR 0050).          |                          |

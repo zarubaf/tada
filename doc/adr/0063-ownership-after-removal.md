@@ -30,7 +30,7 @@ Nothing records this decision.
 - A record can have an owner who is not a member of the event. Each reader of the owner must handle this case.
   For example, the review routing of Slice 2 must send a proposal for such a record to the event managers.
 - A later command that assigns a new owner checks the new owner with the same rule.
-- The web tasks that show open questions and documents show the former member.
+- The web views that show open questions and documents show the former member.
 
 ## Alternatives
 

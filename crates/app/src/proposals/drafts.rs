@@ -1,6 +1,7 @@
 //! The checks of draft proposals (ADR 0051): tada resolves each link of a draft and fixes its provenance manifest.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use tada_domain::RecordVersion;
 use tada_domain::ids::{EventId, FactId, SourceVersionId};
@@ -24,7 +25,7 @@ const LINK_NOT_FOUND: &str = "link-not-found";
 /// 2. An existing document is a document of the event of the proposal.
 /// 3. Each fact link cites a stored fact version of the event: accepted, an assumption or unknown.
 ///    An open proposal has no fact version, so a link to it does not resolve.
-/// 4. Each source link cites a source version in the reach of the caller (`access::source_reach`),
+/// 4. Each source link cites a source version of the event of the draft (`access::citable_reach`),
 ///    and its range is inside the text of the source version.
 pub(super) async fn check_drafts(
     caller: &impl MayPropose,
@@ -33,7 +34,7 @@ pub(super) async fn check_drafts(
 ) -> Result<Vec<DraftProvenance>, ProposeError> {
     let mut errors = Vec::new();
     let mut checked = Vec::new();
-    let mut reach = None;
+    let mut reaches: HashMap<EventId, SourceReach> = HashMap::new();
     for (index, proposal) in proposals.iter().enumerate() {
         let Operation::CreateDocumentDraft {
             event_id,
@@ -66,9 +67,11 @@ pub(super) async fn check_drafts(
             }
         };
         let facts = resolve_facts(caller, *event_id, &links.facts, stores).await?;
-        let reach = match &mut reach {
-            Some(reach) => reach,
-            None => reach.insert(access::source_reach(caller, stores.identity).await?),
+        let reach = match reaches.entry(*event_id) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => {
+                entry.insert(access::citable_reach(caller, *event_id, stores.identity).await?)
+            }
         };
         let sources = resolve_sources(caller, reach, &links.sources, stores).await?;
         let manifest = match (facts, sources) {

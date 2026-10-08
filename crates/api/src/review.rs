@@ -7,8 +7,6 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tada_app::caller::{Actor, ActorKind as AppActorKind, Channel as AppChannel};
-use tada_app::documents::readable_document_id;
 use tada_app::domain::ids::{ChangesetId, EventId, LocalIdKind, ProposalId};
 use tada_app::domain::proposals::{
     DraftDocument as DomainDraftDocument, Operation as DomainOperation,
@@ -34,6 +32,7 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::ApiState;
+use crate::actors::Author;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::json_schema;
@@ -185,59 +184,6 @@ pub struct OpenChangesetPage {
     /// The cursor of the next page. It is absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<String>,
-}
-
-/// Who created a record, for which member and through which channel (ADR 0039).
-#[derive(Debug, Serialize, ToSchema)]
-pub struct Author {
-    pub kind: ActorKind,
-    /// The user ID of a member or an AI client, or the ID of a service identity.
-    pub id: Uuid,
-    /// The member for whom the author acts, if the author is not that member.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub principal_id: Option<Uuid>,
-    pub channel: Channel,
-}
-
-/// The kind of an author. The list of kinds is open.
-#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum ActorKind {
-    Member,
-    Service,
-    Ai,
-}
-
-/// The way an author reached tada. The list of channels is open.
-#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Channel {
-    Web,
-    Telegram,
-    Job,
-    ApiToken,
-    Cli,
-}
-
-impl From<Actor> for Author {
-    fn from(actor: Actor) -> Self {
-        Self {
-            kind: match actor.kind() {
-                AppActorKind::Member => ActorKind::Member,
-                AppActorKind::Service => ActorKind::Service,
-                AppActorKind::Ai => ActorKind::Ai,
-            },
-            id: actor.id(),
-            principal_id: actor.principal(),
-            channel: match actor.channel() {
-                AppChannel::Web => Channel::Web,
-                AppChannel::Telegram => Channel::Telegram,
-                AppChannel::Job => Channel::Job,
-                AppChannel::ApiToken => Channel::ApiToken,
-                AppChannel::Cli => Channel::Cli,
-            },
-        }
-    }
 }
 
 /// A changeset as a reviewer sees it.
@@ -703,7 +649,7 @@ impl From<Applied> for ReviewResult {
                 }),
                 LocalRecord::Document(id) => documents.push(NewDocument {
                     id: id.as_uuid(),
-                    readable_id: readable_document_id(local.local_number),
+                    readable_id: LocalIdKind::Document.readable_id(local.local_number),
                 }),
             }
         }

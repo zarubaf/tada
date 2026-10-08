@@ -1255,12 +1255,22 @@ async fn a_draft_cannot_cite_a_source_that_its_author_cannot_see() {
             markdown_error("link-not-found")
         );
     }
-    // An owner reaches each source of the organization (ADR 0052).
+}
+
+/// A draft cites only the sources of its own event, like the evidence of a proposal: an owner reads each source
+/// of the organization, but a quote of another event would show its text to the viewers of the draft's event.
+#[tokio::test]
+async fn a_draft_cannot_cite_a_source_of_another_event_that_its_author_can_read() {
+    let (memory, [own, other, organization]) = memory_with_targets();
     let owner = caller(OrganizationRole::Owner);
-    let input = draft(
-        new_document(),
-        &format!("{}\n", source_link(organization, 7, 19)),
-    );
+    for source in [other, organization] {
+        let input = draft(new_document(), &format!("{}\n", source_link(source, 7, 19)));
+        assert_eq!(
+            draft_errors(&memory, &owner, input).await,
+            markdown_error("link-not-found")
+        );
+    }
+    let input = draft(new_document(), &format!("{}\n", source_link(own, 7, 19)));
     create_changeset(&owner, input, stores(&memory), &FixedClock)
         .await
         .unwrap();
@@ -1472,5 +1482,23 @@ async fn a_source_text_over_the_limit_stores_nothing() {
         create_changeset(&anna, input, stores(&memory), &FixedClock)
             .await
             .is_ok()
+    );
+}
+
+/// The limit counts characters, not bytes: an umlaut has two bytes in UTF-8.
+#[tokio::test]
+async fn the_source_text_limit_counts_characters() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let used = SourceText::normalize(SOURCE).as_str().chars().count();
+    let mut input = one_fact();
+    input.source_text = format!("{SOURCE}{}", "ä".repeat(MAX_SOURCE_TEXT_CHARS - used));
+    let result = create_changeset(&anna, input.clone(), stores(&memory), &FixedClock).await;
+    assert!(result.is_ok(), "{result:?}");
+    input.source_text.push('ä');
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("source_text".to_owned(), "length")]
     );
 }

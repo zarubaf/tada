@@ -870,6 +870,16 @@ mod tests {
         let f = Fixture::start().await;
         let anna = f.member("Anna Muster", OrganizationRole::Member).await;
         let event = f.event_with_managers(&[f.owner.user_id()]).await;
+        sqlx::query(
+            "INSERT INTO event_membership (organization_id, event_id, user_id, event_role, created_at)
+             VALUES ($1, $2, $3, 'event-contributor', now())",
+        )
+        .bind(f.scope().organization_id().as_uuid())
+        .bind(event.as_uuid())
+        .bind(anna.as_uuid())
+        .execute(&f.db().pool)
+        .await
+        .unwrap();
         let question = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO open_question
@@ -885,6 +895,13 @@ mod tests {
         .unwrap();
 
         assert_eq!(f.remove(anna).await, None);
+        let roles = f
+            .count(&format!(
+                "SELECT count(*) FROM event_membership WHERE user_id = '{}'",
+                anna.as_uuid()
+            ))
+            .await;
+        assert_eq!(roles, 0, "the removal takes the event role");
         let owner: Uuid =
             sqlx::query_scalar("SELECT owner_user_id FROM open_question WHERE id = $1")
                 .bind(question)

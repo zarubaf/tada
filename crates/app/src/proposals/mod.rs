@@ -461,7 +461,7 @@ fn parse(
 
 /// Checks each passage that cites a source version other than the source text of the changeset `intake`.
 ///
-/// The source version must be readable in the event of the proposal, so a proposal never shows a text of another
+/// The source version must be citable in the event of the proposal (`access::citable_reach`), so a proposal never shows a text of another
 /// event to the members of its event: `unknown-source` for any other ID, also of another organization.
 /// A source version without a text, for example a PDF, gives `no-text`.
 async fn check_cited_sources(
@@ -470,36 +470,38 @@ async fn check_cited_sources(
     proposals: &[Proposal],
     stores: ProposeStores<'_>,
 ) -> Result<(), ProposeError> {
-    let mut errors = Vec::new();
-    for (index, proposal) in proposals.iter().enumerate() {
-        let cited: Vec<SourceVersionId> = proposal
-            .evidence
-            .iter()
-            .map(|evidence| evidence.source_version_id)
-            .filter(|id| *id != intake)
-            .collect();
-        if cited.is_empty() {
+    // All cited source versions of one event, so that each event needs one reach and one read.
+    let mut cited: HashMap<EventId, Vec<SourceVersionId>> = HashMap::new();
+    for proposal in proposals {
+        cited
+            .entry(proposal.operation.event_id())
+            .or_default()
+            .extend(
+                proposal
+                    .evidence
+                    .iter()
+                    .map(|evidence| evidence.source_version_id)
+                    .filter(|id| *id != intake),
+            );
+    }
+    let mut texts: HashMap<(EventId, SourceVersionId), Option<SourceText>> = HashMap::new();
+    for (event, ids) in cited {
+        if ids.is_empty() {
             continue;
         }
+        let reach = access::citable_reach(caller, event, stores.identity).await?;
+        for source in stores.sources.texts(caller.scope(), &reach, &ids).await? {
+            texts.insert((event, source.id), source.text);
+        }
+    }
+    let mut errors = Vec::new();
+    for (index, proposal) in proposals.iter().enumerate() {
         let event = proposal.operation.event_id();
-        let texts: HashMap<SourceVersionId, Option<SourceText>> =
-            match access::event_source_reach(caller, event, stores.identity).await {
-                Ok(reach) => stores
-                    .sources
-                    .texts(caller.scope(), &reach, &cited)
-                    .await?
-                    .into_iter()
-                    .map(|source| (source.id, source.text))
-                    .collect(),
-                // A new event of the changeset has no sources yet.
-                Err(AccessError::NotFound) => HashMap::new(),
-                Err(AccessError::Store(error)) => return Err(error.into()),
-            };
         for (number, evidence) in proposal.evidence.iter().enumerate() {
             if evidence.source_version_id == intake {
                 continue;
             }
-            let code = match texts.get(&evidence.source_version_id) {
+            let code = match texts.get(&(event, evidence.source_version_id)) {
                 None => Some("unknown-source"),
                 Some(None) => Some("no-text"),
                 Some(Some(text)) => check_passage(&evidence.passage, text)
@@ -535,7 +537,6 @@ fn passage_error_code(error: PassageError) -> &'static str {
     }
 }
 
-/// Checks the rules between the proposals of a changeset: unique IDs, the event of each operation, and the dependencies.
 /// The choices that a `SetFact` with a choice value uses, with their field.
 fn used_choices(operation: &Operation) -> impl Iterator<Item = (FieldDefinitionId, &ChoiceKey)> {
     let keys = match operation {
@@ -553,6 +554,7 @@ fn used_choices(operation: &Operation) -> impl Iterator<Item = (FieldDefinitionI
         .flat_map(|(field, keys)| keys.iter().map(move |key| (field, key)))
 }
 
+/// Checks the rules between the proposals of a changeset: unique IDs, the event of each operation, and the dependencies.
 fn check_structure(event_id: Option<EventId>, proposals: &[Proposal]) -> Result<(), ProposeError> {
     let mut errors = Vec::new();
     let path = |index: usize, field: &str| format!("proposals/{index}/{field}");
@@ -768,14 +770,14 @@ async fn check_catalog(
                 expected_version,
             } => {
                 // A new event or a new field has no fact yet, so a proposal cannot expect a version of it.
+                // `event_id` is the event of the changeset; `fact_event` is the event of the fact.
                 let new_fact = event_id.is_none() || new_fields.contains(field_id);
                 if new_fact && expected_version.is_some() {
                     errors.push(FieldError::new(path(index, "expected_version"), "invalid"));
                 }
-                let event_id = fact_event;
                 let field = fields.get(field_id).filter(|field| {
                     field.scope == FieldScope::Shipped
-                        || field.scope == FieldScope::Event(*event_id)
+                        || field.scope == FieldScope::Event(*fact_event)
                 });
                 let Some(field) = field else {
                     errors.push(FieldError::new(path(index, "field_id"), "unknown-field"));

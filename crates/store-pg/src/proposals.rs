@@ -1053,7 +1053,7 @@ mod tests {
             })
         );
 
-        // A reviewed proposal is not open. Task 27 writes review results; this test writes one directly.
+        // A reviewed proposal is not open. The apply writes review results (ADR 0050); this test writes one directly.
         sqlx::query(
             "INSERT INTO review_result (id, organization_id, proposal_id, result, reviewer, created_at)
              VALUES ($1, $2, $3, 'rejected', $4, now())",
@@ -1194,7 +1194,7 @@ mod tests {
             .unwrap();
         assert_eq!(events, [event, event]);
 
-        // Task 27 applies the event alone and records the result; this test writes both directly.
+        // The apply creates the event and records the result (ADR 0050); this test writes both directly.
         sqlx::query(
             "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)
              VALUES ($1, $2, 'OPEN31', 'Open Day Testwil', 'Europe/Zurich', 1, now())",
