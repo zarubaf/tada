@@ -50,6 +50,10 @@ id_type!(
     DocumentId
 );
 id_type!(
+    /// The ID of one immutable version of a document.
+    DocumentVersionId
+);
+id_type!(
     /// The ID of a field definition.
     FieldDefinitionId
 );

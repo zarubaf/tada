@@ -31,6 +31,8 @@ pub enum AuditAction {
     OrganizationFeatureEnable,
     /// An owner switched a feature of the organization off (ADR 0036).
     OrganizationFeatureDisable,
+    /// A member uploaded a file as a new document version, of a new or an existing document.
+    DocumentVersionUpload,
 }
 
 impl AuditAction {
@@ -55,6 +57,7 @@ impl AuditAction {
             Self::ApiTokenRevoke => "api_token.revoke",
             Self::OrganizationFeatureEnable => "organization_feature.enable",
             Self::OrganizationFeatureDisable => "organization_feature.disable",
+            Self::DocumentVersionUpload => "document_version.upload",
         }
     }
 
@@ -83,6 +86,7 @@ impl AuditAction {
             Self::OrganizationFeatureEnable | Self::OrganizationFeatureDisable => {
                 "organization_feature"
             }
+            Self::DocumentVersionUpload => "document_version",
         }
     }
 }

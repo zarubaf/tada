@@ -25,6 +25,13 @@ impl BlobKey {
         Self(format!("{organization_id}/{}", Uuid::now_v7()))
     }
 
+    /// For store adapters only: restores the key of a stored document version.
+    /// Other code gets a key from `new`.
+    #[doc(hidden)]
+    pub fn restore(key: String) -> Self {
+        Self(key)
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }

@@ -1,4 +1,6 @@
-// A small router of our own (OP5). It maps the path of the address to a page. It has no loaders
+// A small router of our own, without a new dependency: the pages need no nested layouts and no
+// data loading in the router yet. Replace it with a library when they do.
+// It maps the path of the address to a page. It has no loaders
 // and no nesting rules: a page that needs data loads it itself.
 import {
   Children,

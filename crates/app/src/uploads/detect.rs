@@ -44,6 +44,36 @@ pub enum FileType {
 }
 
 impl FileType {
+    /// All types of the allow-list.
+    pub const ALL: [Self; 14] = [
+        Self::Pdf,
+        Self::Png,
+        Self::Jpeg,
+        Self::Webp,
+        Self::Heic,
+        Self::Text,
+        Self::Markdown,
+        Self::Csv,
+        Self::Docx,
+        Self::Xlsx,
+        Self::Pptx,
+        Self::Odt,
+        Self::Ods,
+        Self::Odp,
+    ];
+
+    /// The type whose `media_type` is `media_type`, for example of a stored document version.
+    pub fn of_media_type(media_type: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|file_type| file_type.media_type() == media_type)
+    }
+
+    /// Whether the file is UTF-8 text: plain text, Markdown or CSV.
+    pub fn is_text(self) -> bool {
+        matches!(self, Self::Text | Self::Markdown | Self::Csv)
+    }
+
     pub fn media_type(self) -> &'static str {
         match self {
             Self::Pdf => "application/pdf",
@@ -66,7 +96,8 @@ impl FileType {
     }
 
     /// Whether the browser may show the file inline.
-    /// Images are downloads only, so that no image metadata leaks (OP14).
+    /// Images are downloads only, so that no image metadata leaks.
+    /// Image previews from copies without metadata (ADR 0043) come later.
     pub fn inline_preview(self) -> bool {
         matches!(self, Self::Pdf | Self::Text)
     }
@@ -491,5 +522,35 @@ mod tests {
         for name in ["", ".", "..", "/", "\n"] {
             assert_eq!(sanitize_file_name(name), "file");
         }
+    }
+
+    #[test]
+    fn each_type_comes_back_from_its_media_type() {
+        // A new type fails to compile here until it is in this match and in `ALL`.
+        let in_all = |file_type: FileType| match file_type {
+            FileType::Pdf
+            | FileType::Png
+            | FileType::Jpeg
+            | FileType::Webp
+            | FileType::Heic
+            | FileType::Text
+            | FileType::Markdown
+            | FileType::Csv
+            | FileType::Docx
+            | FileType::Xlsx
+            | FileType::Pptx
+            | FileType::Odt
+            | FileType::Ods
+            | FileType::Odp => FileType::ALL.contains(&file_type),
+        };
+        assert!(FileType::ALL.into_iter().all(in_all));
+        assert_eq!(FileType::ALL.len(), 14);
+        for file_type in FileType::ALL {
+            assert_eq!(
+                FileType::of_media_type(file_type.media_type()),
+                Some(file_type)
+            );
+        }
+        assert_eq!(FileType::of_media_type("application/zip"), None);
     }
 }

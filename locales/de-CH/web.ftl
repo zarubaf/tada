@@ -129,6 +129,8 @@ problem-not-found = Das gibt es nicht, oder Sie dürfen es nicht sehen.
 problem-validation-failed = Die Eingabe ist ungültig.
 problem-record-version-conflict = Jemand hat diesen Eintrag inzwischen geändert. Versuchen Sie es erneut.
 problem-invalid-transition = Diese Änderung ist im aktuellen Zustand nicht möglich.
+problem-payload-too-large = Die Datei ist zu gross.
+problem-unsupported-media-type = Dieser Dateityp ist nicht erlaubt.
 
 ## Event memberships
 
