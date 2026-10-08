@@ -15,37 +15,42 @@ ADR 0022 sets WCAG 2.2 AA as the minimum. This document gives the rules for each
 - Focus is never hidden behind a sticky header or the bottom bar (WCAG 2.4.11). Use `scroll-padding`.
 - After a route change, focus moves to the `h1` of the new page.
 - When a dialog or a sheet opens, focus moves to its first field or its title. When it closes, focus returns to the element that opened it.
-- When a member deletes or moves an item from a list, focus moves to the next item, or to the list if it is empty.
+- When a member deletes an item from a list, focus moves to the heading of the list (see the table below).
 
 ### Where focus goes after an action
 
-Focus is lost when the focused element leaves the page: the button that a member pressed is replaced, removed with its row or disabled.
+Focus is lost when the focused element leaves the page: the page replaces, removes or disables the button that a member pressed.
 The browser then puts focus on `body`, and a keyboard or screen reader member starts again at the top.
 The page must name the next focus target in the same event that removes the element.
 
-| Event                                          | Focus goes to                                                                                   |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Submit with errors (local or from the server)  | The first field with `aria-invalid`.                                                            |
-| Submit that works, and the form stays          | The first field of the form, so that the member can enter the next item.                        |
-| Submit that works, and the form is replaced    | The heading of the new content.                                                                 |
-| Request fails, and the control stays           | Nowhere. The control keeps focus. The message goes to the live region.                          |
-| Request fails, and the control was replaced    | The `InlineError` (`takeFocus`), which has the retry action.                                    |
-| Delete a row                                   | The heading of the list. The deleted row and its button are gone.                               |
-| Load more                                      | Nowhere while the button stays (it shows `isPending`). When the last page arrives: the heading. |
-| Refresh                                        | Nowhere. The refresh button stays mounted with `isPending`. A failure moves focus as above.     |
-| A result appears that the member must read     | The element with the result, for example a code (`tabIndex={-1}`).                              |
-| Dialog closes by cancel or Escape              | The trigger. React Aria restores it.                                                            |
-| Dialog closes by confirm, and the trigger left | The same targets as for the action that the dialog confirmed (for example „Delete a row“).      |
+| Event                                                    | Focus goes to                                                                                       |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Submit with errors (local or from the server)            | The first field with `aria-invalid`.                                                                |
+| Submit that works, and the form stays                    | The first field of the form, so that the member can enter the next item.                            |
+| Request fails, and the control stays                     | Nowhere. The control keeps focus. The message goes to the live region.                              |
+| Request fails, and the control left                      | The `InlineError` (`takeFocus`), which has the retry action.                                        |
+| Delete a row                                             | The heading of the list. The row and its button are gone.                                           |
+| Delete the last row                                      | The heading of the list. It stays above the empty state.                                            |
+| Load more                                                | Nowhere while the button stays (it shows `isPending`). When the last page arrives: the heading.     |
+| Refresh                                                  | Nowhere. The refresh button stays mounted with `isPending`. A failure moves focus as the row above. |
+| A result appears that the member must read               | The element with the result, for example a code (`tabIndex={-1}`).                                  |
+| Dialog closes by cancel or Escape                        | The trigger. React Aria restores it.                                                                |
+| Dialog closes with its main button, and the trigger left | The target of the action that the dialog confirmed, for example „Delete a row“.                     |
 
 - Keep a control mounted and use `isPending` while its request runs.
   `isDisabled` on the focused control drops focus in some browsers.
+  A button that waits for a `Retry-After` time is the exception: it uses `isPending` and `isDisabled`.
 - Use `useFocusAfterCommit` from `ui/focus.ts` for every move.
-  Call the function it returns in the same event as the state change that removes the element, for example together with the state that closes the dialog.
-  The hook looks up the target after React commits, so the target can be an element that the change renders.
+  Call the function it returns in the same event as the state change that removes the element.
+  For a dialog, call it together with the state that closes the dialog.
+  The hook looks up the target after React commits.
+  So the target can be an element that the change renders.
 - Never use `setTimeout`, `requestAnimationFrame` or a flag in a `ref` to wait for a dialog.
-  React Aria restores focus to the trigger only if focus is on `body` at that time, so a move in the same commit as the close wins.
+  React Aria 1.x restores focus to the trigger only if focus is on `body` at that time.
+  This is the behavior of the library today, and `ui/focus.test.tsx` pins it.
+  A move in the same commit as the close wins.
 - Use `firstInvalidField` for the first target of a failed submit.
-- A test for each page action checks where focus is after the action.
+- A test for each page action in the table checks where focus is after the action.
 
 ## Keyboard
 
@@ -89,7 +94,9 @@ The page must name the next focus target in the same event that removes the elem
   Render `LiveRegion` empty, and set the text later.
 - A page has one polite and one assertive region.
   `LiveRegion` (`ui/LiveRegion.tsx`) is the only component for them.
-- A skeleton with `role="status"` and a label is the exception: it announces that content loads.
+- Two exceptions mount with their text.
+  A skeleton with `role="status"` and a label announces that content loads.
+  `InlineError` has `role="alert"` and takes focus with `takeFocus`, so the focus move announces it.
 - A toast never contains the only way to do an action, and it stays until the member closes it if it contains an action.
 
 ## Color and contrast
