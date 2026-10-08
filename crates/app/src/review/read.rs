@@ -85,7 +85,7 @@ pub async fn get_changeset(
         let excerpts = proposal
             .evidence
             .iter()
-            .map(|passage| passage.excerpt(source.as_str(), EXCERPT_CONTEXT))
+            .map(|evidence| evidence.passage.excerpt(source.as_str(), EXCERPT_CONTEXT))
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| StoreError::Internal(Box::new(PassageOutsideText)))?;
         proposals.push(ProposalReview {

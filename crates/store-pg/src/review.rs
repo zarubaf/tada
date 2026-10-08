@@ -21,7 +21,7 @@ use tada_app::domain::ids::{
     SourceVersionId,
 };
 use tada_app::domain::proposals::{DraftDocument, Operation};
-use tada_app::domain::sources::{Passage, SourceText};
+use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::review::{
     ApplyOutcome, ApplyPlan, ApplyStep, LocalRecord, NewLocalId, OpenChangeset, Recorded,
     ReviewBatch, ReviewOutcome, ReviewRecord, ReviewStore, StepEvidence,
@@ -664,13 +664,12 @@ async fn write_step(
             state,
             expected_version,
         } => {
-            let (source, passages) = match &step.evidence {
-                StepEvidence::Proposal(passages) => (plan.source_version_id, passages.clone()),
+            let evidence = match &step.evidence {
+                StepEvidence::Proposal(evidence) => evidence.clone(),
                 StepEvidence::Edit => {
-                    let (source, passage) =
-                        insert_review_text(conn, scope, plan, *event_id, state).await?;
-                    edit_source = Some(source);
-                    (source, vec![passage])
+                    let evidence = insert_review_text(conn, scope, plan, *event_id, state).await?;
+                    edit_source = Some(evidence.source_version_id);
+                    vec![evidence]
                 }
             };
             let fact = FactWrite {
@@ -678,8 +677,7 @@ async fn write_step(
                 field: *field_id,
                 expected: *expected_version,
                 state,
-                source,
-                passages: &passages,
+                evidence: &evidence,
             };
             insert_fact_version(conn, scope, plan, step, fact).await?;
         }
@@ -881,7 +879,7 @@ async fn insert_review_text(
     plan: &ApplyPlan,
     event: EventId,
     state: &FactState<Valued>,
-) -> Result<(SourceVersionId, Passage), sqlx::Error> {
+) -> Result<Evidence, sqlx::Error> {
     let (state, value, approximate) = values::fact_state_to_columns(state);
     let json = serde_json::json!({"state": state, "value": value, "approximate": approximate});
     let text = SourceText::normalize(&json.to_string());
@@ -894,26 +892,25 @@ async fn insert_review_text(
     sources::insert_text(conn, scope, item, &text, &plan.reviewer, plan.now).await?;
     let length = u32::try_from(text.as_str().chars().count())
         .map_err(|error| sqlx::Error::Encode(Box::new(error)))?;
-    Ok((
-        version,
-        Passage {
+    Ok(Evidence {
+        source_version_id: version,
+        passage: Passage {
             start: 0,
             end: length,
             quote: text.as_str().to_owned(),
             page: None,
         },
-    ))
+    })
 }
 
-/// The next state of the fact of `field` in `event`, with its evidence: passages of the source version `source`.
+/// The next state of the fact of `field` in `event`, with its evidence.
 struct FactWrite<'a> {
     event: EventId,
     field: FieldDefinitionId,
     /// The current version that the step expects; `None` means that the fact does not exist yet.
     expected: Option<RecordVersion>,
     state: &'a FactState<Valued>,
-    source: SourceVersionId,
-    passages: &'a [Passage],
+    evidence: &'a [Evidence],
 }
 
 /// Adds the next version of a fact, with its evidence.
@@ -929,8 +926,7 @@ async fn insert_fact_version(
         field,
         expected,
         state,
-        source,
-        passages,
+        evidence,
     } = fact;
     let organization = scope.organization_id().as_uuid();
     let now = plan.now.to_sqlx();
@@ -989,7 +985,11 @@ async fn insert_fact_version(
     .await?;
     let offset =
         |value: u32| i32::try_from(value).map_err(|error| sqlx::Error::Encode(Box::new(error)));
-    for passage in passages {
+    for Evidence {
+        source_version_id,
+        passage,
+    } in evidence
+    {
         sqlx::query!(
             "INSERT INTO evidence_link
                  (id, organization_id, fact_version_id, source_version_id, start_offset, end_offset, quote, page)
@@ -997,7 +997,7 @@ async fn insert_fact_version(
             Uuid::now_v7(),
             organization,
             version,
-            source.as_uuid(),
+            source_version_id.as_uuid(),
             offset(passage.start)?,
             offset(passage.end)?,
             passage.quote,

@@ -464,7 +464,10 @@ async fn a_contributor_creates_a_changeset_with_its_source_and_an_audit_event() 
     let [proposal] = changeset.proposals.as_slice() else {
         panic!("not one proposal");
     };
-    assert_eq!(proposal.evidence[0].quote, "20000 Besuchern pro Tag");
+    assert_eq!(
+        proposal.evidence[0].passage.quote,
+        "20000 Besuchern pro Tag"
+    );
 }
 
 #[tokio::test]

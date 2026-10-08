@@ -2,6 +2,8 @@
 
 use unicode_normalization::UnicodeNormalization;
 
+use crate::ids::SourceVersionId;
+
 /// The normalized text of a source version: Unicode NFC with `\n` line ends.
 /// The character offsets of a passage count in this text.
 #[derive(Clone, PartialEq, Eq)]
@@ -47,6 +49,16 @@ impl std::fmt::Debug for Passage {
             .field("page", &self.page)
             .finish_non_exhaustive()
     }
+}
+
+/// Evidence (ADR 0050): a passage of one source version.
+///
+/// The one shape of evidence in tada. A proposal, a fact version and a draft cite their evidence with it.
+/// The source version can be the intake text of a changeset, an uploaded document version or a review edit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Evidence {
+    pub source_version_id: SourceVersionId,
+    pub passage: Passage,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]

@@ -14,7 +14,7 @@ use crate::facts::{
     Valued, checked_text,
 };
 use crate::ids::{DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, UserId};
-use crate::sources::Passage;
+use crate::sources::Evidence;
 
 /// The change that a proposal suggests. Slice 1 has these operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,13 +162,13 @@ impl Operation {
 }
 
 /// One proposal of a changeset: its operation, the proposals that it depends on, its evidence and its reason.
-/// The passages point into the source version of the changeset.
+/// Each passage of the evidence names its source version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Proposal {
     pub id: ProposalId,
     pub operation: Operation,
     pub depends_on: Vec<ProposalId>,
-    pub evidence: Vec<Passage>,
+    pub evidence: Vec<Evidence>,
     pub reason: Reason,
 }
 

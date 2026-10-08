@@ -591,8 +591,8 @@ impl From<AppProposalReview> for Proposal {
                 .evidence
                 .iter()
                 .zip(review.excerpts)
-                .map(|(passage, excerpt)| ProposalEvidence {
-                    passage: passage.into(),
+                .map(|(evidence, excerpt)| ProposalEvidence {
+                    passage: (&evidence.passage).into(),
                     excerpt: excerpt.into(),
                 })
                 .collect(),

@@ -10,8 +10,8 @@ use tada_app::domain::facts::{
     Description, FieldDefinition, FieldKey, FieldScope, FieldStatus, ModuleKey,
 };
 use tada_app::domain::ids::{EventId, FactId, FactVersionId, FieldDefinitionId, SourceVersionId};
-use tada_app::domain::sources::Passage;
-use tada_app::facts::{EventProfile, EvidenceRef, FactStore, FactVersionRef, ProfileEntry};
+use tada_app::domain::sources::{Evidence, Passage};
+use tada_app::facts::{EventProfile, FactStore, FactVersionRef, ProfileEntry};
 use tada_app::store::StoreError;
 
 use crate::Database;
@@ -193,12 +193,12 @@ struct EvidenceRow {
     page: Option<i32>,
 }
 
-impl TryFrom<EvidenceRow> for EvidenceRef {
+impl TryFrom<EvidenceRow> for Evidence {
     type Error = InvalidRow;
 
     fn try_from(row: EvidenceRow) -> Result<Self, InvalidRow> {
         let offset = |value: i32| u32::try_from(value).map_err(|_| InvalidRow("evidence_link"));
-        Ok(EvidenceRef {
+        Ok(Evidence {
             source_version_id: SourceVersionId::from_uuid(row.source_version_id),
             passage: Passage {
                 start: offset(row.start_offset)?,
@@ -272,13 +272,13 @@ impl FactStore for Database {
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
-        let mut evidence: HashMap<Uuid, Vec<EvidenceRef>> = HashMap::new();
+        let mut evidence: HashMap<Uuid, Vec<Evidence>> = HashMap::new();
         for row in evidence_rows {
             let version = row.fact_version_id;
             evidence
                 .entry(version)
                 .or_default()
-                .push(EvidenceRef::try_from(row)?);
+                .push(Evidence::try_from(row)?);
         }
         let fields = rows
             .into_iter()
@@ -485,7 +485,7 @@ mod tests {
         fact: FactId,
         number: i64,
         state: &FactState<Valued>,
-        evidence: Option<&EvidenceRef>,
+        evidence: Option<&Evidence>,
     ) -> FactVersionId {
         let id = Uuid::now_v7();
         let (state, value, approximate) = values::fact_state_to_columns(state);
@@ -540,7 +540,7 @@ mod tests {
         event: EventId,
         text: &str,
         quote: &str,
-    ) -> EvidenceRef {
+    ) -> Evidence {
         let text = SourceText::normalize(text);
         let source = test
             .database
@@ -556,7 +556,7 @@ mod tests {
             page: None,
         };
         passage.check(text.as_str()).unwrap();
-        EvidenceRef {
+        Evidence {
             source_version_id: source.id,
             passage,
         }

@@ -5,11 +5,11 @@ use std::collections::HashMap;
 use tada_domain::RecordVersion;
 use tada_domain::ids::{EventId, FactId, SourceVersionId};
 use tada_domain::proposals::{DraftDocument, Operation, Proposal};
-use tada_domain::sources::Passage;
+use tada_domain::sources::{Evidence, Passage};
 
 use super::{MayPropose, ProposeError, ProposeStores, finish};
 use crate::access::{self, SourceReach};
-use crate::drafts::{self, CitedFact, CitedPassage, DraftProvenance, ProvenanceManifest};
+use crate::drafts::{self, CitedFact, DraftProvenance, ProvenanceManifest};
 use crate::problem::FieldError;
 use crate::sources::SourceVersionText;
 use crate::store::StoreError;
@@ -129,7 +129,7 @@ async fn resolve_sources(
     reach: &SourceReach,
     links: &[drafts::SourceLink],
     stores: ProposeStores<'_>,
-) -> Result<Result<Vec<CitedPassage>, &'static str>, StoreError> {
+) -> Result<Result<Vec<Evidence>, &'static str>, StoreError> {
     let ids: Vec<SourceVersionId> = links
         .iter()
         .map(|link| SourceVersionId::from_uuid(link.source_version_id))
@@ -164,11 +164,11 @@ async fn resolve_sources(
 fn cited_passage(
     source: &SourceVersionText,
     link: &drafts::SourceLink,
-) -> Result<CitedPassage, &'static str> {
+) -> Result<Evidence, &'static str> {
     let text = source.text.as_ref().ok_or("no-text")?;
     let passage =
         Passage::of_range(text.as_str(), link.start, link.end).map_err(|_| "out-of-range")?;
-    Ok(CitedPassage {
+    Ok(Evidence {
         source_version_id: source.id,
         passage,
     })

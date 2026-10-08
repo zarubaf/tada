@@ -12,11 +12,10 @@ use tada_domain::events::Event;
 use tada_domain::facts::{
     CORE_CATALOG_VERSION, FactState, FieldDefinition, FieldStatus, Label, Valued,
 };
+use tada_domain::sources::Evidence;
 use uuid::Uuid;
 
-use crate::facts::{
-    EventProfile, EvidenceRef, OpenProposalRef, OpenQuestionRef, ProfileEntry, value_schema,
-};
+use crate::facts::{EventProfile, OpenProposalRef, OpenQuestionRef, ProfileEntry, value_schema};
 use crate::proposals::ValueInput;
 use crate::sources::{SourceHit, SourcePassage};
 
@@ -287,7 +286,7 @@ fn fact_view(entry: &ProfileEntry, valued: &Valued) -> FactView {
 }
 
 /// The one mapping of an evidence link to its view.
-fn evidence_view(evidence: &EvidenceRef) -> EvidenceView {
+fn evidence_view(evidence: &Evidence) -> EvidenceView {
     EvidenceView {
         source_version_id: evidence.source_version_id.as_uuid(),
         start: evidence.passage.start,
@@ -502,7 +501,7 @@ mod tests {
             fact_id: FactId::from_uuid(Uuid::now_v7()),
             version: RecordVersion::FIRST,
             state,
-            evidence: vec![EvidenceRef {
+            evidence: vec![Evidence {
                 source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(30)),
                 passage: Passage {
                     start: 4,

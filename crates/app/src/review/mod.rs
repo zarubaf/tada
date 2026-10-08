@@ -13,11 +13,10 @@ use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
 use tada_domain::facts::{ChoiceValue, FactState, Label, ValueType, Valued};
 use tada_domain::ids::{
-    ChangesetId, DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId,
-    SourceVersionId, UserId,
+    ChangesetId, DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, UserId,
 };
 use tada_domain::proposals::{Operation, Proposal};
-use tada_domain::sources::{Passage, SourceText};
+use tada_domain::sources::{Evidence, SourceText};
 
 pub use self::read::{
     ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, get_changeset,
@@ -149,8 +148,8 @@ impl OpenChangeset {
 /// The evidence of a fact version that an apply creates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StepEvidence {
-    /// The passages of the proposal, in the source version of its changeset.
-    Proposal(Vec<Passage>),
+    /// The evidence of the proposal.
+    Proposal(Vec<Evidence>),
     /// The reviewer edited the value. The store keeps the edited state as a source version of the kind
     /// `review`, with the reviewer as author, and links it as the evidence (ADR 0050).
     Edit,
@@ -188,8 +187,6 @@ impl Debug for ApplyStep {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApplyPlan {
     pub changeset_id: ChangesetId,
-    /// The source version of the changeset. The passages of the proposals point into it.
-    pub source_version_id: SourceVersionId,
     /// The reviewer: the author of the review results, the fact versions and the review source versions.
     pub reviewer: Actor,
     /// The member who becomes the event manager of each new event (ADR 0052),
@@ -468,7 +465,6 @@ pub async fn apply_changeset(
         .collect();
     let plan = ApplyPlan {
         changeset_id,
-        source_version_id: changeset.source_version_id,
         reviewer: caller.actor(),
         manager: caller.user_id(),
         now,

@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{FactId, SourceVersionId};
-use tada_app::domain::sources::Passage;
-use tada_app::drafts::{CitedFact, CitedPassage, LintKind, LintWarning, ProvenanceManifest};
+use tada_app::domain::sources::{Evidence, Passage};
+use tada_app::drafts::{CitedFact, LintKind, LintWarning, ProvenanceManifest};
 
 use crate::error::InvalidRow;
 
@@ -84,7 +84,7 @@ pub(crate) fn manifest_from_json(
         sources: record
             .sources
             .into_iter()
-            .map(|source| CitedPassage {
+            .map(|source| Evidence {
                 source_version_id: SourceVersionId::from_uuid(source.source_version_id),
                 passage: Passage {
                     start: source.start,
@@ -152,7 +152,7 @@ mod tests {
                 fact_id: FactId::from_uuid(Uuid::from_u128(1)),
                 version: RecordVersion::new(3).unwrap(),
             }],
-            sources: vec![CitedPassage {
+            sources: vec![Evidence {
                 source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(2)),
                 passage: Passage {
                     start: 4,

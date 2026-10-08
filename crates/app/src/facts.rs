@@ -12,10 +12,10 @@ use tada_domain::facts::{
 };
 use tada_domain::ids::{
     ChangesetId, EventId, FactId, FactVersionId, FieldDefinitionId, OpenQuestionId, ProposalId,
-    SourceVersionId, UserId,
+    UserId,
 };
 use tada_domain::proposals::QuestionText;
-use tada_domain::sources::Passage;
+use tada_domain::sources::Evidence;
 
 use crate::access::{self, AccessError, Principal};
 use crate::caller::OrgScope;
@@ -72,14 +72,8 @@ pub struct ProfileEntry {
     /// The number of the current fact version.
     pub version: RecordVersion,
     pub state: FactState<Valued>,
-    pub evidence: Vec<EvidenceRef>,
-}
-
-/// One evidence link of a fact version: a passage of a source version.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EvidenceRef {
-    pub source_version_id: SourceVersionId,
-    pub passage: Passage,
+    /// The evidence links of the fact version.
+    pub evidence: Vec<Evidence>,
 }
 
 /// The current version of one fact.

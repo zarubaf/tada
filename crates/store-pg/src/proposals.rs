@@ -20,7 +20,7 @@ use tada_app::domain::ids::{
     SourceVersionId, UserId,
 };
 use tada_app::domain::proposals::{DraftDocument, Operation, Proposal, QuestionText, Reason};
-use tada_app::domain::sources::{Passage, SourceText};
+use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::drafts::DraftProvenance;
 use tada_app::facts::{OpenProposalRef, OpenQuestionRef};
 use tada_app::proposals::{Changeset, Inserted, ProposalStore};
@@ -436,7 +436,7 @@ impl ProposalStore for Database {
         .map_err(store_error)?;
         // The evidence IDs are UUIDv7 in the order of the insert, so this keeps the order of the passages.
         let evidence = sqlx::query!(
-            "SELECT e.proposal_id, e.start_offset, e.end_offset, e.quote, e.page
+            "SELECT e.proposal_id, e.source_version_id, e.start_offset, e.end_offset, e.quote, e.page
              FROM proposal_evidence e
              JOIN proposal p ON p.organization_id = e.organization_id AND p.id = e.proposal_id
              WHERE e.organization_id = $1 AND p.changeset_id = $2
@@ -470,11 +470,16 @@ impl ProposalStore for Database {
                     .iter()
                     .filter(|passage| passage.proposal_id == row.id)
                     .map(|passage| {
-                        Ok(Passage {
-                            start: offset(passage.start_offset)?,
-                            end: offset(passage.end_offset)?,
-                            quote: passage.quote.clone(),
-                            page: passage.page.map(offset).transpose()?,
+                        Ok(Evidence {
+                            source_version_id: SourceVersionId::from_uuid(
+                                passage.source_version_id,
+                            ),
+                            passage: Passage {
+                                start: offset(passage.start_offset)?,
+                                end: offset(passage.end_offset)?,
+                                quote: passage.quote.clone(),
+                                page: passage.page.map(offset).transpose()?,
+                            },
                         })
                     })
                     .collect::<Result<_, InvalidRow>>()?,
@@ -557,7 +562,8 @@ async fn insert_changeset(
             .execute(&mut *conn)
             .await?;
         }
-        for passage in &proposal.evidence {
+        for evidence in &proposal.evidence {
+            let passage = &evidence.passage;
             let offset = |value: u32| {
                 i32::try_from(value).map_err(|error| sqlx::Error::Encode(Box::new(error)))
             };
@@ -568,7 +574,7 @@ async fn insert_changeset(
                 Uuid::now_v7(),
                 organization,
                 proposal.id.as_uuid(),
-                changeset.source_version_id.as_uuid(),
+                evidence.source_version_id.as_uuid(),
                 offset(passage.start)?,
                 offset(passage.end)?,
                 passage.quote,

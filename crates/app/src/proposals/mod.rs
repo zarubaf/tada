@@ -19,7 +19,7 @@ use tada_domain::ids::{
     self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId,
 };
 use tada_domain::proposals::{DependencyError, Operation, Proposal, Reason, check_dependencies};
-use tada_domain::sources::{Passage, PassageError, SourceText};
+use tada_domain::sources::{Evidence, Passage, PassageError, SourceText};
 use uuid::Uuid;
 
 pub use self::input::{
@@ -227,12 +227,14 @@ pub async fn create_changeset(
     authorize(caller, event_id, stores.identity).await?;
 
     let source = SourceText::normalize(&input.source_text);
+    let source_version_id = SourceVersionId::from_uuid(Uuid::now_v7());
     let retry = input.id.is_some();
-    let (id, proposals) = parse(input, &source)?;
+    let (id, proposals) = parse(input, &source, source_version_id)?;
     let intake = Intake {
         event_id,
         author: caller.actor(),
         source: &source,
+        source_version_id,
         proposals: &proposals,
     };
     if retry && let Some(stored) = stores.proposals.get(scope, id).await? {
@@ -247,7 +249,7 @@ pub async fn create_changeset(
         id,
         event_id,
         author: caller.actor(),
-        source_version_id: SourceVersionId::from_uuid(Uuid::now_v7()),
+        source_version_id,
         created_at: clock.now(),
         proposals: proposals.clone(),
         drafts,
@@ -277,6 +279,8 @@ struct Intake<'a> {
     event_id: Option<EventId>,
     author: Actor,
     source: &'a SourceText,
+    /// The new source version of `source`. A stored changeset has its own.
+    source_version_id: SourceVersionId,
     proposals: &'a [Proposal],
 }
 
@@ -287,6 +291,17 @@ impl Intake<'_> {
         let author = |actor: &Actor| (actor.kind(), actor.id(), actor.principal());
         let mut proposals = self.proposals.to_vec();
         proposals.sort_by_key(|proposal| proposal.id);
+        // The evidence in the intake text names the source version of the stored changeset.
+        let intake = |mut evidence: Evidence| {
+            if evidence.source_version_id == self.source_version_id {
+                evidence.source_version_id = stored.source_version_id;
+            }
+            evidence
+        };
+        let proposals = proposals.into_iter().map(|mut proposal| {
+            proposal.evidence = proposal.evidence.into_iter().map(intake).collect();
+            proposal
+        });
         let normalized = |mut proposal: Proposal| {
             proposal.depends_on.sort();
             proposal
@@ -294,13 +309,13 @@ impl Intake<'_> {
         let same = stored.event_id == self.event_id
             && author(&stored.author) == author(&self.author)
             && &source == self.source
-            && stored.proposals.len() == proposals.len()
+            && stored.proposals.len() == self.proposals.len()
             && stored
                 .proposals
                 .iter()
                 .cloned()
                 .map(normalized)
-                .eq(proposals.into_iter().map(normalized));
+                .eq(proposals.map(normalized));
         if same {
             Ok(Created::Existing(stored))
         } else {
@@ -347,10 +362,12 @@ fn record_id_error(uuid: Uuid) -> Option<&'static str> {
     (!ids::is_record_id(uuid)).then_some("not-uuid-v7")
 }
 
-/// Maps the input to the domain, and checks the evidence of each proposal against the source text.
+/// Maps the input to the domain, and checks the evidence of each proposal against the source text,
+/// which tada stores as the source version `source_version_id`.
 fn parse(
     input: NewChangeset,
     source: &SourceText,
+    source_version_id: SourceVersionId,
 ) -> Result<(ChangesetId, Vec<Proposal>), ProposeError> {
     let mut errors = Vec::new();
     let id = match input.id {
@@ -388,7 +405,10 @@ fn parse(
                 None => passage.check(source.as_str()),
             };
             match checked {
-                Ok(()) => evidence.push(passage),
+                Ok(()) => evidence.push(Evidence {
+                    source_version_id,
+                    passage,
+                }),
                 Err(error) => errors.push(FieldError::new(
                     path(&format!("evidence/{number}")),
                     passage_error_code(error),

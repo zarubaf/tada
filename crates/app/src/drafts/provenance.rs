@@ -4,8 +4,8 @@
 //! against the stored fact versions and source versions, and fixes this manifest with the proposal.
 
 use tada_domain::RecordVersion;
-use tada_domain::ids::{FactId, ProposalId, SourceVersionId};
-use tada_domain::sources::Passage;
+use tada_domain::ids::{FactId, ProposalId};
+use tada_domain::sources::Evidence;
 
 use super::LintWarning;
 
@@ -13,7 +13,8 @@ use super::LintWarning;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ProvenanceManifest {
     pub facts: Vec<CitedFact>,
-    pub sources: Vec<CitedPassage>,
+    /// Each cited passage with the quote of its range.
+    pub sources: Vec<Evidence>,
 }
 
 /// An exact fact version: accepted, an assumption or unknown, never an open proposal.
@@ -21,13 +22,6 @@ pub struct ProvenanceManifest {
 pub struct CitedFact {
     pub fact_id: FactId,
     pub version: RecordVersion,
-}
-
-/// A passage of a source version, with the quote of its range.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CitedPassage {
-    pub source_version_id: SourceVersionId,
-    pub passage: Passage,
 }
 
 /// What tada fixes with a draft proposal at its creation: the manifest and the lint warnings for the review.
