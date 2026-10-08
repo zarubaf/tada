@@ -15,19 +15,19 @@
   }
 
   .add {
+    container-type: inline-size;
     display: grid;
     gap: var(--space-3);
     max-width: 40rem;
   }
 
-  /* Narrow: one column with a full-width button. Medium and wide: one row. */
+  /* A narrow container: one column with a full-width button. A wider one: one row (ADR 0019). */
   .addForm {
     display: grid;
     gap: var(--space-3);
   }
 
-  @media (width >= 40rem) {
-    /* --bp-medium */
+  @container (width >= 28rem) {
     .addForm {
       grid-template-columns: 1fr 1fr auto;
       align-items: end;

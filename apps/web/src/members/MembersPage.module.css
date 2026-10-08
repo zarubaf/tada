@@ -27,17 +27,18 @@
 
   /* One column, at most 40rem wide (doc/design/components.md, „Forms“). */
   .form {
+    container-type: inline-size;
     display: grid;
     gap: var(--space-4);
     max-width: 40rem;
   }
 
-  /* The primary action is full width on narrow layouts and on the right on wide layouts. */
+  /* The primary action is full width in a narrow form and on the right in a wide one (ADR 0019). */
   .actions {
     display: grid;
   }
 
-  @media (width >= 40rem) {
+  @container (width >= 28rem) {
     .actions {
       justify-items: end;
     }

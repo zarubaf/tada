@@ -20,6 +20,13 @@
     }
   }
 
+  @media (width >= 80rem) {
+    /* --bp-wide */
+    .page {
+      padding-inline: var(--space-8);
+    }
+  }
+
   .title {
     font-size: var(--font-size-2xl);
     font-weight: var(--font-weight-semibold);
