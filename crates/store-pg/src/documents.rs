@@ -941,7 +941,17 @@ mod tests {
             .publish(a.scope(), &foreign, &audit_of(&a, &foreign))
             .await
             .unwrap_err();
-        assert!(matches!(error, StoreError::Internal(_)), "{error:?}");
+        let StoreError::Internal(source) = &error else {
+            panic!("not internal: {error:?}");
+        };
+        let constraint = source
+            .downcast_ref::<sqlx::Error>()
+            .and_then(|error| error.as_database_error())
+            .and_then(|error| error.constraint());
+        assert_eq!(
+            constraint,
+            Some("document_version_blob_key_in_organization")
+        );
         assert_eq!(count(&test, "document_version").await, 0);
     }
 

@@ -402,7 +402,8 @@ pub async fn upload_document(
 /// 3. The content gives the type (ADR 0055).
 /// 4. The store checks the storage quota and publishes the version, its source version and an audit event in one transaction.
 ///
-/// If a step fails, the object is deleted and nothing is stored.
+/// If a step fails, nothing is stored. A rejected upload also deletes its object.
+/// After a store error, the outcome of the commit is unknown, so the object stays.
 pub async fn upload_version(
     caller: &MemberCaller,
     document_id: DocumentId,
@@ -437,7 +438,8 @@ async fn check_may_upload(
     }
 }
 
-/// Streams the file to a new key, checks it and publishes it. On an error, it deletes the object.
+/// Streams the file to a new key, checks it and publishes it.
+/// It deletes the object after a definite rejection, and keeps it after a store error of the publish.
 async fn upload(
     caller: &MemberCaller,
     target: UploadTarget,
