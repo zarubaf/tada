@@ -43,6 +43,7 @@ mod identity;
 mod jobs;
 mod members;
 mod outbound;
+mod privacy;
 mod proposals;
 pub mod rate_limit;
 mod review;

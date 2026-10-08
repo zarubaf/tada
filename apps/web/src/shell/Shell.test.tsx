@@ -108,6 +108,17 @@ describe("Shell", () => {
     expect(JSON.parse(calls[1]?.body ?? "")).toEqual({ organization_id: second.organization_id });
   });
 
+  it("links to the privacy notice in the footer and in the member menu", async () => {
+    renderShell(json(200, info([first], first)));
+
+    const footer = await screen.findByRole("link", { name: "Datenschutz" });
+    expect(footer).toHaveAttribute("href", "/privacy");
+    await userEvent.click(screen.getByRole("button", { name: "Anna Muster" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Datenschutz" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/privacy"));
+  });
+
   it("signs out from the member menu", async () => {
     const calls = renderShell(json(200, info([first], first)), new Response(null, { status: 204 }));
 

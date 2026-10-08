@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Api, InvitationPreview } from "../api/client";
 import { type Failure, failureOf, invalidFailure, useWaiting } from "../api/failure";
 import { t } from "../i18n";
+import { PrivacyNoticeText } from "../privacy/PrivacyNoticeText";
 import { useNavigate } from "../router/Router";
 import { useRefreshSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
@@ -26,6 +27,8 @@ export function InvitationPage({ api }: { api: Api }) {
     token ? undefined : invalidFailure(t("invitation-invalid")),
   );
   const [busy, setBusy] = useState(false);
+  // The invitee reads the notice before the click that accepts (ADR 0045): the button waits for it.
+  const [noticeShown, setNoticeShown] = useState(false);
   const waiting = useWaiting(failure);
   const refresh = useRefreshSession();
   const navigate = useNavigate();
@@ -103,9 +106,18 @@ export function InvitationPage({ api }: { api: Api }) {
               role: t(`role-${preview.preview.role}`),
             })}
           </PublicText>
-          <Button variant="primary" isPending={busy || waiting} onPress={() => void accept()}>
-            {t("invitation-accept")}
-          </Button>
+          {/* The invitee reads the notice before the click that accepts (ADR 0045). */}
+          <section aria-label={t("invitation-privacy-title")}>
+            <PrivacyNoticeText
+              markdown={preview.preview.privacy_notice}
+              onShown={() => setNoticeShown(true)}
+            />
+          </section>
+          {noticeShown && (
+            <Button variant="primary" isPending={busy || waiting} onPress={() => void accept()}>
+              {t("invitation-accept")}
+            </Button>
+          )}
         </>
       )}
       {/* After a failed accept that is not final, the button stays and keeps focus. */}

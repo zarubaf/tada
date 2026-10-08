@@ -46,9 +46,13 @@ run = "mdformat --check $(git ls-files --cached --others --exclude-standard '*.m
 description = "Check prose style and spelling"
 run = "vale --minAlertLevel=error $(git ls-files --cached --others --exclude-standard '*.md')"
 
+[tasks."check:data-inventory"]
+description = "Check that the data inventory names each table of the migrations (ADR 0045)"
+run = "uv run --quiet scripts/check_data_inventory.py"
+
 [tasks."check:docs"]
 description = "Run all documentation checks"
-depends = ["check:docs-format", "check:docs-style"]
+depends = ["check:docs-format", "check:docs-style", "check:data-inventory"]
 
 [tasks."check:secrets"]
 description = "Scan the full Git history for secrets"
@@ -56,7 +60,7 @@ run = "gitleaks git --redact --no-banner ."
 
 [tasks."check:scripts"]
 description = "Lint and format-check Python scripts"
-run = ["ruff check .", "ruff format --check ."]
+run = ["ruff check .", "ruff format --check .", "uv run --quiet scripts/test_check_data_inventory.py"]
 
 [tasks."check:rust-format"]
 description = "Check Rust formatting"

@@ -83,6 +83,7 @@ pub fn api_state(
         review: database.clone(),
         sources: database.clone(),
         tokens: database.clone(),
+        privacy: database.clone(),
     }
 }
 

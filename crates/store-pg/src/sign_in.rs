@@ -161,7 +161,7 @@ impl SignInStore for Database {
         now: Timestamp,
     ) -> Result<Option<InvitationPreview>, StoreError> {
         let row = sqlx::query!(
-            "SELECT o.name AS organization_name, i.role
+            "SELECT o.name AS organization_name, o.privacy_notice, i.role
              FROM invitation_token t
              JOIN invitation i ON i.organization_id = t.organization_id AND i.id = t.invitation_id
              JOIN organization o ON o.id = i.organization_id
@@ -175,6 +175,7 @@ impl SignInStore for Database {
         row.map(|row| {
             Ok(InvitationPreview {
                 organization_name: row.organization_name,
+                privacy_notice: row.privacy_notice,
                 role: organization_role(&row.role)?,
             })
         })

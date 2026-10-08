@@ -31,6 +31,8 @@ pub enum AuditAction {
     OrganizationFeatureEnable,
     /// An owner switched a feature of the organization off (ADR 0036).
     OrganizationFeatureDisable,
+    /// An owner replaced the privacy notice of the organization (ADR 0045). The event holds no text.
+    OrganizationSetPrivacyNotice,
     /// A member uploaded a file as a new document version, of a new or an existing document.
     DocumentVersionUpload,
     /// An event manager approved a draft version (ADR 0051, ADR 0052).
@@ -59,6 +61,7 @@ impl AuditAction {
             Self::ApiTokenRevoke => "api_token.revoke",
             Self::OrganizationFeatureEnable => "organization_feature.enable",
             Self::OrganizationFeatureDisable => "organization_feature.disable",
+            Self::OrganizationSetPrivacyNotice => "organization.set_privacy_notice",
             Self::DocumentVersionUpload => "document_version.upload",
             Self::DocumentVersionApprove => "document_version.approve",
         }
@@ -67,7 +70,7 @@ impl AuditAction {
     /// The kind of the record that `record_id` identifies.
     pub fn record_kind(self) -> &'static str {
         match self {
-            Self::OrganizationCreate => "organization",
+            Self::OrganizationCreate | Self::OrganizationSetPrivacyNotice => "organization",
             Self::InvitationCreate
             | Self::InvitationRevoke
             | Self::InvitationAccept

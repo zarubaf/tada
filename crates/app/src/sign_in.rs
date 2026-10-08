@@ -66,6 +66,9 @@ pub trait SignInStore: Debug + Send + Sync {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InvitationPreview {
     pub organization_name: String,
+    /// The privacy notice of the organization (ADR 0045). `None` means that the template applies.
+    /// The invitee sees it before the acceptance.
+    pub privacy_notice: Option<String>,
     pub role: OrganizationRole,
 }
 
@@ -330,6 +333,7 @@ mod tests {
             assert_eq!(now, NOW);
             Ok((token == "valid").then(|| InvitationPreview {
                 organization_name: "Open Day Testwil".into(),
+                privacy_notice: None,
                 role: OrganizationRole::Admin,
             }))
         }
