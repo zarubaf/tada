@@ -21,6 +21,7 @@ import { t } from "../i18n";
 import { Redirect, useNavigate, usePathname } from "../router/Router";
 import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { Page } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath, SIGN_IN_PATH } from "./paths";
 
@@ -164,19 +165,22 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
     if (session && pathname === SIGN_IN_PATH) {
       return <Redirect to="/events" />;
     }
+    // The loading and the failed state are in `main`, so that the skip link has a target.
     if (state.kind === "failed") {
       return (
-        <InlineError
-          message={state.message}
-          requestId={state.requestId}
-          onRetry={() =>
-            retry(() => {
-              setState({ kind: "loading" });
-              return load();
-            })
-          }
-          announce={retried ? "focus" : "alert"}
-        />
+        <Page>
+          <InlineError
+            message={state.message}
+            requestId={state.requestId}
+            onRetry={() =>
+              retry(() => {
+                setState({ kind: "loading" });
+                return load();
+              })
+            }
+            announce={retried ? "focus" : "alert"}
+          />
+        </Page>
       );
     }
     if (state.kind === "signed-out") {
@@ -184,9 +188,11 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
     }
     if (!session) {
       return (
-        <div role="status" aria-label={t("session-loading")}>
-          <Skeleton />
-        </div>
+        <Page>
+          <div role="status" aria-label={t("session-loading")}>
+            <Skeleton />
+          </div>
+        </Page>
       );
     }
     if (!session.organization && !isPublic && pathname !== CHOOSE_ORGANIZATION_PATH) {

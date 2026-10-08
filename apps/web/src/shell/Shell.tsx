@@ -40,7 +40,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.side} aria-label={t("shell-side")}>
+      <header className={styles.side}>
         <p className={styles.brand}>{t("app-name")}</p>
         {memberships.length > 1 && (
           <div className={styles.switcher}>
@@ -75,7 +75,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
         <LiveRegion kind="alert" className={styles.failure}>
           {failure}
         </LiveRegion>
-      </aside>
+      </header>
       <Fragment key={organization.organization_id}>{children}</Fragment>
     </div>
   );
