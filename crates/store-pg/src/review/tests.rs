@@ -6,6 +6,7 @@ use tada_app::clock::Clock;
 use tada_app::domain::facts::core_catalog;
 use tada_app::domain::identity::{DisplayName, Email, EventRole};
 use tada_app::domain::ids::{ChangesetId, EventId, OrganizationId, ProposalId, UserId};
+use tada_app::paging::PageLimit;
 use tada_app::proposals::ProposalStore;
 use tada_app::proposals::{
     Changeset, Created, FactStateInput, NewChangeset, ProposeStores, ValueInput, create_changeset,
@@ -552,16 +553,30 @@ async fn a_contributor_cannot_review() {
         matches!(rejected, Err(ApplyError::Forbidden)),
         "{rejected:?}"
     );
-    let listed =
-        list_open_changesets(contributor, Some(event), &test.database, &test.database).await;
+    let listed = list_open_changesets(
+        contributor,
+        Some(event),
+        None,
+        PageLimit::DEFAULT,
+        &test.database,
+        &test.database,
+    )
+    .await;
     assert!(
         matches!(listed, Err(ReviewQueryError::Forbidden)),
         "{listed:?}"
     );
-    let inbox = list_open_changesets(contributor, None, &test.database, &test.database)
-        .await
-        .unwrap();
-    assert!(inbox.is_empty());
+    let inbox = list_open_changesets(
+        contributor,
+        None,
+        None,
+        PageLimit::DEFAULT,
+        &test.database,
+        &test.database,
+    )
+    .await
+    .unwrap();
+    assert!(inbox.items.is_empty());
 
     // An owner of another organization does not find the changeset.
     let elsewhere = test.create_organization("musterhausen").await;
@@ -700,12 +715,20 @@ async fn new_event(
 
 /// The IDs of the Review Inbox of `caller`.
 async fn inbox(test: &TestDatabase, caller: &MemberCaller) -> Vec<ChangesetId> {
-    list_open_changesets(caller, None, &test.database, &test.database)
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|changeset| changeset.id)
-        .collect()
+    list_open_changesets(
+        caller,
+        None,
+        None,
+        PageLimit::DEFAULT,
+        &test.database,
+        &test.database,
+    )
+    .await
+    .unwrap()
+    .items
+    .into_iter()
+    .map(|changeset| changeset.id)
+    .collect()
 }
 
 #[tokio::test]
@@ -746,11 +769,14 @@ async fn the_review_inbox_shows_organization_changesets_to_owners_and_admins_onl
     let listed = list_open_changesets(
         &open_day.manager,
         Some(event),
+        None,
+        PageLimit::DEFAULT,
         &test.database,
         &test.database,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .items;
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].open_proposals, 1);
     assert_eq!(listed[0].event_id, Some(event));
@@ -905,10 +931,18 @@ async fn the_rejection_of_a_new_event_rejects_its_facts() {
         "{again:?}"
     );
     assert!(
-        list_open_changesets(&open_day.owner, None, &test.database, &test.database)
-            .await
-            .unwrap()
-            .is_empty()
+        list_open_changesets(
+            &open_day.owner,
+            None,
+            None,
+            PageLimit::DEFAULT,
+            &test.database,
+            &test.database,
+        )
+        .await
+        .unwrap()
+        .items
+        .is_empty()
     );
 }
 

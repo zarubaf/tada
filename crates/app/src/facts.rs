@@ -4,8 +4,12 @@ use std::fmt::Debug;
 
 use async_trait::async_trait;
 use jiff::Timestamp;
+use serde_json::{Value as Json, json};
 use tada_domain::RecordVersion;
-use tada_domain::facts::{DateWindow, FactState, FactValue, FieldDefinition, Valued, core_catalog};
+use tada_domain::facts::{
+    Currency, DateWindow, Decimal, FactState, FactValue, FieldDefinition, Granularity,
+    ReferenceTarget, ShortText, Unit, ValueType, Valued, core_catalog,
+};
 use tada_domain::ids::{
     ChangesetId, EventId, FactId, FactVersionId, FieldDefinitionId, OpenQuestionId, ProposalId,
     SourceVersionId, UserId,
@@ -117,6 +121,110 @@ pub async fn get_event_profile(
     Ok(store.profile(caller.scope(), event).await?)
 }
 
+/// The field catalog of the event, for each caller who can read the event.
+pub async fn get_field_catalog(
+    caller: &impl Principal,
+    event: EventId,
+    identity: &dyn IdentityStore,
+    store: &dyn FactStore,
+) -> Result<Vec<FieldDefinition>, AccessError> {
+    let access = access::event_access(caller, event, identity).await?;
+    if !access.can_read() {
+        return Err(AccessError::NotFound);
+    }
+    Ok(store.catalog(caller.scope(), event).await?)
+}
+
+/// The JSON Schema of a value of a field with `value_type`: the `ValueInput` of a proposal, narrowed to this field.
+/// The API and the MCP tools give it to clients, so that an agent can propose a valid value (ADR 0040).
+pub fn value_schema(value_type: &ValueType) -> Json {
+    let date = || json!({"type": "string", "format": "date"});
+    let decimal = |unit: &Unit| {
+        json!({
+            "type": "string",
+            "pattern": format!(r"^-?[0-9]+(\.[0-9]{{1,{}}})?$", Decimal::MAX_SCALE),
+            "description": format!("A decimal number in the unit `{}`.", unit.as_str()),
+        })
+    };
+    let money = |currency: &Currency| {
+        json!({
+            "type": "integer",
+            "description": format!("An amount in the minor unit of `{}`.", currency.as_str()),
+        })
+    };
+    let (tag, properties) = match value_type {
+        ValueType::Text => (
+            "text",
+            json!({"text": {"type": "string", "minLength": 1, "maxLength": ShortText::MAX_CHARS}}),
+        ),
+        ValueType::Boolean => ("boolean", json!({"value": {"type": "boolean"}})),
+        ValueType::Quantity { unit } => (
+            "quantity",
+            json!({"min": decimal(unit), "max": decimal(unit)}),
+        ),
+        ValueType::Money { currency } => (
+            "money",
+            json!({"min": money(currency), "max": money(currency)}),
+        ),
+        ValueType::Date => ("date", json!({"date": date()})),
+        ValueType::DateWindow { granularity } => {
+            let granularity = match granularity {
+                Some(granularity) => json!({"const": granularity_name(*granularity)}),
+                None => json!({"enum": ["day", "week", "month"]}),
+            };
+            (
+                "date_window",
+                json!({"start": date(), "end": date(), "granularity": granularity}),
+            )
+        }
+        ValueType::Choice { values, multiple } => {
+            let keys: Vec<&str> = values.iter().map(|value| value.key.as_str()).collect();
+            let mut list = json!({
+                "type": "array",
+                "items": {"enum": keys},
+                "minItems": 1,
+                "uniqueItems": true,
+            });
+            if !multiple {
+                list["maxItems"] = json!(1);
+            }
+            ("choice", json!({"keys": list}))
+        }
+        ValueType::Reference { target } => {
+            let target = match target {
+                ReferenceTarget::Document => "document",
+                ReferenceTarget::Event => "event",
+            };
+            (
+                "reference",
+                json!({"target": {"const": target}, "id": {"type": "string", "format": "uuid"}}),
+            )
+        }
+    };
+    let mut properties = properties;
+    properties["type"] = json!({"const": tag});
+    let mut required: Vec<&String> = properties
+        .as_object()
+        .map(|properties| properties.keys().collect())
+        .unwrap_or_default();
+    required.sort();
+    json!({
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": false,
+    })
+}
+
+/// The API name of a granularity (ADR 0044).
+pub fn granularity_name(granularity: Granularity) -> &'static str {
+    match granularity {
+        Granularity::Day => "day",
+        Granularity::Week => "week",
+        Granularity::Month => "month",
+    }
+}
+
 /// The value type of a reserved core field does not match its typed accessor.
 #[derive(Debug, thiserror::Error)]
 #[error("the fact of the reserved field {0} holds a value of another value type")]
@@ -164,9 +272,12 @@ mod tests {
     use tada_domain::ids::{OrganizationId, UserId};
     use uuid::Uuid;
 
+    use tada_domain::facts::ReferenceTarget;
+
     use super::*;
     use crate::caller::MemberCaller;
     use crate::identity::{Membership, UserRef};
+    use crate::proposals::ValueInput;
 
     /// One event of one organization. The store answers with `current` and an empty profile.
     #[derive(Debug, Default)]
@@ -190,7 +301,7 @@ mod tests {
             _: OrgScope,
             _: EventId,
         ) -> Result<Vec<FieldDefinition>, StoreError> {
-            unreachable!()
+            Ok(core_catalog())
         }
 
         async fn profile(&self, _: OrgScope, _: EventId) -> Result<EventProfile, StoreError> {
@@ -290,6 +401,119 @@ mod tests {
         let member = caller(OrganizationRole::Member);
         let profile = get_event_profile(&member, open_day(), &memory, &memory).await;
         assert!(matches!(profile, Err(AccessError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn a_reader_of_the_event_gets_its_field_catalog() {
+        let memory = Memory::default();
+        let owner = caller(OrganizationRole::Owner);
+        let catalog = get_field_catalog(&owner, open_day(), &memory, &memory).await;
+        assert_eq!(catalog.unwrap(), core_catalog());
+        let member = caller(OrganizationRole::Member);
+        let catalog = get_field_catalog(&member, open_day(), &memory, &memory).await;
+        assert!(matches!(catalog, Err(AccessError::NotFound)));
+    }
+
+    /// The variants of `ValueInput`: the value of `type` and the names of the properties of each.
+    fn value_input_variants() -> Vec<(String, Vec<String>, Vec<String>)> {
+        let schema = serde_json::to_value(schemars::schema_for!(ValueInput)).unwrap();
+        schema["oneOf"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|variant| {
+                let tag = variant["properties"]["type"]["const"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned();
+                (tag, keys(variant), required(variant))
+            })
+            .collect()
+    }
+
+    fn keys(schema: &serde_json::Value) -> Vec<String> {
+        let mut keys: Vec<String> = schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    fn required(schema: &serde_json::Value) -> Vec<String> {
+        let mut required: Vec<String> = schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|key| key.as_str().unwrap().to_owned())
+            .collect();
+        required.sort();
+        required
+    }
+
+    fn each_value_type() -> Vec<ValueType> {
+        let mut types: Vec<ValueType> = core_catalog()
+            .into_iter()
+            .map(|field| field.value_type)
+            .collect();
+        types.extend([
+            ValueType::Boolean,
+            ValueType::Date,
+            ValueType::Reference {
+                target: ReferenceTarget::Document,
+            },
+        ]);
+        types
+    }
+
+    #[test]
+    fn the_schema_of_each_value_type_has_the_shape_of_its_value_input() {
+        let variants = value_input_variants();
+        let mut tags = Vec::new();
+        for value_type in each_value_type() {
+            let schema = value_schema(&value_type);
+            let tag = schema["properties"]["type"]["const"].as_str().unwrap();
+            let (_, input_keys, input_required) = variants
+                .iter()
+                .find(|(variant, _, _)| variant == tag)
+                .unwrap_or_else(|| panic!("no value input of the type {tag}"));
+            assert_eq!(&keys(&schema), input_keys, "{tag}");
+            assert_eq!(&required(&schema), input_required, "{tag}");
+            assert_eq!(schema["additionalProperties"], false, "{tag}");
+            tags.push(tag.to_owned());
+        }
+        tags.sort();
+        tags.dedup();
+        assert_eq!(
+            tags.len(),
+            variants.len(),
+            "a value input without a value type"
+        );
+    }
+
+    #[test]
+    fn the_schema_of_a_choice_lists_its_keys_and_limits_a_single_choice() {
+        let audience = core_catalog()
+            .into_iter()
+            .find(|field| field.key.as_str() == "audience")
+            .unwrap();
+        let schema = value_schema(&audience.value_type);
+        let keys = &schema["properties"]["keys"];
+        assert_eq!(
+            keys["items"]["enum"],
+            serde_json::json!(["public", "members", "invited"])
+        );
+        assert_eq!(keys["minItems"], 1);
+        assert_eq!(keys["maxItems"], 1);
+        let window = value_schema(&ValueType::DateWindow {
+            granularity: Some(Granularity::Day),
+        });
+        assert_eq!(
+            window["properties"]["granularity"],
+            serde_json::json!({"const": "day"})
+        );
     }
 
     #[tokio::test]

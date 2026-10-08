@@ -4,6 +4,8 @@
 //! Review results are append-only. The status of a proposal comes from its latest review result.
 //! Only a `MemberCaller` reviews: an AI client cannot accept proposals (ADR 0010, ADR 0039).
 
+mod read;
+
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
@@ -16,12 +18,16 @@ use tada_domain::ids::{
 use tada_domain::proposals::{Operation, Proposal};
 use tada_domain::sources::{Passage, SourceText};
 
+pub use self::read::{
+    ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, get_changeset,
+};
 use crate::access::{self, AccessError};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::facts::FactStore;
 use crate::identity::IdentityStore;
+use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::{
     Changeset, FactStateInput, ProposalStore, state_from_input, value_error_code,
@@ -510,7 +516,7 @@ pub async fn reject_proposals(
     let (changeset, _) = reviewable(caller, changeset_id, stores).await?;
     let results = stores.review.results(scope, changeset_id).await?;
 
-    let given = selection(&changeset, &ids, "ids")?;
+    let given = selection(&changeset, &ids, "proposal_ids")?;
     let is_open = |id: ProposalId| proposal_status(&results, id) == ProposalStatus::Open;
     if !given.iter().all(|id| is_open(*id)) {
         return Err(ApplyError::InvalidTransition);
@@ -583,12 +589,31 @@ impl CommandError for ReviewQueryError {
     }
 }
 
-/// The changesets with open proposals that the caller can review, oldest first.
+/// The position of an open changeset in the list of open changesets, which is oldest first (ADR 0044).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChangesetCursor {
+    pub created_at: Timestamp,
+    pub id: ChangesetId,
+}
+
+/// One page of the changesets with open proposals that the caller can review, oldest first.
 ///
 /// `Some(event)` lists the changesets of one event and needs the right to review it.
 /// `None` is the Review Inbox: the changesets of each event that the caller reviews and, for owners and admins,
 /// the changesets of the organization, for example a new event.
 pub async fn list_open_changesets(
+    caller: &MemberCaller,
+    event_id: Option<EventId>,
+    after: Option<ChangesetCursor>,
+    limit: PageLimit,
+    identity: &dyn IdentityStore,
+    store: &dyn ReviewStore,
+) -> Result<Page<OpenChangeset, ChangesetCursor>, ReviewQueryError> {
+    let visible = visible_open_changesets(caller, event_id, identity, store).await?;
+    Ok(page(visible, after, limit))
+}
+
+async fn visible_open_changesets(
     caller: &MemberCaller,
     event_id: Option<EventId>,
     identity: &dyn IdentityStore,
@@ -620,6 +645,36 @@ pub async fn list_open_changesets(
         }
     }
     Ok(visible)
+}
+
+/// The page after `after` of `changesets`, which are oldest first.
+/// The access of the caller filters the changesets, so the page comes after the filter.
+/// The open changesets of an organization are few, so the store gives them all.
+fn page(
+    changesets: Vec<OpenChangeset>,
+    after: Option<ChangesetCursor>,
+    limit: PageLimit,
+) -> Page<OpenChangeset, ChangesetCursor> {
+    let limit = limit.get() as usize;
+    let mut items: Vec<OpenChangeset> = changesets
+        .into_iter()
+        .filter(|changeset| {
+            after.is_none_or(|after| {
+                (changeset.created_at, changeset.id) > (after.created_at, after.id)
+            })
+        })
+        .take(limit + 1)
+        .collect();
+    let more = items.len() > limit;
+    items.truncate(limit);
+    let next = more
+        .then(|| items.last())
+        .flatten()
+        .map(|last| ChangesetCursor {
+            created_at: last.created_at,
+            id: last.id,
+        });
+    Page { items, next }
 }
 
 /// True if the caller reviews the event, or for `None`, the changesets of the organization.
@@ -1115,6 +1170,41 @@ mod tests {
         let debug = format!("{step:?}");
         assert!(debug.contains("SetFact"), "{debug}");
         assert!(!debug.contains("Anna"), "{debug}");
+    }
+
+    fn open(n: u128, time: &str) -> OpenChangeset {
+        OpenChangeset {
+            id: ChangesetId::from_uuid(Uuid::from_u128(n)),
+            event_id: None,
+            author: Actor::restore(
+                crate::caller::ActorKind::Member,
+                Uuid::from_u128(9),
+                None,
+                crate::caller::Channel::Web,
+                None,
+            ),
+            created_at: at(time),
+            open_proposals: 1,
+        }
+    }
+
+    #[test]
+    fn a_page_of_open_changesets_continues_after_its_cursor() {
+        let all = || {
+            vec![
+                open(1, "2030-05-01T00:00:00Z"),
+                open(2, "2030-05-01T00:00:00Z"),
+                open(3, "2030-05-02T00:00:00Z"),
+            ]
+        };
+        let two = PageLimit::new(2).unwrap();
+        let first = page(all(), None, two);
+        assert_eq!(first.items, all()[..2]);
+        let cursor = first.next.unwrap();
+        assert_eq!(cursor.id, ChangesetId::from_uuid(Uuid::from_u128(2)));
+        let second = page(all(), Some(cursor), two);
+        assert_eq!(second.items, all()[2..]);
+        assert_eq!(second.next, None);
     }
 
     #[test]
