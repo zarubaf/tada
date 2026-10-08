@@ -113,6 +113,8 @@ pub fn router_with(state: ApiState, web_root: Option<&Path>, adapters: Router) -
         .route("/api/{*path}", any(not_found))
         // tada serves no well-known resource. A client that probes one, for example the OAuth
         // discovery of an MCP client after a 401, must get 404, not the web client (ADR 0040).
+        .route("/.well-known", any(not_found))
+        .route("/.well-known/", any(not_found))
         .route("/.well-known/{*path}", any(not_found));
     let router = match web_root {
         Some(root) => router.fallback_service(
@@ -691,6 +693,8 @@ mod tests {
             "/.well-known/oauth-protected-resource/mcp",
             "/.well-known/oauth-authorization-server",
             "/.well-known/openid-configuration",
+            "/.well-known/",
+            "/.well-known",
         ] {
             let (status, body) = get(&router, path).await;
             assert_eq!(status, StatusCode::NOT_FOUND, "{path}");

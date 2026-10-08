@@ -688,6 +688,25 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
         "OPEN30"
     );
     assert_eq!(body["result"]["isError"], false);
+
+    // A client may open a stream with GET or end a session with DELETE; the stateless server has neither.
+    for method in [Method::GET, Method::DELETE] {
+        let request = Request::builder()
+            .method(method.clone())
+            .uri("/mcp")
+            .header(header::HOST, "tada.example.org")
+            .header(header::AUTHORIZATION, format!("Bearer {}", mcp.token))
+            .header(header::ACCEPT, "text/event-stream")
+            .header("mcp-protocol-version", PROTOCOL_VERSION)
+            .body(Body::empty())
+            .unwrap();
+        let response = mcp.router.clone().oneshot(request).await.unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "{method}"
+        );
+    }
 }
 
 /// A citation and a search write no notice and no member text to the log (ADR 0035).
