@@ -4,6 +4,7 @@ import { type Failure, failureOf, useWaiting } from "../api/failure";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { InlineError } from "../ui/InlineError";
+import { LiveRegion } from "../ui/LiveRegion";
 import { TextField } from "../ui/TextField";
 import { formClass, PublicPage, PublicText } from "./PublicPage";
 
@@ -58,8 +59,7 @@ export function SignInPage({ api }: { api: Api }) {
           {t("sign-in-submit")}
         </Button>
       </form>
-      {/* The live region exists before its text, so that screen readers announce the change. */}
-      <p role="status">{sent ? t("sign-in-sent") : ""}</p>
+      <LiveRegion kind="status">{sent ? t("sign-in-sent") : ""}</LiveRegion>
       {failure && (
         <InlineError
           key={failure.id}

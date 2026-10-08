@@ -94,7 +94,7 @@ for (const viewport of viewports) {
         if (state.status === 200) {
           await expect(page.getByRole("table")).toBeVisible();
         } else {
-          await expect(page.getByRole("alert")).toBeVisible();
+          await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
         }
         if (state.name === "manager") {
           await expect(page.getByRole("button", { name: "Mitglied hinzufügen" })).toBeVisible();

@@ -6,6 +6,7 @@ import { useNavigate } from "../router/Router";
 import { useRefreshSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { InlineError } from "../ui/InlineError";
+import { LiveRegion } from "../ui/LiveRegion";
 import { takeFragmentToken } from "./fragment";
 import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
 
@@ -75,8 +76,9 @@ export function InvitationPage({ api }: { api: Api }) {
 
   return (
     <PublicPage title={t("invitation-title")}>
-      {/* The live region exists before its text, so that screen readers announce the change. */}
-      <p role="status">{preview.kind === "loading" && !failure ? t("invitation-loading") : ""}</p>
+      <LiveRegion kind="status">
+        {preview.kind === "loading" && !failure ? t("invitation-loading") : ""}
+      </LiveRegion>
       {preview.kind === "ready" && !failure?.final && (
         <>
           <PublicText>

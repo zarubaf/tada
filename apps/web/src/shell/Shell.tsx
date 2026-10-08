@@ -18,6 +18,7 @@ import { t } from "../i18n";
 import { Link, usePathname } from "../router/Router";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath } from "../session/paths";
 import { useOptionalSession } from "../session/SessionProvider";
+import { LiveRegion } from "../ui/LiveRegion";
 import styles from "./Shell.module.css";
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
@@ -95,11 +96,9 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
             </Menu>
           </Popover>
         </MenuTrigger>
-        {failure && (
-          <p className={styles.failure} role="alert">
-            {failure}
-          </p>
-        )}
+        <LiveRegion kind="alert" className={styles.failure}>
+          {failure}
+        </LiveRegion>
       </aside>
       <Fragment key={organization.organization_id}>{children}</Fragment>
     </div>

@@ -11,7 +11,9 @@ import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
+import { useFocusAfterCommit } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { LiveRegion } from "../ui/LiveRegion";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./TelegramPage.module.css";
 
@@ -40,7 +42,7 @@ export function TelegramPage({ api }: { api: Api }) {
   const alert = useRef<HTMLParagraphElement>(null);
   const codeBox = useRef<HTMLDivElement>(null);
   const requestsHeading = useRef<HTMLHeadingElement>(null);
-  const focusHeadingAfterClose = useRef(false);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const load = useCallback(
     async (attempts: number) => {
@@ -75,22 +77,6 @@ export function TelegramPage({ api }: { api: Api }) {
     void load(0);
   }, [load]);
 
-  // The pressed button leaves with its row. When the dialog has closed and given its focus back,
-  // focus goes to the heading of the list.
-  useEffect(() => {
-    if (confirming === undefined && focusHeadingAfterClose.current) {
-      focusHeadingAfterClose.current = false;
-      setTimeout(() => requestsHeading.current?.focus(), 0);
-    }
-  }, [confirming]);
-
-  // The code appears: focus goes to it, so that a screen reader reads it.
-  useEffect(() => {
-    if (code) {
-      codeBox.current?.focus();
-    }
-  }, [code]);
-
   const showFailure = (message: string) => {
     setFailure(message);
     // The failure may be far above the button that the member pressed.
@@ -108,6 +94,8 @@ export function TelegramPage({ api }: { api: Api }) {
       const result = await api.POST("/api/v1/telegram/link-codes");
       if (result.data) {
         setCode(result.data);
+        // Focus goes to the code, so that a screen reader reads it.
+        focusAfterCommit(() => codeBox.current);
       } else {
         showFailure(failureOf(result).message);
       }
@@ -130,7 +118,8 @@ export function TelegramPage({ api }: { api: Api }) {
         params: { path: { request_id: item.id } },
       });
       if (result.response.ok) {
-        focusHeadingAfterClose.current = true;
+        // The pressed button leaves with its row: focus goes to the heading of the list.
+        focusAfterCommit(() => requestsHeading.current);
         setConfirmation(t("telegram-linked"));
         // The code has done its work, and a stale code would mislead.
         setCode(undefined);
@@ -143,7 +132,7 @@ export function TelegramPage({ api }: { api: Api }) {
         showFailure(failureOf(result).message);
         if (result.error?.code === "not-found") {
           // The request is gone or taken: the list shows the truth again.
-          focusHeadingAfterClose.current = true;
+          focusAfterCommit(() => requestsHeading.current);
           void load(requests.attempts);
         }
       }
@@ -164,12 +153,12 @@ export function TelegramPage({ api }: { api: Api }) {
 
   return (
     <div className={styles.page}>
-      <p ref={alert} className={styles.failure} role="alert">
+      <LiveRegion ref={alert} kind="alert" className={styles.failure}>
         {failure}
-      </p>
-      <p className={styles.confirmation} role="status">
+      </LiveRegion>
+      <LiveRegion kind="status" className={styles.confirmation}>
         {confirmation}
-      </p>
+      </LiveRegion>
 
       <section className={styles.section} aria-labelledby="telegram-title">
         <h1 id="telegram-title" className={styles.title}>

@@ -15,7 +15,9 @@ import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
+import { useFocusAfterCommit } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { LiveRegion } from "../ui/LiveRegion";
 import { Skeleton } from "../ui/Skeleton";
 import { InviteMemberForm } from "./InviteMemberForm";
 import styles from "./MembersPage.module.css";
@@ -65,25 +67,8 @@ export function MembersPage({ api }: { api: Api }) {
   const [busy, setBusy] = useState(false);
   const membersHeading = useRef<HTMLHeadingElement>(null);
   const invitationsHeading = useRef<HTMLHeadingElement>(null);
-  const focusAfterClose = useRef<"member" | "invitation">(undefined);
-  const [headingFocus, setHeadingFocus] = useState(0);
   const alert = useRef<HTMLParagraphElement>(null);
-
-  // The pressed button leaves with its row. When the dialog has closed and given its focus back,
-  // focus goes to the heading of the list.
-  useEffect(() => {
-    if (confirming === undefined && focusAfterClose.current) {
-      const heading = focusAfterClose.current === "member" ? membersHeading : invitationsHeading;
-      focusAfterClose.current = undefined;
-      setTimeout(() => heading.current?.focus(), 0);
-    }
-  }, [confirming]);
-
-  useEffect(() => {
-    if (headingFocus > 0) {
-      membersHeading.current?.focus();
-    }
-  }, [headingFocus]);
+  const focusAfterCommit = useFocusAfterCommit();
 
   /** The first page. A version conflict and a retry load the list again from here. */
   const loadMembers = useCallback(
@@ -189,7 +174,7 @@ export function MembersPage({ api }: { api: Api }) {
         setConfirmation(t("members-loaded-more"));
         if (nextCursor === undefined) {
           // The button leaves: focus goes to the heading of the list.
-          setHeadingFocus((count) => count + 1);
+          focusAfterCommit(() => membersHeading.current);
         }
       } else {
         setMore({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
@@ -222,7 +207,7 @@ export function MembersPage({ api }: { api: Api }) {
             navigate(CHOOSE_ORGANIZATION_PATH, { replace: true });
             return;
           }
-          focusAfterClose.current = "member";
+          focusAfterCommit(() => membersHeading.current);
           setMembers((current) => ({
             ...current,
             items: current.items.filter((m) => m.user_id !== item.user_id),
@@ -236,7 +221,7 @@ export function MembersPage({ api }: { api: Api }) {
           params: { path: { invitation_id: item.id } },
         });
         if (response.ok) {
-          focusAfterClose.current = "invitation";
+          focusAfterCommit(() => invitationsHeading.current);
           setInvitations((current) => ({
             ...current,
             items: current.items.filter((i) => i.id !== item.id),
@@ -347,13 +332,12 @@ export function MembersPage({ api }: { api: Api }) {
 
   return (
     <div className={styles.page}>
-      {/* Live regions that are always in the page: a text that is set later is announced. */}
-      <p ref={alert} className={styles.failure} role="alert">
+      <LiveRegion ref={alert} kind="alert" className={styles.failure}>
         {failure}
-      </p>
-      <p className={styles.confirmation} role="status">
+      </LiveRegion>
+      <LiveRegion kind="status" className={styles.confirmation}>
         {confirmation}
-      </p>
+      </LiveRegion>
 
       <section className={styles.section} aria-labelledby="members-title">
         <h1 id="members-title" ref={membersHeading} tabIndex={-1} className={styles.title}>

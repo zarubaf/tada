@@ -1,10 +1,12 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { type Api, type Problem, problemMessage } from "../api/client";
 import { failureOf } from "../api/failure";
 import { uuidv7 } from "../api/uuid";
 import { hasMessage, t } from "../i18n";
 import { useNavigate } from "../router/Router";
 import { Button } from "../ui/Button";
+import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
+import { LiveRegion } from "../ui/LiveRegion";
 import { TextField } from "../ui/TextField";
 import styles from "./Form.module.css";
 
@@ -40,14 +42,9 @@ export function CreateEventForm({ api }: { api: Api }) {
   const [failure, setFailure] = useState<string>();
   const [busy, setBusy] = useState(false);
   const form = useRef<HTMLFormElement>(null);
-  // Counts the failed submits: after each one, focus goes to the first invalid field.
-  const [failedSubmits, setFailedSubmits] = useState(0);
-
-  useEffect(() => {
-    if (failedSubmits > 0) {
-      form.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
-    }
-  }, [failedSubmits]);
+  const focusAfterCommit = useFocusAfterCommit();
+  // After a failed submit, focus goes to the first invalid field.
+  const focusInvalidField = () => focusAfterCommit(() => firstInvalidField(form.current));
 
   const edit = (set: (value: string) => void) => (value: string) => {
     set(value);
@@ -67,7 +64,7 @@ export function CreateEventForm({ api }: { api: Api }) {
     setErrors(local);
     setFailure(undefined);
     if (Object.keys(local).length > 0) {
-      setFailedSubmits((count) => count + 1);
+      focusInvalidField();
       return;
     }
     if (busy) {
@@ -88,7 +85,7 @@ export function CreateEventForm({ api }: { api: Api }) {
       if (Object.keys(invalid).length === 0) {
         setFailure(failureOf({ error, response }).message);
       } else {
-        setFailedSubmits((count) => count + 1);
+        focusInvalidField();
       }
     } catch {
       setFailure(problemMessage(undefined));
@@ -127,9 +124,9 @@ export function CreateEventForm({ api }: { api: Api }) {
           autoComplete="off"
           isRequired
         />
-        <p className={styles.failure} role="alert">
+        <LiveRegion kind="alert" className={styles.failure}>
           {failure}
-        </p>
+        </LiveRegion>
         <div className={styles.actions}>
           <Button type="submit" variant="primary" isPending={busy}>
             {t("event-create-submit")}

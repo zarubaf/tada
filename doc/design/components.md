@@ -35,17 +35,21 @@ The danger button is secondary in style with `--color-danger` text until a confi
 
 ### Display
 
-| Component      | Rules                                                                                                          |
-| -------------- | -------------------------------------------------------------------------------------------------------------- |
-| KnowledgeState | Shows the state of knowledge of a value (see [tokens.md](tokens.md)). Used in each place where a fact appears. |
-| StatusLabel    | Icon and text for a workflow status: „offen“, „in Arbeit“, „blockiert“ and „erledigt“.                         |
-| Badge          | A count, for example waiting proposals. Never decorative.                                                      |
-| Avatar         | Initials on `--color-bg-sunken`; a photo only if the member uploads one.                                       |
-| RecordId       | `ACT-042` in `--font-family-mono`, with a copy action.                                                         |
-| RelativeTime   | „vor 2 Stunden“ with the exact time in a tooltip.                                                              |
-| Kbd            | A keyboard key in hints and the shortcut list.                                                                 |
-| Skeleton       | Gray blocks in the shape of the content. No shimmer animation with reduced motion.                             |
-| DataTable      | A read-only table with a sticky header, `--row-height` rows, and monospace or tabular columns where needed.    |
+| Component      | Rules                                                                                                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| KnowledgeState | Shows the state of knowledge of a value (see [tokens.md](tokens.md)). Used in each place where a fact appears.                                        |
+| StatusLabel    | Icon and text for a workflow status: „offen“, „in Arbeit“, „blockiert“ and „erledigt“.                                                                |
+| Badge          | A count, for example waiting proposals. Never decorative.                                                                                             |
+| Avatar         | Initials on `--color-bg-sunken`; a photo only if the member uploads one.                                                                              |
+| RecordId       | `ACT-042` in `--font-family-mono`, with a copy action.                                                                                                |
+| RelativeTime   | „vor 2 Stunden“ with the exact time in a tooltip.                                                                                                     |
+| Kbd            | A keyboard key in hints and the shortcut list.                                                                                                        |
+| Skeleton       | Gray blocks in the shape of the content. No shimmer animation with reduced motion.                                                                    |
+| DataTable      | A read-only table with a sticky header, `--row-height` rows, and monospace or tabular columns where needed.                                           |
+| LiveRegion     | A polite `status` or an assertive `alert` that is in the page before its text. Each screen has one of each; see [accessibility.md](accessibility.md). |
+
+Focus moves are not a component. The hook `useFocusAfterCommit` in `apps/web/src/ui/focus.ts` is the only way to move focus after an action.
+See [accessibility.md](accessibility.md#focus).
 
 ### Containers
 

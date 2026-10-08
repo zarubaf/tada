@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import {
   type Api,
   type Invitation,
@@ -10,6 +10,7 @@ import { type Failure, failureOf, useWaiting } from "../api/failure";
 import { uuidv7 } from "../api/uuid";
 import { hasMessage, t } from "../i18n";
 import { Button } from "../ui/Button";
+import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { Select } from "../ui/Select";
 import { TextField } from "../ui/TextField";
 import styles from "./MembersPage.module.css";
@@ -59,22 +60,12 @@ export function InviteMemberForm({
   const [waitFor, setWaitFor] = useState<Failure>();
   const waiting = useWaiting(waitFor);
   const form = useRef<HTMLFormElement>(null);
-  // Count the submits that move focus: to the first invalid field, or after a success back to
-  // the first field.
-  const [failedSubmits, setFailedSubmits] = useState(0);
-  const [sent, setSent] = useState(0);
-
-  useEffect(() => {
-    if (failedSubmits > 0) {
-      form.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
-    }
-  }, [failedSubmits]);
-
-  useEffect(() => {
-    if (sent > 0) {
-      form.current?.querySelector<HTMLElement>("input")?.focus();
-    }
-  }, [sent]);
+  const focusAfterCommit = useFocusAfterCommit();
+  // After a failed submit, focus goes to the first invalid field; after a success, back to the
+  // first field.
+  const focusInvalidField = () => focusAfterCommit(() => firstInvalidField(form.current));
+  const focusFirstField = () =>
+    focusAfterCommit(() => form.current?.querySelector<HTMLElement>("input"));
 
   const edit = (set: (value: string) => void) => (value: string) => {
     set(value);
@@ -93,7 +84,7 @@ export function InviteMemberForm({
     setErrors(local);
     onStart();
     if (Object.keys(local).length > 0) {
-      setFailedSubmits((count) => count + 1);
+      focusInvalidField();
       return;
     }
     if (busy) {
@@ -110,7 +101,7 @@ export function InviteMemberForm({
         setName("");
         setId(uuidv7());
         onInvited(data);
-        setSent((count) => count + 1);
+        focusFirstField();
       } else {
         const invalid = error?.code === "validation-failed" ? fieldErrors(error) : {};
         setErrors(invalid);
@@ -119,7 +110,7 @@ export function InviteMemberForm({
           setWaitFor(failure);
           onFailed(failure.message);
         } else {
-          setFailedSubmits((count) => count + 1);
+          focusInvalidField();
         }
       }
     } catch {
