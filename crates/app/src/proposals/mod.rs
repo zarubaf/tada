@@ -13,7 +13,8 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use jiff::Timestamp;
 use tada_domain::facts::{
-    ChoiceValue, FactState, FieldKey, FieldScope, FieldStatus, Label, ValueType,
+    ChoiceKey, ChoiceValue, FactState, FactValue, FieldKey, FieldScope, FieldStatus, Label,
+    ValueType,
 };
 use tada_domain::ids::{
     self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId,
@@ -211,6 +212,7 @@ impl CommandError for ProposeError {
 ///    must be readable in the event of the proposal (`access::event_source_reach`), for example a text file of the event.
 /// 3. Each new ID is a UUIDv7 and is free (ADR 0038).
 /// 4. The dependencies stay inside the changeset, have no cycle, and include the proposals that create the records that a proposal uses.
+///    A fact that uses a new choice of the changeset depends on the proposal that adds the choice.
 /// 5. Each value matches the value type of its field. A new field of the same changeset counts.
 /// 6. Each link of a draft resolves to a fact version of its event or a visible source passage (ADR 0051).
 ///    The changeset keeps the provenance manifest and the lint warnings of each draft.
@@ -526,6 +528,23 @@ fn passage_error_code(error: PassageError) -> &'static str {
 }
 
 /// Checks the rules between the proposals of a changeset: unique IDs, the event of each operation, and the dependencies.
+/// The choices that a `SetFact` with a choice value uses, with their field.
+fn used_choices(operation: &Operation) -> impl Iterator<Item = (FieldDefinitionId, &ChoiceKey)> {
+    let keys = match operation {
+        Operation::SetFact {
+            field_id,
+            state: FactState::Accepted(valued) | FactState::Assumption(valued),
+            ..
+        } => match &valued.value {
+            FactValue::Choice(keys) => Some((*field_id, keys)),
+            _ => None,
+        },
+        _ => None,
+    };
+    keys.into_iter()
+        .flat_map(|(field, keys)| keys.iter().map(move |key| (field, key)))
+}
+
 fn check_structure(event_id: Option<EventId>, proposals: &[Proposal]) -> Result<(), ProposeError> {
     let mut errors = Vec::new();
     let path = |index: usize, field: &str| format!("proposals/{index}/{field}");
@@ -545,6 +564,15 @@ fn check_structure(event_id: Option<EventId>, proposals: &[Proposal]) -> Result<
                 errors.push(FieldError::new(path(index, "operation/id"), "duplicate"));
             }
             creators.insert(record.as_uuid(), proposal.id);
+        }
+    }
+
+    // The proposal that adds each new choice of the changeset. A choice creates no record, but a fact that uses
+    // the choice is valid only with it (ADR 0049), so the fact depends on it like on a new record.
+    let mut choice_creators: HashMap<(FieldDefinitionId, &ChoiceKey), ProposalId> = HashMap::new();
+    for proposal in proposals {
+        if let Operation::AddChoiceValue { field_id, key, .. } = &proposal.operation {
+            choice_creators.insert((*field_id, key), proposal.id);
         }
     }
 
@@ -578,10 +606,14 @@ fn check_structure(event_id: Option<EventId>, proposals: &[Proposal]) -> Result<
                 .filter(|_| !matches!(operation, Operation::AddFieldDefinition { .. }))
                 .map(FieldDefinitionId::as_uuid),
         ];
-        let missing = uses
+        let record_creators = uses
             .into_iter()
             .flatten()
-            .filter_map(|record| creators.get(&record))
+            .filter_map(|record| creators.get(&record));
+        let choice_creators =
+            used_choices(operation).filter_map(|(field, key)| choice_creators.get(&(field, key)));
+        let missing = record_creators
+            .chain(choice_creators)
             .any(|creator| !proposal.depends_on.contains(creator));
         if missing {
             errors.push(FieldError::new(

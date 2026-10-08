@@ -854,6 +854,40 @@ async fn a_choice_of_the_changeset_counts_and_a_shipped_field_does_not_change() 
     );
 }
 
+/// Without the dependency, a reviewer could apply the fact alone or reject only the choice,
+/// and the fact would name a choice that its field does not have.
+#[tokio::test]
+async fn a_fact_that_uses_a_new_choice_depends_on_the_proposal_that_adds_it() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let field = Uuid::now_v7();
+    let (define, choice) = (Uuid::now_v7(), Uuid::now_v7());
+    let value_type = json!({"type": "choice", "values": [{"key": "grass", "label": "Gras"}]});
+    let input = changeset(
+        Some(open_day()),
+        vec![
+            proposal(define, new_field(field, value_type), &[], "Open Day"),
+            proposal(
+                choice,
+                json!({"kind": "add-choice-value", "event_id": open_day().as_uuid(), "field_id": field, "key": "asphalt", "label": "Asphalt"}),
+                &[define],
+                "Open Day",
+            ),
+            proposal(
+                Uuid::now_v7(),
+                visitors(field, json!({"type": "choice", "keys": ["asphalt"]})),
+                &[define],
+                "Open Day",
+            ),
+        ],
+    );
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/2/depends_on".to_owned(), "dependency-missing")]
+    );
+}
+
 #[test]
 fn the_json_schema_of_a_new_changeset_names_each_operation_kind() {
     let schema = serde_json::to_string(&schemars::schema_for!(NewChangeset)).unwrap();
