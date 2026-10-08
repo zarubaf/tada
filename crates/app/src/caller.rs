@@ -158,11 +158,21 @@ impl MemberCaller {
         organization_id: OrganizationId,
         role: OrganizationRole,
     ) -> Self {
+        Self::build(user_id, organization_id, role, Channel::Web)
+    }
+
+    /// The one place that builds a member caller from its parts. Only this module can call it.
+    fn build(
+        user_id: UserId,
+        organization_id: OrganizationId,
+        role: OrganizationRole,
+        channel: Channel,
+    ) -> Self {
         Self {
             user_id,
             organization_id,
             role,
-            channel: Channel::Web,
+            channel,
             request_id: None,
         }
     }
@@ -367,6 +377,19 @@ impl ServiceIdentity for TelegramGateway {
     const NAME: &'static str = "telegram-gateway";
     const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0001);
     const CHANNEL: Channel = Channel::Telegram;
+}
+
+impl ServiceCaller<TelegramGateway> {
+    /// The linked member for whom the gateway acts, through the channel `telegram` (ADR 0039).
+    /// Only `telegram::member_for` calls it, after it read the membership of the user.
+    pub(crate) fn member(
+        &self,
+        user_id: UserId,
+        organization_id: OrganizationId,
+        role: OrganizationRole,
+    ) -> MemberCaller {
+        MemberCaller::build(user_id, organization_id, role, TelegramGateway::CHANNEL)
+    }
 }
 
 /// The service identity `job-runner`: the worker that runs the jobs.

@@ -346,6 +346,13 @@ mod tests {
             unreachable!()
         }
 
+        async fn user_of(
+            &self,
+            _: tada_app::telegram::TelegramUserId,
+        ) -> Result<Option<tada_app::domain::ids::UserId>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
         async fn confirm(
             &self,
             _: tada_app::caller::OrgScope,
