@@ -17,7 +17,9 @@ use futures::TryStreamExt;
 use jiff::Timestamp;
 use sha2::{Digest, Sha256};
 use tada_domain::RecordVersion;
-use tada_domain::ids::{DocumentId, DocumentVersionId, EventId, SourceVersionId, UserId};
+use tada_domain::ids::{
+    DocumentId, DocumentVersionId, EventId, LocalIdKind, SourceVersionId, UserId,
+};
 use tada_domain::sources::SourceText;
 use uuid::Uuid;
 
@@ -33,9 +35,6 @@ use crate::store::StoreError;
 use crate::uploads::detect::{
     FileType, Rejected, SNIFF_BYTES, TextValidator, detect, sanitize_file_name,
 };
-
-/// The prefix of the readable ID of a document (ADR 0038).
-const DOCUMENT_PREFIX: &str = "DOC";
 
 /// A document with its newest version.
 #[derive(Clone, PartialEq, Eq)]
@@ -56,7 +55,7 @@ pub struct DocumentView {
 
 /// The readable ID of the document with the organization-local number `local_number`, for example `DOC-001`.
 pub fn readable_document_id(local_number: u64) -> String {
-    format!("{DOCUMENT_PREFIX}-{local_number:03}")
+    LocalIdKind::Document.readable_id(local_number)
 }
 
 impl DocumentView {

@@ -11,8 +11,8 @@ use tada_domain::facts::{
     ReferenceTarget, ShortText, Unit, ValueType, Valued, core_catalog,
 };
 use tada_domain::ids::{
-    ChangesetId, EventId, FactId, FactVersionId, FieldDefinitionId, OpenQuestionId, ProposalId,
-    UserId,
+    ChangesetId, EventId, FactId, FactVersionId, FieldDefinitionId, LocalIdKind, OpenQuestionId,
+    ProposalId, UserId,
 };
 use tada_domain::proposals::QuestionText;
 use tada_domain::sources::Evidence;
@@ -60,7 +60,7 @@ pub struct OpenQuestionRef {
 impl OpenQuestionRef {
     /// The event-local ID, for example `QST-001` (ADR 0038).
     pub fn readable_id(&self) -> String {
-        format!("QST-{:03}", self.local_number)
+        LocalIdKind::OpenQuestion.readable_id(self.local_number)
     }
 }
 

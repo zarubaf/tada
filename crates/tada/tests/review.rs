@@ -293,7 +293,7 @@ mod facts {
             )
             .await;
         assert_eq!(status, StatusCode::OK, "{applied}");
-        assert_eq!(applied["open_questions"][0]["local_id"], "QST-1");
+        assert_eq!(applied["open_questions"][0]["local_id"], "QST-001");
 
         let (status, profile) = api
             .get(&owner.cookie, &format!("/api/v1/events/{event}/profile"))
@@ -334,7 +334,7 @@ mod facts {
             "an unknown has no value, not null"
         );
         assert_eq!(profile["proposals"], json!([]));
-        assert_eq!(profile["open_questions"][0]["local_id"], "QST-1");
+        assert_eq!(profile["open_questions"][0]["local_id"], "QST-001");
         assert_eq!(
             profile["open_questions"][0]["text"],
             "Wer klärt die Bewilligung?"

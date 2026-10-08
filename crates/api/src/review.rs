@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tada_app::caller::{Actor, ActorKind as AppActorKind, Channel as AppChannel};
 use tada_app::documents::readable_document_id;
-use tada_app::domain::ids::{ChangesetId, EventId, ProposalId};
+use tada_app::domain::ids::{ChangesetId, EventId, LocalIdKind, ProposalId};
 use tada_app::domain::proposals::{
     DraftDocument as DomainDraftDocument, Operation as DomainOperation,
 };
@@ -679,7 +679,7 @@ pub struct ReviewedProposal {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct NewOpenQuestion {
     pub id: Uuid,
-    /// The event-local ID, for example `QST-1` (ADR 0038).
+    /// The event-local ID, for example `QST-001` (ADR 0038).
     pub local_id: String,
 }
 
@@ -699,7 +699,7 @@ impl From<Applied> for ReviewResult {
             match local.record {
                 LocalRecord::OpenQuestion(id) => open_questions.push(NewOpenQuestion {
                     id: id.as_uuid(),
-                    local_id: format!("QST-{}", local.local_number),
+                    local_id: LocalIdKind::OpenQuestion.readable_id(local.local_number),
                 }),
                 LocalRecord::Document(id) => documents.push(NewDocument {
                     id: id.as_uuid(),

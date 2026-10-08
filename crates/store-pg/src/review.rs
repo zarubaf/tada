@@ -17,7 +17,7 @@ use tada_app::domain::documents::DraftMarkdown;
 use tada_app::domain::events::Event;
 use tada_app::domain::facts::{ChoiceValue, FactState, FieldStatus, Label, ValueType, Valued};
 use tada_app::domain::ids::{
-    ChangesetId, DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId,
+    ChangesetId, DocumentId, EventId, FieldDefinitionId, LocalIdKind, OpenQuestionId, ProposalId,
     SourceVersionId,
 };
 use tada_app::domain::proposals::{DraftDocument, Operation};
@@ -35,7 +35,7 @@ use crate::sources::{TextItem, TextKind};
 use crate::{actor, audit, drafts, events, sources, values};
 
 /// The kind of the event-local IDs of open questions (ADR 0038).
-const OPEN_QUESTION_PREFIX: &str = "QST";
+const OPEN_QUESTION_PREFIX: &str = LocalIdKind::OpenQuestion.prefix();
 
 /// The constraints that a concurrent apply of another record with the same key breaks.
 const KEY_CONSTRAINTS: &[&str] = &["event_key_unique", "field_definition_event_key_unique"];

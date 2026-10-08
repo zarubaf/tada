@@ -13,7 +13,9 @@ use tada_app::documents::{
     UploadTarget, UploadedFile, VersionContent, VersionView,
 };
 use tada_app::domain::RecordVersion;
-use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId, SourceVersionId, UserId};
+use tada_app::domain::ids::{
+    DocumentId, DocumentVersionId, EventId, LocalIdKind, SourceVersionId, UserId,
+};
 use tada_app::domain::sources::SourceText;
 use tada_app::store::StoreError;
 use tada_app::uploads::detect::FileType;
@@ -29,7 +31,7 @@ const UPLOAD: &str = "upload";
 pub(crate) const DRAFT: &str = "draft";
 
 /// The kind of the counter of the organization-local document numbers (ADR 0038).
-pub(crate) const DOCUMENT_COUNTER: &str = "DOC";
+pub(crate) const DOCUMENT_COUNTER: &str = LocalIdKind::Document.prefix();
 
 /// A document version row, with the event of its document.
 struct VersionRow {

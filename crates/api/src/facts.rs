@@ -103,7 +103,7 @@ pub struct FactProposal {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct OpenQuestion {
     pub id: Uuid,
-    /// The event-local ID, for example `QST-1` (ADR 0038).
+    /// The event-local ID, for example `QST-001` (ADR 0038).
     pub local_id: String,
     pub text: String,
     /// The user ID of the member who owns the question.
@@ -172,7 +172,7 @@ impl From<OpenQuestionRef> for OpenQuestion {
     fn from(question: OpenQuestionRef) -> Self {
         Self {
             id: question.id.as_uuid(),
-            local_id: format!("QST-{}", question.local_number),
+            local_id: question.readable_id(),
             text: question.text.as_str().to_owned(),
             owner_id: question.owner.as_uuid(),
             version: question.version.get(),
