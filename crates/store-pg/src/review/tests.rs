@@ -1084,8 +1084,13 @@ fn duration(event: EventId, days: &str, expected_version: Option<i64>) -> Value 
     })
 }
 
-/// I1: two applies that change the same two facts in opposite orders do not deadlock: one applies, and the other
-/// waits for it and then conflicts. The overlap depends on the scheduler, so a run cannot force it.
+/// Two applies that change the same two facts in opposite orders do not deadlock: one applies, and the other
+/// waits for it and then conflicts.
+///
+/// A third transaction holds the duration fact until both applies wait for a lock. With locks in plan order,
+/// A (duration first) waits on the third transaction, and B locks the date fact and then waits on duration.
+/// After the release, A gets duration and waits on the date fact that B holds: a certain deadlock.
+/// With locks in the order of the fact IDs, the second apply waits for the first one, whatever the IDs are.
 #[tokio::test]
 async fn two_applies_of_the_same_facts_in_opposite_orders_do_not_deadlock() {
     let test = TestDatabase::start().await;
@@ -1129,9 +1134,29 @@ async fn two_applies_of_the_same_facts_in_opposite_orders_do_not_deadlock() {
         ],
     )
     .await;
-    let (first, second) = tokio::join!(
+    let mut holder = test.database.pool.begin().await.unwrap();
+    sqlx::query("SELECT id FROM fact WHERE event_id = $1 AND field_id = $2 FOR UPDATE")
+        .bind(event.as_uuid())
+        .bind(core_field("duration_days"))
+        .fetch_one(&mut *holder)
+        .await
+        .unwrap();
+    let release = async {
+        let waiting = "SELECT count(DISTINCT pid) FROM pg_locks WHERE NOT granted";
+        let wait_for_both = async {
+            while test.scalar::<i64>(waiting).await < 2 {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        };
+        tokio::time::timeout(std::time::Duration::from_secs(30), wait_for_both)
+            .await
+            .expect("both applies wait for a lock");
+        holder.commit().await.unwrap();
+    };
+    let (first, second, ()) = tokio::join!(
         apply(&test, &open_day.manager, &a, select(&[a1, a2])),
         apply(&test, &open_day.manager, &b, select(&[b1, b2])),
+        release,
     );
     let outcomes = [&first, &second].map(|result| match result {
         Ok(_) => "applied",
