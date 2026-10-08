@@ -14,6 +14,7 @@ events-empty-title = Noch keine Anlässe erfasst
 events-empty-text = Hier erscheinen die Anlässe Ihrer Organisation.
 events-load-more = Weitere Anlässe laden
 events-loading = Anlässe werden geladen
+events-loaded-more = Weitere Anlässe geladen.
 
 ## Errors
 
@@ -155,6 +156,8 @@ event-members-add-title = Rolle vergeben
 event-members-add-member = Mitglied
 event-members-add-placeholder = Mitglied wählen
 event-members-add-submit = Mitglied hinzufügen
+# $name: the display name of the member.
+event-members-added = { $name } hat jetzt eine Rolle in diesem Anlass.
 event-members-add-none = Alle Mitglieder der Organisation haben schon eine Rolle in diesem Anlass.
 role-event-manager = Anlassleitung
 role-event-contributor = Mitarbeit

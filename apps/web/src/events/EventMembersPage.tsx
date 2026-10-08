@@ -60,6 +60,8 @@ export function EventMembersPage({ api }: { api: Api }) {
   const [state, setState] = useState<State>({ kind: "loading" });
   // The message of the last failed action, for example the refusal to remove the last event manager.
   const [failure, setFailure] = useState<string>();
+  // The result of an action that does not move focus to the result, for example an added member.
+  const [confirmation, setConfirmation] = useState<string>();
   const [organization, setOrganization] = useState<OrganizationMember[]>();
   const [organizationFailure, setOrganizationFailure] = useState<Failure>();
   const [removing, setRemoving] = useState<EventMembership>();
@@ -252,6 +254,7 @@ export function EventMembersPage({ api }: { api: Api }) {
         {t("event-members-title")}
       </h2>
       <LiveRegion kind="alert">{failure}</LiveRegion>
+      <LiveRegion kind="status">{confirmation}</LiveRegion>
       <DataTable
         label={t("event-members-title")}
         columns={columns}
@@ -267,15 +270,19 @@ export function EventMembersPage({ api }: { api: Api }) {
           setOrganizationFailure(undefined);
           return loadOrganization();
         }}
-        onAdded={(added) =>
+        onAdded={(added) => {
+          setConfirmation(t("event-members-added", { name: added.display_name }));
           setState((current) =>
             current.kind === "loaded"
               ? { kind: "loaded", items: [...current.items, added] }
               : current,
-          )
-        }
+          );
+        }}
         onFailed={fail}
-        onStart={() => setFailure(undefined)}
+        onStart={() => {
+          setFailure(undefined);
+          setConfirmation(undefined);
+        }}
       />
       <ConfirmDialog
         isOpen={removing !== undefined}

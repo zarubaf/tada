@@ -30,7 +30,8 @@ for (const viewport of viewports) {
         await page.goto("/");
         await setTheme(page, theme);
         await expect(page.getByRole("heading", { name: "Anlässe" })).toBeVisible();
-        await expect(page.getByRole("status")).toHaveCount(0);
+        // The skeleton is a labelled status; the live regions have no label.
+        await expect(page.locator("[role=status][aria-label]")).toHaveCount(0);
 
         const results = await new AxeBuilder({ page })
           .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])

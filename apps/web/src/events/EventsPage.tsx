@@ -45,6 +45,7 @@ export function EventsPage({ api }: { api: Api }) {
   const { retried, retry } = useRetry(() => heading.current);
   // The failure of „Weitere laden“: the button stays and keeps focus, so the region announces it.
   const [failure, setFailure] = useState<string>();
+  const [confirmation, setConfirmation] = useState<string>();
 
   /** The first page. Resolves to true when it loaded. */
   const load = useCallback(async () => {
@@ -73,6 +74,7 @@ export function EventsPage({ api }: { api: Api }) {
   /** The next page: the loaded rows stay, and a failure keeps the cursor for the next press. */
   const loadMore = async (events: Event[], cursor: string) => {
     setFailure(undefined);
+    setConfirmation(undefined);
     setState({ kind: "loaded", events, nextCursor: cursor, loadingMore: true });
     let message: string;
     try {
@@ -85,6 +87,7 @@ export function EventsPage({ api }: { api: Api }) {
           nextCursor,
           loadingMore: false,
         });
+        setConfirmation(t("events-loaded-more"));
         if (nextCursor === undefined) {
           // The last page arrived and the button leaves: focus goes to the heading.
           focusAfterCommit(() => heading.current);
@@ -141,6 +144,7 @@ export function EventsPage({ api }: { api: Api }) {
             rowKey={(event) => event.id}
           />
           <LiveRegion kind="alert">{failure}</LiveRegion>
+          <LiveRegion kind="status">{confirmation}</LiveRegion>
           {state.nextCursor !== undefined && (
             <div>
               <Button

@@ -17,7 +17,8 @@ for (const viewport of viewports) {
       await fakeEvents(page, state.status, state.body);
       await page.goto("/?pseudo");
       await expect(page.getByRole("heading", { name: /Áñlässé/ })).toBeVisible();
-      await expect(page.getByRole("status")).toHaveCount(0);
+      // The skeleton is a labelled status; the live regions have no label.
+      await expect(page.locator("[role=status][aria-label]")).toHaveCount(0);
 
       const overflows = await textOverflows(page);
       expect(overflows).toEqual([]);

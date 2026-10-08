@@ -157,6 +157,9 @@ describe("EventMembersPage", () => {
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "Rolle vergeben" })).toHaveFocus(),
     );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Cäcilia Probst hat jetzt eine Rolle in diesem Anlass.",
+    );
     expect(calls.find((c) => c.call.startsWith("POST"))?.body).toEqual({
       user_id: "u3",
       event_role: "event-viewer",

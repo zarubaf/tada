@@ -165,6 +165,7 @@ describe("EventsPage", () => {
 
     expect(await screen.findByText("BB")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Weitere Anlässe laden" })).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("Weitere Anlässe geladen.");
   });
 
   it("moves focus to the heading when the last page arrives", async () => {
