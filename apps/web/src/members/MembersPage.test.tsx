@@ -412,8 +412,9 @@ describe("MembersPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "Weitere Mitglieder laden" }));
 
-    const alerts = await screen.findAllByRole("alert");
-    await waitFor(() => expect(alerts.some((a) => a === document.activeElement)).toBe(true));
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert").some((a) => a === document.activeElement)).toBe(true),
+    );
     expect(screen.getByText("Anna Muster")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Weitere Mitglieder laden" }));
 

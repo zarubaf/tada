@@ -154,12 +154,10 @@ export function TelegramPage({ api }: { api: Api }) {
 
   return (
     <div className={styles.page}>
-      <LiveRegion ref={alert} kind="alert" className={styles.failure}>
+      <LiveRegion ref={alert} kind="alert">
         {failure}
       </LiveRegion>
-      <LiveRegion kind="status" className={styles.confirmation}>
-        {confirmation}
-      </LiveRegion>
+      <LiveRegion kind="status">{confirmation}</LiveRegion>
 
       <section className={styles.section} aria-labelledby="telegram-title">
         <PageTitle id="telegram-title">{t("telegram-title")}</PageTitle>

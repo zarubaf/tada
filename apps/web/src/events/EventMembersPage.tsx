@@ -242,9 +242,7 @@ export function EventMembersPage({ api }: { api: Api }) {
       <h2 ref={heading} tabIndex={-1} className={styles.heading}>
         {t("event-members-title")}
       </h2>
-      <LiveRegion kind="alert" className={styles.failure}>
-        {failure}
-      </LiveRegion>
+      <LiveRegion kind="alert">{failure}</LiveRegion>
       <DataTable
         label={t("event-members-title")}
         columns={columns}

@@ -125,9 +125,7 @@ export function CreateEventForm({ api }: { api: Api }) {
           autoComplete="off"
           isRequired
         />
-        <LiveRegion kind="alert" className={styles.failure}>
-          {failure}
-        </LiveRegion>
+        <LiveRegion kind="alert">{failure}</LiveRegion>
         <div className={styles.actions}>
           <Button type="submit" variant="primary" isPending={busy}>
             {t("event-create-submit")}

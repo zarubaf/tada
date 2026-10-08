@@ -114,12 +114,6 @@
 
   .failure {
     grid-column: 1 / -1;
-    color: var(--color-danger);
-  }
-
-  /* The region stays in the page when it is empty, but it takes no grid cell and no gap. */
-  .failure:empty {
-    position: absolute;
   }
 
   /* Medium and wide (--bp-medium): a sidebar of 15rem (240 px). */
