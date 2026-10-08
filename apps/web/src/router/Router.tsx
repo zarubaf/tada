@@ -17,9 +17,19 @@ import {
 
 type Params = Record<string, string>;
 
+export interface NavigateOptions {
+  /** Replaces the current history entry instead of a new one. */
+  replace?: boolean;
+  /**
+   * Moves focus to the `h1` of the new page (doc/design/accessibility.md). Only a redirect that no
+   * member caused turns it off; after a member action the pressed control has left the page.
+   */
+  moveFocus?: boolean;
+}
+
 interface Location {
   pathname: string;
-  navigate: (to: string, options?: { replace?: boolean }) => void;
+  navigate: (to: string, options?: NavigateOptions) => void;
 }
 
 const LocationContext = createContext<Location | null>(null);
@@ -36,7 +46,7 @@ function useLocation(): Location {
 /** Keeps the path of the address in state and changes it with `history.pushState`. */
 export function Router({ children }: { children: ReactNode }) {
   const [pathname, setPathname] = useState(() => window.location.pathname);
-  // Focus moves to the new page after a member navigates, not after a redirect or the first render.
+  // Focus moves to the new page after a navigation, not after a redirect or the first render.
   const moveFocus = useRef(false);
 
   useEffect(() => {
@@ -59,11 +69,11 @@ export function Router({ children }: { children: ReactNode }) {
     target?.focus();
   }, [pathname]);
 
-  const navigate = useCallback((to: string, options?: { replace?: boolean }) => {
+  const navigate = useCallback((to: string, options?: NavigateOptions) => {
     if (to === window.location.pathname) {
       return;
     }
-    moveFocus.current = !options?.replace;
+    moveFocus.current = options?.moveFocus ?? true;
     if (options?.replace) {
       window.history.replaceState(null, "", to);
     } else {
@@ -139,10 +149,10 @@ export function Routes({ children }: { children: ReactNode }) {
   return null;
 }
 
-/** Replaces the current history entry with `to`. */
+/** Replaces the current history entry with `to`. Focus stays: no member caused the redirect. */
 export function Redirect({ to }: { to: string }) {
   const navigate = useNavigate();
-  useEffect(() => navigate(to, { replace: true }), [navigate, to]);
+  useEffect(() => navigate(to, { replace: true, moveFocus: false }), [navigate, to]);
   return null;
 }
 
