@@ -44,7 +44,7 @@ pub struct DocumentView {
     pub event_id: EventId,
     /// The number of the readable ID `DOC-<n>`, unique in the organization.
     pub local_number: u64,
-    /// The file name of the first upload.
+    /// The file name of the first upload, or the name that the draft proposal of a new document gave.
     pub name: String,
     /// The member who created the document.
     pub owner: UserId,
@@ -54,10 +54,15 @@ pub struct DocumentView {
     pub newest_version: VersionView,
 }
 
+/// The readable ID of the document with the organization-local number `local_number`, for example `DOC-001`.
+pub fn readable_document_id(local_number: u64) -> String {
+    format!("{DOCUMENT_PREFIX}-{local_number:03}")
+}
+
 impl DocumentView {
     /// The readable ID, for example `DOC-001` (ADR 0038).
     pub fn readable_id(&self) -> String {
-        format!("{DOCUMENT_PREFIX}-{:03}", self.local_number)
+        readable_document_id(self.local_number)
     }
 }
 
@@ -76,42 +81,98 @@ impl Debug for DocumentView {
     }
 }
 
-/// One immutable version of a document: an uploaded file.
-#[derive(Clone, PartialEq, Eq)]
+/// One immutable version of a document.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VersionView {
     pub id: DocumentVersionId,
     pub document_id: DocumentId,
     /// 1 for the first version of the document, then 2, 3 and so on.
     pub number: u32,
+    /// The SHA-256 hash of the content.
+    pub sha256: [u8; 32],
+    /// The member who added the version.
+    pub uploaded_by: UserId,
+    pub created_at: Timestamp,
+    pub content: VersionContent,
+}
+
+impl VersionView {
+    /// The file of an upload version.
+    pub fn file(&self) -> Option<&UploadedFile> {
+        match &self.content {
+            VersionContent::Upload(file) => Some(file),
+            VersionContent::Draft { .. } => None,
+        }
+    }
+}
+
+/// What a document version holds. Each kind has its own fields (ADR 0051).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VersionContent {
+    Upload(UploadedFile),
+    /// A draft in Markdown, added by the acceptance of a draft proposal.
+    Draft {
+        status: DraftStatus,
+    },
+}
+
+/// The status of a draft version (ADR 0051).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DraftStatus {
+    Draft,
+    Review,
+    Approved,
+    Superseded,
+    Archived,
+}
+
+impl DraftStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::Review => "review",
+            Self::Approved => "approved",
+            Self::Superseded => "superseded",
+            Self::Archived => "archived",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        [
+            Self::Draft,
+            Self::Review,
+            Self::Approved,
+            Self::Superseded,
+            Self::Archived,
+        ]
+        .into_iter()
+        .find(|status| status.as_str() == name)
+    }
+}
+
+/// The file of an upload version.
+#[derive(Clone, PartialEq, Eq)]
+pub struct UploadedFile {
     /// The original file name, after `sanitize_file_name`.
     pub file_name: String,
     pub file_type: FileType,
     pub size_bytes: u64,
-    /// The SHA-256 hash of the file.
-    pub sha256: [u8; 32],
-    pub uploaded_by: UserId,
     /// The source version of the kind `upload` that holds the same file (ADR 0050).
     pub source_version_id: SourceVersionId,
-    pub created_at: Timestamp,
 }
 
 /// The file name can contain personal data, so `Debug` leaves it out (ADR 0035).
-impl Debug for VersionView {
+impl Debug for UploadedFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("VersionView")
-            .field("id", &self.id)
-            .field("document_id", &self.document_id)
-            .field("number", &self.number)
+        f.debug_struct("UploadedFile")
             .field("file_type", &self.file_type)
             .field("size_bytes", &self.size_bytes)
-            .field("uploaded_by", &self.uploaded_by)
             .field("source_version_id", &self.source_version_id)
-            .field("created_at", &self.created_at)
             .finish_non_exhaustive()
     }
 }
 
-/// A stored version with what a download needs.
+/// A stored upload version with what a download needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredVersion {
     pub event_id: EventId,
@@ -220,6 +281,7 @@ pub trait DocumentStore: Debug + Send + Sync {
         document: DocumentId,
     ) -> Result<Vec<VersionView>, StoreError>;
 
+    /// The upload version `id` with its object. A draft has no file, so its ID gives `None`.
     async fn version(
         &self,
         scope: OrgScope,
@@ -637,7 +699,7 @@ pub async fn list_versions(
     Ok(stores.documents.versions(caller.scope(), id).await?)
 }
 
-/// The version `id` and the stream of its file.
+/// The upload version `id` and the stream of its file. A draft version has no file: it is not found here.
 pub async fn download(
     caller: &impl Principal,
     id: DocumentVersionId,
@@ -681,13 +743,15 @@ mod tests {
                 id: DocumentVersionId::from_uuid(Uuid::from_u128(4)),
                 document_id: id,
                 number: 1,
-                file_name: "Programm.pdf".to_owned(),
-                file_type: FileType::Pdf,
-                size_bytes: 10,
                 sha256: [0; 32],
                 uploaded_by: UserId::from_uuid(Uuid::from_u128(3)),
-                source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(5)),
                 created_at: Timestamp::UNIX_EPOCH,
+                content: VersionContent::Upload(UploadedFile {
+                    file_name: "Programm.pdf".to_owned(),
+                    file_type: FileType::Pdf,
+                    size_bytes: 10,
+                    source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(5)),
+                }),
             },
         }
     }
@@ -697,6 +761,17 @@ mod tests {
         assert_eq!(document(1).readable_id(), "DOC-001");
         assert_eq!(document(42).readable_id(), "DOC-042");
         assert_eq!(document(1234).readable_id(), "DOC-1234");
+    }
+
+    #[test]
+    fn each_draft_status_has_its_name() {
+        for name in ["draft", "review", "approved", "superseded", "archived"] {
+            assert_eq!(
+                DraftStatus::parse(name).map(DraftStatus::as_str),
+                Some(name)
+            );
+        }
+        assert_eq!(DraftStatus::parse("upload"), None);
     }
 
     #[test]

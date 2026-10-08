@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT scope_id FROM local_id_counter\n         WHERE organization_id = $1 AND scope_id = ANY($2) AND kind = $3\n         ORDER BY scope_id\n         FOR UPDATE",
+  "query": "SELECT c.scope_id FROM local_id_counter c\n         JOIN unnest($2::uuid[], $3::text[]) AS t (scope_id, kind)\n           ON c.scope_id = t.scope_id AND c.kind = t.kind\n         WHERE c.organization_id = $1\n         ORDER BY c.scope_id, c.kind\n         FOR UPDATE OF c",
   "describe": {
     "columns": [
       {
@@ -19,12 +19,12 @@
       "Left": [
         "Uuid",
         "UuidArray",
-        "Text"
+        "TextArray"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "20e576bee603b31cdf4cd76b0cf5d077dbe38c790ea8bc8e6633e89453c71851"
+  "hash": "98c0bc19952b611931b61dfe32af39f14c62f06fe72b5ffca8e57883fa903310"
 }

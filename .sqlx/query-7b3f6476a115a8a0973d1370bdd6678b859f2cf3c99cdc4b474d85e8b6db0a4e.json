@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT v.fact_id, v.number\n               FROM unnest($3::uuid[], $4::bigint[]) AS t (fact_id, number)\n               JOIN fact_version v ON v.fact_id = t.fact_id AND v.number = t.number\n               JOIN fact f ON f.organization_id = v.organization_id AND f.id = v.fact_id\n               WHERE v.organization_id = $1 AND f.event_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fact_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "fact_version",
+            "name": "fact_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "fact_version",
+            "name": "number"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray",
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "7b3f6476a115a8a0973d1370bdd6678b859f2cf3c99cdc4b474d85e8b6db0a4e"
+}

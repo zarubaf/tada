@@ -1,14 +1,21 @@
 use std::sync::Mutex;
 
 use serde_json::{Value, json};
+use tada_domain::RecordVersion;
 use tada_domain::facts::{FieldDefinition, core_catalog};
 use tada_domain::identity::{EventRole, OrganizationRole};
-use tada_domain::ids::{ApiTokenId, OrganizationId, UserId};
+use tada_domain::ids::{ApiTokenId, DocumentId, DocumentVersionId, FactId, OrganizationId, UserId};
 
 use super::*;
+use crate::access::SourceReach;
 use crate::caller::AiCaller;
+use crate::documents::{
+    DocumentCursor, DocumentView, NewUpload, Published, StoredVersion, VersionContent, VersionView,
+};
+use crate::drafts::{CitedFact, LintKind, LintWarning};
 use crate::facts::{EventProfile, FactVersionRef};
 use crate::identity::{Membership, UserRef};
+use crate::sources::{SourceHit, SourceVersionRef, SourceVersionText};
 use crate::tokens::TokenScope;
 
 const SOURCE: &str =
@@ -47,6 +54,12 @@ struct Memory {
     stored: Mutex<Vec<(Changeset, SourceText)>>,
     /// The next insert loses a race: a concurrent request stores this changeset first.
     race: Mutex<Option<Changeset>>,
+    /// The fact versions of Testwil, with their events.
+    fact_versions: Mutex<Vec<(EventId, FactId, RecordVersion)>>,
+    /// The source versions of Testwil.
+    sources: Mutex<Vec<(Option<EventId>, SourceVersionText)>>,
+    /// The documents of Testwil, with their events.
+    documents: Mutex<Vec<(DocumentId, EventId)>>,
 }
 
 #[async_trait]
@@ -94,11 +107,12 @@ impl IdentityStore for Memory {
         &self,
         scope: OrgScope,
         user: UserId,
-    ) -> Result<Vec<EventRole>, StoreError> {
+    ) -> Result<Vec<(EventId, EventRole)>, StoreError> {
         let found = scope.organization_id() == testwil() && user == anna();
         Ok(found
             .then(|| *self.role.lock().unwrap())
             .flatten()
+            .map(|role| (open_day(), role))
             .into_iter()
             .collect())
     }
@@ -120,6 +134,140 @@ impl FactStore for Memory {
         _: EventId,
         _: FieldDefinitionId,
     ) -> Result<Option<FactVersionRef>, StoreError> {
+        unreachable!()
+    }
+
+    async fn existing_versions(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+        versions: &[(FactId, RecordVersion)],
+    ) -> Result<Vec<(FactId, RecordVersion)>, StoreError> {
+        if scope.organization_id() != testwil() {
+            return Ok(Vec::new());
+        }
+        let stored = self.fact_versions.lock().unwrap();
+        Ok(versions
+            .iter()
+            .filter(|(fact, number)| stored.contains(&(event, *fact, *number)))
+            .copied()
+            .collect())
+    }
+}
+
+#[async_trait]
+impl SourceStore for Memory {
+    async fn add_member_text(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: &SourceText,
+        _: &Actor,
+        _: Timestamp,
+    ) -> Result<SourceVersionRef, StoreError> {
+        unreachable!()
+    }
+
+    async fn search(
+        &self,
+        _: OrgScope,
+        _: &[EventId],
+        _: &str,
+        _: u32,
+    ) -> Result<Vec<SourceHit>, StoreError> {
+        unreachable!()
+    }
+
+    /// The evidence clause of the reach is tested with the store, so this memory knows no evidence.
+    async fn texts(
+        &self,
+        scope: OrgScope,
+        reach: &SourceReach,
+        ids: &[SourceVersionId],
+    ) -> Result<Vec<SourceVersionText>, StoreError> {
+        if scope.organization_id() != testwil() {
+            return Ok(Vec::new());
+        }
+        let sources = self.sources.lock().unwrap();
+        Ok(sources
+            .iter()
+            .filter(|(event, source)| {
+                ids.contains(&source.id)
+                    && match reach {
+                        SourceReach::Organization => true,
+                        SourceReach::Events(events) => event.is_some_and(|e| events.contains(&e)),
+                    }
+            })
+            .map(|(_, source)| source.clone())
+            .collect())
+    }
+}
+
+#[async_trait]
+impl DocumentStore for Memory {
+    async fn publish(
+        &self,
+        _: OrgScope,
+        _: &NewUpload,
+        _: &AuditEvent,
+    ) -> Result<Published, StoreError> {
+        unreachable!()
+    }
+
+    async fn list(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: Option<&str>,
+        _: Option<DocumentCursor>,
+        _: u32,
+    ) -> Result<Vec<DocumentView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn get(
+        &self,
+        scope: OrgScope,
+        id: DocumentId,
+    ) -> Result<Option<DocumentView>, StoreError> {
+        if scope.organization_id() != testwil() {
+            return Ok(None);
+        }
+        let documents = self.documents.lock().unwrap();
+        Ok(documents
+            .iter()
+            .find(|(document, _)| *document == id)
+            .map(|(document, event)| DocumentView {
+                id: *document,
+                event_id: *event,
+                local_number: 1,
+                name: "Konzept".to_owned(),
+                owner: anna(),
+                created_at: Timestamp::UNIX_EPOCH,
+                version: RecordVersion::FIRST,
+                newest_version: VersionView {
+                    id: DocumentVersionId::from_uuid(Uuid::now_v7()),
+                    document_id: *document,
+                    number: 1,
+                    sha256: [0; 32],
+                    uploaded_by: anna(),
+                    created_at: Timestamp::UNIX_EPOCH,
+                    content: VersionContent::Draft {
+                        status: crate::documents::DraftStatus::Draft,
+                    },
+                },
+            }))
+    }
+
+    async fn versions(&self, _: OrgScope, _: DocumentId) -> Result<Vec<VersionView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn version(
+        &self,
+        _: OrgScope,
+        _: DocumentVersionId,
+    ) -> Result<Option<StoredVersion>, StoreError> {
         unreachable!()
     }
 }
@@ -197,6 +345,8 @@ fn stores(memory: &Memory) -> ProposeStores<'_> {
         identity: memory,
         facts: memory,
         proposals: memory,
+        sources: memory,
+        documents: memory,
     }
 }
 
@@ -904,4 +1054,269 @@ async fn a_passage_of_a_member_text_has_no_page() {
             [("proposals/0/evidence/0".to_owned(), "page")]
         );
     }
+}
+
+// Document drafts (ADR 0051).
+
+/// The member text of the other event: Anna has no role there.
+fn other_event() -> EventId {
+    EventId::from_uuid(Uuid::from_u128(21))
+}
+
+const FACT: u128 = 0x0190_f3a2_7b1c_7d4e_8f00_0000_0000_0001;
+const LEAFLET: &str = "Flyer: Das Flugfeld öffnet um 9 Uhr.";
+
+/// A memory with fact version 1 of the open day and three source versions:
+/// one of the open day, one of the other event and one of the organization.
+fn memory_with_targets() -> (Memory, [SourceVersionId; 3]) {
+    let memory = Memory::default();
+    memory.fact_versions.lock().unwrap().push((
+        open_day(),
+        FactId::from_uuid(Uuid::from_u128(FACT)),
+        RecordVersion::FIRST,
+    ));
+    let ids = [
+        SourceVersionId::from_uuid(Uuid::now_v7()),
+        SourceVersionId::from_uuid(Uuid::now_v7()),
+        SourceVersionId::from_uuid(Uuid::now_v7()),
+    ];
+    let events = [Some(open_day()), Some(other_event()), None];
+    for (id, event) in ids.into_iter().zip(events) {
+        memory.sources.lock().unwrap().push((
+            event,
+            SourceVersionText {
+                id,
+                text: Some(SourceText::normalize(LEAFLET)),
+            },
+        ));
+    }
+    (memory, ids)
+}
+
+fn fact_link(version: i64) -> String {
+    format!("[](tada:fact/{}?v={version})", Uuid::from_u128(FACT))
+}
+
+fn source_link(source: SourceVersionId, start: u32, end: u32) -> String {
+    format!("[das Flugfeld](tada:source/{source}#{start}-{end})")
+}
+
+fn draft(document: Value, markdown: &str) -> NewChangeset {
+    changeset(
+        Some(open_day()),
+        vec![proposal(
+            Uuid::now_v7(),
+            json!({
+                "kind": "create-document-draft",
+                "event_id": open_day().as_uuid(),
+                "document": document,
+                "markdown": markdown,
+            }),
+            &[],
+            "Open Day",
+        )],
+    )
+}
+
+fn new_document() -> Value {
+    json!({"new": {"id": Uuid::now_v7(), "name": "Konzept Open Day"}})
+}
+
+#[tokio::test]
+async fn a_draft_proposal_fixes_its_manifest_and_its_lint_warnings() {
+    let (memory, [source, ..]) = memory_with_targets();
+    let anna = contributor(&memory);
+    let markdown = format!(
+        "# Konzept\n\nDas Fest ist am {}.\n{} öffnet früh.\nWir erwarten 20000 Gäste.\n",
+        fact_link(1),
+        source_link(source, 7, 19),
+    );
+    let changeset = changeset_of(
+        create_changeset(
+            &anna,
+            draft(new_document(), &markdown),
+            stores(&memory),
+            &FixedClock,
+        )
+        .await
+        .unwrap(),
+    );
+
+    let [draft] = changeset.drafts.as_slice() else {
+        panic!("not one draft: {:?}", changeset.drafts);
+    };
+    assert_eq!(draft.proposal_id, changeset.proposals[0].id);
+    assert_eq!(
+        draft.manifest.facts,
+        [CitedFact {
+            fact_id: FactId::from_uuid(Uuid::from_u128(FACT)),
+            version: RecordVersion::FIRST,
+        }]
+    );
+    let [cited] = draft.manifest.sources.as_slice() else {
+        panic!("not one source");
+    };
+    assert_eq!(cited.source_version_id, source);
+    assert_eq!(cited.passage.quote, "Das Flugfeld");
+    assert_eq!(
+        draft.lint_warnings,
+        [LintWarning {
+            line: 5,
+            kind: LintKind::Number
+        }]
+    );
+    assert_eq!(
+        memory.inserted.lock().unwrap()[0].0.drafts,
+        changeset.drafts
+    );
+}
+
+async fn draft_errors(
+    memory: &Memory,
+    caller: &MemberCaller,
+    input: NewChangeset,
+) -> Vec<(String, &'static str)> {
+    let result = create_changeset(caller, input, stores(memory), &FixedClock).await;
+    let errors = invalid_fields(result);
+    assert!(memory.inserted.lock().unwrap().is_empty());
+    errors
+}
+
+fn markdown_error(code: &'static str) -> Vec<(String, &'static str)> {
+    vec![("proposals/0/operation/markdown".to_owned(), code)]
+}
+
+#[tokio::test]
+async fn a_draft_link_to_a_missing_fact_version_is_rejected() {
+    let (memory, _) = memory_with_targets();
+    let anna = contributor(&memory);
+    // Version 2 does not exist yet: an open proposal can propose it, but a draft cannot cite it.
+    let input = draft(new_document(), &format!("Am {}.\n", fact_link(2)));
+    assert_eq!(
+        draft_errors(&memory, &anna, input).await,
+        markdown_error("link-not-found")
+    );
+}
+
+#[tokio::test]
+async fn a_draft_cannot_cite_a_source_that_its_author_cannot_see() {
+    let (memory, [_, other, organization]) = memory_with_targets();
+    let anna = contributor(&memory);
+    for source in [other, organization] {
+        let input = draft(new_document(), &format!("{}\n", source_link(source, 7, 19)));
+        assert_eq!(
+            draft_errors(&memory, &anna, input).await,
+            markdown_error("link-not-found")
+        );
+    }
+    // An owner reaches each source of the organization (ADR 0052).
+    let owner = caller(OrganizationRole::Owner);
+    let input = draft(
+        new_document(),
+        &format!("{}\n", source_link(organization, 7, 19)),
+    );
+    create_changeset(&owner, input, stores(&memory), &FixedClock)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn a_draft_cannot_cite_a_source_without_text() {
+    let (memory, _) = memory_with_targets();
+    let pdf = SourceVersionId::from_uuid(Uuid::now_v7());
+    memory.sources.lock().unwrap().push((
+        Some(open_day()),
+        SourceVersionText {
+            id: pdf,
+            text: None,
+        },
+    ));
+    let anna = contributor(&memory);
+    let input = draft(new_document(), &format!("{}\n", source_link(pdf, 7, 19)));
+    assert_eq!(
+        draft_errors(&memory, &anna, input).await,
+        markdown_error("no-text")
+    );
+}
+
+#[tokio::test]
+async fn a_draft_link_outside_the_source_text_is_rejected() {
+    let (memory, [source, ..]) = memory_with_targets();
+    let anna = contributor(&memory);
+    let input = draft(
+        new_document(),
+        &format!("{}\n", source_link(source, 7, 999)),
+    );
+    assert_eq!(
+        draft_errors(&memory, &anna, input).await,
+        markdown_error("out-of-range")
+    );
+}
+
+#[tokio::test]
+async fn a_draft_that_breaks_a_link_rule_is_rejected() {
+    let (memory, _) = memory_with_targets();
+    let anna = contributor(&memory);
+    let input = draft(new_document(), "![Logo](https://example.org/logo.png)\n");
+    assert_eq!(
+        draft_errors(&memory, &anna, input).await,
+        markdown_error("image-not-allowed")
+    );
+}
+
+#[tokio::test]
+async fn a_draft_for_a_document_of_another_event_is_rejected() {
+    let (memory, _) = memory_with_targets();
+    let anna = contributor(&memory);
+    let elsewhere = DocumentId::from_uuid(Uuid::now_v7());
+    memory
+        .documents
+        .lock()
+        .unwrap()
+        .push((elsewhere, other_event()));
+    let existing = json!({"existing": {"document_id": elsewhere.as_uuid(), "expected_version": 1}});
+    assert_eq!(
+        draft_errors(&memory, &anna, draft(existing, "Text.\n")).await,
+        [(
+            "proposals/0/operation/document/existing/document_id".to_owned(),
+            "unknown-document"
+        )]
+    );
+
+    let own = DocumentId::from_uuid(Uuid::now_v7());
+    memory.documents.lock().unwrap().push((own, open_day()));
+    let existing = json!({"existing": {"document_id": own.as_uuid(), "expected_version": 1}});
+    create_changeset(
+        &anna,
+        draft(existing, "Text.\n"),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn a_draft_needs_a_name_a_version_and_text() {
+    let (memory, _) = memory_with_targets();
+    let anna = contributor(&memory);
+    let unnamed = json!({"new": {"id": Uuid::now_v7(), "name": " "}});
+    assert_eq!(
+        draft_errors(&memory, &anna, draft(unnamed, " \n")).await,
+        [
+            (
+                "proposals/0/operation/document/new/name".to_owned(),
+                "empty"
+            ),
+            ("proposals/0/operation/markdown".to_owned(), "empty"),
+        ]
+    );
+    let unversioned = json!({"existing": {"document_id": Uuid::now_v7(), "expected_version": 0}});
+    assert_eq!(
+        draft_errors(&memory, &anna, draft(unversioned, "Text.\n")).await,
+        [(
+            "proposals/0/operation/document/existing/expected_version".to_owned(),
+            "invalid"
+        )]
+    );
 }

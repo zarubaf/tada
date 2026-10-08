@@ -8,8 +8,11 @@ use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tada_app::caller::{Actor, ActorKind as AppActorKind, Channel as AppChannel};
+use tada_app::documents::readable_document_id;
 use tada_app::domain::ids::{ChangesetId, EventId, ProposalId};
-use tada_app::domain::proposals::Operation as DomainOperation;
+use tada_app::domain::proposals::{
+    DraftDocument as DomainDraftDocument, Operation as DomainOperation,
+};
 use tada_app::domain::sources::Excerpt as DomainExcerpt;
 use tada_app::facts::FactVersionRef;
 use tada_app::problem::ProblemCode;
@@ -19,7 +22,7 @@ use tada_app::proposals::{
 };
 use tada_app::review::{
     self as app, Applied, ApplyError, ApplyInput, ChangesetCursor, ChangesetReview,
-    ConflictReason as AppConflictReason, Edit, OpenChangeset as AppOpenChangeset,
+    ConflictReason as AppConflictReason, Edit, LocalRecord, OpenChangeset as AppOpenChangeset,
     ProposalReview as AppProposalReview, ProposalStatus as AppProposalStatus, ReviewQueryError,
     ReviewStores,
 };
@@ -434,6 +437,44 @@ pub enum Operation {
         /// The user ID of the member who owns the question.
         owner: Uuid,
     },
+    CreateDocumentDraft {
+        event_id: Uuid,
+        document: DraftDocument,
+        /// The Markdown of the draft.
+        markdown: String,
+    },
+}
+
+/// The document of a draft.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum DraftDocument {
+    /// A new document of the event.
+    New { id: Uuid, name: String },
+    /// An existing document of the event.
+    Existing {
+        document_id: Uuid,
+        /// The record version of the document that the proposal expects.
+        expected_version: i64,
+    },
+}
+
+impl From<&DomainDraftDocument> for DraftDocument {
+    fn from(document: &DomainDraftDocument) -> Self {
+        match document {
+            DomainDraftDocument::New { id, name } => Self::New {
+                id: id.as_uuid(),
+                name: name.as_str().to_owned(),
+            },
+            DomainDraftDocument::Existing {
+                document_id,
+                expected_version,
+            } => Self::Existing {
+                document_id: document_id.as_uuid(),
+                expected_version: expected_version.get(),
+            },
+        }
+    }
 }
 
 impl From<&DomainOperation> for Operation {
@@ -511,6 +552,15 @@ impl From<&DomainOperation> for Operation {
                 event_id: event_id.as_uuid(),
                 text: text.as_str().to_owned(),
                 owner: owner.as_uuid(),
+            },
+            DomainOperation::CreateDocumentDraft {
+                event_id,
+                document,
+                markdown,
+            } => Self::CreateDocumentDraft {
+                event_id: event_id.as_uuid(),
+                document: document.into(),
+                markdown: markdown.as_str().to_owned(),
             },
         }
     }
@@ -610,6 +660,8 @@ pub struct ReviewResult {
     pub proposals: Vec<ReviewedProposal>,
     /// The new open questions with their event-local IDs.
     pub open_questions: Vec<NewOpenQuestion>,
+    /// The new documents with their organization-local IDs.
+    pub documents: Vec<NewDocument>,
 }
 
 /// A proposal with its new status.
@@ -627,8 +679,30 @@ pub struct NewOpenQuestion {
     pub local_id: String,
 }
 
+/// A new document with its readable ID.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct NewDocument {
+    pub id: Uuid,
+    /// The readable ID, for example `DOC-001` (ADR 0038).
+    pub readable_id: String,
+}
+
 impl From<Applied> for ReviewResult {
     fn from(applied: Applied) -> Self {
+        let mut open_questions = Vec::new();
+        let mut documents = Vec::new();
+        for local in applied.local_ids {
+            match local.record {
+                LocalRecord::OpenQuestion(id) => open_questions.push(NewOpenQuestion {
+                    id: id.as_uuid(),
+                    local_id: format!("QST-{}", local.local_number),
+                }),
+                LocalRecord::Document(id) => documents.push(NewDocument {
+                    id: id.as_uuid(),
+                    readable_id: readable_document_id(local.local_number),
+                }),
+            }
+        }
         Self {
             proposals: applied
                 .proposals
@@ -638,14 +712,8 @@ impl From<Applied> for ReviewResult {
                     status: status.into(),
                 })
                 .collect(),
-            open_questions: applied
-                .local_ids
-                .into_iter()
-                .map(|local| NewOpenQuestion {
-                    id: local.open_question.as_uuid(),
-                    local_id: format!("QST-{}", local.local_number),
-                })
-                .collect(),
+            open_questions,
+            documents,
         }
     }
 }
@@ -693,6 +761,8 @@ async fn create_changeset(
         identity: state.identity.as_ref(),
         facts: state.facts.as_ref(),
         proposals: state.proposals.as_ref(),
+        sources: state.sources.as_ref(),
+        documents: state.documents.as_ref(),
     };
     match proposals::create_changeset(&caller, input, stores, state.clock.as_ref()).await? {
         Created::New(changeset) => Ok((StatusCode::CREATED, axum::Json(changeset.into()))),
@@ -900,6 +970,7 @@ async fn reject_proposals(
             })
             .collect(),
         open_questions: Vec::new(),
+        documents: Vec::new(),
     }))
 }
 

@@ -46,6 +46,7 @@ use tada_app::public_url::PublicUrl;
 use tada_app::review::ReviewStore;
 use tada_app::session::SessionStore;
 use tada_app::sign_in::{SignInRequestStore, SignInStore};
+use tada_app::sources::SourceStore;
 use tada_app::telegram::TelegramLinks;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa::openapi::OpenApi;
@@ -84,6 +85,8 @@ pub struct ApiState {
     pub facts: Arc<dyn FactStore>,
     pub proposals: Arc<dyn ProposalStore>,
     pub review: Arc<dyn ReviewStore>,
+    /// The source versions that drafts cite.
+    pub sources: Arc<dyn SourceStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -383,8 +386,13 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: tada_app::domain::ids::UserId,
-        ) -> Result<Vec<tada_app::domain::identity::EventRole>, tada_app::store::StoreError>
-        {
+        ) -> Result<
+            Vec<(
+                tada_app::domain::ids::EventId,
+                tada_app::domain::identity::EventRole,
+            )>,
+            tada_app::store::StoreError,
+        > {
             unreachable!()
         }
     }
@@ -698,6 +706,58 @@ mod tests {
         ) -> Result<Option<tada_app::facts::FactVersionRef>, tada_app::store::StoreError> {
             unreachable!()
         }
+
+        async fn existing_versions(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: &[(
+                tada_app::domain::ids::FactId,
+                tada_app::domain::RecordVersion,
+            )],
+        ) -> Result<
+            Vec<(
+                tada_app::domain::ids::FactId,
+                tada_app::domain::RecordVersion,
+            )>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl SourceStore for NoReview {
+        async fn add_member_text(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: &tada_app::domain::sources::SourceText,
+            _: &tada_app::caller::Actor,
+            _: jiff::Timestamp,
+        ) -> Result<tada_app::sources::SourceVersionRef, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn search(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &[tada_app::domain::ids::EventId],
+            _: &str,
+            _: u32,
+        ) -> Result<Vec<tada_app::sources::SourceHit>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn texts(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::access::SourceReach,
+            _: &[tada_app::domain::ids::SourceVersionId],
+        ) -> Result<Vec<tada_app::sources::SourceVersionText>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
     }
 
     #[async_trait::async_trait]
@@ -790,6 +850,7 @@ mod tests {
             facts: Arc::new(NoReview),
             proposals: Arc::new(NoReview),
             review: Arc::new(NoReview),
+            sources: Arc::new(NoReview),
         }
     }
 

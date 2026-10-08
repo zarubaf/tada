@@ -7,6 +7,7 @@ use jiff::Timestamp;
 use tada_domain::ids::{EventId, SourceItemId, SourceVersionId};
 use tada_domain::sources::SourceText;
 
+use crate::access::SourceReach;
 use crate::caller::{Actor, OrgScope};
 use crate::store::StoreError;
 
@@ -43,6 +44,14 @@ impl Debug for SourceHit {
     }
 }
 
+/// A stored source version with its normalized text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceVersionText {
+    pub id: SourceVersionId,
+    /// `None` for a file without text, for example a PDF.
+    pub text: Option<SourceText>,
+}
+
 /// The repository port for source items and source versions. Each method stays inside `scope`.
 #[async_trait]
 pub trait SourceStore: Debug + Send + Sync {
@@ -65,4 +74,13 @@ pub trait SourceStore: Debug + Send + Sync {
         query: &str,
         limit: u32,
     ) -> Result<Vec<SourceHit>, StoreError>;
+
+    /// The source versions of `ids` inside `reach` (`access::source_reach`).
+    /// An ID outside the reach, or of another organization, gives nothing.
+    async fn texts(
+        &self,
+        scope: OrgScope,
+        reach: &SourceReach,
+        ids: &[SourceVersionId],
+    ) -> Result<Vec<SourceVersionText>, StoreError>;
 }

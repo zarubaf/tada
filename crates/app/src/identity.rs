@@ -52,10 +52,10 @@ pub trait IdentityStore: Debug + Send + Sync {
         user: UserId,
     ) -> Result<Option<EventRole>, StoreError>;
 
-    /// The event roles of a user in all events of the organization of `scope`.
+    /// The event roles of a user in all events of the organization of `scope`, each with its event.
     async fn event_roles_of(
         &self,
         scope: OrgScope,
         user: UserId,
-    ) -> Result<Vec<EventRole>, StoreError>;
+    ) -> Result<Vec<(EventId, EventRole)>, StoreError>;
 }

@@ -8,27 +8,31 @@ use std::collections::{HashMap, HashSet};
 use async_trait::async_trait;
 use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
+use sha2::{Digest, Sha256};
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::caller::{Actor, OrgScope};
 use tada_app::domain::RecordVersion;
+use tada_app::domain::documents::DraftMarkdown;
 use tada_app::domain::events::Event;
 use tada_app::domain::facts::{ChoiceValue, FactState, FieldStatus, Label, ValueType, Valued};
 use tada_app::domain::ids::{
-    ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, SourceVersionId,
+    ChangesetId, DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId,
+    SourceVersionId,
 };
-use tada_app::domain::proposals::Operation;
+use tada_app::domain::proposals::{DraftDocument, Operation};
 use tada_app::domain::sources::{Passage, SourceText};
 use tada_app::review::{
-    ApplyOutcome, ApplyPlan, ApplyStep, NewLocalId, OpenChangeset, Recorded, ReviewBatch,
-    ReviewOutcome, ReviewRecord, ReviewStore, StepEvidence,
+    ApplyOutcome, ApplyPlan, ApplyStep, LocalRecord, NewLocalId, OpenChangeset, Recorded,
+    ReviewBatch, ReviewOutcome, ReviewRecord, ReviewStore, StepEvidence,
 };
 use tada_app::store::StoreError;
 
 use crate::Database;
+use crate::documents::{DOCUMENT_COUNTER, DRAFT};
 use crate::error::{InvalidRow, store_error};
 use crate::sources::{TextItem, TextKind};
-use crate::{actor, audit, events, sources, values};
+use crate::{actor, audit, drafts, events, sources, values};
 
 /// The kind of the event-local IDs of open questions (ADR 0038).
 const OPEN_QUESTION_PREFIX: &str = "QST";
@@ -42,6 +46,7 @@ const RECORD_CONSTRAINTS: &[&str] = &[
     "field_definition_pkey",
     "open_question_pkey",
     "fact_event_id_field_id_key",
+    "document_pkey",
 ];
 
 #[async_trait]
@@ -219,9 +224,9 @@ async fn lock_open(
     Ok(!reviewed)
 }
 
-/// Locks the existing field definitions and facts that the plan uses or changes, and the event-local ID counters
-/// that it moves, before any check. It keeps the lock order of the crate documentation: fields, then facts,
-/// then counters, each kind in the order of its keys. So two applies take their row locks in the same order and
+/// Locks the existing field definitions and facts that the plan uses or changes, the local ID counters
+/// that it moves and the existing documents of its drafts, before any check. It keeps the lock order of the crate
+/// documentation: fields, then facts, then counters, then documents, each kind in the order of its keys. So two applies take their row locks in the same order and
 /// cannot deadlock on them. The plan order follows the dependencies and the client IDs.
 /// A missing counter row is inserted here, so the lock covers it; a rollback removes it again.
 /// Inserts of other new rows can still wait on each other; a deadlock there maps to `Unavailable`,
@@ -233,7 +238,10 @@ async fn lock_targets(
 ) -> Result<(), sqlx::Error> {
     let mut fields = Vec::new();
     let (mut fact_events, mut fact_fields) = (Vec::new(), Vec::new());
-    let mut question_events = Vec::new();
+    // The counters to move, as (scope, kind): `QST` in an event, `DOC` in the organization (ADR 0038).
+    let (mut counter_scopes, mut counter_kinds) = (Vec::new(), Vec::new());
+    let mut documents = Vec::new();
+    let organization = scope.organization_id().as_uuid();
     for step in steps {
         match &step.operation {
             Operation::SetFact {
@@ -248,12 +256,21 @@ async fn lock_targets(
                 fields.push(field_id.as_uuid());
             }
             Operation::CreateOpenQuestion { event_id, .. } => {
-                question_events.push(event_id.as_uuid());
+                counter_scopes.push(event_id.as_uuid());
+                counter_kinds.push(OPEN_QUESTION_PREFIX);
             }
+            Operation::CreateDocumentDraft { document, .. } => match document {
+                DraftDocument::New { .. } => {
+                    counter_scopes.push(organization);
+                    counter_kinds.push(DOCUMENT_COUNTER);
+                }
+                DraftDocument::Existing { document_id, .. } => {
+                    documents.push(document_id.as_uuid());
+                }
+            },
             Operation::CreateEvent { .. } | Operation::AddFieldDefinition { .. } => {}
         }
     }
-    let organization = scope.organization_id().as_uuid();
     // Shipped fields have no organization and change only with `tada migrate`, so they need no lock.
     sqlx::query_scalar!(
         "SELECT id FROM field_definition WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
@@ -275,26 +292,37 @@ async fn lock_targets(
     )
     .fetch_all(&mut *conn)
     .await?;
+    let counter_kinds: Vec<String> = counter_kinds.into_iter().map(str::to_owned).collect();
     // A new counter starts at 1, the value that `next_local_number` would give.
     sqlx::query!(
         "INSERT INTO local_id_counter (organization_id, scope_id, kind, next)
-         SELECT DISTINCT $1::uuid, t.scope_id, $3::text, 1::bigint FROM unnest($2::uuid[]) AS t (scope_id)
-         ORDER BY t.scope_id
+         SELECT DISTINCT $1::uuid, t.scope_id, t.kind, 1::bigint
+         FROM unnest($2::uuid[], $3::text[]) AS t (scope_id, kind)
+         ORDER BY t.scope_id, t.kind
          ON CONFLICT (organization_id, scope_id, kind) DO NOTHING",
         organization,
-        &question_events,
-        OPEN_QUESTION_PREFIX,
+        &counter_scopes,
+        &counter_kinds,
     )
     .execute(&mut *conn)
     .await?;
     sqlx::query_scalar!(
-        "SELECT scope_id FROM local_id_counter
-         WHERE organization_id = $1 AND scope_id = ANY($2) AND kind = $3
-         ORDER BY scope_id
-         FOR UPDATE",
+        "SELECT c.scope_id FROM local_id_counter c
+         JOIN unnest($2::uuid[], $3::text[]) AS t (scope_id, kind)
+           ON c.scope_id = t.scope_id AND c.kind = t.kind
+         WHERE c.organization_id = $1
+         ORDER BY c.scope_id, c.kind
+         FOR UPDATE OF c",
         organization,
-        &question_events,
-        OPEN_QUESTION_PREFIX,
+        &counter_scopes,
+        &counter_kinds,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    sqlx::query_scalar!(
+        "SELECT id FROM document WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+        organization,
+        &documents,
     )
     .fetch_all(&mut *conn)
     .await?;
@@ -312,6 +340,7 @@ async fn check_versions(
     let organization = scope.organization_id().as_uuid();
     let mut new_records: HashSet<Uuid> = HashSet::new();
     let mut fact_versions: HashMap<(EventId, FieldDefinitionId), Option<i64>> = HashMap::new();
+    let mut document_versions: HashMap<DocumentId, i64> = HashMap::new();
     let mut conflicts = Vec::new();
     for step in steps {
         let matches = match &step.operation {
@@ -406,6 +435,41 @@ async fn check_versions(
                         Some((_, FieldStatus::Active))
                     )
             }
+            Operation::CreateDocumentDraft {
+                event_id, document, ..
+            } => match document {
+                DraftDocument::New { id, .. } => {
+                    document_versions.insert(*id, 1);
+                    !sqlx::query_scalar!(
+                        r#"SELECT EXISTS (SELECT 1 FROM document WHERE id = $1) AS "exists!""#,
+                        id.as_uuid(),
+                    )
+                    .fetch_one(&mut *conn)
+                    .await?
+                }
+                DraftDocument::Existing {
+                    document_id,
+                    expected_version,
+                } => {
+                    // A document that an earlier step of the plan changes counts with its new version.
+                    let current = match document_versions.get(document_id) {
+                        Some(version) => Some(*version),
+                        None => {
+                            sqlx::query_scalar!(
+                                "SELECT version FROM document
+                                 WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+                                organization,
+                                event_id.as_uuid(),
+                                document_id.as_uuid(),
+                            )
+                            .fetch_optional(&mut *conn)
+                            .await?
+                        }
+                    };
+                    document_versions.insert(*document_id, expected_version.get() + 1);
+                    current == Some(expected_version.get())
+                }
+            },
         };
         if let Some(record) = step.operation.new_record() {
             new_records.insert(record.as_uuid());
@@ -553,7 +617,8 @@ async fn write_step(
             text,
             owner,
         } => {
-            let number = next_local_number(conn, scope, *event_id, OPEN_QUESTION_PREFIX).await?;
+            let number =
+                next_local_number(conn, scope, event_id.as_uuid(), OPEN_QUESTION_PREFIX).await?;
             sqlx::query!(
                 "INSERT INTO open_question
                      (id, organization_id, event_id, local_number, text, owner_user_id, status, version, created_at)
@@ -569,10 +634,29 @@ async fn write_step(
             .execute(&mut *conn)
             .await?;
             local_id = Some(NewLocalId {
-                open_question: OpenQuestionId::from_uuid(id.as_uuid()),
+                record: LocalRecord::OpenQuestion(OpenQuestionId::from_uuid(id.as_uuid())),
                 local_number: u64::try_from(number)
                     .map_err(|error| sqlx::Error::Decode(Box::new(error)))?,
             });
+        }
+        Operation::CreateDocumentDraft {
+            event_id,
+            document,
+            markdown,
+        } => {
+            let (document, number, new_local_id) =
+                draft_target(conn, scope, plan, *event_id, document).await?;
+            local_id = new_local_id;
+            insert_draft(
+                conn,
+                scope,
+                plan,
+                step.proposal_id,
+                document,
+                number,
+                markdown,
+            )
+            .await?;
         }
         Operation::SetFact {
             event_id,
@@ -617,12 +701,12 @@ async fn write_step(
     Ok(local_id)
 }
 
-/// The next event-local number of `kind` in the event (ADR 0038). The counter changes in the transaction of the
-/// caller, so a rollback takes no number and a number is never given twice.
+/// The next local number of `kind` in its scope: an event, or the organization (ADR 0038).
+/// The counter changes in the transaction of the caller, so a rollback takes no number and a number is never given twice.
 async fn next_local_number(
     conn: &mut PgConnection,
     scope: OrgScope,
-    event: EventId,
+    counter_scope: Uuid,
     kind: &str,
 ) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar!(
@@ -631,11 +715,158 @@ async fn next_local_number(
            ON CONFLICT (organization_id, scope_id, kind) DO UPDATE SET next = local_id_counter.next + 1
            RETURNING next - 1 AS "number!""#,
         scope.organization_id().as_uuid(),
-        event.as_uuid(),
+        counter_scope,
         kind,
     )
     .fetch_one(&mut *conn)
     .await
+}
+
+/// The document of a draft step and the number of its new version, with the `DOC-<n>` of a new document.
+/// A new document gets the next number of the organization; the reviewer owns it (ADR 0038, ADR 0051).
+/// An existing document gets its next record version; the write repeats the expected version,
+/// so a changed document updates no row (`RowNotFound`), which is a conflict.
+async fn draft_target(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    plan: &ApplyPlan,
+    event: EventId,
+    document: &DraftDocument,
+) -> Result<(DocumentId, i32, Option<NewLocalId>), sqlx::Error> {
+    let organization = scope.organization_id().as_uuid();
+    match document {
+        DraftDocument::New { id, name } => {
+            let number = next_local_number(conn, scope, organization, DOCUMENT_COUNTER).await?;
+            sqlx::query!(
+                "INSERT INTO document
+                     (id, organization_id, event_id, local_number, name, owner_user_id, created_at, version)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, 1)",
+                id.as_uuid(),
+                organization,
+                event.as_uuid(),
+                number,
+                name.as_str(),
+                plan.manager.as_uuid(),
+                plan.now.to_sqlx() as _,
+            )
+            .execute(&mut *conn)
+            .await?;
+            let local_id = NewLocalId {
+                record: LocalRecord::Document(*id),
+                local_number: u64::try_from(number)
+                    .map_err(|error| sqlx::Error::Decode(Box::new(error)))?,
+            };
+            Ok((*id, 1, Some(local_id)))
+        }
+        DraftDocument::Existing {
+            document_id,
+            expected_version,
+        } => {
+            sqlx::query_scalar!(
+                "UPDATE document SET version = version + 1
+                 WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4
+                 RETURNING id",
+                organization,
+                event.as_uuid(),
+                document_id.as_uuid(),
+                expected_version.get(),
+            )
+            .fetch_optional(&mut *conn)
+            .await?
+            .ok_or(sqlx::Error::RowNotFound)?;
+            let number = sqlx::query_scalar!(
+                r#"SELECT coalesce(max(number), 0) + 1 AS "number!"
+                   FROM document_version WHERE organization_id = $1 AND document_id = $2"#,
+                organization,
+                document_id.as_uuid(),
+            )
+            .fetch_one(&mut *conn)
+            .await?;
+            Ok((*document_id, number, None))
+        }
+    }
+}
+
+/// Adds the draft version `number` of the document with its Markdown, and copies the provenance manifest that
+/// the proposal fixed at its creation into the manifest rows of the version (ADR 0051).
+/// The member who accepts the proposal adds the version.
+async fn insert_draft(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    plan: &ApplyPlan,
+    proposal: ProposalId,
+    document: DocumentId,
+    number: i32,
+    markdown: &DraftMarkdown,
+) -> Result<(), sqlx::Error> {
+    let organization = scope.organization_id().as_uuid();
+    let version = Uuid::now_v7();
+    let sha256: [u8; 32] = Sha256::digest(markdown.as_str().as_bytes()).into();
+    sqlx::query!(
+        "INSERT INTO document_version
+             (id, organization_id, document_id, number, kind, sha256, uploaded_by, status, created_at, markdown)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $5, $8, $9)",
+        version,
+        organization,
+        document.as_uuid(),
+        number,
+        DRAFT,
+        &sha256[..],
+        plan.manager.as_uuid(),
+        plan.now.to_sqlx() as _,
+        markdown.as_str(),
+    )
+    .execute(&mut *conn)
+    .await?;
+    // The manifest that the proposal fixed at its creation, read with the one codec of its format.
+    let stored = sqlx::query_scalar!(
+        r#"SELECT manifest AS "manifest!" FROM proposal
+           WHERE organization_id = $1 AND id = $2 AND manifest IS NOT NULL"#,
+        organization,
+        proposal.as_uuid(),
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    let manifest = drafts::manifest_from_json(&stored)
+        .map_err(|error| sqlx::Error::Decode(Box::new(error)))?;
+    let (facts, numbers): (Vec<Uuid>, Vec<i64>) = manifest
+        .facts
+        .iter()
+        .map(|fact| (fact.fact_id.as_uuid(), fact.version.get()))
+        .unzip();
+    sqlx::query!(
+        "INSERT INTO document_manifest_fact (organization_id, document_version_id, fact_id, fact_version_number)
+         SELECT $1, $2, t.fact_id, t.number FROM unnest($3::uuid[], $4::bigint[]) AS t (fact_id, number)",
+        organization,
+        version,
+        &facts,
+        &numbers,
+    )
+    .execute(&mut *conn)
+    .await?;
+    let offset =
+        |value: u32| i32::try_from(value).map_err(|error| sqlx::Error::Encode(Box::new(error)));
+    let mut sources = Vec::new();
+    let (mut starts, mut ends) = (Vec::new(), Vec::new());
+    for cited in &manifest.sources {
+        sources.push(cited.source_version_id.as_uuid());
+        starts.push(offset(cited.passage.start)?);
+        ends.push(offset(cited.passage.end)?);
+    }
+    sqlx::query!(
+        "INSERT INTO document_manifest_source
+             (organization_id, document_version_id, source_version_id, start_offset, end_offset)
+         SELECT $1, $2, t.source_version_id, t.start_offset, t.end_offset
+         FROM unnest($3::uuid[], $4::int[], $5::int[]) AS t (source_version_id, start_offset, end_offset)",
+        organization,
+        version,
+        &sources,
+        &starts,
+        &ends,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Stores an edited state as a source version of the kind `review` with the reviewer as author (ADR 0050).

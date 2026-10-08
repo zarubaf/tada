@@ -7,12 +7,13 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::RecordVersion;
+use crate::documents::{DocumentName, DraftMarkdown};
 use crate::events::{EventKey, EventName, EventTimeZone};
 use crate::facts::{
     ChoiceKey, Description, FactState, FieldKey, ModuleKey, ShortText, TextError, ValueType,
     Valued, checked_text,
 };
-use crate::ids::{EventId, FieldDefinitionId, OpenQuestionId, ProposalId, UserId};
+use crate::ids::{DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, UserId};
 use crate::sources::Passage;
 
 /// The change that a proposal suggests. Slice 1 has these operations.
@@ -62,6 +63,36 @@ pub enum Operation {
         text: QuestionText,
         owner: UserId,
     },
+    /// Add a draft version to a document of an event (ADR 0051).
+    /// The links of the Markdown cite fact versions and source passages; their provenance manifest is fixed when tada stores the proposal.
+    CreateDocumentDraft {
+        event_id: EventId,
+        document: DraftDocument,
+        markdown: DraftMarkdown,
+    },
+}
+
+/// The document of a draft: a new document, or an existing document of the event at its current version.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DraftDocument {
+    New {
+        id: DocumentId,
+        name: DocumentName,
+    },
+    /// `expected_version` is the current record version of the document (ADR 0050).
+    Existing {
+        document_id: DocumentId,
+        expected_version: RecordVersion,
+    },
+}
+
+impl DraftDocument {
+    pub fn document_id(&self) -> DocumentId {
+        match self {
+            Self::New { id, .. } => *id,
+            Self::Existing { document_id, .. } => *document_id,
+        }
+    }
 }
 
 /// The ID of the record that an operation creates.
@@ -70,6 +101,7 @@ pub enum NewRecord {
     Event(EventId),
     Field(FieldDefinitionId),
     OpenQuestion(OpenQuestionId),
+    Document(DocumentId),
 }
 
 impl NewRecord {
@@ -78,6 +110,7 @@ impl NewRecord {
             Self::Event(id) => id.as_uuid(),
             Self::Field(id) => id.as_uuid(),
             Self::OpenQuestion(id) => id.as_uuid(),
+            Self::Document(id) => id.as_uuid(),
         }
     }
 }
@@ -89,9 +122,14 @@ impl Operation {
             Self::CreateEvent { id, .. } => Some(NewRecord::Event(*id)),
             Self::AddFieldDefinition { id, .. } => Some(NewRecord::Field(*id)),
             Self::CreateOpenQuestion { id, .. } => Some(NewRecord::OpenQuestion(*id)),
-            Self::SetFact { .. } | Self::AddChoiceValue { .. } | Self::DeprecateField { .. } => {
-                None
-            }
+            Self::CreateDocumentDraft {
+                document: DraftDocument::New { id, .. },
+                ..
+            } => Some(NewRecord::Document(*id)),
+            Self::SetFact { .. }
+            | Self::AddChoiceValue { .. }
+            | Self::DeprecateField { .. }
+            | Self::CreateDocumentDraft { .. } => None,
         }
     }
 
@@ -104,7 +142,8 @@ impl Operation {
             | Self::AddFieldDefinition { event_id, .. }
             | Self::AddChoiceValue { event_id, .. }
             | Self::DeprecateField { event_id, .. }
-            | Self::CreateOpenQuestion { event_id, .. } => *event_id,
+            | Self::CreateOpenQuestion { event_id, .. }
+            | Self::CreateDocumentDraft { event_id, .. } => *event_id,
         }
     }
 
@@ -115,7 +154,9 @@ impl Operation {
             | Self::AddChoiceValue { field_id, .. }
             | Self::DeprecateField { field_id, .. } => Some(*field_id),
             Self::AddFieldDefinition { id, .. } => Some(*id),
-            Self::CreateEvent { .. } | Self::CreateOpenQuestion { .. } => None,
+            Self::CreateEvent { .. }
+            | Self::CreateOpenQuestion { .. }
+            | Self::CreateDocumentDraft { .. } => None,
         }
     }
 }

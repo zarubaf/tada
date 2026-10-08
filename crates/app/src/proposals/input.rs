@@ -10,6 +10,7 @@ use jiff::civil;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use tada_domain::RecordVersion;
+use tada_domain::documents::{DocumentName, DraftMarkdown};
 use tada_domain::events::{EventKey, EventName, EventTimeZone};
 use tada_domain::facts::{
     ChoiceKey, ChoiceValue, Currency, DateWindow, Decimal, Description, FactState, FactValue,
@@ -17,7 +18,7 @@ use tada_domain::facts::{
     ReferenceTarget, ShortText, TextError, Unit, ValueError, ValueType, Valued,
 };
 use tada_domain::ids::{DocumentId, EventId, FieldDefinitionId, OpenQuestionId, UserId};
-use tada_domain::proposals::{Operation, QuestionText};
+use tada_domain::proposals::{DraftDocument, Operation, QuestionText};
 use uuid::Uuid;
 
 use crate::events::{key_error_code, name_error_code};
@@ -133,6 +134,36 @@ pub enum OperationInput {
         text: String,
         /// The user ID of the member who owns the question.
         owner: Uuid,
+    },
+    /// Add a draft version to a document of the event (ADR 0051).
+    CreateDocumentDraft {
+        event_id: Uuid,
+        document: DraftDocumentInput,
+        /// CommonMark with tables, UTF-8, one sentence per line. No raw HTML and no images.
+        /// A fact is an empty link to an exact fact version: `[](tada:fact/<fact-uuid>?v=<n>)`.
+        /// A source passage is a link with the supporting words: `[words](tada:source/<source-version-uuid>#<start>-<end>)`.
+        /// Each link must cite an accepted fact version, an assumption or an unknown of the event, never an open proposal,
+        /// or a source version that the member can see.
+        markdown: String,
+    },
+}
+
+/// The document of a draft.
+#[derive(Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum DraftDocumentInput {
+    /// A new document of the event.
+    New {
+        /// The UUIDv7 of the new document.
+        id: Uuid,
+        /// The name of the document, 1 to 200 characters.
+        name: String,
+    },
+    /// An existing document of the event.
+    Existing {
+        document_id: Uuid,
+        /// The current version of the document.
+        expected_version: i64,
     },
 }
 
@@ -266,6 +297,7 @@ redacted_debug!(
     NewProposal,
     PassageInput,
     OperationInput,
+    DraftDocumentInput,
     FactStateInput,
     ValueInput,
     ValueTypeInput,
@@ -467,6 +499,46 @@ impl TryFrom<OperationInput> for Operation {
                     text,
                     owner: UserId::from_uuid(owner),
                 }),
+            OperationInput::CreateDocumentDraft {
+                event_id,
+                document,
+                markdown,
+            } => {
+                let document = match document {
+                    DraftDocumentInput::New { id, name } => errors
+                        .take(
+                            "document/new/name",
+                            DocumentName::parse(&name),
+                            text_error_code,
+                        )
+                        .map(|name| DraftDocument::New {
+                            id: DocumentId::from_uuid(id),
+                            name,
+                        }),
+                    DraftDocumentInput::Existing {
+                        document_id,
+                        expected_version,
+                    } => match RecordVersion::new(expected_version) {
+                        Some(expected_version) => Some(DraftDocument::Existing {
+                            document_id: DocumentId::from_uuid(document_id),
+                            expected_version,
+                        }),
+                        None => {
+                            errors.push("document/existing/expected_version", "invalid");
+                            None
+                        }
+                    },
+                };
+                let markdown =
+                    errors.take("markdown", DraftMarkdown::parse(&markdown), text_error_code);
+                (|| {
+                    Some(Operation::CreateDocumentDraft {
+                        event_id: EventId::from_uuid(event_id),
+                        document: document?,
+                        markdown: markdown?,
+                    })
+                })()
+            }
         };
         errors.finish(operation)
     }

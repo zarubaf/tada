@@ -9,8 +9,8 @@ use tada_app::audit::AuditEvent;
 use tada_app::blobs::BlobKey;
 use tada_app::caller::OrgScope;
 use tada_app::documents::{
-    DocumentCursor, DocumentStore, DocumentView, NewUpload, Published, StoredVersion, UploadTarget,
-    VersionView,
+    DocumentCursor, DocumentStore, DocumentView, DraftStatus, NewUpload, Published, StoredVersion,
+    UploadTarget, UploadedFile, VersionContent, VersionView,
 };
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId, SourceVersionId, UserId};
@@ -25,8 +25,11 @@ use crate::{actor, audit};
 /// The kind of a source item, a source version and a document version of an uploaded file.
 const UPLOAD: &str = "upload";
 
+/// The kind of a document version of a draft (ADR 0051).
+pub(crate) const DRAFT: &str = "draft";
+
 /// The kind of the counter of the organization-local document numbers (ADR 0038).
-const DOCUMENT_COUNTER: &str = "DOC";
+pub(crate) const DOCUMENT_COUNTER: &str = "DOC";
 
 /// A document version row, with the event of its document.
 struct VersionRow {
@@ -42,52 +45,79 @@ struct VersionRow {
     file_name: Option<String>,
     uploaded_by: Uuid,
     source_version_id: Option<Uuid>,
+    status: Option<String>,
     created_at: jiff_sqlx::Timestamp,
 }
 
-impl TryFrom<VersionRow> for StoredVersion {
-    type Error = InvalidRow;
-
-    /// Slice 1 has upload versions only. A draft row is an invalid row until drafts exist (ADR 0051).
-    fn try_from(row: VersionRow) -> Result<Self, InvalidRow> {
-        if row.kind != UPLOAD {
-            return Err(InvalidRow("document_version.kind"));
-        }
-        let version = VersionView {
-            id: DocumentVersionId::from_uuid(row.id),
-            document_id: DocumentId::from_uuid(row.document_id),
-            number: u32::try_from(row.number).map_err(|_| InvalidRow("document_version.number"))?,
-            file_name: row
+impl VersionRow {
+    /// The content of an upload row: its file.
+    fn uploaded_file(&self) -> Result<UploadedFile, InvalidRow> {
+        Ok(UploadedFile {
+            file_name: self
                 .file_name
+                .clone()
                 .ok_or(InvalidRow("document_version.file_name"))?,
-            file_type: row
+            file_type: self
                 .media_type
                 .as_deref()
                 .and_then(FileType::of_media_type)
                 .ok_or(InvalidRow("document_version.media_type"))?,
-            size_bytes: row
+            size_bytes: self
                 .size_bytes
                 .and_then(|size| u64::try_from(size).ok())
                 .ok_or(InvalidRow("document_version.size_bytes"))?,
-            sha256: row
-                .sha256
-                .try_into()
-                .map_err(|_| InvalidRow("document_version.sha256"))?,
-            uploaded_by: UserId::from_uuid(row.uploaded_by),
-            source_version_id: row
+            source_version_id: self
                 .source_version_id
                 .map(SourceVersionId::from_uuid)
                 .ok_or(InvalidRow("document_version.source_version_id"))?,
-            created_at: row.created_at.to_jiff(),
-        };
-        Ok(StoredVersion {
-            event_id: EventId::from_uuid(row.event_id),
+        })
+    }
+
+    fn content(&self) -> Result<VersionContent, InvalidRow> {
+        match self.kind.as_str() {
+            UPLOAD => Ok(VersionContent::Upload(self.uploaded_file()?)),
+            DRAFT => Ok(VersionContent::Draft {
+                status: self
+                    .status
+                    .as_deref()
+                    .and_then(DraftStatus::parse)
+                    .ok_or(InvalidRow("document_version.status"))?,
+            }),
+            _ => Err(InvalidRow("document_version.kind")),
+        }
+    }
+
+    fn view(&self) -> Result<VersionView, InvalidRow> {
+        Ok(VersionView {
+            id: DocumentVersionId::from_uuid(self.id),
+            document_id: DocumentId::from_uuid(self.document_id),
+            number: u32::try_from(self.number)
+                .map_err(|_| InvalidRow("document_version.number"))?,
+            sha256: self
+                .sha256
+                .clone()
+                .try_into()
+                .map_err(|_| InvalidRow("document_version.sha256"))?,
+            uploaded_by: UserId::from_uuid(self.uploaded_by),
+            created_at: self.created_at.to_jiff(),
+            content: self.content()?,
+        })
+    }
+
+    /// The stored upload with its object, or `None` for a draft, which has no file.
+    fn stored_upload(self) -> Result<Option<StoredVersion>, InvalidRow> {
+        let version = self.view()?;
+        if version.file().is_none() {
+            return Ok(None);
+        }
+        Ok(Some(StoredVersion {
+            event_id: EventId::from_uuid(self.event_id),
             version,
             blob_key: BlobKey::restore(
-                row.blob_key
+                self.blob_key
                     .ok_or(InvalidRow("document_version.blob_key"))?,
             ),
-        })
+        }))
     }
 }
 
@@ -110,6 +140,7 @@ struct DocumentRow {
     file_name: Option<String>,
     uploaded_by: Uuid,
     source_version_id: Option<Uuid>,
+    status: Option<String>,
     version_created_at: jiff_sqlx::Timestamp,
 }
 
@@ -117,7 +148,7 @@ impl TryFrom<DocumentRow> for DocumentView {
     type Error = InvalidRow;
 
     fn try_from(row: DocumentRow) -> Result<Self, InvalidRow> {
-        let newest = StoredVersion::try_from(VersionRow {
+        let newest = VersionRow {
             id: row.version_id,
             document_id: row.id,
             event_id: row.event_id,
@@ -130,8 +161,10 @@ impl TryFrom<DocumentRow> for DocumentView {
             file_name: row.file_name,
             uploaded_by: row.uploaded_by,
             source_version_id: row.source_version_id,
+            status: row.status,
             created_at: row.version_created_at,
-        })?;
+        }
+        .view()?;
         Ok(DocumentView {
             id: DocumentId::from_uuid(row.id),
             event_id: EventId::from_uuid(row.event_id),
@@ -141,7 +174,7 @@ impl TryFrom<DocumentRow> for DocumentView {
             owner: UserId::from_uuid(row.owner_user_id),
             created_at: row.created_at.to_jiff(),
             version: RecordVersion::new(row.version).ok_or(InvalidRow("document.version"))?,
-            newest_version: newest.version,
+            newest_version: newest,
         })
     }
 }
@@ -171,7 +204,7 @@ async fn documents(
                   d.created_at AS "created_at: jiff_sqlx::Timestamp", d.version,
                   v.id AS "version_id!", v.number AS "number!", v.kind AS "kind!", v.blob_key,
                   v.media_type, v.size_bytes, v.sha256 AS "sha256!", v.file_name,
-                  v.uploaded_by AS "uploaded_by!", v.source_version_id,
+                  v.uploaded_by AS "uploaded_by!", v.source_version_id, v.status,
                   v.created_at AS "version_created_at!: jiff_sqlx::Timestamp"
            FROM document d
            JOIN LATERAL (
@@ -202,17 +235,17 @@ async fn documents(
         .collect()
 }
 
-/// The versions of the organization, in the order of their documents and numbers.
+/// The version rows of the organization, in the order of their documents and numbers.
 async fn versions(
     conn: &mut PgConnection,
     scope: OrgScope,
     document: Option<DocumentId>,
     id: Option<DocumentVersionId>,
-) -> Result<Vec<StoredVersion>, StoreError> {
-    let rows = sqlx::query_as!(
+) -> Result<Vec<VersionRow>, StoreError> {
+    sqlx::query_as!(
         VersionRow,
         r#"SELECT v.id, v.document_id, d.event_id, v.number, v.kind, v.blob_key, v.media_type,
-                  v.size_bytes, v.sha256, v.file_name, v.uploaded_by, v.source_version_id,
+                  v.size_bytes, v.sha256, v.file_name, v.uploaded_by, v.source_version_id, v.status,
                   v.created_at AS "created_at: jiff_sqlx::Timestamp"
            FROM document_version v
            JOIN document d ON d.organization_id = v.organization_id AND d.id = v.document_id
@@ -226,10 +259,7 @@ async fn versions(
     )
     .fetch_all(&mut *conn)
     .await
-    .map_err(store_error)?;
-    rows.into_iter()
-        .map(|row| Ok(StoredVersion::try_from(row)?))
-        .collect()
+    .map_err(store_error)
 }
 
 /// True if the files of the organization and `size` more bytes fit into its storage quota.
@@ -518,11 +548,11 @@ impl DocumentStore for Database {
         document: DocumentId,
     ) -> Result<Vec<VersionView>, StoreError> {
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        Ok(versions(&mut conn, scope, Some(document), None)
+        versions(&mut conn, scope, Some(document), None)
             .await?
-            .into_iter()
-            .map(|stored| stored.version)
-            .collect())
+            .iter()
+            .map(|row| Ok(row.view()?))
+            .collect()
     }
 
     async fn version(
@@ -531,7 +561,10 @@ impl DocumentStore for Database {
         id: DocumentVersionId,
     ) -> Result<Option<StoredVersion>, StoreError> {
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        Ok(versions(&mut conn, scope, None, Some(id)).await?.pop())
+        match versions(&mut conn, scope, None, Some(id)).await?.pop() {
+            Some(row) => Ok(row.stored_upload()?),
+            None => Ok(None),
+        }
     }
 }
 
@@ -644,11 +677,12 @@ mod tests {
         let version = &document.newest_version;
         assert_eq!(version.id, upload.version_id);
         assert_eq!(version.number, 1);
-        assert_eq!(version.file_name, "Programm.txt");
-        assert_eq!(version.file_type, FileType::Text);
-        assert_eq!(version.size_bytes, 18);
         assert_eq!(version.sha256, upload.sha256);
-        assert_eq!(version.source_version_id, upload.source_version_id);
+        let file = version.file().unwrap();
+        assert_eq!(file.file_name, "Programm.txt");
+        assert_eq!(file.file_type, FileType::Text);
+        assert_eq!(file.size_bytes, 18);
+        assert_eq!(file.source_version_id, upload.source_version_id);
         assert_eq!(
             test.database.get(f.scope(), document.id).await.unwrap(),
             Some(document.clone())
@@ -716,7 +750,10 @@ mod tests {
             "the name stays the name of the first upload"
         );
         assert_eq!(changed.newest_version.number, 2);
-        assert_eq!(changed.newest_version.file_name, "Programm-neu.txt");
+        assert_eq!(
+            changed.newest_version.file().unwrap().file_name,
+            "Programm-neu.txt"
+        );
         let after = test
             .database
             .versions(f.scope(), document.id)
@@ -954,35 +991,53 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn only_a_draft_has_a_status() {
+    async fn only_a_draft_has_a_status_and_markdown_and_it_has_no_file() {
         let test = TestDatabase::start().await;
         let f = fixture(&test, "testwil").await;
         let first = upload(&f, new_document(&f), "Programm.txt", b"Version eins");
         let document = published(&test, &f, &first).await;
-        let insert = |number: i32, kind: &'static str, status: Option<&'static str>| {
+        // A second version of the kind `kind`, with or without a file, a status and Markdown.
+        let insert = |kind: &'static str,
+                      file: bool,
+                      status: Option<&'static str>,
+                      markdown: Option<&'static str>| {
             sqlx::query(
                 "INSERT INTO document_version
                      (id, organization_id, document_id, number, kind, sha256, uploaded_by, status, created_at,
-                      blob_key, media_type, size_bytes, file_name, source_version_id)
-                 VALUES ($1, $2, $3, $4, $5, decode(repeat('00', 32), 'hex'), $6, $7, now(),
-                         $8, 'text/plain; charset=utf-8', 1, 'x.txt', $9)",
+                      markdown, blob_key, media_type, size_bytes, file_name, source_version_id)
+                 VALUES ($1, $2, $3, 2, $4, decode(repeat('00', 32), 'hex'), $5, $6, now(), $7,
+                         CASE WHEN $10 THEN $8 END, CASE WHEN $10 THEN 'text/plain; charset=utf-8' END,
+                         CASE WHEN $10 THEN 1 END, CASE WHEN $10 THEN 'x.txt' END, CASE WHEN $10 THEN $9::uuid END)",
             )
             .bind(Uuid::now_v7())
             .bind(f.organization.as_uuid())
             .bind(document.id.as_uuid())
-            .bind(number)
             .bind(kind)
             .bind(f.caller.user_id().as_uuid())
             .bind(status)
+            .bind(markdown)
             .bind(format!("{}/{}", f.organization, Uuid::now_v7()))
             .bind(first.source_version_id.as_uuid())
+            .bind(file)
             .execute(&test.database.pool)
         };
-        for (kind, status) in [("draft", None), ("upload", Some("draft"))] {
-            let error = insert(2, kind, status).await.unwrap_err();
-            assert_eq!(sqlstate(&error), "23514", "{kind} {status:?}");
+        for (kind, file, status, markdown) in [
+            ("draft", false, None, Some("Text")),
+            ("draft", false, Some("draft"), None),
+            ("draft", true, Some("draft"), Some("Text")),
+            ("upload", true, Some("draft"), None),
+            ("upload", true, None, Some("Text")),
+        ] {
+            let error = insert(kind, file, status, markdown).await.unwrap_err();
+            assert_eq!(
+                sqlstate(&error),
+                "23514",
+                "{kind} {file} {status:?} {markdown:?}"
+            );
         }
-        insert(2, "draft", Some("draft")).await.unwrap();
+        insert("draft", false, Some("draft"), Some("Text"))
+            .await
+            .unwrap();
         // The status of a draft can change: it is not content.
         let changed = sqlx::query(
             "UPDATE document_version SET status = 'review' WHERE document_id = $1 AND number = 2",

@@ -15,8 +15,8 @@ use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use tada_app::blobs::ByteStream;
 use tada_app::documents::{
-    self as app, DocumentCursor, DocumentStores, DocumentView, ReadDocumentError, UploadError,
-    VersionView,
+    self as app, DocumentCursor, DocumentStores, DocumentView, DraftStatus, ReadDocumentError,
+    UploadError, VersionContent, VersionView,
 };
 use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId};
 use tada_app::problem::ProblemCode;
@@ -116,6 +116,39 @@ impl From<DocumentView> for Document {
     }
 }
 
+/// The kind of a document version (ADR 0051).
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum DocumentVersionKind {
+    /// A file that a member uploaded. It has the file fields.
+    Upload,
+    /// A Markdown draft from an accepted proposal. It has a `status` and no file.
+    Draft,
+}
+
+/// The status of a draft version (ADR 0051).
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum DraftVersionStatus {
+    Draft,
+    Review,
+    Approved,
+    Superseded,
+    Archived,
+}
+
+impl From<DraftStatus> for DraftVersionStatus {
+    fn from(status: DraftStatus) -> Self {
+        match status {
+            DraftStatus::Draft => Self::Draft,
+            DraftStatus::Review => Self::Review,
+            DraftStatus::Approved => Self::Approved,
+            DraftStatus::Superseded => Self::Superseded,
+            DraftStatus::Archived => Self::Archived,
+        }
+    }
+}
+
 /// One immutable version of a document.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct DocumentVersion {
@@ -123,36 +156,53 @@ pub struct DocumentVersion {
     pub document_id: Uuid,
     /// 1 for the first version of the document, then 2, 3 and so on.
     pub number: u32,
-    /// The file name of the upload, without control characters and path separators.
-    pub file_name: String,
-    /// The media type that tada detected from the content (ADR 0055).
-    pub media_type: String,
-    pub size_bytes: u64,
-    /// The SHA-256 hash of the file, as lowercase hexadecimal digits.
+    pub kind: DocumentVersionKind,
+    /// The status of a draft. It is absent for an upload.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<DraftVersionStatus>,
+    /// The file name of the upload, without control characters and path separators. It is absent for a draft.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
+    /// The media type that tada detected from the content (ADR 0055). It is absent for a draft.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
+    /// It is absent for a draft.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size_bytes: Option<u64>,
+    /// The SHA-256 hash of the content, as lowercase hexadecimal digits.
     pub sha256: String,
-    /// The user ID of the member who uploaded the version.
+    /// The user ID of the member who added the version.
     pub uploaded_by: Uuid,
-    /// The source version that holds the same file (ADR 0050).
-    pub source_version_id: Uuid,
+    /// The source version that holds the same file (ADR 0050). It is absent for a draft.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_version_id: Option<Uuid>,
     pub created_at: Timestamp,
 }
 
 impl From<VersionView> for DocumentVersion {
     fn from(version: VersionView) -> Self {
+        let (kind, status, file) = match &version.content {
+            VersionContent::Upload(file) => (DocumentVersionKind::Upload, None, Some(file)),
+            VersionContent::Draft { status } => {
+                (DocumentVersionKind::Draft, Some((*status).into()), None)
+            }
+        };
         Self {
             id: version.id.as_uuid(),
             document_id: version.document_id.as_uuid(),
             number: version.number,
-            file_name: version.file_name,
-            media_type: version.file_type.media_type().to_owned(),
-            size_bytes: version.size_bytes,
+            kind,
+            status,
+            file_name: file.map(|file| file.file_name.clone()),
+            media_type: file.map(|file| file.file_type.media_type().to_owned()),
+            size_bytes: file.map(|file| file.size_bytes),
             sha256: version
                 .sha256
                 .iter()
                 .map(|byte| format!("{byte:02x}"))
                 .collect(),
             uploaded_by: version.uploaded_by.as_uuid(),
-            source_version_id: version.source_version_id.as_uuid(),
+            source_version_id: file.map(|file| file.source_version_id.as_uuid()),
             created_at: version.created_at,
         }
     }
@@ -480,21 +530,22 @@ async fn download_document_version(
         state.document_stores(),
     )
     .await?;
+    // `download` answers `not-found` for a draft, so the version has a file.
+    let file = version
+        .file()
+        .ok_or_else(|| ApiError::new(ProblemCode::NotFound))?;
     let inline = query.disposition.unwrap_or_default() == Disposition::Inline
-        && version.file_type.inline_preview();
+        && file.file_type.inline_preview();
     let disposition = content_disposition(
         if inline { "inline" } else { "attachment" },
-        &version.file_name,
+        &file.file_name,
     )?;
     let headers = [
         (
             header::CONTENT_TYPE,
-            HeaderValue::from_static(version.file_type.media_type()),
+            HeaderValue::from_static(file.file_type.media_type()),
         ),
-        (
-            header::CONTENT_LENGTH,
-            HeaderValue::from(version.size_bytes),
-        ),
+        (header::CONTENT_LENGTH, HeaderValue::from(file.size_bytes)),
         (header::CONTENT_DISPOSITION, disposition),
         (
             header::X_CONTENT_TYPE_OPTIONS,
@@ -627,5 +678,27 @@ mod tests {
         let cursor = decode_cursor(&encode_cursor(DocumentCursor(42))).unwrap();
         assert_eq!(cursor, DocumentCursor(42));
         assert!(decode_cursor("not a cursor").is_err());
+    }
+
+    #[test]
+    fn a_draft_version_has_a_status_and_no_file_fields() {
+        use tada_app::domain::ids::{DocumentVersionId, UserId};
+        let version = VersionView {
+            id: DocumentVersionId::from_uuid(Uuid::from_u128(1)),
+            document_id: DocumentId::from_uuid(Uuid::from_u128(2)),
+            number: 2,
+            sha256: [0; 32],
+            uploaded_by: UserId::from_uuid(Uuid::from_u128(3)),
+            created_at: Timestamp::UNIX_EPOCH,
+            content: VersionContent::Draft {
+                status: DraftStatus::Review,
+            },
+        };
+        let json = serde_json::to_value(DocumentVersion::from(version)).unwrap();
+        assert_eq!(json["kind"], "draft");
+        assert_eq!(json["status"], "review");
+        for absent in ["file_name", "media_type", "size_bytes", "source_version_id"] {
+            assert!(json.get(absent).is_none(), "{absent}");
+        }
     }
 }

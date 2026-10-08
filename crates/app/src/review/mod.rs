@@ -13,7 +13,8 @@ use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
 use tada_domain::facts::{ChoiceValue, FactState, Label, ValueType, Valued};
 use tada_domain::ids::{
-    ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, SourceVersionId, UserId,
+    ChangesetId, DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId,
+    SourceVersionId, UserId,
 };
 use tada_domain::proposals::{Operation, Proposal};
 use tada_domain::sources::{Passage, SourceText};
@@ -173,6 +174,7 @@ impl Debug for ApplyStep {
             Operation::AddChoiceValue { .. } => "AddChoiceValue",
             Operation::DeprecateField { .. } => "DeprecateField",
             Operation::CreateOpenQuestion { .. } => "CreateOpenQuestion",
+            Operation::CreateDocumentDraft { .. } => "CreateDocumentDraft",
         };
         f.debug_struct("ApplyStep")
             .field("proposal_id", &self.proposal_id)
@@ -190,7 +192,8 @@ pub struct ApplyPlan {
     pub source_version_id: SourceVersionId,
     /// The reviewer: the author of the review results, the fact versions and the review source versions.
     pub reviewer: Actor,
-    /// The member who becomes the event manager of each new event (ADR 0052).
+    /// The member who becomes the event manager of each new event (ADR 0052),
+    /// and who adds each draft version and owns each new document of a draft (ADR 0051).
     pub manager: UserId,
     pub now: Timestamp,
     /// Each step follows the steps of its dependencies.
@@ -198,11 +201,20 @@ pub struct ApplyPlan {
     pub audit: Vec<AuditEvent>,
 }
 
-/// The event-local number that an apply gave a new open question: `QST-<local_number>` (ADR 0038).
+/// The local number that an apply gave a new record (ADR 0038).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NewLocalId {
-    pub open_question: OpenQuestionId,
+    pub record: LocalRecord,
     pub local_number: u64,
+}
+
+/// A new record with a local number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocalRecord {
+    /// An open question: `QST-<n>`, local to its event.
+    OpenQuestion(OpenQuestionId),
+    /// A document: `DOC-<n>`, local to the organization.
+    Document(DocumentId),
 }
 
 /// The result of `ReviewStore::apply`. Each result other than `Applied` changed nothing.
@@ -272,7 +284,8 @@ pub trait ReviewStore: Debug + Send + Sync {
 
     /// Applies `plan` in one transaction, or nothing (ADR 0050).
     /// It locks the changeset and checks that each proposal is open and that each target has the expected version.
-    /// Then it creates the records and fact versions with their evidence, assigns the event-local IDs,
+    /// Then it creates the records and fact versions with their evidence, assigns the local IDs,
+    /// adds the draft versions with the provenance manifests that their proposals fixed (ADR 0051),
     /// appends `accepted` or `accepted-with-edit` for each step, and records the audit events of the plan.
     async fn apply(&self, scope: OrgScope, plan: &ApplyPlan) -> Result<ApplyOutcome, StoreError>;
 
@@ -325,7 +338,7 @@ impl Debug for Edit {
 pub struct Applied {
     /// The applied proposals with their new status, in the order of the apply.
     pub proposals: Vec<(ProposalId, ProposalStatus)>,
-    /// The event-local IDs of the new open questions.
+    /// The local IDs of the new open questions and documents.
     pub local_ids: Vec<NewLocalId>,
 }
 
@@ -406,8 +419,8 @@ impl CommandError for ApplyError {
 /// 3. Each proposal of the selection is open, else `invalid-transition`.
 /// 4. Each target has the expected version. Else nothing changes, a separate transaction appends
 ///    `conflict` for the proposals concerned, and the result is `record-version-conflict`.
-/// 5. A successful apply writes the records, the fact versions with their evidence, the event-local IDs,
-///    the review results and the audit events in one transaction.
+/// 5. A successful apply writes the records, the fact versions with their evidence, the draft versions with their
+///    provenance manifests, the local IDs, the review results and the audit events in one transaction.
 ///
 /// The caller is a `MemberCaller`, so an AI client cannot apply (ADR 0039).
 /// Code that has an `AiCaller` does not compile, because the caller type does not match:

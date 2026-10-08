@@ -3574,6 +3574,94 @@
                             "owner"
                           ],
                           "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Add a draft version to a document of the event (ADR 0051).",
+                          "properties": {
+                            "document": {
+                              "description": "The document of a draft.",
+                              "oneOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "description": "A new document of the event.",
+                                  "properties": {
+                                    "new": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "id": {
+                                          "description": "The UUIDv7 of the new document.",
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "description": "The name of the document, 1 to 200 characters.",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "name"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required": [
+                                    "new"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "description": "An existing document of the event.",
+                                  "properties": {
+                                    "existing": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "document_id": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
+                                        "expected_version": {
+                                          "description": "The current version of the document.",
+                                          "format": "int64",
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "document_id",
+                                        "expected_version"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required": [
+                                    "existing"
+                                  ],
+                                  "type": "object"
+                                }
+                              ]
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create-document-draft",
+                              "type": "string"
+                            },
+                            "markdown": {
+                              "description": "CommonMark with tables, UTF-8, one sentence per line. No raw HTML and no images.\nA fact is an empty link to an exact fact version: `[](tada:fact/<fact-uuid>?v=<n>)`.\nA source passage is a link with the supporting words: `[words](tada:source/<source-version-uuid>#<start>-<end>)`.\nEach link must cite an accepted fact version, an assumption or an unknown of the event, never an open proposal,\nor a source version that the member can see.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "document",
+                            "markdown"
+                          ],
+                          "type": "object"
                         }
                       ]
                     },
@@ -3790,12 +3878,9 @@
           "id",
           "document_id",
           "number",
-          "file_name",
-          "media_type",
-          "size_bytes",
+          "kind",
           "sha256",
           "uploaded_by",
-          "source_version_id",
           "created_at"
         ],
         "properties": {
@@ -3813,38 +3898,73 @@
             "description": "1 for the first version of the document, then 2, 3 and so on.",
             "minimum": 0
           },
+          "kind": {
+            "$ref": "#/components/schemas/DocumentVersionKind"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DraftVersionStatus",
+                "description": "The status of a draft. It is absent for an upload."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "file_name": {
-            "type": "string",
-            "description": "The file name of the upload, without control characters and path separators."
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The file name of the upload, without control characters and path separators. It is absent for a draft."
           },
           "media_type": {
-            "type": "string",
-            "description": "The media type that tada detected from the content (ADR 0055)."
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The media type that tada detected from the content (ADR 0055). It is absent for a draft."
           },
           "size_bytes": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64",
+            "description": "It is absent for a draft.",
             "minimum": 0
           },
           "sha256": {
             "type": "string",
-            "description": "The SHA-256 hash of the file, as lowercase hexadecimal digits."
+            "description": "The SHA-256 hash of the content, as lowercase hexadecimal digits."
           },
           "uploaded_by": {
             "type": "string",
             "format": "uuid",
-            "description": "The user ID of the member who uploaded the version."
+            "description": "The user ID of the member who added the version."
           },
           "source_version_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "description": "The source version that holds the same file (ADR 0050)."
+            "description": "The source version that holds the same file (ADR 0050). It is absent for a draft."
           },
           "created_at": {
             "type": "string",
             "format": "date-time"
           }
         }
+      },
+      "DocumentVersionKind": {
+        "type": "string",
+        "description": "The kind of a document version (ADR 0051).",
+        "enum": [
+          "upload",
+          "draft"
+        ]
       },
       "DocumentVersionList": {
         "type": "object",
@@ -3861,6 +3981,72 @@
             "description": "The versions in the order of their numbers."
           }
         }
+      },
+      "DraftDocument": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A new document of the event.",
+            "required": [
+              "id",
+              "name",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "new"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "An existing document of the event.",
+            "required": [
+              "document_id",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "document_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The record version of the document that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "existing"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "The document of a draft."
+      },
+      "DraftVersionStatus": {
+        "type": "string",
+        "description": "The status of a draft version (ADR 0051).",
+        "enum": [
+          "draft",
+          "review",
+          "approved",
+          "superseded",
+          "archived"
+        ]
       },
       "Event": {
         "type": "object",
@@ -4470,6 +4656,24 @@
           }
         }
       },
+      "NewDocument": {
+        "type": "object",
+        "description": "A new document with its readable ID.",
+        "required": [
+          "id",
+          "readable_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "readable_id": {
+            "type": "string",
+            "description": "The readable ID, for example `DOC-001` (ADR 0038)."
+          }
+        }
+      },
       "NewOpenQuestion": {
         "type": "object",
         "description": "A new open question with its event-local ID.",
@@ -4797,6 +5001,34 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "document",
+              "markdown",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "document": {
+                "$ref": "#/components/schemas/DraftDocument"
+              },
+              "markdown": {
+                "type": "string",
+                "description": "The Markdown of the draft."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create-document-draft"
+                ]
+              }
+            }
           }
         ],
         "description": "The change that a proposal suggests. `kind` names the operation. The list of kinds is open."
@@ -5086,7 +5318,8 @@
         "description": "The proposals that a review changed, with their new status.",
         "required": [
           "proposals",
-          "open_questions"
+          "open_questions",
+          "documents"
         ],
         "properties": {
           "proposals": {
@@ -5101,6 +5334,13 @@
               "$ref": "#/components/schemas/NewOpenQuestion"
             },
             "description": "The new open questions with their event-local IDs."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewDocument"
+            },
+            "description": "The new documents with their organization-local IDs."
           }
         }
       },

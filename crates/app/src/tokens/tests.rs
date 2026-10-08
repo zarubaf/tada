@@ -103,10 +103,12 @@ impl IdentityStore for Memory {
         &self,
         scope: OrgScope,
         user: UserId,
-    ) -> Result<Vec<EventRole>, StoreError> {
+    ) -> Result<Vec<(EventId, EventRole)>, StoreError> {
         let found = scope.organization_id() == testwil() && user == anna();
         Ok(if found {
-            self.event_roles.lock().unwrap().clone()
+            let event = EventId::from_uuid(Uuid::from_u128(20));
+            let roles = self.event_roles.lock().unwrap();
+            roles.iter().map(|role| (event, *role)).collect()
         } else {
             Vec::new()
         })

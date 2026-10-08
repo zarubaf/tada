@@ -6,10 +6,11 @@ use jiff_sqlx::ToSqlx;
 use sha2::{Digest, Sha256};
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
+use tada_app::access::SourceReach;
 use tada_app::caller::{Actor, OrgScope};
 use tada_app::domain::ids::{EventId, SourceItemId, SourceVersionId};
 use tada_app::domain::sources::SourceText;
-use tada_app::sources::{SourceHit, SourceStore, SourceVersionRef};
+use tada_app::sources::{SourceHit, SourceStore, SourceVersionRef, SourceVersionText};
 use tada_app::store::StoreError;
 
 use crate::Database;
@@ -113,6 +114,61 @@ impl SourceStore for Database {
                 })
             })
             .collect()
+    }
+
+    async fn texts(
+        &self,
+        scope: OrgScope,
+        reach: &SourceReach,
+        ids: &[SourceVersionId],
+    ) -> Result<Vec<SourceVersionText>, StoreError> {
+        let ids: Vec<Uuid> = ids.iter().map(|id| id.as_uuid()).collect();
+        let (whole, events) = reach_filter(reach);
+        // The rule of `access::SourceReach`: the sources of the events, and each source that a fact version or a
+        // proposal of the events cites as evidence.
+        let rows = sqlx::query!(
+            "SELECT v.id, v.text
+             FROM source_version v
+             JOIN source_item i ON i.organization_id = v.organization_id AND i.id = v.source_item_id
+             WHERE v.organization_id = $1 AND v.id = ANY($2)
+               AND ($3 OR i.event_id = ANY($4)
+                    OR EXISTS (
+                        SELECT 1 FROM evidence_link e
+                        JOIN fact_version fv ON fv.organization_id = e.organization_id AND fv.id = e.fact_version_id
+                        JOIN fact f ON f.organization_id = fv.organization_id AND f.id = fv.fact_id
+                        WHERE e.organization_id = v.organization_id AND e.source_version_id = v.id
+                          AND f.event_id = ANY($4))
+                    OR EXISTS (
+                        SELECT 1 FROM proposal_evidence pe
+                        JOIN proposal p ON p.organization_id = pe.organization_id AND p.id = pe.proposal_id
+                        WHERE pe.organization_id = v.organization_id AND pe.source_version_id = v.id
+                          AND p.event_id = ANY($4)))",
+            scope.organization_id().as_uuid(),
+            &ids,
+            whole,
+            &events,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| SourceVersionText {
+                id: SourceVersionId::from_uuid(row.id),
+                // The stored text is normalized already; normalizing it again keeps it unchanged.
+                text: row.text.as_deref().map(SourceText::normalize),
+            })
+            .collect())
+    }
+}
+
+/// The SQL parameters of a reach: true for the whole organization, else the events.
+fn reach_filter(reach: &SourceReach) -> (bool, Vec<Uuid>) {
+    match reach {
+        SourceReach::Organization => (true, Vec::new()),
+        SourceReach::Events(events) => {
+            (false, events.iter().map(|event| event.as_uuid()).collect())
+        }
     }
 }
 

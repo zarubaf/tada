@@ -141,10 +141,11 @@ async fn uploads_a_pdf_as_the_first_version_of_doc_001() {
     assert_eq!(document.readable_id(), "DOC-001");
     let version = &document.newest_version;
     assert_eq!(version.number, 1);
-    assert_eq!(version.file_name, "Programm.pdf");
-    assert_eq!(version.file_type.media_type(), "application/pdf");
-    assert_eq!(version.size_bytes, content.len() as u64);
     assert_eq!(version.sha256, sha256(&content));
+    let file = version.file().unwrap();
+    assert_eq!(file.file_name, "Programm.pdf");
+    assert_eq!(file.file_type.media_type(), "application/pdf");
+    assert_eq!(file.size_bytes, content.len() as u64);
     assert_eq!(f.read(&f.owner, &document).await, content);
     assert_eq!(f.garage.keys().await.len(), 1);
     // The object key starts with the organization and holds no file name (ADR 0009).
@@ -156,7 +157,7 @@ async fn uploads_a_pdf_as_the_first_version_of_doc_001() {
         .test
         .scalar(&format!(
             "SELECT kind || ' ' || (text IS NULL) FROM source_version WHERE id = '{}'",
-            version.source_version_id
+            file.source_version_id
         ))
         .await;
     assert_eq!(source, "upload true");
@@ -423,7 +424,7 @@ async fn finds_documents_by_name_and_stores_the_text_of_a_text_file() {
         .test
         .scalar(&format!(
             "SELECT text FROM source_version WHERE id = '{}'",
-            notes.newest_version.source_version_id
+            notes.newest_version.file().unwrap().source_version_id
         ))
         .await;
     assert_eq!(text, "# Notizen\nFlugshow um 14 Uhr\n");

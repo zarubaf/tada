@@ -105,6 +105,14 @@ pub trait FactStore: Debug + Send + Sync {
         event: EventId,
         field: FieldDefinitionId,
     ) -> Result<Option<FactVersionRef>, StoreError>;
+
+    /// The fact versions of `versions` that exist in the event, each as a fact and its version number.
+    async fn existing_versions(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+        versions: &[(FactId, RecordVersion)],
+    ) -> Result<Vec<(FactId, RecordVersion)>, StoreError>;
 }
 
 /// The event profile: the current facts of the event, for each caller who can read the event.
@@ -321,6 +329,15 @@ mod tests {
             *self.asked_field.lock().unwrap() = Some(field);
             Ok(self.current.lock().unwrap().clone())
         }
+
+        async fn existing_versions(
+            &self,
+            _: OrgScope,
+            _: EventId,
+            _: &[(FactId, RecordVersion)],
+        ) -> Result<Vec<(FactId, RecordVersion)>, StoreError> {
+            unreachable!()
+        }
     }
 
     #[async_trait]
@@ -358,7 +375,7 @@ mod tests {
             &self,
             _: OrgScope,
             _: UserId,
-        ) -> Result<Vec<EventRole>, StoreError> {
+        ) -> Result<Vec<(EventId, EventRole)>, StoreError> {
             unreachable!()
         }
     }

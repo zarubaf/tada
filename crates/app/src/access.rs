@@ -160,7 +160,38 @@ pub async fn proposes_in_some_event(
         .event_roles_of(caller.scope(), caller.user_id())
         .await?
         .into_iter()
-        .any(|role| EventAccess::from(role).can_propose()))
+        .any(|(_, role)| EventAccess::from(role).can_propose()))
+}
+
+/// The source versions that a caller can read (ADR 0050, ADR 0052). Search and citations use this one rule.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SourceReach {
+    /// Each source version of the organization: the reach of owners and admins.
+    Organization,
+    /// The source versions of these events, and each source version that a fact version or a proposal
+    /// of these events cites as evidence. For example, an organization changeset stores its text without
+    /// an event, and the members of the event that it creates read the text through the evidence.
+    Events(Vec<EventId>),
+}
+
+/// The source versions that `caller` can read: owners and admins read each source version of their
+/// organization, and other members read the sources of the events in which they have an event role.
+pub async fn source_reach(
+    caller: &impl Principal,
+    identity: &dyn IdentityStore,
+) -> Result<SourceReach, StoreError> {
+    if sees_all_events(caller) {
+        return Ok(SourceReach::Organization);
+    }
+    // Each event role can read (`EventAccess::can_read`).
+    let events = identity
+        .event_roles_of(caller.scope(), caller.user_id())
+        .await?
+        .into_iter()
+        .filter(|(_, role)| EventAccess::from(*role).can_read())
+        .map(|(event, _)| event)
+        .collect();
+    Ok(SourceReach::Events(events))
 }
 
 /// The access of the member `user`, who is not the caller, in the event `event`, or `None` if the user has none.
@@ -241,13 +272,13 @@ mod tests {
             &self,
             scope: OrgScope,
             user: UserId,
-        ) -> Result<Vec<EventRole>, StoreError> {
+        ) -> Result<Vec<(EventId, EventRole)>, StoreError> {
             let roles = self.roles.lock().unwrap();
             Ok(self
                 .events
                 .iter()
                 .filter(|(organization, _)| *organization == scope.organization_id())
-                .filter_map(|(_, event)| roles.get(&(*event, user)).copied())
+                .filter_map(|(_, event)| roles.get(&(*event, user)).map(|role| (*event, *role)))
                 .collect())
         }
     }
