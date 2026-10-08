@@ -109,7 +109,7 @@ describe("InvitationPage", () => {
       problem(429, "rate-limited", { "Retry-After": "1" }),
     );
     expect(await screen.findByText(/Rolle Organisationsleitung/)).toBeInTheDocument();
-    const button = screen.getByRole("button", { name: "Einladung annehmen" });
+    const button = await screen.findByRole("button", { name: "Einladung annehmen" });
     await userEvent.click(button);
 
     const alert = await findAlert();
