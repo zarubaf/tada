@@ -11,8 +11,22 @@ use tracing_subscriber::{EnvFilter, Layer};
 /// Starts the logs of a process. `filter` is a valid `TADA_LOG` value.
 pub fn init(process_role: &'static str, filter: &str) {
     tracing_subscriber::registry()
-        .with(layer_for(process_role, std::io::stdout).with_filter(EnvFilter::new(filter)))
+        .with(layer_for(process_role, std::io::stdout).with_filter(self::filter(filter)))
         .init();
+}
+
+/// The filter of `TADA_LOG`, with a fixed cap for crates that log content at lower levels (ADR 0035).
+///
+/// rmcp logs each MCP request and result at `debug`, and a rejected tool input with the serde message
+/// at `warn`. Both can hold the words of members, for example a search query or a quote. Only its errors
+/// of the transport pass, whatever `TADA_LOG` says.
+pub fn filter(directives: &str) -> EnvFilter {
+    // `add_directive` replaces a directive of the same target, for example `rmcp=trace` in `TADA_LOG`.
+    EnvFilter::new(directives).add_directive(
+        "rmcp=error"
+            .parse()
+            .expect("the cap of rmcp is a valid directive"),
+    )
 }
 
 /// The layer of one line format, for any writer. Tests of other crates use it to read the lines.
@@ -67,6 +81,25 @@ mod tests {
 
         fn make_writer(&'writer self) -> Self::Writer {
             self.clone()
+        }
+    }
+
+    /// rmcp logs content below `error`, so no `TADA_LOG` value lets those lines through (ADR 0035).
+    #[test]
+    fn rmcp_logs_only_errors_whatever_the_filter_says() {
+        for directives in ["info", "trace", "trace,rmcp=trace", "rmcp=debug"] {
+            let buffer = Buffer::default();
+            let subscriber = tracing_subscriber::registry().with(
+                layer_for::<Registry, _>("serve", buffer.clone()).with_filter(filter(directives)),
+            );
+            tracing::subscriber::with_default(subscriber, || {
+                tracing::debug!(target: "rmcp::service", query = "Flugfeld", "received request");
+                tracing::warn!(target: "rmcp::service", error = "Flugfeld", "response error");
+                tracing::error!(target: "rmcp::service", "fail to close sink");
+            });
+            let output = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();
+            assert_eq!(output.lines().count(), 1, "{directives}: {output}");
+            assert!(!output.contains("Flugfeld"), "{directives}");
         }
     }
 

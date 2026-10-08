@@ -152,7 +152,7 @@ async fn readable_versions(
                              JOIN proposal p ON p.organization_id = pe.organization_id AND p.id = pe.proposal_id
                              WHERE pe.organization_id = v.organization_id AND pe.source_version_id = v.id
                                AND p.event_id = ANY($3)))
-           ORDER BY ts_rank(v.search, websearch_to_tsquery('simple', coalesce($5, ''))) DESC, v.captured_at DESC, v.id
+           ORDER BY CASE WHEN $5::text IS NULL THEN 0 ELSE ts_rank(v.search, websearch_to_tsquery('simple', $5)) END DESC, v.captured_at DESC, v.id
            LIMIT $6"#,
         scope.organization_id().as_uuid(),
         organization,

@@ -299,6 +299,9 @@ async fn send(router: &Router, request: Request<Body>) -> (StatusCode, Value) {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
+    if bytes.is_empty() {
+        return (status, Value::Null);
+    }
     let body = serde_json::from_slice(&bytes)
         .unwrap_or_else(|_| panic!("{status}: not JSON: {}", String::from_utf8_lossy(&bytes)));
     (status, body)
@@ -607,4 +610,31 @@ async fn a_member_reads_the_organization_source_that_the_facts_of_its_event_cite
         profile["accepted"][0]["evidence"][0]["source_version_id"],
         source.to_string()
     );
+}
+
+/// A citation and a search write no notice and no member text to the log (ADR 0035).
+#[tokio::test]
+async fn reads_of_sources_leave_no_text_in_the_log() {
+    let mcp = Mcp::start().await;
+    mcp.add_text(&mcp.owner, mcp.open_day, SOURCE).await;
+    let hits = mcp
+        .result("search_sources", json!({"query": "Flugfeld"}))
+        .await;
+    let hit = &hits["hits"][0];
+    let citation = json!({"source_version_id": hit["source_version_id"], "start": 0, "end": 7});
+    assert_eq!(
+        mcp.result("get_source_passage", citation).await["quote"],
+        "Das Ope"
+    );
+    // A rejected input repeats the value in its serde message; rmcp would log it below `error`.
+    let wrong =
+        json!({"source_version_id": hit["source_version_id"], "start": "Flugfeld", "end": 1});
+    let body = mcp.call("get_source_passage", wrong).await;
+    assert_eq!(body["result"]["isError"], true, "{body}");
+    assert!(
+        body.to_string().contains("Flugfeld"),
+        "the client sees its input: {body}"
+    );
+
+    logs::assert_clean(&["Flugfeld", "Das Ope", "text-search query"]);
 }
