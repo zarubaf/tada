@@ -160,7 +160,7 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
       );
     }
     if (state.kind === "signed-out") {
-      return pathname === SIGN_IN_PATH ? null : <Redirect to={SIGN_IN_PATH} />;
+      return <Redirect to={SIGN_IN_PATH} />;
     }
     if (!session) {
       return (
