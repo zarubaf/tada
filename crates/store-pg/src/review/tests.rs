@@ -1395,15 +1395,37 @@ async fn sources_and_fact_versions_never_change() {
         .await
         .unwrap_err();
     assert_eq!(crate::testing::sqlstate(&error), "23503");
-    // A fact version names a proposal of its organization.
-    let other = test.create_organization("musterhausen").await;
+    // A fact version names a proposal of its organization, not one of another organization.
+    let musterhausen = test.create_organization("musterhausen").await;
+    let fly_in = test.create_event(musterhausen, "FLY31").await;
+    let otto = test
+        .create_user(
+            &DisplayName::parse("Otto Owner").unwrap(),
+            &Email::parse("otto@example.org").unwrap(),
+        )
+        .await;
+    test.add_membership(musterhausen, otto, OrganizationRole::Owner)
+        .await;
+    let otto = MemberCaller::new(otto, musterhausen, OrganizationRole::Owner);
+    let foreign = propose(
+        &test,
+        &otto,
+        Some(fly_in),
+        vec![proposal(
+            Uuid::now_v7(),
+            date_window(fly_in, 5, None),
+            &[],
+            "im Mai 2030",
+        )],
+    )
+    .await;
     let error = sqlx::query(
         "INSERT INTO fact_version
              (id, organization_id, fact_id, number, state, approximate, created_at, accepted_by, proposal_id)
          SELECT $1, organization_id, fact_id, 2, 'unknown', false, now(), accepted_by, $2 FROM fact_version",
     )
     .bind(Uuid::now_v7())
-    .bind(other.as_uuid())
+    .bind(foreign.proposals[0].id.as_uuid())
     .execute(&test.database.pool)
     .await
     .unwrap_err();

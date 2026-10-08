@@ -1484,3 +1484,21 @@ async fn a_source_text_over_the_limit_stores_nothing() {
             .is_ok()
     );
 }
+
+/// The limit counts characters, not bytes: an umlaut has two bytes in UTF-8.
+#[tokio::test]
+async fn the_source_text_limit_counts_characters() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let used = SourceText::normalize(SOURCE).as_str().chars().count();
+    let mut input = one_fact();
+    input.source_text = format!("{SOURCE}{}", "ä".repeat(MAX_SOURCE_TEXT_CHARS - used));
+    let result = create_changeset(&anna, input.clone(), stores(&memory), &FixedClock).await;
+    assert!(result.is_ok(), "{result:?}");
+    input.source_text.push('ä');
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("source_text".to_owned(), "length")]
+    );
+}
