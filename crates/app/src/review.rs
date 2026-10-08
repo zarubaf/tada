@@ -211,12 +211,35 @@ pub enum ApplyOutcome {
     KeyTaken,
 }
 
+/// The review result that a batch appends without an apply. Only an apply accepts, so a batch cannot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchOutcome {
+    Rejected,
+    Conflict,
+}
+
+impl BatchOutcome {
+    pub fn review_outcome(self) -> ReviewOutcome {
+        match self {
+            Self::Rejected => ReviewOutcome::Rejected,
+            Self::Conflict => ReviewOutcome::Conflict,
+        }
+    }
+
+    fn audit_action(self) -> AuditAction {
+        match self {
+            Self::Rejected => AuditAction::ProposalReject,
+            Self::Conflict => AuditAction::ProposalConflict,
+        }
+    }
+}
+
 /// Review results to append without an apply: one rejection or one conflict for each proposal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReviewBatch {
     pub changeset_id: ChangesetId,
     pub proposals: Vec<ProposalId>,
-    pub outcome: ReviewOutcome,
+    pub outcome: BatchOutcome,
     /// The author of the review results.
     pub reviewer: Actor,
     pub now: Timestamp,
@@ -449,7 +472,7 @@ pub async fn apply_changeset(
                 caller,
                 changeset_id,
                 &proposals,
-                ReviewOutcome::Conflict,
+                BatchOutcome::Conflict,
                 now,
             );
             // A concurrent review may have closed a proposal first. Then its status stays as it is.
@@ -499,7 +522,7 @@ pub async fn reject_proposals(
         caller,
         changeset_id,
         &rejected,
-        ReviewOutcome::Rejected,
+        BatchOutcome::Rejected,
         clock.now(),
     );
     match stores.review.record(scope, &batch).await? {
@@ -950,13 +973,10 @@ fn review_batch(
     caller: &MemberCaller,
     changeset_id: ChangesetId,
     proposals: &[ProposalId],
-    outcome: ReviewOutcome,
+    outcome: BatchOutcome,
     now: Timestamp,
 ) -> ReviewBatch {
-    let action = match outcome {
-        ReviewOutcome::Conflict => AuditAction::ProposalConflict,
-        _ => AuditAction::ProposalReject,
-    };
+    let action = outcome.audit_action();
     ReviewBatch {
         changeset_id,
         proposals: proposals.to_vec(),

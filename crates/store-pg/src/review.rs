@@ -133,7 +133,7 @@ impl ReviewStore for Database {
                 &mut tx,
                 scope,
                 *proposal,
-                batch.outcome,
+                batch.outcome.review_outcome(),
                 None,
                 &batch.reviewer,
                 batch.now,
