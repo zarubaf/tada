@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO organization_feature (organization_id, feature, enabled, version)\n                 VALUES ($1, $2, $3, 2)\n                 ON CONFLICT (organization_id, feature) DO NOTHING\n                 RETURNING version",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "organization_feature",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3d5dba3e11d270d125fe44aeb97a677a30c14ceef97b6321aefd7efba6b8d534"
+}

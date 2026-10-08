@@ -3,11 +3,13 @@ use std::sync::Mutex;
 use serde_json::{Value, json};
 use tada_domain::facts::{FieldDefinition, core_catalog};
 use tada_domain::identity::{EventRole, OrganizationRole};
-use tada_domain::ids::{OrganizationId, UserId};
+use tada_domain::ids::{ApiTokenId, OrganizationId, UserId};
 
 use super::*;
+use crate::caller::AiCaller;
 use crate::facts::{EventProfile, FactVersionRef};
 use crate::identity::{Membership, UserRef};
+use crate::tokens::TokenScope;
 
 const SOURCE: &str =
     "Das Open Day findet im Mai oder Juni 2030 statt.\r\nWir rechnen mit 20000 Besuchern pro Tag.";
@@ -86,6 +88,19 @@ impl IdentityStore for Memory {
     ) -> Result<Option<EventRole>, StoreError> {
         let found = self.event_exists(scope, event).await? && user == anna();
         Ok(found.then(|| *self.role.lock().unwrap()).flatten())
+    }
+
+    async fn event_roles_of(
+        &self,
+        scope: OrgScope,
+        user: UserId,
+    ) -> Result<Vec<EventRole>, StoreError> {
+        let found = scope.organization_id() == testwil() && user == anna();
+        Ok(found
+            .then(|| *self.role.lock().unwrap())
+            .flatten()
+            .into_iter()
+            .collect())
     }
 }
 
@@ -302,6 +317,43 @@ async fn a_viewer_cannot_propose() {
     assert!(matches!(result, Err(ProposeError::Forbidden)), "{result:?}");
     assert_eq!(ProposeError::Forbidden.code(), ProblemCode::Forbidden);
     assert!(memory.inserted.lock().unwrap().is_empty());
+}
+
+fn ai(member: MemberCaller, scope: TokenScope) -> AiCaller {
+    AiCaller::new(member, ApiTokenId::from_uuid(Uuid::now_v7()), scope)
+}
+
+#[tokio::test]
+async fn a_read_token_cannot_create_a_changeset() {
+    let memory = Memory::default();
+    let client = ai(contributor(&memory), TokenScope::Read);
+    let result = create_changeset(&client, one_fact(), stores(&memory), &FixedClock).await;
+    assert!(matches!(result, Err(ProposeError::Forbidden)), "{result:?}");
+    assert!(memory.inserted.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_propose_token_creates_a_changeset_as_ai_for_its_member() {
+    let memory = Memory::default();
+    let client = ai(contributor(&memory), TokenScope::Propose);
+    let changeset = create_changeset(&client, one_fact(), stores(&memory), &FixedClock)
+        .await
+        .unwrap();
+    let changeset = changeset_of(changeset);
+    assert_eq!(changeset.author, client.actor());
+    assert_eq!(changeset.author.kind(), crate::caller::ActorKind::Ai);
+    assert_eq!(changeset.author.principal(), Some(anna().as_uuid()));
+    let inserted = memory.inserted.lock().unwrap();
+    assert_eq!(inserted[0].2.actor(), &client.actor());
+}
+
+#[tokio::test]
+async fn a_propose_token_of_a_viewer_cannot_create_a_changeset() {
+    let memory = Memory::default();
+    *memory.role.lock().unwrap() = Some(EventRole::EventViewer);
+    let client = ai(caller(OrganizationRole::Member), TokenScope::Propose);
+    let result = create_changeset(&client, one_fact(), stores(&memory), &FixedClock).await;
+    assert!(matches!(result, Err(ProposeError::Forbidden)), "{result:?}");
 }
 
 #[tokio::test]

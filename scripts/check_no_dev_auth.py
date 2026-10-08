@@ -3,14 +3,16 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""Fail if the Rust sources contain a way around the session authenticator (ADR 0056, ADR 0062).
+"""Fail if the Rust sources contain a way around the real authenticators (ADR 0056, ADR 0062).
 
-The session authenticator is the only way in. The script is a tripwire against an accidental
-return, not a parser that resists a determined bypass. It checks two kinds of rules:
+Two authenticators are the only ways in: sessions (ADR 0008) and personal API tokens (ADR 0039).
+The token authenticator gives an `AiCaller` only, never a `MemberCaller` to a handler.
+The script is a tripwire against an accidental return of development code, not a parser that
+resists a determined bypass. It checks two kinds of rules:
 
 - The names of the removed development code must not return.
-- The structure must stay closed: only `crates/app/src/session.rs` creates a `MemberCaller`
-  with `MemberCaller::create(`, and `SessionAuthenticator` is the only `Authenticator`
+- The structure must stay closed: only the files in CREATORS create a `MemberCaller` with
+  `MemberCaller::create(`, and only the types in ALLOWED_AUTHENTICATORS implement `Authenticator`
   outside tests. The bodies of `#[cfg(test)] mod name { ... }` blocks and the integration test
   directories `crates/*/tests/` count as tests.
 
@@ -26,8 +28,8 @@ from pathlib import Path
 
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent
 FORBIDDEN = ("DevAuthenticator", "dev_authenticator", "ensure_dev_organization")
-CREATOR = "crates/app/src/session.rs"
-ALLOWED_AUTHENTICATOR = "SessionAuthenticator"
+CREATORS = ("crates/app/src/session.rs", "crates/app/src/tokens/mod.rs")
+ALLOWED_AUTHENTICATORS = ("SessionAuthenticator", "TokenAuthenticator")
 # The header of an `impl` block, over several lines. Group 1 is the type after `for`.
 IMPL_AUTHENTICATOR = re.compile(r"\bimpl\b[^{;]*?\bAuthenticator\s+for\s+(.*?)\s*(?:\bwhere\b[^{]*)?\{", re.S)
 TEST_MODULE = re.compile(r"#\[cfg\(test\)\]\s*(?:#\[[^\]]*\]\s*)*(?:pub\s+)?mod\s+\w+\s*\{")
@@ -61,17 +63,18 @@ def main(root: Path) -> int:
         text = without_test_modules(path.read_text())
         for number, line in enumerate(text.splitlines(), start=1):
             found.extend(f"{relative}:{number}: {name}" for name in FORBIDDEN if name in line)
-            if "MemberCaller::create(" in line and relative.as_posix() != CREATOR and not is_integration_test(relative):
-                found.append(f"{relative}:{number}: MemberCaller::create outside {CREATOR}")
+            creator = relative.as_posix() in CREATORS or is_integration_test(relative)
+            if "MemberCaller::create(" in line and not creator:
+                found.append(f"{relative}:{number}: MemberCaller::create outside {', '.join(CREATORS)}")
         if is_integration_test(relative):
             continue
         for match in IMPL_AUTHENTICATOR.finditer(text):
             target = implemented_type(match.group(1))
-            if target != ALLOWED_AUTHENTICATOR:
+            if target not in ALLOWED_AUTHENTICATORS:
                 number = text.count("\n", 0, match.start()) + 1
                 found.append(f"{relative}:{number}: Authenticator for {target}")
     if found:
-        print("A way around the session authenticator (ADR 0056, ADR 0062):", file=sys.stderr)
+        print("A way around the real authenticators (ADR 0056, ADR 0062):", file=sys.stderr)
         print("\n".join(found), file=sys.stderr)
         return 1
     return 0

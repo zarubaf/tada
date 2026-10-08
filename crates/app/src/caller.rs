@@ -226,6 +226,11 @@ impl AiCaller {
     /// For tests of other crates only. Production code gets a caller from an authenticator.
     #[cfg(any(test, feature = "testing"))]
     pub fn new(principal: MemberCaller, token_id: ApiTokenId, scope: TokenScope) -> Self {
+        Self::create(principal, token_id, scope)
+    }
+
+    /// For the token authenticator of this crate (ADR 0062).
+    pub(crate) fn create(principal: MemberCaller, token_id: ApiTokenId, scope: TokenScope) -> Self {
         Self {
             principal: principal.with_request(Channel::ApiToken, None),
             token_id,

@@ -457,6 +457,14 @@ mod tests {
         ) -> Result<Option<EventRole>, StoreError> {
             unreachable!()
         }
+
+        async fn event_roles_of(
+            &self,
+            _: OrgScope,
+            _: UserId,
+        ) -> Result<Vec<EventRole>, StoreError> {
+            unreachable!()
+        }
     }
 
     fn anna() -> UserId {

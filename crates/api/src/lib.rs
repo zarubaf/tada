@@ -352,6 +352,15 @@ mod tests {
         {
             unreachable!()
         }
+
+        async fn event_roles_of(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<Vec<tada_app::domain::identity::EventRole>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
     }
 
     #[async_trait::async_trait]

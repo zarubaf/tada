@@ -126,6 +126,21 @@ impl OrganizationName {
     }
 }
 
+/// The name that a member gives a personal API token, for example the name of the client, with the rules of `crate::name`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenName(String);
+
+impl TokenName {
+    /// Removes the spaces at the ends, then checks the value.
+    pub fn parse(value: &str) -> Result<Self, NameError> {
+        name::parse(value).map(Self)
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum EmailError {
     #[error("the email address has no single @ with text on both sides")]
