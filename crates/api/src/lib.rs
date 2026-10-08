@@ -17,6 +17,7 @@ mod review;
 mod roles;
 mod sign_in;
 mod telegram;
+mod tokens;
 mod values;
 
 use std::net::SocketAddr;
@@ -48,6 +49,7 @@ use tada_app::session::SessionStore;
 use tada_app::sign_in::{SignInRequestStore, SignInStore};
 use tada_app::sources::SourceStore;
 use tada_app::telegram::TelegramLinks;
+use tada_app::tokens::TokenStore;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa::openapi::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
@@ -87,6 +89,8 @@ pub struct ApiState {
     pub review: Arc<dyn ReviewStore>,
     /// The source versions that drafts cite.
     pub sources: Arc<dyn SourceStore>,
+    /// Personal API tokens and the organization switches (ADR 0039, ADR 0045).
+    pub tokens: Arc<dyn TokenStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -104,7 +108,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(members::routes())
                 .merge(documents::routes())
                 .merge(facts::routes())
-                .merge(review::routes()),
+                .merge(review::routes())
+                .merge(tokens::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -122,6 +127,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(documents::problem_codes())
         .chain(facts::problem_codes())
         .chain(review::problem_codes())
+        .chain(tokens::problem_codes())
         .collect()
 }
 
@@ -858,6 +864,75 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct NoTokens;
+
+    #[async_trait::async_trait]
+    impl TokenStore for NoTokens {
+        async fn insert(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+            _: &tada_app::tokens::ApiToken,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<secrecy::SecretString, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn list(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<Vec<tada_app::tokens::ApiToken>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn revoke(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+            _: tada_app::domain::ids::ApiTokenId,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn find(
+            &self,
+            _: &str,
+        ) -> Result<Option<tada_app::tokens::StoredToken>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn touch(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::ApiTokenId,
+            _: jiff::Timestamp,
+        ) -> Result<(), tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn features(
+            &self,
+            _: tada_app::caller::OrgScope,
+        ) -> Result<Vec<tada_app::tokens::FeatureState>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn set_feature(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::tokens::Feature,
+            _: bool,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<Option<tada_app::tokens::FeatureState>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
@@ -880,6 +955,7 @@ mod tests {
             proposals: Arc::new(NoReview),
             review: Arc::new(NoReview),
             sources: Arc::new(NoReview),
+            tokens: Arc::new(NoTokens),
         }
     }
 
