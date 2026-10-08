@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n                   SELECT 1 FROM document_manifest_fact m\n                   JOIN fact f ON f.organization_id = m.organization_id AND f.id = m.fact_id\n                   WHERE m.organization_id = $1\n                     AND m.document_version_id = (\n                         SELECT id FROM document_version\n                         WHERE organization_id = $1 AND document_id = $2\n                         ORDER BY number DESC\n                         LIMIT 1)\n                     AND f.version > m.fact_version_number\n               ) AS \"changed!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "changed!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a980a93a7916612fce42f28d3102b62da7d5f5011356896841063e056b56af71"
+}

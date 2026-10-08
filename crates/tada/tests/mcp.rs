@@ -372,13 +372,15 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 6, "{names:?}");
+    assert_eq!(names.len(), 8, "{names:?}");
     for name in [
         "list_events",
         "get_event_schema",
         "get_event_profile",
         "search_sources",
         "get_source_passage",
+        "list_documents",
+        "get_document_version",
         "propose_changeset",
     ] {
         assert!(names.contains(&name), "{names:?}");
@@ -709,7 +711,7 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
     let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &list).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     let tools = body["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 6);
+    assert_eq!(tools.len(), 8);
     for tool in tools {
         assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
         assert_eq!(tool["outputSchema"]["type"], "object", "{tool}");
@@ -728,6 +730,26 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
             .unwrap()
             .contains("Always send a new UUIDv7 as the id of the changeset"),
         "{propose}"
+    );
+    // The description tells the agent how a draft cites a fact (ADR 0051).
+    assert!(
+        propose["description"]
+            .as_str()
+            .unwrap()
+            .contains("[](tada:fact/<fact_id>?v=<version>)"),
+        "{propose}"
+    );
+    // The list of documents has no next page, so its description says what `more` means.
+    let documents = tools
+        .iter()
+        .find(|tool| tool["name"] == "list_documents")
+        .unwrap();
+    assert!(
+        documents["description"]
+            .as_str()
+            .unwrap()
+            .contains("If more is true"),
+        "{documents}"
     );
 
     let call = json!({
@@ -1012,21 +1034,118 @@ async fn only_a_propose_token_of_a_member_who_can_propose_in_the_event_proposes(
 }
 
 /// The tool takes each operation of the `app` input, also a document draft (ADR 0051).
+/// The draft waits in the Review Inbox, and after its acceptance the agent reads it back to write the next version.
 #[tokio::test]
-async fn an_agent_proposes_a_document_draft() {
+async fn an_agent_proposes_a_document_draft_and_reads_it_back() {
     let mcp = Mcp::start().await;
     let (_, token) = mcp.contributor_token().await;
+    let date = Uuid::now_v7();
+    let facts = mcp
+        .propose(
+            Some(mcp.secret),
+            SOURCE,
+            json!([proposal(
+                date,
+                set_fact(mcp.secret, "date_window", may_2030()),
+                &[],
+                SOURCE,
+                "im Mai 2030"
+            )]),
+        )
+        .await;
+    mcp.apply(&facts, &[date]).await;
+    let fact: Uuid = mcp.test.scalar("SELECT id FROM fact").await;
+    let document = Uuid::now_v7();
+    let markdown = format!("# Konzept\n\nDas Open Day ist am [](tada:fact/{fact}?v=1).\n");
     let draft = json!({
         "kind": "create-document-draft",
         "event_id": mcp.secret.as_uuid(),
-        "document": {"new": {"id": Uuid::now_v7(), "name": "Konzept Open Day"}},
-        "markdown": "# Konzept\n\nDas Open Day ist im Mai 2030.\n",
+        "document": {"new": {"id": document, "name": "Konzept Open Day"}},
+        "markdown": markdown,
     });
-    let proposals = json!([proposal(Uuid::now_v7(), draft, &[], SOURCE, "im Mai 2030")]);
+    let proposal_id = Uuid::now_v7();
+    let proposals = json!([proposal(proposal_id, draft, &[], SOURCE, "im Mai 2030")]);
     let body = mcp
         .propose_with(&token, changeset(mcp.secret, SOURCE, proposals))
         .await;
     assert_eq!(body["result"]["isError"], false, "{body}");
-    let link = &body["result"]["structuredContent"]["link"];
-    assert!(link.as_str().unwrap().starts_with("/inbox/"), "{body}");
+    let result = &body["result"]["structuredContent"];
+    assert!(
+        result["link"].as_str().unwrap().starts_with("/inbox/"),
+        "{body}"
+    );
+
+    // Olga sees the draft in the Review Inbox with its Markdown and the value that its link cites.
+    let changeset_id = result["changeset_id"].as_str().unwrap();
+    let cookie = mcp
+        .test
+        .sign_in(mcp.owner.user_id(), Some(mcp.testwil), mcp.clock.now())
+        .await;
+    let request = support::request(Method::GET, &format!("/api/v1/changesets/{changeset_id}"))
+        .header(
+            header::COOKIE,
+            format!("{}={cookie}", support::SESSION_COOKIE),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let web = support::session_router(&mcp.test, mcp.clock.clone());
+    let (status, review) = send(&web, request).await;
+    assert_eq!(status, StatusCode::OK, "{review}");
+    let rendering = &review["proposals"][0]["draft"];
+    assert_eq!(rendering["markdown"], markdown);
+    assert_eq!(rendering["lint_warnings"], json!([]));
+    assert_eq!(
+        rendering["links"][format!("tada:fact/{fact}?v=1")]["state"],
+        "accepted"
+    );
+
+    let changeset = tada_app::proposals::ProposalStore::get(
+        &mcp.test.database,
+        mcp.owner.scope(),
+        tada_app::domain::ids::ChangesetId::from_uuid(changeset_id.parse().unwrap()),
+    )
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+    mcp.apply(&changeset, &[proposal_id]).await;
+
+    let listed = mcp
+        .result("list_documents", json!({"event_key": "SECRET30"}))
+        .await;
+    assert_eq!(listed["more"], false);
+    let [item] = listed["documents"].as_array().unwrap().as_slice() else {
+        panic!("not one document: {listed}");
+    };
+    assert_eq!(item["document_id"], document.to_string());
+    assert_eq!(item["readable_id"], "DOC-001");
+    assert_eq!(item["version"], 1);
+    assert_eq!(item["newest_version"]["kind"], "draft");
+    assert_eq!(item["newest_version"]["status"], "draft");
+    let version_id = item["newest_version"]["version_id"].clone();
+
+    let version = mcp
+        .result("get_document_version", json!({"version_id": version_id}))
+        .await;
+    assert_eq!(version["document_id"], document.to_string());
+    assert_eq!(version["number"], 1);
+    assert_eq!(version["status"], "draft");
+    assert_eq!(version["markdown"], markdown);
+    assert_eq!(
+        version["manifest"],
+        json!({"facts": [{"fact_id": fact, "version": 1}], "sources": []})
+    );
+
+    // A version that the member cannot read is not found, and the agent sees the refusal as a tool result.
+    let body = mcp
+        .call(
+            "get_document_version",
+            json!({"version_id": Uuid::now_v7()}),
+        )
+        .await;
+    assert_eq!(problem(&body)["code"], "not-found", "{body}");
+    let body = mcp
+        .call("list_documents", json!({"event_key": "FLY31"}))
+        .await;
+    assert_eq!(problem(&body)["code"], "not-found", "{body}");
 }

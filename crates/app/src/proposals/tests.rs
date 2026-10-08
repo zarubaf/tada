@@ -2,9 +2,11 @@ use std::sync::Mutex;
 
 use serde_json::{Value, json};
 use tada_domain::RecordVersion;
-use tada_domain::facts::{FieldDefinition, core_catalog};
+use tada_domain::facts::{FactState, FieldDefinition, core_catalog};
 use tada_domain::identity::{EventRole, OrganizationRole};
-use tada_domain::ids::{ApiTokenId, DocumentId, DocumentVersionId, FactId, OrganizationId, UserId};
+use tada_domain::ids::{
+    ApiTokenId, DocumentId, DocumentVersionId, FactId, FactVersionId, OrganizationId, UserId,
+};
 
 use super::*;
 use crate::access::SourceReach;
@@ -137,12 +139,12 @@ impl FactStore for Memory {
         unreachable!()
     }
 
-    async fn existing_versions(
+    async fn fact_versions(
         &self,
         scope: OrgScope,
         event: EventId,
         versions: &[(FactId, RecordVersion)],
-    ) -> Result<Vec<(FactId, RecordVersion)>, StoreError> {
+    ) -> Result<Vec<FactVersionRef>, StoreError> {
         if scope.organization_id() != testwil() {
             return Ok(Vec::new());
         }
@@ -150,7 +152,12 @@ impl FactStore for Memory {
         Ok(versions
             .iter()
             .filter(|(fact, number)| stored.contains(&(event, *fact, *number)))
-            .copied()
+            .map(|(fact, number)| FactVersionRef {
+                id: FactVersionId::from_uuid(fact.as_uuid()),
+                fact_id: *fact,
+                number: *number,
+                state: FactState::Unknown,
+            })
             .collect())
     }
 }
@@ -277,6 +284,27 @@ impl DocumentStore for Memory {
         _: OrgScope,
         _: DocumentVersionId,
     ) -> Result<Option<StoredVersion>, StoreError> {
+        unreachable!()
+    }
+
+    async fn draft(
+        &self,
+        _: OrgScope,
+        _: DocumentVersionId,
+    ) -> Result<Option<crate::documents::StoredDraft>, StoreError> {
+        unreachable!()
+    }
+
+    async fn approve(
+        &self,
+        _: OrgScope,
+        _: &crate::documents::Approval,
+        _: &AuditEvent,
+    ) -> Result<crate::documents::Approved, StoreError> {
+        unreachable!()
+    }
+
+    async fn facts_changed(&self, _: OrgScope, _: DocumentId) -> Result<bool, StoreError> {
         unreachable!()
     }
 }

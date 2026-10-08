@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE document_version SET status = 'superseded'\n             WHERE organization_id = $1 AND document_id = $2 AND status = 'approved'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9e2b74614f8a55c19a6ff8b937ce0771a821f1a13420db24e905cfa13ebaa246"
+}

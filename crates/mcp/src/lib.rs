@@ -38,7 +38,7 @@ pub struct McpState {
     pub facts: Arc<dyn FactStore>,
     pub sources: Arc<dyn SourceStore>,
     pub proposals: Arc<dyn ProposalStore>,
-    /// The existing documents of draft proposals.
+    /// The documents that the document tools read and that draft proposals target.
     pub documents: Arc<dyn DocumentStore>,
     pub clock: Arc<dyn Clock>,
     /// `TADA_PUBLIC_URL`. Its origin is the only `Origin` that a request can have.

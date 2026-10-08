@@ -1,8 +1,11 @@
-//! Documents and their versions: upload, list, read and download (ADR 0009, ADR 0043, ADR 0055).
+//! Documents and their versions: upload, list, read and download (ADR 0009, ADR 0043, ADR 0055),
+//! and the rendering, approval and comparison of draft versions (ADR 0051).
 //!
 //! An upload is a raw request body with the media type `application/octet-stream`, not a multipart form.
 //! The handler then streams the body to the object storage without a parser in between, and the
 //! `X-File-Name` header carries the file name.
+
+use std::collections::BTreeMap;
 
 use axum::body::Body;
 use axum::extract::{FromRequest, Request, State};
@@ -15,10 +18,12 @@ use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use tada_app::blobs::ByteStream;
 use tada_app::documents::{
-    self as app, DocumentCursor, DocumentStores, DocumentView, DraftStatus, ReadDocumentError,
-    UploadError, VersionContent, VersionView,
+    self as app, ApproveError, DocumentCursor, DocumentReads, DocumentStores, DocumentView,
+    DraftRendering as AppDraftRendering, DraftStatus, LineKind, ReadDocumentError, Resolution,
+    UploadError, VersionContent, VersionDiff as AppVersionDiff, VersionView,
 };
 use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId};
+use tada_app::drafts::{CitedFact as AppCitedFact, LintKind, LintWarning as AppLintWarning};
 use tada_app::problem::ProblemCode;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -26,9 +31,10 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::ApiState;
-use crate::contract::{AUTHENTICATED, PATH, QUERY, codes};
-use crate::extract::{Caller, Path, Query, page_limit};
+use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
+use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
+use crate::values::{FactState, Passage, Value, state_parts};
 
 /// The header with the file name of an upload, percent-encoded as UTF-8.
 const FILE_NAME_HEADER: HeaderName = HeaderName::from_static("x-file-name");
@@ -45,6 +51,9 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
         .routes(routes!(get_document))
         .routes(routes!(list_document_versions, upload_document_version))
         .routes(routes!(download_document_version))
+        .routes(routes!(render_document_version))
+        .routes(routes!(approve_document_version))
+        .routes(routes!(diff_document_versions))
 }
 
 /// The problem codes of each operation (ADR 0037).
@@ -74,6 +83,18 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
             "download_document_version",
             codes(&[AUTHENTICATED, PATH, QUERY, ReadDocumentError::CODES]),
         ),
+        (
+            "render_document_version",
+            codes(&[AUTHENTICATED, PATH, ReadDocumentError::CODES]),
+        ),
+        (
+            "approve_document_version",
+            codes(&[AUTHENTICATED, PATH, JSON_BODY, ApproveError::CODES]),
+        ),
+        (
+            "diff_document_versions",
+            codes(&[AUTHENTICATED, PATH, QUERY, ReadDocumentError::CODES]),
+        ),
     ]
 }
 
@@ -99,6 +120,10 @@ pub struct Document {
     /// The record version. It increases with each new document version.
     pub version: i64,
     pub newest_version: DocumentVersion,
+    /// True if the newest version cites an older version of a fact: the client shows „Fakten geändert“ (ADR 0051).
+    /// Only `get_document` gives it; it is absent in a list.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub facts_changed: Option<bool>,
 }
 
 impl From<DocumentView> for Document {
@@ -112,6 +137,7 @@ impl From<DocumentView> for Document {
             created_at: document.created_at,
             version: document.version.get(),
             newest_version: document.newest_version.into(),
+            facts_changed: None,
         }
     }
 }
@@ -409,7 +435,7 @@ async fn list_documents(
         query.q.as_deref(),
         after,
         limit,
-        state.document_stores(),
+        state.document_reads(),
     )
     .await?;
     Ok(axum::Json(DocumentPage {
@@ -435,13 +461,13 @@ async fn get_document(
     Caller(caller): Caller,
     Path(document_id): Path<Uuid>,
 ) -> Result<axum::Json<Document>, ApiError> {
-    let document = app::get_document(
-        &caller,
-        DocumentId::from_uuid(document_id),
-        state.document_stores(),
-    )
-    .await?;
-    Ok(axum::Json(document.into()))
+    let id = DocumentId::from_uuid(document_id);
+    let document = app::get_document(&caller, id, state.document_reads()).await?;
+    let facts_changed = app::facts_changed(&caller, id, state.document_reads()).await?;
+    Ok(axum::Json(Document {
+        facts_changed: Some(facts_changed),
+        ..document.into()
+    }))
 }
 
 /// All versions of a document.
@@ -471,7 +497,7 @@ async fn list_document_versions(
     let versions = app::list_versions(
         &caller,
         DocumentId::from_uuid(document_id),
-        state.document_stores(),
+        state.document_reads(),
     )
     .await?;
     Ok(axum::Json(DocumentVersionList {
@@ -565,6 +591,341 @@ async fn download_document_version(
     Ok((headers, Body::from_stream(body)).into_response())
 }
 
+/// A draft as the reader sees it (ADR 0051, ADR 0058). The client renders the Markdown and resolves each `tada:`
+/// link from `links` only: a link without an entry shows „entfernt“. The server never formats a value.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DraftRendering {
+    /// The Markdown with LF line ends. Raw HTML in it is text.
+    pub markdown: String,
+    /// The warnings of the draft lint for the review. They do not block.
+    pub lint_warnings: Vec<LintWarning>,
+    /// The target of each `tada:` link, by the exact text of its destination.
+    pub links: BTreeMap<String, LinkTarget>,
+}
+
+impl From<AppDraftRendering> for DraftRendering {
+    fn from(draft: AppDraftRendering) -> Self {
+        Self {
+            markdown: draft.markdown.as_str().to_owned(),
+            lint_warnings: draft
+                .lint_warnings
+                .into_iter()
+                .map(LintWarning::from)
+                .collect(),
+            links: draft
+                .links
+                .into_iter()
+                .map(|(link, target)| (link, target.into()))
+                .collect(),
+        }
+    }
+}
+
+/// A warning of the draft lint on one line, from 1.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LintWarning {
+    pub line: u32,
+    pub kind: LintWarningKind,
+}
+
+/// What the lint found outside a `tada:` link. The list of kinds is open.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum LintWarningKind {
+    Number,
+    Date,
+    Money,
+    /// Raw HTML, which the client shows as text.
+    RawHtml,
+}
+
+impl From<AppLintWarning> for LintWarning {
+    fn from(warning: AppLintWarning) -> Self {
+        Self {
+            line: warning.line,
+            kind: match warning.kind {
+                LintKind::Number => LintWarningKind::Number,
+                LintKind::Date => LintWarningKind::Date,
+                LintKind::Money => LintWarningKind::Money,
+                LintKind::RawHtml => LintWarningKind::RawHtml,
+            },
+        }
+    }
+}
+
+/// The target of a `tada:` link for the reader. `kind` names it. The list of kinds is open.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum LinkTarget {
+    /// The exact fact version that the draft cites. The client marks an assumption with „Annahme“
+    /// and shows an unknown as „unbekannt“.
+    Fact {
+        fact_id: Uuid,
+        version: i64,
+        state: FactState,
+        /// The value. It is absent if the state is `unknown`.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Value>,
+        /// It is absent if the state is `unknown`.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        approximate: Option<bool>,
+    },
+    /// The cited passage of a source version.
+    Source {
+        source_version_id: Uuid,
+        passage: Passage,
+    },
+    /// The reader cannot see the target. The client shows „entfernt“.
+    Hidden,
+}
+
+impl From<Resolution> for LinkTarget {
+    fn from(resolution: Resolution) -> Self {
+        match resolution {
+            Resolution::Fact(fact) => {
+                let (state, value, approximate) = state_parts(&fact.state);
+                Self::Fact {
+                    fact_id: fact.fact_id.as_uuid(),
+                    version: fact.number.get(),
+                    state,
+                    value,
+                    approximate,
+                }
+            }
+            Resolution::Source(evidence) => Self::Source {
+                source_version_id: evidence.source_version_id.as_uuid(),
+                passage: (&evidence.passage).into(),
+            },
+            Resolution::Hidden => Self::Hidden,
+        }
+    }
+}
+
+/// A draft version as the reader sees it.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DocumentVersionRendering {
+    pub version: DocumentVersion,
+    pub draft: DraftRendering,
+}
+
+/// Reads a draft version with what the client needs to render it: the Markdown, the lint warnings and the target
+/// of each `tada:` link for the caller. An upload version is not found here.
+#[utoipa::path(
+    get,
+    path = "/document-versions/{version_id}/rendering",
+    operation_id = "render_document_version",
+    tag = "documents",
+    params(("version_id" = Uuid, Path, description = "The ID of the draft version.")),
+    responses(
+        (status = OK, description = "The draft version for the caller.", body = DocumentVersionRendering),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn render_document_version(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+    Path(version_id): Path<Uuid>,
+) -> Result<axum::Json<DocumentVersionRendering>, ApiError> {
+    let rendering = app::render_context(
+        &caller,
+        DocumentVersionId::from_uuid(version_id),
+        state.document_reads(),
+    )
+    .await?;
+    Ok(axum::Json(DocumentVersionRendering {
+        version: rendering.version.into(),
+        draft: rendering.draft.into(),
+    }))
+}
+
+/// The input of `ApproveDocumentVersion`.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ApproveDocumentVersionRequest {
+    /// The record version of the document that the caller read.
+    #[schema(minimum = 1)]
+    pub expected_version: i64,
+}
+
+/// Approves a draft version. Only an event manager approves (ADR 0052).
+///
+/// The approved version never changes. The version that was approved before becomes `superseded`.
+/// A version that is approved, superseded or archived, or older than the approved version, gives `invalid-transition`.
+#[utoipa::path(
+    post,
+    path = "/document-versions/{version_id}/approve",
+    operation_id = "approve_document_version",
+    tag = "documents",
+    params(("version_id" = Uuid, Path, description = "The ID of the draft version.")),
+    request_body = ApproveDocumentVersionRequest,
+    responses(
+        (status = OK, description = "The approved version.", body = DocumentVersion),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn approve_document_version(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+    Path(version_id): Path<Uuid>,
+    Json(request): Json<ApproveDocumentVersionRequest>,
+) -> Result<axum::Json<DocumentVersion>, ApiError> {
+    let version = app::approve_version(
+        &caller,
+        DocumentVersionId::from_uuid(version_id),
+        record_version(request.expected_version)?,
+        state.document_reads(),
+        state.clock.as_ref(),
+    )
+    .await?;
+    Ok(axum::Json(version.into()))
+}
+
+/// The parameters of `DiffDocumentVersions`.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct DiffQuery {
+    /// The ID of the older draft version.
+    pub from: Uuid,
+    /// The ID of the newer draft version.
+    pub to: Uuid,
+}
+
+/// The difference between two draft versions of a document (ADR 0051).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct VersionDiff {
+    /// Each line of the two versions, in the order of the newer version, with the removed lines at their places.
+    pub lines: Vec<LineChange>,
+    pub facts: FactDiff,
+}
+
+/// One line of the text difference.
+#[derive(Serialize, ToSchema)]
+pub struct LineChange {
+    pub kind: LineChangeKind,
+    /// The line number in the older version. It is absent for an added line.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub old_line: Option<u32>,
+    /// The line number in the newer version. It is absent for a removed line.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_line: Option<u32>,
+    /// The text of the line without its line end.
+    pub text: String,
+}
+
+/// The text is document content, so `Debug` leaves it out (ADR 0035).
+impl std::fmt::Debug for LineChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LineChange")
+            .field("kind", &self.kind)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum LineChangeKind {
+    Unchanged,
+    Removed,
+    Added,
+}
+
+/// The facts that the two manifests cite. If a version cites more than one version of a fact, the newest counts.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct FactDiff {
+    /// The facts that both versions cite, each in another version.
+    pub changed: Vec<FactChange>,
+    /// The facts that only the newer version cites.
+    pub added: Vec<CitedFact>,
+    /// The facts that only the older version cites.
+    pub removed: Vec<CitedFact>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct FactChange {
+    pub fact_id: Uuid,
+    /// The fact version that the older draft version cites.
+    pub from: i64,
+    /// The fact version that the newer draft version cites.
+    pub to: i64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CitedFact {
+    pub fact_id: Uuid,
+    pub version: i64,
+}
+
+impl From<AppVersionDiff> for VersionDiff {
+    fn from(diff: AppVersionDiff) -> Self {
+        let cited = |fact: AppCitedFact| CitedFact {
+            fact_id: fact.fact_id.as_uuid(),
+            version: fact.version.get(),
+        };
+        Self {
+            lines: diff
+                .lines
+                .into_iter()
+                .map(|line| LineChange {
+                    kind: match line.kind {
+                        LineKind::Unchanged => LineChangeKind::Unchanged,
+                        LineKind::Removed => LineChangeKind::Removed,
+                        LineKind::Added => LineChangeKind::Added,
+                    },
+                    old_line: line.old_line,
+                    new_line: line.new_line,
+                    text: line.text,
+                })
+                .collect(),
+            facts: FactDiff {
+                changed: diff
+                    .facts
+                    .changed
+                    .into_iter()
+                    .map(|change| FactChange {
+                        fact_id: change.fact_id.as_uuid(),
+                        from: change.from.get(),
+                        to: change.to.get(),
+                    })
+                    .collect(),
+                added: diff.facts.added.into_iter().map(cited).collect(),
+                removed: diff.facts.removed.into_iter().map(cited).collect(),
+            },
+        }
+    }
+}
+
+/// Compares two draft versions of the document: the lines, and the facts of their manifests.
+/// A version that is not a draft version of this document is not found.
+#[utoipa::path(
+    get,
+    path = "/documents/{document_id}/diff",
+    operation_id = "diff_document_versions",
+    tag = "documents",
+    params(
+        ("document_id" = Uuid, Path, description = "The ID of the document."),
+        DiffQuery,
+    ),
+    responses(
+        (status = OK, description = "The difference from `from` to `to`.", body = VersionDiff),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn diff_document_versions(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+    Path(document_id): Path<Uuid>,
+    Query(query): Query<DiffQuery>,
+) -> Result<axum::Json<VersionDiff>, ApiError> {
+    let diff = app::diff_versions(
+        &caller,
+        DocumentId::from_uuid(document_id),
+        DocumentVersionId::from_uuid(query.from),
+        DocumentVersionId::from_uuid(query.to),
+        state.document_reads(),
+    )
+    .await?;
+    Ok(axum::Json(diff.into()))
+}
+
 /// `Content-Disposition` with the file name (RFC 6266).
 ///
 /// `filename` holds an ASCII fallback for old clients: each character other than letters, digits,
@@ -615,6 +976,15 @@ impl ApiState {
             identity: self.identity.as_ref(),
             documents: self.documents.as_ref(),
             blobs: self.blobs.as_ref(),
+        }
+    }
+
+    fn document_reads(&self) -> DocumentReads<'_> {
+        DocumentReads {
+            identity: self.identity.as_ref(),
+            documents: self.documents.as_ref(),
+            facts: self.facts.as_ref(),
+            sources: self.sources.as_ref(),
         }
     }
 }

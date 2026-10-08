@@ -17,6 +17,7 @@ use futures::TryStreamExt;
 use jiff::Timestamp;
 use sha2::{Digest, Sha256};
 use tada_domain::RecordVersion;
+use tada_domain::documents::DraftMarkdown;
 use tada_domain::ids::{
     DocumentId, DocumentVersionId, EventId, LocalIdKind, SourceVersionId, UserId,
 };
@@ -28,12 +29,26 @@ use crate::audit::{AuditAction, AuditEvent};
 use crate::blobs::{BlobError, BlobKey, BlobStore, ByteStream};
 use crate::caller::{Actor, MemberCaller, OrgScope};
 use crate::clock::Clock;
+use crate::drafts::ProvenanceManifest;
+use crate::facts::FactStore;
 use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
+use crate::sources::SourceStore;
 use crate::store::StoreError;
 use crate::uploads::detect::{
     FileType, Rejected, SNIFF_BYTES, TextValidator, detect, sanitize_file_name,
+};
+
+mod approval;
+mod comparison;
+mod rendering;
+
+pub use approval::{ApproveError, approve_version};
+pub use comparison::{FactChange, FactDiff, LineChange, LineKind, VersionDiff, diff_versions};
+pub(crate) use rendering::resolve_links;
+pub use rendering::{
+    DraftRendering, Links, Rendering, Resolution, facts_changed, get_draft, render_context,
 };
 
 /// A document with its newest version.
@@ -174,6 +189,41 @@ pub struct StoredVersion {
     pub blob_key: BlobKey,
 }
 
+/// A stored draft version with its Markdown and its provenance manifest (ADR 0051).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredDraft {
+    pub event_id: EventId,
+    pub version: VersionView,
+    /// The status of the draft, so that a reader of a draft never meets an upload.
+    pub status: DraftStatus,
+    pub markdown: DraftMarkdown,
+    /// The fact versions and source passages that the draft cites, fixed with its proposal.
+    pub manifest: ProvenanceManifest,
+}
+
+/// The approval of a draft version by an event manager (ADR 0052).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Approval {
+    pub version_id: DocumentVersionId,
+    /// The record version of the document that the approver read.
+    pub expected_version: RecordVersion,
+    pub approved_by: UserId,
+    pub approved_at: Timestamp,
+}
+
+/// The result of `DocumentStore::approve`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Approved {
+    /// The approved version.
+    Approved(Box<VersionView>),
+    /// The version is not a draft version of the organization. The store changed nothing.
+    NotFound,
+    /// The document has another record version than the approver read. The store changed nothing.
+    VersionConflict,
+    /// The version is approved, superseded or archived, or a newer version is approved. The store changed nothing.
+    InvalidTransition,
+}
+
 /// The position after the last document of a page (ADR 0044).
 /// The documents are in the order of their readable IDs, the newest first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -281,6 +331,32 @@ pub trait DocumentStore: Debug + Send + Sync {
         scope: OrgScope,
         id: DocumentVersionId,
     ) -> Result<Option<StoredVersion>, StoreError>;
+
+    /// The draft version `id`. An upload has no Markdown, so its ID gives `None`.
+    async fn draft(
+        &self,
+        scope: OrgScope,
+        id: DocumentVersionId,
+    ) -> Result<Option<StoredDraft>, StoreError>;
+
+    /// Approves a draft version in one transaction, or changes nothing (ADR 0051).
+    ///
+    /// Only a version with the status `draft` or `review`, and with no newer approved version, can become approved.
+    /// The approved version of the document before it becomes `superseded`. The store also records `audit`.
+    async fn approve(
+        &self,
+        scope: OrgScope,
+        approval: &Approval,
+        audit: &AuditEvent,
+    ) -> Result<Approved, StoreError>;
+
+    /// True if the newest version of the document cites a fact that has a newer version now (ADR 0051).
+    /// A fact that was unknown and is known now has a newer version too.
+    async fn facts_changed(
+        &self,
+        scope: OrgScope,
+        document: DocumentId,
+    ) -> Result<bool, StoreError>;
 }
 
 /// The largest text file whose text tada stores for the search and for passages (ADR 0050, ARCHITECTURE.md).
@@ -332,12 +408,24 @@ impl Inspection {
     }
 }
 
-/// The ports that the document commands and queries use.
+/// The ports of the uploads and downloads: they read and write files.
 #[derive(Debug, Clone, Copy)]
 pub struct DocumentStores<'a> {
     pub identity: &'a dyn IdentityStore,
     pub documents: &'a dyn DocumentStore,
     pub blobs: &'a dyn BlobStore,
+}
+
+/// The ports of the queries of documents and drafts and of the approval. They never read a file,
+/// so an adapter without the object storage, for example the MCP server, can use them.
+#[derive(Debug, Clone, Copy)]
+pub struct DocumentReads<'a> {
+    pub identity: &'a dyn IdentityStore,
+    pub documents: &'a dyn DocumentStore,
+    /// The fact versions that drafts cite.
+    pub facts: &'a dyn FactStore,
+    /// The source versions that drafts cite.
+    pub sources: &'a dyn SourceStore,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -650,7 +738,7 @@ pub async fn list_documents(
     name: Option<&str>,
     after: Option<DocumentCursor>,
     limit: PageLimit,
-    stores: DocumentStores<'_>,
+    stores: DocumentReads<'_>,
 ) -> Result<Page<DocumentView, DocumentCursor>, ReadDocumentError> {
     check_may_read(caller, event_id, stores.identity).await?;
     let name = name.map(str::trim).filter(|name| !name.is_empty());
@@ -672,7 +760,7 @@ pub async fn list_documents(
 pub async fn get_document(
     caller: &impl Principal,
     id: DocumentId,
-    stores: DocumentStores<'_>,
+    stores: DocumentReads<'_>,
 ) -> Result<DocumentView, ReadDocumentError> {
     let document = stores
         .documents
@@ -687,7 +775,7 @@ pub async fn get_document(
 pub async fn list_versions(
     caller: &impl Principal,
     id: DocumentId,
-    stores: DocumentStores<'_>,
+    stores: DocumentReads<'_>,
 ) -> Result<Vec<VersionView>, ReadDocumentError> {
     get_document(caller, id, stores).await?;
     Ok(stores.documents.versions(caller.scope(), id).await?)

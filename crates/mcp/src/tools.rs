@@ -1,4 +1,4 @@
-//! The read tools of ADR 0040 and the server handler of all tools; `propose` has the proposal tool.
+//! The read tools of ADR 0040, also for documents, and the server handler of all tools; `propose` has the proposal tool.
 //! The names are stable; the descriptions tell the agent the rules.
 
 use std::sync::Arc;
@@ -16,9 +16,9 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use tada_app::caller::AiCaller;
 use tada_app::clock::Clock;
-use tada_app::documents::DocumentStore;
+use tada_app::documents::{self, DocumentReads, DocumentStore};
 use tada_app::domain::events::EventKey;
-use tada_app::domain::ids::SourceVersionId;
+use tada_app::domain::ids::{DocumentVersionId, SourceVersionId};
 use tada_app::events::{self, EventStore};
 use tada_app::facts::{self, FactStore};
 use tada_app::identity::IdentityStore;
@@ -28,7 +28,8 @@ use tada_app::proposals::ProposalStore;
 use tada_app::search::{self, SearchRequest};
 use tada_app::sources::{self, SourceStore};
 use tada_app::views::{
-    EventList, EventSchema, EventView, PassageView, ProfileView, SearchHitView, SearchResult,
+    DocumentList, DocumentSummaryView, DraftVersionView, EventList, EventSchema, EventView,
+    PassageView, ProfileView, SearchHitView, SearchResult,
 };
 use uuid::Uuid;
 
@@ -83,6 +84,13 @@ pub(crate) struct PassageInput {
     start: u32,
     /// The offset after the last character.
     end: u32,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DocumentVersionInput {
+    /// The ID of a draft version, from `list_documents`.
+    version_id: Uuid,
 }
 
 #[tool_router(router = read_tools)]
@@ -217,10 +225,73 @@ The offsets count characters, as in the evidence of a fact and in a search hit."
     }
 }
 
+#[tool_router(router = document_tools)]
+impl Tools {
+    #[tool(
+        name = "list_documents",
+        description = "List the documents of an event, the newest first, each with its readable ID, its record version and its newest version. \
+A version is an upload (a file) or a draft (Markdown). To propose a new draft version of a document, send its version as expected_version. \
+The list holds at most the 200 newest documents and has no next page. If more is true, the event has older documents that this tool cannot show: tell the member.",
+        annotations(read_only_hint = true)
+    )]
+    async fn list_documents(
+        &self,
+        Extension(parts): Extension<Parts>,
+        Parameters(input): Parameters<EventInput>,
+    ) -> Result<Json<DocumentList>, ToolError> {
+        let caller = caller(&parts)?;
+        let event = self.event(caller, &input.event_key).await?;
+        let page = documents::list_documents(
+            caller,
+            event.id,
+            None,
+            None,
+            PageLimit::new(PageLimit::MAX).unwrap_or_default(),
+            self.document_reads(),
+        )
+        .await?;
+        Ok(Json(DocumentList {
+            documents: page.items.iter().map(DocumentSummaryView::from).collect(),
+            more: page.next.is_some(),
+        }))
+    }
+
+    #[tool(
+        name = "get_document_version",
+        description = "Get a draft version of a document: its Markdown, its status and its provenance manifest, the exact fact versions and source passages that it cites. \
+An approved version never changes: write a new draft from the Markdown, cite the current fact versions of get_event_profile, and propose it with propose_changeset. \
+An upload version has no Markdown and is not found here.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_document_version(
+        &self,
+        Extension(parts): Extension<Parts>,
+        Parameters(input): Parameters<DocumentVersionInput>,
+    ) -> Result<Json<DraftVersionView>, ToolError> {
+        let caller = caller(&parts)?;
+        let draft = documents::get_draft(
+            caller,
+            DocumentVersionId::from_uuid(input.version_id),
+            self.document_reads(),
+        )
+        .await?;
+        Ok(Json(DraftVersionView::from(&draft)))
+    }
+}
+
 impl Tools {
     /// All tools of the server.
     fn all_tools() -> ToolRouter<Self> {
-        Self::read_tools() + Self::propose_tools()
+        Self::read_tools() + Self::document_tools() + Self::propose_tools()
+    }
+
+    fn document_reads(&self) -> DocumentReads<'_> {
+        DocumentReads {
+            identity: &*self.identity,
+            documents: &*self.documents,
+            facts: &*self.facts,
+            sources: &*self.sources,
+        }
     }
 
     /// The event with the key `key`, if the caller can read it.

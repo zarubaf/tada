@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT markdown AS \"markdown!\" FROM document_version\n               WHERE organization_id = $1 AND id = $2 AND markdown IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "markdown!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "markdown"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "b821c9fdb723ee031a80b0f1767ba43862eab05b05642779ce5242e82406e0b1"
+}

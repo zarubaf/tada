@@ -33,6 +33,8 @@ pub enum AuditAction {
     OrganizationFeatureDisable,
     /// A member uploaded a file as a new document version, of a new or an existing document.
     DocumentVersionUpload,
+    /// An event manager approved a draft version (ADR 0051, ADR 0052).
+    DocumentVersionApprove,
 }
 
 impl AuditAction {
@@ -58,6 +60,7 @@ impl AuditAction {
             Self::OrganizationFeatureEnable => "organization_feature.enable",
             Self::OrganizationFeatureDisable => "organization_feature.disable",
             Self::DocumentVersionUpload => "document_version.upload",
+            Self::DocumentVersionApprove => "document_version.approve",
         }
     }
 
@@ -86,7 +89,7 @@ impl AuditAction {
             Self::OrganizationFeatureEnable | Self::OrganizationFeatureDisable => {
                 "organization_feature"
             }
-            Self::DocumentVersionUpload => "document_version",
+            Self::DocumentVersionUpload | Self::DocumentVersionApprove => "document_version",
         }
     }
 }

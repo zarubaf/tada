@@ -11,6 +11,7 @@ use super::{ProposalStatus, ReviewQueryError, ReviewStores, proposal_status, rev
 use crate::access;
 use crate::caller::{Actor, MemberCaller};
 use crate::clock::Clock;
+use crate::documents::{DraftRendering, resolve_links};
 use crate::facts::FactVersionRef;
 use crate::proposals::Changeset;
 use crate::store::StoreError;
@@ -44,6 +45,9 @@ pub struct ProposalReview {
     pub conflict: Option<ConflictReason>,
     /// The current version of the fact that a `SetFact` proposal sets, or `None`.
     pub current: Option<FactVersionRef>,
+    /// A draft proposal as the reviewer sees it: its Markdown, its lint warnings and the target of each link.
+    /// `None` for each other operation.
+    pub draft: Option<DraftRendering>,
 }
 
 /// Why a proposal conflicts.
@@ -54,6 +58,11 @@ pub enum ConflictReason {
     /// Another target record changed, for example a field that is deprecated now.
     TargetChanged,
 }
+
+/// A draft proposal without its stored provenance.
+#[derive(Debug, thiserror::Error)]
+#[error("a draft proposal has no stored provenance")]
+struct MissingProvenance;
 
 /// A stored passage that does not match the text of its source version.
 #[derive(Debug, thiserror::Error)]
@@ -87,6 +96,32 @@ pub async fn get_changeset(
             }
             _ => None,
         };
+        let draft = match &proposal.operation {
+            Operation::CreateDocumentDraft {
+                event_id, markdown, ..
+            } => {
+                let provenance = changeset
+                    .drafts
+                    .iter()
+                    .find(|draft| draft.proposal_id == proposal.id)
+                    .ok_or_else(|| StoreError::Internal(Box::new(MissingProvenance)))?;
+                let links = resolve_links(
+                    caller,
+                    *event_id,
+                    &provenance.manifest,
+                    stores.identity,
+                    stores.facts,
+                    stores.sources,
+                )
+                .await?;
+                Some(DraftRendering {
+                    markdown: markdown.clone(),
+                    lint_warnings: provenance.lint_warnings.clone(),
+                    links,
+                })
+            }
+            _ => None,
+        };
         let excerpts = proposal
             .evidence
             .iter()
@@ -103,6 +138,7 @@ pub async fn get_changeset(
             status,
             excerpts,
             current,
+            draft,
             proposal,
         });
     }
