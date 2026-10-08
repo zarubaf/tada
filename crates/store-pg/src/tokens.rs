@@ -282,7 +282,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::testing::TestDatabase;
+    use crate::testing::{TestDatabase, sqlstate};
 
     const DAY: SignedDuration = SignedDuration::from_hours(24);
 
@@ -454,6 +454,56 @@ mod tests {
             1,
             "a second revocation records nothing"
         );
+    }
+
+    #[tokio::test]
+    async fn tokens_stay_in_their_organization() {
+        let test = TestDatabase::start().await;
+        let clock = TestClock::new();
+        let anna = member(&test, OrganizationRole::Member).await;
+        let token = create(&test, &anna, TokenScope::Read, &clock)
+            .await
+            .unwrap();
+        // The same user in another organization sees and revokes nothing of Testwil.
+        let musterhausen = test.create_organization("musterhausen").await;
+        test.add_membership(musterhausen, anna.user_id(), OrganizationRole::Member)
+            .await;
+        let elsewhere = MemberCaller::new(anna.user_id(), musterhausen, OrganizationRole::Member);
+
+        assert!(
+            list_tokens(&elsewhere, &test.database)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let result = revoke_token(&elsewhere, token.token.id, &test.database, &clock).await;
+        assert!(matches!(result, Err(TokenError::NotFound)), "{result:?}");
+        assert_eq!(
+            list_tokens(&anna, &test.database).await.unwrap()[0].revoked_at,
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn tokens_names_follow_the_name_rules_in_the_schema() {
+        let test = TestDatabase::start().await;
+        let anna = member(&test, OrganizationRole::Member).await;
+        for name in ["", &"ä".repeat(201)] {
+            let error = sqlx::query(
+                "INSERT INTO api_token (id, organization_id, user_id, token_hash, name, scope,
+                     expires_at, notice_version, notice_confirmed_at, created_at)
+                 VALUES ($1, $2, $3, $4, $5, 'read', now() + interval '1 day', 1, now(), now())",
+            )
+            .bind(Uuid::now_v7())
+            .bind(anna.scope().organization_id().as_uuid())
+            .bind(anna.user_id().as_uuid())
+            .bind(hash_token(name))
+            .bind(name)
+            .execute(&test.database.pool)
+            .await
+            .unwrap_err();
+            assert_eq!(sqlstate(&error), "23514", "a CHECK violation");
+        }
     }
 
     #[tokio::test]

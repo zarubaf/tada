@@ -8,7 +8,7 @@ CREATE TABLE api_token (
     organization_id uuid NOT NULL,
     user_id uuid NOT NULL,
     token_hash bytea NOT NULL UNIQUE CHECK (octet_length(token_hash) = 32),
-    name text NOT NULL,
+    name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 200),
     scope text NOT NULL CHECK (scope IN ('read', 'propose')),
     expires_at timestamptz NOT NULL,
     notice_version integer NOT NULL CHECK (notice_version >= 1),
@@ -24,6 +24,9 @@ CREATE TABLE api_token (
 
 -- A member lists the own tokens of one organization.
 CREATE INDEX api_token_member ON api_token (organization_id, user_id, created_at);
+
+-- The creation of a `propose` token reads the event roles of one member in all events of the organization (ADR 0052).
+CREATE INDEX event_membership_member ON event_membership (organization_id, user_id);
 
 -- A switch of one organization, for example `mcp-tokens` (ADR 0036). An owner changes it.
 -- A feature without a row has its default value and version 1.
