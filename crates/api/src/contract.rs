@@ -171,6 +171,67 @@ mod tests {
         assert!(!list.as_array().unwrap().contains(&"forbidden".into()));
     }
 
+    /// The names of the types with `ToSchema` in one source file.
+    fn schema_types(source: &str) -> Vec<String> {
+        let name_of = |line: &str| {
+            let rest = line
+                .trim_start()
+                .trim_start_matches("pub ")
+                .trim_start_matches("pub(crate) ");
+            let rest = rest
+                .strip_prefix("struct ")
+                .or_else(|| rest.strip_prefix("enum "))?;
+            Some(
+                rest.split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()?
+                    .to_owned(),
+            )
+        };
+        let mut names = Vec::new();
+        let mut derived = false;
+        for line in source.lines() {
+            let trimmed = line.trim_start();
+            if let Some(rest) = trimmed.strip_prefix("impl ToSchema for ") {
+                names.extend(name_of(&format!("struct {rest}")));
+            } else if trimmed.starts_with("#[derive(") && trimmed.contains("ToSchema") {
+                derived = true;
+            } else if derived && let Some(name) = name_of(trimmed) {
+                names.push(name);
+                derived = false;
+            }
+        }
+        names
+    }
+
+    /// utoipa keys the component schemas by type name and keeps one of two types with the same name,
+    /// so the contract would describe the wrong type without an error.
+    #[test]
+    fn each_schema_type_has_its_own_name() {
+        let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut seen: BTreeMap<String, String> = BTreeMap::new();
+        let mut duplicates = Vec::new();
+        for entry in std::fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            let source = std::fs::read_to_string(&path).unwrap();
+            let file = path.file_name().unwrap().to_string_lossy().into_owned();
+            for name in schema_types(&source) {
+                if let Some(other) = seen.insert(name.clone(), file.clone()) {
+                    duplicates.push(format!("{name} in {other} and {file}"));
+                }
+            }
+        }
+        assert!(
+            seen.contains_key("Problem"),
+            "the scan finds the schema types"
+        );
+        assert!(duplicates.is_empty(), "{duplicates:?}");
+        let document = serde_json::to_value(crate::openapi()).unwrap();
+        let components = document["components"]["schemas"].as_object().unwrap();
+        for name in components.keys() {
+            assert!(seen.contains_key(name), "the scan misses the schema {name}");
+        }
+    }
+
     #[test]
     fn the_catalog_lists_each_code_once() {
         let catalog = problem_catalog();

@@ -262,7 +262,7 @@ pub struct Proposal {
     /// The short reason of the proposal.
     pub reason: String,
     /// The passages of the source text that support the proposal, each with the text around it.
-    pub evidence: Vec<Evidence>,
+    pub evidence: Vec<ProposalEvidence>,
     pub status: ProposalStatus,
     /// True if the proposal is open and older than 14 days (ADR 0050).
     pub stale: bool,
@@ -276,7 +276,7 @@ pub struct Proposal {
 
 /// One passage of the source text of a changeset, with the text around it.
 #[derive(Debug, Serialize, ToSchema)]
-pub struct Evidence {
+pub struct ProposalEvidence {
     pub passage: Passage,
     pub excerpt: Excerpt,
 }
@@ -519,7 +519,7 @@ impl From<AppProposalReview> for Proposal {
                 .evidence
                 .iter()
                 .zip(review.excerpts)
-                .map(|(passage, excerpt)| Evidence {
+                .map(|(passage, excerpt)| ProposalEvidence {
                     passage: passage.into(),
                     excerpt: excerpt.into(),
                 })

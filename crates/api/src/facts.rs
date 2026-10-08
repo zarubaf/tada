@@ -67,12 +67,12 @@ pub struct Fact {
     /// The number of the current fact version. A proposal that changes the fact expects it.
     pub version: i64,
     /// The passages of source versions that support the current fact version.
-    pub evidence: Vec<Evidence>,
+    pub evidence: Vec<FactEvidence>,
 }
 
 /// One evidence link: a passage of a source version.
 #[derive(Debug, Serialize, ToSchema)]
-pub struct Evidence {
+pub struct FactEvidence {
     pub source_version_id: Uuid,
     pub passage: Passage,
 }
@@ -136,7 +136,7 @@ impl From<ProfileEntry> for Fact {
             evidence: entry
                 .evidence
                 .iter()
-                .map(|evidence| Evidence {
+                .map(|evidence| FactEvidence {
                     source_version_id: evidence.source_version_id.as_uuid(),
                     passage: (&evidence.passage).into(),
                 })

@@ -1722,7 +1722,6 @@
                           "additionalProperties": false,
                           "properties": {
                             "approximate": {
-                              "default": false,
                               "description": "True for an approximate value, for example \"about 20,000\".",
                               "type": "boolean"
                             },
@@ -1922,7 +1921,6 @@
                           "additionalProperties": false,
                           "properties": {
                             "approximate": {
-                              "default": false,
                               "type": "boolean"
                             },
                             "state": {
@@ -2305,7 +2303,6 @@
             "description": "The input of `CreateChangeset`: the text of one intake and the proposals that it supports.\nThe event of the path is the event of each proposal.\nThe proposals have the shape of the MCP tools (ADR 0040).",
             "properties": {
               "id": {
-                "default": null,
                 "description": "The UUIDv7 of the new changeset. A client that sends it can retry the request safely.",
                 "format": "uuid",
                 "type": [
@@ -2319,7 +2316,6 @@
                   "description": "One proposal of a new changeset.",
                   "properties": {
                     "depends_on": {
-                      "default": [],
                       "description": "The proposals of the same changeset that must apply before this one,\nfor example the new field definition of a fact.",
                       "items": {
                         "format": "uuid",
@@ -2340,7 +2336,6 @@
                             "type": "integer"
                           },
                           "page": {
-                            "default": null,
                             "description": "The page of a PDF, from 1.",
                             "format": "uint32",
                             "minimum": 0,
@@ -2398,7 +2393,6 @@
                               "type": "string"
                             },
                             "time_zone": {
-                              "default": null,
                               "description": "An IANA time zone. The default is `Europe/Zurich`.",
                               "type": [
                                 "string",
@@ -2423,7 +2417,6 @@
                               "type": "string"
                             },
                             "expected_version": {
-                              "default": null,
                               "description": "The current version of the fact. Leave it out if the event has no fact of the field yet.",
                               "format": "int64",
                               "type": [
@@ -2447,7 +2440,6 @@
                                   "additionalProperties": false,
                                   "properties": {
                                     "approximate": {
-                                      "default": false,
                                       "description": "True for an approximate value, for example \"about 20,000\".",
                                       "type": "boolean"
                                     },
@@ -2647,7 +2639,6 @@
                                   "additionalProperties": false,
                                   "properties": {
                                     "approximate": {
-                                      "default": false,
                                       "type": "boolean"
                                     },
                                     "state": {
@@ -3007,7 +2998,6 @@
                                   "additionalProperties": false,
                                   "properties": {
                                     "multiple": {
-                                      "default": false,
                                       "description": "True if a fact can hold several choices.",
                                       "type": "boolean"
                                     },
@@ -3451,23 +3441,6 @@
           "event-viewer"
         ]
       },
-      "Evidence": {
-        "type": "object",
-        "description": "One evidence link: a passage of a source version.",
-        "required": [
-          "source_version_id",
-          "passage"
-        ],
-        "properties": {
-          "source_version_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "passage": {
-            "$ref": "#/components/schemas/Passage"
-          }
-        }
-      },
       "Excerpt": {
         "type": "object",
         "description": "A passage with the text around it: at most 100 characters before and after it.",
@@ -3526,9 +3499,26 @@
           "evidence": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Evidence"
+              "$ref": "#/components/schemas/FactEvidence"
             },
             "description": "The passages of source versions that support the current fact version."
+          }
+        }
+      },
+      "FactEvidence": {
+        "type": "object",
+        "description": "One evidence link: a passage of a source version.",
+        "required": [
+          "source_version_id",
+          "passage"
+        ],
+        "properties": {
+          "source_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passage": {
+            "$ref": "#/components/schemas/Passage"
           }
         }
       },
@@ -4371,7 +4361,7 @@
           "evidence": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Evidence"
+              "$ref": "#/components/schemas/ProposalEvidence"
             },
             "description": "The passages of the source text that support the proposal, each with the text around it."
           },
@@ -4403,6 +4393,22 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "ProposalEvidence": {
+        "type": "object",
+        "description": "One passage of the source text of a changeset, with the text around it.",
+        "required": [
+          "passage",
+          "excerpt"
+        ],
+        "properties": {
+          "passage": {
+            "$ref": "#/components/schemas/Passage"
+          },
+          "excerpt": {
+            "$ref": "#/components/schemas/Excerpt"
           }
         }
       },
