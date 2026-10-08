@@ -176,7 +176,10 @@ async fn uploads_a_pdf_as_doc_001_and_reads_it_back() {
         .get(&api.owner_cookie, &format!("/api/v1/documents/{id}"))
         .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(read, document);
+    // The read of one document adds „Fakten geändert“; an upload cites no facts.
+    let mut expected = document.clone();
+    expected["facts_changed"] = false.into();
+    assert_eq!(read, expected);
 
     let list = format!("/api/v1/events/{}/documents", api.event);
     let (status, page) = api

@@ -34,6 +34,7 @@ use uuid::Uuid;
 use crate::ApiState;
 use crate::actors::Author;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
+use crate::documents::DraftRendering;
 use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::json_schema;
 use crate::problem::{ApiError, Problem};
@@ -221,6 +222,10 @@ pub struct Proposal {
     /// The current version of the fact that a `set-fact` proposal sets. It is absent if the event has no such fact.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current: Option<CurrentFact>,
+    /// A `create-document-draft` proposal as the reviewer sees it: its Markdown, its lint warnings and the target
+    /// of each `tada:` link. It is absent for each other operation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub draft: Option<DraftRendering>,
 }
 
 /// One passage of a source version, with the text around it.
@@ -550,6 +555,7 @@ impl From<AppProposalReview> for Proposal {
             stale: review.stale,
             conflict_reason: review.conflict.map(ConflictReason::from),
             current: review.current.map(CurrentFact::from),
+            draft: review.draft.map(DraftRendering::from),
         }
     }
 }

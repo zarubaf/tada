@@ -1555,6 +1555,195 @@
         ]
       }
     },
+    "/api/v1/document-versions/{version_id}/rendering": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Reads a draft version with what the client needs to render it: the Markdown, the lint warnings and the target\nof each `tada:` link for the caller. An upload version is not found here.",
+        "operationId": "render_document_version",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "The ID of the draft version.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The draft version for the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentVersionRendering"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/document-versions/{version_id}/approve": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Approves a draft version. Only an event manager approves (ADR 0052).",
+        "description": "The approved version never changes. The version that was approved before becomes `superseded`.\nA version that is approved, superseded or archived, or older than the approved version, gives `invalid-transition`.",
+        "operationId": "approve_document_version",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "The ID of the draft version.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveDocumentVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The approved version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentVersion"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/diff": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Compares two draft versions of the document: the lines, and the facts of their manifests.\nA version that is not a draft version of this document is not found.",
+        "operationId": "diff_document_versions",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "description": "The ID of the document.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "The ID of the older draft version.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "The ID of the newer draft version.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The difference from `from` to `to`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionDiff"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/events/{event_id}/profile": {
       "get": {
         "tags": [
@@ -2932,6 +3121,21 @@
           }
         ]
       },
+      "ApproveDocumentVersionRequest": {
+        "type": "object",
+        "description": "The input of `ApproveDocumentVersion`.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version of the document that the caller read.",
+            "minimum": 1
+          }
+        }
+      },
       "Author": {
         "type": "object",
         "description": "Who created a record, for which member and through which channel (ADR 0039).",
@@ -3061,6 +3265,23 @@
           "organization_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "CitedFact": {
+        "type": "object",
+        "required": [
+          "fact_id",
+          "version"
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -4269,6 +4490,13 @@
           },
           "newest_version": {
             "$ref": "#/components/schemas/DocumentVersion"
+          },
+          "facts_changed": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "True if the newest version cites an older version of a fact: the client shows „Fakten geändert“ (ADR 0051).\nOnly `get_document` gives it; it is absent in a list."
           }
         }
       },
@@ -4405,6 +4633,22 @@
           }
         }
       },
+      "DocumentVersionRendering": {
+        "type": "object",
+        "description": "A draft version as the reader sees it.",
+        "required": [
+          "version",
+          "draft"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/DocumentVersion"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/DraftRendering"
+          }
+        }
+      },
       "DraftDocument": {
         "oneOf": [
           {
@@ -4459,6 +4703,38 @@
           }
         ],
         "description": "The document of a draft."
+      },
+      "DraftRendering": {
+        "type": "object",
+        "description": "A draft as the reader sees it (ADR 0051, ADR 0058). The client renders the Markdown and resolves each `tada:`\nlink from `links` only: a link without an entry shows „entfernt“. The server never formats a value.",
+        "required": [
+          "markdown",
+          "lint_warnings",
+          "links"
+        ],
+        "properties": {
+          "markdown": {
+            "type": "string",
+            "description": "The Markdown with LF line ends. Raw HTML in it is text."
+          },
+          "lint_warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LintWarning"
+            },
+            "description": "The warnings of the draft lint for the review. They do not block."
+          },
+          "links": {
+            "type": "object",
+            "description": "The target of each `tada:` link, by the exact text of its destination.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/LinkTarget"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
       },
       "DraftVersionStatus": {
         "type": "string",
@@ -4698,6 +4974,62 @@
             "type": "string",
             "format": "date-time",
             "description": "The time of the acceptance of the current fact version."
+          }
+        }
+      },
+      "FactChange": {
+        "type": "object",
+        "required": [
+          "fact_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The fact version that the older draft version cites."
+          },
+          "to": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The fact version that the newer draft version cites."
+          }
+        }
+      },
+      "FactDiff": {
+        "type": "object",
+        "description": "The facts that the two manifests cite. If a version cites more than one version of a fact, the newest counts.",
+        "required": [
+          "changed",
+          "added",
+          "removed"
+        ],
+        "properties": {
+          "changed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactChange"
+            },
+            "description": "The facts that both versions cite, each in another version."
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitedFact"
+            },
+            "description": "The facts that only the newer version cites."
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitedFact"
+            },
+            "description": "The facts that only the older version cites."
           }
         }
       },
@@ -5017,6 +5349,160 @@
           }
         ],
         "description": "The label that people see: a Fluent message of a shipped field, or the German text of a field of an event."
+      },
+      "LineChange": {
+        "type": "object",
+        "description": "One line of the text difference.",
+        "required": [
+          "kind",
+          "text"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/LineChangeKind"
+          },
+          "old_line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The line number in the older version. It is absent for an added line.",
+            "minimum": 0
+          },
+          "new_line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The line number in the newer version. It is absent for a removed line.",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string",
+            "description": "The text of the line without its line end."
+          }
+        }
+      },
+      "LineChangeKind": {
+        "type": "string",
+        "enum": [
+          "unchanged",
+          "removed",
+          "added"
+        ]
+      },
+      "LinkTarget": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The exact fact version that the draft cites. The client marks an assumption with „Annahme“\nand shows an unknown as „unbekannt“.",
+            "required": [
+              "fact_id",
+              "version",
+              "state",
+              "kind"
+            ],
+            "properties": {
+              "fact_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "version": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "state": {
+                "$ref": "#/components/schemas/FactState"
+              },
+              "value": {
+                "description": "The value. It is absent if the state is `unknown`."
+              },
+              "approximate": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "It is absent if the state is `unknown`."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "fact"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The cited passage of a source version.",
+            "required": [
+              "source_version_id",
+              "passage",
+              "kind"
+            ],
+            "properties": {
+              "source_version_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "passage": {
+                "$ref": "#/components/schemas/Passage"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "source"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The reader cannot see the target. The client shows „entfernt“.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "hidden"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "The target of a `tada:` link for the reader. `kind` names it. The list of kinds is open."
+      },
+      "LintWarning": {
+        "type": "object",
+        "description": "A warning of the draft lint on one line, from 1.",
+        "required": [
+          "line",
+          "kind"
+        ],
+        "properties": {
+          "line": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LintWarningKind"
+          }
+        }
+      },
+      "LintWarningKind": {
+        "type": "string",
+        "description": "What the lint found outside a `tada:` link. The list of kinds is open.",
+        "enum": [
+          "number",
+          "date",
+          "money",
+          "raw-html"
+        ]
       },
       "Member": {
         "type": "object",
@@ -5699,6 +6185,17 @@
                 "type": "null"
               }
             ]
+          },
+          "draft": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DraftRendering",
+                "description": "A `create-document-draft` proposal as the reviewer sees it: its Markdown, its lint warnings and the target\nof each `tada:` link. It is absent for each other operation."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -6159,6 +6656,26 @@
           }
         ],
         "description": "The value type of a field, with its unit, currency or choices. The list of types is open."
+      },
+      "VersionDiff": {
+        "type": "object",
+        "description": "The difference between two draft versions of a document (ADR 0051).",
+        "required": [
+          "lines",
+          "facts"
+        ],
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineChange"
+            },
+            "description": "Each line of the two versions, in the order of the newer version, with the removed lines at their places."
+          },
+          "facts": {
+            "$ref": "#/components/schemas/FactDiff"
+          }
+        }
       }
     }
   }
