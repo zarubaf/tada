@@ -44,7 +44,7 @@ pub struct DocumentView {
     pub event_id: EventId,
     /// The number of the readable ID `DOC-<n>`, unique in the organization.
     pub local_number: u64,
-    /// The file name of the first upload.
+    /// The file name of the first upload, or the name that the draft proposal of a new document gave.
     pub name: String,
     /// The member who created the document.
     pub owner: UserId,
@@ -96,6 +96,7 @@ impl VersionView {
     pub fn file(&self) -> Option<&UploadedFile> {
         match &self.content {
             VersionContent::Upload(file) => Some(file),
+            VersionContent::Draft { .. } => None,
         }
     }
 }
@@ -104,6 +105,44 @@ impl VersionView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VersionContent {
     Upload(UploadedFile),
+    /// A draft in Markdown, added by the acceptance of a draft proposal.
+    Draft {
+        status: DraftStatus,
+    },
+}
+
+/// The status of a draft version (ADR 0051).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DraftStatus {
+    Draft,
+    Review,
+    Approved,
+    Superseded,
+    Archived,
+}
+
+impl DraftStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::Review => "review",
+            Self::Approved => "approved",
+            Self::Superseded => "superseded",
+            Self::Archived => "archived",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        [
+            Self::Draft,
+            Self::Review,
+            Self::Approved,
+            Self::Superseded,
+            Self::Archived,
+        ]
+        .into_iter()
+        .find(|status| status.as_str() == name)
+    }
 }
 
 /// The file of an upload version.
@@ -128,7 +167,7 @@ impl Debug for UploadedFile {
     }
 }
 
-/// A stored version with what a download needs.
+/// A stored upload version with what a download needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredVersion {
     pub event_id: EventId,
@@ -237,6 +276,7 @@ pub trait DocumentStore: Debug + Send + Sync {
         document: DocumentId,
     ) -> Result<Vec<VersionView>, StoreError>;
 
+    /// The upload version `id` with its object. A draft has no file, so its ID gives `None`.
     async fn version(
         &self,
         scope: OrgScope,
@@ -654,7 +694,7 @@ pub async fn list_versions(
     Ok(stores.documents.versions(caller.scope(), id).await?)
 }
 
-/// The version `id` and the stream of its file.
+/// The upload version `id` and the stream of its file. A draft version has no file: it is not found here.
 pub async fn download(
     caller: &impl Principal,
     id: DocumentVersionId,
@@ -716,6 +756,17 @@ mod tests {
         assert_eq!(document(1).readable_id(), "DOC-001");
         assert_eq!(document(42).readable_id(), "DOC-042");
         assert_eq!(document(1234).readable_id(), "DOC-1234");
+    }
+
+    #[test]
+    fn each_draft_status_has_its_name() {
+        for name in ["draft", "review", "approved", "superseded", "archived"] {
+            assert_eq!(
+                DraftStatus::parse(name).map(DraftStatus::as_str),
+                Some(name)
+            );
+        }
+        assert_eq!(DraftStatus::parse("upload"), None);
     }
 
     #[test]

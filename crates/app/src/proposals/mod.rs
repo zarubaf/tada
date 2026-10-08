@@ -2,6 +2,7 @@
 //!
 //! A proposal never changes accepted state. A member with the right to review applies it later.
 
+mod drafts;
 mod input;
 #[cfg(test)]
 mod tests;
@@ -22,17 +23,20 @@ use tada_domain::sources::{Passage, PassageError, SourceText};
 use uuid::Uuid;
 
 pub use self::input::{
-    ChoiceInput, FactStateInput, GranularityInput, NewChangeset, NewProposal, OperationInput,
-    PassageInput, ReferenceTargetInput, ValueInput, ValueTypeInput,
+    ChoiceInput, DraftDocumentInput, FactStateInput, GranularityInput, NewChangeset, NewProposal,
+    OperationInput, PassageInput, ReferenceTargetInput, ValueInput, ValueTypeInput,
 };
 pub(crate) use self::input::{state_from_input, text_error_code, value_error_code};
 use crate::access::{self, AccessError, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, AiCaller, MemberCaller, OrgScope};
 use crate::clock::Clock;
+use crate::documents::DocumentStore;
+use crate::drafts::DraftProvenance;
 use crate::facts::FactStore;
 use crate::identity::IdentityStore;
 use crate::problem::{CommandError, FieldError, ProblemCode};
+use crate::sources::SourceStore;
 use crate::store::StoreError;
 use crate::tokens::TokenScope;
 
@@ -78,6 +82,8 @@ pub struct Changeset {
     pub source_version_id: SourceVersionId,
     pub created_at: Timestamp,
     pub proposals: Vec<Proposal>,
+    /// The provenance manifest and the lint warnings of each draft proposal, fixed at its creation (ADR 0051).
+    pub drafts: Vec<DraftProvenance>,
 }
 
 /// The result of `ProposalStore::insert`.
@@ -98,7 +104,7 @@ pub trait ProposalStore: Debug + Send + Sync {
     async fn taken_ids(&self, ids: &[Uuid]) -> Result<Vec<Uuid>, StoreError>;
 
     /// Stores `source` as a source version of the kind `member-text` with the ID `changeset.source_version_id`,
-    /// then the changeset with its proposals, their dependencies and their evidence, then `audit`.
+    /// then the changeset with its proposals, their dependencies, their evidence and the provenance of its drafts, then `audit`.
     /// It writes all of them in one transaction, or nothing.
     async fn insert(
         &self,
@@ -109,7 +115,7 @@ pub trait ProposalStore: Debug + Send + Sync {
     ) -> Result<Inserted, StoreError>;
 
     /// The changeset `id` of the organization with the normalized text of its source version, or `None`.
-    /// Its proposals are in the order of their IDs.
+    /// Its proposals and drafts are in the order of their IDs.
     async fn get(
         &self,
         scope: OrgScope,
@@ -131,6 +137,10 @@ pub struct ProposeStores<'a> {
     pub identity: &'a dyn IdentityStore,
     pub facts: &'a dyn FactStore,
     pub proposals: &'a dyn ProposalStore,
+    /// The source versions that drafts cite.
+    pub sources: &'a dyn SourceStore,
+    /// The existing documents of drafts.
+    pub documents: &'a dyn DocumentStore,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -200,6 +210,8 @@ impl CommandError for ProposeError {
 /// 3. Each new ID is a UUIDv7 and is free (ADR 0038).
 /// 4. The dependencies stay inside the changeset, have no cycle, and include the proposals that create the records that a proposal uses.
 /// 5. Each value matches the value type of its field. A new field of the same changeset counts.
+/// 6. Each link of a draft resolves to a fact version of its event or a visible source passage (ADR 0051).
+///    The changeset keeps the provenance manifest and the lint warnings of each draft.
 ///
 /// It stores the source text as a source version, the changeset and an audit event in one transaction.
 /// If a check fails, it stores nothing.
@@ -228,6 +240,7 @@ pub async fn create_changeset(
     }
     check_structure(event_id, &proposals)?;
     check_catalog(scope, event_id, &proposals, stores).await?;
+    let drafts = drafts::check_drafts(caller, &proposals, stores).await?;
     check_free_ids(id, &proposals, stores.proposals).await?;
 
     let changeset = Changeset {
@@ -237,6 +250,7 @@ pub async fn create_changeset(
         source_version_id: SourceVersionId::from_uuid(Uuid::now_v7()),
         created_at: clock.now(),
         proposals: proposals.clone(),
+        drafts,
     };
     let audit = AuditEvent::new(
         caller.actor(),

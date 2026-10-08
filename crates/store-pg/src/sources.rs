@@ -9,7 +9,7 @@ use sqlx::types::Uuid;
 use tada_app::caller::{Actor, OrgScope};
 use tada_app::domain::ids::{EventId, SourceItemId, SourceVersionId};
 use tada_app::domain::sources::SourceText;
-use tada_app::sources::{SourceHit, SourceStore, SourceVersionRef};
+use tada_app::sources::{SourceHit, SourceStore, SourceVersionRef, SourceVersionText};
 use tada_app::store::StoreError;
 
 use crate::Database;
@@ -113,6 +113,34 @@ impl SourceStore for Database {
                 })
             })
             .collect()
+    }
+
+    async fn texts(
+        &self,
+        scope: OrgScope,
+        ids: &[SourceVersionId],
+    ) -> Result<Vec<SourceVersionText>, StoreError> {
+        let ids: Vec<Uuid> = ids.iter().map(|id| id.as_uuid()).collect();
+        let rows = sqlx::query!(
+            "SELECT v.id, i.event_id, v.text
+             FROM source_version v
+             JOIN source_item i ON i.organization_id = v.organization_id AND i.id = v.source_item_id
+             WHERE v.organization_id = $1 AND v.id = ANY($2)",
+            scope.organization_id().as_uuid(),
+            &ids,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| SourceVersionText {
+                id: SourceVersionId::from_uuid(row.id),
+                event_id: row.event_id.map(EventId::from_uuid),
+                // The stored text is normalized already; normalizing it again keeps it unchanged.
+                text: row.text.as_deref().map(SourceText::normalize),
+            })
+            .collect())
     }
 }
 

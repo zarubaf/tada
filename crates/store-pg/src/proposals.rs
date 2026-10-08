@@ -12,20 +12,23 @@ use sqlx::{PgConnection, PgPool};
 use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
+use tada_app::domain::documents::{DocumentName, DraftMarkdown};
 use tada_app::domain::events::{EventKey, EventName, EventTimeZone};
 use tada_app::domain::facts::{ChoiceKey, Description, FieldKey, ModuleKey, ShortText};
 use tada_app::domain::ids::{
-    ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, SourceVersionId, UserId,
+    ChangesetId, DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId,
+    SourceVersionId, UserId,
 };
-use tada_app::domain::proposals::{Operation, Proposal, QuestionText, Reason};
+use tada_app::domain::proposals::{DraftDocument, Operation, Proposal, QuestionText, Reason};
 use tada_app::domain::sources::{Passage, SourceText};
+use tada_app::drafts::DraftProvenance;
 use tada_app::facts::{OpenProposalRef, OpenQuestionRef};
 use tada_app::proposals::{Changeset, Inserted, ProposalStore};
 use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::error::{InvalidRow, store_error};
-use crate::{actor, audit, sources, values};
+use crate::{actor, audit, drafts, sources, values};
 
 /// The format of `proposal.operation`.
 const OPERATION_VERSION: i32 = 1;
@@ -73,6 +76,24 @@ enum OperationRecord {
         event_id: Uuid,
         text: String,
         owner: Uuid,
+    },
+    CreateDocumentDraft {
+        event_id: Uuid,
+        document: DocumentRecord,
+        markdown: String,
+    },
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum DocumentRecord {
+    New {
+        id: Uuid,
+        name: String,
+    },
+    Existing {
+        document_id: Uuid,
+        expected_version: i64,
     },
 }
 
@@ -147,6 +168,27 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             event_id: event_id.as_uuid(),
             text: text.as_str().to_owned(),
             owner: owner.as_uuid(),
+        },
+        Operation::CreateDocumentDraft {
+            event_id,
+            document,
+            markdown,
+        } => OperationRecord::CreateDocumentDraft {
+            event_id: event_id.as_uuid(),
+            document: match document {
+                DraftDocument::New { id, name } => DocumentRecord::New {
+                    id: id.as_uuid(),
+                    name: name.as_str().to_owned(),
+                },
+                DraftDocument::Existing {
+                    document_id,
+                    expected_version,
+                } => DocumentRecord::Existing {
+                    document_id: document_id.as_uuid(),
+                    expected_version: expected_version.get(),
+                },
+            },
+            markdown: markdown.as_str().to_owned(),
         },
     };
     serde_json::to_value(record).expect("an operation record is valid JSON")
@@ -232,6 +274,27 @@ pub(crate) fn operation_from_json(
             text: QuestionText::parse(&text).map_err(|_| invalid())?,
             owner: UserId::from_uuid(owner),
         },
+        OperationRecord::CreateDocumentDraft {
+            event_id,
+            document,
+            markdown,
+        } => Operation::CreateDocumentDraft {
+            event_id: EventId::from_uuid(event_id),
+            document: match document {
+                DocumentRecord::New { id, name } => DraftDocument::New {
+                    id: DocumentId::from_uuid(id),
+                    name: DocumentName::parse(&name).map_err(|_| invalid())?,
+                },
+                DocumentRecord::Existing {
+                    document_id,
+                    expected_version,
+                } => DraftDocument::Existing {
+                    document_id: DocumentId::from_uuid(document_id),
+                    expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+                },
+            },
+            markdown: DraftMarkdown::parse(&markdown).map_err(|_| invalid())?,
+        },
     })
 }
 
@@ -254,6 +317,17 @@ fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>) {
             ("field_definition", field_id.as_uuid(), None)
         }
         Operation::CreateOpenQuestion { id, .. } => ("open_question", id.as_uuid(), None),
+        Operation::CreateDocumentDraft { document, .. } => match document {
+            DraftDocument::New { id, .. } => ("document", id.as_uuid(), None),
+            DraftDocument::Existing {
+                document_id,
+                expected_version,
+            } => (
+                "document",
+                document_id.as_uuid(),
+                Some(expected_version.get()),
+            ),
+        },
     }
 }
 
@@ -264,13 +338,15 @@ impl ProposalStore for Database {
         // It returns only the given IDs that exist, and never an organization.
         // The new record of a proposal reserves its ID: else a second changeset could propose the same record,
         // and only one of the two could apply. The target of a fact is its field, which is not a new record.
+        // The target of a draft for an existing document is that document, which exists already.
         sqlx::query_scalar!(
             r#"SELECT id AS "id!" FROM changeset WHERE id = ANY($1)
                UNION SELECT id FROM proposal WHERE id = ANY($1)
                UNION SELECT target_id FROM proposal WHERE target_id = ANY($1) AND target_kind <> 'fact'
                UNION SELECT id FROM event WHERE id = ANY($1)
                UNION SELECT id FROM field_definition WHERE id = ANY($1)
-               UNION SELECT id FROM open_question WHERE id = ANY($1)"#,
+               UNION SELECT id FROM open_question WHERE id = ANY($1)
+               UNION SELECT id FROM document WHERE id = ANY($1)"#,
             ids,
         )
         .fetch_all(&self.pool)
@@ -337,7 +413,7 @@ impl ProposalStore for Database {
             return Ok(None);
         };
         let rows = sqlx::query!(
-            "SELECT id, operation, operation_version, reason
+            "SELECT id, operation, operation_version, reason, manifest, lint_warnings
              FROM proposal
              WHERE organization_id = $1 AND changeset_id = $2
              ORDER BY id",
@@ -373,7 +449,15 @@ impl ProposalStore for Database {
         .map_err(store_error)?;
         let offset = |value: i32| u32::try_from(value).map_err(|_| InvalidRow("proposal_evidence"));
         let mut proposals = Vec::new();
+        let mut draft_provenance = Vec::new();
         for row in rows {
+            if let (Some(manifest), Some(lint_warnings)) = (&row.manifest, &row.lint_warnings) {
+                draft_provenance.push(DraftProvenance {
+                    proposal_id: ProposalId::from_uuid(row.id),
+                    manifest: drafts::manifest_from_json(manifest)?,
+                    lint_warnings: drafts::lint_from_json(lint_warnings)?,
+                });
+            }
             proposals.push(Proposal {
                 id: ProposalId::from_uuid(row.id),
                 operation: operation_from_json(row.operation_version, &row.operation)?,
@@ -405,6 +489,7 @@ impl ProposalStore for Database {
                 source_version_id: SourceVersionId::from_uuid(changeset.source_version_id),
                 created_at: changeset.created_at.to_jiff(),
                 proposals,
+                drafts: draft_provenance,
             },
             SourceText::normalize(&changeset.text),
         )))
@@ -432,10 +517,15 @@ async fn insert_changeset(
     .await?;
     for proposal in &changeset.proposals {
         let (target_kind, target_id, expected_version) = target(&proposal.operation);
+        let draft = changeset
+            .drafts
+            .iter()
+            .find(|draft| draft.proposal_id == proposal.id);
         sqlx::query!(
             "INSERT INTO proposal (id, organization_id, changeset_id, event_id, operation, operation_version,
-                                   target_kind, target_id, expected_version, reason, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+                                   target_kind, target_id, expected_version, reason, created_at,
+                                   manifest, lint_warnings)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
             proposal.id.as_uuid(),
             organization,
             changeset.id.as_uuid(),
@@ -447,6 +537,8 @@ async fn insert_changeset(
             expected_version,
             proposal.reason.as_str(),
             created_at as _,
+            draft.map(|draft| drafts::manifest_to_json(&draft.manifest)),
+            draft.map(|draft| drafts::lint_to_json(&draft.lint_warnings)),
         )
         .execute(&mut *conn)
         .await?;
@@ -619,6 +711,8 @@ mod tests {
             identity: &test.database,
             facts: &test.database,
             proposals: &test.database,
+            sources: &test.database,
+            documents: &test.database,
         }
     }
 

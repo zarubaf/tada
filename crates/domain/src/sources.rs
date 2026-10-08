@@ -62,6 +62,21 @@ pub enum PassageError {
 }
 
 impl Passage {
+    /// The passage from `start` to `end` of `text`, the normalized text of a source version, with its quote.
+    pub fn of_range(text: &str, start: u32, end: u32) -> Result<Self, PassageError> {
+        if start >= end {
+            return Err(PassageError::Empty);
+        }
+        let from = byte_offset(text, start).ok_or(PassageError::OutOfRange)?;
+        let to = byte_offset(text, end).ok_or(PassageError::OutOfRange)?;
+        Ok(Self {
+            start,
+            end,
+            quote: text[from..to].to_owned(),
+            page: None,
+        })
+    }
+
     /// Returns `Ok` if `quote` is the text from `start` to `end` of `text`, the normalized text of the source version.
     pub fn check(&self, text: &str) -> Result<(), PassageError> {
         if self.page == Some(0) {
@@ -138,6 +153,18 @@ mod tests {
         let mut on_page_zero = passage(4, 12, "Flugfeld");
         on_page_zero.page = Some(0);
         assert_eq!(on_page_zero.check(TEXT), Err(PassageError::Page));
+    }
+
+    #[test]
+    fn a_range_gives_the_passage_with_its_quote() {
+        let passage = Passage::of_range(TEXT, 13, 19).unwrap();
+        assert_eq!(passage.quote, "öffnet");
+        assert_eq!(passage.check(TEXT), Ok(()));
+        assert_eq!(Passage::of_range(TEXT, 4, 4), Err(PassageError::Empty));
+        assert_eq!(
+            Passage::of_range(TEXT, 50, 53),
+            Err(PassageError::OutOfRange)
+        );
     }
 
     #[test]

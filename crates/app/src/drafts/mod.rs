@@ -9,9 +9,11 @@ use pulldown_cmark::{Options, Parser};
 
 mod lint;
 mod manifest;
+mod provenance;
 
 pub use lint::{LintKind, LintWarning, lint};
 pub use manifest::{DraftError, FactLink, Manifest, SourceLink, extract};
+pub use provenance::{CitedFact, CitedPassage, DraftProvenance, ProvenanceManifest};
 
 /// Changes CRLF and CR line endings to LF, so that all functions count the same lines.
 fn normalize_line_endings(markdown: &str) -> Cow<'_, str> {

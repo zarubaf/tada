@@ -18,6 +18,8 @@ use tada_app::review::{
 use crate::actor;
 use crate::testing::TestDatabase;
 
+mod drafts;
+
 const SOURCE: &str = "Das Open Day findet im Mai 2030 statt. Wir rechnen mit 20000 Besuchern.";
 
 #[derive(Debug)]
@@ -49,6 +51,8 @@ fn propose_stores(test: &TestDatabase) -> ProposeStores<'_> {
         identity: &test.database,
         facts: &test.database,
         proposals: &test.database,
+        sources: &test.database,
+        documents: &test.database,
     }
 }
 
