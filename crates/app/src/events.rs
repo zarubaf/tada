@@ -35,6 +35,13 @@ pub trait EventStore: Debug + Send + Sync {
 
     async fn get(&self, scope: OrgScope, id: EventId) -> Result<Option<Event>, StoreError>;
 
+    /// The event with the key `key`, unique in the organization (ADR 0038).
+    async fn find_by_key(
+        &self,
+        scope: OrgScope,
+        key: &EventKey,
+    ) -> Result<Option<Event>, StoreError>;
+
     /// Returns at most `limit` events in the order of their keys, after `after` if it is given.
     async fn list(
         &self,
@@ -233,7 +240,7 @@ fn same_content(existing: &Event, new: &Event) -> bool {
 }
 
 /// The entry code of an invalid event key.
-pub(crate) fn key_error_code(error: EventKeyError) -> &'static str {
+pub fn key_error_code(error: EventKeyError) -> &'static str {
     match error {
         EventKeyError::Length => "length",
         EventKeyError::Characters => "characters",
@@ -332,6 +339,27 @@ pub async fn get_event(
         .ok_or(AccessError::NotFound)
 }
 
+/// The event with the key `key`, if the caller can read it (ADR 0052).
+/// An event that the caller cannot read is not found, like an event that does not exist.
+pub async fn find_event(
+    caller: &impl Principal,
+    key: &EventKey,
+    store: &dyn EventStore,
+    identity: &dyn IdentityStore,
+) -> Result<Event, AccessError> {
+    let event = store
+        .find_by_key(caller.scope(), key)
+        .await?
+        .ok_or(AccessError::NotFound)?;
+    if !access::event_access(caller, event.id, identity)
+        .await?
+        .can_read()
+    {
+        return Err(AccessError::NotFound);
+    }
+    Ok(event)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
@@ -381,6 +409,18 @@ mod tests {
             Ok(events
                 .iter()
                 .find(|event| event.id == id && event.organization_id == scope.organization_id())
+                .cloned())
+        }
+
+        async fn find_by_key(
+            &self,
+            scope: OrgScope,
+            key: &EventKey,
+        ) -> Result<Option<Event>, StoreError> {
+            let events = self.0.lock().unwrap();
+            Ok(events
+                .iter()
+                .find(|event| &event.key == key && event.organization_id == scope.organization_id())
                 .cloned())
         }
 

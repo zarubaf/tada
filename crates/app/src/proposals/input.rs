@@ -8,7 +8,7 @@ use std::fmt;
 
 use jiff::civil;
 use schemars::JsonSchema;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tada_domain::RecordVersion;
 use tada_domain::events::{EventKey, EventName, EventTimeZone};
 use tada_domain::facts::{
@@ -155,7 +155,8 @@ pub enum FactStateInput {
 }
 
 /// A fact value. Its type must match the value type of the field.
-#[derive(Clone, Deserialize, JsonSchema)]
+/// The read tools give values in the same shape (ADR 0040).
+#[derive(Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ValueInput {
     Text {
@@ -235,7 +236,7 @@ pub struct ChoiceInput {
     pub label: String,
 }
 
-#[derive(Clone, Copy, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GranularityInput {
     Day,
@@ -243,7 +244,7 @@ pub enum GranularityInput {
     Month,
 }
 
-#[derive(Clone, Copy, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReferenceTargetInput {
     Document,
@@ -627,6 +628,62 @@ impl From<GranularityInput> for Granularity {
     }
 }
 
+/// The value in the shape of the input, so that a value that a read tool gives can go back into a proposal.
+impl From<&FactValue> for ValueInput {
+    fn from(value: &FactValue) -> Self {
+        match value {
+            FactValue::Text(text) => Self::Text {
+                text: text.as_str().to_owned(),
+            },
+            FactValue::Boolean(value) => Self::Boolean { value: *value },
+            FactValue::Quantity(range) => Self::Quantity {
+                min: decimal_text(range.min()),
+                max: decimal_text(range.max()),
+            },
+            FactValue::Money(range) => Self::Money {
+                min: range.min().get(),
+                max: range.max().get(),
+            },
+            FactValue::Date(date) => Self::Date {
+                date: date.to_string(),
+            },
+            FactValue::DateWindow(window) => Self::DateWindow {
+                start: window.start().to_string(),
+                end: window.end().to_string(),
+                granularity: match window.granularity() {
+                    Granularity::Day => GranularityInput::Day,
+                    Granularity::Week => GranularityInput::Week,
+                    Granularity::Month => GranularityInput::Month,
+                },
+            },
+            FactValue::Choice(keys) => Self::Choice {
+                keys: keys.iter().map(|key| key.as_str().to_owned()).collect(),
+            },
+            FactValue::Reference(ReferenceId::Document(id)) => Self::Reference {
+                target: ReferenceTargetInput::Document,
+                id: id.as_uuid(),
+            },
+            FactValue::Reference(ReferenceId::Event(id)) => Self::Reference {
+                target: ReferenceTargetInput::Event,
+                id: id.as_uuid(),
+            },
+        }
+    }
+}
+
+/// The text of a decimal that `parse_decimal` reads: for example `20000`, `1.5` or `-0.25`.
+fn decimal_text(decimal: Decimal) -> String {
+    let digits = decimal.units().unsigned_abs().to_string();
+    let scale = usize::from(decimal.scale());
+    let sign = if decimal.units() < 0 { "-" } else { "" };
+    if scale == 0 {
+        return format!("{sign}{digits}");
+    }
+    let digits = format!("{digits:0>width$}", width = scale + 1);
+    let (whole, fraction) = digits.split_at(digits.len() - scale);
+    format!("{sign}{whole}.{fraction}")
+}
+
 /// Parses a decimal number without a float: an optional `-`, digits, and an optional `.` with digits.
 fn parse_decimal(text: &str) -> Result<Decimal, ValueError> {
     let invalid = ValueError::TypeMismatch;
@@ -653,6 +710,39 @@ mod tests {
 
     fn decimal(units: i64, scale: u8) -> Decimal {
         Decimal::new(units, scale).unwrap()
+    }
+
+    #[test]
+    fn writes_decimals_that_parse_back() {
+        for (units, scale, text) in [
+            (20_000, 0, "20000"),
+            (15, 1, "1.5"),
+            (-25, 2, "-0.25"),
+            (7, 6, "0.000007"),
+            (-3, 0, "-3"),
+        ] {
+            assert_eq!(decimal_text(decimal(units, scale)), text);
+            assert_eq!(parse_decimal(text), Ok(decimal(units, scale)));
+        }
+    }
+
+    #[test]
+    fn a_value_goes_back_into_the_same_value() {
+        for json in [
+            serde_json::json!({"type": "text", "text": "Flugfeld Testwil"}),
+            serde_json::json!({"type": "boolean", "value": true}),
+            serde_json::json!({"type": "quantity", "min": "15000", "max": "25000.5"}),
+            serde_json::json!({"type": "money", "min": 1500, "max": 1500}),
+            serde_json::json!({"type": "date", "date": "2030-05-18"}),
+            serde_json::json!({"type": "date_window", "start": "2030-05-01", "end": "2030-06-30", "granularity": "month"}),
+            serde_json::json!({"type": "choice", "keys": ["airshow", "catering"]}),
+            serde_json::json!({"type": "reference", "target": "event", "id": "01a116d3-b70e-7215-91cb-7bc0ffc656e5"}),
+        ] {
+            let input: ValueInput = serde_json::from_value(json.clone()).unwrap();
+            let value = value_from_input(input).unwrap();
+            let output = serde_json::to_value(ValueInput::from(&value)).unwrap();
+            assert_eq!(output, json);
+        }
     }
 
     #[test]

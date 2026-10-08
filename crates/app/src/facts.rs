@@ -53,6 +53,13 @@ pub struct OpenQuestionRef {
     pub version: RecordVersion,
 }
 
+impl OpenQuestionRef {
+    /// The event-local ID, for example `QST-001` (ADR 0038).
+    pub fn readable_id(&self) -> String {
+        format!("QST-{:03}", self.local_number)
+    }
+}
+
 /// The current version of one fact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileEntry {
@@ -115,6 +122,22 @@ pub async fn get_event_profile(
         return Err(AccessError::NotFound);
     }
     Ok(store.profile(caller.scope(), event).await?)
+}
+
+/// The field catalog of the event, for each caller who can read the event (ADR 0049).
+pub async fn get_catalog(
+    caller: &impl Principal,
+    event: EventId,
+    identity: &dyn IdentityStore,
+    store: &dyn FactStore,
+) -> Result<Vec<FieldDefinition>, AccessError> {
+    if !access::event_access(caller, event, identity)
+        .await?
+        .can_read()
+    {
+        return Err(AccessError::NotFound);
+    }
+    Ok(store.catalog(caller.scope(), event).await?)
 }
 
 /// The value type of a reserved core field does not match its typed accessor.
@@ -290,6 +313,27 @@ mod tests {
         let member = caller(OrganizationRole::Member);
         let profile = get_event_profile(&member, open_day(), &memory, &memory).await;
         assert!(matches!(profile, Err(AccessError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn a_member_without_an_event_role_does_not_find_the_catalog() {
+        let memory = Memory::default();
+        let member = caller(OrganizationRole::Member);
+        let catalog = get_catalog(&member, open_day(), &memory, &memory).await;
+        assert!(matches!(catalog, Err(AccessError::NotFound)));
+    }
+
+    #[test]
+    fn an_open_question_has_a_readable_id_with_three_digits() {
+        let question = |local_number| OpenQuestionRef {
+            id: OpenQuestionId::from_uuid(Uuid::from_u128(40)),
+            local_number,
+            text: QuestionText::parse("Welcher Samstag?").unwrap(),
+            owner: UserId::from_uuid(Uuid::from_u128(1)),
+            version: RecordVersion::FIRST,
+        };
+        assert_eq!(question(1).readable_id(), "QST-001");
+        assert_eq!(question(1234).readable_id(), "QST-1234");
     }
 
     #[tokio::test]

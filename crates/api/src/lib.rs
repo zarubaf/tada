@@ -245,6 +245,14 @@ mod tests {
             unreachable!()
         }
 
+        async fn find_by_key(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::domain::events::EventKey,
+        ) -> Result<Option<tada_app::domain::events::Event>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
         async fn list(
             &self,
             _: tada_app::caller::OrgScope,

@@ -1,0 +1,163 @@
+//! The guard of each MCP request: the `Origin` check and the token authentication (ADR 0039, ADR 0040).
+
+use axum::Json;
+use axum::extract::{Request, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::middleware::Next;
+use axum::response::{IntoResponse, Response};
+use serde::Serialize;
+use tada_app::auth::{Authenticated, AuthenticationError, Authenticator, Credential};
+use tada_app::problem::{CommandError, ProblemCode};
+
+use crate::McpState;
+
+/// Rejects a request with a foreign `Origin` (403) or without a valid personal API token (401).
+/// For a valid token, it gives the `AiCaller` to the tools in the extensions of the request.
+pub(crate) async fn check(
+    State(state): State<McpState>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    if !origin_allowed(request.headers(), state.public_url.origin()) {
+        return problem(ProblemCode::Forbidden);
+    }
+    let credential = bearer_token(request.headers()).map(Credential::ApiToken);
+    let authenticated = match state.authenticator.authenticate(credential).await {
+        Ok(authenticated) => authenticated,
+        Err(error) => {
+            if let AuthenticationError::Store(store_error) = &error {
+                tracing::error!(error = %error_chain(store_error), "the store failed");
+            }
+            return problem(error.code());
+        }
+    };
+    match authenticated {
+        Authenticated::Ai(caller) => {
+            request.extensions_mut().insert(caller);
+            next.run(request).await
+        }
+        // The token authenticator never gives a member: only AI clients use this server (ADR 0039).
+        Authenticated::Member(_member) => problem(ProblemCode::Unauthenticated),
+    }
+}
+
+/// The error and all its sources in one line, for logs.
+pub(crate) fn error_chain(error: &dyn std::error::Error) -> String {
+    let mut text = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        text.push_str(": ");
+        text.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    text
+}
+
+/// A browser sends `Origin`; an MCP client usually does not. A request with `Origin` must come from tada itself.
+fn origin_allowed(headers: &HeaderMap, origin: &str) -> bool {
+    let mut values = headers.get_all(header::ORIGIN).iter();
+    match (values.next(), values.next()) {
+        (None, _) => true,
+        (Some(value), None) => value.as_bytes() == origin.as_bytes(),
+        (Some(_), Some(_)) => false,
+    }
+}
+
+/// The token of the only `Authorization: Bearer` header of the request.
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    let mut values = headers.get_all(header::AUTHORIZATION).iter();
+    let (Some(value), None) = (values.next(), values.next()) else {
+        return None;
+    };
+    let (scheme, token) = value.to_str().ok()?.split_once(' ')?;
+    let token = token.trim();
+    (scheme.eq_ignore_ascii_case("bearer") && !token.is_empty()).then_some(token)
+}
+
+/// The body of an error response: the problem code and its meaning (ADR 0037).
+#[derive(Serialize)]
+struct Problem {
+    code: &'static str,
+    title: &'static str,
+    status: u16,
+}
+
+fn problem(code: ProblemCode) -> Response {
+    let status = match code {
+        ProblemCode::Unauthenticated => StatusCode::UNAUTHORIZED,
+        ProblemCode::Forbidden => StatusCode::FORBIDDEN,
+        ProblemCode::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
+        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    let body = Problem {
+        code: code.as_str(),
+        title: code.meaning(),
+        status: status.as_u16(),
+    };
+    let mut response = (status, Json(body)).into_response();
+    let headers = response.headers_mut();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/problem+json"),
+    );
+    if status == StatusCode::UNAUTHORIZED {
+        // RFC 6750: the client must show a bearer token.
+        headers.insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+    }
+    response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn headers(pairs: &[(header::HeaderName, &str)]) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for (name, value) in pairs {
+            headers.append(name.clone(), HeaderValue::from_str(value).unwrap());
+        }
+        headers
+    }
+
+    #[test]
+    fn reads_only_one_bearer_token() {
+        let token =
+            |pairs: &[(header::HeaderName, &str)]| bearer_token(&headers(pairs)).map(str::to_owned);
+        assert_eq!(
+            token(&[(header::AUTHORIZATION, "Bearer tada_pat_x")]).as_deref(),
+            Some("tada_pat_x")
+        );
+        assert_eq!(
+            token(&[(header::AUTHORIZATION, "bearer tada_pat_x")]).as_deref(),
+            Some("tada_pat_x")
+        );
+        assert_eq!(token(&[(header::AUTHORIZATION, "Basic dGFkYQ==")]), None);
+        assert_eq!(token(&[(header::AUTHORIZATION, "Bearer ")]), None);
+        assert_eq!(token(&[]), None);
+        let two = [
+            (header::AUTHORIZATION, "Bearer a"),
+            (header::AUTHORIZATION, "Bearer b"),
+        ];
+        assert_eq!(token(&two), None);
+    }
+
+    #[test]
+    fn allows_no_origin_or_the_origin_of_tada_only() {
+        let origin = "https://tada.example.org";
+        assert!(origin_allowed(&headers(&[]), origin));
+        assert!(origin_allowed(
+            &headers(&[(header::ORIGIN, origin)]),
+            origin
+        ));
+        assert!(!origin_allowed(
+            &headers(&[(header::ORIGIN, "https://evil.example")]),
+            origin
+        ));
+        assert!(!origin_allowed(
+            &headers(&[(header::ORIGIN, "null")]),
+            origin
+        ));
+        let two = [(header::ORIGIN, origin), (header::ORIGIN, origin)];
+        assert!(!origin_allowed(&headers(&two), origin));
+    }
+}

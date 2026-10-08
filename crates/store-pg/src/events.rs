@@ -123,6 +123,26 @@ impl EventStore for Database {
         Ok(row.map(Event::try_from).transpose()?)
     }
 
+    async fn find_by_key(
+        &self,
+        scope: OrgScope,
+        key: &EventKey,
+    ) -> Result<Option<Event>, StoreError> {
+        let row = sqlx::query_as!(
+            EventRow,
+            r#"SELECT id, organization_id, key, name, time_zone, version,
+                      created_at AS "created_at: jiff_sqlx::Timestamp"
+               FROM event
+               WHERE organization_id = $1 AND key = $2"#,
+            scope.organization_id().as_uuid(),
+            key.as_str(),
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(row.map(Event::try_from).transpose()?)
+    }
+
     async fn list(
         &self,
         scope: OrgScope,
@@ -248,6 +268,27 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(read, Some(event));
+    }
+
+    #[tokio::test]
+    async fn finds_an_event_by_its_key_in_its_organization_only() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let musterhausen = test.create_organization("musterhausen").await;
+        let open_day = event(testwil, "TEST30");
+        insert(&test, &owner(&test, testwil).await, &open_day).await;
+        let key = EventKey::parse("TEST30").unwrap();
+        let db = &test.database;
+
+        let found = db.find_by_key(scope(testwil), &key).await.unwrap();
+        assert_eq!(found, Some(open_day));
+        let other = db.find_by_key(scope(musterhausen), &key).await.unwrap();
+        assert_eq!(other, None);
+        let unknown = EventKey::parse("NONE30").unwrap();
+        assert_eq!(
+            db.find_by_key(scope(testwil), &unknown).await.unwrap(),
+            None
+        );
     }
 
     /// The creator of an event becomes its event manager in the transaction of the insert, with

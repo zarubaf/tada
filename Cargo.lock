@@ -3618,6 +3618,7 @@ dependencies = [
  "tada-adapters",
  "tada-api",
  "tada-app",
+ "tada-mcp",
  "tada-store-pg",
  "tada-telegram",
  "tempfile",
@@ -3713,7 +3714,10 @@ dependencies = [
  "rmcp",
  "schemars 1.2.2",
  "serde",
+ "serde_json",
  "tada-app",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
