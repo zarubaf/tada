@@ -3,6 +3,8 @@
 //! The search reads only the source versions that the caller can read (ADR 0006, ADR 0052).
 //! `access::source_reach` chooses them before the store runs the full-text search.
 
+use schemars::JsonSchema;
+use serde::Deserialize;
 use tada_domain::events::EventKey;
 
 use crate::access::{self, AccessError, Principal};
@@ -20,12 +22,20 @@ pub const MAX_LIMIT: u32 = 50;
 pub const MAX_QUERY_CHARS: usize = 200;
 
 /// A search as the caller gives it.
-#[derive(Clone)]
+/// The JSON Schema of the MCP tool comes from this type (ADR 0040), with the limits of this module.
+#[derive(Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SearchRequest {
     /// The key of one event. Without it, the search reads all source versions that the caller can read.
+    #[serde(default)]
+    #[schemars(regex(pattern = EventKey::PATTERN))]
     pub event_key: Option<String>,
     /// The words to find, in the syntax of a web search: words, `"a phrase"`, `or` and `-word`.
+    #[schemars(length(min = 1, max = MAX_QUERY_CHARS))]
     pub query: String,
+    /// The largest number of hits.
+    #[serde(default)]
+    #[schemars(range(min = 1, max = MAX_LIMIT), extend("default" = DEFAULT_LIMIT))]
     pub limit: Option<u32>,
 }
 

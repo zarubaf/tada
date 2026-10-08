@@ -4,8 +4,11 @@ use std::fmt::Debug;
 
 use async_trait::async_trait;
 use jiff::Timestamp;
+use schemars::JsonSchema;
+use serde::Deserialize;
 use tada_domain::ids::{EventId, SourceItemId, SourceVersionId};
 use tada_domain::sources::{self as passages, SourceText};
+use uuid::Uuid;
 
 use crate::access::{self, Principal, SourceReach};
 use crate::caller::{Actor, OrgScope};
@@ -97,6 +100,24 @@ pub trait SourceStore: Debug + Send + Sync {
 /// The longest passage that `get_source_passage` returns, in characters.
 pub const MAX_PASSAGE_CHARS: u32 = 10_000;
 
+/// A range of a source version as the caller gives it, for `get_source_passage`.
+/// The JSON Schema of the MCP tool comes from this type (ADR 0040).
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PassageRequest {
+    pub source_version_id: Uuid,
+    /// The offset of the first character, in characters of the normalized text.
+    pub start: u32,
+    #[schemars(description = end_description())]
+    pub end: u32,
+}
+
+fn end_description() -> String {
+    format!(
+        "The offset after the last character. A passage has at most {MAX_PASSAGE_CHARS} characters."
+    )
+}
+
 /// The exact text of a range of a source version, for a citation (ADR 0050).
 #[derive(Clone, PartialEq, Eq)]
 pub struct SourcePassage {
@@ -166,12 +187,16 @@ impl CommandError for PassageError {
 /// The offsets count characters of the normalized text, as in a passage of evidence.
 pub async fn get_source_passage(
     caller: &impl Principal,
-    id: SourceVersionId,
-    start: u32,
-    end: u32,
+    request: PassageRequest,
     identity: &dyn IdentityStore,
     sources: &dyn SourceStore,
 ) -> Result<SourcePassage, PassageError> {
+    let PassageRequest {
+        source_version_id,
+        start,
+        end,
+    } = request;
+    let id = SourceVersionId::from_uuid(source_version_id);
     if end.saturating_sub(start) > MAX_PASSAGE_CHARS {
         return Err(PassageError::Invalid(vec![FieldError::new(
             "end", "too-long",
@@ -327,7 +352,12 @@ mod tests {
     }
 
     async fn passage(memory: &Memory, start: u32, end: u32) -> Result<SourcePassage, PassageError> {
-        get_source_passage(&anna(), source(), start, end, memory, memory).await
+        let request = PassageRequest {
+            source_version_id: source().as_uuid(),
+            start,
+            end,
+        };
+        get_source_passage(&anna(), request, memory, memory).await
     }
 
     fn codes(result: Result<SourcePassage, PassageError>) -> Vec<(String, &'static str)> {
