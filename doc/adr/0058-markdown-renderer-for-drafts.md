@@ -10,7 +10,7 @@ It leaves the choice of the renderer to the walking skeleton.
 The server must read each draft for three jobs: the provenance manifest, the lint and, later, the export.
 The web client must show a draft to a reader with the rules of ADR 0051:
 
-- Raw HTML shows as text.
+- The client never makes elements of raw HTML: it drops the HTML and keeps the text between the tags (`skipHtml`).
 - The renderer allows only the link schemes `https`, `mailto` and `tada`.
 - A fact link shows the formatted value of the cited fact version, „Annahme“, „unbekannt“ or „entfernt“.
 
