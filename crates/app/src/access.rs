@@ -194,6 +194,19 @@ pub async fn source_reach(
     Ok(SourceReach::Events(events))
 }
 
+/// The source versions of the event `event` that `caller` can read, for a search in one event.
+/// An event that the caller cannot read is not found.
+pub async fn event_source_reach(
+    caller: &impl Principal,
+    event: EventId,
+    identity: &dyn IdentityStore,
+) -> Result<SourceReach, AccessError> {
+    if !event_access(caller, event, identity).await?.can_read() {
+        return Err(AccessError::NotFound);
+    }
+    Ok(SourceReach::Events(vec![event]))
+}
+
 /// The access of the member `user`, who is not the caller, in the event `event`, or `None` if the user has none.
 /// It also serves an event that a changeset creates and that does not exist yet: there, only owners and admins have access.
 /// For example, the owner of a work record must be a member of its event (ADR 0052).
@@ -451,6 +464,62 @@ mod tests {
             .insert((open_day(), anna()), EventRole::EventManager);
         let elsewhere = caller(musterhausen(), OrganizationRole::Member);
         assert!(!proposes(elsewhere).await, "a role in another organization");
+    }
+
+    #[tokio::test]
+    async fn owners_and_admins_read_each_source_of_their_organization() {
+        let identity = identity();
+        for role in [OrganizationRole::Owner, OrganizationRole::Admin] {
+            let reach = source_reach(&caller(testwil(), role), &identity).await;
+            assert_eq!(reach.unwrap(), SourceReach::Organization);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_member_reads_the_sources_of_the_events_with_an_event_role() {
+        let identity = identity();
+        let member = caller(testwil(), OrganizationRole::Member);
+        let reach = source_reach(&member, &identity).await.unwrap();
+        assert_eq!(reach, SourceReach::Events(Vec::new()), "no event role");
+        for role in [
+            EventRole::EventViewer,
+            EventRole::EventContributor,
+            EventRole::EventManager,
+        ] {
+            identity
+                .roles
+                .lock()
+                .unwrap()
+                .insert((open_day(), anna()), role);
+            let reach = source_reach(&member, &identity).await.unwrap();
+            assert_eq!(reach, SourceReach::Events(vec![open_day()]), "{role:?}");
+        }
+        let elsewhere = caller(musterhausen(), OrganizationRole::Member);
+        let reach = source_reach(&elsewhere, &identity).await.unwrap();
+        assert_eq!(
+            reach,
+            SourceReach::Events(Vec::new()),
+            "another organization"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_sources_of_one_event_need_the_access_to_the_event() {
+        let identity = identity();
+        let member = caller(testwil(), OrganizationRole::Member);
+        let reach = event_source_reach(&member, open_day(), &identity).await;
+        assert!(matches!(reach, Err(AccessError::NotFound)));
+        identity
+            .roles
+            .lock()
+            .unwrap()
+            .insert((open_day(), anna()), EventRole::EventViewer);
+        let reach = event_source_reach(&member, open_day(), &identity).await;
+        assert_eq!(reach.unwrap(), SourceReach::Events(vec![open_day()]));
+        // An owner reads all sources, but a search in one event stays in that event.
+        let owner = caller(testwil(), OrganizationRole::Owner);
+        let reach = event_source_reach(&owner, open_day(), &identity).await;
+        assert_eq!(reach.unwrap(), SourceReach::Events(vec![open_day()]));
     }
 
     #[test]

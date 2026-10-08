@@ -171,10 +171,19 @@ impl SourceStore for Memory {
     async fn search(
         &self,
         _: OrgScope,
-        _: &[EventId],
+        _: &SourceReach,
         _: &str,
         _: u32,
     ) -> Result<Vec<SourceHit>, StoreError> {
+        unreachable!()
+    }
+
+    async fn readable_text(
+        &self,
+        _: OrgScope,
+        _: &SourceReach,
+        _: SourceVersionId,
+    ) -> Result<Option<String>, StoreError> {
         unreachable!()
     }
 

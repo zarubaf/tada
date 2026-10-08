@@ -24,6 +24,7 @@ pub mod proposals;
 pub mod public_url;
 pub mod rate_limit;
 pub mod review;
+pub mod search;
 pub mod session;
 pub mod sign_in;
 pub mod sources;
@@ -31,5 +32,6 @@ pub mod store;
 pub mod telegram;
 pub mod tokens;
 pub mod uploads;
+pub mod views;
 
 pub use tada_domain as domain;

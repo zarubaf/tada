@@ -64,15 +64,10 @@ pub enum PassageError {
 impl Passage {
     /// The passage from `start` to `end` of `text`, the normalized text of a source version, with its quote.
     pub fn of_range(text: &str, start: u32, end: u32) -> Result<Self, PassageError> {
-        if start >= end {
-            return Err(PassageError::Empty);
-        }
-        let from = byte_offset(text, start).ok_or(PassageError::OutOfRange)?;
-        let to = byte_offset(text, end).ok_or(PassageError::OutOfRange)?;
         Ok(Self {
             start,
             end,
-            quote: text[from..to].to_owned(),
+            quote: quote(text, start, end)?.to_owned(),
             page: None,
         })
     }
@@ -82,12 +77,7 @@ impl Passage {
         if self.page == Some(0) {
             return Err(PassageError::Page);
         }
-        if self.start >= self.end {
-            return Err(PassageError::Empty);
-        }
-        let start = byte_offset(text, self.start).ok_or(PassageError::OutOfRange)?;
-        let end = byte_offset(text, self.end).ok_or(PassageError::OutOfRange)?;
-        if text[start..end] == self.quote {
+        if quote(text, self.start, self.end)? == self.quote {
             Ok(())
         } else {
             Err(PassageError::QuoteMismatch)
@@ -140,6 +130,16 @@ impl Passage {
     }
 }
 
+/// The text from the character offset `start` to `end` of `text`, the normalized text of a source version.
+pub fn quote(text: &str, start: u32, end: u32) -> Result<&str, PassageError> {
+    if start >= end {
+        return Err(PassageError::Empty);
+    }
+    let start = byte_offset(text, start).ok_or(PassageError::OutOfRange)?;
+    let end = byte_offset(text, end).ok_or(PassageError::OutOfRange)?;
+    Ok(&text[start..end])
+}
+
 /// The byte offset of the character offset `chars` in `text`, or `None` after the end of the text.
 fn byte_offset(text: &str, chars: u32) -> Option<usize> {
     let chars = usize::try_from(chars).ok()?;
@@ -173,6 +173,14 @@ mod tests {
             passage(28, 52, "Der Eintritt ist gratis.").check(TEXT),
             Ok(())
         );
+    }
+
+    #[test]
+    fn quotes_a_range_of_characters() {
+        assert_eq!(quote(TEXT, 13, 19), Ok("öffnet"));
+        assert_eq!(quote(TEXT, 28, 52), Ok("Der Eintritt ist gratis."));
+        assert_eq!(quote(TEXT, 4, 4), Err(PassageError::Empty));
+        assert_eq!(quote(TEXT, 50, 53), Err(PassageError::OutOfRange));
     }
 
     #[test]

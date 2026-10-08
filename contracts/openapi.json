@@ -2142,7 +2142,7 @@
                               "type": "string"
                             },
                             "value": {
-                              "description": "A fact value. Its type must match the value type of the field.",
+                              "description": "A fact value. Its type must match the value type of the field.\nThe read tools give values in the same shape (ADR 0040).",
                               "oneOf": [
                                 {
                                   "additionalProperties": false,
@@ -2340,7 +2340,7 @@
                               "type": "string"
                             },
                             "value": {
-                              "description": "A fact value. Its type must match the value type of the field.",
+                              "description": "A fact value. Its type must match the value type of the field.\nThe read tools give values in the same shape (ADR 0040).",
                               "oneOf": [
                                 {
                                   "additionalProperties": false,
@@ -2860,7 +2860,7 @@
                                       "type": "string"
                                     },
                                     "value": {
-                                      "description": "A fact value. Its type must match the value type of the field.",
+                                      "description": "A fact value. Its type must match the value type of the field.\nThe read tools give values in the same shape (ADR 0040).",
                                       "oneOf": [
                                         {
                                           "additionalProperties": false,
@@ -3058,7 +3058,7 @@
                                       "type": "string"
                                     },
                                     "value": {
-                                      "description": "A fact value. Its type must match the value type of the field.",
+                                      "description": "A fact value. Its type must match the value type of the field.\nThe read tools give values in the same shape (ADR 0040).",
                                       "oneOf": [
                                         {
                                           "additionalProperties": false,

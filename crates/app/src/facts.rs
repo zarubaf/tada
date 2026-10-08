@@ -57,6 +57,13 @@ pub struct OpenQuestionRef {
     pub version: RecordVersion,
 }
 
+impl OpenQuestionRef {
+    /// The event-local ID, for example `QST-001` (ADR 0038).
+    pub fn readable_id(&self) -> String {
+        format!("QST-{:03}", self.local_number)
+    }
+}
+
 /// The current version of one fact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileEntry {
@@ -531,6 +538,19 @@ mod tests {
             window["properties"]["granularity"],
             serde_json::json!({"const": "day"})
         );
+    }
+
+    #[test]
+    fn an_open_question_has_a_readable_id_with_three_digits() {
+        let question = |local_number| OpenQuestionRef {
+            id: OpenQuestionId::from_uuid(Uuid::from_u128(40)),
+            local_number,
+            text: QuestionText::parse("Welcher Samstag?").unwrap(),
+            owner: UserId::from_uuid(Uuid::from_u128(1)),
+            version: RecordVersion::FIRST,
+        };
+        assert_eq!(question(1).readable_id(), "QST-001");
+        assert_eq!(question(1234).readable_id(), "QST-1234");
     }
 
     #[tokio::test]

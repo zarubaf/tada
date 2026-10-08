@@ -14,7 +14,7 @@ use serde_json::Value;
 use tada::logging::layer_for;
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::{EnvFilter, Layer, Registry};
+use tracing_subscriber::{Layer, Registry};
 
 /// Strings that no line may hold, whatever the test: loopback and the test client (`super::PEER`).
 const ALWAYS_FORBIDDEN: [&str; 2] = ["127.0.0.1", "192.0.2.10"];
@@ -41,8 +41,9 @@ impl<'writer> MakeWriter<'writer> for Buffer {
 }
 
 /// The code of tada at `trace`, because ADR 0035 forbids identifiers at each level and an operator can set
-/// `TADA_LOG`. Other crates stay at `info`: hyper logs the address of the fake Bot API at `debug`.
-const FILTER: &str = "info,tada=trace,tada_api=trace,tada_app=trace,tada_adapters=trace,tada_domain=trace,tada_store_pg=trace,tada_telegram=trace";
+/// `TADA_LOG`. rmcp asks for `trace` too: `tada::logging::filter` must cap it.
+/// Other crates stay at `info`: hyper logs the address of the fake Bot API at `debug`.
+const FILTER: &str = "info,rmcp=trace,tada=trace,tada_api=trace,tada_app=trace,tada_adapters=trace,tada_domain=trace,tada_store_pg=trace,tada_telegram=trace,tada_mcp=trace";
 
 static BUFFER: OnceLock<Buffer> = OnceLock::new();
 
@@ -51,7 +52,7 @@ pub fn install() {
     BUFFER.get_or_init(|| {
         let buffer = Buffer::default();
         let subscriber = Registry::default()
-            .with(layer_for("test", buffer.clone()).with_filter(EnvFilter::new(FILTER)));
+            .with(layer_for("test", buffer.clone()).with_filter(tada::logging::filter(FILTER)));
         tracing::subscriber::set_global_default(subscriber).unwrap();
         buffer
     });

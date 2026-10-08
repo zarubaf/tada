@@ -20,6 +20,7 @@ tada-store-pg = { path = "crates/store-pg" }
 tada-adapters = { path = "crates/adapters" }
 tada-api = { path = "crates/api" }
 tada-telegram = { path = "crates/telegram" }
+tada-mcp = { path = "crates/mcp" }
 
 anyhow = "1.0.104"
 async-trait = "0.1.92"
@@ -41,6 +42,8 @@ jiff-sqlx = { version = "0.2.0", features = ["postgres"] }
 json-subscriber = "0.3.0"
 lettre = { version = "0.11.23", default-features = false, features = ["tokio1", "tokio1-rustls", "ring", "rustls-native-certs", "builder", "smtp-transport"] }
 pulldown-cmark = { version = "0.13.4", default-features = false }
+# The official MCP SDK: the tool macros and the Streamable HTTP transport of the MCP server (ADR 0040).
+rmcp = { version = "3.5.1", default-features = false, features = ["server", "macros", "transport-streamable-http-server"] }
 # JSON Schemas of the app input types for the MCP tools (ADR 0040).
 schemars = { version = "1.2.2", features = ["uuid1"] }
 secrecy = "0.10.3"
