@@ -9,6 +9,11 @@ Causes are a crash, a failed delete, or a commit with an unknown outcome.
 Such an object can hold personal data.
 Slice 1 has no job that finds and deletes these objects.
 
+An export of `tada export` holds all personal data of one organization in files outside the database (ADR 0059).
+It holds the rows of the tables below and the uploaded files, without tokens, token hashes and other secrets.
+The operator stores, transfers and deletes it like a backup.
+tada does not keep a record of exports.
+
 | Category                 | Table and columns                                                                                                                                            | Purpose                                                                                                                                                                                                                     | Retention                                                                                                                                                                                    |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Display name             | `app_user.display_name`                                                                                                                                      | Shows the member to other members                                                                                                                                                                                           | While the user exists. Slice 1 has no user deletion.                                                                                                                                         |

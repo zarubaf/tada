@@ -43,7 +43,8 @@ The layout:
 - `tables/<table>.jsonl`: one JSON object for each row, with the PostgreSQL JSON form of each value.
   This file is the authority of the export.
 - `tables/<table>.csv`: the same rows as RFC 4180 CSV with a header line, for spreadsheets.
-  An empty field is a null value; a `jsonb` value is its JSON text.
+  An empty field is a null value or an empty text; the JSON Lines file tells them apart.
+  A `jsonb` value is its JSON text.
 - `blobs/<sha256>`: the original file of each upload version, named by the hex SHA-256 of its content.
   The column `document_version.sha256` names the file.
   The export checks the hash of each file against that column, and fails on a difference or a missing object.

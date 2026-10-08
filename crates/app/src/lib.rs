@@ -11,6 +11,7 @@ pub mod documents;
 pub mod drafts;
 pub mod event_members;
 pub mod events;
+pub mod export;
 pub mod facts;
 pub mod health;
 pub mod identity;

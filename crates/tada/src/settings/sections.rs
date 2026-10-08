@@ -25,6 +25,8 @@ pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp);
 pub type TelegramSettings = (Database, Telegram);
 /// The settings of `tada bootstrap`.
 pub type BootstrapSettings = (Database, PublicUrl);
+/// The settings of `tada export` (ADR 0059).
+pub type ExportSettings = (Database, Storage);
 /// The settings of `tada migrate`.
 pub type MigrateSettings = (Database,);
 

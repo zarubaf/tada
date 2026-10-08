@@ -36,6 +36,7 @@ mod drafts;
 mod error;
 mod event_members;
 mod events;
+mod export;
 mod facts;
 mod heartbeat;
 mod identity;

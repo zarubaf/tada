@@ -1,5 +1,6 @@
 //! A PostgreSQL container with the tada schema, for tests (ADR 0003).
 
+use std::path::Path;
 use std::time::Duration;
 
 use jiff::Timestamp;
@@ -311,6 +312,67 @@ impl TestDatabase {
         .unwrap();
         tx.commit().await.unwrap();
         id
+    }
+
+    /// Rebuilds the data of an export of `tada export` in this database (ADR 0059).
+    /// It inserts the tables in the order of the manifest, in one transaction.
+    /// Each secret column that the export leaves out gets a new random value, so no old token works.
+    ///
+    /// # Panics
+    ///
+    /// If a file is missing or invalid, the manifest names a table without an export decision,
+    /// or an insert fails.
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    pub async fn import_export(&self, directory: &Path) {
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(directory.join("manifest.json")).unwrap())
+                .unwrap();
+        let mut tx = self.database.pool.begin().await.unwrap();
+        for table in manifest["tables"].as_array().unwrap() {
+            let name = table["name"].as_str().unwrap();
+            let exported = crate::export::exported_table(name).expect("an exported table");
+            let columns: Vec<String> = table["columns"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|column| crate::export::quoted(column.as_str().unwrap()))
+                .collect();
+            let secrets: Vec<String> = exported
+                .secret_columns
+                .iter()
+                .map(|column| crate::export::quoted(column))
+                .collect();
+            let random = secrets
+                .iter()
+                .map(|_| "sha256(convert_to(gen_random_uuid()::text, 'UTF8'))".to_owned());
+            let table_name = crate::export::quoted(name);
+            // The names come from the list of exported tables and the manifest, quoted. The row is a bind parameter.
+            let sql = format!(
+                "INSERT INTO {table_name} ({}) SELECT {} FROM jsonb_populate_record(NULL::{table_name}, $1::jsonb)",
+                columns
+                    .iter()
+                    .chain(&secrets)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                columns
+                    .iter()
+                    .cloned()
+                    .chain(random)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            );
+            let lines =
+                std::fs::read_to_string(directory.join(format!("tables/{name}.jsonl"))).unwrap();
+            for line in lines.lines() {
+                sqlx::query(AssertSqlSafe(sql.clone()))
+                    .bind(line)
+                    .execute(&mut *tx)
+                    .await
+                    .unwrap();
+            }
+        }
+        tx.commit().await.unwrap();
     }
 
     /// Adds a membership of a user in an organization.

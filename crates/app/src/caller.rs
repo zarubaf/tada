@@ -436,6 +436,25 @@ impl ServiceCaller<Bootstrap> {
     }
 }
 
+/// The service identity `exporter`: the command `tada export` (ADR 0059).
+/// It reads all data of one organization; it changes nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Exporter;
+
+impl ServiceIdentity for Exporter {
+    const NAME: &'static str = "exporter";
+    const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0004);
+    const CHANNEL: Channel = Channel::Cli;
+}
+
+impl ServiceCaller<Exporter> {
+    /// The scope of the organization that the slug of the operator names (ADR 0039).
+    /// Only this crate calls it, after the named infrastructure query of the slug.
+    pub(crate) fn scope(&self, organization_id: OrganizationId) -> OrgScope {
+        OrgScope(organization_id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -515,10 +534,17 @@ mod tests {
 
     #[test]
     fn service_identities_have_distinct_ids() {
-        let ids = [JobRunner::ID, TelegramGateway::ID, Bootstrap::ID];
+        let ids = [
+            JobRunner::ID,
+            TelegramGateway::ID,
+            Bootstrap::ID,
+            Exporter::ID,
+        ];
         assert!(ids.iter().enumerate().all(|(i, id)| !ids[..i].contains(id)));
         assert_eq!(JobRunner::NAME, "job-runner");
         assert_eq!(Bootstrap::NAME, "bootstrap");
+        assert_eq!(Exporter::NAME, "exporter");
+        assert_eq!(Exporter::CHANNEL, Channel::Cli);
     }
 
     #[test]
