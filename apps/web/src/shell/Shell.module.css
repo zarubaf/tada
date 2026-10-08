@@ -87,6 +87,7 @@
 
     .nav {
       position: static;
+      flex-direction: column;
       padding: 0;
       border-top: 0;
       background: none;

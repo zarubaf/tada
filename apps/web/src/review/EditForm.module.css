@@ -1,0 +1,30 @@
+@layer components {
+  .form {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 40rem;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+  }
+
+  .title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* Narrow: the actions fill the width. Medium and wide: the primary action on the right. */
+  .actions {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  @media (width >= 40rem) {
+    /* --bp-medium */
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+  }
+}

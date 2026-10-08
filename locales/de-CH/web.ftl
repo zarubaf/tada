@@ -85,6 +85,7 @@ knowledge-accepted = Bestätigt
 knowledge-proposed = Vorschlag
 knowledge-assumption = Annahme
 knowledge-unknown = Unbekannt
+knowledge-conflict = Konflikt
 
 ## Navigation
 
@@ -97,6 +98,9 @@ session-loading = Sitzung wird geladen
 skip-link = Zum Inhalt springen
 shell-nav = Hauptnavigation
 nav-events = Anlässe
+nav-inbox = Eingang
+# $count: the number of changesets that wait for a review.
+nav-inbox-count = { $count } offen
 organization-switcher = Organisation
 member-menu = Mitgliedermenü
 sign-out = Abmelden
@@ -416,3 +420,199 @@ org-mcp-help = Nur wenn der Schalter an ist, können Mitglieder API-Token für K
 org-mcp-loading = Einstellungen werden geladen
 org-mcp-on = MCP-Token sind eingeschaltet.
 org-mcp-off = MCP-Token sind ausgeschaltet.
+
+## The edit form of a value (ADR 0049)
+
+value-error-required = Geben Sie einen Wert ein.
+value-error-number = Das ist keine Zahl. Geben Sie eine Zahl wie 20000 oder 12,5 ein.
+value-error-money = Das ist kein Betrag. Geben Sie einen Betrag wie 15.00 ein.
+value-error-date = Das ist kein gültiges Datum. Geben Sie ein Datum wie 18.05.2030 ein.
+value-error-range = Der obere Wert liegt unter dem unteren. Geben Sie einen Wert ab dem unteren Wert ein.
+value-error-window = Das Ende liegt vor dem Beginn. Wählen Sie ein Datum ab dem Beginn.
+value-error-granularity = Wählen Sie, wie genau das Zeitfenster ist.
+value-error-choice = Wählen Sie mindestens eine Möglichkeit.
+value-error-choice-single = Wählen Sie genau eine Möglichkeit.
+value-input-text = Text
+value-input-flag = Antwort
+value-input-min = Wert
+value-input-min-range = Von
+value-input-max = Bis (leer lassen, wenn es ein einzelner Wert ist)
+value-input-amount = Betrag in { $currency }
+value-input-amount-max = Bis (leer lassen, wenn es ein einzelner Betrag ist)
+value-input-date = Datum
+value-input-start = Beginn
+value-input-end = Ende
+value-input-granularity = Genauigkeit
+value-input-granularity-day = Tag
+value-input-granularity-week = Woche
+value-input-granularity-month = Monat
+value-input-choice = Auswahl
+value-input-approximate = Ungefährer Wert
+
+## Review Inbox (ADR 0050)
+
+inbox-title = Eingang
+inbox-list-label = Offene Änderungen
+inbox-loading = Eingang wird geladen
+inbox-empty-title = Nichts zu prüfen
+inbox-empty-text = Es gibt keine offenen Vorschläge. Neue Vorschläge von Mitgliedern und KI-Clients erscheinen hier.
+inbox-more = Es gibt weitere offene Änderungen. Die Liste zeigt die ältesten zuerst.
+inbox-scope-organization = Organisation
+inbox-event-unknown = Anlass
+# $count: the number of open proposals of the changeset.
+inbox-open-proposals =
+    { $count ->
+        [one] 1 offener Vorschlag
+       *[other] { $count } offene Vorschläge
+    }
+inbox-stale = Veraltet
+inbox-stale-hint = Älter als 14 Tage
+# $author: who proposed the change.
+inbox-proposed-by = Von { $author }
+inbox-author-member = Mitglied
+# $time: a date and time.
+inbox-proposed-at = vorgeschlagen am { $time }
+inbox-detail-select = Wählen Sie in der Liste einen Eintrag.
+# $title: the event or the organization of the changeset.
+inbox-detail-of = Vorschläge zu { $title }
+inbox-detail-loading = Vorschläge werden geladen
+inbox-back = Zur Liste
+inbox-hints = Tastenkürzel
+inbox-hint-j = nächster Eintrag
+inbox-hint-k = vorheriger Eintrag
+inbox-hint-a = annehmen
+inbox-hint-e = bearbeiten
+inbox-hint-r = ablehnen
+inbox-active = Tastenkürzel gelten für diesen Vorschlag
+inbox-list-position = Eintrag { $position } von { $total }
+
+## Review Inbox: one proposal
+
+# $title: the title of the proposal.
+inbox-select = { $title } auswählen
+inbox-section-change = Änderung
+inbox-section-source = Quelle
+inbox-section-reason = Begründung und Annahmen
+inbox-current = Aktuell
+inbox-proposed = Vorgeschlagen
+inbox-reason = Begründung
+inbox-assumption-note = Der Vorschlag gilt als Annahme. Er ist nicht bestätigt.
+inbox-unknown-note = Der Vorschlag setzt den Wert auf „unbekannt“.
+inbox-approximate-note = Der vorgeschlagene Wert ist ungefähr.
+inbox-no-assumptions = Keine Annahmen.
+inbox-source-none = Der Vorschlag nennt keine Quelle.
+# $id: the start of the ID of the source version.
+inbox-source-version = Quellversion { $id }
+# $page: the page number in a PDF.
+inbox-source-page = Seite { $page }
+inbox-status-accepted = Angenommen
+inbox-status-accepted-with-edit = Mit Änderung angenommen
+inbox-status-rejected = Abgelehnt
+inbox-status-withdrawn = Zurückgezogen
+inbox-accept = Annehmen
+inbox-edit = Bearbeiten und annehmen
+inbox-reject = Ablehnen
+inbox-conflict-fact-changed = Jemand hat den Wert nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Der KI-Client kann einen neuen Vorschlag zum aktuellen Wert machen.
+inbox-conflict-target-changed = Der Eintrag hat sich nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Der KI-Client kann einen neuen Vorschlag machen.
+inbox-conflict-dependency = Ein Vorschlag, von dem dieser abhängt, hat einen Konflikt. Lehnen Sie beide ab.
+# $titles: the titles of the proposals, separated by commas.
+inbox-depends-on = Setzt voraus: { $titles }
+# $titles: the titles of the selected proposals that need this one.
+inbox-needed-by = Mitgewählt, weil es gebraucht wird von: { $titles }
+
+## Review Inbox: the operations of a proposal
+
+inbox-op-create-event = Anlass anlegen
+# $label: the label of the field.
+inbox-op-set-fact = Wert für „{ $label }“
+# $label: the label of the new field.
+inbox-op-add-field = Feld „{ $label }“ hinzufügen
+# $label: the label of the new choice.
+inbox-op-add-choice = Auswahl „{ $label }“ hinzufügen
+# $label: the label of the field.
+inbox-op-deprecate-field = Feld „{ $label }“ ausmustern
+inbox-op-create-question = Offene Frage anlegen
+# $name: the name of the new document.
+inbox-op-create-draft = Dokumentenentwurf „{ $name }“
+inbox-op-create-draft-existing = Entwurf für ein bestehendes Dokument
+inbox-op-unknown = Änderung ohne Darstellung
+inbox-field-unknown = Feld
+inbox-row-key = Kürzel
+inbox-row-name = Name
+inbox-row-time-zone = Zeitzone
+inbox-row-field = Feld
+inbox-row-label = Bezeichnung
+inbox-row-field-key = Schlüssel
+inbox-row-value-type = Wertetyp
+inbox-row-description = Beschreibung
+inbox-row-text = Text
+inbox-value-type-text = Text
+inbox-value-type-boolean = Ja oder Nein
+inbox-value-type-quantity = Menge
+inbox-value-type-money = Betrag
+inbox-value-type-date = Datum
+inbox-value-type-date-window = Zeitfenster
+inbox-value-type-choice = Auswahl
+inbox-value-type-reference = Verweis
+inbox-draft-new = Das Dokument entsteht, wenn Sie den Entwurf annehmen.
+inbox-draft-existing = Der Entwurf wird eine neue Version des Dokuments.
+inbox-draft-open = Dokument öffnen
+# $count: the number of lint warnings of the draft.
+inbox-draft-warnings =
+    { $count ->
+        [one] 1 Hinweis der Prüfung
+       *[other] { $count } Hinweise der Prüfung
+    }
+
+## Review Inbox: the selection and the actions
+
+inbox-summary-title = Auswahl
+# $count: the number of selected proposals.
+inbox-summary-count =
+    { $count ->
+        [one] 1 Vorschlag ausgewählt
+       *[other] { $count } Vorschläge ausgewählt
+    }
+# $count: the number of selected proposals that other selected proposals need.
+inbox-summary-dependencies =
+    { $count ->
+        [one] Davon 1 als Abhängigkeit
+       *[other] Davon { $count } als Abhängigkeiten
+    }
+inbox-summary-accept = Auswahl annehmen
+inbox-summary-reject = Auswahl ablehnen
+inbox-apply-blocked = Dieser Vorschlag hat einen Konflikt. Er lässt sich nicht annehmen.
+inbox-summary-blocked = Die Auswahl enthält einen Konflikt. Sie lässt sich nicht annehmen.
+# $count: the number of dependencies that the selection added.
+inbox-dependencies-added =
+    { $count ->
+        [one] 1 Abhängigkeit mitgewählt.
+       *[other] { $count } Abhängigkeiten mitgewählt.
+    }
+# $count: the number of proposals that the deselection removed.
+inbox-dependents-removed =
+    { $count ->
+        [one] 1 abhängiger Vorschlag abgewählt.
+       *[other] { $count } abhängige Vorschläge abgewählt.
+    }
+# $count: the number of accepted proposals.
+inbox-applied =
+    { $count ->
+        [one] 1 Vorschlag angenommen.
+       *[other] { $count } Vorschläge angenommen.
+    }
+# $count: the number of rejected proposals.
+inbox-rejected =
+    { $count ->
+        [one] 1 Vorschlag abgelehnt.
+       *[other] { $count } Vorschläge abgelehnt.
+    }
+inbox-reject-title = Vorschläge ablehnen?
+inbox-reject-text = Abgelehnte Vorschläge lassen sich nicht wieder öffnen. Vorschläge, die davon abhängen, lehnt tada auch ab.
+inbox-reject-cancel = Abbrechen
+inbox-reject-confirm = Ablehnen
+inbox-edit-title = Wert bearbeiten
+inbox-edit-assumption = Als Annahme übernehmen
+inbox-edit-cancel = Abbrechen
+inbox-edit-submit = Bearbeiten und annehmen
+inbox-edit-unavailable = Diesen Wert können Sie hier nicht bearbeiten.

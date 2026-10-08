@@ -6,6 +6,7 @@ import { t } from "../i18n";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Sheet } from "../ui/Sheet";
 import styles from "./EvidencePanel.module.css";
+import { Excerpt } from "./Excerpt";
 
 export interface EvidencePanelProps {
   api: Api;
@@ -87,9 +88,7 @@ function Source({
   const source = lookups.sources.get(evidence.source_version_id);
   return (
     <li className={styles.source}>
-      <blockquote className={styles.quote}>
-        <mark>{passage.quote}</mark>
-      </blockquote>
+      <Excerpt quote={passage.quote} />
       <p className={styles.meta}>
         {source
           ? t("evidence-document-version", { name: source.name, number: source.number })

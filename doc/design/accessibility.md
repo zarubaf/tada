@@ -71,7 +71,11 @@ The page must name the next focus target in the same event that removes the elem
 | `Enter`          | Open the selected item                       |
 | `Esc`            | Close the menu, sheet or dialog              |
 
-- Single-character shortcuts work only when no text field has focus. A member can turn them off in the settings (WCAG 2.1.4).
+- Single-character shortcuts work only while focus is inside the page that defines them, for example the Review Inbox.
+  They never work while a text field, a select, a dialog or an element that can be edited has focus.
+  A checkbox or a button does not block them.
+  This meets WCAG 2.1.4 through the option „active only when the component has focus“.
+  A settings switch to turn them off is not built.
 - Lists and tables use one tab stop and arrow keys inside (roving focus, as React Aria Components provides).
 
 ## Forms

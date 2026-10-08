@@ -171,6 +171,7 @@ export function Gallery() {
           <KnowledgeState state="accepted">Flugplatz Musterhausen</KnowledgeState>
           <KnowledgeState state="proposed">CHF 15.00</KnowledgeState>
           <KnowledgeState state="assumption">ca. 20’000 Personen pro Tag</KnowledgeState>
+          <KnowledgeState state="conflict">CHF 12.00</KnowledgeState>
           <KnowledgeState state="unknown" />
         </div>
       </section>

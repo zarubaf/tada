@@ -3,6 +3,7 @@
 import { Fragment, type ReactNode, useState } from "react";
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
+import { InboxCount } from "../review/InboxCount";
 import { usePathname } from "../router/Router";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath } from "../session/paths";
 import { useOptionalSession } from "../session/SessionProvider";
@@ -56,6 +57,10 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           </div>
         )}
         <nav className={styles.nav} aria-label={t("shell-nav")}>
+          <NavLink to="/inbox" large>
+            {t("nav-inbox")}
+            <InboxCount />
+          </NavLink>
           <NavLink to="/events" large>
             {t("nav-events")}
           </NavLink>

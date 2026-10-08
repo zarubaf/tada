@@ -31,6 +31,18 @@ export type Field = components["schemas"]["Field"];
 export type Author = components["schemas"]["Author"];
 export type Label = components["schemas"]["Label"];
 export type ValueType = components["schemas"]["ValueType"];
+export type OpenChangeset = components["schemas"]["OpenChangeset"];
+export type Changeset = components["schemas"]["Changeset"];
+export type Proposal = components["schemas"]["Proposal"];
+export type ProposalEvidence = components["schemas"]["ProposalEvidence"];
+export type Operation = components["schemas"]["Operation"];
+export type ReviewResult = components["schemas"]["ReviewResult"];
+export type ConflictReason = components["schemas"]["ConflictReason"];
+export type ApplyEdit = NonNullable<
+  components["schemas"]["ApplyChangesetRequest"]["edits"]
+>[number];
+/** A fact value as the API takes and returns it. Its type must match the value type of the field. */
+export type FactValue = Extract<ApplyEdit["state"], { state: "accepted" }>["value"];
 
 /** The problem codes that the session handles for every call (ADR 0037). */
 export const SESSION_PROBLEMS = ["unauthenticated", "organization-required"] as const;

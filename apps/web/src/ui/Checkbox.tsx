@@ -7,10 +7,12 @@ export interface CheckboxProps {
   isSelected: boolean;
   onChange: (selected: boolean) => void;
   isDisabled?: boolean;
+  /** Only the accessible name shows the label, for a checkbox in a row or a card header. */
+  labelHidden?: boolean;
 }
 
 /** A checkbox with its label to the right. */
-export function Checkbox({ label, isSelected, onChange, isDisabled }: CheckboxProps) {
+export function Checkbox({ label, isSelected, onChange, isDisabled, labelHidden }: CheckboxProps) {
   return (
     <AriaCheckbox
       className={styles.checkbox}
@@ -21,7 +23,7 @@ export function Checkbox({ label, isSelected, onChange, isDisabled }: CheckboxPr
       <span className={styles.box} aria-hidden="true">
         {isSelected ? "✓" : ""}
       </span>
-      {label}
+      {labelHidden ? <span className={styles.hidden}>{label}</span> : label}
     </AriaCheckbox>
   );
 }
