@@ -5,6 +5,7 @@
 //! never a member caller, so no tool can call a command that only a member can call.
 
 mod guard;
+mod propose;
 mod tools;
 
 use std::sync::Arc;
@@ -13,9 +14,12 @@ use axum::Router;
 use axum::middleware;
 use rmcp::transport::streamable_http_server::session::never::NeverSessionManager;
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
+use tada_app::clock::Clock;
+use tada_app::documents::DocumentStore;
 use tada_app::events::EventStore;
 use tada_app::facts::FactStore;
 use tada_app::identity::IdentityStore;
+use tada_app::proposals::ProposalStore;
 use tada_app::public_url::PublicUrl;
 use tada_app::sources::SourceStore;
 use tada_app::tokens::TokenAuthenticator;
@@ -32,6 +36,10 @@ pub struct McpState {
     pub identity: Arc<dyn IdentityStore>,
     pub facts: Arc<dyn FactStore>,
     pub sources: Arc<dyn SourceStore>,
+    pub proposals: Arc<dyn ProposalStore>,
+    /// The existing documents of draft proposals.
+    pub documents: Arc<dyn DocumentStore>,
+    pub clock: Arc<dyn Clock>,
     /// `TADA_PUBLIC_URL`. Its origin is the only `Origin` that a request can have.
     pub public_url: PublicUrl,
 }

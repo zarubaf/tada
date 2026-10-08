@@ -1,4 +1,5 @@
-//! The read tools of ADR 0040. The names are stable; the descriptions tell the agent the rules.
+//! The read tools of ADR 0040 and the server handler of all tools; `propose` has the proposal tool.
+//! The names are stable; the descriptions tell the agent the rules.
 
 use std::sync::Arc;
 
@@ -11,6 +12,8 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::json;
 use tada_app::caller::AiCaller;
+use tada_app::clock::Clock;
+use tada_app::documents::DocumentStore;
 use tada_app::domain::events::EventKey;
 use tada_app::domain::ids::SourceVersionId;
 use tada_app::events::{self, EventStore};
@@ -18,6 +21,7 @@ use tada_app::facts::{self, FactStore};
 use tada_app::identity::IdentityStore;
 use tada_app::paging::PageLimit;
 use tada_app::problem::{CommandError, FieldError, ProblemCode};
+use tada_app::proposals::ProposalStore;
 use tada_app::search::{self, SearchRequest};
 use tada_app::sources::{self, SourceStore};
 use tada_app::views::{
@@ -31,15 +35,19 @@ use crate::McpState;
 const INSTRUCTIONS: &str = "tada holds the planning data of the events of a club. \
 Accepted facts are confirmed; assumptions are not confirmed; unknowns have no value. \
 Rules: use the existing fields of get_event_schema first. Never fill in an unknown value and never present an assumption or an open proposal as accepted. \
-Cite each statement with the source_version_id and the passage (start, end) that supports it; get_source_passage gives the exact quote.";
+Cite each statement with the source_version_id and the passage (start, end) that supports it; get_source_passage gives the exact quote. \
+Propose changes with propose_changeset; the member reviews them in tada, and no tool accepts, rejects or deletes.";
 
-/// The tools of one request. They read with the rights of the member of the token.
+/// The tools of one request. They read and propose with the rights of the member of the token.
 #[derive(Debug, Clone)]
 pub(crate) struct Tools {
     events: Arc<dyn EventStore>,
-    identity: Arc<dyn IdentityStore>,
-    facts: Arc<dyn FactStore>,
-    sources: Arc<dyn SourceStore>,
+    pub(crate) identity: Arc<dyn IdentityStore>,
+    pub(crate) facts: Arc<dyn FactStore>,
+    pub(crate) sources: Arc<dyn SourceStore>,
+    pub(crate) proposals: Arc<dyn ProposalStore>,
+    pub(crate) documents: Arc<dyn DocumentStore>,
+    pub(crate) clock: Arc<dyn Clock>,
 }
 
 /// The input of the tools that read one event.
@@ -73,7 +81,7 @@ pub(crate) struct PassageInput {
     end: u32,
 }
 
-#[tool_router]
+#[tool_router(router = read_tools)]
 impl Tools {
     pub(crate) fn new(state: &McpState) -> Self {
         Self {
@@ -81,6 +89,9 @@ impl Tools {
             identity: state.identity.clone(),
             facts: state.facts.clone(),
             sources: state.sources.clone(),
+            proposals: state.proposals.clone(),
+            documents: state.documents.clone(),
+            clock: state.clock.clone(),
         }
     }
 
@@ -224,7 +235,7 @@ impl Tools {
     }
 }
 
-#[tool_handler]
+#[tool_handler(router = (Self::read_tools() + Self::propose_tools()))]
 impl ServerHandler for Tools {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
@@ -234,7 +245,7 @@ impl ServerHandler for Tools {
 }
 
 /// The AI caller that the guard found for the request.
-fn caller(parts: &Parts) -> Result<&AiCaller, ErrorData> {
+pub(crate) fn caller(parts: &Parts) -> Result<&AiCaller, ErrorData> {
     // The guard runs before each request, so a missing caller is a wiring error: fail closed.
     parts
         .extensions
@@ -244,7 +255,7 @@ fn caller(parts: &Parts) -> Result<&AiCaller, ErrorData> {
 
 /// The error of an `app` query as a JSON-RPC error with the problem code (ADR 0037).
 /// A store failure goes to the log; the agent sees the code only.
-fn tool_error(error: impl CommandError) -> ErrorData {
+pub(crate) fn tool_error(error: impl CommandError) -> ErrorData {
     if let Some(store_error) = error.store_error() {
         tracing::error!(error = %crate::guard::error_chain(store_error), "the store failed");
     }
