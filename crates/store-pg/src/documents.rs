@@ -1144,6 +1144,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn documents_and_versions_are_never_deleted() {
+        let test = TestDatabase::start().await;
+        let f = fixture(&test, "testwil").await;
+        let first = upload(&f, new_document(&f), "Programm.txt", b"Version eins");
+        published(&test, &f, &first).await;
+        for statement in [
+            "DELETE FROM document_version",
+            "TRUNCATE document_version CASCADE",
+            "DELETE FROM document",
+            "TRUNCATE document CASCADE",
+        ] {
+            let error = sqlx::query(sqlx::AssertSqlSafe(statement))
+                .execute(&test.database.pool)
+                .await
+                .unwrap_err();
+            assert_eq!(sqlstate(&error), "23001", "{statement}");
+        }
+        assert_eq!(count(&test, "document").await, 1);
+        assert_eq!(count(&test, "document_version").await, 1);
+    }
+
+    #[tokio::test]
     async fn keeps_a_text_without_search_index_if_the_index_is_too_long() {
         let test = TestDatabase::start().await;
         let f = fixture(&test, "testwil").await;
