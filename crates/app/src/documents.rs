@@ -76,37 +76,54 @@ impl Debug for DocumentView {
     }
 }
 
-/// One immutable version of a document: an uploaded file.
-#[derive(Clone, PartialEq, Eq)]
+/// One immutable version of a document.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VersionView {
     pub id: DocumentVersionId,
     pub document_id: DocumentId,
     /// 1 for the first version of the document, then 2, 3 and so on.
     pub number: u32,
+    /// The SHA-256 hash of the content.
+    pub sha256: [u8; 32],
+    /// The member who added the version.
+    pub uploaded_by: UserId,
+    pub created_at: Timestamp,
+    pub content: VersionContent,
+}
+
+impl VersionView {
+    /// The file of an upload version.
+    pub fn file(&self) -> Option<&UploadedFile> {
+        match &self.content {
+            VersionContent::Upload(file) => Some(file),
+        }
+    }
+}
+
+/// What a document version holds. Each kind has its own fields (ADR 0051).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VersionContent {
+    Upload(UploadedFile),
+}
+
+/// The file of an upload version.
+#[derive(Clone, PartialEq, Eq)]
+pub struct UploadedFile {
     /// The original file name, after `sanitize_file_name`.
     pub file_name: String,
     pub file_type: FileType,
     pub size_bytes: u64,
-    /// The SHA-256 hash of the file.
-    pub sha256: [u8; 32],
-    pub uploaded_by: UserId,
     /// The source version of the kind `upload` that holds the same file (ADR 0050).
     pub source_version_id: SourceVersionId,
-    pub created_at: Timestamp,
 }
 
 /// The file name can contain personal data, so `Debug` leaves it out (ADR 0035).
-impl Debug for VersionView {
+impl Debug for UploadedFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("VersionView")
-            .field("id", &self.id)
-            .field("document_id", &self.document_id)
-            .field("number", &self.number)
+        f.debug_struct("UploadedFile")
             .field("file_type", &self.file_type)
             .field("size_bytes", &self.size_bytes)
-            .field("uploaded_by", &self.uploaded_by)
             .field("source_version_id", &self.source_version_id)
-            .field("created_at", &self.created_at)
             .finish_non_exhaustive()
     }
 }
@@ -681,13 +698,15 @@ mod tests {
                 id: DocumentVersionId::from_uuid(Uuid::from_u128(4)),
                 document_id: id,
                 number: 1,
-                file_name: "Programm.pdf".to_owned(),
-                file_type: FileType::Pdf,
-                size_bytes: 10,
                 sha256: [0; 32],
                 uploaded_by: UserId::from_uuid(Uuid::from_u128(3)),
-                source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(5)),
                 created_at: Timestamp::UNIX_EPOCH,
+                content: VersionContent::Upload(UploadedFile {
+                    file_name: "Programm.pdf".to_owned(),
+                    file_type: FileType::Pdf,
+                    size_bytes: 10,
+                    source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(5)),
+                }),
             },
         }
     }

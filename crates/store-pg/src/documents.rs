@@ -10,7 +10,7 @@ use tada_app::blobs::BlobKey;
 use tada_app::caller::OrgScope;
 use tada_app::documents::{
     DocumentCursor, DocumentStore, DocumentView, NewUpload, Published, StoredVersion, UploadTarget,
-    VersionView,
+    UploadedFile, VersionContent, VersionView,
 };
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId, SourceVersionId, UserId};
@@ -53,10 +53,7 @@ impl TryFrom<VersionRow> for StoredVersion {
         if row.kind != UPLOAD {
             return Err(InvalidRow("document_version.kind"));
         }
-        let version = VersionView {
-            id: DocumentVersionId::from_uuid(row.id),
-            document_id: DocumentId::from_uuid(row.document_id),
-            number: u32::try_from(row.number).map_err(|_| InvalidRow("document_version.number"))?,
+        let file = UploadedFile {
             file_name: row
                 .file_name
                 .ok_or(InvalidRow("document_version.file_name"))?,
@@ -69,16 +66,22 @@ impl TryFrom<VersionRow> for StoredVersion {
                 .size_bytes
                 .and_then(|size| u64::try_from(size).ok())
                 .ok_or(InvalidRow("document_version.size_bytes"))?,
+            source_version_id: row
+                .source_version_id
+                .map(SourceVersionId::from_uuid)
+                .ok_or(InvalidRow("document_version.source_version_id"))?,
+        };
+        let version = VersionView {
+            id: DocumentVersionId::from_uuid(row.id),
+            document_id: DocumentId::from_uuid(row.document_id),
+            number: u32::try_from(row.number).map_err(|_| InvalidRow("document_version.number"))?,
             sha256: row
                 .sha256
                 .try_into()
                 .map_err(|_| InvalidRow("document_version.sha256"))?,
             uploaded_by: UserId::from_uuid(row.uploaded_by),
-            source_version_id: row
-                .source_version_id
-                .map(SourceVersionId::from_uuid)
-                .ok_or(InvalidRow("document_version.source_version_id"))?,
             created_at: row.created_at.to_jiff(),
+            content: VersionContent::Upload(file),
         };
         Ok(StoredVersion {
             event_id: EventId::from_uuid(row.event_id),
@@ -644,11 +647,12 @@ mod tests {
         let version = &document.newest_version;
         assert_eq!(version.id, upload.version_id);
         assert_eq!(version.number, 1);
-        assert_eq!(version.file_name, "Programm.txt");
-        assert_eq!(version.file_type, FileType::Text);
-        assert_eq!(version.size_bytes, 18);
         assert_eq!(version.sha256, upload.sha256);
-        assert_eq!(version.source_version_id, upload.source_version_id);
+        let file = version.file().unwrap();
+        assert_eq!(file.file_name, "Programm.txt");
+        assert_eq!(file.file_type, FileType::Text);
+        assert_eq!(file.size_bytes, 18);
+        assert_eq!(file.source_version_id, upload.source_version_id);
         assert_eq!(
             test.database.get(f.scope(), document.id).await.unwrap(),
             Some(document.clone())
@@ -716,7 +720,10 @@ mod tests {
             "the name stays the name of the first upload"
         );
         assert_eq!(changed.newest_version.number, 2);
-        assert_eq!(changed.newest_version.file_name, "Programm-neu.txt");
+        assert_eq!(
+            changed.newest_version.file().unwrap().file_name,
+            "Programm-neu.txt"
+        );
         let after = test
             .database
             .versions(f.scope(), document.id)
