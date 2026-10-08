@@ -9,6 +9,7 @@ pub mod files;
 pub mod logs;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::num::NonZeroU64;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -76,7 +77,7 @@ pub fn api_state(
         public_url: public_url(),
         documents: database.clone(),
         blobs: Arc::new(NoObjectStorage),
-        upload_max_bytes: 1024 * 1024,
+        upload_max_bytes: NonZeroU64::new(1024 * 1024).unwrap(),
     }
 }
 

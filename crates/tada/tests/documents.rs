@@ -5,6 +5,7 @@
 
 mod support;
 
+use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use axum::Router;
@@ -53,7 +54,7 @@ impl Api {
         ));
         let state = ApiState {
             blobs: Arc::new(garage.storage.clone()),
-            upload_max_bytes: LIMIT,
+            upload_max_bytes: NonZeroU64::new(LIMIT).unwrap(),
             ..support::api_state(&test, authenticator, clock)
         };
         Self {
@@ -199,6 +200,7 @@ async fn uploads_a_pdf_as_doc_001_and_reads_it_back() {
         "default-src 'none'; sandbox"
     );
     assert_eq!(headers[header::CACHE_CONTROL], "private, no-store");
+    assert_eq!(headers["cross-origin-resource-policy"], "same-origin");
 }
 
 #[tokio::test]

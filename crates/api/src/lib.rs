@@ -16,6 +16,7 @@ mod sign_in;
 mod telegram;
 
 use std::net::SocketAddr;
+use std::num::NonZeroU64;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -71,7 +72,7 @@ pub struct ApiState {
     /// The object storage of the document files (ADR 0009).
     pub blobs: Arc<dyn BlobStore>,
     /// `TADA_UPLOAD_MAX_BYTES`: the largest file of one upload (ADR 0043).
-    pub upload_max_bytes: u64,
+    pub upload_max_bytes: NonZeroU64,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -668,7 +669,7 @@ mod tests {
             public_url: PublicUrl::parse("https://tada.example.org").unwrap(),
             documents: Arc::new(NoDocuments),
             blobs: Arc::new(NoBlobs),
-            upload_max_bytes: 1,
+            upload_max_bytes: NonZeroU64::MIN,
         }
     }
 

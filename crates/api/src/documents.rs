@@ -188,7 +188,7 @@ impl FromRequest<ApiState> for Upload {
             .get(header::CONTENT_LENGTH)
             .and_then(|value| value.to_str().ok())
             .and_then(|value| value.parse::<u64>().ok());
-        if declared.is_some_and(|size| size > state.upload_max_bytes) {
+        if declared.is_some_and(|size| size > state.upload_max_bytes.get()) {
             return Err(ApiError::new(ProblemCode::PayloadTooLarge));
         }
         let body = request
@@ -263,7 +263,7 @@ async fn upload_document(
         EventId::from_uuid(event_id),
         &upload.file_name,
         upload.body,
-        state.upload_max_bytes,
+        state.upload_max_bytes.get(),
         state.document_stores(),
         state.clock.as_ref(),
     )
@@ -300,7 +300,7 @@ async fn upload_document_version(
         DocumentId::from_uuid(document_id),
         &upload.file_name,
         upload.body,
-        state.upload_max_bytes,
+        state.upload_max_bytes.get(),
         state.document_stores(),
         state.clock.as_ref(),
     )
@@ -501,6 +501,11 @@ async fn download_document_version(
             HeaderValue::from_static("nosniff"),
         ),
         (header::CONTENT_SECURITY_POLICY, DOWNLOAD_CSP),
+        // Another site cannot embed the file, also if the cookie policy changes later.
+        (
+            HeaderName::from_static("cross-origin-resource-policy"),
+            HeaderValue::from_static("same-origin"),
+        ),
         (
             header::CACHE_CONTROL,
             HeaderValue::from_static("private, no-store"),

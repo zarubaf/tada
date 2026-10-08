@@ -308,9 +308,14 @@ mod tests {
     #[test]
     fn the_upload_limit_is_100_mb_by_default_and_never_zero() {
         let loaded = load_from::<(Uploads,)>(&[]).unwrap();
-        assert_eq!(loaded.settings.0.max_bytes, 100_000_000);
+        assert_eq!(loaded.settings.0.max_bytes.get(), 100_000_000);
         let errors = load_from::<(Uploads,)>(&[("TADA_UPLOAD_MAX_BYTES", "0")]).unwrap_err();
-        assert_eq!(errors.0, ["TADA_UPLOAD_MAX_BYTES must be 1 or more"]);
+        assert_eq!(
+            errors.0,
+            [
+                "TADA_UPLOAD_MAX_BYTES is not a valid byte count: number would be zero for non-zero type"
+            ]
+        );
     }
 
     #[test]

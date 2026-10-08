@@ -1,5 +1,6 @@
 //! The settings sections and the sections of each command.
 
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -350,7 +351,7 @@ impl Section for SignIn {
 #[derive(Debug)]
 pub struct Uploads {
     /// The largest file that one upload can have, in bytes.
-    pub max_bytes: u64,
+    pub max_bytes: NonZeroU64,
 }
 
 const UPLOAD_MAX_BYTES: Setting = Setting {
@@ -367,12 +368,9 @@ impl Section for Uploads {
     }
 
     fn read(source: &mut Source<'_>) -> Option<Self> {
-        let max_bytes: u64 = source.value(&UPLOAD_MAX_BYTES)?;
-        if max_bytes == 0 {
-            source.error(&UPLOAD_MAX_BYTES, "must be 1 or more");
-            return None;
-        }
-        Some(Self { max_bytes })
+        Some(Self {
+            max_bytes: source.value(&UPLOAD_MAX_BYTES)?,
+        })
     }
 }
 
