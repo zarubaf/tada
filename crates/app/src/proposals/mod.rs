@@ -203,11 +203,16 @@ impl CommandError for ProposeError {
     }
 }
 
+/// The longest source text of a changeset, in characters after the normalization.
+/// The search index of one text is limited to 1 MB, and each passage check reads the text.
+pub const MAX_SOURCE_TEXT_CHARS: usize = 100_000;
+
 /// Creates a changeset of proposals with their evidence (ADR 0050).
 ///
 /// 1. A changeset of an event needs the right to propose in the event (ADR 0052).
 ///    A changeset of the organization, for example a new event, needs an owner or admin as principal.
-/// 2. Each proposal has at least one passage, and each passage matches the text of its source version (ADR 0040).
+/// 2. The source text has at most `MAX_SOURCE_TEXT_CHARS` characters.
+///    Each proposal has at least one passage, and each passage matches the text of its source version (ADR 0040).
 ///    A passage names no source version for the source text of the changeset. A passage of another source version
 ///    must be readable in the event of the proposal (`access::event_source_reach`), for example a text file of the event.
 /// 3. Each new ID is a UUIDv7 and is free (ADR 0038).
@@ -231,6 +236,9 @@ pub async fn create_changeset(
     authorize(caller, event_id, stores.identity).await?;
 
     let source = SourceText::normalize(&input.source_text);
+    if source.as_str().chars().count() > MAX_SOURCE_TEXT_CHARS {
+        return Err(invalid("source_text", "length"));
+    }
     let source_version_id = SourceVersionId::from_uuid(Uuid::now_v7());
     let retry = input.id.is_some();
     let (id, proposals) = parse(input, &source, source_version_id)?;

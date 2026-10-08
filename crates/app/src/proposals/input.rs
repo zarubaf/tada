@@ -37,6 +37,7 @@ pub struct NewChangeset {
     pub event_id: Option<Uuid>,
     /// The member's own words. tada stores them as a source version.
     /// The passages count characters (Unicode scalar values) of this text after normalization: Unicode NFC with `\n` line ends.
+    /// At most 100,000 characters after the normalization.
     pub source_text: String,
     pub proposals: Vec<NewProposal>,
 }

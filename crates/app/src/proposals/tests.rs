@@ -1449,3 +1449,28 @@ async fn a_cited_passage_must_match_its_source_version() {
         [("proposals/0/evidence/0".to_owned(), "quote-mismatch")]
     );
 }
+
+#[tokio::test]
+async fn a_source_text_over_the_limit_stores_nothing() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let mut input = one_fact();
+    input.source_text = format!("{SOURCE} {}", "x".repeat(MAX_SOURCE_TEXT_CHARS));
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("source_text".to_owned(), "length")]
+    );
+    assert!(memory.inserted.lock().unwrap().is_empty());
+    // The limit counts characters after the normalization: `\r\n` counts as one.
+    let mut input = one_fact();
+    input.source_text = format!(
+        "{SOURCE}{}",
+        "\r\n".repeat(MAX_SOURCE_TEXT_CHARS - SOURCE.len())
+    );
+    assert!(
+        create_changeset(&anna, input, stores(&memory), &FixedClock)
+            .await
+            .is_ok()
+    );
+}

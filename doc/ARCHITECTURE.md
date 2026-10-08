@@ -181,6 +181,8 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. A larger text file has no searchable text.
   The PostgreSQL search index of one text is limited to 1 MB, and the index of a text with many unique words can be larger than the text.
   If the index of a text under the cap is too large, tada stores the version without searchable text.
+- The source text of a changeset has at most 100,000 characters after the normalization, else the request fails with `validation-failed`.
+  The cap keeps the search index of the text under its limit, and it limits the cost of the passage checks, which read the text.
 - An upload is a raw request body with the media type `application/octet-stream`, not a multipart form.
   The header `X-File-Name` holds the file name, percent-encoded as UTF-8.
   The server then streams the body to the object storage without a form parser.
