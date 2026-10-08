@@ -33,6 +33,10 @@ pub enum EventKeyError {
 }
 
 impl EventKey {
+    /// The rule of `parse` as a regular expression, for the JSON Schema of an input.
+    /// Change it together with `parse`.
+    pub const PATTERN: &str = "^[A-Z0-9]{2,8}$";
+
     pub fn parse(value: &str) -> Result<Self, EventKeyError> {
         if !(2..=8).contains(&value.len()) {
             return Err(EventKeyError::Length);

@@ -8,6 +8,21 @@ use uuid::Uuid;
 
 use crate::tokens::TokenScope;
 
+/// The ID of one request (ADR 0035). The HTTP server gives it to each driving adapter in the request
+/// extensions, also to an adapter that runs its handlers in other tasks, for example the MCP server.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RequestId(Uuid);
+
+impl RequestId {
+    pub fn new(id: Uuid) -> Self {
+        Self(id)
+    }
+
+    pub fn as_uuid(self) -> Uuid {
+        self.0
+    }
+}
+
 /// The way a request reached tada (ADR 0039).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Channel {

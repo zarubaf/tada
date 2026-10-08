@@ -7,6 +7,8 @@ pub struct PageLimit(u32);
 impl PageLimit {
     pub const DEFAULT: Self = Self(50);
     pub const MAX: u32 = 200;
+    /// The largest page, for a reader that shows one page only.
+    pub const LARGEST: Self = Self(Self::MAX);
 
     pub fn new(limit: u32) -> Option<Self> {
         (1..=Self::MAX).contains(&limit).then_some(Self(limit))

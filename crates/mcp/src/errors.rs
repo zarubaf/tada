@@ -2,8 +2,8 @@
 //!
 //! A problem that a command or query decides, for example `forbidden` or `validation-failed`, is a tool result with
 //! `isError`: clients show tool results to the model, so the agent can correct its call. Only a failure of tada
-//! itself (`internal`, `unavailable`) is a JSON-RPC error. The agent sees the problem code and the JSON pointers of
-//! the invalid values, never the input itself.
+//! itself (`internal`, `unavailable`) is a JSON-RPC error. The agent sees the problem code, the JSON pointers of
+//! the invalid values and the request ID, never the input itself.
 
 use axum::http::request::Parts;
 use rmcp::ErrorData;
@@ -12,6 +12,7 @@ use rmcp::model::{CallToolResponse, CallToolResult};
 use serde_json::{Value, json};
 use tada_app::caller::AiCaller;
 use tada_app::problem::{CommandError, FieldError, ProblemCode};
+use uuid::Uuid;
 
 /// The error of a tool call.
 #[derive(Debug)]
@@ -64,6 +65,35 @@ impl IntoCallToolResult for ToolError {
             Self::Problem(content) => Ok(CallToolResult::structured_error(content).into()),
             Self::Fault(error) => Err(error),
         }
+    }
+}
+
+/// Adds the request ID to the answer of a refused or failed tool call, so that a member can give it to an
+/// operator (ADR 0035, ADR 0037). A successful answer stays as it is.
+pub(crate) fn name_request(
+    answer: Result<CallToolResponse, ErrorData>,
+    request_id: Option<Uuid>,
+) -> Result<CallToolResponse, ErrorData> {
+    let Some(request_id) = request_id else {
+        return answer;
+    };
+    let name = |data: &mut Value| {
+        if let Some(fields) = data.as_object_mut() {
+            fields.insert("request_id".to_owned(), json!(request_id));
+        }
+    };
+    match answer {
+        Ok(CallToolResponse::Complete(mut result)) if result.is_error == Some(true) => {
+            if let Some(content) = result.structured_content.as_mut() {
+                name(content);
+            }
+            Ok(result.into())
+        }
+        Err(mut error) => {
+            name(error.data.get_or_insert_with(|| json!({})));
+            Err(error)
+        }
+        answer => answer,
     }
 }
 
@@ -126,5 +156,33 @@ mod tests {
             answer(ToolError::internal()).unwrap_err().code,
             ErrorCode::INTERNAL_ERROR
         );
+    }
+
+    #[test]
+    fn a_refusal_and_a_failure_name_the_request() {
+        let id = Uuid::now_v7();
+        let named = |error: ToolError| name_request(error.into_call_tool_result(), Some(id));
+        let refusal = named(ToolError::problem(ProblemCode::Forbidden, &[])).unwrap();
+        let CallToolResponse::Complete(refusal) = refusal else {
+            panic!("not a complete result");
+        };
+        assert_eq!(
+            refusal.structured_content,
+            Some(json!({"code": "forbidden", "errors": [], "request_id": id}))
+        );
+        let failure = named(ToolError::problem(ProblemCode::Unavailable, &[])).unwrap_err();
+        assert_eq!(
+            failure.data,
+            Some(json!({"code": "unavailable", "request_id": id}))
+        );
+        let failure = named(ToolError::internal()).unwrap_err();
+        assert_eq!(failure.data, Some(json!({"request_id": id})));
+
+        let success: Result<CallToolResponse, ErrorData> =
+            Ok(CallToolResult::structured(json!({"events": []})).into());
+        let CallToolResponse::Complete(success) = name_request(success, Some(id)).unwrap() else {
+            panic!("not a complete result");
+        };
+        assert_eq!(success.structured_content, Some(json!({"events": []})));
     }
 }

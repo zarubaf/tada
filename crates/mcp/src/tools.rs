@@ -18,7 +18,7 @@ use tada_app::caller::AiCaller;
 use tada_app::clock::Clock;
 use tada_app::documents::{self, DocumentReads, DocumentStore};
 use tada_app::domain::events::EventKey;
-use tada_app::domain::ids::{DocumentVersionId, SourceVersionId};
+use tada_app::domain::ids::DocumentVersionId;
 use tada_app::events::{self, EventStore};
 use tada_app::facts::{self, FactStore};
 use tada_app::identity::IdentityStore;
@@ -26,7 +26,7 @@ use tada_app::paging::PageLimit;
 use tada_app::problem::{FieldError, ProblemCode};
 use tada_app::proposals::ProposalStore;
 use tada_app::search::{self, SearchRequest};
-use tada_app::sources::{self, SourceStore};
+use tada_app::sources::{self, PassageRequest, SourceStore};
 use tada_app::views::{
     DocumentList, DocumentSummaryView, DraftVersionView, EventList, EventSchema, EventView,
     PassageView, ProfileView, SearchHitView, SearchResult,
@@ -34,7 +34,7 @@ use tada_app::views::{
 use uuid::Uuid;
 
 use crate::McpState;
-use crate::errors::{ToolError, caller};
+use crate::errors::{ToolError, caller, name_request};
 
 /// The rules for each agent, in the `initialize` answer.
 const INSTRUCTIONS: &str = "tada holds the planning data of the events of a club. \
@@ -42,6 +42,25 @@ Accepted facts are confirmed; assumptions are not confirmed; unknowns have no va
 Rules: use the existing fields of get_event_schema first. Never fill in an unknown value and never present an assumption or an open proposal as accepted. \
 Cite each statement with the source_version_id and the passage (start, end) that supports it; get_source_passage gives the exact quote. \
 Propose changes with propose_changeset; the member reviews them in tada, and no tool accepts, rejects or deletes.";
+
+/// The description of `list_events`, with the page size of `app`.
+fn list_events_description() -> String {
+    format!(
+        "List the events that the member can read, in the order of their keys. The other tools take the key. \
+The list holds at most {} events and has no next page. If more is true, the member can read more events than this tool can show: tell the member.",
+        PageLimit::MAX
+    )
+}
+
+/// The description of `list_documents`, with the page size of `app`.
+fn list_documents_description() -> String {
+    format!(
+        "List the documents of an event, the newest first, each with its readable ID, its record version and its newest version. \
+A version is an upload (a file) or a draft (Markdown). To propose a new draft version of a document, send its version as expected_version. \
+The list holds at most the {} newest documents and has no next page. If more is true, the event has older documents that this tool cannot show: tell the member.",
+        PageLimit::MAX
+    )
+}
 
 /// The tools of one request. They read and propose with the rights of the member of the token.
 #[derive(Debug, Clone)]
@@ -60,30 +79,8 @@ pub(crate) struct Tools {
 #[serde(deny_unknown_fields)]
 pub(crate) struct EventInput {
     /// The key of the event, for example `FLY28`, from `list_events`.
+    #[schemars(regex(pattern = EventKey::PATTERN))]
     event_key: String,
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct SearchInput {
-    /// The key of one event. Without it, the search reads each event that the member can read.
-    #[serde(default)]
-    event_key: Option<String>,
-    /// The words to find, in the syntax of a web search: words, `"a phrase"`, `or` and `-word`.
-    query: String,
-    /// The largest number of hits, 1 to 50. The default is 10.
-    #[serde(default)]
-    limit: Option<u32>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct PassageInput {
-    source_version_id: Uuid,
-    /// The offset of the first character, in characters of the normalized text.
-    start: u32,
-    /// The offset after the last character.
-    end: u32,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -109,7 +106,7 @@ impl Tools {
 
     #[tool(
         name = "list_events",
-        description = "List the events that the member can read, with their keys. The other tools take the key.",
+        description = list_events_description(),
         annotations(read_only_hint = true)
     )]
     async fn list_events(
@@ -117,13 +114,7 @@ impl Tools {
         Extension(parts): Extension<Parts>,
     ) -> Result<Json<EventList>, ToolError> {
         let caller = caller(&parts)?;
-        let page = events::list_events(
-            caller,
-            None,
-            PageLimit::new(PageLimit::MAX).unwrap_or_default(),
-            &*self.events,
-        )
-        .await?;
+        let page = events::list_events(caller, None, PageLimit::LARGEST, &*self.events).await?;
         Ok(Json(EventList {
             events: page.items.iter().map(EventView::from).collect(),
             more: page.next.is_some(),
@@ -179,14 +170,9 @@ Each hit names its source version and a snippet with its offsets. Cite a hit as 
     async fn search_sources(
         &self,
         Extension(parts): Extension<Parts>,
-        Parameters(input): Parameters<SearchInput>,
+        Parameters(request): Parameters<SearchRequest>,
     ) -> Result<Json<SearchResult>, ToolError> {
         let caller = caller(&parts)?;
-        let request = SearchRequest {
-            event_key: input.event_key,
-            query: input.query,
-            limit: input.limit,
-        };
         let hits = search::search_sources(
             caller,
             request,
@@ -209,18 +195,11 @@ The offsets count characters, as in the evidence of a fact and in a search hit."
     async fn get_source_passage(
         &self,
         Extension(parts): Extension<Parts>,
-        Parameters(input): Parameters<PassageInput>,
+        Parameters(request): Parameters<PassageRequest>,
     ) -> Result<Json<PassageView>, ToolError> {
         let caller = caller(&parts)?;
-        let passage = sources::get_source_passage(
-            caller,
-            SourceVersionId::from_uuid(input.source_version_id),
-            input.start,
-            input.end,
-            &*self.identity,
-            &*self.sources,
-        )
-        .await?;
+        let passage =
+            sources::get_source_passage(caller, request, &*self.identity, &*self.sources).await?;
         Ok(Json(PassageView::from(&passage)))
     }
 }
@@ -229,9 +208,7 @@ The offsets count characters, as in the evidence of a fact and in a search hit."
 impl Tools {
     #[tool(
         name = "list_documents",
-        description = "List the documents of an event, the newest first, each with its readable ID, its record version and its newest version. \
-A version is an upload (a file) or a draft (Markdown). To propose a new draft version of a document, send its version as expected_version. \
-The list holds at most the 200 newest documents and has no next page. If more is true, the event has older documents that this tool cannot show: tell the member.",
+        description = list_documents_description(),
         annotations(read_only_hint = true)
     )]
     async fn list_documents(
@@ -246,7 +223,7 @@ The list holds at most the 200 newest documents and has no next page. If more is
             event.id,
             None,
             None,
-            PageLimit::new(PageLimit::MAX).unwrap_or_default(),
+            PageLimit::LARGEST,
             self.document_reads(),
         )
         .await?;
@@ -315,22 +292,79 @@ impl ServerHandler for Tools {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
+        let request_id = context
+            .extensions
+            .get::<Parts>()
+            .and_then(|parts| crate::guard::request_id(&parts.extensions));
         let call = ToolCallContext::new(self, request, context);
-        match Self::all_tools().call(call).await? {
+        let answer = match Self::all_tools().call(call).await {
             // rmcp answers arguments that do not match the input schema with a text that can repeat input values
             // (ADR 0037). Each refusal of a tool has structured content, so the result without it is that answer.
-            CallToolResponse::Complete(result)
+            Ok(CallToolResponse::Complete(result))
                 if result.is_error == Some(true) && result.structured_content.is_none() =>
             {
                 ToolError::problem(ProblemCode::MalformedRequest, &[]).into_call_tool_result()
             }
-            response => Ok(response),
-        }
+            answer => answer,
+        };
+        name_request(answer, request_id)
     }
 
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("tada", env!("CARGO_PKG_VERSION")))
             .with_instructions(INSTRUCTIONS)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{Value, json};
+    use tada_app::search::{DEFAULT_LIMIT, MAX_LIMIT, MAX_QUERY_CHARS};
+    use tada_app::sources::MAX_PASSAGE_CHARS;
+
+    use super::*;
+
+    fn tool(name: &str) -> rmcp::model::Tool {
+        Tools::all_tools()
+            .list_all()
+            .into_iter()
+            .find(|tool| tool.name == name)
+            .unwrap()
+    }
+
+    fn property(tool_name: &str, name: &str) -> Value {
+        Value::Object((*tool(tool_name).input_schema).clone())["properties"][name].clone()
+    }
+
+    /// The limits of `app` are the one authority of the tool schemas and descriptions (ADR 0040).
+    #[test]
+    fn the_tool_inputs_state_the_limits_of_app() {
+        let key = json!(EventKey::PATTERN);
+        for name in [
+            "get_event_schema",
+            "get_event_profile",
+            "list_documents",
+            "search_sources",
+        ] {
+            assert_eq!(property(name, "event_key")["pattern"], key, "{name}");
+        }
+        let query = property("search_sources", "query");
+        assert_eq!(query["maxLength"], json!(MAX_QUERY_CHARS));
+        let limit = property("search_sources", "limit");
+        assert_eq!(limit["maximum"], json!(MAX_LIMIT));
+        assert_eq!(limit["default"], json!(DEFAULT_LIMIT));
+        let end = property("get_source_passage", "end");
+        let end = end["description"].as_str().unwrap();
+        assert!(end.contains(&MAX_PASSAGE_CHARS.to_string()), "{end}");
+        // A list without a next page says how many items it holds and what `more` means.
+        for name in ["list_events", "list_documents"] {
+            let description = tool(name).description.unwrap();
+            assert!(
+                description.contains(&PageLimit::MAX.to_string()),
+                "{description}"
+            );
+            assert!(description.contains("If more is true"), "{description}");
+        }
     }
 }

@@ -4245,7 +4245,7 @@
                               "type": "string"
                             },
                             "markdown": {
-                              "description": "CommonMark with tables, UTF-8, one sentence per line. No raw HTML and no images.\nA fact is an empty link to an exact fact version: `[](tada:fact/<fact-uuid>?v=<n>)`.\nA source passage is a link with the supporting words: `[words](tada:source/<source-version-uuid>#<start>-<end>)`.\nEach link must cite an accepted fact version, an assumption or an unknown of the event, never an open proposal,\nor a source version that the member can see.",
+                              "description": "CommonMark with tables, UTF-8, one sentence per line. No raw HTML and no images.\nA fact is an empty link to an exact fact version: `[](tada:fact/<fact-uuid>?v=<n>)`.\nNever write the value of a fact as text.\nA source passage is a link with the supporting words: `[words](tada:source/<source-version-uuid>#<start>-<end>)`.\nA `tada:` link writes each UUID in lowercase with hyphens. Other links use `https` or `mailto` only.\nEach link must cite an accepted fact version, an assumption or an unknown of the event, never an open proposal,\nor a source version that the member can see.\nA number, date or amount outside a `tada:` link gives a lint warning for the reviewer.",
                               "type": "string"
                             }
                           },

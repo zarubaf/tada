@@ -1053,7 +1053,17 @@ mod tests {
     async fn the_routes_of_another_adapter_get_the_request_id_and_the_referrer_policy() {
         let web = tempfile::tempdir().unwrap();
         fs::write(web.path().join("index.html"), "<html>tada</html>").unwrap();
-        let adapter = Router::new().nest_service("/mcp", any(|| async { "mcp" }));
+        // The adapter answers with the request ID of its request extensions.
+        let adapter = Router::new().nest_service(
+            "/mcp",
+            any(|request: Request<Body>| async move {
+                request
+                    .extensions()
+                    .get::<tada_app::caller::RequestId>()
+                    .map(|id| id.as_uuid().to_string())
+                    .unwrap_or_default()
+            }),
+        );
         let router = router_with(state(), Some(web.path()), adapter);
 
         let response = router
@@ -1062,11 +1072,11 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.headers()[header::REFERRER_POLICY], "no-referrer");
-        assert!(response.headers().contains_key(request_id::HEADER));
+        let header = response.headers()[request_id::HEADER].clone();
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        assert_eq!(&body[..], b"mcp");
+        assert_eq!(&body[..], header.as_bytes());
         assert_eq!(
             get(&router, "/").await,
             (StatusCode::OK, "<html>tada</html>".to_owned())
