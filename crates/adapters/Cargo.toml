@@ -9,8 +9,8 @@ repository.workspace = true
 publish.workspace = true
 
 [features]
-# Test doubles for the tests of other crates.
-testing = []
+# Test doubles and the Garage container for the tests of other crates.
+testing = ["dep:testcontainers-modules", "dep:uuid"]
 
 [lints]
 workspace = true
@@ -25,9 +25,11 @@ futures.workspace = true
 jiff.workspace = true
 lettre.workspace = true
 secrecy.workspace = true
+testcontainers-modules = { workspace = true, optional = true }
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+uuid = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
