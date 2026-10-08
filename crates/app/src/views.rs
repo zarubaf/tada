@@ -266,7 +266,11 @@ impl ProfileView {
                     field_key: entry.field.key.as_str().to_owned(),
                     fact_id: entry.fact_id.as_uuid(),
                     version: entry.version.get(),
-                    evidence: entry.evidence.iter().map(evidence_view).collect(),
+                    evidence: entry
+                        .evidence
+                        .iter()
+                        .map(|dated| evidence_view(&dated.evidence))
+                        .collect(),
                 }),
             }
         }
@@ -281,7 +285,11 @@ fn fact_view(entry: &ProfileEntry, valued: &Valued) -> FactView {
         version: entry.version.get(),
         value: ValueInput::from(&valued.value),
         approximate: valued.approximate,
-        evidence: entry.evidence.iter().map(evidence_view).collect(),
+        evidence: entry
+            .evidence
+            .iter()
+            .map(|dated| evidence_view(&dated.evidence))
+            .collect(),
     }
 }
 
@@ -419,6 +427,8 @@ mod tests {
     use tada_domain::sources::Passage;
 
     use super::*;
+    use crate::caller::{MemberCaller, OrganizationRole};
+    use crate::facts::DatedEvidence;
 
     fn field(key: &str) -> FieldDefinition {
         core_catalog()
@@ -501,15 +511,25 @@ mod tests {
             fact_id: FactId::from_uuid(Uuid::now_v7()),
             version: RecordVersion::FIRST,
             state,
-            evidence: vec![Evidence {
-                source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(30)),
-                passage: Passage {
-                    start: 4,
-                    end: 12,
-                    quote: "Flugfeld".to_owned(),
-                    page: None,
+            evidence: vec![DatedEvidence {
+                evidence: Evidence {
+                    source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(30)),
+                    passage: Passage {
+                        start: 4,
+                        end: 12,
+                        quote: "Flugfeld".to_owned(),
+                        page: None,
+                    },
                 },
+                captured_at: Timestamp::UNIX_EPOCH,
             }],
+            accepted_by: MemberCaller::new(
+                UserId::from_uuid(Uuid::from_u128(40)),
+                OrganizationId::from_uuid(Uuid::from_u128(41)),
+                OrganizationRole::Member,
+            )
+            .actor(),
+            accepted_at: Timestamp::UNIX_EPOCH,
         }
     }
 

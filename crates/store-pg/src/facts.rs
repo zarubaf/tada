@@ -11,12 +11,12 @@ use tada_app::domain::facts::{
 };
 use tada_app::domain::ids::{EventId, FactId, FactVersionId, FieldDefinitionId, SourceVersionId};
 use tada_app::domain::sources::{Evidence, Passage};
-use tada_app::facts::{EventProfile, FactStore, FactVersionRef, ProfileEntry};
+use tada_app::facts::{DatedEvidence, EventProfile, FactStore, FactVersionRef, ProfileEntry};
 use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::error::{InvalidRow, store_error};
-use crate::{proposals, values};
+use crate::{actor, proposals, values};
 
 /// The sync of a shipped field catalog failed. It changed nothing.
 #[derive(Debug, thiserror::Error)]
@@ -173,6 +173,8 @@ struct ProfileRow {
     state: String,
     value: Option<serde_json::Value>,
     approximate: bool,
+    accepted_by: serde_json::Value,
+    accepted_at: jiff_sqlx::Timestamp,
     id: Uuid,
     event_id: Option<Uuid>,
     key: String,
@@ -186,6 +188,7 @@ struct ProfileRow {
 
 struct EvidenceRow {
     fact_version_id: Uuid,
+    captured_at: jiff_sqlx::Timestamp,
     source_version_id: Uuid,
     start_offset: i32,
     end_offset: i32,
@@ -193,19 +196,22 @@ struct EvidenceRow {
     page: Option<i32>,
 }
 
-impl TryFrom<EvidenceRow> for Evidence {
+impl TryFrom<EvidenceRow> for DatedEvidence {
     type Error = InvalidRow;
 
     fn try_from(row: EvidenceRow) -> Result<Self, InvalidRow> {
         let offset = |value: i32| u32::try_from(value).map_err(|_| InvalidRow("evidence_link"));
-        Ok(Evidence {
-            source_version_id: SourceVersionId::from_uuid(row.source_version_id),
-            passage: Passage {
-                start: offset(row.start_offset)?,
-                end: offset(row.end_offset)?,
-                quote: row.quote,
-                page: row.page.map(offset).transpose()?,
+        Ok(DatedEvidence {
+            evidence: Evidence {
+                source_version_id: SourceVersionId::from_uuid(row.source_version_id),
+                passage: Passage {
+                    start: offset(row.start_offset)?,
+                    end: offset(row.end_offset)?,
+                    quote: row.quote,
+                    page: row.page.map(offset).transpose()?,
+                },
             },
+            captured_at: row.captured_at.to_jiff(),
         })
     }
 }
@@ -245,6 +251,7 @@ impl FactStore for Database {
         let rows = sqlx::query_as!(
             ProfileRow,
             r#"SELECT f.id AS fact_id, v.id AS version_id, v.number, v.state, v.value, v.approximate,
+                      v.accepted_by, v.created_at AS "accepted_at: jiff_sqlx::Timestamp",
                       d.id, d.event_id, d.key, d.label_text, d.label_message, d.value_type, d.description,
                       d.module, d.status
                FROM fact f
@@ -262,23 +269,25 @@ impl FactStore for Database {
         let version_ids: Vec<Uuid> = rows.iter().map(|row| row.version_id).collect();
         let evidence_rows = sqlx::query_as!(
             EvidenceRow,
-            "SELECT fact_version_id, source_version_id, start_offset, end_offset, quote, page
-             FROM evidence_link
-             WHERE organization_id = $1 AND fact_version_id = ANY($2)
-             ORDER BY source_version_id, start_offset, id",
+            r#"SELECT e.fact_version_id, s.captured_at AS "captured_at: jiff_sqlx::Timestamp",
+                      e.source_version_id, e.start_offset, e.end_offset, e.quote, e.page
+               FROM evidence_link e
+               JOIN source_version s ON s.organization_id = e.organization_id AND s.id = e.source_version_id
+               WHERE e.organization_id = $1 AND e.fact_version_id = ANY($2)
+               ORDER BY e.source_version_id, e.start_offset, e.id"#,
             organization,
             &version_ids,
         )
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
-        let mut evidence: HashMap<Uuid, Vec<Evidence>> = HashMap::new();
+        let mut evidence: HashMap<Uuid, Vec<DatedEvidence>> = HashMap::new();
         for row in evidence_rows {
             let version = row.fact_version_id;
             evidence
                 .entry(version)
                 .or_default()
-                .push(Evidence::try_from(row)?);
+                .push(DatedEvidence::try_from(row)?);
         }
         let fields = rows
             .into_iter()
@@ -288,6 +297,8 @@ impl FactStore for Database {
                     version: record_version(row.number)?,
                     state: values::fact_state_from_columns(&row.state, row.value, row.approximate)?,
                     evidence: evidence.remove(&row.version_id).unwrap_or_default(),
+                    accepted_by: actor::from_json(&row.accepted_by)?,
+                    accepted_at: row.accepted_at.to_jiff(),
                     field: FieldDefinition::try_from(FieldRow {
                         id: row.id,
                         event_id: row.event_id,
@@ -301,7 +312,7 @@ impl FactStore for Database {
                     })?,
                 })
             })
-            .collect::<Result<_, InvalidRow>>()?;
+            .collect::<Result<_, StoreError>>()?;
         Ok(EventProfile {
             fields,
             proposals: proposals::open_fact_proposals(&self.pool, scope, event).await?,
@@ -372,7 +383,7 @@ impl FactStore for Database {
 #[cfg(test)]
 mod tests {
     use jiff::civil::date;
-    use tada_app::caller::{Actor, MemberCaller, OrganizationRole};
+    use tada_app::caller::{Actor, ActorKind, MemberCaller, OrganizationRole};
     use tada_app::domain::facts::{
         CORE_CATALOG_VERSION, DateWindow, FactState, FactValue, Granularity, Label, ShortText,
         Unit, ValueType, Valued, core_catalog,
@@ -750,13 +761,31 @@ mod tests {
             .unwrap();
 
         let profile = db.profile(scope, event).await.unwrap();
+        let captured_at: jiff_sqlx::Timestamp =
+            sqlx::query_scalar("SELECT captured_at FROM source_version WHERE id = $1")
+                .bind(source.source_version_id.as_uuid())
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        // The test inserts each version with a new member as its acceptor.
+        let acceptance = |index: usize| {
+            let entry: &ProfileEntry = &profile.fields[index];
+            assert_eq!(entry.accepted_by.kind(), ActorKind::Member);
+            (entry.accepted_by, entry.accepted_at)
+        };
+        let ((first_by, first_at), (second_by, second_at)) = (acceptance(0), acceptance(1));
         let expected = [
             ProfileEntry {
                 field: date_window.clone(),
                 fact_id: fact,
                 version: RecordVersion::new(2).unwrap(),
                 state: assumption.clone(),
-                evidence: vec![source],
+                evidence: vec![DatedEvidence {
+                    evidence: source,
+                    captured_at: captured_at.to_jiff(),
+                }],
+                accepted_by: first_by,
+                accepted_at: first_at,
             },
             ProfileEntry {
                 field: hangars.clone(),
@@ -764,6 +793,8 @@ mod tests {
                 version: RecordVersion::FIRST,
                 state: FactState::Unknown,
                 evidence: Vec::new(),
+                accepted_by: second_by,
+                accepted_at: second_at,
             },
         ];
         assert_eq!(profile.fields, expected);
@@ -811,7 +842,7 @@ mod tests {
         let states: Vec<_> = profile.fields.iter().map(|entry| &entry.state).collect();
         assert_eq!(states, [&FactState::Accepted(venue("Flugfeld Testwil"))]);
         assert_eq!(
-            profile.fields[0].evidence[0].passage.quote,
+            profile.fields[0].evidence[0].evidence.passage.quote,
             "Flugfeld Testwil"
         );
 

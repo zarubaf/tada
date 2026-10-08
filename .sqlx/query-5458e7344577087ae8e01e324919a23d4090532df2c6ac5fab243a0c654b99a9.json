@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT f.id AS fact_id, v.id AS version_id, v.number, v.state, v.value, v.approximate,\n                      d.id, d.event_id, d.key, d.label_text, d.label_message, d.value_type, d.description,\n                      d.module, d.status\n               FROM fact f\n               JOIN fact_version v ON v.organization_id = f.organization_id AND v.fact_id = f.id\n                                  AND v.number = f.version\n               JOIN field_definition d ON d.id = f.field_id\n               WHERE f.organization_id = $1 AND f.event_id = $2\n               ORDER BY d.key COLLATE \"C\", d.id",
+  "query": "SELECT f.id AS fact_id, v.id AS version_id, v.number, v.state, v.value, v.approximate,\n                      v.accepted_by, v.created_at AS \"accepted_at: jiff_sqlx::Timestamp\",\n                      d.id, d.event_id, d.key, d.label_text, d.label_message, d.value_type, d.description,\n                      d.module, d.status\n               FROM fact f\n               JOIN fact_version v ON v.organization_id = f.organization_id AND v.fact_id = f.id\n                                  AND v.number = f.version\n               JOIN field_definition d ON d.id = f.field_id\n               WHERE f.organization_id = $1 AND f.event_id = $2\n               ORDER BY d.key COLLATE \"C\", d.id",
   "describe": {
     "columns": [
       {
@@ -71,6 +71,28 @@
       },
       {
         "ordinal": 6,
+        "name": "accepted_by",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "fact_version",
+            "name": "accepted_by"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "accepted_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "fact_version",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "id",
         "type_info": "Uuid",
         "origin": {
@@ -81,7 +103,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 9,
         "name": "event_id",
         "type_info": "Uuid",
         "origin": {
@@ -92,7 +114,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 10,
         "name": "key",
         "type_info": "Text",
         "origin": {
@@ -103,7 +125,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 11,
         "name": "label_text",
         "type_info": "Text",
         "origin": {
@@ -114,7 +136,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 12,
         "name": "label_message",
         "type_info": "Text",
         "origin": {
@@ -125,7 +147,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 13,
         "name": "value_type",
         "type_info": "Jsonb",
         "origin": {
@@ -136,7 +158,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 14,
         "name": "description",
         "type_info": "Text",
         "origin": {
@@ -147,7 +169,7 @@
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 15,
         "name": "module",
         "type_info": "Text",
         "origin": {
@@ -158,7 +180,7 @@
         }
       },
       {
-        "ordinal": 14,
+        "ordinal": 16,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -183,6 +205,8 @@
       true,
       false,
       false,
+      false,
+      false,
       true,
       false,
       true,
@@ -193,5 +217,5 @@
       false
     ]
   },
-  "hash": "ed751f0a861ff7871517f5005b28676ab9c7207fa1d7378d8cf1a966ae00b410"
+  "hash": "5458e7344577087ae8e01e324919a23d4090532df2c6ac5fab243a0c654b99a9"
 }

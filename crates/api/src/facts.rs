@@ -19,6 +19,7 @@ use crate::ApiState;
 use crate::contract::{AUTHENTICATED, PATH, codes};
 use crate::extract::{Caller, Path};
 use crate::problem::{ApiError, Problem};
+use crate::review::Author;
 use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
@@ -71,6 +72,10 @@ pub struct Fact {
     pub version: i64,
     /// The passages of source versions that support the current fact version.
     pub evidence: Vec<FactEvidence>,
+    /// The reviewer who accepted the current fact version.
+    pub accepted_by: Author,
+    /// The time of the acceptance of the current fact version.
+    pub accepted_at: Timestamp,
 }
 
 /// One evidence link: a passage of a source version.
@@ -78,6 +83,8 @@ pub struct Fact {
 pub struct FactEvidence {
     pub source_version_id: Uuid,
     pub passage: Passage,
+    /// The time when tada captured the source version.
+    pub captured_at: Timestamp,
 }
 
 /// An open proposal that sets the fact of a field.
@@ -140,12 +147,15 @@ impl From<ProfileEntry> for Fact {
             value,
             approximate,
             version: entry.version.get(),
+            accepted_by: entry.accepted_by.into(),
+            accepted_at: entry.accepted_at,
             evidence: entry
                 .evidence
                 .iter()
-                .map(|evidence| FactEvidence {
-                    source_version_id: evidence.source_version_id.as_uuid(),
-                    passage: (&evidence.passage).into(),
+                .map(|dated| FactEvidence {
+                    source_version_id: dated.evidence.source_version_id.as_uuid(),
+                    passage: (&dated.evidence.passage).into(),
+                    captured_at: dated.captured_at,
                 })
                 .collect(),
         }

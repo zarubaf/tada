@@ -18,7 +18,7 @@ use tada_domain::proposals::QuestionText;
 use tada_domain::sources::Evidence;
 
 use crate::access::{self, AccessError, Principal};
-use crate::caller::OrgScope;
+use crate::caller::{Actor, OrgScope};
 use crate::identity::IdentityStore;
 use crate::store::StoreError;
 
@@ -73,7 +73,18 @@ pub struct ProfileEntry {
     pub version: RecordVersion,
     pub state: FactState<Valued>,
     /// The evidence links of the fact version.
-    pub evidence: Vec<Evidence>,
+    pub evidence: Vec<DatedEvidence>,
+    /// The reviewer who accepted the fact version.
+    pub accepted_by: Actor,
+    /// The time of the acceptance.
+    pub accepted_at: Timestamp,
+}
+
+/// An evidence link with the capture time of its source version.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatedEvidence {
+    pub evidence: Evidence,
+    pub captured_at: Timestamp,
 }
 
 /// The current version of one fact.

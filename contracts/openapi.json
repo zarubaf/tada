@@ -4233,7 +4233,9 @@
           "field_key",
           "state",
           "version",
-          "evidence"
+          "evidence",
+          "accepted_by",
+          "accepted_at"
         ],
         "properties": {
           "id": {
@@ -4272,6 +4274,15 @@
               "$ref": "#/components/schemas/FactEvidence"
             },
             "description": "The passages of source versions that support the current fact version."
+          },
+          "accepted_by": {
+            "$ref": "#/components/schemas/Author",
+            "description": "The reviewer who accepted the current fact version."
+          },
+          "accepted_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time of the acceptance of the current fact version."
           }
         }
       },
@@ -4280,7 +4291,8 @@
         "description": "One evidence link: a passage of a source version.",
         "required": [
           "source_version_id",
-          "passage"
+          "passage",
+          "captured_at"
         ],
         "properties": {
           "source_version_id": {
@@ -4289,6 +4301,11 @@
           },
           "passage": {
             "$ref": "#/components/schemas/Passage"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time when tada captured the source version."
           }
         }
       },
