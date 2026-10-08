@@ -1,4 +1,19 @@
 //! PostgreSQL repositories, migrations, sessions and the job queue.
+//!
+//! # Lock order
+//!
+//! A transaction that locks rows of more than one kind takes them in this global order, so two transactions
+//! cannot deadlock on their row locks:
+//!
+//! 1. the organization row (`FOR NO KEY UPDATE`), for example to check a quota of the organization;
+//! 2. the changeset row;
+//! 3. the event field definitions, in the order of their IDs;
+//! 4. the facts, in the order of their IDs;
+//! 5. the event-local ID counters, in the order of their scopes.
+//!
+//! A transaction can skip a kind, but it never takes an earlier kind after a later one.
+//! A new command that needs the organization lock takes it first, before the lock of a changeset.
+//! The apply of a changeset (`review::lock_targets`) takes kinds 2 to 5 before its checks and writes.
 
 mod actor;
 mod audit;

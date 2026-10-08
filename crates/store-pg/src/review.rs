@@ -220,8 +220,9 @@ async fn lock_open(
 }
 
 /// Locks the existing field definitions and facts that the plan uses or changes, and the event-local ID counters
-/// that it moves, before any check. It locks fields, then facts, then counters, each kind in the order of its keys. So two applies take their row locks in the
-/// same order and cannot deadlock on them. The plan order follows the dependencies and the client IDs.
+/// that it moves, before any check. It keeps the lock order of the crate documentation: fields, then facts,
+/// then counters, each kind in the order of its keys. So two applies take their row locks in the same order and
+/// cannot deadlock on them. The plan order follows the dependencies and the client IDs.
 /// A missing counter row is inserted here, so the lock covers it; a rollback removes it again.
 /// Inserts of other new rows can still wait on each other; a deadlock there maps to `Unavailable`,
 /// so the client retries.
