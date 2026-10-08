@@ -49,6 +49,7 @@ Optional later adapters: Microsoft Graph (mail, calendar, SharePoint), Nextcloud
 | Runtime          | One image that follows the platform contract. Each operator deploys it from a separate repository.                                   | [0025](adr/0025-platform-contract.md), [0028](adr/0028-images-and-registry.md), [0033](adr/0033-deployment-outside-this-repository.md) |
 
 An MCP tool answers a refusal of `app`, also invalid arguments, as a tool result with `isError`, the problem code and the JSON pointers of the invalid values; only `internal` and `unavailable` are JSON-RPC errors.
+Each refusal and each JSON-RPC error of a tool also contains the request ID.
 
 Search uses PostgreSQL full-text search first.
 pgvector comes only if an evaluation shows a benefit.

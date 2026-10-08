@@ -175,6 +175,17 @@ impl Mcp {
         origin: Option<&str>,
         body: &Value,
     ) -> (StatusCode, Value) {
+        let (status, _, body) = self.rpc_traced(token, origin, body).await;
+        (status, body)
+    }
+
+    /// Like `rpc`, and also returns the request ID of the response header.
+    async fn rpc_traced(
+        &self,
+        token: Option<&str>,
+        origin: Option<&str>,
+        body: &Value,
+    ) -> (StatusCode, Uuid, Value) {
         // An MCP client sends no `Origin`; `support::request` would add one to a POST.
         let mut request = support::request(Method::GET, "/mcp")
             .method(Method::POST)
@@ -188,7 +199,7 @@ impl Mcp {
             request = request.header(header::ORIGIN, origin);
         }
         let request = request.body(Body::from(body.to_string())).unwrap();
-        send(&self.router, request).await
+        send_traced(&self.router, request).await
     }
 
     /// Calls the tool `name` with Anna's token and returns the JSON-RPC response.
@@ -313,18 +324,29 @@ fn problem(body: &Value) -> &Value {
 
 /// Sends a request and returns the status and the JSON body. Each response must forbid the referrer (ADR 0008).
 async fn send(router: &Router, request: Request<Body>) -> (StatusCode, Value) {
+    let (status, _, body) = send_traced(router, request).await;
+    (status, body)
+}
+
+/// Like `send`, and also returns the request ID of the response header.
+async fn send_traced(router: &Router, request: Request<Body>) -> (StatusCode, Uuid, Value) {
     let response = router.clone().oneshot(request).await.unwrap();
     assert_eq!(response.headers()[header::REFERRER_POLICY], "no-referrer");
+    let request_id = response.headers()["x-request-id"]
+        .to_str()
+        .unwrap()
+        .parse()
+        .unwrap();
     let status = response.status();
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
     if bytes.is_empty() {
-        return (status, Value::Null);
+        return (status, request_id, Value::Null);
     }
     let body = serde_json::from_slice(&bytes)
         .unwrap_or_else(|_| panic!("{status}: not JSON: {}", String::from_utf8_lossy(&bytes)));
-    (status, body)
+    (status, request_id, body)
 }
 
 fn set_fact(event: EventId, field: &str, value: Value) -> Value {
@@ -802,10 +824,9 @@ async fn reads_of_sources_leave_no_text_in_the_log() {
     let wrong =
         json!({"source_version_id": hit["source_version_id"], "start": "Flugfeld", "end": 1});
     let body = mcp.call("get_source_passage", wrong).await;
-    assert_eq!(
-        problem(&body),
-        &json!({"code": "malformed-request", "errors": []})
-    );
+    let refusal = problem(&body);
+    assert_eq!(refusal["code"], "malformed-request", "{body}");
+    assert_eq!(refusal["errors"], json!([]), "{body}");
     assert!(!body.to_string().contains("Flugfeld"), "{body}");
     // An unknown tool stays a JSON-RPC error.
     let body = mcp.call("accept_changeset", json!({})).await;
@@ -940,6 +961,67 @@ async fn a_changeset_through_mcp_waits_in_the_review_inbox_with_the_ai_as_author
     assert_eq!(channel, "api-token");
 
     logs::assert_clean(&[&token, "Flugfeld", "Hangar 3", "im Mai 2030"]);
+}
+
+/// One request ID connects an MCP call with its audit records, its answer and its log lines (ADR 0035, ADR 0039).
+#[tokio::test]
+async fn the_records_and_the_refusals_of_an_mcp_call_name_its_request() {
+    let mcp = Mcp::start().await;
+    let (_, token) = mcp.contributor_token().await;
+    let changeset_id = Uuid::now_v7();
+    let mut arguments = changeset(
+        mcp.secret,
+        SOURCE,
+        json!([proposal(
+            Uuid::now_v7(),
+            set_fact(mcp.secret, "date_window", may_2030()),
+            &[],
+            SOURCE,
+            "im Mai 2030"
+        )]),
+    );
+    arguments["id"] = json!(changeset_id);
+    let call = |arguments: Value| {
+        json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "propose_changeset", "arguments": arguments},
+        })
+    };
+
+    let (status, request_id, body) = mcp.rpc_traced(Some(&token), None, &call(arguments)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["result"]["isError"], false, "{body}");
+    let author: Uuid = mcp
+        .test
+        .scalar(&format!(
+            "SELECT (author->>'request_id')::uuid FROM changeset WHERE id = '{changeset_id}'"
+        ))
+        .await;
+    assert_eq!(author, request_id);
+    let audit: Uuid = mcp
+        .test
+        .scalar(&format!(
+            "SELECT request_id FROM audit_event \
+             WHERE action = 'changeset.create' AND record_id = '{changeset_id}'"
+        ))
+        .await;
+    assert_eq!(audit, request_id);
+
+    // A refusal of a tool names the request.
+    let refused = changeset(mcp.secret, SOURCE, json!([]));
+    let (_, request_id, body) = mcp.rpc_traced(Some(&token), None, &call(refused)).await;
+    assert_eq!(
+        problem(&body)["request_id"],
+        request_id.to_string(),
+        "{body}"
+    );
+
+    // A refusal of the guard is a problem with the request ID (ADR 0037).
+    let list = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"});
+    let (status, request_id, body) = mcp.rpc_traced(None, None, &list).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["request_id"], request_id.to_string(), "{body}");
+    assert_eq!(body["instance"], format!("urn:uuid:{request_id}"), "{body}");
 }
 
 #[tokio::test]

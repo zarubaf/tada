@@ -7,17 +7,21 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use tada_app::auth::{Authenticated, AuthenticationError, Authenticator, Credential};
+use tada_app::caller::RequestId;
 use tada_app::problem::{CommandError, ProblemCode};
+use uuid::Uuid;
 
 use crate::McpState;
 
 /// Rejects a request with a foreign `Origin` (403) or without a valid personal API token (401).
-/// For a valid token, it gives the `AiCaller` to the tools in the extensions of the request.
+/// For a valid token, it gives the `AiCaller` of the request to the tools in the extensions of the request.
 pub(crate) async fn check(
     State(state): State<McpState>,
     mut request: Request,
     next: Next,
 ) -> Response {
+    let request_id = request_id(request.extensions());
+    let problem = |code| problem(code, request_id);
     if !origin_allowed(request.headers(), state.public_url.origin()) {
         return problem(ProblemCode::Forbidden);
     }
@@ -33,12 +37,18 @@ pub(crate) async fn check(
     };
     match authenticated {
         Authenticated::Ai(caller) => {
+            let caller = caller.with_request(request_id);
             request.extensions_mut().insert(caller);
             next.run(request).await
         }
         // The token authenticator never gives a member: only AI clients use this server (ADR 0039).
         Authenticated::Member(_member) => problem(ProblemCode::Unauthenticated),
     }
+}
+
+/// The ID that the HTTP server gave the request (ADR 0035).
+pub(crate) fn request_id(extensions: &axum::http::Extensions) -> Option<Uuid> {
+    extensions.get::<RequestId>().map(|id| id.as_uuid())
 }
 
 /// The error and all its sources in one line, for logs.
@@ -74,15 +84,20 @@ fn bearer_token(headers: &HeaderMap) -> Option<&str> {
     (scheme.eq_ignore_ascii_case("bearer") && !token.is_empty()).then_some(token)
 }
 
-/// The body of an error response: the problem code and its meaning (ADR 0037).
+/// The body of an error response: the problem code, its meaning and the request ID (ADR 0037).
 #[derive(Serialize)]
 struct Problem {
     code: &'static str,
     title: &'static str,
     status: u16,
+    /// `urn:uuid:` and the request ID.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    instance: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_id: Option<Uuid>,
 }
 
-fn problem(code: ProblemCode) -> Response {
+fn problem(code: ProblemCode, request_id: Option<Uuid>) -> Response {
     let status = match code {
         ProblemCode::Unauthenticated => StatusCode::UNAUTHORIZED,
         ProblemCode::Forbidden => StatusCode::FORBIDDEN,
@@ -93,6 +108,8 @@ fn problem(code: ProblemCode) -> Response {
         code: code.as_str(),
         title: code.meaning(),
         status: status.as_u16(),
+        instance: request_id.map(|id| format!("urn:uuid:{id}")),
+        request_id,
     };
     let mut response = (status, Json(body)).into_response();
     let headers = response.headers_mut();

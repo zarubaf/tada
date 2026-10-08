@@ -34,7 +34,7 @@ use tada_app::views::{
 use uuid::Uuid;
 
 use crate::McpState;
-use crate::errors::{ToolError, caller};
+use crate::errors::{ToolError, caller, name_request};
 
 /// The rules for each agent, in the `initialize` answer.
 const INSTRUCTIONS: &str = "tada holds the planning data of the events of a club. \
@@ -309,17 +309,22 @@ impl ServerHandler for Tools {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
+        let request_id = context
+            .extensions
+            .get::<Parts>()
+            .and_then(|parts| crate::guard::request_id(&parts.extensions));
         let call = ToolCallContext::new(self, request, context);
-        match Self::all_tools().call(call).await? {
+        let answer = match Self::all_tools().call(call).await {
             // rmcp answers arguments that do not match the input schema with a text that can repeat input values
             // (ADR 0037). Each refusal of a tool has structured content, so the result without it is that answer.
-            CallToolResponse::Complete(result)
+            Ok(CallToolResponse::Complete(result))
                 if result.is_error == Some(true) && result.structured_content.is_none() =>
             {
                 ToolError::problem(ProblemCode::MalformedRequest, &[]).into_call_tool_result()
             }
-            response => Ok(response),
-        }
+            answer => answer,
+        };
+        name_request(answer, request_id)
     }
 
     fn get_info(&self) -> ServerConfig {
