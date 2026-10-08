@@ -19,8 +19,9 @@ A new component needs an entry here in the same pull request.
 | CommandMenu  |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                                         |
 
 Button sizes follow `--control-height-*` of the density. The primary button uses `--color-accent` and `--color-text-on-accent`.
-The danger button is secondary in style with `--color-danger` text until a confirmation step.
+The danger button is secondary in style with `--color-danger` text.
 Row actions that remove or revoke something use the danger button.
+The confirm button of a destructive confirmation also uses the danger button.
 
 ### Input
 

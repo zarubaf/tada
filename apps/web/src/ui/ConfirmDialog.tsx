@@ -50,7 +50,7 @@ export function ConfirmDialog({
           {warning && <p className={styles.warning}>{warning}</p>}
           <div className={styles.actions}>
             <Button onPress={onCancel}>{cancelLabel}</Button>
-            <Button variant="primary" isPending={isPending} onPress={onConfirm}>
+            <Button variant="danger" isPending={isPending} onPress={onConfirm}>
               {confirmLabel}
             </Button>
           </div>
