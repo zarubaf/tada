@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
 import { Link } from "../router/Router";
+import { Page } from "../ui/Page";
 import styles from "./SettingsLayout.module.css";
 
 /**
@@ -9,7 +10,7 @@ import styles from "./SettingsLayout.module.css";
  */
 export function SettingsLayout({ children }: { children: ReactNode }) {
   return (
-    <main id="main" className={styles.layout}>
+    <Page>
       <nav className={styles.nav} aria-label={t("settings-nav")}>
         <Link to="/settings/members" className={styles.link}>
           {t("settings-nav-members")}
@@ -19,6 +20,6 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
         </Link>
       </nav>
       {children}
-    </main>
+    </Page>
   );
 }

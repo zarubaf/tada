@@ -1,22 +1,9 @@
 @layer components {
-  .layout {
-    display: grid;
-    align-content: start;
-  }
-
   .nav {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-1);
-    margin: var(--space-4) var(--space-4) 0;
     border-bottom: 1px solid var(--color-border-subtle);
-  }
-
-  @media (width >= 40rem) {
-    /* --bp-medium */
-    .nav {
-      margin: var(--space-6) var(--space-6) 0;
-    }
   }
 
   .link {

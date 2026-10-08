@@ -3,6 +3,7 @@ import { type Api, type Event, problemMessage } from "../api/client";
 import { t } from "../i18n";
 import { Link, useParams } from "../router/Router";
 import { InlineError } from "../ui/InlineError";
+import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventPage.module.css";
 
@@ -40,7 +41,7 @@ export function EventPage({ api, children }: { api: Api; children: ReactNode }) 
 
   const base = `/events/${encodeURIComponent(eventId)}`;
   return (
-    <main id="main" className={styles.page}>
+    <Page>
       {state.kind === "loading" && (
         <div className={styles.skeleton} role="status" aria-label={t("event-loading")}>
           <Skeleton />
@@ -61,7 +62,7 @@ export function EventPage({ api, children }: { api: Api; children: ReactNode }) 
         <>
           <header className={styles.header}>
             <p className={styles.key}>{state.event.key}</p>
-            <h1 className={styles.title}>{state.event.name}</h1>
+            <PageTitle>{state.event.name}</PageTitle>
           </header>
           <nav className={styles.nav} aria-label={t("event-nav")}>
             <Link to={base} className={styles.link} exact>
@@ -74,6 +75,6 @@ export function EventPage({ api, children }: { api: Api; children: ReactNode }) 
           {children}
         </>
       )}
-    </main>
+    </Page>
   );
 }

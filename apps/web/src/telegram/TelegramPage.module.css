@@ -3,27 +3,12 @@
     display: grid;
     align-content: start;
     gap: var(--space-6);
-    padding: var(--space-6) var(--space-4);
-  }
-
-  @media (width >= 40rem) {
-    /* --bp-medium */
-    .page {
-      padding: var(--space-8) var(--space-6);
-    }
   }
 
   .section {
     display: grid;
     gap: var(--space-3);
     max-width: 40rem;
-  }
-
-  .title {
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--letter-spacing-tight);
-    line-height: var(--line-height-2xl);
   }
 
   .heading {

@@ -1,22 +1,6 @@
 @layer components {
-  .page {
-    display: grid;
-    align-content: start;
-    gap: var(--space-4);
-    max-width: 40rem; /* the width of a form */
-    margin-inline: auto;
-    padding: var(--space-8) var(--space-4);
-  }
-
   .brand {
     font-weight: var(--font-weight-semibold);
-  }
-
-  .title {
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--letter-spacing-tight);
-    line-height: var(--line-height-2xl);
   }
 
   .form {

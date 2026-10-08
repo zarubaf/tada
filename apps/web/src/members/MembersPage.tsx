@@ -18,6 +18,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { useFocusAfterCommit } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
+import { PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import { InviteMemberForm } from "./InviteMemberForm";
 import styles from "./MembersPage.module.css";
@@ -340,9 +341,9 @@ export function MembersPage({ api }: { api: Api }) {
       </LiveRegion>
 
       <section className={styles.section} aria-labelledby="members-title">
-        <h1 id="members-title" ref={membersHeading} tabIndex={-1} className={styles.title}>
+        <PageTitle id="members-title" ref={membersHeading}>
           {t("members-title")}
-        </h1>
+        </PageTitle>
         {members.kind === "loading" && (
           <div className={styles.skeleton} role="status" aria-label={t("members-loading")}>
             <Skeleton />

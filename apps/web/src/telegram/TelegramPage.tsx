@@ -14,6 +14,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { useFocusAfterCommit } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
+import { PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./TelegramPage.module.css";
 
@@ -161,9 +162,7 @@ export function TelegramPage({ api }: { api: Api }) {
       </LiveRegion>
 
       <section className={styles.section} aria-labelledby="telegram-title">
-        <h1 id="telegram-title" className={styles.title}>
-          {t("telegram-title")}
-        </h1>
+        <PageTitle id="telegram-title">{t("telegram-title")}</PageTitle>
         <p>{t("telegram-intro")}</p>
         <h2 className={styles.heading}>{t("telegram-steps-title")}</h2>
         <ol className={styles.steps}>

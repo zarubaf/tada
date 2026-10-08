@@ -8,6 +8,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { useFocusAfterCommit } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LinkButton } from "../ui/LinkButton";
+import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventsPage.module.css";
 
@@ -82,11 +83,9 @@ export function EventsPage({ api }: { api: Api }) {
   };
 
   return (
-    <main id="main" className={styles.page}>
+    <Page>
       <div className={styles.toolbar}>
-        <h1 ref={heading} tabIndex={-1} className={styles.title}>
-          {t("events-title")}
-        </h1>
+        <PageTitle ref={heading}>{t("events-title")}</PageTitle>
         {canCreate && (
           <LinkButton to="/events/new" primary>
             {t("events-create")}
@@ -127,6 +126,6 @@ export function EventsPage({ api }: { api: Api }) {
           )}
         </>
       )}
-    </main>
+    </Page>
   );
 }
