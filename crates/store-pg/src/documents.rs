@@ -670,15 +670,14 @@ impl DocumentStore for Database {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         // The lock of the document row (kind 6 of the lock order) orders the approval after a new version
         // of the document and before the next one, because the apply of a draft updates this row too.
-        let Some(target) = sqlx::query!(
-            r#"SELECT d.id, d.version, v.number, v.kind, v.status,
-                      EXISTS (SELECT 1 FROM document_version n
-                              WHERE n.organization_id = v.organization_id AND n.document_id = v.document_id
-                                AND n.number > v.number AND n.status = 'approved') AS "newer_approved!"
-               FROM document_version v
-               JOIN document d ON d.organization_id = v.organization_id AND d.id = v.document_id
-               WHERE v.organization_id = $1 AND v.id = $2
-               FOR UPDATE OF d"#,
+        // It orders two approvals of the document too. The lock is a statement of its own: in READ COMMITTED,
+        // only a statement after the wait sees what a concurrent approval committed, because an approval
+        // does not update the document row.
+        let Some(document) = sqlx::query!(
+            "SELECT d.id, d.version FROM document d
+             WHERE d.organization_id = $1
+               AND d.id = (SELECT document_id FROM document_version WHERE organization_id = $1 AND id = $2)
+             FOR UPDATE",
             organization,
             approval.version_id.as_uuid(),
         )
@@ -688,10 +687,23 @@ impl DocumentStore for Database {
         else {
             return Ok(Approved::NotFound);
         };
+        let target = sqlx::query!(
+            r#"SELECT v.kind, v.status,
+                      EXISTS (SELECT 1 FROM document_version n
+                              WHERE n.organization_id = v.organization_id AND n.document_id = v.document_id
+                                AND n.number > v.number AND n.status = 'approved') AS "newer_approved!"
+               FROM document_version v
+               WHERE v.organization_id = $1 AND v.id = $2"#,
+            organization,
+            approval.version_id.as_uuid(),
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(store_error)?;
         if target.kind != DRAFT {
             return Ok(Approved::NotFound);
         }
-        if target.version != approval.expected_version.get() {
+        if document.version != approval.expected_version.get() {
             return Ok(Approved::VersionConflict);
         }
         let open = target
@@ -706,7 +718,7 @@ impl DocumentStore for Database {
             "UPDATE document_version SET status = 'superseded'
              WHERE organization_id = $1 AND document_id = $2 AND status = 'approved'",
             organization,
-            target.id,
+            document.id,
         )
         .execute(&mut *tx)
         .await

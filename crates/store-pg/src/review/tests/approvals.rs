@@ -182,6 +182,131 @@ async fn nobody_can_overwrite_an_approved_version() {
     assert_eq!(markdown, "Erste Fassung.\n");
 }
 
+/// Waits until `count` sessions of the test database wait for a lock.
+async fn wait_for_lock_waiters(test: &TestDatabase, count: i64) {
+    loop {
+        let waiting: i64 = test
+            .scalar(
+                "SELECT count(*) FROM pg_stat_activity
+                 WHERE datname = current_database() AND wait_event_type = 'Lock'",
+            )
+            .await;
+        if waiting >= count {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+}
+
+/// Runs the approvals `first` and then `second` while another transaction holds the lock of the document row,
+/// so that both wait for the lock, and returns their results in this order.
+async fn approve_at_once(
+    test: &TestDatabase,
+    open_day: &OpenDay,
+    document: Uuid,
+    (first, second): (DocumentVersionId, DocumentVersionId),
+    expected: i64,
+) -> (
+    Result<DraftStatus, ApproveError>,
+    Result<DraftStatus, ApproveError>,
+) {
+    let mut holder = test.database.pool.begin().await.unwrap();
+    sqlx::query("SELECT 1 FROM document WHERE id = $1 FOR UPDATE")
+        .bind(document)
+        .execute(&mut *holder)
+        .await
+        .unwrap();
+    let release = async {
+        wait_for_lock_waiters(test, 2).await;
+        holder.commit().await.unwrap();
+    };
+    let later = async {
+        wait_for_lock_waiters(test, 1).await;
+        approve(test, &open_day.manager, second, expected).await
+    };
+    let (first, second, ()) = tokio::join!(
+        approve(test, &open_day.manager, first, expected),
+        later,
+        release
+    );
+    (first, second)
+}
+
+/// Two approvals at the same time see the state after the lock (ADR 0051): the same version is approved once,
+/// and an older version never becomes approved over a newer approved one.
+#[tokio::test]
+async fn concurrent_approvals_keep_one_approved_version_in_order() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let document = Uuid::now_v7();
+    let first = add_draft(
+        &test,
+        &open_day,
+        new_document(document),
+        document,
+        "Eins.\n",
+    )
+    .await;
+    let (a, b) = approve_at_once(&test, &open_day, document, (first, first), 1).await;
+    assert_eq!(a.unwrap(), DraftStatus::Approved);
+    assert!(matches!(b, Err(ApproveError::InvalidTransition)), "{b:?}");
+    let audits: i64 = test
+        .scalar("SELECT count(*) FROM audit_event WHERE action = 'document_version.approve'")
+        .await;
+    assert_eq!(audits, 1);
+
+    // The newer version first: the older one must not take its place.
+    let second = add_draft(&test, &open_day, existing(document, 1), document, "Zwei.\n").await;
+    let third = add_draft(&test, &open_day, existing(document, 2), document, "Drei.\n").await;
+    let (newer, older) = approve_at_once(&test, &open_day, document, (third, second), 3).await;
+    assert_eq!(newer.unwrap(), DraftStatus::Approved);
+    assert!(
+        matches!(older, Err(ApproveError::InvalidTransition)),
+        "{older:?}"
+    );
+    assert_eq!(status_of_version(&test, third).await, "approved");
+    assert_eq!(status_of_version(&test, second).await, "draft");
+    assert_eq!(status_of_version(&test, first).await, "superseded");
+
+    // The older version first: the newer one supersedes it.
+    let fourth = add_draft(&test, &open_day, existing(document, 3), document, "Vier.\n").await;
+    let fifth = add_draft(&test, &open_day, existing(document, 4), document, "Fünf.\n").await;
+    let (older, newer) = approve_at_once(&test, &open_day, document, (fourth, fifth), 5).await;
+    assert_eq!(older.unwrap(), DraftStatus::Approved);
+    assert_eq!(newer.unwrap(), DraftStatus::Approved);
+    assert_eq!(status_of_version(&test, fourth).await, "superseded");
+    assert_eq!(status_of_version(&test, fifth).await, "approved");
+    let approved: i64 = test
+        .scalar("SELECT count(*) FROM document_version WHERE status = 'approved'")
+        .await;
+    assert_eq!(approved, 1);
+}
+
+/// The database keeps at most one approved version of each document, also if the application fails.
+#[tokio::test]
+async fn a_document_has_at_most_one_approved_version() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let document = Uuid::now_v7();
+    let first = add_draft(
+        &test,
+        &open_day,
+        new_document(document),
+        document,
+        "Eins.\n",
+    )
+    .await;
+    let second = add_draft(&test, &open_day, existing(document, 1), document, "Zwei.\n").await;
+    approve(&test, &open_day.manager, first, 2).await.unwrap();
+
+    let error = sqlx::query("UPDATE document_version SET status = 'approved' WHERE id = $1")
+        .bind(second.as_uuid())
+        .execute(&test.database.pool)
+        .await
+        .unwrap_err();
+    assert_eq!(sqlstate(&error), "23505");
+}
+
 /// Demonstration steps 6 and 7: a changed date shows „Fakten geändert“, and the new draft shows the differences.
 #[tokio::test]
 async fn a_changed_date_window_marks_the_document_and_the_difference_lists_it() {
