@@ -1,4 +1,5 @@
 import {
+  IconAlertTriangle,
   IconCircleCheck,
   IconCircleDashed,
   IconCircleDotted,
@@ -8,7 +9,7 @@ import type { ReactNode } from "react";
 import { t } from "../i18n";
 import styles from "./KnowledgeState.module.css";
 
-export type KnowledgeStateName = "accepted" | "proposed" | "assumption" | "unknown";
+export type KnowledgeStateName = "accepted" | "proposed" | "assumption" | "unknown" | "conflict";
 
 export interface KnowledgeStateProps {
   state: KnowledgeStateName;
@@ -26,6 +27,7 @@ const ICONS = {
   proposed: IconCircleDashed,
   assumption: IconCircleDotted,
   unknown: IconHelpCircle,
+  conflict: IconAlertTriangle,
 } satisfies Record<KnowledgeStateName, unknown>;
 
 /**

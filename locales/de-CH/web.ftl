@@ -85,6 +85,7 @@ knowledge-accepted = Bestätigt
 knowledge-proposed = Vorschlag
 knowledge-assumption = Annahme
 knowledge-unknown = Unbekannt
+knowledge-conflict = Konflikt
 
 ## Navigation
 

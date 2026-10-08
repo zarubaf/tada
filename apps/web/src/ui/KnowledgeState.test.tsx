@@ -7,6 +7,7 @@ describe("KnowledgeState", () => {
     ["accepted", "Bestätigt"],
     ["proposed", "Vorschlag"],
     ["assumption", "Annahme"],
+    ["conflict", "Konflikt"],
   ] as const)("shows the value and the label %s", (state, label) => {
     render(<KnowledgeState state={state}>Flugplatz Testwil</KnowledgeState>);
     expect(screen.getByText("Flugplatz Testwil")).toBeInTheDocument();

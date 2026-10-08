@@ -59,6 +59,17 @@
     text-underline-offset: 4px;
   }
 
+  .state[data-state="conflict"] .value {
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    background: var(--color-danger-subtle);
+  }
+
+  .state[data-state="conflict"] .icon,
+  .state[data-state="conflict"] .label {
+    color: var(--color-danger);
+  }
+
   .state[data-state="unknown"] .mark {
     color: var(--color-text-muted);
     font-size: inherit;
