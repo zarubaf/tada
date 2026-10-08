@@ -66,6 +66,7 @@ fn update(update_id: u32, text: &str) -> Value {
 
 #[tokio::test]
 async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
+    support::logs::install();
     let test = TestDatabase::start().await;
     let (_, _, cookie) = test.member("testwil", OrganizationRole::Owner).await;
     let member = authenticate(&test, &cookie).await;
@@ -124,6 +125,8 @@ async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
     assert_eq!(requests.len(), 1);
     assert_eq!(requests[0].telegram_user_id.0, 4242);
     assert_eq!(requests[0].telegram_name.0, "Testperson Muster");
+
+    support::logs::assert_clean(&[&code.code, &cookie, "Testperson", "Muster", "test-token"]);
 }
 
 /// The member of a session cookie, as the session authenticator finds it.
@@ -166,6 +169,7 @@ async fn call(
 
 #[tokio::test]
 async fn the_member_confirms_the_link_in_the_web_client() {
+    support::logs::install();
     let test = TestDatabase::start().await;
     let (_, _, cookie) = test.member("testwil", OrganizationRole::Owner).await;
     let router = support::session_router(&test, Arc::new(SystemClock));
@@ -220,4 +224,7 @@ async fn the_member_confirms_the_link_in_the_web_client() {
     let (status, _, problem) = call(&router, &cookie, Method::POST, &path).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(problem["code"], "not-found");
+
+    support::logs::assert_clean(&[&code, &cookie, "Testperson"]);
+    support::logs::assert_route_logged("/api/v1/telegram/link-requests/{request_id}/confirm");
 }

@@ -299,6 +299,17 @@ async fn a_removed_member_loses_the_organization_with_the_next_request() {
 
     let (status, _) = app.remove(&owner, anna.id).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+
+    support::logs::assert_clean(&[
+        &owner.cookie,
+        &anna.cookie,
+        "olga.owner@example.org",
+        "anna.muster@example.org",
+        "Olga Owner",
+        "Anna Muster",
+        &anna.id.as_uuid().to_string(),
+    ]);
+    support::logs::assert_route_logged("/api/v1/members/{user_id}/remove");
 }
 
 #[tokio::test]

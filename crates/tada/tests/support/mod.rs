@@ -5,6 +5,8 @@
 // The helpers are not `#[test]` functions, so clippy.toml does not cover them.
 #![allow(clippy::unwrap_used)]
 
+pub mod logs;
+
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -174,6 +176,7 @@ pub struct MailApp {
 impl MailApp {
     /// Starts a test database and the API. The clock starts at 2030-05-18 08:00 UTC.
     pub async fn start() -> Self {
+        logs::install();
         let test = TestDatabase::start().await;
         let clock = Arc::new(TestClock::new("2030-05-18T08:00:00Z".parse().unwrap()));
         let router = session_router(&test, clock.clone());

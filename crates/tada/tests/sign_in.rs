@@ -134,6 +134,14 @@ async fn a_sign_in_request_gets_the_same_answer_for_each_address_and_only_a_memb
     let sent = app.mailer.sent();
     assert_eq!(sent.len(), 1, "only the member gets a mail");
     assert_eq!(sent[0].to, Email::parse("anna@example.org").unwrap());
+
+    support::logs::assert_clean(&[
+        "nobody@example.org",
+        "ben@example.org",
+        "anna@example.org",
+        "Anna@Example.org",
+        "Anna Muster",
+    ]);
 }
 
 #[tokio::test]
@@ -172,6 +180,9 @@ async fn a_member_signs_in_with_the_magic_link_in_the_organization() {
     assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
     let (response, _) = app.get("/api/v1/events", Some(&cookie)).await;
     assert_eq!(response.status(), StatusCode::OK);
+
+    support::logs::assert_clean(&[&token, &cookie, "anna@example.org", "Anna Muster"]);
+    support::logs::assert_route_logged("/api/v1/sign-in/magic-link");
 }
 
 #[tokio::test]
@@ -378,6 +389,8 @@ async fn the_sixth_request_for_one_address_is_rate_limited_also_with_two_process
     app.clock.advance(SignedDuration::from_hours(1));
     let (response, _) = request_link_from(processes[0], support::PEER, "anna@example.org").await;
     assert_eq!(response.status(), StatusCode::ACCEPTED, "a new window");
+
+    support::logs::assert_clean(&["anna@example.org", "ben@example.org", "198.51.100.1"]);
 }
 
 #[tokio::test]
@@ -397,4 +410,6 @@ async fn the_31st_request_from_one_ip_address_is_rate_limited() {
     assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(problem["code"], "rate-limited");
     assert!(response.headers().contains_key(header::RETRY_AFTER));
+
+    support::logs::assert_clean(&["person0@example.org", "person30@example.org"]);
 }
