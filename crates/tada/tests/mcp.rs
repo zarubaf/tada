@@ -612,6 +612,84 @@ async fn a_member_reads_the_organization_source_that_the_facts_of_its_event_cite
     );
 }
 
+/// The protocol version that current MCP clients, for example Claude Code, negotiate.
+const PROTOCOL_VERSION: &str = "2025-06-18";
+
+/// A POST of a real MCP client: the token, the Accept header of the Streamable HTTP transport and,
+/// after the handshake, the negotiated protocol version.
+async fn client_post(mcp: &Mcp, protocol: Option<&str>, body: &Value) -> (StatusCode, Value) {
+    let mut request = Request::post("/mcp")
+        .header(header::HOST, "tada.example.org")
+        .header(header::AUTHORIZATION, format!("Bearer {}", mcp.token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::ACCEPT, "application/json, text/event-stream")
+        .extension(axum::extract::ConnectInfo(std::net::SocketAddr::new(
+            support::PEER,
+            40000,
+        )));
+    if let Some(protocol) = protocol {
+        request = request.header("mcp-protocol-version", protocol);
+    }
+    send(
+        &mcp.router,
+        request.body(Body::from(body.to_string())).unwrap(),
+    )
+    .await
+}
+
+/// The flow of a real MCP client against the stateless server: handshake, tool list and tool call.
+#[tokio::test]
+async fn a_client_completes_the_handshake_and_calls_a_tool() {
+    let mcp = Mcp::start().await;
+    let initialize = json!({
+        "jsonrpc": "2.0", "id": 0, "method": "initialize",
+        "params": {
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {"roots": {"listChanged": true}},
+            "clientInfo": {"name": "claude-code", "version": "2.0.0"},
+        },
+    });
+    let (status, body) = client_post(&mcp, None, &initialize).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let result = &body["result"];
+    assert_eq!(result["protocolVersion"], PROTOCOL_VERSION);
+    assert_eq!(result["serverInfo"]["name"], "tada");
+    assert!(result["capabilities"]["tools"].is_object(), "{body}");
+    assert!(
+        result["instructions"]
+            .as_str()
+            .unwrap()
+            .contains("Never fill in")
+    );
+
+    let initialized = json!({"jsonrpc": "2.0", "method": "notifications/initialized"});
+    let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &initialized).await;
+    assert_eq!(status, StatusCode::ACCEPTED, "{body}");
+
+    let list = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"});
+    let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &list).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let tools = body["result"]["tools"].as_array().unwrap();
+    assert_eq!(tools.len(), 5);
+    for tool in tools {
+        assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
+        assert_eq!(tool["outputSchema"]["type"], "object", "{tool}");
+        assert_eq!(tool["annotations"]["readOnlyHint"], true, "{tool}");
+    }
+
+    let call = json!({
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": {"name": "list_events", "arguments": {}},
+    });
+    let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &call).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        body["result"]["structuredContent"]["events"][0]["event_key"],
+        "OPEN30"
+    );
+    assert_eq!(body["result"]["isError"], false);
+}
+
 /// A citation and a search write no notice and no member text to the log (ADR 0035).
 #[tokio::test]
 async fn reads_of_sources_leave_no_text_in_the_log() {
