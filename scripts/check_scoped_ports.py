@@ -39,6 +39,7 @@ NON_PORTS = {
     "Clock": "reads the time, no data",
     "CommandError": "maps a command error to a problem code, no data access",
     "DependencyCheck": "probes a dependency for the health endpoint, no data access",
+    "ExportSink": "writes the files of an export; it reads no data, the export source does",
     "JobHandler": "runs one job; it reaches data only through the ports",
     "MailTexts": "renders the mail texts, no data access",
     "Mailer": "sends a mail, no data access",

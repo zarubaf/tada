@@ -7,7 +7,6 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::Router;
 use tada_adapters::clock::SystemClock;
-use tada_adapters::storage::{S3Config, S3Storage};
 use tada_api::ApiState;
 use tada_app::session::SessionAuthenticator;
 use tada_app::tokens::TokenAuthenticator;
@@ -31,14 +30,7 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
-    let storage = S3Storage::new(S3Config {
-        endpoint: storage.endpoint.into(),
-        region: storage.region,
-        bucket: storage.bucket,
-        access_key_id: storage.access_key_id,
-        secret_access_key: storage.secret_access_key,
-    });
-    let storage = Arc::new(storage);
+    let storage = Arc::new(storage.open());
     let api = ApiState {
         dependencies: vec![Arc::new(db.clone()), storage.clone()],
         authenticator: Arc::new(SessionAuthenticator::new(

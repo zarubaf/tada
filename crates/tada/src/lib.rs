@@ -2,6 +2,7 @@
 //! `main.rs` only parses the command line.
 
 pub mod bootstrap;
+pub mod export;
 pub mod logging;
 pub mod serve;
 pub mod settings;

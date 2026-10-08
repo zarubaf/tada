@@ -1,14 +1,17 @@
 //! The tada binary (ADR 0025).
 
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use tada::bootstrap::BootstrapCommand;
+use tada::export::ExportCommand;
 use tada::settings::{
-    self, BootstrapSettings, MigrateSettings, ServeSettings, TelegramSettings, WorkerSettings,
+    self, BootstrapSettings, ExportSettings, MigrateSettings, ServeSettings, TelegramSettings,
+    WorkerSettings,
 };
-use tada::{bootstrap, migrate, run, serve, telegram, worker};
+use tada::{bootstrap, export, migrate, run, serve, telegram, worker};
 use tada_app::domain::identity::{Email, OrganizationName, OrganizationSlug};
 
 #[derive(Debug, Parser)]
@@ -44,6 +47,16 @@ enum Command {
         #[arg(long)]
         print_link: bool,
     },
+    /// Write all data of one organization into a new or empty directory (ADR 0059).
+    /// The export holds personal data: store it like a backup.
+    Export {
+        /// The organization to export.
+        #[arg(long, value_parser = OrganizationSlug::parse)]
+        organization_slug: OrganizationSlug,
+        /// The directory for the files of the export. It must be new or empty.
+        #[arg(long)]
+        output: PathBuf,
+    },
     /// Print the settings reference as Markdown.
     Settings,
     /// Print the OpenAPI document of the HTTP API.
@@ -71,6 +84,18 @@ fn main() -> ExitCode {
                     organization_name,
                     owner_email,
                     print_link,
+                },
+            )
+        }),
+        Command::Export {
+            organization_slug,
+            output,
+        } => run::<ExportSettings, _>("export", |settings| {
+            export::run(
+                settings,
+                ExportCommand {
+                    organization_slug,
+                    output,
                 },
             )
         }),

@@ -7,6 +7,7 @@ use std::str::FromStr;
 use ipnet::IpNet;
 use secrecy::SecretString;
 use tada_adapters::mail::SmtpTls;
+use tada_adapters::storage::{S3Config, S3Storage};
 use tada_app::domain::identity::Email;
 use tada_app::public_url::PublicUrl;
 use tracing_subscriber::EnvFilter;
@@ -24,6 +25,8 @@ pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp);
 pub type TelegramSettings = (Database, Telegram);
 /// The settings of `tada bootstrap`.
 pub type BootstrapSettings = (Database, PublicUrl);
+/// The settings of `tada export` (ADR 0059).
+pub type ExportSettings = (Database, Storage);
 /// The settings of `tada migrate`.
 pub type MigrateSettings = (Database,);
 
@@ -187,6 +190,19 @@ pub struct Storage {
     pub bucket: String,
     pub access_key_id: SecretString,
     pub secret_access_key: SecretString,
+}
+
+impl Storage {
+    /// The S3 adapter of these settings. Each command that reads or writes objects opens it here.
+    pub fn open(self) -> S3Storage {
+        S3Storage::new(S3Config {
+            endpoint: self.endpoint.into(),
+            region: self.region,
+            bucket: self.bucket,
+            access_key_id: self.access_key_id,
+            secret_access_key: self.secret_access_key,
+        })
+    }
 }
 
 const S3_ENDPOINT: Setting = Setting {

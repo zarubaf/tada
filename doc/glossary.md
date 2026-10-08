@@ -94,13 +94,14 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 ## Documents
 
-| Term             | Meaning                                                                                                | Avoid          |
-| ---------------- | ------------------------------------------------------------------------------------------------------ | -------------- |
-| document         | A file with a stable tada ID. The ID does not change with its name or folder.                          | file (in code) |
-| document version | One immutable upload or generated draft of a document.                                                 |                |
-| draft            | A document version in Markdown that tada adds when a member accepts a draft proposal. It has a status. |                |
-| approved version | A draft version with the status `approved`. Nobody can overwrite it.                                   | final          |
-| storage quota    | The largest total size of the uploaded files of one organization (ADR 0043).                           |                |
+| Term             | Meaning                                                                                                                                                    | Avoid          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| document         | A file with a stable tada ID. The ID does not change with its name or folder.                                                                              | file (in code) |
+| document version | One immutable upload or generated draft of a document.                                                                                                     |                |
+| draft            | A document version in Markdown that tada adds when a member accepts a draft proposal. It has a status.                                                     |                |
+| approved version | A draft version with the status `approved`. Nobody can overwrite it.                                                                                       | final          |
+| storage quota    | The largest total size of the uploaded files of one organization (ADR 0043).                                                                               |                |
+| export           | All data of one organization as files (ADR 0059): JSON Lines, CSV, the original files and a manifest with hashes. An operator makes it with `tada export`. | dump, backup   |
 
 ## AI and automation
 
@@ -126,7 +127,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | job              | A durable unit of background work with a versioned payload.                                                                                       | task (in code)                                   |
 | actor            | The record of who did a change, for the audit log: a member, a service identity, or AI with its principal. Code never checks permissions with it. | user (in code)                                   |
 | audit subject    | The member whom an audit event is about, for example the member whose event role changed (ADR 0061).                                              | target, affected user                            |
-| service identity | A named identity of tada that acts without a member: `job-runner`, `ai-pm`, `telegram-gateway` or `bootstrap`.                                    | system user, worker                              |
+| service identity | A named identity of tada that acts without a member: `job-runner`, `ai-pm`, `telegram-gateway`, `bootstrap` or `exporter`.                        | system user, worker                              |
 | caller           | The typed value that a command takes for authorization: member, service identity or AI.                                                           | actor (for permissions)                          |
 | principal        | The member or service identity for which AI acts. Never AI itself.                                                                                |                                                  |
 | process role     | The kind of process that the `tada` binary runs: `serve`, `worker` or `telegram`.                                                                 | role (alone; it also means an organization role) |
