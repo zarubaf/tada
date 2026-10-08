@@ -568,3 +568,54 @@ async fn a_contributor_cites_the_intake_text_that_the_facts_of_the_event_cite() 
         .await,
     );
 }
+
+/// A draft cites the facts of its own event only, also for an owner who can read every event.
+#[tokio::test]
+async fn a_draft_cannot_cite_a_fact_of_another_event() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let (_, facts) = accepted_fact(&test, &open_day).await;
+    let elsewhere = test.create_event(open_day.organization, "FLY31").await;
+    let id = Uuid::now_v7();
+    let theirs = propose(
+        &test,
+        &open_day.owner,
+        Some(elsewhere),
+        vec![proposal(
+            id,
+            date_window(elsewhere, 6, None),
+            &[],
+            "im Mai 2030",
+        )],
+    )
+    .await;
+    apply(&test, &open_day.owner, &theirs, select(&[id]))
+        .await
+        .unwrap();
+    let other_fact: Uuid = sqlx::query_scalar("SELECT id FROM fact WHERE event_id = $1")
+        .bind(elsewhere.as_uuid())
+        .fetch_one(&test.database.pool)
+        .await
+        .unwrap();
+
+    let source = facts.source_version_id.as_uuid();
+    for caller in [&open_day.contributor, &open_day.owner] {
+        let result = propose_draft(
+            &test,
+            caller,
+            open_day.event,
+            vec![proposal(
+                Uuid::now_v7(),
+                draft(
+                    open_day.event,
+                    new_document(Uuid::now_v7()),
+                    &markdown(other_fact, 1, source),
+                ),
+                &[],
+                "Das Open Day",
+            )],
+        )
+        .await;
+        rejected_link(result);
+    }
+}
