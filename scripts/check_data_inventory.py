@@ -23,6 +23,7 @@ INVENTORY = ROOT / "doc" / "data-inventory.md"
 
 # Tables without personal data. Each reason says what the table holds.
 # A table that can hold personal data needs a row in the inventory instead.
+# An `ALTER TABLE` that adds a column to one of these tables needs a new look at its reason.
 ALLOWED = {
     "worker_heartbeat": "A worker ID and times of its loop, and the depth of the queue. No data about a person.",
     "job": (
@@ -37,18 +38,34 @@ ALLOWED = {
     "organization_feature": "One switch of an organization and its version, for example `mcp-tokens`. No person.",
 }
 
-TABLE = re.compile(r"^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)", re.IGNORECASE | re.MULTILINE)
+# Any `CREATE TABLE`, also with a modifier. The name after it must then be readable, or the check fails.
+STATEMENT = re.compile(
+    r"^\s*CREATE\s+(?:(?:GLOBAL|LOCAL|UNLOGGED|TEMP|TEMPORARY)\s+)*TABLE\s+(?P<rest>[^\n]*)",
+    re.IGNORECASE | re.MULTILINE,
+)
+# `name`, `"name"`, `schema.name` and `"schema"."name"`, after an optional `IF NOT EXISTS`.
+NAME = re.compile(
+    r'(?:IF\s+NOT\s+EXISTS\s+)?(?:"?[a-z_][a-z0-9_]*"?\.)?"?([a-z_][a-z0-9_]*)"?(?=[\s(;]|$)', re.IGNORECASE
+)
 CODE = re.compile(r"`([a-z_][a-z0-9_]*)(?:\.[a-z_][a-z0-9_*]*)?`")
 
 
-def tables(migrations: Path) -> dict[str, str]:
-    """The tables that the migrations create, each with the file of its first `CREATE TABLE`."""
+def tables(migrations: Path) -> tuple[dict[str, str], list[str]]:
+    """The tables that the migrations create, each with the file of its first `CREATE TABLE`.
+
+    The second value lists the statements whose table name this script cannot read.
+    """
     found: dict[str, str] = {}
+    unreadable: list[str] = []
     for path in sorted(migrations.glob("*.sql")):
         sql = re.sub(r"--[^\n]*", "", path.read_text())
-        for name in TABLE.findall(sql):
-            found.setdefault(name.lower(), path.name)
-    return found
+        for statement in STATEMENT.finditer(sql):
+            name = NAME.match(statement["rest"])
+            if name:
+                found.setdefault(name[1].lower(), path.name)
+            else:
+                unreadable.append(f"{path.name}: {statement[0].strip()[:60]}")
+    return found, unreadable
 
 
 def named(inventory: str) -> set[str]:
@@ -56,17 +73,23 @@ def named(inventory: str) -> set[str]:
     return set(CODE.findall(inventory))
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str], allowed: dict[str, str] | None = None) -> int:
+    allowed = ALLOWED if allowed is None else allowed
     migrations = Path(argv[0]) if argv else MIGRATIONS
     inventory = Path(argv[1]) if len(argv) > 1 else INVENTORY
-    found = tables(migrations)
+    found, unreadable = tables(migrations)
     if not found:
         print(f"{migrations} has no CREATE TABLE statement; check the path.", file=sys.stderr)
         return 1
-    covered = named(inventory.read_text()) | ALLOWED.keys()
+    covered = named(inventory.read_text()) | allowed.keys()
     missing = {table: file for table, file in found.items() if table not in covered}
+    stale = sorted(allowed.keys() - found.keys())
+    for statement in unreadable:
+        print(f"This script cannot read the table name of: {statement}", file=sys.stderr)
     for table, file in missing.items():
         print(f"The table {table} ({file}) is not in {inventory.name}.", file=sys.stderr)
+    for table in stale:
+        print(f"ALLOWED names {table}, but no migration creates it. Remove the entry.", file=sys.stderr)
     if missing:
         print(
             "Add a row for the personal data of the table to the inventory (ADR 0045).\n"
@@ -74,6 +97,7 @@ def main(argv: list[str]) -> int:
             " with the reason.",
             file=sys.stderr,
         )
+    if missing or stale or unreadable:
         return 1
     print(f"The inventory covers {len(found)} tables.")
     return 0

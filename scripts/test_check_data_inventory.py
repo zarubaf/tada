@@ -22,7 +22,9 @@ INVENTORY = (
 )
 
 
-def run(migrations: dict[str, str], inventory: str = INVENTORY) -> tuple[int, str]:
+def run(
+    migrations: dict[str, str], inventory: str = INVENTORY, allowed: dict[str, str] | None = None
+) -> tuple[int, str]:
     """Runs the check on temporary files. Returns the exit code and the text of standard error."""
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
@@ -32,7 +34,7 @@ def run(migrations: dict[str, str], inventory: str = INVENTORY) -> tuple[int, st
         (root / "inventory.md").write_text(inventory)
         error = io.StringIO()
         with contextlib.redirect_stderr(error), contextlib.redirect_stdout(io.StringIO()):
-            code = check.main([str(root / "migrations"), str(root / "inventory.md")])
+            code = check.main([str(root / "migrations"), str(root / "inventory.md")], allowed or {})
         return code, error.getvalue()
 
 
@@ -59,13 +61,42 @@ class CheckDataInventory(unittest.TestCase):
         self.assertIn("display_name", error)
 
     def test_a_table_on_the_allow_list_needs_no_row(self) -> None:
-        code, _ = run({"0001.sql": "CREATE TABLE job (id uuid);\nCREATE TABLE telegram_update (update_id bigint);"})
+        sql = "CREATE TABLE job (id uuid);\nCREATE TABLE telegram_update (update_id bigint);"
+        code, _ = run({"0001.sql": sql}, allowed={"job": "A reason.", "telegram_update": "A reason."})
         self.assertEqual(code, 0)
 
     def test_ignores_a_table_in_a_comment_and_reads_other_spellings(self) -> None:
         sql = "-- CREATE TABLE commented_out (id uuid);\ncreate table if not exists app_user (id uuid);"
         code, error = run({"0001.sql": sql})
         self.assertEqual(code, 0, error)
+
+    def test_reads_quoted_unlogged_temporary_and_schema_qualified_names(self) -> None:
+        sql = (
+            'CREATE TABLE "quoted_t" (id uuid);\n'
+            "CREATE UNLOGGED TABLE unlogged_t (id uuid);\n"
+            "CREATE TEMP TABLE temp_t (id uuid);\n"
+            "CREATE GLOBAL TEMPORARY TABLE IF NOT EXISTS temporary_t (id uuid);\n"
+            "CREATE TABLE public.schema_t (id uuid);\n"
+            'CREATE TABLE "public"."both_quoted_t" (id uuid);\n'
+        )
+        code, error = run({"0001.sql": sql})
+        self.assertEqual(code, 1)
+        for name in ("quoted_t", "unlogged_t", "temp_t", "temporary_t", "schema_t", "both_quoted_t"):
+            self.assertIn(f"The table {name} (", error)
+        self.assertNotIn("The table public ", error)
+
+    def test_fails_for_a_create_table_statement_that_it_cannot_read(self) -> None:
+        code, error = run({"0001.sql": "CREATE TABLE app_user (id uuid);\nCREATE TABLE $weird$ (id uuid);"})
+        self.assertEqual(code, 1)
+        self.assertIn("0001.sql", error)
+        self.assertIn("cannot read", error)
+
+    def test_fails_for_an_allowed_table_that_no_migration_creates(self) -> None:
+        sql = "CREATE TABLE app_user (id uuid);\nCREATE TABLE membership (id uuid);"
+        code, error = run({"0001.sql": sql}, allowed={"gone_table": "A reason."})
+        self.assertEqual(code, 1)
+        self.assertIn("gone_table", error)
+        self.assertIn("no migration creates", error)
 
     def test_fails_for_a_folder_without_tables(self) -> None:
         code, error = run({"0001.sql": "SELECT 1;"})
