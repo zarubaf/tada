@@ -376,6 +376,7 @@ pub(crate) fn value_error_code(error: ValueError) -> &'static str {
         ValueError::RangeOrder => "range-order",
         ValueError::DateWindowOrder => "date-window-order",
         ValueError::Currency => "currency",
+        ValueError::NoTextForm => "no-text-form",
         ValueError::Key(error) => snake_case_code(error),
         ValueError::Text(error) => text_error_code(error),
     }
@@ -580,8 +581,8 @@ fn value_from_input(input: ValueInput) -> Result<FactValue, Vec<FieldError>> {
             .map(FactValue::Text),
         ValueInput::Boolean { value } => Some(FactValue::Boolean(value)),
         ValueInput::Quantity { min, max } => {
-            let min = errors.take("min", parse_decimal(&min), value_error_code);
-            let max = errors.take("max", parse_decimal(&max), value_error_code);
+            let min = errors.take("min", Decimal::parse(&min), value_error_code);
+            let max = errors.take("max", Decimal::parse(&max), value_error_code);
             match (min, max) {
                 (Some(min), Some(max)) => errors
                     .take("max", Range::new(min, max), value_error_code)
@@ -749,7 +750,7 @@ impl From<&FactValue> for ValueInput {
     }
 }
 
-/// The text of a decimal that `parse_decimal` reads: for example `20000`, `1.5` or `-0.25`.
+/// The text of a decimal that `Decimal::parse` reads: for example `20000`, `1.5` or `-0.25`.
 fn decimal_text(decimal: Decimal) -> String {
     let digits = decimal.units().unsigned_abs().to_string();
     let scale = usize::from(decimal.scale());
@@ -763,25 +764,6 @@ fn decimal_text(decimal: Decimal) -> String {
 }
 
 /// Parses a decimal number without a float: an optional `-`, digits, and an optional `.` with digits.
-fn parse_decimal(text: &str) -> Result<Decimal, ValueError> {
-    let invalid = ValueError::TypeMismatch;
-    let (negative, digits) = match text.strip_prefix('-') {
-        Some(rest) => (true, rest),
-        None => (false, text),
-    };
-    let (whole, fraction) = digits.split_once('.').unwrap_or((digits, ""));
-    let all_digits = |part: &str| part.bytes().all(|byte| byte.is_ascii_digit());
-    if whole.is_empty() || !all_digits(whole) || !all_digits(fraction) || digits.ends_with('.') {
-        return Err(invalid);
-    }
-    let scale = u8::try_from(fraction.len()).map_err(|_| ValueError::ScaleTooLarge)?;
-    if scale > Decimal::MAX_SCALE {
-        return Err(ValueError::ScaleTooLarge);
-    }
-    let units: i64 = format!("{whole}{fraction}").parse().map_err(|_| invalid)?;
-    Decimal::new(if negative { -units } else { units }, scale)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -800,7 +782,7 @@ mod tests {
             (-3, 0, "-3"),
         ] {
             assert_eq!(decimal_text(decimal(units, scale)), text);
-            assert_eq!(parse_decimal(text), Ok(decimal(units, scale)));
+            assert_eq!(Decimal::parse(text), Ok(decimal(units, scale)));
         }
     }
 
@@ -825,10 +807,10 @@ mod tests {
 
     #[test]
     fn parses_decimals_without_a_float() {
-        assert_eq!(parse_decimal("20000"), Ok(Decimal::integer(20_000)));
-        assert_eq!(parse_decimal("1.5"), Ok(decimal(15, 1)));
-        assert_eq!(parse_decimal("-0.25"), Ok(decimal(-25, 2)));
-        assert_eq!(parse_decimal("1.0000001"), Err(ValueError::ScaleTooLarge));
+        assert_eq!(Decimal::parse("20000"), Ok(Decimal::integer(20_000)));
+        assert_eq!(Decimal::parse("1.5"), Ok(decimal(15, 1)));
+        assert_eq!(Decimal::parse("-0.25"), Ok(decimal(-25, 2)));
+        assert_eq!(Decimal::parse("1.0000001"), Err(ValueError::ScaleTooLarge));
         for text in [
             "",
             "-",
@@ -840,7 +822,7 @@ mod tests {
             "99999999999999999999",
         ] {
             assert_eq!(
-                parse_decimal(text),
+                Decimal::parse(text),
                 Err(ValueError::TypeMismatch),
                 "{text:?}"
             );
