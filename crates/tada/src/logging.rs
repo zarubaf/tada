@@ -11,17 +11,19 @@ use tracing_subscriber::{EnvFilter, Layer};
 /// Starts the logs of a process. `filter` is a valid `TADA_LOG` value.
 pub fn init(process_role: &'static str, filter: &str) {
     tracing_subscriber::registry()
-        .with(layer(process_role, std::io::stdout).with_filter(EnvFilter::new(filter)))
+        .with(layer_for(process_role, std::io::stdout).with_filter(EnvFilter::new(filter)))
         .init();
 }
 
+/// The layer of one line format, for any writer. Tests of other crates use it to read the lines.
+///
 /// The fields of each line: `timestamp`, `level`, `target`, the event fields with `message`, the fields
 /// of all spans, for example `request_id`, and `process_role`. All fields are at the top level.
 ///
 /// `process_role` is a static field, not a span field, so that it is also in the lines of spawned tasks.
 /// `json-subscriber` also writes the name of the innermost span as `name`. An event field `name` would
 /// repeat this key; ADR 0035 forbids names in logs anyway.
-fn layer<S, W>(process_role: &'static str, writer: W) -> JsonLayer<S, W>
+pub fn layer_for<S, W>(process_role: &'static str, writer: W) -> JsonLayer<S, W>
 where
     S: tracing::Subscriber + for<'lookup> LookupSpan<'lookup>,
     W: for<'writer> MakeWriter<'writer> + 'static,
@@ -73,7 +75,7 @@ mod tests {
     fn writes_one_flat_json_object_per_event() {
         let buffer = Buffer::default();
         let subscriber =
-            tracing_subscriber::registry().with(layer::<Registry, _>("serve", buffer.clone()));
+            tracing_subscriber::registry().with(layer_for::<Registry, _>("serve", buffer.clone()));
         tracing::subscriber::with_default(subscriber, || {
             let request = tracing::info_span!(
                 "request",
