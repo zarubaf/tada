@@ -1,5 +1,7 @@
 //! A PostgreSQL container with the tada schema, for tests (ADR 0003).
 
+use std::time::Duration;
+
 use jiff::Timestamp;
 use secrecy::{ExposeSecret, SecretString};
 use sqlx::AssertSqlSafe;
@@ -40,7 +42,13 @@ impl TestDatabase {
             .expect("cannot start PostgreSQL; is Docker running?");
         let port = container.get_host_port_ipv4(5432).await.unwrap();
         let url = format!("postgres://postgres@127.0.0.1:{port}/postgres");
-        let database = Database::connect_lazy(&url, &SecretString::from("postgres")).unwrap();
+        // Production fails fast after 5 s; test containers need longer under heavy machine load.
+        let database = Database::connect_lazy_with_timeout(
+            &url,
+            &SecretString::from("postgres"),
+            Duration::from_secs(60),
+        )
+        .unwrap();
         database.migrate().await.unwrap();
         database
             .sync_catalog(&core_catalog(), CORE_CATALOG_VERSION)

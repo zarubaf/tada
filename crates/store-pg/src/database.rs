@@ -26,11 +26,20 @@ impl Database {
     ///
     /// The URL must not contain the password (ADR 0036).
     pub fn connect_lazy(url: &str, password: &SecretString) -> Result<Self, sqlx::Error> {
+        Self::connect_lazy_with_timeout(url, password, Duration::from_secs(5))
+    }
+
+    /// Like [`Self::connect_lazy`] with another acquire timeout. Only tests use it.
+    pub(crate) fn connect_lazy_with_timeout(
+        url: &str,
+        password: &SecretString,
+        acquire_timeout: Duration,
+    ) -> Result<Self, sqlx::Error> {
         let options = PgConnectOptions::from_str(url)?
             .password(password.expose_secret())
             .application_name("tada");
         let pool = PgPoolOptions::new()
-            .acquire_timeout(Duration::from_secs(5))
+            .acquire_timeout(acquire_timeout)
             .connect_lazy_with(options);
         Ok(Self { pool })
     }
