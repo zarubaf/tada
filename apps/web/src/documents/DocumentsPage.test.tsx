@@ -114,6 +114,14 @@ describe("DocumentsPage", () => {
     expect(within(table).getAllByText("2.5 MB")).toHaveLength(2);
   });
 
+  it("shows a label for the file type, not the media type", async () => {
+    setup();
+
+    const table = await screen.findByRole("table", { name: "Dokumente" });
+    expect(within(table).getAllByText("PDF").length).toBeGreaterThan(0);
+    expect(within(table).queryByText("application/pdf")).not.toBeInTheDocument();
+  });
+
   it("searches by name and sends the trimmed text as q", async () => {
     const { queries } = setup({ "": [programm, budget], Budget: [budget] });
 

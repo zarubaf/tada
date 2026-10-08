@@ -4,9 +4,9 @@ import { DocumentPage } from "./documents/DocumentPage";
 import { DocumentsPage } from "./documents/DocumentsPage";
 import { CreateEventForm } from "./events/CreateEventForm";
 import { EventMembersPage } from "./events/EventMembersPage";
+import { EventOverview } from "./events/EventOverview";
 import { EventPage } from "./events/EventPage";
 import { EventsPage } from "./events/EventsPage";
-import { t } from "./i18n";
 import { MembersPage } from "./members/MembersPage";
 import { NotFoundPage } from "./NotFoundPage";
 import { Redirect, Route, Router, Routes } from "./router/Router";
@@ -71,7 +71,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 </Route>
                 <Route path="/events/:eventId">
                   <EventPage api={api}>
-                    <p>{t("event-overview-placeholder")}</p>
+                    <EventOverview api={api} />
                   </EventPage>
                 </Route>
                 <Route path="/events/:eventId/members">

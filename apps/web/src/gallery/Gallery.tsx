@@ -7,6 +7,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { FileButton } from "../ui/FileButton";
 import { FileLink } from "../ui/FileLink";
 import { InlineError } from "../ui/InlineError";
+import { KnowledgeState } from "../ui/KnowledgeState";
 import { Skeleton } from "../ui/Skeleton";
 import { Switch } from "../ui/Switch";
 import styles from "./Gallery.module.css";
@@ -159,6 +160,19 @@ export function Gallery() {
           requestId="01a1118e-3359-73dd-a500-feed65806a9d"
           onRetry={() => {}}
         />
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Stand des Wissens</h2>
+        <div className={styles.row}>
+          <KnowledgeState state="accepted" showLabel>
+            Flugplatz Musterhausen
+          </KnowledgeState>
+          <KnowledgeState state="accepted">Flugplatz Musterhausen</KnowledgeState>
+          <KnowledgeState state="proposed">CHF 15.00</KnowledgeState>
+          <KnowledgeState state="assumption">ca. 20’000 Personen pro Tag</KnowledgeState>
+          <KnowledgeState state="unknown" />
+        </div>
       </section>
 
       <section className={styles.section}>

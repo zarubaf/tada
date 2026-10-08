@@ -13,7 +13,7 @@ import { LiveRegion } from "../ui/LiveRegion";
 import { Skeleton } from "../ui/Skeleton";
 import { TextField } from "../ui/TextField";
 import styles from "./DocumentsPage.module.css";
-import { formatSize } from "./format";
+import { formatSize, mediaTypeKind } from "./format";
 import { searchParam } from "./search";
 
 const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" });
@@ -33,7 +33,10 @@ const columns: Column<Document>[] = [
   {
     id: "type",
     header: t("documents-column-type"),
-    cell: (d) => d.newest_version.media_type ?? t("document-draft"),
+    cell: (d) =>
+      d.newest_version.media_type
+        ? t(`documents-type-${mediaTypeKind(d.newest_version.media_type)}`)
+        : t("document-draft"),
   },
   {
     id: "size",

@@ -12,6 +12,7 @@
     "@fluent/bundle": "0.19.1",
     "@fontsource-variable/jetbrains-mono": "5.3.0",
     "@fontsource-variable/mona-sans": "5.3.0",
+    "@tabler/icons-react": "3.47.0",
     "openapi-fetch": "0.17.0",
     "react": "19.3.0",
     "react-aria-components": "1.21.1",

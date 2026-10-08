@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSize, hashPrefix } from "./format";
+import { formatSize, hashPrefix, mediaTypeKind } from "./format";
 
 describe("formatSize", () => {
   it("shows bytes below 1 KB", () => {
@@ -17,5 +17,22 @@ describe("formatSize", () => {
 describe("hashPrefix", () => {
   it("shows the first 12 digits", () => {
     expect(hashPrefix("0123456789abcdef0123456789abcdef")).toBe("0123456789ab");
+  });
+});
+
+describe("mediaTypeKind", () => {
+  it.each([
+    ["application/pdf", "pdf"],
+    ["text/plain; charset=utf-8", "text"],
+    ["text/markdown; charset=utf-8", "text"],
+    ["text/csv", "text"],
+    ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "office"],
+    ["application/vnd.oasis.opendocument.spreadsheet", "office"],
+    ["image/png", "image"],
+    ["image/heic", "image"],
+    ["application/zip", "other"],
+    ["text/html", "other"],
+  ])("maps %s to %s", (mediaType, kind) => {
+    expect(mediaTypeKind(mediaType)).toBe(kind);
   });
 });
