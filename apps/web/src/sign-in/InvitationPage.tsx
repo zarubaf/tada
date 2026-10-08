@@ -110,7 +110,7 @@ export function InvitationPage({ api }: { api: Api }) {
                 }
               : undefined
           }
-          takeFocus
+          announce="focus"
         >
           {failure.final && <ToSignInLink />}
         </InlineError>

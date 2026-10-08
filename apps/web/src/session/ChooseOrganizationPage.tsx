@@ -73,7 +73,7 @@ export function ChooseOrganizationPage({ api }: { api: Api }) {
           key={failure.id}
           message={failure.message}
           requestId={failure.requestId}
-          takeFocus
+          announce="focus"
         />
       )}
     </PublicPage>

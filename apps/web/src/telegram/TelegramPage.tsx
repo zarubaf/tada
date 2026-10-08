@@ -213,7 +213,7 @@ export function TelegramPage({ api }: { api: Api }) {
             message={requests.message}
             requestId={requests.requestId}
             onRetry={refresh}
-            takeFocus={requests.attempts > 0}
+            announce={requests.attempts > 0 ? "focus" : "alert"}
           />
         )}
         {requests.kind === "loaded" && requests.items.length === 0 && (

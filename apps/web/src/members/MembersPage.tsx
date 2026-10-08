@@ -354,7 +354,7 @@ export function MembersPage({ api }: { api: Api }) {
             message={members.message ?? ""}
             requestId={members.requestId}
             onRetry={retryMembers}
-            takeFocus={members.attempts > 0}
+            announce={members.attempts > 0 ? "focus" : "alert"}
           />
         )}
         {members.kind === "loaded" && (
@@ -366,7 +366,7 @@ export function MembersPage({ api }: { api: Api }) {
               rowKey={(member) => member.user_id}
             />
             {more.kind === "failed" && (
-              <InlineError message={more.message} requestId={more.requestId} takeFocus />
+              <InlineError message={more.message} requestId={more.requestId} announce="focus" />
             )}
             {members.nextCursor !== undefined && (
               <Button isPending={more.kind === "loading"} onPress={() => void loadMore()}>
@@ -398,7 +398,7 @@ export function MembersPage({ api }: { api: Api }) {
               message={invitations.message ?? ""}
               requestId={invitations.requestId}
               onRetry={retryInvitations}
-              takeFocus={invitations.attempts > 0}
+              announce={invitations.attempts > 0 ? "focus" : "alert"}
             />
           )}
           {invitations.kind === "loaded" && invitations.items.length === 0 && (
