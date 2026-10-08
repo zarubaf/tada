@@ -8,14 +8,16 @@ A new component needs an entry here in the same pull request.
 
 ### Actions
 
-| Component   | Variants                          | Rules                                                                                           |
-| ----------- | --------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Button      | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap. |
-| IconButton  | quiet                             | Only in toolbars and rows. Always an accessible name and a tooltip.                             |
-| Link        | inline, standalone                | Inline links are underlined. A link never does what a button does.                              |
-| LinkButton  | primary                           | A link in the style of a button. Only for an action that opens a page, for example a form.      |
-| Menu        |                                   | For more than three secondary actions. The trigger is `dots-vertical`.                          |
-| CommandMenu |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                    |
+| Component   | Variants                          | Rules                                                                                                              |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Button      | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap.                    |
+| IconButton  | quiet                             | Only in toolbars and rows. Always an accessible name and a tooltip.                                                |
+| Link        | inline, standalone                | Inline links are underlined. A link never does what a button does.                                                 |
+| LinkButton  | primary                           | A link in the style of a button. Only for an action that opens a page, for example a form.                         |
+| FileButton  | primary                           | A button that opens the file picker. It shows `isPending` while the upload runs and keeps focus.                   |
+| FileLink    | secondary                         | A plain link to a file on the server, in the style of a button, for a download or a preview. The browser loads it. |
+| Menu        |                                   | For more than three secondary actions. The trigger is `dots-vertical`.                                             |
+| CommandMenu |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                                       |
 
 Button sizes follow `--control-height-*` of the density. The primary button uses `--color-accent` and `--color-text-on-accent`.
 The danger button is secondary in style with `--color-danger` text until a confirmation step.

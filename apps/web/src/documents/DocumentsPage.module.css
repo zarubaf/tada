@@ -1,0 +1,63 @@
+@layer components {
+  .documents {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .help {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  /* Narrow: the button under the field. Medium and wide: one row. */
+  .search {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 40rem;
+  }
+
+  @media (width >= 40rem) {
+    /* --bp-medium */
+    .search {
+      grid-template-columns: 1fr auto;
+      align-items: end;
+    }
+  }
+
+  .failure {
+    padding: var(--space-3);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius-md);
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+
+  /* The live regions stay in the page: empty, they are hidden from the eye but not from the tree. */
+  .failure:empty,
+  .status:empty {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+  }
+}
