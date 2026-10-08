@@ -19,7 +19,7 @@ use crate::ApiState;
 use crate::contract::{AUTHENTICATED, PATH, codes};
 use crate::extract::{Caller, Path};
 use crate::problem::{ApiError, Problem};
-use crate::values::{FactState, Label, Passage, Value, ValueType, state_and_value};
+use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
@@ -64,6 +64,9 @@ pub struct Fact {
     /// The value. It is absent if the state is `unknown`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<Value>,
+    /// True for an approximate value, for example "about 20,000". It is absent if the state is `unknown`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub approximate: Option<bool>,
     /// The number of the current fact version. A proposal that changes the fact expects it.
     pub version: i64,
     /// The passages of source versions that support the current fact version.
@@ -87,6 +90,9 @@ pub struct FactProposal {
     /// The proposed value. It is absent if the proposed state is `unknown`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<Value>,
+    /// True for an approximate value, for example "about 20,000". It is absent if the state is `unknown`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub approximate: Option<bool>,
     /// The fact version that the proposal expects. It is absent if the field had no fact.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_version: Option<i64>,
@@ -125,13 +131,14 @@ impl From<AppProfile> for EventProfile {
 
 impl From<ProfileEntry> for Fact {
     fn from(entry: ProfileEntry) -> Self {
-        let (state, value) = state_and_value(&entry.state);
+        let (state, value, approximate) = state_parts(&entry.state);
         Self {
             id: entry.fact_id.as_uuid(),
             field_id: entry.field.id.as_uuid(),
             field_key: entry.field.key.as_str().to_owned(),
             state,
             value,
+            approximate,
             version: entry.version.get(),
             evidence: entry
                 .evidence
@@ -147,13 +154,14 @@ impl From<ProfileEntry> for Fact {
 
 impl From<OpenProposalRef> for FactProposal {
     fn from(proposal: OpenProposalRef) -> Self {
-        let (state, value) = state_and_value(&proposal.state);
+        let (state, value, approximate) = state_parts(&proposal.state);
         Self {
             id: proposal.proposal_id.as_uuid(),
             changeset_id: proposal.changeset_id.as_uuid(),
             field_id: proposal.field_id.as_uuid(),
             state,
             value,
+            approximate,
             expected_version: proposal.expected_version.map(|version| version.get()),
             created_at: proposal.created_at,
         }

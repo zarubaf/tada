@@ -1,6 +1,7 @@
 //! The DTOs of fact values, fact states, value types and passages (ADRs 0049 and 0050) that more than one resource uses.
 //!
-//! The `type` values are the ones of the `ValueInput` of a proposal (ADR 0044: kebab-case).
+//! The values and states have the shape of the `ValueInput` and `FactStateInput` of a proposal,
+//! so a client can send a value back as it reads it. The tag values are kebab-case (ADR 0044).
 
 use jiff::civil;
 use serde::Serialize;
@@ -21,52 +22,44 @@ pub enum FactState {
     Unknown,
 }
 
-/// A fact value with its mark "approximate". `type` names the value type. The list of types is open.
+/// A fact value. `type` names the value type. The list of types is open.
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Value {
     /// A short text.
     Text {
         text: String,
-        approximate: bool,
     },
     Boolean {
         value: bool,
-        approximate: bool,
     },
     /// A decimal number or range in the unit of the field, as text, for example `"20000"` or `"1.5"`.
     /// A single value has `min` equal to `max`.
     Quantity {
         min: String,
         max: String,
-        approximate: bool,
     },
     /// An amount or range in the minor unit of the currency of the field, for example 1500 for CHF 15.00.
     Money {
         min: i64,
         max: i64,
-        approximate: bool,
     },
     Date {
         date: civil::Date,
-        approximate: bool,
     },
     /// A range of dates with the meaning of its dates.
     DateWindow {
         start: civil::Date,
         end: civil::Date,
         granularity: Granularity,
-        approximate: bool,
     },
     /// The keys of the choices.
     Choice {
         keys: Vec<String>,
-        approximate: bool,
     },
     Reference {
         target: ReferenceTarget,
         id: Uuid,
-        approximate: bool,
     },
 }
 
@@ -87,60 +80,55 @@ pub enum ReferenceTarget {
     Event,
 }
 
-/// The state of a fact and its value. An unknown fact has no value, never `null` (ADR 0044).
-pub(crate) fn state_and_value(state: &domain::FactState<Valued>) -> (FactState, Option<Value>) {
+/// The state of a fact with its value and its mark "approximate", in the shape of the `FactStateInput` of a proposal,
+/// so a client can send a state back as it reads it. An unknown fact has neither, never `null` (ADR 0044).
+pub(crate) fn state_parts(
+    state: &domain::FactState<Valued>,
+) -> (FactState, Option<Value>, Option<bool>) {
     match state {
-        domain::FactState::Accepted(valued) => (FactState::Accepted, Some(value(valued))),
-        domain::FactState::Assumption(valued) => (FactState::Assumption, Some(value(valued))),
-        domain::FactState::Unknown => (FactState::Unknown, None),
+        domain::FactState::Accepted(valued) => (
+            FactState::Accepted,
+            Some(value(valued)),
+            Some(valued.approximate),
+        ),
+        domain::FactState::Assumption(valued) => (
+            FactState::Assumption,
+            Some(value(valued)),
+            Some(valued.approximate),
+        ),
+        domain::FactState::Unknown => (FactState::Unknown, None, None),
     }
 }
 
 fn value(valued: &Valued) -> Value {
-    let approximate = valued.approximate;
     match &valued.value {
         FactValue::Text(text) => Value::Text {
             text: text.as_str().to_owned(),
-            approximate,
         },
-        FactValue::Boolean(value) => Value::Boolean {
-            value: *value,
-            approximate,
-        },
+        FactValue::Boolean(value) => Value::Boolean { value: *value },
         FactValue::Quantity(range) => Value::Quantity {
             min: range.min().to_string(),
             max: range.max().to_string(),
-            approximate,
         },
         FactValue::Money(range) => Value::Money {
             min: range.min().get(),
             max: range.max().get(),
-            approximate,
         },
-        FactValue::Date(date) => Value::Date {
-            date: *date,
-            approximate,
-        },
+        FactValue::Date(date) => Value::Date { date: *date },
         FactValue::DateWindow(window) => Value::DateWindow {
             start: window.start(),
             end: window.end(),
             granularity: window.granularity().into(),
-            approximate,
         },
         FactValue::Choice(keys) => Value::Choice {
             keys: keys.iter().map(|key| key.as_str().to_owned()).collect(),
-            approximate,
         },
         FactValue::Reference(reference) => {
             let (target, id) = match reference {
                 ReferenceId::Document(id) => (ReferenceTarget::Document, id.as_uuid()),
                 ReferenceId::Event(id) => (ReferenceTarget::Event, id.as_uuid()),
             };
-            Value::Reference {
-                target,
-                id,
-                approximate,
-            }
+            Value::Reference { target, id }
         }
     }
 }

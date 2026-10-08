@@ -35,7 +35,7 @@ use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::json_schema;
 use crate::problem::{ApiError, Problem};
-use crate::values::{FactState, Label, Passage, Value, ValueType, state_and_value};
+use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
@@ -266,10 +266,10 @@ pub struct Proposal {
     pub status: ProposalStatus,
     /// True if the proposal is open and older than 14 days (ADR 0050).
     pub stale: bool,
-    /// Why the proposal conflicts. It is present only if the status is `conflict`.
+    /// Why the proposal conflicts, at the time of the read. It is present only if the status is `conflict`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conflict_reason: Option<ConflictReason>,
-    /// The current version of the fact that a `set_fact` proposal sets. It is absent if the event has no such fact.
+    /// The current version of the fact that a `set-fact` proposal sets. It is absent if the event has no such fact.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current: Option<CurrentFact>,
 }
@@ -282,11 +282,25 @@ pub struct ProposalEvidence {
 }
 
 /// A passage with the text around it: at most 100 characters before and after it.
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Serialize, ToSchema)]
 pub struct Excerpt {
     pub before: String,
     pub quote: String,
     pub after: String,
+}
+
+/// The excerpt copies the source text, so `Debug` shows its lengths only (ADR 0035).
+impl std::fmt::Debug for Excerpt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let length = |text: &str| text.chars().count();
+        write!(
+            f,
+            "Excerpt({} + {} + {} characters)",
+            length(&self.before),
+            length(&self.quote),
+            length(&self.after)
+        )
+    }
 }
 
 impl From<DomainExcerpt> for Excerpt {
@@ -352,16 +366,20 @@ pub struct CurrentFact {
     /// The value. It is absent if the state is `unknown`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<Value>,
+    /// True for an approximate value, for example "about 20,000". It is absent if the state is `unknown`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub approximate: Option<bool>,
 }
 
 impl From<FactVersionRef> for CurrentFact {
     fn from(current: FactVersionRef) -> Self {
-        let (state, value) = state_and_value(&current.state);
+        let (state, value, approximate) = state_parts(&current.state);
         Self {
             fact_id: current.fact_id.as_uuid(),
             version: current.number.get(),
             state,
             value,
+            approximate,
         }
     }
 }
@@ -383,6 +401,9 @@ pub enum Operation {
         /// The proposed value. It is absent if the proposed state is `unknown`.
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<Value>,
+        /// True for an approximate value. It is absent if the proposed state is `unknown`.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        approximate: Option<bool>,
         /// The fact version that the proposal expects. It is absent if the event had no fact of the field.
         #[serde(skip_serializing_if = "Option::is_none")]
         expected_version: Option<i64>,
@@ -438,12 +459,13 @@ impl From<&DomainOperation> for Operation {
                 state,
                 expected_version,
             } => {
-                let (state, value) = state_and_value(state);
+                let (state, value, approximate) = state_parts(state);
                 Self::SetFact {
                     event_id: event_id.as_uuid(),
                     field_id: field_id.as_uuid(),
                     state,
                     value,
+                    approximate,
                     expected_version: expected_version.map(|version| version.get()),
                 }
             }

@@ -313,8 +313,9 @@ mod facts {
         assert_eq!(window["version"], 1);
         assert_eq!(
             window["value"],
-            json!({"type": "date-window", "start": "2030-05-01", "end": "2030-06-30", "granularity": "month", "approximate": false})
+            json!({"type": "date-window", "start": "2030-05-01", "end": "2030-06-30", "granularity": "month"})
         );
+        assert_eq!(window["approximate"], false);
         assert_eq!(
             window["evidence"][0]["passage"]["quote"],
             "im Mai oder Juni 2030"
@@ -323,8 +324,9 @@ mod facts {
         assert_eq!(visitors["state"], "assumption");
         assert_eq!(
             visitors["value"],
-            json!({"type": "quantity", "min": "20000", "max": "20000", "approximate": true})
+            json!({"type": "quantity", "min": "20000", "max": "20000"})
         );
+        assert_eq!(visitors["approximate"], true);
         let venue = fact("venue");
         assert_eq!(venue["state"], "unknown");
         assert!(
@@ -389,8 +391,46 @@ mod review {
         assert_eq!(proposal["current"]["version"], 1);
         assert_eq!(
             proposal["current"]["value"],
-            json!({"type": "text", "text": "Flugfeld Testwil", "approximate": false})
+            json!({"type": "text", "text": "Flugfeld Testwil"})
         );
+        assert_eq!(proposal["current"]["approximate"], false);
+    }
+
+    #[tokio::test]
+    async fn a_value_goes_back_as_an_edit_in_the_shape_that_the_review_reads() {
+        let api = Api::start().await;
+        let owner = api.member("testwil", OrganizationRole::Owner).await;
+        let event = api.create_event(&owner.cookie, "TEST30").await;
+        let (_, created) = api.venue_changeset(&owner.cookie, &event, "Flugfeld").await;
+        let id = created["id"].as_str().unwrap();
+        let (_, changeset) = api
+            .get(&owner.cookie, &format!("/api/v1/changesets/{id}"))
+            .await;
+        let proposal = &changeset["proposals"][0];
+        let operation = &proposal["operation"];
+        assert_eq!(operation["kind"], "set-fact");
+        assert_eq!(operation["state"], "assumption");
+
+        // The reviewer confirms the value as read: the state, the value and the mark "approximate".
+        let state = json!({
+            "state": "accepted",
+            "value": operation["value"],
+            "approximate": operation["approximate"],
+        });
+        let (status, applied) = api
+            .post(
+                &owner.cookie,
+                &format!("/api/v1/changesets/{id}/apply"),
+                &json!({"selected": [proposal["id"]], "edits": [{"proposal_id": proposal["id"], "state": state}]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(applied["proposals"][0]["status"], "accepted-with-edit");
+        let (_, profile) = api
+            .get(&owner.cookie, &format!("/api/v1/events/{event}/profile"))
+            .await;
+        assert_eq!(profile["facts"][0]["state"], "accepted");
+        assert_eq!(profile["facts"][0]["value"], operation["value"]);
     }
 
     #[tokio::test]

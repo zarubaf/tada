@@ -3290,6 +3290,13 @@
           },
           "value": {
             "description": "The value. It is absent if the state is `unknown`."
+          },
+          "approximate": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "True for an approximate value, for example \"about 20,000\". It is absent if the state is `unknown`."
           }
         }
       },
@@ -3491,6 +3498,13 @@
           "value": {
             "description": "The value. It is absent if the state is `unknown`."
           },
+          "approximate": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "True for an approximate value, for example \"about 20,000\". It is absent if the state is `unknown`."
+          },
           "version": {
             "type": "integer",
             "format": "int64",
@@ -3550,6 +3564,13 @@
           },
           "value": {
             "description": "The proposed value. It is absent if the proposed state is `unknown`."
+          },
+          "approximate": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "True for an approximate value, for example \"about 20,000\". It is absent if the state is `unknown`."
           },
           "expected_version": {
             "type": [
@@ -4058,6 +4079,13 @@
               "value": {
                 "description": "The proposed value. It is absent if the proposed state is `unknown`."
               },
+              "approximate": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "True for an approximate value. It is absent if the proposed state is `unknown`."
+              },
               "expected_version": {
                 "type": [
                   "integer",
@@ -4376,7 +4404,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/ConflictReason",
-                "description": "Why the proposal conflicts. It is present only if the status is `conflict`."
+                "description": "Why the proposal conflicts, at the time of the read. It is present only if the status is `conflict`."
               },
               {
                 "type": "null"
@@ -4387,7 +4415,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/CurrentFact",
-                "description": "The current version of the fact that a `set_fact` proposal sets. It is absent if the event has no such fact."
+                "description": "The current version of the fact that a `set-fact` proposal sets. It is absent if the event has no such fact."
               },
               {
                 "type": "null"
