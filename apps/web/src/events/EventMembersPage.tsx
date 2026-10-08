@@ -13,7 +13,9 @@ import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { type Column, DataTable } from "../ui/DataTable";
+import { useFocusAfterCommit } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { LiveRegion } from "../ui/LiveRegion";
 import { Select } from "../ui/Select";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventMembersPage.module.css";
@@ -64,16 +66,7 @@ export function EventMembersPage({ api }: { api: Api }) {
   // A request runs: a second press does nothing.
   const [busy, setBusy] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const focusHeading = useRef(false);
-
-  // The pressed button leaves with its row. When the dialog has closed and given its focus back,
-  // focus goes to the heading of the list.
-  useEffect(() => {
-    if (removing === undefined && focusHeading.current) {
-      focusHeading.current = false;
-      setTimeout(() => heading.current?.focus(), 0);
-    }
-  }, [removing]);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const load = useCallback(async () => {
     try {
@@ -176,7 +169,8 @@ export function EventMembersPage({ api }: { api: Api }) {
         },
       );
       if (response.ok) {
-        focusHeading.current = true;
+        // The pressed button leaves with its row: focus goes to the heading of the list.
+        focusAfterCommit(() => heading.current);
         setState((current) =>
           current.kind === "loaded"
             ? { kind: "loaded", items: current.items.filter((i) => i.user_id !== item.user_id) }
@@ -248,10 +242,9 @@ export function EventMembersPage({ api }: { api: Api }) {
       <h2 ref={heading} tabIndex={-1} className={styles.heading}>
         {t("event-members-title")}
       </h2>
-      {/* A live region that is always in the page: a text that is set later is announced. */}
-      <p className={styles.failure} role="alert">
+      <LiveRegion kind="alert" className={styles.failure}>
         {failure}
-      </p>
+      </LiveRegion>
       <DataTable
         label={t("event-members-title")}
         columns={columns}
@@ -317,18 +310,7 @@ function AddMember({
   const [role, setRole] = useState<EventRole>("event-contributor");
   const [pending, setPending] = useState(false);
   const section = useRef<HTMLElement>(null);
-  const [added, setAdded] = useState(0);
-
-  // After an add, the button is disabled again, so focus moves to the first control of the form,
-  // or to the heading if no member is left to add.
-  useEffect(() => {
-    if (added > 0) {
-      (
-        section.current?.querySelector<HTMLElement>("button") ??
-        section.current?.querySelector<HTMLElement>("h2")
-      )?.focus();
-    }
-  }, [added]);
+  const focusAfterCommit = useFocusAfterCommit();
 
   if (organizationFailure) {
     return (
@@ -357,7 +339,13 @@ function AddMember({
       if (data) {
         setUserId(undefined);
         onAdded(data);
-        setAdded((count) => count + 1);
+        // The button is disabled again, so focus moves to the first control of the form, or to the
+        // heading if no member is left to add.
+        focusAfterCommit(
+          () =>
+            section.current?.querySelector<HTMLElement>("button") ??
+            section.current?.querySelector<HTMLElement>("h2"),
+        );
       } else {
         onFailed({ error, response });
       }
