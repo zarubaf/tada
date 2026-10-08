@@ -92,6 +92,43 @@ describe("formatValue", () => {
     expect(formatValue({ value, approximate: true }, quantity)).toMatch(/^ca\. 20.000 Personen/);
   });
 
+  it("shows a negative amount, an approximate range and money without a currency", () => {
+    expect(formatValue({ value: { type: "money", min: -250, max: -250 } }, money)).toMatch(
+      /^-CHF.2\.50$|^CHF-2\.50$/,
+    );
+    const range = { type: "quantity", min: "10", max: "20" };
+    expect(formatValue({ value: range, approximate: true }, quantity)).toBe(
+      `ca. 10 ${EN_DASH} 20 Personen pro Tag`,
+    );
+    expect(formatValue({ value: { type: "money", min: 1500, max: 1500 } }, undefined)).toBe(
+      "15.00",
+    );
+  });
+
+  it("shows a week window by its first and last day", () => {
+    const week = {
+      type: "date-window",
+      start: "2030-05-13",
+      end: "2030-05-19",
+      granularity: "week",
+    };
+    expect(formatValue({ value: week }, window)).toBe(`13.05.2030 ${EN_DASH} 19.05.2030`);
+  });
+
+  it("uses the singular of a unit for one", () => {
+    const type: ValueType = { type: "quantity", unit: "day" };
+    expect(formatValue({ value: { type: "quantity", min: "1", max: "1" } }, type)).toBe("1 Tag");
+    expect(formatValue({ value: { type: "quantity", min: "3", max: "3" } }, type)).toBe("3 Tage");
+  });
+
+  it("shows Nicht darstellbar for an invalid date", () => {
+    expect(formatValue({ value: { type: "date", date: "2030-13-45" } }, { type: "date" })).toBe(
+      "Nicht darstellbar",
+    );
+    const bad = { type: "date-window", start: "x", end: "y", granularity: "month" };
+    expect(formatValue({ value: bad }, window)).toBe("Nicht darstellbar");
+  });
+
   it("does not leave a value that it cannot show empty", () => {
     expect(formatValue({ value: { type: "colour" } }, text)).toBe("Nicht darstellbar");
     expect(formatValue({ value: 7 }, undefined)).toBe("Nicht darstellbar");
@@ -108,5 +145,10 @@ describe("formatLabel", () => {
 describe("formatDateTime", () => {
   it("shows the time in the time zone of the event", () => {
     expect(formatDateTime("2026-10-03T12:12:00Z", "Europe/Zurich")).toBe("03.10.2026, 14:12");
+  });
+
+  it("shows Nicht darstellbar for an invalid time zone or time", () => {
+    expect(formatDateTime("2026-10-03T12:12:00Z", "Mars/Olympus")).toBe("Nicht darstellbar");
+    expect(formatDateTime("not a time", "Europe/Zurich")).toBe("Nicht darstellbar");
   });
 });

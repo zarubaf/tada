@@ -53,7 +53,11 @@ field-components-exhibition = Ausstellung
 field-venue = Ort
 
 ## Units, and values as the web client shows them (ADR 0049).
-unit-day = Tage
+unit-day =
+    { $count ->
+        [one] Tag
+       *[other] Tage
+    }
 unit-person_per_day = Personen pro Tag
 value-yes = Ja
 value-no = Nein

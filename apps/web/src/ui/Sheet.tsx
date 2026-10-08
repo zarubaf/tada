@@ -31,7 +31,7 @@ export function Sheet({ title, onClose, children }: SheetProps) {
       <Modal className={styles.sheet}>
         <Dialog className={styles.dialog}>
           <div className={styles.head}>
-            <Heading slot="title" className={styles.title}>
+            <Heading slot="title" level={2} className={styles.title}>
               {title}
             </Heading>
             <Button onPress={onClose}>{t("sheet-close")}</Button>

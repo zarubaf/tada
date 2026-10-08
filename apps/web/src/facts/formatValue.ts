@@ -40,9 +40,21 @@ const monthFormat = new Intl.DateTimeFormat(LOCALE, {
 });
 const number = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 6 });
 
+/** The value could not be shown: an invalid date, a time zone that `Intl` does not know. */
+class Unshowable extends Error {}
+
+/** A civil date (`2030-05-18`) as a `Date` at midnight UTC. */
+function civilDate(date: string): Date {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Unshowable(date);
+  }
+  return parsed;
+}
+
 /** A civil date (`2030-05-18`) as 18.05.2030. */
 function formatDate(date: string): string {
-  return dayFormat.format(new Date(`${date}T00:00:00Z`));
+  return dayFormat.format(civilDate(date));
 }
 
 /** A range as „from – to“, or one value when both ends read the same. */
@@ -55,9 +67,10 @@ function formatQuantity(text: string): string {
   return Number.isNaN(parsed) ? text : number.format(parsed);
 }
 
-function unitLabel(unit: string): string {
+/** The label of a unit for `count`, which picks the singular or the plural. */
+function unitLabel(unit: string, count: number): string {
   const id = `unit-${unit}`;
-  return hasMessage(id) ? t(id) : unit;
+  return hasMessage(id) ? t(id, { count }) : unit;
 }
 
 function money(minor: number, currency: string | undefined): string {
@@ -69,7 +82,7 @@ function money(minor: number, currency: string | undefined): string {
 
 function formatWindow(start: string, end: string, granularity: Granularity): string {
   if (granularity === "month") {
-    const format = (date: string) => monthFormat.format(new Date(`${date}T00:00:00Z`));
+    const format = (date: string) => monthFormat.format(civilDate(date));
     return range(format(start), format(end));
   }
   // A week reads as its first and last day.
@@ -126,7 +139,9 @@ function formatTyped(value: FactValue, type: ValueType | undefined): string {
       return t(value.value ? "value-yes" : "value-no");
     case "quantity": {
       const amount = range(formatQuantity(value.min), formatQuantity(value.max));
-      return type?.type === "quantity" ? `${amount} ${unitLabel(type.unit)}` : amount;
+      return type?.type === "quantity"
+        ? `${amount} ${unitLabel(type.unit, Number(value.max))}`
+        : amount;
     }
     case "money": {
       const currency = type?.type === "money" ? type.currency : undefined;
@@ -158,8 +173,15 @@ export function formatValue(input: ValueInput, type: ValueType | undefined): str
   if (!value) {
     return t("value-unsupported");
   }
-  const text = formatTyped(value, type);
-  return input.approximate ? t("value-approximate", { value: text }) : text;
+  try {
+    const text = formatTyped(value, type);
+    return input.approximate ? t("value-approximate", { value: text }) : text;
+  } catch (error) {
+    if (error instanceof Unshowable) {
+      return t("value-unsupported");
+    }
+    throw error;
+  }
 }
 
 /** The text of a field label or a choice label: a Fluent message or the text of the event. */
@@ -169,12 +191,17 @@ export function formatLabel(label: Label): string {
 
 /** A time as 03.10.2026, 14:12 in `timeZone`, the IANA zone of the event. */
 export function formatDateTime(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat(LOCALE, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(new Date(iso));
+  try {
+    return new Intl.DateTimeFormat(LOCALE, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone,
+    }).format(new Date(iso));
+  } catch {
+    // `Intl` throws a RangeError for an invalid time or an unknown time zone.
+    return t("value-unsupported");
+  }
 }

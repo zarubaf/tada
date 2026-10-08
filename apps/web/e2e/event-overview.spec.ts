@@ -97,6 +97,14 @@ const profile = {
       value: { type: "money", min: 1500, max: 1500 },
       created_at: "2028-03-05T09:00:00Z",
     },
+    {
+      id: "0199b8e0-0000-7000-8000-0000000003a2",
+      changeset_id: "0199b8e0-0000-7000-8000-0000000003c2",
+      field_id: idOf("duration_days"),
+      state: "assumption",
+      value: { type: "quantity", min: "1", max: "1" },
+      created_at: "2028-03-05T10:00:00Z",
+    },
   ],
   open_questions: [
     {
@@ -146,7 +154,7 @@ for (const viewport of viewports) {
       await page.goto(`/events/${event?.id}`);
       await setTheme(page, theme);
       await expect(page.getByRole("heading", { level: 2, name: "Fakten" })).toBeVisible();
-      await expect(page.getByText("Vorschlag", { exact: true })).toBeVisible();
+      await expect(page.getByText("Vorschlag", { exact: true }).first()).toBeVisible();
 
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])

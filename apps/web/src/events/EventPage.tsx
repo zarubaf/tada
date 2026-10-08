@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
-import { formatValue } from "../facts/formatValue";
+import { formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { useParams } from "../router/Router";
 import { useRetry } from "../ui/focus";
@@ -121,7 +121,9 @@ function DateWindow({ profile }: { profile: ProfileState }) {
   const state = fact?.state ?? "unknown";
   return (
     <p className={styles.dates}>
-      <span className={styles.datesLabel}>{t("field-date_window")}: </span>
+      <span className={styles.datesLabel}>
+        {field ? formatLabel(field.label) : t("field-date_window")}:{" "}
+      </span>
       <KnowledgeState state={state}>
         {state === "unknown" ? undefined : formatValue(fact ?? {}, field?.value_type)}
       </KnowledgeState>

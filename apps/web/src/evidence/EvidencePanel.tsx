@@ -36,7 +36,9 @@ function useLookups(api: Api, eventId: string): Lookups {
       const [members, documents] = await Promise.all([
         loadOrganizationMembers(api).catch(() => undefined),
         api
-          .GET("/api/v1/events/{event_id}/documents", { params: { path: { event_id: eventId } } })
+          .GET("/api/v1/events/{event_id}/documents", {
+            params: { path: { event_id: eventId }, query: { limit: 200 } },
+          })
           .catch(() => undefined),
       ]);
       if (!current) {

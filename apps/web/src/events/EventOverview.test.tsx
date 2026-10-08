@@ -88,6 +88,21 @@ const profile = {
       value: { type: "money", min: 1500, max: 1500 },
       created_at: "2026-10-05T09:00:00Z",
     },
+    {
+      id: "p2",
+      changeset_id: "c2",
+      field_id: "fd-visitor_estimate",
+      state: "assumption",
+      value: { type: "quantity", min: "30000", max: "30000" },
+      created_at: "2026-10-05T10:00:00Z",
+    },
+    {
+      id: "p3",
+      changeset_id: "c3",
+      field_id: "fd-venue",
+      state: "unknown",
+      created_at: "2026-10-05T11:00:00Z",
+    },
   ],
   open_questions: [
     {
@@ -189,10 +204,26 @@ describe("EventOverview", () => {
       .closest("section") as HTMLElement;
     expect(within(proposals).getByText("Eintritt Erwachsene")).toBeInTheDocument();
     expect(within(proposals).getByText(/^CHF.15\.00$/)).toBeInTheDocument();
-    expect(within(proposals).getByText("Vorschlag")).toBeVisible();
+    expect(within(proposals).getAllByText("Vorschlag")).toHaveLength(3);
     // The accepted list does not show the amount.
     const row = within(facts).getByText("Eintritt Erwachsene", { selector: "dt" }).closest("div");
     expect(within(row as HTMLElement).queryByText(/^CHF.15\.00$/)).not.toBeInTheDocument();
+  });
+
+  it("shows the proposed state of a proposal next to Vorschlag", async () => {
+    setup();
+
+    const heading = await screen.findByRole("heading", { level: 3, name: "Vorschläge" });
+    const proposals = heading.closest("section") as HTMLElement;
+    const item = (label: string) => within(proposals).getByText(label).closest("li") as HTMLElement;
+
+    // A proposed assumption reads as an assumption, a proposal for unknown as Unbekannt.
+    expect(within(item("Erwartete Besucher pro Tag")).getByText("Annahme")).toBeVisible();
+    expect(within(item("Erwartete Besucher pro Tag")).getByText(/^30.000 Personen/)).toBeVisible();
+    expect(within(item("Ort")).getByText("Unbekannt")).toBeVisible();
+    expect(within(item("Ort")).getByText("Vorschlag")).toBeVisible();
+    // An accepted proposal adds no second label.
+    expect(within(item("Eintritt Erwachsene")).queryByText("Bestätigt")).not.toBeInTheDocument();
   });
 
   it("opens the evidence of a value and returns focus to the button on Escape", async () => {

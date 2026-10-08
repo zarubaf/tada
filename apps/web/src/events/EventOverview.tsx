@@ -152,9 +152,14 @@ export function EventOverview({ api }: { api: Api }) {
                   return (
                     <li key={proposal.id} className={styles.proposal}>
                       <span>{field ? formatLabel(field.label) : proposal.field_id}</span>
-                      <KnowledgeState state="proposed">
-                        {formatValue(proposal, field?.value_type)}
-                      </KnowledgeState>
+                      <span className={styles.proposed}>
+                        <KnowledgeState state="proposed">
+                          {proposal.state === "unknown"
+                            ? undefined
+                            : formatValue(proposal, field?.value_type)}
+                        </KnowledgeState>
+                        {proposal.state !== "accepted" && <KnowledgeState state={proposal.state} />}
+                      </span>
                       <time className={styles.note} dateTime={proposal.created_at}>
                         {t("event-overview-proposed-at", {
                           time: formatDateTime(proposal.created_at, event.time_zone),

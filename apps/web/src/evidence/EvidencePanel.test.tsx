@@ -15,6 +15,8 @@ function json(body: unknown) {
   });
 }
 
+const limits: (string | null)[] = [];
+
 function fakeApi(options: { documentsFail?: boolean } = {}) {
   const fetch = async (request: Request) => {
     const { pathname } = new URL(request.url);
@@ -24,6 +26,7 @@ function fakeApi(options: { documentsFail?: boolean } = {}) {
       });
     }
     if (pathname.endsWith("/documents") && !options.documentsFail) {
+      limits.push(new URL(request.url).searchParams.get("limit"));
       return json({
         items: [
           {
@@ -90,12 +93,15 @@ describe("EvidencePanel", () => {
     renderPanel();
 
     const dialog = await screen.findByRole("dialog", { name: "Ort" });
+    expect(within(dialog).getByRole("heading", { level: 2, name: "Ort" })).toBeVisible();
+    expect(within(dialog).getByRole("heading", { level: 3, name: "Belege" })).toBeVisible();
     expect(within(dialog).getByText("Flugplatz Testwil", { selector: "mark" })).toBeVisible();
     expect(within(dialog).getByText("erfasst am 03.10.2026, 14:12")).toBeVisible();
     expect(within(dialog).getByText("Seite 3")).toBeVisible();
     expect(await within(dialog).findByText("Anna Muster")).toBeVisible();
     expect(within(dialog).getByText("04.10.2026, 10:30")).toBeVisible();
     expect(await within(dialog).findByText("Programm Flugtag.pdf, Version 2")).toBeVisible();
+    expect(limits).toContain("200");
   });
 
   it("names the source version by its number when no document matches", async () => {

@@ -30,6 +30,20 @@ const dateWindowFact = {
   accepted_at: "2030-03-01T13:12:00Z",
 };
 
+/** The catalog: the label of the field comes from here. */
+const fields = [
+  {
+    id: "fd1",
+    key: "date_window",
+    label: { kind: "text", text: "Durchführung" },
+    value_type: { type: "date-window", granularity: null },
+    value_schema: {},
+    description: "",
+    module: "core",
+    status: "active",
+  },
+];
+
 /** The answer to the profile: the date window is accepted. */
 const profile = { facts: [dateWindowFact], proposals: [], open_questions: [] };
 
@@ -46,7 +60,7 @@ function fakeApiWithProfile(answerProfile: () => Response, ...responses: Respons
       return answerProfile();
     }
     if (pathname.endsWith("/fields")) {
-      return json(200, { items: [] });
+      return json(200, { items: fields });
     }
     urls.push(pathname);
     const response = responses.shift();
@@ -120,6 +134,7 @@ describe("EventPage", () => {
       await within(header as HTMLElement).findByText("Mai 2030 \u2013 Juni 2030"),
     ).toBeVisible();
     expect(within(header as HTMLElement).getByText("Bestätigt")).toBeInTheDocument();
+    expect(within(header as HTMLElement).getByText(/Durchführung/)).toBeVisible();
   });
 
   it("shows Unbekannt in the header when the profile has no date window", async () => {
