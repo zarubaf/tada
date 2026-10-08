@@ -13,8 +13,7 @@ type State =
 
 /**
  * The page of one event: the header with the name, the sub-navigation and the sub-page in
- * `children`. It owns the route `/events/:eventId`. Task 30 adds the `date_window` value to the
- * header and the overview to the first sub-page.
+ * `children`. It owns the route `/events/:eventId`. The header shows the key and the name only.
  */
 export function EventPage({ api, children }: { api: Api; children: ReactNode }) {
   const { eventId = "" } = useParams();

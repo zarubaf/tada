@@ -83,7 +83,7 @@ export function problemBody(code: string, status: number) {
   return { ...unavailable, code, status };
 }
 
-// The fake API of the sign-in pages (Task 19).
+// The fake API of the sign-in pages.
 
 /** A client without a session: the answer of `GET /api/v1/session`. */
 export async function fakeSignedOut(page: Page): Promise<void> {
