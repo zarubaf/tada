@@ -150,11 +150,30 @@ pub enum StepEvidence {
 }
 
 /// One proposal of an apply, with the operation to apply. An edit changes the state of a `SetFact`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ApplyStep {
     pub proposal_id: ProposalId,
     pub operation: Operation,
     pub evidence: StepEvidence,
+}
+
+/// An operation can hold an edited value with personal data, so `Debug` names the kind of the operation only (ADR 0035).
+impl Debug for ApplyStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let operation = match self.operation {
+            Operation::CreateEvent { .. } => "CreateEvent",
+            Operation::SetFact { .. } => "SetFact",
+            Operation::AddFieldDefinition { .. } => "AddFieldDefinition",
+            Operation::AddChoiceValue { .. } => "AddChoiceValue",
+            Operation::DeprecateField { .. } => "DeprecateField",
+            Operation::CreateOpenQuestion { .. } => "CreateOpenQuestion",
+        };
+        f.debug_struct("ApplyStep")
+            .field("proposal_id", &self.proposal_id)
+            .field("operation", &operation)
+            .field("evidence", &self.evidence)
+            .finish()
+    }
 }
 
 /// All writes of one apply. The store applies them in one transaction, or nothing.
@@ -416,7 +435,9 @@ pub async fn apply_changeset(
                 now,
             );
             // A concurrent review may have closed a proposal first. Then its status stays as it is.
-            stores.review.record(scope, &batch).await?;
+            // If the record fails, the caller still learns of the conflict: the proposals stay open,
+            // and the next apply finds the same conflict and records it then.
+            let _recorded = stores.review.record(scope, &batch).await;
             Err(ApplyError::Conflict(proposals))
         }
     }
@@ -433,6 +454,9 @@ pub struct Rejected {
 /// these can never apply: an apply selects the dependencies of each proposal (ADR 0050).
 /// For example, the rejection of a new event rejects the facts of that event.
 /// Each given proposal must be open, else `invalid-transition`.
+///
+/// A conflict does not close the dependents of a proposal in the same way: the conflict is a fact about the
+/// target record, not a decision of the reviewer. The dependents stay open until a reviewer rejects them.
 pub async fn reject_proposals(
     caller: &MemberCaller,
     changeset_id: ChangesetId,
@@ -1030,6 +1054,27 @@ mod tests {
             [id(1), id(2), id(3)]
         );
         assert_eq!(with_dependents(&proposals, &set(&[3])), [id(3)]);
+    }
+
+    #[test]
+    fn debug_hides_the_value_of_a_step() {
+        let value = tada_domain::facts::ShortText::parse("Anna Muster").unwrap();
+        let step = ApplyStep {
+            proposal_id: id(1),
+            operation: Operation::SetFact {
+                event_id: EventId::from_uuid(Uuid::from_u128(20)),
+                field_id: FieldDefinitionId::from_uuid(Uuid::from_u128(30)),
+                state: FactState::Accepted(Valued {
+                    value: tada_domain::facts::FactValue::Text(value),
+                    approximate: false,
+                }),
+                expected_version: None,
+            },
+            evidence: StepEvidence::Edit,
+        };
+        let debug = format!("{step:?}");
+        assert!(debug.contains("SetFact"), "{debug}");
+        assert!(!debug.contains("Anna"), "{debug}");
     }
 
     #[test]

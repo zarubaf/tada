@@ -11,8 +11,8 @@ use tada_app::proposals::{
     Changeset, Created, FactStateInput, NewChangeset, ProposeStores, ValueInput, create_changeset,
 };
 use tada_app::review::{
-    Applied, ApplyError, ApplyInput, Edit, ProposalStatus, ReviewStore, ReviewStores,
-    apply_changeset, list_open_changesets, reject_proposals, status,
+    Applied, ApplyError, ApplyInput, Edit, ListChangesetsError, ProposalStatus, ReviewStore,
+    ReviewStores, apply_changeset, list_open_changesets, reject_proposals, status,
 };
 
 use crate::actor;
@@ -554,11 +554,20 @@ async fn a_contributor_cannot_review() {
     );
     let listed =
         list_open_changesets(contributor, Some(event), &test.database, &test.database).await;
-    assert!(listed.is_err());
+    assert!(
+        matches!(listed, Err(ListChangesetsError::Forbidden)),
+        "{listed:?}"
+    );
     let inbox = list_open_changesets(contributor, None, &test.database, &test.database)
         .await
         .unwrap();
     assert!(inbox.is_empty());
+
+    // An owner of another organization does not find the changeset.
+    let elsewhere = test.create_organization("musterhausen").await;
+    let stranger = MemberCaller::new(open_day.owner.user_id(), elsewhere, OrganizationRole::Owner);
+    let applied = apply(&test, &stranger, &changeset, select(&[id])).await;
+    assert!(matches!(applied, Err(ApplyError::NotFound)), "{applied:?}");
     assert_eq!(count(&test, "review_result").await, 0);
 }
 
@@ -724,6 +733,15 @@ async fn the_review_inbox_shows_organization_changesets_to_owners_and_admins_onl
         inbox(&test, &open_day.owner).await,
         [of_event.id, of_organization.id],
         "oldest first"
+    );
+    let admin = MemberCaller::new(
+        open_day.manager.user_id(),
+        open_day.organization,
+        OrganizationRole::Admin,
+    );
+    assert_eq!(
+        inbox(&test, &admin).await,
+        [of_event.id, of_organization.id]
     );
     let listed = list_open_changesets(
         &open_day.manager,
