@@ -108,6 +108,7 @@ tada does not copy every tool into PostgreSQL.
   A passage of a proposal cites the source text of its changeset by default.
   It can also cite another source version with a text, for example an uploaded text file, if the source version is readable in the event of the proposal (`app::access::event_source_reach`).
   Otherwise the passage could show a text of another event to the members of the event.
+  The source links of a draft follow the same rule: they cite only source versions that are readable in the event of the draft.
   A draft version has no source version, so a passage cannot cite a draft.
 - Audit messages contain no raw personal data.
 - [doc/data-inventory.md](data-inventory.md) lists each category of personal data that tada stores.
@@ -122,7 +123,8 @@ tada does not copy every tool into PostgreSQL.
 - Owners and admins read each source version of their organization.
   Another member reads the source versions of the events in which the member has an event role, and the source versions that the facts and proposals of these events cite as evidence.
   For example, the text of an organization changeset has no event, and the members of the event that it creates read it through the evidence.
-  `app::access::source_reach` holds this rule. Search and citations both use it.
+  `app::access::source_reach` holds this rule. Search and the reads of citations use it.
+  A new citation in a proposal or a draft uses the reach of its own event (`app::access::event_source_reach`).
 - A document copied into an event does not widen access. Both the source access and the event membership must allow disclosure.
 - Unknown event attribution goes to a triage queue. AI can suggest an event, but it never shows a message to more than one event team on its own.
 
