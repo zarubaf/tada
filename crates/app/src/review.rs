@@ -192,11 +192,18 @@ pub struct ApplyPlan {
     pub audit: Vec<AuditEvent>,
 }
 
-/// The event-local number that an apply gave a new open question: `QST-<local_number>` (ADR 0038).
+/// The local number that an apply gave a new record (ADR 0038).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NewLocalId {
-    pub open_question: OpenQuestionId,
+    pub record: LocalRecord,
     pub local_number: u64,
+}
+
+/// A new record with a local number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocalRecord {
+    /// An open question: `QST-<n>`, local to its event.
+    OpenQuestion(OpenQuestionId),
 }
 
 /// The result of `ReviewStore::apply`. Each result other than `Applied` changed nothing.

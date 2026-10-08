@@ -20,8 +20,8 @@ use tada_app::domain::ids::{
 use tada_app::domain::proposals::Operation;
 use tada_app::domain::sources::{Passage, SourceText};
 use tada_app::review::{
-    ApplyOutcome, ApplyPlan, ApplyStep, NewLocalId, OpenChangeset, Recorded, ReviewBatch,
-    ReviewOutcome, ReviewRecord, ReviewStore, StepEvidence,
+    ApplyOutcome, ApplyPlan, ApplyStep, LocalRecord, NewLocalId, OpenChangeset, Recorded,
+    ReviewBatch, ReviewOutcome, ReviewRecord, ReviewStore, StepEvidence,
 };
 use tada_app::store::StoreError;
 
@@ -569,7 +569,7 @@ async fn write_step(
             .execute(&mut *conn)
             .await?;
             local_id = Some(NewLocalId {
-                open_question: OpenQuestionId::from_uuid(id.as_uuid()),
+                record: LocalRecord::OpenQuestion(OpenQuestionId::from_uuid(id.as_uuid())),
                 local_number: u64::try_from(number)
                     .map_err(|error| sqlx::Error::Decode(Box::new(error)))?,
             });
