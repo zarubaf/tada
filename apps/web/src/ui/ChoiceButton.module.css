@@ -23,11 +23,6 @@
     outline-offset: 2px;
   }
 
-  .choice[data-disabled] {
-    cursor: default;
-    opacity: 0.5;
-  }
-
   .title {
     font-weight: var(--font-weight-medium);
     overflow-wrap: anywhere;

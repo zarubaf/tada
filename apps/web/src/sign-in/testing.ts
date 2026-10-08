@@ -1,4 +1,5 @@
 // Helpers of the tests of the pages that a member without a session can open.
+import { screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import { createApi } from "../api/client";
 
@@ -46,4 +47,25 @@ export function fakeApi(...responses: Response[]) {
     return response;
   });
   return { api: createApi(fetch as unknown as typeof globalThis.fetch), calls };
+}
+
+/** The alerts that show a text. An empty live region is in the page before its text. */
+function shownAlerts(): HTMLElement[] {
+  return screen.queryAllByRole("alert").filter((alert) => alert.textContent?.trim());
+}
+
+/** The one alert that shows a text, or nothing. */
+export function queryAlert(): HTMLElement | null {
+  return shownAlerts()[0] ?? null;
+}
+
+/** Waits for the one alert that shows a text. */
+export function findAlert(): Promise<HTMLElement> {
+  return waitFor(() => {
+    const shown = shownAlerts();
+    if (shown.length !== 1) {
+      throw new Error(`expected one alert with a text, found ${shown.length}`);
+    }
+    return shown[0] as HTMLElement;
+  });
 }

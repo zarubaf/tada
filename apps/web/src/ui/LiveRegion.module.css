@@ -8,12 +8,15 @@
   }
 
   /* The region stays in the page: empty, it is hidden from the eye but not from the tree. */
-  .region:empty {
+  .region:empty,
+  .hidden {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     padding: 0;
     border: 0;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }

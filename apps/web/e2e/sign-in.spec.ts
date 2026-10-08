@@ -128,7 +128,8 @@ test("the magic link page keeps the token out of the address and signs in only o
   expect(redeemed).toEqual([]);
 
   await page.getByRole("button", { name: "Anmelden" }).click();
-  await expect(page.getByRole("alert")).toContainText("Dieser Link ist ungültig oder abgelaufen.");
+  // The message takes focus, because the button left with the final failure.
+  await expect(page.getByRole("alert").filter({ hasText: "ungültig" })).toBeFocused();
   expect(redeemed).toEqual(['{"token":"invented-token"}']);
   await page.getByRole("link", { name: "Zur Anmeldung" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);

@@ -6,6 +6,7 @@ import { useNavigate } from "../router/Router";
 import { useRefreshSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { InlineError } from "../ui/InlineError";
+import { LiveRegion } from "../ui/LiveRegion";
 import { takeFragmentToken } from "./fragment";
 import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
 
@@ -48,22 +49,21 @@ export function MagicLinkPage({ api }: { api: Api }) {
       {!failure?.final && (
         <>
           <PublicText>{t("magic-link-text")}</PublicText>
-          <Button
-            variant="primary"
-            isPending={busy}
-            isDisabled={waiting}
-            onPress={() => void signIn()}
-          >
+          <Button variant="primary" isPending={busy || waiting} onPress={() => void signIn()}>
             {t("magic-link-submit")}
           </Button>
         </>
       )}
+      {/* The button stays after a failure that is not final, so it keeps focus. */}
+      <LiveRegion kind="alert" visuallyHidden>
+        {failure && !failure.final ? failure.message : undefined}
+      </LiveRegion>
       {failure && (
         <InlineError
           key={failure.id}
           message={failure.message}
           requestId={failure.requestId}
-          announce="focus"
+          announce={failure.final ? "focus" : "none"}
         >
           {failure.final && <ToSignInLink />}
         </InlineError>

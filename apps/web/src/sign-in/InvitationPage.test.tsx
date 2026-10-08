@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Router, usePathname } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 import { InvitationPage } from "./InvitationPage";
-import { fakeApi, json, problem } from "./testing";
+import { fakeApi, findAlert, json, problem, queryAlert } from "./testing";
 
 const membership = {
   organization_id: "0199b8e0-0000-7000-8000-0000000000a1",
@@ -71,22 +71,21 @@ describe("InvitationPage", () => {
     );
   });
 
-  it("does not call a rate-limited accept invalid, keeps the button and moves focus", async () => {
+  it("does not call a rate-limited accept invalid, and the button keeps focus", async () => {
     renderAt(
       "#token=invite-token",
       json(200, { organization_name: "Fliegergruppe Testwil", role: "owner" }),
       problem(429, "rate-limited", { "Retry-After": "1" }),
     );
     expect(await screen.findByText(/Organisationsleitung/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Einladung annehmen" }));
+    const button = screen.getByRole("button", { name: "Einladung annehmen" });
+    await userEvent.click(button);
 
-    const alert = await screen.findByRole("alert");
+    const alert = await findAlert();
     expect(alert).toHaveTextContent("Zu viele Anfragen. Versuchen Sie es in 1 Sekunde erneut.");
     expect(alert).not.toHaveTextContent("ungültig");
-    expect(alert).toHaveFocus();
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Einladung annehmen" })).toBeEnabled(),
-    );
+    expect(button).toHaveFocus();
+    await waitFor(() => expect(button).not.toHaveAttribute("aria-disabled"));
   });
 
   it("does not call a rate-limited preview invalid and offers a retry", async () => {
@@ -95,10 +94,20 @@ describe("InvitationPage", () => {
       problem(429, "rate-limited"),
       json(200, { organization_name: "Fliegergruppe Testwil", role: "member" }),
     );
-    const alert = await screen.findByRole("alert");
+    const alert = await findAlert();
     expect(alert).not.toHaveTextContent("ungültig");
     await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
     expect(await screen.findByText(/Fliegergruppe Testwil/)).toBeInTheDocument();
+    // The retry button left with the message: focus goes to the heading.
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Einladung" })).toHaveFocus());
+  });
+
+  it("moves focus to the message when a retry of the preview fails", async () => {
+    renderAt("#token=invite-token", problem(503, "unavailable"), problem(503, "unavailable"));
+    await findAlert();
+    await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
+
+    await waitFor(() => expect(queryAlert()).toHaveFocus());
   });
 
   it("moves focus to the message when the accept fails for good", async () => {
@@ -108,16 +117,14 @@ describe("InvitationPage", () => {
       problem(401, "unauthenticated"),
     );
     await userEvent.click(await screen.findByRole("button", { name: "Einladung annehmen" }));
-    const alert = await screen.findByRole("alert");
+    const alert = await findAlert();
     expect(alert).toHaveTextContent("Diese Einladung ist ungültig oder abgelaufen.");
     expect(alert).toHaveFocus();
   });
 
   it("shows the invalid-invitation message for a rejected token", async () => {
     renderAt("#token=old", problem(401, "unauthenticated"));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Diese Einladung ist ungültig oder abgelaufen.",
-    );
+    expect(await findAlert()).toHaveTextContent("Diese Einladung ist ungültig oder abgelaufen.");
     expect(screen.getByRole("link", { name: "Zur Anmeldung" })).toHaveAttribute("href", "/sign-in");
   });
 });

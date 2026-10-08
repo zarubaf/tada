@@ -7,18 +7,12 @@ export interface ChoiceButtonProps {
   detail: string;
   onPress: () => void;
   isPending?: boolean;
-  isDisabled?: boolean;
 }
 
 /** A full-width button for one option of a choice, with a title and a detail line. */
-export function ChoiceButton({ title, detail, onPress, isPending, isDisabled }: ChoiceButtonProps) {
+export function ChoiceButton({ title, detail, onPress, isPending }: ChoiceButtonProps) {
   return (
-    <AriaButton
-      className={styles.choice}
-      onPress={onPress}
-      isPending={isPending}
-      isDisabled={isDisabled}
-    >
+    <AriaButton className={styles.choice} onPress={onPress} isPending={isPending}>
       <span className={styles.title}>{title}</span>
       <span className={styles.detail}>{detail}</span>
     </AriaButton>

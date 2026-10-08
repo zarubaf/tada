@@ -36,12 +36,6 @@ interface Loadable<T> {
 
 const loading = <T,>(): Loadable<T> => ({ kind: "loading", items: [] });
 
-/** The state of the request for the next page of members. */
-type More =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "failed"; message: string; requestId: string | undefined };
-
 /** What the member confirms: the removal of a member or the revocation of an invitation. */
 type Confirming = { kind: "member"; item: Member } | { kind: "invitation"; item: Invitation };
 
@@ -55,8 +49,8 @@ export function MembersPage({ api }: { api: Api }) {
   const manages = canManage(role);
   const [members, setMembers] = useState<Loadable<Member>>(loading());
   const [invitations, setInvitations] = useState<Loadable<Invitation>>(loading());
-  // The next page of members: the loaded rows stay while it loads or fails.
-  const [more, setMore] = useState<More>({ kind: "idle" });
+  // The next page of members loads: the loaded rows stay while it loads or fails.
+  const [loadingMore, setLoadingMore] = useState(false);
   const navigate = useNavigate();
   // The message of the last failed action. Both live regions are in the page from the start.
   const [failure, setFailure] = useState<string>();
@@ -85,7 +79,7 @@ export function MembersPage({ api }: { api: Api }) {
               requestId: error?.request_id,
             },
       );
-      setMore({ kind: "idle" });
+      setLoadingMore(false);
       return data !== undefined;
     } catch {
       setMembers({ kind: "failed", items: [], message: problemMessage(undefined) });
@@ -146,10 +140,11 @@ export function MembersPage({ api }: { api: Api }) {
 
   /** The next page: the loaded rows stay, and a retry continues from the same cursor. */
   const loadMore = async () => {
-    if (members.kind !== "loaded" || members.nextCursor === undefined || more.kind === "loading") {
+    if (members.kind !== "loaded" || members.nextCursor === undefined || loadingMore) {
       return;
     }
-    setMore({ kind: "loading" });
+    setLoadingMore(true);
+    setFailure(undefined);
     setConfirmation(undefined);
     try {
       const { data, error } = await api.GET("/api/v1/members", {
@@ -162,18 +157,19 @@ export function MembersPage({ api }: { api: Api }) {
           items: [...current.items, ...data.items],
           nextCursor,
         }));
-        setMore({ kind: "idle" });
         setConfirmation(t("members-loaded-more"));
         if (nextCursor === undefined) {
           // The button leaves: focus goes to the heading of the list.
           focusAfterCommit(() => membersHeading.current);
         }
       } else {
-        setMore({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
+        // The button stays and keeps focus: the alert region announces the failure.
+        fail({ error });
       }
     } catch {
-      setMore({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+      fail({});
     }
+    setLoadingMore(false);
   };
 
   const confirm = async () => {
@@ -356,11 +352,8 @@ export function MembersPage({ api }: { api: Api }) {
               rows={members.items}
               rowKey={(member) => member.user_id}
             />
-            {more.kind === "failed" && (
-              <InlineError message={more.message} requestId={more.requestId} announce="focus" />
-            )}
             {members.nextCursor !== undefined && (
-              <Button isPending={more.kind === "loading"} onPress={() => void loadMore()}>
+              <Button isPending={loadingMore} onPress={() => void loadMore()}>
                 {t("members-load-more")}
               </Button>
             )}

@@ -54,18 +54,21 @@ export function SignInPage({ api }: { api: Api }) {
           value={email}
           onChange={setEmail}
         />
-        {/* isPending keeps the button focusable; isDisabled would drop the focus. */}
-        <Button type="submit" variant="primary" isPending={busy} isDisabled={waiting}>
+        {/* isPending keeps the button focusable, also during a wait; isDisabled would drop focus. */}
+        <Button type="submit" variant="primary" isPending={busy || waiting}>
           {t("sign-in-submit")}
         </Button>
       </form>
       <LiveRegion kind="status">{sent ? t("sign-in-sent") : ""}</LiveRegion>
+      <LiveRegion kind="alert" visuallyHidden>
+        {failure?.message}
+      </LiveRegion>
       {failure && (
         <InlineError
           key={failure.id}
           message={failure.message}
           requestId={failure.requestId}
-          announce="focus"
+          announce="none"
         />
       )}
     </PublicPage>

@@ -7,6 +7,7 @@ import { PublicPage, PublicText } from "../sign-in/PublicPage";
 import { ChoiceButton } from "../ui/ChoiceButton";
 import { EmptyState } from "../ui/EmptyState";
 import { InlineError } from "../ui/InlineError";
+import { LiveRegion } from "../ui/LiveRegion";
 import styles from "./ChooseOrganizationPage.module.css";
 import { useRefreshSession, useSession } from "./SessionProvider";
 
@@ -59,8 +60,7 @@ export function ChooseOrganizationPage({ api }: { api: Api }) {
                 <ChoiceButton
                   title={membership.name}
                   detail={t(`role-${membership.role}`)}
-                  isDisabled={waiting}
-                  isPending={busy}
+                  isPending={busy || waiting}
                   onPress={() => void choose(membership.organization_id)}
                 />
               </li>
@@ -68,12 +68,16 @@ export function ChooseOrganizationPage({ api }: { api: Api }) {
           </ul>
         </>
       )}
+      {/* The buttons stay, so the pressed one keeps focus. */}
+      <LiveRegion kind="alert" visuallyHidden>
+        {failure?.message}
+      </LiveRegion>
       {failure && (
         <InlineError
           key={failure.id}
           message={failure.message}
           requestId={failure.requestId}
-          announce="focus"
+          announce="none"
         />
       )}
     </PublicPage>

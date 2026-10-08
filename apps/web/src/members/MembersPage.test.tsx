@@ -410,19 +410,20 @@ describe("MembersPage", () => {
       },
     });
 
-    await user.click(await screen.findByRole("button", { name: "Weitere Mitglieder laden" }));
+    const more = await screen.findByRole("button", { name: "Weitere Mitglieder laden" });
+    await user.click(more);
 
-    await waitFor(() =>
-      expect(screen.getAllByRole("alert").some((a) => a === document.activeElement)).toBe(true),
-    );
+    // The button stays: it keeps focus, and the alert region announces the failure.
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("nicht erreichbar"));
+    expect(more).toHaveFocus();
     expect(screen.getByText("Anna Muster")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Weitere Mitglieder laden" }));
+    await user.click(more);
 
     expect(await screen.findByText("Bernd Beispiel")).toBeInTheDocument();
     expect(count("GET /api/v1/members")).toBe(3);
   });
 
-  it("disables the invite button while the server asks to wait", async () => {
+  it("makes the invite button wait while the server asks to wait", async () => {
     setup({
       answers: {
         "POST /invitations": () =>
@@ -448,7 +449,9 @@ describe("MembersPage", () => {
     await user.click(screen.getByRole("button", { name: "Einladen" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("60 Sekunden"));
-    expect(screen.getByRole("button", { name: "Einladen" })).toBeDisabled();
+    const button = screen.getByRole("button", { name: "Einladen" });
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).toHaveFocus();
   });
 
   it("loads the invitations again when a revoked invitation is gone", async () => {

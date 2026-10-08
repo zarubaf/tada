@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { Router, usePathname } from "../router/Router";
-import { fakeApi, json, problem } from "../sign-in/testing";
+import { fakeApi, findAlert, json, problem } from "../sign-in/testing";
 import { ChooseOrganizationPage } from "./ChooseOrganizationPage";
 import { SessionProvider } from "./SessionProvider";
 
@@ -68,12 +68,12 @@ describe("ChooseOrganizationPage", () => {
 
   it("shows the message of the problem and stays on the page", async () => {
     renderPage(problem(403, "forbidden"));
-    await userEvent.click(await screen.findByRole("button", { name: /Fliegergruppe Testwil/ }));
+    const choice = await screen.findByRole("button", { name: /Fliegergruppe Testwil/ });
+    await userEvent.click(choice);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Sie haben keine Berechtigung für diese Aktion.",
-    );
+    expect(await findAlert()).toHaveTextContent("Sie haben keine Berechtigung für diese Aktion.");
     expect(screen.getByTestId("where")).toHaveTextContent("/choose-organization");
-    expect(screen.getByRole("alert")).toHaveFocus();
+    // The buttons stay, so the pressed one keeps focus.
+    expect(choice).toHaveFocus();
   });
 });

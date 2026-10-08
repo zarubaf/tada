@@ -87,7 +87,7 @@ export function InviteMemberForm({
       focusInvalidField();
       return;
     }
-    if (busy) {
+    if (busy || waiting) {
       return;
     }
 
@@ -152,7 +152,7 @@ export function InviteMemberForm({
           }}
         />
         <div className={styles.actions}>
-          <Button type="submit" variant="primary" isPending={busy} isDisabled={waiting}>
+          <Button type="submit" variant="primary" isPending={busy || waiting}>
             {t("invite-submit")}
           </Button>
         </div>

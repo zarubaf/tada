@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Api, InvitationPreview } from "../api/client";
 import { type Failure, failureOf, invalidFailure, useWaiting } from "../api/failure";
 import { t } from "../i18n";
 import { useNavigate } from "../router/Router";
 import { useRefreshSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
+import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { takeFragmentToken } from "./fragment";
@@ -24,36 +25,36 @@ export function InvitationPage({ api }: { api: Api }) {
   const [failure, setFailure] = useState<Failure | undefined>(() =>
     token ? undefined : invalidFailure(t("invitation-invalid")),
   );
-  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const waiting = useWaiting(failure);
   const refresh = useRefreshSession();
   const navigate = useNavigate();
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` loads the preview again
-  useEffect(() => {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const { retried, retry } = useRetry(() => heading.current);
+
+  /** The preview uses no token up. Resolves to true when it loaded. */
+  const loadPreview = useCallback(async () => {
     if (!token) {
-      return;
+      return false;
     }
-    let current = true;
-    api
-      .POST("/api/v1/invitations/preview", { body: { token } })
-      .then((result) => {
-        if (!current) {
-          return;
-        }
-        if (result.data) {
-          setFailure(undefined);
-          setPreview({ kind: "ready", preview: result.data });
-        } else {
-          setFailure(failureOf(result, t("invitation-invalid")));
-        }
-      })
-      .catch(() => current && setFailure(failureOf({})));
-    return () => {
-      current = false;
-    };
-  }, [api, token, attempt]);
+    try {
+      const result = await api.POST("/api/v1/invitations/preview", { body: { token } });
+      if (result.data) {
+        setFailure(undefined);
+        setPreview({ kind: "ready", preview: result.data });
+        return true;
+      }
+      setFailure(failureOf(result, t("invitation-invalid")));
+    } catch {
+      setFailure(failureOf({}));
+    }
+    return false;
+  }, [api, token]);
+
+  useEffect(() => {
+    void loadPreview();
+  }, [loadPreview]);
 
   const accept = async () => {
     if (!token || busy || waiting) {
@@ -74,8 +75,11 @@ export function InvitationPage({ api }: { api: Api }) {
     setBusy(false);
   };
 
+  // The accept button is in the page: its failure leaves it there.
+  const acceptStays = preview.kind === "ready" && failure !== undefined && !failure.final;
+
   return (
-    <PublicPage title={t("invitation-title")}>
+    <PublicPage title={t("invitation-title")} titleRef={heading}>
       <LiveRegion kind="status">
         {preview.kind === "loading" && !failure ? t("invitation-loading") : ""}
       </LiveRegion>
@@ -87,16 +91,15 @@ export function InvitationPage({ api }: { api: Api }) {
               role: t(`role-${preview.preview.role}`),
             })}
           </PublicText>
-          <Button
-            variant="primary"
-            isPending={busy}
-            isDisabled={waiting}
-            onPress={() => void accept()}
-          >
+          <Button variant="primary" isPending={busy || waiting} onPress={() => void accept()}>
             {t("invitation-accept")}
           </Button>
         </>
       )}
+      {/* After a failed accept that is not final, the button stays and keeps focus. */}
+      <LiveRegion kind="alert" visuallyHidden>
+        {acceptStays ? failure?.message : undefined}
+      </LiveRegion>
       {failure && (
         <InlineError
           key={failure.id}
@@ -104,13 +107,14 @@ export function InvitationPage({ api }: { api: Api }) {
           requestId={failure.requestId}
           onRetry={
             !failure.final && preview.kind === "loading" && !waiting
-              ? () => {
-                  setFailure(undefined);
-                  setAttempt(attempt + 1);
-                }
+              ? () =>
+                  retry(() => {
+                    setFailure(undefined);
+                    return loadPreview();
+                  })
               : undefined
           }
-          announce="focus"
+          announce={acceptStays ? "none" : failure.final || retried ? "focus" : "alert"}
         >
           {failure.final && <ToSignInLink />}
         </InlineError>

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { Router } from "../router/Router";
 import { SignInPage } from "./SignInPage";
-import { fakeApi, json, problem } from "./testing";
+import { fakeApi, findAlert, json, problem, queryAlert } from "./testing";
 
 const SAME_MESSAGE = "Wenn die Adresse bekannt ist, erhalten Sie in Kürze eine E-Mail.";
 
@@ -31,7 +31,7 @@ describe("SignInPage", () => {
         body: JSON.stringify({ email: "anna.muster@example.org" }),
       },
     ]);
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(queryAlert()).not.toBeInTheDocument();
   });
 
   it("shows the same message for an unknown address and for a known one", async () => {
@@ -55,27 +55,28 @@ describe("SignInPage", () => {
     expect(screen.getByRole("status")).toBe(region);
   });
 
-  it("names the wait of Retry-After for a 429, moves focus and enables the button after it", async () => {
+  it("names the wait of Retry-After for a 429, keeps focus and lets the button work after it", async () => {
     await submit("anna.muster@example.org", problem(429, "rate-limited", { "Retry-After": "1" }));
-    const alert = await screen.findByRole("alert");
+    const alert = await findAlert();
     expect(alert).toHaveTextContent("Zu viele Anfragen. Versuchen Sie es in 1 Sekunde erneut.");
-    expect(alert).toHaveFocus();
     const button = screen.getByRole("button", { name: "Anmeldelink senden" });
-    expect(button).toBeDisabled();
-    await waitFor(() => expect(button).toBeEnabled());
+    expect(button).toHaveFocus();
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    await waitFor(() => expect(button).not.toHaveAttribute("aria-disabled"));
+    expect(button).toHaveFocus();
     expect(screen.queryByText(SAME_MESSAGE)).not.toBeInTheDocument();
   });
 
   it("shows the general message of the rate limit without Retry-After", async () => {
     await submit("anna.muster@example.org", problem(429, "rate-limited"));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await findAlert()).toHaveTextContent(
       "Zu viele Anfragen. Versuchen Sie es in einigen Minuten erneut.",
     );
   });
 
   it("keeps the address after an error", async () => {
     await submit("anna.muster@example.org", problem(503, "unavailable"));
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(await findAlert()).toBeInTheDocument();
     expect(screen.getByLabelText(/E-Mail-Adresse/)).toHaveValue("anna.muster@example.org");
   });
 });
