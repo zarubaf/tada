@@ -7,6 +7,7 @@ use tada_domain::identity::{EventRole, OrganizationRole};
 use tada_domain::ids::{ApiTokenId, DocumentId, DocumentVersionId, FactId, OrganizationId, UserId};
 
 use super::*;
+use crate::access::SourceReach;
 use crate::caller::AiCaller;
 use crate::documents::{
     DocumentCursor, DocumentView, NewUpload, Published, StoredVersion, VersionContent, VersionView,
@@ -56,7 +57,7 @@ struct Memory {
     /// The fact versions of Testwil, with their events.
     fact_versions: Mutex<Vec<(EventId, FactId, RecordVersion)>>,
     /// The source versions of Testwil.
-    sources: Mutex<Vec<SourceVersionText>>,
+    sources: Mutex<Vec<(Option<EventId>, SourceVersionText)>>,
     /// The documents of Testwil, with their events.
     documents: Mutex<Vec<(DocumentId, EventId)>>,
 }
@@ -177,9 +178,11 @@ impl SourceStore for Memory {
         unreachable!()
     }
 
+    /// The evidence clause of the reach is tested with the store, so this memory knows no evidence.
     async fn texts(
         &self,
         scope: OrgScope,
+        reach: &SourceReach,
         ids: &[SourceVersionId],
     ) -> Result<Vec<SourceVersionText>, StoreError> {
         if scope.organization_id() != testwil() {
@@ -188,8 +191,14 @@ impl SourceStore for Memory {
         let sources = self.sources.lock().unwrap();
         Ok(sources
             .iter()
-            .filter(|source| ids.contains(&source.id))
-            .cloned()
+            .filter(|(event, source)| {
+                ids.contains(&source.id)
+                    && match reach {
+                        SourceReach::Organization => true,
+                        SourceReach::Events(events) => event.is_some_and(|e| events.contains(&e)),
+                    }
+            })
+            .map(|(_, source)| source.clone())
             .collect())
     }
 }
@@ -1073,11 +1082,13 @@ fn memory_with_targets() -> (Memory, [SourceVersionId; 3]) {
     ];
     let events = [Some(open_day()), Some(other_event()), None];
     for (id, event) in ids.into_iter().zip(events) {
-        memory.sources.lock().unwrap().push(SourceVersionText {
-            id,
-            event_id: event,
-            text: Some(SourceText::normalize(LEAFLET)),
-        });
+        memory.sources.lock().unwrap().push((
+            event,
+            SourceVersionText {
+                id,
+                text: Some(SourceText::normalize(LEAFLET)),
+            },
+        ));
     }
     (memory, ids)
 }
@@ -1198,7 +1209,7 @@ async fn a_draft_cannot_cite_a_source_that_its_author_cannot_see() {
             markdown_error("link-not-found")
         );
     }
-    // An owner sees the sources of the organization (ADR 0052).
+    // An owner reaches each source of the organization (ADR 0052).
     let owner = caller(OrganizationRole::Owner);
     let input = draft(
         new_document(),
@@ -1207,6 +1218,25 @@ async fn a_draft_cannot_cite_a_source_that_its_author_cannot_see() {
     create_changeset(&owner, input, stores(&memory), &FixedClock)
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn a_draft_cannot_cite_a_source_without_text() {
+    let (memory, _) = memory_with_targets();
+    let pdf = SourceVersionId::from_uuid(Uuid::now_v7());
+    memory.sources.lock().unwrap().push((
+        Some(open_day()),
+        SourceVersionText {
+            id: pdf,
+            text: None,
+        },
+    ));
+    let anna = contributor(&memory);
+    let input = draft(new_document(), &format!("{}\n", source_link(pdf, 7, 19)));
+    assert_eq!(
+        draft_errors(&memory, &anna, input).await,
+        markdown_error("no-text")
+    );
 }
 
 #[tokio::test]

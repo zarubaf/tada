@@ -163,6 +163,37 @@ pub async fn proposes_in_some_event(
         .any(|(_, role)| EventAccess::from(role).can_propose()))
 }
 
+/// The source versions that a caller can read (ADR 0050, ADR 0052). Search and citations use this one rule.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SourceReach {
+    /// Each source version of the organization: the reach of owners and admins.
+    Organization,
+    /// The source versions of these events, and each source version that a fact version or a proposal
+    /// of these events cites as evidence. For example, an organization changeset stores its text without
+    /// an event, and the members of the event that it creates read the text through the evidence.
+    Events(Vec<EventId>),
+}
+
+/// The source versions that `caller` can read: owners and admins read each source version of their
+/// organization, and other members read the sources of the events in which they have an event role.
+pub async fn source_reach(
+    caller: &impl Principal,
+    identity: &dyn IdentityStore,
+) -> Result<SourceReach, StoreError> {
+    if sees_all_events(caller) {
+        return Ok(SourceReach::Organization);
+    }
+    // Each event role can read (`EventAccess::can_read`).
+    let events = identity
+        .event_roles_of(caller.scope(), caller.user_id())
+        .await?
+        .into_iter()
+        .filter(|(_, role)| EventAccess::from(*role).can_read())
+        .map(|(event, _)| event)
+        .collect();
+    Ok(SourceReach::Events(events))
+}
+
 /// The access of the member `user`, who is not the caller, in the event `event`, or `None` if the user has none.
 /// It also serves an event that a changeset creates and that does not exist yet: there, only owners and admins have access.
 /// For example, the owner of a work record must be a member of its event (ADR 0052).

@@ -8,7 +8,7 @@ use tada_domain::proposals::{DraftDocument, Operation, Proposal};
 use tada_domain::sources::Passage;
 
 use super::{MayPropose, ProposeError, ProposeStores, finish};
-use crate::access::{self, AccessError};
+use crate::access::{self, SourceReach};
 use crate::drafts::{self, CitedFact, CitedPassage, DraftProvenance, ProvenanceManifest};
 use crate::problem::FieldError;
 use crate::sources::SourceVersionText;
@@ -24,7 +24,8 @@ const LINK_NOT_FOUND: &str = "link-not-found";
 /// 2. An existing document is a document of the event of the proposal.
 /// 3. Each fact link cites a stored fact version of the event: accepted, an assumption or unknown.
 ///    An open proposal has no fact version, so a link to it does not resolve.
-/// 4. Each source link cites a source version that the caller can see, and its range is inside the text.
+/// 4. Each source link cites a source version in the reach of the caller (`access::source_reach`),
+///    and its range is inside the text of the source version.
 pub(super) async fn check_drafts(
     caller: &impl MayPropose,
     proposals: &[Proposal],
@@ -32,7 +33,7 @@ pub(super) async fn check_drafts(
 ) -> Result<Vec<DraftProvenance>, ProposeError> {
     let mut errors = Vec::new();
     let mut checked = Vec::new();
-    let mut visible = Visibility::default();
+    let mut reach = None;
     for (index, proposal) in proposals.iter().enumerate() {
         let Operation::CreateDocumentDraft {
             event_id,
@@ -65,7 +66,11 @@ pub(super) async fn check_drafts(
             }
         };
         let facts = resolve_facts(caller, *event_id, &links.facts, stores).await?;
-        let sources = resolve_sources(caller, &links.sources, stores, &mut visible).await?;
+        let reach = match &mut reach {
+            Some(reach) => reach,
+            None => reach.insert(access::source_reach(caller, stores.identity).await?),
+        };
+        let sources = resolve_sources(caller, reach, &links.sources, stores).await?;
         let manifest = match (facts, sources) {
             (Ok(facts), Ok(sources)) => ProvenanceManifest { facts, sources },
             (facts, sources) => {
@@ -121,9 +126,9 @@ async fn resolve_facts(
 /// The cited passages with their quotes, or the entry code of the first link that does not resolve.
 async fn resolve_sources(
     caller: &impl MayPropose,
+    reach: &SourceReach,
     links: &[drafts::SourceLink],
     stores: ProposeStores<'_>,
-    visible: &mut Visibility,
 ) -> Result<Result<Vec<CitedPassage>, &'static str>, StoreError> {
     let ids: Vec<SourceVersionId> = links
         .iter()
@@ -134,63 +139,37 @@ async fn resolve_sources(
     }
     let texts: HashMap<SourceVersionId, SourceVersionText> = stores
         .sources
-        .texts(caller.scope(), &ids)
+        .texts(caller.scope(), reach, &ids)
         .await?
         .into_iter()
         .map(|text| (text.id, text))
         .collect();
     let mut cited = Vec::new();
     for (link, id) in links.iter().zip(ids) {
+        // The store gives only the source versions in the reach of the caller.
         let Some(source) = texts.get(&id) else {
             return Ok(Err(LINK_NOT_FOUND));
         };
-        if !visible.sees(caller, source.event_id, stores).await? {
-            return Ok(Err(LINK_NOT_FOUND));
-        }
         match cited_passage(source, link) {
-            Some(passage) => cited.push(passage),
-            None => return Ok(Err("out-of-range")),
+            Ok(passage) => cited.push(passage),
+            Err(code) => return Ok(Err(code)),
         }
     }
     Ok(Ok(cited))
 }
 
-/// The passage of a source link with the quote of its range, or `None` if the source version has no text for the range.
+/// The passage of a source link with the quote of its range, or the entry code `no-text` for a source version
+/// without text (for example a PDF), or `out-of-range` for a range after the end of the text.
 /// Evidence in drafts and in proposals is a passage of a source version (ADR 0050); this is the one place that maps a link to it.
-fn cited_passage(source: &SourceVersionText, link: &drafts::SourceLink) -> Option<CitedPassage> {
-    let text = source.text.as_ref()?;
-    let passage = Passage::of_range(text.as_str(), link.start, link.end).ok()?;
-    Some(CitedPassage {
+fn cited_passage(
+    source: &SourceVersionText,
+    link: &drafts::SourceLink,
+) -> Result<CitedPassage, &'static str> {
+    let text = source.text.as_ref().ok_or("no-text")?;
+    let passage =
+        Passage::of_range(text.as_str(), link.start, link.end).map_err(|_| "out-of-range")?;
+    Ok(CitedPassage {
         source_version_id: source.id,
         passage,
     })
-}
-
-/// The events that the caller can read, asked once each.
-#[derive(Default)]
-struct Visibility(HashMap<Option<EventId>, bool>);
-
-impl Visibility {
-    /// True if the caller can read a source item of the event `event`.
-    /// A source item without an event belongs to the organization: only owners and admins see it (ADR 0052).
-    async fn sees(
-        &mut self,
-        caller: &impl MayPropose,
-        event: Option<EventId>,
-        stores: ProposeStores<'_>,
-    ) -> Result<bool, StoreError> {
-        if let Some(known) = self.0.get(&event) {
-            return Ok(*known);
-        }
-        let sees = match event {
-            None => access::sees_all_events(caller),
-            Some(event) => match access::event_access(caller, event, stores.identity).await {
-                Ok(access) => access.can_read(),
-                Err(AccessError::NotFound) => false,
-                Err(AccessError::Store(error)) => return Err(error),
-            },
-        };
-        self.0.insert(event, sees);
-        Ok(sees)
-    }
 }

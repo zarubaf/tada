@@ -169,6 +169,8 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. A larger text file has no searchable text.
   The PostgreSQL search index of one text is limited to 1 MB, and the index of a text with many unique words can be larger than the text.
   If the index of a text under the cap is too large, tada stores the version without searchable text.
+- A draft has at most 200,000 characters of Markdown ([ADR 0051](adr/0051-document-drafts-and-provenance.md)).
+  A concept of an event has some ten thousand characters. The limit bounds the size of one proposal.
 
 ### Safe evolution
 

@@ -93,13 +93,13 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 ## Documents
 
-| Term             | Meaning                                                                       | Avoid          |
-| ---------------- | ----------------------------------------------------------------------------- | -------------- |
-| document         | A file with a stable tada ID. The ID does not change with its name or folder. | file (in code) |
-| document version | One immutable upload or generated draft of a document.                        |                |
-| draft            | A document version that nobody approved.                                      |                |
-| approved version | A document version that a member approved. Nobody can overwrite it.           | final          |
-| storage quota    | The largest total size of the uploaded files of one organization (ADR 0043).  |                |
+| Term             | Meaning                                                                                                | Avoid          |
+| ---------------- | ------------------------------------------------------------------------------------------------------ | -------------- |
+| document         | A file with a stable tada ID. The ID does not change with its name or folder.                          | file (in code) |
+| document version | One immutable upload or generated draft of a document.                                                 |                |
+| draft            | A document version in Markdown that tada adds when a member accepts a draft proposal. It has a status. |                |
+| approved version | A draft version with the status `approved`. Nobody can overwrite it.                                   | final          |
+| storage quota    | The largest total size of the uploaded files of one organization (ADR 0043).                           |                |
 
 ## AI and automation
 

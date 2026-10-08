@@ -32,7 +32,7 @@ use crate::Database;
 use crate::documents::{DOCUMENT_COUNTER, DRAFT};
 use crate::error::{InvalidRow, store_error};
 use crate::sources::{TextItem, TextKind};
-use crate::{actor, audit, events, sources, values};
+use crate::{actor, audit, drafts, events, sources, values};
 
 /// The kind of the event-local IDs of open questions (ADR 0038).
 const OPEN_QUESTION_PREFIX: &str = "QST";
@@ -818,27 +818,51 @@ async fn insert_draft(
     )
     .execute(&mut *conn)
     .await?;
-    sqlx::query!(
-        r#"INSERT INTO document_manifest_fact (organization_id, document_version_id, fact_id, fact_version_number)
-           SELECT p.organization_id, $3, f.fact_id, f.version
-           FROM proposal p, jsonb_to_recordset(p.manifest -> 'facts') AS f (fact_id uuid, version bigint)
-           WHERE p.organization_id = $1 AND p.id = $2"#,
+    // The manifest that the proposal fixed at its creation, read with the one codec of its format.
+    let stored = sqlx::query_scalar!(
+        r#"SELECT manifest AS "manifest!" FROM proposal
+           WHERE organization_id = $1 AND id = $2 AND manifest IS NOT NULL"#,
         organization,
         proposal.as_uuid(),
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    let manifest = drafts::manifest_from_json(&stored)
+        .map_err(|error| sqlx::Error::Decode(Box::new(error)))?;
+    let (facts, numbers): (Vec<Uuid>, Vec<i64>) = manifest
+        .facts
+        .iter()
+        .map(|fact| (fact.fact_id.as_uuid(), fact.version.get()))
+        .unzip();
+    sqlx::query!(
+        "INSERT INTO document_manifest_fact (organization_id, document_version_id, fact_id, fact_version_number)
+         SELECT $1, $2, t.fact_id, t.number FROM unnest($3::uuid[], $4::bigint[]) AS t (fact_id, number)",
+        organization,
         version,
+        &facts,
+        &numbers,
     )
     .execute(&mut *conn)
     .await?;
+    let offset =
+        |value: u32| i32::try_from(value).map_err(|error| sqlx::Error::Encode(Box::new(error)));
+    let mut sources = Vec::new();
+    let (mut starts, mut ends) = (Vec::new(), Vec::new());
+    for cited in &manifest.sources {
+        sources.push(cited.source_version_id.as_uuid());
+        starts.push(offset(cited.passage.start)?);
+        ends.push(offset(cited.passage.end)?);
+    }
     sqlx::query!(
-        r#"INSERT INTO document_manifest_source
-               (organization_id, document_version_id, source_version_id, start_offset, end_offset)
-           SELECT p.organization_id, $3, s.source_version_id, s.start, s."end"
-           FROM proposal p,
-                jsonb_to_recordset(p.manifest -> 'sources') AS s (source_version_id uuid, start int, "end" int)
-           WHERE p.organization_id = $1 AND p.id = $2"#,
+        "INSERT INTO document_manifest_source
+             (organization_id, document_version_id, source_version_id, start_offset, end_offset)
+         SELECT $1, $2, t.source_version_id, t.start_offset, t.end_offset
+         FROM unnest($3::uuid[], $4::int[], $5::int[]) AS t (source_version_id, start_offset, end_offset)",
         organization,
-        proposal.as_uuid(),
         version,
+        &sources,
+        &starts,
+        &ends,
     )
     .execute(&mut *conn)
     .await?;

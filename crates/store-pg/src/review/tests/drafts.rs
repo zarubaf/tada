@@ -2,8 +2,10 @@
 
 use tada_app::documents::{DocumentStore, DraftStatus, VersionContent};
 use tada_app::domain::ids::DocumentId;
+use tada_app::domain::sources::SourceText;
 use tada_app::proposals::ProposeError;
 use tada_app::review::LocalRecord;
+use tada_app::sources::SourceStore;
 
 use super::*;
 use crate::testing::sqlstate;
@@ -494,4 +496,75 @@ async fn the_markdown_and_the_manifest_of_a_draft_version_never_change() {
         .execute(&test.database.pool)
         .await
         .unwrap();
+}
+
+/// The reach of `access::source_reach`: a member cites the sources that the facts of a readable event cite,
+/// also the intake text of the organization changeset that created the event, but not a source of an event
+/// without a role.
+#[tokio::test]
+async fn a_contributor_cites_the_intake_text_that_the_facts_of_the_event_cite() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let (changeset, event, ids) = new_event(&test, &open_day, "OPEN31").await;
+    apply(&test, &open_day.owner, &changeset, select(&ids))
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO event_membership (organization_id, event_id, user_id, event_role, version, created_at)
+         VALUES ($1, $2, $3, 'event-contributor', 1, now())",
+    )
+    .bind(open_day.organization.as_uuid())
+    .bind(event.as_uuid())
+    .bind(open_day.contributor.user_id().as_uuid())
+    .execute(&test.database.pool)
+    .await
+    .unwrap();
+    let intake = changeset.source_version_id.as_uuid();
+    let has_event: bool = test
+        .scalar(&format!(
+            "SELECT i.event_id IS NOT NULL FROM source_version v
+             JOIN source_item i ON i.id = v.source_item_id WHERE v.id = '{intake}'"
+        ))
+        .await;
+    assert!(!has_event, "the intake text belongs to the organization");
+
+    let cite = |source: Uuid| {
+        vec![proposal(
+            Uuid::now_v7(),
+            draft(
+                event,
+                new_document(Uuid::now_v7()),
+                &format!("Es ist [ein Open Day](tada:source/{source}#4-12).\n"),
+            ),
+            &[],
+            "Das Open Day",
+        )]
+    };
+    propose_draft(&test, &open_day.contributor, event, cite(intake))
+        .await
+        .unwrap();
+
+    // A member text of an event without a role of the contributor, which no fact or proposal of her events cites.
+    let elsewhere = test.create_event(open_day.organization, "FLY31").await;
+    let text = SourceText::normalize(SOURCE);
+    let hidden = test
+        .database
+        .add_member_text(
+            open_day.owner.scope(),
+            elsewhere,
+            &text,
+            &open_day.owner.actor(),
+            FixedClock.now(),
+        )
+        .await
+        .unwrap();
+    rejected_link(
+        propose_draft(
+            &test,
+            &open_day.contributor,
+            event,
+            cite(hidden.id.as_uuid()),
+        )
+        .await,
+    );
 }

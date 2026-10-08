@@ -1,8 +1,8 @@
 //! The stored form of the provenance manifest and the lint warnings of a draft proposal (ADR 0051):
 //! the columns `proposal.manifest` and `proposal.lint_warnings`.
 //!
-//! The apply of a draft reads `proposal.manifest` with SQL (`review::insert_draft`), so the field names of
-//! `ManifestRecord` are part of the format. A change of the format needs a new version of the proposal format.
+//! The apply of a draft reads `proposal.manifest` with this codec (`review::insert_draft`).
+//! A change of the format needs a new version of the proposal format.
 
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;

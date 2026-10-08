@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO document_manifest_fact (organization_id, document_version_id, fact_id, fact_version_number)\n         SELECT $1, $2, t.fact_id, t.number FROM unnest($3::uuid[], $4::bigint[]) AS t (fact_id, number)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray",
+        "Int8Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c4d92582b92ec38c58f906995be23434f2cbd7b3a915d2b2f95de8eda972ed05"
+}
