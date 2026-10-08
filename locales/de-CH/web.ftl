@@ -157,3 +157,48 @@ event-members-remove-title = { $name } entfernen?
 event-members-remove-text = { $name } verliert die Rolle in diesem Anlass und sieht den Anlass nicht mehr.
 event-members-remove-self = Sie entfernen Ihre eigene Rolle als Anlassleitung. Danach können Sie die Mitglieder dieses Anlasses womöglich nicht mehr verwalten.
 event-members-remove-cancel = Abbrechen
+
+## Members and invitations (settings)
+
+nav-settings = Einstellungen
+members-title = Mitglieder
+members-column-name = Name
+members-column-email = E-Mail
+members-column-role = Rolle
+members-column-actions = Aktionen
+members-column-invited = Eingeladen am
+members-loading = Mitglieder werden geladen
+members-load-more = Weitere Mitglieder laden
+members-remove = Entfernen
+# $name: the display name of the member.
+members-remove-of = { $name } entfernen
+members-remove-title = Mitglied entfernen?
+# $name: the display name of the member.
+members-remove-text = { $name } verliert den Zugang zur Organisation und zu allen Anlässen.
+members-remove-cancel = Abbrechen
+invitations-title = Offene Einladungen
+invitations-loading = Einladungen werden geladen
+invitations-empty-title = Keine offenen Einladungen
+invitations-empty-text = Neue Einladungen erscheinen hier, bis die Person sie annimmt.
+invitations-revoke = Widerrufen
+# $name: the display name of the invited person.
+invitations-revoke-of = Einladung an { $name } widerrufen
+invitations-revoke-title = Einladung widerrufen?
+# $name: the display name of the invited person.
+invitations-revoke-text = Der Link in der Einladung an { $name } funktioniert danach nicht mehr.
+invite-title = Mitglied einladen
+invite-email = E-Mail
+invite-name = Name
+invite-role = Rolle
+invite-submit = Einladen
+# $name: the display name of the invited person.
+invite-sent = Einladung an { $name } gesendet.
+invite-error-email = Das ist keine gültige E-Mail-Adresse.
+invite-error-display_name = Der Name hat 1 bis 100 Zeichen.
+members-leave = Organisation verlassen
+members-leave-title = Organisation verlassen?
+members-leave-text = Sie verlieren den Zugang zur Organisation und zu allen Anlässen.
+members-leave-warning = Sie entfernen sich selbst. Danach sehen Sie diese Organisation nicht mehr und können nur über eine neue Einladung zurückkehren.
+members-remove-last = Die Organisation braucht mindestens eine Organisationsleitung, und jeder Anlass braucht eine Anlassleitung. Bestimmen Sie zuerst jemand anderen.
+members-conflict = Jemand hat die Mitglieder inzwischen geändert. Die Liste ist neu geladen. Versuchen Sie es erneut.
+members-loaded-more = Weitere Mitglieder geladen.

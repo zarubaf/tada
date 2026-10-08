@@ -5,6 +5,7 @@ import { EventMembersPage } from "./events/EventMembersPage";
 import { EventPage } from "./events/EventPage";
 import { EventsPage } from "./events/EventsPage";
 import { t } from "./i18n";
+import { MembersPage } from "./members/MembersPage";
 import { NotFoundPage } from "./NotFoundPage";
 import { Redirect, Route, Router, Routes } from "./router/Router";
 import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
@@ -71,6 +72,10 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   <EventPage api={api}>
                     <EventMembersPage api={api} />
                   </EventPage>
+                </Route>
+                {/* Settings (Task 20) */}
+                <Route path="/settings/members">
+                  <MembersPage api={api} />
                 </Route>
                 <Route path="*">
                   <NotFoundPage />

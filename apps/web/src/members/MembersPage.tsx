@@ -1,0 +1,472 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type Api,
+  type Invitation,
+  type Member,
+  type Problem,
+  problemMessage,
+} from "../api/client";
+import { failureOf } from "../api/failure";
+import { LOCALE, t } from "../i18n";
+import { useNavigate } from "../router/Router";
+import { CHOOSE_ORGANIZATION_PATH } from "../session/paths";
+import { useSession } from "../session/SessionProvider";
+import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { type Column, DataTable } from "../ui/DataTable";
+import { EmptyState } from "../ui/EmptyState";
+import { InlineError } from "../ui/InlineError";
+import { Skeleton } from "../ui/Skeleton";
+import { InviteMemberForm } from "./InviteMemberForm";
+import styles from "./MembersPage.module.css";
+import { canManage, canRemove, invitableRoles } from "./roles";
+
+const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium" });
+
+interface Loadable<T> {
+  kind: "loading" | "failed" | "loaded";
+  items: T[];
+  nextCursor?: string | undefined;
+  message?: string;
+  requestId?: string | undefined;
+  /** Counts the retries, so that a failure after a retry takes focus. */
+  attempts: number;
+}
+
+const loading = <T,>(attempts = 0): Loadable<T> => ({ kind: "loading", items: [], attempts });
+
+/** The state of the request for the next page of members. */
+type More =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "failed"; message: string; requestId: string | undefined };
+
+/** What the member confirms: the removal of a member or the revocation of an invitation. */
+type Confirming = { kind: "member"; item: Member } | { kind: "invitation"; item: Invitation };
+
+/**
+ * „Mitglieder“ in the settings: the members, and for owners and admins the pending invitations
+ * and the invitation form. The server decides each action; the page hides what would fail.
+ */
+export function MembersPage({ api }: { api: Api }) {
+  const session = useSession();
+  const role = session.organization?.role;
+  const manages = canManage(role);
+  const [members, setMembers] = useState<Loadable<Member>>(loading());
+  const [invitations, setInvitations] = useState<Loadable<Invitation>>(loading());
+  // The next page of members: the loaded rows stay while it loads or fails.
+  const [more, setMore] = useState<More>({ kind: "idle" });
+  const navigate = useNavigate();
+  // The message of the last failed action. Both live regions are in the page from the start.
+  const [failure, setFailure] = useState<string>();
+  const [confirmation, setConfirmation] = useState<string>();
+  const [confirming, setConfirming] = useState<Confirming>();
+  // A request runs: a second press does nothing.
+  const [busy, setBusy] = useState(false);
+  const membersHeading = useRef<HTMLHeadingElement>(null);
+  const invitationsHeading = useRef<HTMLHeadingElement>(null);
+  const focusAfterClose = useRef<"member" | "invitation">(undefined);
+  const [headingFocus, setHeadingFocus] = useState(0);
+  const alert = useRef<HTMLParagraphElement>(null);
+
+  // The pressed button leaves with its row. When the dialog has closed and given its focus back,
+  // focus goes to the heading of the list.
+  useEffect(() => {
+    if (confirming === undefined && focusAfterClose.current) {
+      const heading = focusAfterClose.current === "member" ? membersHeading : invitationsHeading;
+      focusAfterClose.current = undefined;
+      setTimeout(() => heading.current?.focus(), 0);
+    }
+  }, [confirming]);
+
+  useEffect(() => {
+    if (headingFocus > 0) {
+      membersHeading.current?.focus();
+    }
+  }, [headingFocus]);
+
+  /** The first page. A version conflict and a retry load the list again from here. */
+  const loadMembers = useCallback(
+    async (attempts: number) => {
+      try {
+        const { data, error } = await api.GET("/api/v1/members");
+        setMembers(
+          data
+            ? {
+                kind: "loaded",
+                items: data.items,
+                nextCursor: data.next_cursor ?? undefined,
+                attempts,
+              }
+            : {
+                kind: "failed",
+                items: [],
+                message: problemMessage(error),
+                requestId: error?.request_id,
+                attempts,
+              },
+        );
+        setMore({ kind: "idle" });
+      } catch {
+        setMembers({ kind: "failed", items: [], message: problemMessage(undefined), attempts });
+      }
+    },
+    [api],
+  );
+
+  const loadInvitations = useCallback(
+    async (attempts: number) => {
+      try {
+        const { data, error } = await api.GET("/api/v1/invitations");
+        setInvitations(
+          data
+            ? { kind: "loaded", items: data.items, attempts }
+            : {
+                kind: "failed",
+                items: [],
+                message: problemMessage(error),
+                requestId: error?.request_id,
+                attempts,
+              },
+        );
+      } catch {
+        setInvitations({ kind: "failed", items: [], message: problemMessage(undefined), attempts });
+      }
+    },
+    [api],
+  );
+
+  useEffect(() => {
+    void loadMembers(0);
+  }, [loadMembers]);
+
+  useEffect(() => {
+    if (manages) {
+      void loadInvitations(0);
+    }
+  }, [manages, loadInvitations]);
+
+  /** A failed action: a version conflict also loads the list again. */
+  const fail = (result: { error?: Problem | undefined; response?: Response }) => {
+    const code = result.error?.code;
+    setFailure(
+      code === "invalid-transition" && confirming?.kind === "member"
+        ? t("members-remove-last")
+        : code === "record-version-conflict"
+          ? t("members-conflict")
+          : failureOf(result).message,
+    );
+    // The failure may be far above the button that the member pressed.
+    alert.current?.scrollIntoView?.({ block: "nearest" });
+    if (code === "record-version-conflict") {
+      void loadMembers(members.attempts);
+    }
+    if (code === "not-found" && confirming?.kind === "invitation") {
+      // The person accepted the invitation in the meantime.
+      void loadInvitations(invitations.attempts);
+    }
+  };
+
+  /** The next page: the loaded rows stay, and a retry continues from the same cursor. */
+  const loadMore = async () => {
+    if (members.kind !== "loaded" || members.nextCursor === undefined || more.kind === "loading") {
+      return;
+    }
+    setMore({ kind: "loading" });
+    setConfirmation(undefined);
+    try {
+      const { data, error } = await api.GET("/api/v1/members", {
+        params: { query: { cursor: members.nextCursor } },
+      });
+      if (data) {
+        const nextCursor = data.next_cursor ?? undefined;
+        setMembers((current) => ({
+          ...current,
+          items: [...current.items, ...data.items],
+          nextCursor,
+        }));
+        setMore({ kind: "idle" });
+        setConfirmation(t("members-loaded-more"));
+        if (nextCursor === undefined) {
+          // The button leaves: focus goes to the heading of the list.
+          setHeadingFocus((count) => count + 1);
+        }
+      } else {
+        setMore({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
+      }
+    } catch {
+      setMore({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+    }
+  };
+
+  const confirm = async () => {
+    if (busy || !confirming) {
+      return;
+    }
+    setFailure(undefined);
+    setConfirmation(undefined);
+    setBusy(true);
+    try {
+      if (confirming.kind === "member") {
+        const { item } = confirming;
+        const { response, error } = await api.POST("/api/v1/members/{user_id}/remove", {
+          params: { path: { user_id: item.user_id } },
+          body: { expected_version: item.version },
+        });
+        if (response.ok) {
+          if (item.user_id === session.user.id) {
+            // The member left: the organization context is gone, so no manager mode stays.
+            setBusy(false);
+            setConfirming(undefined);
+            await session.refresh();
+            navigate(CHOOSE_ORGANIZATION_PATH, { replace: true });
+            return;
+          }
+          focusAfterClose.current = "member";
+          setMembers((current) => ({
+            ...current,
+            items: current.items.filter((m) => m.user_id !== item.user_id),
+          }));
+        } else {
+          fail({ error, response });
+        }
+      } else {
+        const { item } = confirming;
+        const { response, error } = await api.POST("/api/v1/invitations/{invitation_id}/revoke", {
+          params: { path: { invitation_id: item.id } },
+        });
+        if (response.ok) {
+          focusAfterClose.current = "invitation";
+          setInvitations((current) => ({
+            ...current,
+            items: current.items.filter((i) => i.id !== item.id),
+          }));
+        } else {
+          fail({ error, response });
+        }
+      }
+    } catch {
+      fail({});
+    }
+    setBusy(false);
+    setConfirming(undefined);
+  };
+
+  const memberColumns: Column<Member>[] = [
+    { id: "name", header: t("members-column-name"), cell: (member) => member.display_name },
+    ...(manages
+      ? [{ id: "email", header: t("members-column-email"), cell: (member: Member) => member.email }]
+      : []),
+    { id: "role", header: t("members-column-role"), cell: (member) => t(`role-${member.role}`) },
+    {
+      id: "actions",
+      header: t("members-column-actions"),
+      cell: (member) =>
+        member.user_id === session.user.id ? (
+          // Each member can leave.
+          <Button onPress={() => setConfirming({ kind: "member", item: member })}>
+            {t("members-leave")}
+          </Button>
+        ) : (
+          canRemove(role, member.role) && (
+            <Button
+              aria-label={t("members-remove-of", { name: member.display_name })}
+              onPress={() => setConfirming({ kind: "member", item: member })}
+            >
+              {t("members-remove")}
+            </Button>
+          )
+        ),
+    },
+  ];
+
+  const invitationColumns: Column<Invitation>[] = [
+    { id: "name", header: t("members-column-name"), cell: (invitation) => invitation.display_name },
+    { id: "email", header: t("members-column-email"), cell: (invitation) => invitation.email },
+    {
+      id: "role",
+      header: t("members-column-role"),
+      cell: (invitation) => t(`role-${invitation.role}`),
+    },
+    {
+      id: "invited",
+      header: t("members-column-invited"),
+      cell: (invitation) => (
+        <time dateTime={invitation.created_at}>
+          {createdFormat.format(new Date(invitation.created_at))}
+        </time>
+      ),
+      numeric: true,
+    },
+    {
+      id: "actions",
+      header: t("members-column-actions"),
+      cell: (invitation) => (
+        <Button
+          aria-label={t("invitations-revoke-of", { name: invitation.display_name })}
+          onPress={() => setConfirming({ kind: "invitation", item: invitation })}
+        >
+          {t("invitations-revoke")}
+        </Button>
+      ),
+    },
+  ];
+
+  const retryMembers = () => {
+    const attempts = members.attempts + 1;
+    setMembers(loading(attempts));
+    void loadMembers(attempts);
+  };
+  const retryInvitations = () => {
+    const attempts = invitations.attempts + 1;
+    setInvitations(loading(attempts));
+    void loadInvitations(attempts);
+  };
+
+  const revoking = confirming?.kind === "invitation";
+  const name = confirming?.item.display_name ?? "";
+  const leaving = confirming?.kind === "member" && confirming.item.user_id === session.user.id;
+
+  const dialog = revoking
+    ? {
+        title: t("invitations-revoke-title"),
+        text: t("invitations-revoke-text", { name }),
+        confirm: t("invitations-revoke"),
+      }
+    : leaving
+      ? {
+          title: t("members-leave-title"),
+          text: t("members-leave-text"),
+          confirm: t("members-leave"),
+        }
+      : {
+          title: t("members-remove-title"),
+          text: t("members-remove-text", { name }),
+          confirm: t("members-remove"),
+        };
+
+  return (
+    <main id="main" className={styles.page}>
+      {/* Live regions that are always in the page: a text that is set later is announced. */}
+      <p ref={alert} className={styles.failure} role="alert">
+        {failure}
+      </p>
+      <p className={styles.confirmation} role="status">
+        {confirmation}
+      </p>
+
+      <section className={styles.section} aria-labelledby="members-title">
+        <h1 id="members-title" ref={membersHeading} tabIndex={-1} className={styles.title}>
+          {t("members-title")}
+        </h1>
+        {members.kind === "loading" && (
+          <div className={styles.skeleton} role="status" aria-label={t("members-loading")}>
+            <Skeleton />
+            <Skeleton />
+            <Skeleton />
+          </div>
+        )}
+        {members.kind === "failed" && (
+          <InlineError
+            message={members.message ?? ""}
+            requestId={members.requestId}
+            onRetry={retryMembers}
+            takeFocus={members.attempts > 0}
+          />
+        )}
+        {members.kind === "loaded" && (
+          <>
+            <DataTable
+              label={t("members-title")}
+              columns={memberColumns}
+              rows={members.items}
+              rowKey={(member) => member.user_id}
+            />
+            {more.kind === "failed" && (
+              <InlineError message={more.message} requestId={more.requestId} takeFocus />
+            )}
+            {members.nextCursor !== undefined && (
+              <Button isPending={more.kind === "loading"} onPress={() => void loadMore()}>
+                {t("members-load-more")}
+              </Button>
+            )}
+          </>
+        )}
+      </section>
+
+      {manages && (
+        <section className={styles.section} aria-labelledby="invitations-title">
+          <h2
+            id="invitations-title"
+            ref={invitationsHeading}
+            tabIndex={-1}
+            className={styles.heading}
+          >
+            {t("invitations-title")}
+          </h2>
+          {invitations.kind === "loading" && (
+            <div className={styles.skeleton} role="status" aria-label={t("invitations-loading")}>
+              <Skeleton />
+              <Skeleton />
+            </div>
+          )}
+          {invitations.kind === "failed" && (
+            <InlineError
+              message={invitations.message ?? ""}
+              requestId={invitations.requestId}
+              onRetry={retryInvitations}
+              takeFocus={invitations.attempts > 0}
+            />
+          )}
+          {invitations.kind === "loaded" && invitations.items.length === 0 && (
+            <EmptyState title={t("invitations-empty-title")} text={t("invitations-empty-text")} />
+          )}
+          {invitations.kind === "loaded" && invitations.items.length > 0 && (
+            <DataTable
+              label={t("invitations-title")}
+              columns={invitationColumns}
+              rows={invitations.items}
+              rowKey={(invitation) => invitation.id}
+            />
+          )}
+        </section>
+      )}
+
+      {manages && (
+        <InviteMemberForm
+          api={api}
+          roles={invitableRoles(role)}
+          onStart={() => {
+            setFailure(undefined);
+            setConfirmation(undefined);
+          }}
+          onFailed={setFailure}
+          onInvited={(invitation) => {
+            setConfirmation(t("invite-sent", { name: invitation.display_name }));
+            // A list that is not loaded yet or failed gets the new invitation with its next load.
+            if (invitations.kind === "loaded") {
+              setInvitations({
+                ...invitations,
+                items: [...invitations.items.filter((i) => i.id !== invitation.id), invitation],
+              });
+            } else {
+              void loadInvitations(invitations.attempts);
+            }
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={confirming !== undefined}
+        title={dialog.title}
+        text={dialog.text}
+        warning={leaving ? t("members-leave-warning") : undefined}
+        confirmLabel={dialog.confirm}
+        cancelLabel={t("members-remove-cancel")}
+        isPending={busy}
+        onConfirm={() => void confirm()}
+        onCancel={() => !busy && setConfirming(undefined)}
+      />
+    </main>
+  );
+}
