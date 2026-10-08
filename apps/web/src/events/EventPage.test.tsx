@@ -41,6 +41,16 @@ function renderAt(path: string, api: ReturnType<typeof createApi>) {
             <p>Platzhalter</p>
           </EventPage>
         </Route>
+        <Route path="/events/:eventId/documents">
+          <EventPage api={api}>
+            <p>Dokumentenliste</p>
+          </EventPage>
+        </Route>
+        <Route path="/documents/:documentId">
+          <EventPage api={api} eventId={event.id}>
+            <p>Dokumentseite</p>
+          </EventPage>
+        </Route>
         <Route path="/events/:eventId/members">
           <EventPage api={api}>
             <p>Mitgliederliste</p>
@@ -81,6 +91,24 @@ describe("EventPage", () => {
     await screen.findByText("Mitgliederliste");
     const nav = screen.getByRole("navigation", { name: "Anlass" });
     expect(within(nav).getByRole("link", { name: "Mitglieder" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it.each([
+    ["the documents path", `/events/${event.id}/documents`, "Dokumentenliste"],
+    ["the path of one document", "/documents/d1", "Dokumentseite"],
+  ])("marks only Dokumente as current on %s", async (_name, path, content) => {
+    const { api } = fakeApi(json(200, event));
+    renderAt(path, api);
+
+    await screen.findByText(content);
+    const nav = screen.getByRole("navigation", { name: "Anlass" });
+    expect(within(nav).getByRole("link", { name: "Dokumente" })).toHaveAttribute(
       "aria-current",
       "page",
     );
