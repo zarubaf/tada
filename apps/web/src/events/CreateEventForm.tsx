@@ -99,7 +99,7 @@ export function CreateEventForm({ api }: { api: Api }) {
       <PageTitle>{t("event-create-title")}</PageTitle>
       <form ref={form} className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
         <TextField
-          label={t("events-column-key")}
+          label={t("event-create-key-label")}
           help={t("event-create-key-help")}
           value={key}
           onChange={edit(setKey)}
@@ -109,7 +109,7 @@ export function CreateEventForm({ api }: { api: Api }) {
           isRequired
         />
         <TextField
-          label={t("events-column-name")}
+          label={t("event-create-name-label")}
           value={name}
           onChange={edit(setName)}
           error={errors.name}
@@ -117,7 +117,7 @@ export function CreateEventForm({ api }: { api: Api }) {
           isRequired
         />
         <TextField
-          label={t("events-column-time-zone")}
+          label={t("event-create-time-zone-label")}
           help={t("event-create-time-zone-help")}
           value={timeZone}
           onChange={edit(setTimeZone)}

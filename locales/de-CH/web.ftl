@@ -114,6 +114,9 @@ choose-organization-empty-text = Sie sind noch in keiner Organisation Mitglied. 
 events-create = Anlass erfassen
 event-create-title = Anlass erfassen
 event-create-submit = Anlass erfassen
+event-create-key-label = Kürzel (Pflichtfeld)
+event-create-name-label = Name (Pflichtfeld)
+event-create-time-zone-label = Zeitzone (Pflichtfeld)
 event-create-key-help = Zwei bis acht Grossbuchstaben oder Ziffern, zum Beispiel FLY28.
 event-create-time-zone-help = Eine IANA-Zeitzone, zum Beispiel Europe/Zurich.
 event-error-key = Das Kürzel hat 2 bis 8 Grossbuchstaben oder Ziffern.
@@ -194,8 +197,8 @@ invitations-revoke-title = Einladung widerrufen?
 # $name: the display name of the invited person.
 invitations-revoke-text = Der Link in der Einladung an { $name } funktioniert danach nicht mehr.
 invite-title = Mitglied einladen
-invite-email = E-Mail
-invite-name = Name
+invite-email = E-Mail-Adresse (Pflichtfeld)
+invite-name = Name (Pflichtfeld)
 invite-role = Rolle
 invite-submit = Einladen
 # $name: the display name of the invited person.
