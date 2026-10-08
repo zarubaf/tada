@@ -10,7 +10,6 @@ use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
-use tada_app::audit::AuditEvent;
 use tada_app::caller::{Actor, OrgScope};
 use tada_app::domain::RecordVersion;
 use tada_app::domain::events::Event;
@@ -21,7 +20,7 @@ use tada_app::domain::ids::{
 use tada_app::domain::proposals::Operation;
 use tada_app::domain::sources::{Passage, SourceText};
 use tada_app::review::{
-    ApplyOutcome, ApplyPlan, ApplyStep, NewLocalId, NewReviewResult, OpenChangeset, Recorded,
+    ApplyOutcome, ApplyPlan, ApplyStep, NewLocalId, OpenChangeset, Recorded, ReviewBatch,
     ReviewOutcome, ReviewRecord, ReviewStore, StepEvidence,
 };
 use tada_app::store::StoreError;
@@ -117,34 +116,25 @@ impl ReviewStore for Database {
         Ok(ApplyOutcome::Applied(local_ids))
     }
 
-    async fn record(
-        &self,
-        scope: OrgScope,
-        changeset: ChangesetId,
-        results: &[NewReviewResult],
-        reviewer: &Actor,
-        now: Timestamp,
-        audit: &[AuditEvent],
-    ) -> Result<Recorded, StoreError> {
+    async fn record(&self, scope: OrgScope, batch: &ReviewBatch) -> Result<Recorded, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let proposals: Vec<ProposalId> = results.iter().map(|result| result.proposal_id).collect();
-        if !lock_open(&mut tx, scope, changeset, &proposals).await? {
+        if !lock_open(&mut tx, scope, batch.changeset_id, &batch.proposals).await? {
             return Ok(Recorded::NotOpen);
         }
-        for result in results {
+        for proposal in &batch.proposals {
             insert_result(
                 &mut tx,
                 scope,
-                result.proposal_id,
-                result.outcome,
+                *proposal,
+                batch.outcome,
                 None,
-                reviewer,
-                now,
+                &batch.reviewer,
+                batch.now,
             )
             .await
             .map_err(store_error)?;
         }
-        for entry in audit {
+        for entry in &batch.audit {
             audit::record(&mut tx, entry).await.map_err(store_error)?;
         }
         tx.commit().await.map_err(store_error)?;
@@ -490,10 +480,14 @@ async fn write_step(
                     (source, vec![passage])
                 }
             };
-            insert_fact_version(
-                conn, scope, plan, step, *event_id, *field_id, state, source, &passages,
-            )
-            .await?;
+            let fact = FactWrite {
+                event: *event_id,
+                field: *field_id,
+                state,
+                source,
+                passages: &passages,
+            };
+            insert_fact_version(conn, scope, plan, step, fact).await?;
         }
     }
     let outcome = match step.evidence {
@@ -566,19 +560,30 @@ async fn insert_review_text(
     ))
 }
 
-/// Adds the next version of the fact of `field` in the event, with its evidence.
-#[allow(clippy::too_many_arguments)]
+/// The next state of the fact of `field` in `event`, with its evidence: passages of the source version `source`.
+struct FactWrite<'a> {
+    event: EventId,
+    field: FieldDefinitionId,
+    state: &'a FactState<Valued>,
+    source: SourceVersionId,
+    passages: &'a [Passage],
+}
+
+/// Adds the next version of a fact, with its evidence.
 async fn insert_fact_version(
     conn: &mut PgConnection,
     scope: OrgScope,
     plan: &ApplyPlan,
     step: &ApplyStep,
-    event: EventId,
-    field: FieldDefinitionId,
-    state: &FactState<Valued>,
-    source: SourceVersionId,
-    passages: &[Passage],
+    fact: FactWrite<'_>,
 ) -> Result<(), sqlx::Error> {
+    let FactWrite {
+        event,
+        field,
+        state,
+        source,
+        passages,
+    } = fact;
     let organization = scope.organization_id().as_uuid();
     let now = plan.now.to_sqlx();
     let current = sqlx::query!(

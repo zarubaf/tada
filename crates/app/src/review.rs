@@ -192,11 +192,16 @@ pub enum ApplyOutcome {
     KeyTaken,
 }
 
-/// A review result to append without an apply: a rejection or a conflict.
+/// Review results to append without an apply: one rejection or one conflict for each proposal.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NewReviewResult {
-    pub proposal_id: ProposalId,
+pub struct ReviewBatch {
+    pub changeset_id: ChangesetId,
+    pub proposals: Vec<ProposalId>,
     pub outcome: ReviewOutcome,
+    /// The author of the review results.
+    pub reviewer: Actor,
+    pub now: Timestamp,
+    pub audit: Vec<AuditEvent>,
 }
 
 /// The result of `ReviewStore::record`.
@@ -223,16 +228,8 @@ pub trait ReviewStore: Debug + Send + Sync {
     /// appends `accepted` or `accepted-with-edit` for each step, and records the audit events of the plan.
     async fn apply(&self, scope: OrgScope, plan: &ApplyPlan) -> Result<ApplyOutcome, StoreError>;
 
-    /// Appends `results` with `reviewer` as author, and `audit`, in one transaction, if each proposal is open.
-    async fn record(
-        &self,
-        scope: OrgScope,
-        changeset: ChangesetId,
-        results: &[NewReviewResult],
-        reviewer: &Actor,
-        now: Timestamp,
-        audit: &[AuditEvent],
-    ) -> Result<Recorded, StoreError>;
+    /// Appends the review results and the audit events of `batch` in one transaction, if each proposal is open.
+    async fn record(&self, scope: OrgScope, batch: &ReviewBatch) -> Result<Recorded, StoreError>;
 
     /// The changesets with at least one open proposal, oldest first.
     /// `Some(event)` gives the changesets of the event only; `None` gives all changesets of the organization.
@@ -411,26 +408,15 @@ pub async fn apply_changeset(
         ApplyOutcome::KeyTaken => Err(invalid("key", "taken")),
         ApplyOutcome::Conflict(proposals) => {
             // The conflict stays visible: a separate transaction records it (ADR 0050).
-            let conflicts: Vec<NewReviewResult> = proposals
-                .iter()
-                .map(|&proposal_id| NewReviewResult {
-                    proposal_id,
-                    outcome: ReviewOutcome::Conflict,
-                })
-                .collect();
-            let audit = review_audit(caller, AuditAction::ProposalConflict, &proposals);
+            let batch = review_batch(
+                caller,
+                changeset_id,
+                &proposals,
+                ReviewOutcome::Conflict,
+                now,
+            );
             // A concurrent review may have closed a proposal first. Then its status stays as it is.
-            stores
-                .review
-                .record(
-                    scope,
-                    changeset_id,
-                    &conflicts,
-                    &caller.actor(),
-                    now,
-                    &audit,
-                )
-                .await?;
+            stores.review.record(scope, &batch).await?;
             Err(ApplyError::Conflict(proposals))
         }
     }
@@ -467,26 +453,14 @@ pub async fn reject_proposals(
         .into_iter()
         .filter(|id| is_open(*id))
         .collect();
-    let new_results: Vec<NewReviewResult> = rejected
-        .iter()
-        .map(|&proposal_id| NewReviewResult {
-            proposal_id,
-            outcome: ReviewOutcome::Rejected,
-        })
-        .collect();
-    let audit = review_audit(caller, AuditAction::ProposalReject, &rejected);
-    match stores
-        .review
-        .record(
-            scope,
-            changeset_id,
-            &new_results,
-            &caller.actor(),
-            clock.now(),
-            &audit,
-        )
-        .await?
-    {
+    let batch = review_batch(
+        caller,
+        changeset_id,
+        &rejected,
+        ReviewOutcome::Rejected,
+        clock.now(),
+    );
+    match stores.review.record(scope, &batch).await? {
         Recorded::Recorded => Ok(Rejected {
             proposals: rejected,
         }),
@@ -929,22 +903,36 @@ fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEvent> {
     events
 }
 
-fn review_audit(
+/// A rejection or a conflict of `proposals` by the caller, with one audit event for each proposal.
+fn review_batch(
     caller: &MemberCaller,
-    action: AuditAction,
+    changeset_id: ChangesetId,
     proposals: &[ProposalId],
-) -> Vec<AuditEvent> {
-    proposals
-        .iter()
-        .map(|id| {
-            AuditEvent::new(
-                caller.actor(),
-                action,
-                Some(id.as_uuid()),
-                Some(caller.scope()),
-            )
-        })
-        .collect()
+    outcome: ReviewOutcome,
+    now: Timestamp,
+) -> ReviewBatch {
+    let action = match outcome {
+        ReviewOutcome::Conflict => AuditAction::ProposalConflict,
+        _ => AuditAction::ProposalReject,
+    };
+    ReviewBatch {
+        changeset_id,
+        proposals: proposals.to_vec(),
+        outcome,
+        reviewer: caller.actor(),
+        now,
+        audit: proposals
+            .iter()
+            .map(|id| {
+                AuditEvent::new(
+                    caller.actor(),
+                    action,
+                    Some(id.as_uuid()),
+                    Some(caller.scope()),
+                )
+            })
+            .collect(),
+    }
 }
 
 #[cfg(test)]
