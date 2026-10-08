@@ -14,7 +14,7 @@ use tada_domain::ids::{
     ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, SourceVersionId, UserId,
 };
 use tada_domain::proposals::{Operation, Proposal};
-use tada_domain::sources::Passage;
+use tada_domain::sources::{Passage, SourceText};
 
 use crate::access::{self, AccessError};
 use crate::audit::{AuditAction, AuditEvent};
@@ -356,11 +356,12 @@ impl ApplyError {
     ];
 }
 
-impl From<AccessError> for ApplyError {
-    fn from(error: AccessError) -> Self {
+impl From<ReviewQueryError> for ApplyError {
+    fn from(error: ReviewQueryError) -> Self {
         match error {
-            AccessError::NotFound => Self::NotFound,
-            AccessError::Store(error) => Self::Store(error),
+            ReviewQueryError::NotFound => Self::NotFound,
+            ReviewQueryError::Forbidden => Self::Forbidden,
+            ReviewQueryError::Store(error) => Self::Store(error),
         }
     }
 }
@@ -429,7 +430,7 @@ pub async fn apply_changeset(
     clock: &dyn Clock,
 ) -> Result<Applied, ApplyError> {
     let scope = caller.scope();
-    let changeset = reviewable(caller, changeset_id, stores).await?;
+    let (changeset, _) = reviewable(caller, changeset_id, stores).await?;
     let results = stores.review.results(scope, changeset_id).await?;
 
     let given = selection(&changeset, &input.selected, "selected")?;
@@ -506,7 +507,7 @@ pub async fn reject_proposals(
     clock: &dyn Clock,
 ) -> Result<Rejected, ApplyError> {
     let scope = caller.scope();
-    let changeset = reviewable(caller, changeset_id, stores).await?;
+    let (changeset, _) = reviewable(caller, changeset_id, stores).await?;
     let results = stores.review.results(scope, changeset_id).await?;
 
     let given = selection(&changeset, &ids, "ids")?;
@@ -533,10 +534,11 @@ pub async fn reject_proposals(
     }
 }
 
+/// The error of a review query, and of the access check of each review.
 #[derive(Debug, thiserror::Error)]
-pub enum ListChangesetsError {
-    /// The event is not in the caller's organization, or the caller has no event role in it.
-    #[error("the event does not exist or the caller cannot see it")]
+pub enum ReviewQueryError {
+    /// The event or the changeset is not in the caller's organization, or the caller cannot see it.
+    #[error("the event or the changeset does not exist or the caller cannot see it")]
     NotFound,
     /// Only event managers review (ADR 0052).
     #[error("the caller cannot review this event")]
@@ -545,7 +547,7 @@ pub enum ListChangesetsError {
     Store(#[from] StoreError),
 }
 
-impl ListChangesetsError {
+impl ReviewQueryError {
     /// All codes that the query can return, for the API contract (ADR 0037).
     pub const CODES: &[ProblemCode] = &[
         ProblemCode::Forbidden,
@@ -555,7 +557,7 @@ impl ListChangesetsError {
     ];
 }
 
-impl From<AccessError> for ListChangesetsError {
+impl From<AccessError> for ReviewQueryError {
     fn from(error: AccessError) -> Self {
         match error {
             AccessError::NotFound => Self::NotFound,
@@ -564,7 +566,7 @@ impl From<AccessError> for ListChangesetsError {
     }
 }
 
-impl CommandError for ListChangesetsError {
+impl CommandError for ReviewQueryError {
     fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
@@ -591,14 +593,14 @@ pub async fn list_open_changesets(
     event_id: Option<EventId>,
     identity: &dyn IdentityStore,
     store: &dyn ReviewStore,
-) -> Result<Vec<OpenChangeset>, ListChangesetsError> {
+) -> Result<Vec<OpenChangeset>, ReviewQueryError> {
     let scope = caller.scope();
     if let Some(event) = event_id {
         if !access::event_access(caller, event, identity)
             .await?
             .can_review()
         {
-            return Err(ListChangesetsError::Forbidden);
+            return Err(ReviewQueryError::Forbidden);
         }
         return Ok(store.open_changesets(scope, Some(event)).await?);
     }
@@ -636,14 +638,14 @@ async fn can_review(
     }
 }
 
-/// The changeset, if the caller can review it.
+/// The changeset with the text of its source version, if the caller can review it.
 async fn reviewable(
     caller: &MemberCaller,
     id: ChangesetId,
     stores: ReviewStores<'_>,
-) -> Result<Changeset, ApplyError> {
-    let Some((changeset, _)) = stores.proposals.get(caller.scope(), id).await? else {
-        return Err(ApplyError::NotFound);
+) -> Result<(Changeset, SourceText), ReviewQueryError> {
+    let Some((changeset, source)) = stores.proposals.get(caller.scope(), id).await? else {
+        return Err(ReviewQueryError::NotFound);
     };
     match changeset.event_id {
         Some(event) => {
@@ -651,14 +653,14 @@ async fn reviewable(
                 .await?
                 .can_review()
             {
-                return Err(ApplyError::Forbidden);
+                return Err(ReviewQueryError::Forbidden);
             }
         }
         // Only owners and admins see the changesets of the organization.
-        None if !access::sees_all_events(caller) => return Err(ApplyError::NotFound),
+        None if !access::sees_all_events(caller) => return Err(ReviewQueryError::NotFound),
         None => {}
     }
-    Ok(changeset)
+    Ok((changeset, source))
 }
 
 fn invalid(field: &'static str, code: &'static str) -> ApplyError {
@@ -1140,15 +1142,12 @@ mod tests {
             assert!(ApplyError::CODES.contains(&error.code()), "{error:?}");
         }
         for error in [
-            ListChangesetsError::NotFound,
-            ListChangesetsError::Forbidden,
-            ListChangesetsError::Store(StoreError::Internal("test".into())),
-            ListChangesetsError::Store(StoreError::Unavailable("test".into())),
+            ReviewQueryError::NotFound,
+            ReviewQueryError::Forbidden,
+            ReviewQueryError::Store(StoreError::Internal("test".into())),
+            ReviewQueryError::Store(StoreError::Unavailable("test".into())),
         ] {
-            assert!(
-                ListChangesetsError::CODES.contains(&error.code()),
-                "{error:?}"
-            );
+            assert!(ReviewQueryError::CODES.contains(&error.code()), "{error:?}");
         }
     }
 }

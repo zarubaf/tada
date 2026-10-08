@@ -11,7 +11,7 @@ use tada_app::proposals::{
     Changeset, Created, FactStateInput, NewChangeset, ProposeStores, ValueInput, create_changeset,
 };
 use tada_app::review::{
-    Applied, ApplyError, ApplyInput, Edit, ListChangesetsError, ProposalStatus, ReviewStore,
+    Applied, ApplyError, ApplyInput, Edit, ProposalStatus, ReviewQueryError, ReviewStore,
     ReviewStores, apply_changeset, list_open_changesets, reject_proposals, status,
 };
 
@@ -555,7 +555,7 @@ async fn a_contributor_cannot_review() {
     let listed =
         list_open_changesets(contributor, Some(event), &test.database, &test.database).await;
     assert!(
-        matches!(listed, Err(ListChangesetsError::Forbidden)),
+        matches!(listed, Err(ReviewQueryError::Forbidden)),
         "{listed:?}"
     );
     let inbox = list_open_changesets(contributor, None, &test.database, &test.database)
