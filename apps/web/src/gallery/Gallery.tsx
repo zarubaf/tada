@@ -1,12 +1,14 @@
 // The component gallery (ADR 0024): each token and each component in each state.
 // Only builds that are not production builds contain this page.
 import { Button } from "../ui/Button";
+import { Checkbox } from "../ui/Checkbox";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
 import { FileButton } from "../ui/FileButton";
 import { FileLink } from "../ui/FileLink";
 import { InlineError } from "../ui/InlineError";
 import { Skeleton } from "../ui/Skeleton";
+import { Switch } from "../ui/Switch";
 import styles from "./Gallery.module.css";
 
 const colors = [
@@ -111,6 +113,21 @@ export function Gallery() {
             Anlass erfassen
           </Button>
           <Button isDisabled>Erneut versuchen</Button>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Auswahl und Schalter</h2>
+        <div className={styles.row}>
+          <Checkbox label="Hinweis gelesen" isSelected={false} onChange={() => {}} />
+          <Checkbox label="Hinweis gelesen" isSelected onChange={() => {}} />
+          <Checkbox label="Hinweis gelesen" isSelected isDisabled onChange={() => {}} />
+        </div>
+        <div className={styles.row}>
+          <Switch label="MCP-Token erlauben" isSelected={false} onChange={() => {}} />
+          <Switch label="MCP-Token erlauben" isSelected onChange={() => {}} />
+          <Switch label="MCP-Token erlauben" isSelected isDisabled onChange={() => {}} />
+          <Switch label="MCP-Token erlauben" isSelected isPending onChange={() => {}} />
         </div>
       </section>
 

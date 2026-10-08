@@ -12,12 +12,14 @@ import { NotFoundPage } from "./NotFoundPage";
 import { Redirect, Route, Router, Routes } from "./router/Router";
 import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
 import { SessionProvider } from "./session/SessionProvider";
+import { OrganizationPage } from "./settings/OrganizationPage";
 import { SettingsLayout } from "./settings/SettingsLayout";
 import { Shell } from "./shell/Shell";
 import { InvitationPage } from "./sign-in/InvitationPage";
 import { MagicLinkPage } from "./sign-in/MagicLinkPage";
 import { SignInPage } from "./sign-in/SignInPage";
 import { TelegramPage } from "./telegram/TelegramPage";
+import { TokensPage } from "./tokens/TokensPage";
 import { SkipLink } from "./ui/SkipLink";
 
 const defaultApi = createApi();
@@ -94,6 +96,16 @@ export function App({ api = defaultApi }: { api?: Api }) {
                 <Route path="/settings/telegram">
                   <SettingsLayout>
                     <TelegramPage api={api} />
+                  </SettingsLayout>
+                </Route>
+                <Route path="/settings/tokens">
+                  <SettingsLayout>
+                    <TokensPage api={api} />
+                  </SettingsLayout>
+                </Route>
+                <Route path="/settings/organization">
+                  <SettingsLayout>
+                    <OrganizationPage api={api} />
                   </SettingsLayout>
                 </Route>
                 <Route path="*">

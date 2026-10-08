@@ -1,0 +1,44 @@
+@layer components {
+  .checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    cursor: pointer;
+  }
+
+  .box {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: var(--space-5);
+    height: var(--space-5);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-surface);
+    color: var(--color-text-on-accent);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1;
+  }
+
+  .checkbox[data-selected] .box {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+  }
+
+  .checkbox[data-focus-visible] .box {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .checkbox[data-disabled] {
+    cursor: default;
+    opacity: 0.5;
+  }
+
+  @media (forced-colors: active) {
+    .checkbox[data-selected] .box {
+      background: Highlight;
+      color: HighlightText;
+    }
+  }
+}
