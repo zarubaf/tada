@@ -16,8 +16,32 @@ use crate::Database;
 use crate::actor;
 use crate::error::{InvalidRow, store_error};
 
-/// The kind of a source item and of its source version for the text of a member.
-const MEMBER_TEXT: &str = "member-text";
+/// The kind of a source item and of its source version that holds a text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TextKind {
+    /// The text of a member.
+    MemberText,
+    /// A value that a reviewer edited (ADR 0050).
+    Review,
+}
+
+impl TextKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::MemberText => "member-text",
+            Self::Review => "review",
+        }
+    }
+}
+
+/// The new source item of a text with its one source version `version`.
+/// An item without an event belongs to the organization.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct TextItem {
+    pub kind: TextKind,
+    pub event: Option<EventId>,
+    pub version: SourceVersionId,
+}
 
 /// The number of characters of a snippet before and after the first word that matches.
 const SNIPPET_CONTEXT: usize = 80;
@@ -34,7 +58,12 @@ impl SourceStore for Database {
     ) -> Result<SourceVersionRef, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         let version = SourceVersionId::from_uuid(Uuid::now_v7());
-        let stored = insert_member_text(&mut tx, scope, Some(event), version, text, actor, now)
+        let item = TextItem {
+            kind: TextKind::MemberText,
+            event: Some(event),
+            version,
+        };
+        let stored = insert_text(&mut tx, scope, item, text, actor, now)
             .await
             .map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
@@ -87,18 +116,21 @@ impl SourceStore for Database {
     }
 }
 
-/// Stores the text of a member as a new source item with the one source version `version`, inside the
-/// transaction of the caller. An item without an event belongs to the organization.
-pub(crate) async fn insert_member_text(
+/// Stores a text as the new source item `item`, inside the transaction of the caller.
+pub(crate) async fn insert_text(
     conn: &mut PgConnection,
     scope: OrgScope,
-    event: Option<EventId>,
-    version: SourceVersionId,
+    item: TextItem,
     text: &SourceText,
     actor: &Actor,
     now: Timestamp,
 ) -> Result<SourceVersionRef, sqlx::Error> {
     let organization = scope.organization_id().as_uuid();
+    let TextItem {
+        kind,
+        event,
+        version,
+    } = item;
     let item = Uuid::now_v7();
     let sha256: [u8; 32] = Sha256::digest(text.as_str().as_bytes()).into();
     sqlx::query!(
@@ -107,7 +139,7 @@ pub(crate) async fn insert_member_text(
         item,
         organization,
         event.map(EventId::as_uuid),
-        MEMBER_TEXT,
+        kind.as_str(),
         now.to_sqlx() as _,
     )
     .execute(&mut *conn)
@@ -119,7 +151,7 @@ pub(crate) async fn insert_member_text(
         version.as_uuid(),
         organization,
         item,
-        MEMBER_TEXT,
+        kind.as_str(),
         actor.channel().as_str(),
         actor::to_json(actor),
         text.as_str(),

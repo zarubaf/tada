@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n               SELECT 1 FROM review_result WHERE organization_id = $1 AND proposal_id = ANY($2)\n           ) AS \"reviewed!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "reviewed!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c8d042efd03a3e3753ccd6808b533cc1f45014d4ecd83fcf6713004c80c94602"
+}

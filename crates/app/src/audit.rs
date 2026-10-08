@@ -21,6 +21,10 @@ pub enum AuditAction {
     EventMembershipChangeRole,
     EventMembershipRemove,
     ChangesetCreate,
+    ProposalAccept,
+    ProposalReject,
+    /// An apply found that the target of the proposal changed after the proposal (ADR 0050).
+    ProposalConflict,
 }
 
 impl AuditAction {
@@ -38,6 +42,9 @@ impl AuditAction {
             Self::EventMembershipChangeRole => "event_membership.change_role",
             Self::EventMembershipRemove => "event_membership.remove",
             Self::ChangesetCreate => "changeset.create",
+            Self::ProposalAccept => "proposal.accept",
+            Self::ProposalReject => "proposal.reject",
+            Self::ProposalConflict => "proposal.conflict",
         }
     }
 
@@ -59,6 +66,7 @@ impl AuditAction {
             | Self::EventMembershipChangeRole
             | Self::EventMembershipRemove => "event_membership",
             Self::ChangesetCreate => "changeset",
+            Self::ProposalAccept | Self::ProposalReject | Self::ProposalConflict => "proposal",
         }
     }
 }

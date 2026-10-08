@@ -25,7 +25,7 @@ pub use self::input::{
     ChoiceInput, FactStateInput, GranularityInput, NewChangeset, NewProposal, OperationInput,
     PassageInput, ReferenceTargetInput, ValueInput, ValueTypeInput,
 };
-use self::input::{text_error_code, value_error_code};
+pub(crate) use self::input::{state_from_input, text_error_code, value_error_code};
 use crate::access::{self, AccessError, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, MemberCaller, OrgScope};
@@ -73,7 +73,8 @@ pub enum Inserted {
 #[async_trait]
 pub trait ProposalStore: Debug + Send + Sync {
     /// The IDs of `ids` that a changeset, a proposal, an event, a field definition or an open question has,
-    /// in any organization. A new record ID must be free in the whole installation (ADR 0038).
+    /// in any organization, or that a proposal names as the ID of its new record.
+    /// A new record ID must be free in the whole installation (ADR 0038).
     /// Infrastructure query (ADR 0039): a record ID must be free in the whole installation (ADR 0038).
     async fn taken_ids(&self, ids: &[Uuid]) -> Result<Vec<Uuid>, StoreError>;
 

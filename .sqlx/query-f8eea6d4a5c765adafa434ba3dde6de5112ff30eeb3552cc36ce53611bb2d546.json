@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE field_definition SET value_type = $4\n                 WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f8eea6d4a5c765adafa434ba3dde6de5112ff30eeb3552cc36ce53611bb2d546"
+}

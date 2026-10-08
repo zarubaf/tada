@@ -15,6 +15,7 @@ mod members;
 mod outbound;
 mod proposals;
 pub mod rate_limit;
+mod review;
 mod session;
 mod sign_in;
 mod sources;

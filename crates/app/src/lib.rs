@@ -22,6 +22,7 @@ pub mod problem;
 pub mod proposals;
 pub mod public_url;
 pub mod rate_limit;
+pub mod review;
 pub mod session;
 pub mod sign_in;
 pub mod sources;

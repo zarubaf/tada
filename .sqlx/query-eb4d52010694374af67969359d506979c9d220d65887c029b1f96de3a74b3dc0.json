@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO local_id_counter (organization_id, scope_id, kind, next)\n           VALUES ($1, $2, $3, 2)\n           ON CONFLICT (organization_id, scope_id, kind) DO UPDATE SET next = local_id_counter.next + 1\n           RETURNING next - 1 AS \"number!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "number!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "eb4d52010694374af67969359d506979c9d220d65887c029b1f96de3a74b3dc0"
+}

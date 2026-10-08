@@ -472,7 +472,9 @@ impl TryFrom<OperationInput> for Operation {
     }
 }
 
-fn state_from_input(input: FactStateInput) -> Result<FactState<Valued>, Vec<FieldError>> {
+pub(crate) fn state_from_input(
+    input: FactStateInput,
+) -> Result<FactState<Valued>, Vec<FieldError>> {
     let valued = |value: ValueInput, approximate: bool| {
         let mut errors = Errors::default();
         let value = value_from_input(value)

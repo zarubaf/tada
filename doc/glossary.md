@@ -85,6 +85,9 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | review result       | One append-only record of a review of a proposal: accepted, accepted with edit, rejected, conflict or withdrawn (ADR 0050).          | status (of the record)   |
 | conflict            | The state of a proposal when its target record changed after the proposal was created.                                               |                          |
 | changeset           | The proposals of one intake, reviewed together. A proposal can depend on another proposal of its changeset.                          | batch                    |
+| apply               | The command that accepts selected proposals of a changeset and their dependencies, all or nothing (ADR 0050).                        | merge (of proposals)     |
+| stale               | The mark of an open proposal that is older than 14 days. A stale proposal does not change.                                           | expired                  |
+| Review Inbox        | The list of changesets with open proposals that a member can review.                                                                 | approval queue           |
 | provenance manifest | The list of fact versions and source passages that one document version uses, extracted from its `tada:` links.                      | citations list           |
 | legal redaction     | The audited replacement of personal data with a tombstone, the only exception to immutability (ADR 0045).                            | deletion (for evidence)  |
 

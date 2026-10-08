@@ -262,9 +262,12 @@ impl ProposalStore for Database {
     async fn taken_ids(&self, ids: &[Uuid]) -> Result<Vec<Uuid>, StoreError> {
         // A cross-organization uniqueness check (ADR 0038): IDs are unique in the whole installation.
         // It returns only the given IDs that exist, and never an organization.
+        // The new record of a proposal reserves its ID: else a second changeset could propose the same record,
+        // and only one of the two could apply. The target of a fact is its field, which is not a new record.
         sqlx::query_scalar!(
             r#"SELECT id AS "id!" FROM changeset WHERE id = ANY($1)
                UNION SELECT id FROM proposal WHERE id = ANY($1)
+               UNION SELECT target_id FROM proposal WHERE target_id = ANY($1) AND target_kind <> 'fact'
                UNION SELECT id FROM event WHERE id = ANY($1)
                UNION SELECT id FROM field_definition WHERE id = ANY($1)
                UNION SELECT id FROM open_question WHERE id = ANY($1)"#,
@@ -283,11 +286,15 @@ impl ProposalStore for Database {
         audit: &AuditEvent,
     ) -> Result<Inserted, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        sources::insert_member_text(
+        let item = sources::TextItem {
+            kind: sources::TextKind::MemberText,
+            event: changeset.event_id,
+            version: changeset.source_version_id,
+        };
+        sources::insert_text(
             &mut tx,
             scope,
-            changeset.event_id,
-            changeset.source_version_id,
+            item,
             source,
             &changeset.author,
             changeset.created_at,

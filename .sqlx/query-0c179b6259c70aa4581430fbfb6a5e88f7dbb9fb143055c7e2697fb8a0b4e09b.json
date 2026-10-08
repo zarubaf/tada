@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO evidence_link\n                 (id, organization_id, fact_version_id, source_version_id, start_offset, end_offset, quote, page)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0c179b6259c70aa4581430fbfb6a5e88f7dbb9fb143055c7e2697fb8a0b4e09b"
+}
