@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.source_item_id\n         FROM document_version v\n         JOIN source_version s ON s.organization_id = v.organization_id AND s.id = v.source_version_id\n         WHERE v.organization_id = $1 AND v.document_id = $2\n         ORDER BY v.number\n         LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_item_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "source_version",
+            "name": "source_item_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7b6bdb248a1b11c9bdba0ea03eb76d12eaacb8a5a8506a63f6ff711fbe64c51f"
+}

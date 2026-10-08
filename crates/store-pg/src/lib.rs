@@ -4,6 +4,7 @@ mod actor;
 mod audit;
 mod bootstrap;
 mod database;
+mod documents;
 mod error;
 mod event_members;
 mod events;

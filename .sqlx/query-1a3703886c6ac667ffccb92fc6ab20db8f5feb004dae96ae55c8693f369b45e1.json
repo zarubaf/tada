@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(max(number), 0) + 1 AS \"number!\"\n                   FROM document_version WHERE organization_id = $1 AND document_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "number!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "1a3703886c6ac667ffccb92fc6ab20db8f5feb004dae96ae55c8693f369b45e1"
+}

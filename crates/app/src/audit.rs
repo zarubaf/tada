@@ -21,6 +21,8 @@ pub enum AuditAction {
     EventMembershipChangeRole,
     EventMembershipRemove,
     ChangesetCreate,
+    /// A member uploaded a file as a new document version, of a new or an existing document.
+    DocumentVersionUpload,
 }
 
 impl AuditAction {
@@ -38,6 +40,7 @@ impl AuditAction {
             Self::EventMembershipChangeRole => "event_membership.change_role",
             Self::EventMembershipRemove => "event_membership.remove",
             Self::ChangesetCreate => "changeset.create",
+            Self::DocumentVersionUpload => "document_version.upload",
         }
     }
 
@@ -59,6 +62,7 @@ impl AuditAction {
             | Self::EventMembershipChangeRole
             | Self::EventMembershipRemove => "event_membership",
             Self::ChangesetCreate => "changeset",
+            Self::DocumentVersionUpload => "document_version",
         }
     }
 }

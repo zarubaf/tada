@@ -1,0 +1,174 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT v.id, v.document_id, d.event_id, v.number, v.kind, v.blob_key, v.media_type,\n                  v.size_bytes, v.sha256, v.file_name, v.uploaded_by, v.source_version_id,\n                  v.created_at AS \"created_at: jiff_sqlx::Timestamp\"\n           FROM document_version v\n           JOIN document d ON d.organization_id = v.organization_id AND d.id = v.document_id\n           WHERE v.organization_id = $1\n             AND ($2::uuid IS NULL OR v.document_id = $2)\n             AND ($3::uuid IS NULL OR v.id = $3)\n           ORDER BY v.document_id, v.number",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "document_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "document_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "number",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "blob_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "blob_key"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "media_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "media_type"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "size_bytes",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "size_bytes"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "sha256",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "sha256"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "file_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "file_name"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "uploaded_by",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "uploaded_by"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "source_version_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "source_version_id"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "11b965cd155ae4b88a59af33ef41e781bd80a3cf1bc488258a31a92bb0cffb3f"
+}

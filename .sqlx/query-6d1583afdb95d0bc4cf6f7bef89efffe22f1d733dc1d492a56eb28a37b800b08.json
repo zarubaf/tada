@@ -1,0 +1,237 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.id, d.event_id, d.local_number, d.name, d.owner_user_id,\n                  d.created_at AS \"created_at: jiff_sqlx::Timestamp\", d.version,\n                  v.id AS \"version_id!\", v.number AS \"number!\", v.kind AS \"kind!\", v.blob_key,\n                  v.media_type, v.size_bytes, v.sha256 AS \"sha256!\", v.file_name,\n                  v.uploaded_by AS \"uploaded_by!\", v.source_version_id,\n                  v.created_at AS \"version_created_at!: jiff_sqlx::Timestamp\"\n           FROM document d\n           JOIN LATERAL (\n               SELECT * FROM document_version\n               WHERE organization_id = d.organization_id AND document_id = d.id\n               ORDER BY number DESC\n               LIMIT 1\n           ) v ON true\n           WHERE d.organization_id = $1\n             AND ($2::uuid IS NULL OR d.id = $2)\n             AND ($3::uuid IS NULL OR d.event_id = $3)\n             AND ($4::text IS NULL OR position(lower($4) IN lower(d.name)) > 0)\n             AND ($5::bigint IS NULL OR d.local_number < $5)\n           ORDER BY d.local_number DESC\n           LIMIT $6",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "local_number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "document",
+            "name": "local_number"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "owner_user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document",
+            "name": "owner_user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "document",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "document",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "version_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "number!",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "kind!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "blob_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "blob_key"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "media_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "media_type"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "size_bytes",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "size_bytes"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "sha256!",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "sha256"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "file_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "file_name"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "uploaded_by!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "uploaded_by"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "source_version_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "source_version_id"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "version_created_at!: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "6d1583afdb95d0bc4cf6f7bef89efffe22f1d733dc1d492a56eb28a37b800b08"
+}

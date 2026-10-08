@@ -159,6 +159,8 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - tada shows unsupported pages and formats explicitly. OCR text alone cannot check traffic capacity, evacuation geometry or aviation safety.
 - The first formats: Markdown concepts, PDF preview and export, text PDFs and selected office files. Specialist formats stay downloadable originals.
 - A move to another storage provider keeps document IDs, version IDs, hashes and approvals, with a tested mapping manifest.
+- Each organization has a storage quota: the column `organization.storage_quota_bytes`, 5 GiB by default ([ADR 0043](adr/0043-upload-policy.md)).
+  It is a database value, not a setting. An operator changes it for one organization with SQL.
 
 ### Safe evolution
 

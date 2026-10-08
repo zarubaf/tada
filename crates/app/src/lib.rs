@@ -7,6 +7,7 @@ pub mod blobs;
 pub mod bootstrap;
 pub mod caller;
 pub mod clock;
+pub mod documents;
 pub mod drafts;
 pub mod event_members;
 pub mod events;
