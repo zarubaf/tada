@@ -31,16 +31,11 @@ impl Tools {
 Only a `propose` token of a member who can propose in the event can propose. \
 One changeset holds one intake: source_text is the member's own words of this intake, and the proposals are the changes that these words support. \
 event_id comes from list_events; leave it out only for a changeset that creates new events. \
-Operation kinds: create-event (only in a changeset without event_id), set-fact (state accepted, assumption or unknown; an unknown has no value; never guess a value; \
-expected_version is the version of the current fact from get_event_profile), add-field-definition (only if no field of get_event_schema has the meaning), \
-add-choice-value, deprecate-field, create-open-question and create-document-draft. \
-create-document-draft: document is {\"new\": {\"id\", \"name\"}} for a new document, or {\"existing\": {\"document_id\", \"expected_version\"}} with the version of list_documents. \
-The markdown is CommonMark with tables, one sentence per line. Cite a fact as a link with empty text to its exact version: [](tada:fact/<fact_id>?v=<version>), with the version of get_event_profile; never write the value as text. \
-Cite a source passage as [supporting words](tada:source/<source_version_id>#<start>-<end>). Use lowercase UUIDs, no images and no raw HTML; other links use https or mailto only. \
-A number, date or amount outside a tada link gives a lint warning for the reviewer. To change a draft, read it with get_document_version and propose a new version. \
-Each proposal has at least one passage in evidence: start and end count characters of the normalized text (Unicode NFC, \\n line ends), and quote is the exact text. \
-A passage without source_version_id cites source_text. A passage with source_version_id cites another source version that the member can read in the event, for example a hit of search_sources. \
-depends_on lists the proposals of the same changeset that create the records that a proposal uses, for example the new field of a fact. \
+The input schema names the kinds of operations and the rules of each field, for example the links of a document draft. \
+Use an existing field of get_event_schema first. Never guess a value: propose an unknown instead. \
+Take the expected_version of a fact and the fact versions that a draft cites from get_event_profile, and the expected_version of a document from list_documents. \
+To change a draft, read it with get_document_version and propose a new version. \
+Each proposal cites at least one passage as evidence: of source_text, or of another source version that the member can read in the event, for example a hit of search_sources. \
 Always send a new UUIDv7 as the id of the changeset and of each proposal. To retry, send the same changeset with the same ids again. \
 If a check fails, tada stores nothing: the result has isError, the problem code and, for validation-failed, each invalid value as a JSON pointer and a code.",
         annotations(

@@ -28,7 +28,8 @@ use crate::problem::FieldError;
 #[derive(Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NewChangeset {
-    /// The UUIDv7 of the new changeset. Without it, tada makes one.
+    /// The UUIDv7 of the new changeset. Send a new one, so that a retry with the same id is safe.
+    /// Without it, tada makes one, and a retry after a lost response is refused.
     #[serde(default)]
     pub id: Option<Uuid>,
     /// The event of all proposals. A changeset without an event belongs to the organization:
@@ -147,9 +148,12 @@ pub enum OperationInput {
         document: DraftDocumentInput,
         /// CommonMark with tables, UTF-8, one sentence per line. No raw HTML and no images.
         /// A fact is an empty link to an exact fact version: `[](tada:fact/<fact-uuid>?v=<n>)`.
+        /// Never write the value of a fact as text.
         /// A source passage is a link with the supporting words: `[words](tada:source/<source-version-uuid>#<start>-<end>)`.
+        /// A `tada:` link writes each UUID in lowercase with hyphens. Other links use `https` or `mailto` only.
         /// Each link must cite an accepted fact version, an assumption or an unknown of the event, never an open proposal,
         /// or a source version that the member can see.
+        /// A number, date or amount outside a `tada:` link gives a lint warning for the reviewer.
         markdown: String,
     },
 }

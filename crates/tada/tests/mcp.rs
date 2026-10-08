@@ -753,14 +753,21 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
             .contains("Always send a new UUIDv7 as the id of the changeset"),
         "{propose}"
     );
-    // The description tells the agent how a draft cites a fact (ADR 0051).
-    assert!(
-        propose["description"]
-            .as_str()
-            .unwrap()
-            .contains("[](tada:fact/<fact_id>?v=<version>)"),
-        "{propose}"
-    );
+    // The schema of app is the one place of the rules of each field (ADR 0040), for example how a draft
+    // cites a fact (ADR 0051). The description does not repeat them.
+    let schema = propose["inputSchema"].to_string();
+    for rule in [
+        "[](tada:fact/<fact-uuid>?v=<n>)",
+        "lowercase",
+        "`https` or `mailto`",
+        "a retry with the same id is safe",
+    ] {
+        assert!(schema.contains(rule), "{rule}: {schema}");
+    }
+    let description = propose["description"].as_str().unwrap();
+    for repeated in ["tada:fact/", "add-choice-value", "mailto", "depends_on"] {
+        assert!(!description.contains(repeated), "{repeated}: {description}");
+    }
     // The list of documents has no next page, so its description says what `more` means.
     let documents = tools
         .iter()
