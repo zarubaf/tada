@@ -41,9 +41,17 @@
     outline-offset: 2px;
   }
 
-  .switch[data-disabled],
+  .switch[data-disabled] {
+    cursor: default;
+    opacity: 0.5;
+  }
+
+  /* A running request dims the track only: the label stays readable. */
   .switch[data-pending] {
     cursor: default;
+  }
+
+  .switch[data-pending] .track {
     opacity: 0.5;
   }
 
