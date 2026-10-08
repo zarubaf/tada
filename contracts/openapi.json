@@ -1142,6 +1142,418 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/events/{event_id}/documents": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Lists the documents of the event, the newest first.",
+        "operationId": "list_documents",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only the documents whose name contains this text, without regard to case.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of documents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Uploads a file as the first version of a new document in the event.",
+        "description": "The body is the raw file with the media type `application/octet-stream`, not a multipart form,\nso that the server streams it to the object storage. The header `X-File-Name` holds the file\nname, percent-encoded as UTF-8. The server detects the type from the content (ADR 0055).\nThe body can be as large as `TADA_UPLOAD_MAX_BYTES`. The caller needs the event role\ncontributor or manager, or the organization role owner or admin (ADR 0052).",
+        "operationId": "upload_document",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-File-Name",
+            "in": "header",
+            "description": "The file name, percent-encoded as UTF-8.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The raw file. Not a multipart form.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037). An upload over the storage quota is `validation-failed` with the entry `quota-exceeded` on `/file`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Reads one document with its newest version.",
+        "operationId": "get_document",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "description": "The ID of the document.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/versions": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Lists the versions of the document, in the order of their numbers.",
+        "operationId": "list_document_versions",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "description": "The ID of the document.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The versions of the document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentVersionList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Uploads a file as a new version of the document. The older versions stay unchanged.",
+        "description": "The body has the same form as for `upload_document`.",
+        "operationId": "upload_document_version",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "description": "The ID of the document.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-File-Name",
+            "in": "header",
+            "description": "The file name, percent-encoded as UTF-8.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The raw file. Not a multipart form.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The document with the new version as its newest version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037). An upload over the storage quota is `validation-failed` with the entry `quota-exceeded` on `/file`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/document-versions/{version_id}/content": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Downloads the file of a document version.",
+        "description": "The response has the media type that tada detected, `X-Content-Type-Options: nosniff`, a\n`Content-Security-Policy` that allows nothing, and the file name in `Content-Disposition`\n(RFC 6266). `disposition=inline` applies only to PDF and plain text (ADR 0009, ADR 0043).",
+        "operationId": "download_document_version",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "The ID of the document version.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "disposition",
+            "in": "query",
+            "description": "The default is `attachment`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "How the browser handles a download.",
+              "enum": [
+                "attachment",
+                "inline"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file. Its media type is the `media_type` of the version.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
@@ -1227,6 +1639,156 @@
               "null"
             ],
             "description": "An IANA time zone. The default is `Europe/Zurich`."
+          }
+        }
+      },
+      "Document": {
+        "type": "object",
+        "description": "A document with its newest version.",
+        "required": [
+          "id",
+          "event_id",
+          "readable_id",
+          "name",
+          "owner",
+          "created_at",
+          "version",
+          "newest_version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "readable_id": {
+            "type": "string",
+            "description": "The readable ID, unique in the organization, for example `DOC-001`."
+          },
+          "name": {
+            "type": "string",
+            "description": "The file name of the first upload."
+          },
+          "owner": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The user ID of the member who created the document."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. It increases with each new document version."
+          },
+          "newest_version": {
+            "$ref": "#/components/schemas/DocumentVersion"
+          }
+        }
+      },
+      "DocumentPage": {
+        "type": "object",
+        "description": "One page of documents.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page. It is absent on the last page."
+          }
+        }
+      },
+      "DocumentVersion": {
+        "type": "object",
+        "description": "One immutable version of a document.",
+        "required": [
+          "id",
+          "document_id",
+          "number",
+          "file_name",
+          "media_type",
+          "size_bytes",
+          "sha256",
+          "uploaded_by",
+          "source_version_id",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1 for the first version of the document, then 2, 3 and so on.",
+            "minimum": 0
+          },
+          "file_name": {
+            "type": "string",
+            "description": "The file name of the upload, without control characters and path separators."
+          },
+          "media_type": {
+            "type": "string",
+            "description": "The media type that tada detected from the content (ADR 0055)."
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "description": "The SHA-256 hash of the file, as lowercase hexadecimal digits."
+          },
+          "uploaded_by": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The user ID of the member who uploaded the version."
+          },
+          "source_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The source version that holds the same file (ADR 0050)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DocumentVersionList": {
+        "type": "object",
+        "description": "All versions of a document.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentVersion"
+            },
+            "description": "The versions in the order of their numbers."
           }
         }
       },

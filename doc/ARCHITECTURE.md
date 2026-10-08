@@ -169,6 +169,14 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. A larger text file has no searchable text.
   The PostgreSQL search index of one text is limited to 1 MB, and the index of a text with many unique words can be larger than the text.
   If the index of a text under the cap is too large, tada stores the version without searchable text.
+- An upload is a raw request body with the media type `application/octet-stream`, not a multipart form.
+  The header `X-File-Name` holds the file name, percent-encoded as UTF-8.
+  The server then streams the body to the object storage without a form parser.
+- The upload routes read the body as a stream, so the default body limit of `axum` does not apply to them.
+  They apply `TADA_UPLOAD_MAX_BYTES` instead ([ADR 0043](adr/0043-upload-policy.md)): a larger `Content-Length` fails at once, and the upload counts the bytes of the stream.
+  All other routes keep the default limit of `axum`.
+- A download sends `Content-Disposition` with the RFC 6266 file name, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`, `Cross-Origin-Resource-Policy: same-origin` and `Cache-Control: private, no-store` ([ADR 0009](adr/0009-object-storage.md)).
+  Only PDF and plain text can be inline. Each other type is an attachment, also if the client asks for inline.
 
 ### Safe evolution
 

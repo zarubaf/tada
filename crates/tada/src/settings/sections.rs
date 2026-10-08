@@ -1,5 +1,6 @@
 //! The settings sections and the sections of each command.
 
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -16,7 +17,7 @@ use super::{Section, Setting, Source};
 // Each command also reads `Logging`; see `crate::main`.
 
 /// The settings of `tada serve`.
-pub type ServeSettings = (Database, Http, Storage, PublicUrl, SignIn);
+pub type ServeSettings = (Database, Http, Storage, PublicUrl, SignIn, Uploads);
 /// The settings of `tada worker`.
 pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp);
 /// The settings of `tada telegram`.
@@ -342,6 +343,33 @@ impl Section for SignIn {
     fn read(source: &mut Source<'_>) -> Option<Self> {
         Some(Self {
             rate_limit_key: source.secret(&RATE_LIMIT_KEY)?,
+        })
+    }
+}
+
+/// The uploads of `tada serve` (ADR 0043).
+#[derive(Debug)]
+pub struct Uploads {
+    /// The largest file that one upload can have, in bytes.
+    pub max_bytes: NonZeroU64,
+}
+
+const UPLOAD_MAX_BYTES: Setting = Setting {
+    name: "TADA_UPLOAD_MAX_BYTES",
+    kind: "byte count",
+    default: Some("100000000"),
+    secret: false,
+    description: "The largest file that one upload can have, in bytes. Only the upload routes accept a body of this size.",
+};
+
+impl Section for Uploads {
+    fn settings() -> Vec<&'static Setting> {
+        vec![&UPLOAD_MAX_BYTES]
+    }
+
+    fn read(source: &mut Source<'_>) -> Option<Self> {
+        Some(Self {
+            max_bytes: source.value(&UPLOAD_MAX_BYTES)?,
         })
     }
 }

@@ -3598,6 +3598,7 @@ dependencies = [
  "async-trait",
  "axum",
  "base64 0.23.1",
+ "futures",
  "ipnet",
  "jiff",
  "secrecy",

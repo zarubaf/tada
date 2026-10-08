@@ -132,6 +132,11 @@ problem-invalid-transition = Diese Änderung ist im aktuellen Zustand nicht mög
 problem-payload-too-large = Die Datei ist zu gross.
 problem-unsupported-media-type = Dieser Dateityp ist nicht erlaubt.
 
+## Documents
+
+# The `validation-failed` entry `quota-exceeded` on `file`: the upload is over the storage quota of the organization (ADR 0043).
+document-error-file-quota-exceeded = Der Speicherplatz der Organisation reicht für diese Datei nicht aus.
+
 ## Event memberships
 
 event-members-title = Mitglieder des Anlasses

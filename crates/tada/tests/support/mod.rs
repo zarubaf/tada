@@ -5,9 +5,11 @@
 // The helpers are not `#[test]` functions, so clippy.toml does not cover them.
 #![allow(clippy::unwrap_used)]
 
+pub mod files;
 pub mod logs;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::num::NonZeroU64;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -22,6 +24,7 @@ use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
 use tada_api::ApiState;
 pub use tada_api::SESSION_COOKIE;
 use tada_app::auth::Authenticator;
+use tada_app::blobs::{BlobError, BlobKey, BlobStore, ByteStream};
 use tada_app::clock::Clock;
 use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::outbound::SendOutbound;
@@ -72,6 +75,39 @@ pub fn api_state(
         event_members: database.clone(),
         members: database.clone(),
         public_url: public_url(),
+        documents: database.clone(),
+        blobs: Arc::new(NoObjectStorage),
+        upload_max_bytes: NonZeroU64::new(1024 * 1024).unwrap(),
+    }
+}
+
+/// The object storage of the tests without Garage.
+/// A test that reaches it forgot to set the `blobs` of `api_state` to a `TestGarage`, so it panics with that hint.
+#[derive(Debug)]
+pub struct NoObjectStorage;
+
+impl NoObjectStorage {
+    fn missing() -> ! {
+        panic!("this test has no object storage; set `ApiState::blobs` to a `TestGarage`")
+    }
+}
+
+#[async_trait::async_trait]
+impl BlobStore for NoObjectStorage {
+    async fn put(&self, _: &BlobKey, _: ByteStream, _: u64) -> Result<u64, BlobError> {
+        Self::missing()
+    }
+
+    async fn get(&self, _: &BlobKey) -> Result<Option<ByteStream>, BlobError> {
+        Self::missing()
+    }
+
+    async fn head(&self, _: &BlobKey) -> Result<Option<u64>, BlobError> {
+        Self::missing()
+    }
+
+    async fn delete(&self, _: &BlobKey) -> Result<(), BlobError> {
+        Self::missing()
     }
 }
 
