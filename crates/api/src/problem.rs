@@ -102,7 +102,7 @@ impl<E: CommandError> From<E> for ApiError {
                 .field_errors()
                 .iter()
                 .map(|error| ProblemError {
-                    pointer: format!("/{}", error.field),
+                    pointer: error.pointer(),
                     code: error.code.to_owned(),
                 })
                 .collect(),

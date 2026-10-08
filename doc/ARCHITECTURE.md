@@ -43,10 +43,12 @@ Optional later adapters: Microsoft Graph (mail, calendar, SharePoint), Nextcloud
 | `adapters` crate | Object storage, mail and model provider.                                                                                             | [0009](adr/0009-object-storage.md), [0010](adr/0010-model-provider.md)                                                                 |
 | `api` crate      | HTTP handlers, DTOs and the OpenAPI document.                                                                                        | [0017](adr/0017-api-contract-rust.md)                                                                                                  |
 | `telegram` crate | Telegram gateway.                                                                                                                    | [0011](adr/0011-telegram.md)                                                                                                           |
-| `mcp` crate      | MCP server at `/mcp` for the AI clients of members: read tools with personal API tokens.                                             | [0040](adr/0040-ai-intake-through-mcp.md), [0039](adr/0039-actors-and-identities.md)                                                   |
+| `mcp` crate      | MCP server at `/mcp` for the AI clients of members: read tools and one proposal tool, with personal API tokens.                      | [0040](adr/0040-ai-intake-through-mcp.md), [0039](adr/0039-actors-and-identities.md)                                                   |
 | `tada` binary    | Composition root. Process roles: `serve`, `worker`, `telegram`. Commands: `migrate`, `bootstrap`, `settings`, `openapi`, `problems`. | [0025](adr/0025-platform-contract.md)                                                                                                  |
 | `apps/web`       | React web client, German UI, design system.                                                                                          | [0005](adr/0005-web-client.md), [0018](adr/0018-design-system-foundation.md)–[0024](adr/0024-frontend-quality-gates.md)                |
 | Runtime          | One image that follows the platform contract. Each operator deploys it from a separate repository.                                   | [0025](adr/0025-platform-contract.md), [0028](adr/0028-images-and-registry.md), [0033](adr/0033-deployment-outside-this-repository.md) |
+
+An MCP tool answers a refusal of `app`, also invalid arguments, as a tool result with `isError`, the problem code and the JSON pointers of the invalid values; only `internal` and `unavailable` are JSON-RPC errors.
 
 Search uses PostgreSQL full-text search first.
 pgvector comes only if an evaluation shows a benefit.

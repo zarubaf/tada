@@ -81,6 +81,9 @@ pub async fn run(
         identity: Arc::new(db.clone()),
         facts: Arc::new(db.clone()),
         sources: Arc::new(db.clone()),
+        proposals: Arc::new(db.clone()),
+        documents: Arc::new(db.clone()),
+        clock: Arc::new(SystemClock),
         public_url,
     };
 

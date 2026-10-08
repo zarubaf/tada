@@ -89,7 +89,7 @@ impl ProblemCode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldError {
     /// The path of the input field, without a leading `/`, for example `key` or `proposals/0/evidence`.
-    /// The API makes a JSON pointer of it (ADR 0037).
+    /// Each adapter shows it as the JSON pointer of `pointer` (ADR 0037).
     pub field: Cow<'static, str>,
     pub code: &'static str,
 }
@@ -100,6 +100,11 @@ impl FieldError {
             field: field.into(),
             code,
         }
+    }
+
+    /// The JSON pointer of the field in the request, for example `/proposals/0/evidence` (ADR 0037).
+    pub fn pointer(&self) -> String {
+        format!("/{}", self.field)
     }
 }
 
@@ -122,5 +127,19 @@ pub trait CommandError {
     /// The wait before the next try of a `rate-limited` error.
     fn retry_after(&self) -> Option<SignedDuration> {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_field_error_names_its_field_by_a_json_pointer() {
+        assert_eq!(FieldError::new("key", "empty").pointer(), "/key");
+        assert_eq!(
+            FieldError::new("proposals/0/evidence", "evidence-missing").pointer(),
+            "/proposals/0/evidence"
+        );
     }
 }

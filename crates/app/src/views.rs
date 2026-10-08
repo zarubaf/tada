@@ -12,10 +12,12 @@ use tada_domain::events::Event;
 use tada_domain::facts::{
     CORE_CATALOG_VERSION, FactState, FieldDefinition, FieldStatus, Label, Valued,
 };
-use tada_domain::sources::Evidence;
 use uuid::Uuid;
 
-use crate::facts::{EventProfile, OpenProposalRef, OpenQuestionRef, ProfileEntry, value_schema};
+use crate::caller::Actor;
+use crate::facts::{
+    DatedEvidence, EventProfile, OpenProposalRef, OpenQuestionRef, ProfileEntry, value_schema,
+};
 use crate::proposals::ValueInput;
 use crate::sources::{SourceHit, SourcePassage};
 
@@ -162,6 +164,11 @@ pub struct FactView {
     /// True for an approximate value, for example "about 20,000".
     pub approximate: bool,
     pub evidence: Vec<EvidenceView>,
+    /// The reviewer who accepted the current fact version.
+    pub accepted_by: AuthorView,
+    /// RFC 3339. The time of the acceptance of the current fact version.
+    #[schemars(with = "String")]
+    pub accepted_at: Timestamp,
 }
 
 /// The current version of a fact whose value nobody knows.
@@ -171,6 +178,36 @@ pub struct UnknownView {
     pub fact_id: Uuid,
     pub version: i64,
     pub evidence: Vec<EvidenceView>,
+    /// The reviewer who accepted the current fact version.
+    pub accepted_by: AuthorView,
+    /// RFC 3339. The time of the acceptance of the current fact version.
+    #[schemars(with = "String")]
+    pub accepted_at: Timestamp,
+}
+
+/// Who did something, for which member and through which channel (ADR 0039).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct AuthorView {
+    /// `member`, `service` or `ai`. The list of kinds is open.
+    pub kind: &'static str,
+    /// The user ID of a member or an AI client, or the ID of a service identity.
+    pub id: Uuid,
+    /// The member for whom the author acts, if the author is not that member.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub principal_id: Option<Uuid>,
+    /// `web`, `telegram`, `job`, `api-token` or `cli`. The list of channels is open.
+    pub channel: &'static str,
+}
+
+impl From<Actor> for AuthorView {
+    fn from(actor: Actor) -> Self {
+        Self {
+            kind: actor.kind().as_str(),
+            id: actor.id(),
+            principal_id: actor.principal(),
+            channel: actor.channel().as_str(),
+        }
+    }
 }
 
 /// A passage of a source version that supports a fact version.
@@ -185,6 +222,9 @@ pub struct EvidenceView {
     /// The page of a PDF, from 1.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<u32>,
+    /// RFC 3339. The time when tada captured the source version.
+    #[schemars(with = "String")]
+    pub captured_at: Timestamp,
 }
 
 /// The quote can contain personal data, so `Debug` shows the range only (ADR 0035).
@@ -266,11 +306,9 @@ impl ProfileView {
                     field_key: entry.field.key.as_str().to_owned(),
                     fact_id: entry.fact_id.as_uuid(),
                     version: entry.version.get(),
-                    evidence: entry
-                        .evidence
-                        .iter()
-                        .map(|dated| evidence_view(&dated.evidence))
-                        .collect(),
+                    evidence: entry.evidence.iter().map(evidence_view).collect(),
+                    accepted_by: entry.accepted_by.into(),
+                    accepted_at: entry.accepted_at,
                 }),
             }
         }
@@ -285,22 +323,22 @@ fn fact_view(entry: &ProfileEntry, valued: &Valued) -> FactView {
         version: entry.version.get(),
         value: ValueInput::from(&valued.value),
         approximate: valued.approximate,
-        evidence: entry
-            .evidence
-            .iter()
-            .map(|dated| evidence_view(&dated.evidence))
-            .collect(),
+        evidence: entry.evidence.iter().map(evidence_view).collect(),
+        accepted_by: entry.accepted_by.into(),
+        accepted_at: entry.accepted_at,
     }
 }
 
 /// The one mapping of an evidence link to its view.
-fn evidence_view(evidence: &Evidence) -> EvidenceView {
+fn evidence_view(dated: &DatedEvidence) -> EvidenceView {
+    let evidence = &dated.evidence;
     EvidenceView {
         source_version_id: evidence.source_version_id.as_uuid(),
         start: evidence.passage.start,
         end: evidence.passage.end,
         quote: evidence.passage.quote.clone(),
         page: evidence.passage.page,
+        captured_at: dated.captured_at,
     }
 }
 
@@ -427,8 +465,9 @@ mod tests {
     use tada_domain::sources::Passage;
 
     use super::*;
+    use tada_domain::sources::Evidence;
+
     use crate::caller::{MemberCaller, OrganizationRole};
-    use crate::facts::DatedEvidence;
 
     fn field(key: &str) -> FieldDefinition {
         core_catalog()
@@ -579,6 +618,18 @@ mod tests {
         assert_eq!(json["accepted"][0]["field_key"], "date_window");
         assert_eq!(json["accepted"][0]["value"]["granularity"], "month");
         assert_eq!(json["accepted"][0]["evidence"][0]["quote"], "Flugfeld");
+        assert_eq!(
+            json["accepted"][0]["evidence"][0]["captured_at"],
+            "1970-01-01T00:00:00Z"
+        );
+        let accepted_by = json!({"kind": "member", "id": Uuid::from_u128(40), "channel": "web"});
+        assert_eq!(json["accepted"][0]["accepted_by"], accepted_by);
+        assert_eq!(json["accepted"][0]["accepted_at"], "1970-01-01T00:00:00Z");
+        assert_eq!(json["unknowns"][0]["accepted_by"], accepted_by);
+        assert_eq!(
+            json["unknowns"][0]["evidence"][0]["captured_at"],
+            "1970-01-01T00:00:00Z"
+        );
         assert_eq!(json["assumptions"][0]["field_key"], "venue");
         assert_eq!(json["unknowns"][0]["field_key"], "exact_dates");
         assert!(
