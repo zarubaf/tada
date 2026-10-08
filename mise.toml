@@ -119,7 +119,7 @@ description = "Fail if the Rust sources contain a way around the session authent
 run = "uv run --quiet scripts/check_no_dev_auth.py"
 
 [tasks."check:scoped-ports"]
-description = "Fail if a port method has neither an organization scope nor the infrastructure marker"
+description = "Fail if a method of an app port trait has neither an organization scope nor the infrastructure marker"
 run = "uv run --quiet scripts/check_scoped_ports.py"
 
 [tasks."check:rust"]
