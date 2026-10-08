@@ -79,9 +79,9 @@ pub enum ValueError {
     ReferenceTargetMismatch,
     #[error("a decimal has a scale of at most {}", Decimal::MAX_SCALE)]
     ScaleTooLarge,
-    #[error("the start of a range is not after its end")]
+    #[error("the start of a range is after its end")]
     RangeOrder,
-    #[error("the start of a date window is not after its end")]
+    #[error("the start of a date window is after its end")]
     DateWindowOrder,
     #[error("a currency is an ISO 4217 code of three capital letters")]
     Currency,

@@ -32,6 +32,6 @@ uuid.workspace = true
 tokio.workspace = true
 
 [features]
-# Constructors for the tests of other crates. Enable it only as a dev-dependency of the crate whose
-# tests use it. `cargo nextest run -p tada` does not enable it; `--workspace` does, through store-pg.
+# Constructors for the tests of other crates. Enable it only in `[dev-dependencies]`.
+# A normal dependency with this feature would put the test constructors into the release binary.
 testing = []

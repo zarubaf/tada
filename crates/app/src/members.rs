@@ -48,13 +48,23 @@ impl Invitation {
 }
 
 /// The input of `InviteMember`, as the caller gives it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct NewInvitation {
     /// The ID of the new invitation. A client that sends it can retry safely (ADR 0038).
     pub id: Option<Uuid>,
     pub email: String,
     pub display_name: String,
     pub role: OrganizationRole,
+}
+
+/// The email address and the name are personal data, so `Debug` leaves them out (ADR 0035).
+impl Debug for NewInvitation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NewInvitation")
+            .field("id", &self.id)
+            .field("role", &self.role)
+            .finish_non_exhaustive()
+    }
 }
 
 /// The position after the last member of a page (ADR 0044).
@@ -205,8 +215,9 @@ pub trait MemberStore: Debug + Send + Sync {
         audit: &AuditEvent,
     ) -> Result<bool, StoreError>;
 
-    /// Removes the organization membership of `member` with its event memberships, if
+    /// Removes the organization membership of `member` with its event memberships and its API tokens, if
     /// `remover` allows it for the locked rows. The store adds the old role to `audit`.
+    /// The audit event `organization_membership.remove` implies the deletion of the tokens; no event names them.
     async fn remove(
         &self,
         scope: OrgScope,
@@ -605,6 +616,21 @@ mod tests {
     use OrganizationRole::{Admin, Member, Owner};
 
     const NOW: Timestamp = Timestamp::constant(1_900_000_000, 0);
+
+    #[test]
+    fn the_debug_output_of_an_invitation_input_has_no_address_and_no_name() {
+        let input = NewInvitation {
+            id: None,
+            email: "anna@example.org".to_owned(),
+            display_name: "Anna Muster".to_owned(),
+            role: Member,
+        };
+        let debug = format!("{input:?}");
+        assert!(
+            !debug.contains("anna@example.org") && !debug.contains("Anna Muster"),
+            "{debug}"
+        );
+    }
 
     #[derive(Debug)]
     struct FixedClock;

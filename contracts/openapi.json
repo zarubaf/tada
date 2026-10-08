@@ -944,7 +944,7 @@
         "tags": [
           "members"
         ],
-        "summary": "Removes a member from the organization, with all event memberships of the member.",
+        "summary": "Removes a member from the organization, with all event memberships and API tokens of the member.",
         "description": "Owners and admins remove members; only an owner removes an owner. Each member can leave.\nThe last owner and the only event manager of an event stay: this gives `invalid-transition`.\nThe member loses access with the next request.",
         "operationId": "remove_member",
         "parameters": [

@@ -59,7 +59,7 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
 }
 
 /// A member of the organization.
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Serialize, ToSchema)]
 pub struct Member {
     pub user_id: Uuid,
     pub display_name: String,
@@ -69,6 +69,17 @@ pub struct Member {
     pub role: OrganizationRole,
     /// The record version of the organization membership. `RemoveMember` needs it.
     pub version: i64,
+}
+
+/// The name and the email address are personal data, so `Debug` leaves them out (ADR 0035).
+impl std::fmt::Debug for Member {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Member")
+            .field("user_id", &self.user_id)
+            .field("role", &self.role)
+            .field("version", &self.version)
+            .finish_non_exhaustive()
+    }
 }
 
 impl From<OrganizationMember> for Member {
@@ -111,13 +122,24 @@ pub struct RemoveMemberRequest {
 }
 
 /// An invitation to the organization.
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Serialize, ToSchema)]
 pub struct Invitation {
     pub id: Uuid,
     pub email: String,
     pub display_name: String,
     pub role: OrganizationRole,
     pub created_at: Timestamp,
+}
+
+/// The email address and the name are personal data, so `Debug` leaves them out (ADR 0035).
+impl std::fmt::Debug for Invitation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Invitation")
+            .field("id", &self.id)
+            .field("role", &self.role)
+            .field("created_at", &self.created_at)
+            .finish_non_exhaustive()
+    }
 }
 
 impl From<AppInvitation> for Invitation {
@@ -139,7 +161,7 @@ pub struct InvitationPage {
 }
 
 /// The input of `InviteMember`.
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Deserialize, ToSchema)]
 pub struct InviteMemberRequest {
     /// The UUIDv7 of the new invitation. A client that sends it can retry the request safely.
     pub id: Option<Uuid>,
@@ -150,6 +172,16 @@ pub struct InviteMemberRequest {
     pub display_name: String,
     /// An owner invites with any role; an admin with admin or member.
     pub role: OrganizationRole,
+}
+
+/// The email address and the name are personal data, so `Debug` leaves them out (ADR 0035).
+impl std::fmt::Debug for InviteMemberRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InviteMemberRequest")
+            .field("id", &self.id)
+            .field("role", &self.role)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Lists the members of the organization, in the order of their display names.
@@ -179,7 +211,7 @@ async fn list_members(
     }))
 }
 
-/// Removes a member from the organization, with all event memberships of the member.
+/// Removes a member from the organization, with all event memberships and API tokens of the member.
 ///
 /// Owners and admins remove members; only an owner removes an owner. Each member can leave.
 /// The last owner and the only event manager of an event stay: this gives `invalid-transition`.
@@ -305,4 +337,43 @@ fn decode_cursor(text: &str) -> Result<MemberCursor, ApiError> {
     let bytes = URL_SAFE_NO_PAD.decode(text).map_err(|_| invalid())?;
     let id = Uuid::from_slice(&bytes).map_err(|_| invalid())?;
     Ok(MemberCursor(UserId::from_uuid(id)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_debug_output_has_no_address_and_no_name() {
+        let member = Member {
+            user_id: Uuid::nil(),
+            display_name: "Anna Muster".to_owned(),
+            email: Some("anna@example.org".to_owned()),
+            role: OrganizationRole::Member,
+            version: 1,
+        };
+        let invitation = Invitation {
+            id: Uuid::nil(),
+            email: "anna@example.org".to_owned(),
+            display_name: "Anna Muster".to_owned(),
+            role: OrganizationRole::Member,
+            created_at: Timestamp::UNIX_EPOCH,
+        };
+        let request = InviteMemberRequest {
+            id: None,
+            email: "anna@example.org".to_owned(),
+            display_name: "Anna Muster".to_owned(),
+            role: OrganizationRole::Member,
+        };
+        for debug in [
+            format!("{member:?}"),
+            format!("{invitation:?}"),
+            format!("{request:?}"),
+        ] {
+            assert!(
+                !debug.contains("anna@example.org") && !debug.contains("Anna Muster"),
+                "{debug}"
+            );
+        }
+    }
 }
