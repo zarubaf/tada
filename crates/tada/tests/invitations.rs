@@ -184,7 +184,7 @@ async fn the_first_owner_previews_and_accepts_the_bootstrap_invitation() {
         .await;
     assert_eq!(audit, 1);
 
-    support::logs::assert_clean(&[&token, &cookie, "owner@example.org"]);
+    support::logs::assert_clean(&[&token, &cookie, "owner@example.org", "Firefox"]);
     support::logs::assert_route_logged("/api/v1/invitations/accept");
 }
 

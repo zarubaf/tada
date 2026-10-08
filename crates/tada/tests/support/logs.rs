@@ -2,6 +2,10 @@
 //!
 //! `install` starts one global subscriber with the JSON format of `serve`, which writes into a buffer.
 //! `assert_clean` scans the lines of the whole test process, so a leak in any task or thread fails.
+//!
+//! The buffer is global. `nextest` runs each test in its own process. Under plain `cargo test` the tests of
+//! one file share the buffer: a leak of another test then fails too, and `assert_route_logged` can match a
+//! line of another test.
 
 use std::io;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -36,6 +40,10 @@ impl<'writer> MakeWriter<'writer> for Buffer {
     }
 }
 
+/// The code of tada at `trace`, because ADR 0035 forbids identifiers at each level and an operator can set
+/// `TADA_LOG`. Other crates stay at `info`: hyper logs the address of the fake Bot API at `debug`.
+const FILTER: &str = "info,tada=trace,tada_api=trace,tada_app=trace,tada_adapters=trace,tada_domain=trace,tada_store_pg=trace,tada_telegram=trace";
+
 static BUFFER: OnceLock<Buffer> = OnceLock::new();
 
 /// Starts the capture once per process. Call it before the code under test runs.
@@ -43,7 +51,7 @@ pub fn install() {
     BUFFER.get_or_init(|| {
         let buffer = Buffer::default();
         let subscriber = Registry::default()
-            .with(layer_for("test", buffer.clone()).with_filter(EnvFilter::new("info")));
+            .with(layer_for("test", buffer.clone()).with_filter(EnvFilter::new(FILTER)));
         tracing::subscriber::set_global_default(subscriber).unwrap();
         buffer
     });
@@ -68,7 +76,13 @@ pub fn assert_clean(forbidden: &[&str]) {
     let always = ALWAYS_FORBIDDEN.iter().copied();
     for needle in forbidden.iter().copied().chain(always) {
         assert!(!needle.is_empty(), "an empty needle matches each line");
-        if let Some(line) = lines.iter().find(|line| line.contains(needle)) {
+        // A line is JSON: it holds a quote, a backslash or a non-ASCII character in the escaped form.
+        let escaped = serde_json::to_string(needle).unwrap();
+        let escaped = &escaped[1..escaped.len() - 1];
+        let found = lines
+            .iter()
+            .find(|line| line.contains(needle) || line.contains(escaped));
+        if let Some(line) = found {
             panic!(
                 "a log line holds a direct identifier ({} bytes): {line}",
                 needle.len()

@@ -181,7 +181,13 @@ async fn a_member_signs_in_with_the_magic_link_in_the_organization() {
     let (response, _) = app.get("/api/v1/events", Some(&cookie)).await;
     assert_eq!(response.status(), StatusCode::OK);
 
-    support::logs::assert_clean(&[&token, &cookie, "anna@example.org", "Anna Muster"]);
+    support::logs::assert_clean(&[
+        &token,
+        &cookie,
+        "anna@example.org",
+        "Anna Muster",
+        "Firefox",
+    ]);
     support::logs::assert_route_logged("/api/v1/sign-in/magic-link");
 }
 
@@ -248,6 +254,9 @@ async fn a_magic_link_works_once() {
         without_request_id(unknown),
         "no detail difference"
     );
+
+    // The failed redemptions are the error path of the sign-in.
+    support::logs::assert_clean(&[&token, "unknown", "anna@example.org"]);
 }
 
 /// A problem without the fields that differ for each request.

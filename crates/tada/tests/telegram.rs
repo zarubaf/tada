@@ -55,12 +55,12 @@ async fn send_message(State(api): State<FakeBotApi>, Json(body): Json<Value>) ->
     }}))
 }
 
-/// A private message from the invented account 4242.
+/// A private message from the invented account 7130429.
 fn update(update_id: u32, text: &str) -> Value {
     json!({"update_id": update_id, "message": {
         "message_id": update_id, "date": 0, "text": text,
-        "chat": {"id": 4242, "type": "private", "first_name": "Testperson"},
-        "from": {"id": 4242, "is_bot": false, "first_name": "Testperson", "last_name": "Muster"}
+        "chat": {"id": 7130429, "type": "private", "first_name": "Testperson"},
+        "from": {"id": 7130429, "is_bot": false, "first_name": "Testperson", "last_name": "Muster"}
     }})
 }
 
@@ -123,10 +123,17 @@ async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
         .await
         .unwrap();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].telegram_user_id.0, 4242);
+    assert_eq!(requests[0].telegram_user_id.0, 7130429);
     assert_eq!(requests[0].telegram_name.0, "Testperson Muster");
 
-    support::logs::assert_clean(&[&code.code, &cookie, "Testperson", "Muster", "test-token"]);
+    support::logs::assert_clean(&[
+        &code.code,
+        &cookie,
+        "Testperson",
+        "Muster",
+        "test-token",
+        "7130429",
+    ]);
 }
 
 /// The member of a session cookie, as the session authenticator finds it.
@@ -195,7 +202,7 @@ async fn the_member_confirms_the_link_in_the_web_client() {
         claim_link_code(
             &gateway,
             &code,
-            TelegramUserId(4242),
+            TelegramUserId(7130429),
             &name,
             &test.database,
             &SystemClock
@@ -220,11 +227,11 @@ async fn the_member_confirms_the_link_in_the_web_client() {
 
     let (status, _, link) = call(&router, &cookie, Method::POST, &path).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(link["telegram_user_id"], 4242);
+    assert_eq!(link["telegram_user_id"], 7130429);
     let (status, _, problem) = call(&router, &cookie, Method::POST, &path).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(problem["code"], "not-found");
 
-    support::logs::assert_clean(&[&code, &cookie, "Testperson"]);
+    support::logs::assert_clean(&[&code, &cookie, "Testperson", "7130429"]);
     support::logs::assert_route_logged("/api/v1/telegram/link-requests/{request_id}/confirm");
 }
