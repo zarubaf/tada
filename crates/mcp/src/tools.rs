@@ -43,6 +43,15 @@ Rules: use the existing fields of get_event_schema first. Never fill in an unkno
 Cite each statement with the source_version_id and the passage (start, end) that supports it; get_source_passage gives the exact quote. \
 Propose changes with propose_changeset; the member reviews them in tada, and no tool accepts, rejects or deletes.";
 
+/// The description of `list_events`, with the page size of `app`.
+fn list_events_description() -> String {
+    format!(
+        "List the events that the member can read, in the order of their keys. The other tools take the key. \
+The list holds at most {} events and has no next page. If more is true, the member can read more events than this tool can show: tell the member.",
+        PageLimit::MAX
+    )
+}
+
 /// The description of `list_documents`, with the page size of `app`.
 fn list_documents_description() -> String {
     format!(
@@ -97,7 +106,7 @@ impl Tools {
 
     #[tool(
         name = "list_events",
-        description = "List the events that the member can read, with their keys. The other tools take the key.",
+        description = list_events_description(),
         annotations(read_only_hint = true)
     )]
     async fn list_events(
@@ -348,10 +357,14 @@ mod tests {
         let end = property("get_source_passage", "end");
         let end = end["description"].as_str().unwrap();
         assert!(end.contains(&MAX_PASSAGE_CHARS.to_string()), "{end}");
-        let description = tool("list_documents").description.unwrap();
-        assert!(
-            description.contains(&PageLimit::MAX.to_string()),
-            "{description}"
-        );
+        // A list without a next page says how many items it holds and what `more` means.
+        for name in ["list_events", "list_documents"] {
+            let description = tool(name).description.unwrap();
+            assert!(
+                description.contains(&PageLimit::MAX.to_string()),
+                "{description}"
+            );
+            assert!(description.contains("If more is true"), "{description}");
+        }
     }
 }
