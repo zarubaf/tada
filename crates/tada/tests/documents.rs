@@ -204,7 +204,7 @@ async fn uploads_a_pdf_as_doc_001_and_reads_it_back() {
     assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
     assert_eq!(
         headers[header::CONTENT_SECURITY_POLICY],
-        "default-src 'none'; sandbox"
+        "default-src 'none'; frame-ancestors 'self'; sandbox"
     );
     assert_eq!(headers[header::CACHE_CONTROL], "private, no-store");
     assert_eq!(headers["cross-origin-resource-policy"], "same-origin");
@@ -384,7 +384,7 @@ async fn shows_only_pdf_and_text_inline() {
     );
     assert_eq!(
         headers[header::CONTENT_SECURITY_POLICY],
-        "default-src 'none'; sandbox"
+        "default-src 'none'; frame-ancestors 'self'; sandbox"
     );
 
     let (status, _, _) = api

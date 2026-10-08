@@ -193,7 +193,7 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - The upload routes read the body as a stream, so the default body limit of `axum` does not apply to them.
   They apply `TADA_UPLOAD_MAX_BYTES` instead ([ADR 0043](adr/0043-upload-policy.md)): a larger `Content-Length` fails at once, and the upload counts the bytes of the stream.
   All other routes keep the default limit of `axum`.
-- A download sends `Content-Disposition` with the RFC 6266 file name, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`, `Cross-Origin-Resource-Policy: same-origin` and `Cache-Control: private, no-store` ([ADR 0009](adr/0009-object-storage.md)).
+- A download sends `Content-Disposition` with the RFC 6266 file name, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'self'; sandbox`, `Cross-Origin-Resource-Policy: same-origin` and `Cache-Control: private, no-store` ([ADR 0009](adr/0009-object-storage.md)).
   Only PDF and plain text can be inline. Each other type is an attachment, also if the client asks for inline.
 - A draft has at most 200,000 characters of Markdown ([ADR 0051](adr/0051-document-drafts-and-provenance.md)).
   A concept of an event has some ten thousand characters. The limit bounds the size of one proposal.
