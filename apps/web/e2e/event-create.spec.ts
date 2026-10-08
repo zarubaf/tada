@@ -8,6 +8,7 @@ import {
   fontsLoaded,
   sessionWithRole,
   setTheme,
+  textOverflows,
   themes,
   viewports,
 } from "./fixtures";
@@ -94,3 +95,28 @@ test("a member creates an event and lands on its page", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/events/${created?.id}$`));
   await expect(page.getByRole("heading", { level: 1, name: created?.name })).toBeVisible();
 });
+
+// ADR 0024: no text overflows with the 40 % longer pseudo-locale.
+for (const viewport of viewports) {
+  test(`create event, pseudo-locale, ${viewport.name} px: no text overflows`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await fakeSession(page, sessionWithRole("admin"));
+    await page.goto("/events/new?pseudo");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    // The error state shows the longest texts.
+    await page.getByRole("button", { name: /Áñláss/ }).click();
+    await expect(page.locator("[aria-invalid='true']").first()).toBeFocused();
+
+    expect(await textOverflows(page)).toEqual([]);
+  });
+
+  test(`event page, pseudo-locale, ${viewport.name} px: no text overflows`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await fakeSession(page, sessionWithRole("admin"));
+    await fakeEvent(page, event);
+    await page.goto(`/events/${event?.id}?pseudo`);
+    await expect(page.getByRole("heading", { level: 1, name: event?.name })).toBeVisible();
+
+    expect(await textOverflows(page)).toEqual([]);
+  });
+}
