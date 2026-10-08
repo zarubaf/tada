@@ -739,6 +739,18 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
             .contains("[](tada:fact/<fact_id>?v=<version>)"),
         "{propose}"
     );
+    // The list of documents has no next page, so its description says what `more` means.
+    let documents = tools
+        .iter()
+        .find(|tool| tool["name"] == "list_documents")
+        .unwrap();
+    assert!(
+        documents["description"]
+            .as_str()
+            .unwrap()
+            .contains("If more is true"),
+        "{documents}"
+    );
 
     let call = json!({
         "jsonrpc": "2.0", "id": 2, "method": "tools/call",

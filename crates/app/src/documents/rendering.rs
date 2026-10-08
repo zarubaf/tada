@@ -144,7 +144,8 @@ pub async fn render_context(
     Ok(Rendering {
         version: draft.version,
         draft: DraftRendering {
-            // The lint is deterministic, so it gives the warnings that the proposal of the version had.
+            // A version stores no lint warnings; only its proposal does, and a version does not name its proposal.
+            // The lint is deterministic, so it gives the warnings of the proposal while the lint rules stay the same.
             lint_warnings: drafts::lint(draft.markdown.as_str()),
             markdown: draft.markdown,
             links,

@@ -452,7 +452,7 @@ impl From<&SourcePassage> for PassageView {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct DocumentList {
     pub documents: Vec<DocumentSummaryView>,
-    /// True if the event has more documents than the list shows.
+    /// True if the event has older documents than the list shows. The list has no next page.
     pub more: bool,
 }
 

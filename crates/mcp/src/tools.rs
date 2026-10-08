@@ -230,7 +230,8 @@ impl Tools {
     #[tool(
         name = "list_documents",
         description = "List the documents of an event, the newest first, each with its readable ID, its record version and its newest version. \
-A version is an upload (a file) or a draft (Markdown). To propose a new draft version of a document, send its version as expected_version.",
+A version is an upload (a file) or a draft (Markdown). To propose a new draft version of a document, send its version as expected_version. \
+The list holds at most the 200 newest documents and has no next page. If more is true, the event has older documents that this tool cannot show: tell the member.",
         annotations(read_only_hint = true)
     )]
     async fn list_documents(
