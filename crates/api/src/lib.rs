@@ -99,7 +99,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
 /// All routes of the `serve` process role.
 ///
 /// With `web_root`, the server also delivers the built web client from this folder (ADR 0005).
-/// A path outside `/api` that is not a file gets `index.html`, so that the client handles its own routes.
+/// A path outside `/api` and `/.well-known` that is not a file gets `index.html`, so that the client handles its own routes.
 pub fn router(state: ApiState, web_root: Option<&Path>) -> Router {
     router_with(state, web_root, Router::new())
 }
@@ -110,7 +110,10 @@ pub fn router_with(state: ApiState, web_root: Option<&Path>, adapters: Router) -
     let (api, _) = api();
     let router = Router::new()
         .merge(api)
-        .route("/api/{*path}", any(not_found));
+        .route("/api/{*path}", any(not_found))
+        // tada serves no well-known resource. A client that probes one, for example the OAuth
+        // discovery of an MCP client after a 401, must get 404, not the web client (ADR 0040).
+        .route("/.well-known/{*path}", any(not_found));
     let router = match web_root {
         Some(root) => router.fallback_service(
             ServeDir::new(root).fallback(ServeFile::new(root.join("index.html"))),
@@ -676,5 +679,22 @@ mod tests {
             get(&router, "/").await,
             (StatusCode::OK, "<html>tada</html>".to_owned())
         );
+    }
+
+    #[tokio::test]
+    async fn a_well_known_path_is_not_found_and_never_the_web_client() {
+        let web = tempfile::tempdir().unwrap();
+        fs::write(web.path().join("index.html"), "<html>tada</html>").unwrap();
+        let router = router(state(), Some(web.path()));
+        for path in [
+            "/.well-known/oauth-protected-resource",
+            "/.well-known/oauth-protected-resource/mcp",
+            "/.well-known/oauth-authorization-server",
+            "/.well-known/openid-configuration",
+        ] {
+            let (status, body) = get(&router, path).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
+            assert!(body.contains("\"code\":\"not-found\""), "{path}: {body}");
+        }
     }
 }
