@@ -135,9 +135,9 @@ fn proposal(id: Uuid, operation: Value, depends_on: &[Uuid], quote: &str) -> Val
 
 fn date_window(event: EventId, month: u8, expected_version: Option<i64>) -> Value {
     json!({
-        "kind": "set_fact", "event_id": event.as_uuid(), "field_id": core_field("date_window"),
+        "kind": "set-fact", "event_id": event.as_uuid(), "field_id": core_field("date_window"),
         "state": {"state": "accepted",
-                  "value": {"type": "date_window", "start": format!("2030-{month:02}-01"),
+                  "value": {"type": "date-window", "start": format!("2030-{month:02}-01"),
                             "end": format!("2030-{month:02}-28"), "granularity": "month"}},
         "expected_version": expected_version,
     })
@@ -145,7 +145,7 @@ fn date_window(event: EventId, month: u8, expected_version: Option<i64>) -> Valu
 
 fn question(event: EventId, id: Uuid, owner: UserId) -> Value {
     json!({
-        "kind": "create_open_question", "id": id, "event_id": event.as_uuid(),
+        "kind": "create-open-question", "id": id, "event_id": event.as_uuid(),
         "text": "Welcher Samstag?", "owner": owner.as_uuid(),
     })
 }
@@ -332,7 +332,7 @@ async fn selecting_a_fact_that_depends_on_a_new_field_also_applies_the_field() {
             proposal(
                 ids[0],
                 json!({
-                    "kind": "add_field_definition", "id": field, "event_id": event.as_uuid(),
+                    "kind": "add-field-definition", "id": field, "event_id": event.as_uuid(),
                     "key": "visitors_total", "label": "Besucher total",
                     "value_type": {"type": "quantity", "unit": "person"},
                     "description": "The expected number of visitors of the whole event.",
@@ -344,7 +344,7 @@ async fn selecting_a_fact_that_depends_on_a_new_field_also_applies_the_field() {
             proposal(
                 ids[1],
                 json!({
-                    "kind": "set_fact", "event_id": event.as_uuid(), "field_id": field,
+                    "kind": "set-fact", "event_id": event.as_uuid(), "field_id": field,
                     "state": {"state": "assumption", "approximate": true,
                               "value": {"type": "quantity", "min": "20000", "max": "20000"}},
                 }),
@@ -413,7 +413,7 @@ async fn an_edit_is_the_evidence_of_its_value_and_keeps_the_proposal() {
     .await;
     let edit: FactStateInput = serde_json::from_value(json!({
         "state": "assumption",
-        "value": {"type": "date_window", "start": "2030-06-01", "end": "2030-06-30", "granularity": "month"},
+        "value": {"type": "date-window", "start": "2030-06-01", "end": "2030-06-30", "granularity": "month"},
     }))
     .unwrap();
     let input = ApplyInput {
@@ -668,7 +668,7 @@ async fn an_unknown_applies_as_a_fact_version_without_a_value() {
     let event = open_day.event;
     let id = Uuid::now_v7();
     let unknown = json!({
-        "kind": "set_fact", "event_id": event.as_uuid(), "field_id": core_field("date_window"),
+        "kind": "set-fact", "event_id": event.as_uuid(), "field_id": core_field("date_window"),
         "state": {"state": "unknown"},
     });
     let changeset = propose(
@@ -702,7 +702,7 @@ async fn new_event(
         vec![
             proposal(
                 ids[0],
-                json!({"kind": "create_event", "id": event.as_uuid(), "key": key, "name": "Open Day 2031"}),
+                json!({"kind": "create-event", "id": event.as_uuid(), "key": key, "name": "Open Day 2031"}),
                 &[],
                 "Das Open Day",
             ),
@@ -958,7 +958,7 @@ async fn the_new_record_ids_of_proposals_are_taken() {
         "source_text": SOURCE,
         "proposals": [proposal(
             Uuid::now_v7(),
-            json!({"kind": "create_event", "id": event.as_uuid(), "key": "OPEN32", "name": "Open Day 2032"}),
+            json!({"kind": "create-event", "id": event.as_uuid(), "key": "OPEN32", "name": "Open Day 2032"}),
             &[],
             "Das Open Day",
         )],
@@ -992,7 +992,7 @@ async fn insert_visitors_field(test: &TestDatabase, open_day: &OpenDay) {
 
 fn visitors_field(event: EventId, id: Uuid) -> Value {
     json!({
-        "kind": "add_field_definition", "id": id, "event_id": event.as_uuid(),
+        "kind": "add-field-definition", "id": id, "event_id": event.as_uuid(),
         "key": "visitors_total", "label": "Besucher total",
         "value_type": {"type": "quantity", "unit": "person"},
         "description": "The expected number of visitors of the whole event.",
@@ -1112,7 +1112,7 @@ async fn a_fact_created_by_a_concurrent_apply_after_the_check_is_a_conflict() {
 
 fn duration(event: EventId, days: &str, expected_version: Option<i64>) -> Value {
     json!({
-        "kind": "set_fact", "event_id": event.as_uuid(), "field_id": core_field("duration_days"),
+        "kind": "set-fact", "event_id": event.as_uuid(), "field_id": core_field("duration_days"),
         "state": {"state": "accepted", "value": {"type": "quantity", "min": days, "max": days}},
         "expected_version": expected_version,
     })
@@ -1211,7 +1211,7 @@ async fn a_deprecated_field_takes_no_choice_and_no_second_deprecation() {
     let event = open_day.event.as_uuid();
     let (field, add) = (Uuid::now_v7(), Uuid::now_v7());
     let new_field = json!({
-        "kind": "add_field_definition", "id": field, "event_id": event,
+        "kind": "add-field-definition", "id": field, "event_id": event,
         "key": "runway_surface", "label": "Pistenbelag",
         "value_type": {"type": "choice", "values": [{"key": "grass", "label": "Gras"}]},
         "description": "The surface of the runway.", "module": "aviation",
@@ -1227,9 +1227,9 @@ async fn a_deprecated_field_takes_no_choice_and_no_second_deprecation() {
         .await
         .unwrap();
 
-    let deprecate = json!({"kind": "deprecate_field", "event_id": event, "field_id": field});
+    let deprecate = json!({"kind": "deprecate-field", "event_id": event, "field_id": field});
     let choice = json!({
-        "kind": "add_choice_value", "event_id": event, "field_id": field,
+        "kind": "add-choice-value", "event_id": event, "field_id": field,
         "key": "asphalt", "label": "Asphalt",
     });
     let mut changesets = Vec::new();

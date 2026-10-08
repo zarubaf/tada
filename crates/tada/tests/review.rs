@@ -144,7 +144,7 @@ fn venue_body(event: &str, field: &str, venue: &str) -> Value {
     json!({
         "source_text": SOURCE,
         "proposals": [proposal(
-            json!({"kind": "set_fact", "event_id": event, "field_id": field, "state": {
+            json!({"kind": "set-fact", "event_id": event, "field_id": field, "state": {
                 "state": "assumption", "value": {"type": "text", "text": venue},
             }}),
             "Der Ort ist noch offen.",
@@ -198,14 +198,14 @@ mod facts {
             .iter()
             .find(|field| field["key"] == "date_window")
             .unwrap();
-        assert_eq!(window["value_type"], json!({"type": "date_window"}));
+        assert_eq!(window["value_type"], json!({"type": "date-window"}));
         assert_eq!(
             window["label"],
             json!({"kind": "message", "id": "field-date_window"})
         );
         assert_eq!(
             window["value_schema"]["properties"]["type"],
-            json!({"const": "date_window"})
+            json!({"const": "date-window"})
         );
 
         let date_window = api.field(&owner.cookie, &event, "date_window").await;
@@ -217,25 +217,25 @@ mod facts {
             "source_text": SOURCE,
             "proposals": [
                 proposal(
-                    json!({"kind": "set_fact", "event_id": event, "field_id": date_window, "state": {
+                    json!({"kind": "set-fact", "event_id": event, "field_id": date_window, "state": {
                         "state": "accepted",
-                        "value": {"type": "date_window", "start": "2030-05-01", "end": "2030-06-30", "granularity": "month"},
+                        "value": {"type": "date-window", "start": "2030-05-01", "end": "2030-06-30", "granularity": "month"},
                     }}),
                     "im Mai oder Juni 2030",
                 ),
                 proposal(
-                    json!({"kind": "set_fact", "event_id": event, "field_id": visitors, "state": {
+                    json!({"kind": "set-fact", "event_id": event, "field_id": visitors, "state": {
                         "state": "assumption", "approximate": true,
                         "value": {"type": "quantity", "min": "20000", "max": "20000"},
                     }}),
                     "ungefähr 20000 Leute",
                 ),
                 proposal(
-                    json!({"kind": "set_fact", "event_id": event, "field_id": venue, "state": {"state": "unknown"}}),
+                    json!({"kind": "set-fact", "event_id": event, "field_id": venue, "state": {"state": "unknown"}}),
                     "Der Ort ist noch offen.",
                 ),
                 proposal(
-                    json!({"kind": "create_open_question", "id": Uuid::now_v7(), "event_id": event,
+                    json!({"kind": "create-open-question", "id": Uuid::now_v7(), "event_id": event,
                            "text": "Wer klärt die Bewilligung?", "owner": owner.user.as_uuid()}),
                     "Wer klärt die Bewilligung?",
                 ),
@@ -313,7 +313,7 @@ mod facts {
         assert_eq!(window["version"], 1);
         assert_eq!(
             window["value"],
-            json!({"type": "date_window", "start": "2030-05-01", "end": "2030-06-30", "granularity": "month", "approximate": false})
+            json!({"type": "date-window", "start": "2030-05-01", "end": "2030-06-30", "granularity": "month", "approximate": false})
         );
         assert_eq!(
             window["evidence"][0]["passage"]["quote"],
@@ -541,7 +541,7 @@ mod review {
             "source_text": "Fly-in Musterhausen 2031",
             "proposals": [{
                 "id": Uuid::now_v7(),
-                "operation": {"kind": "create_event", "id": new_event, "key": "FLY31", "name": "Fly-in Musterhausen"},
+                "operation": {"kind": "create-event", "id": new_event, "key": "FLY31", "name": "Fly-in Musterhausen"},
                 "evidence": [{"start": 0, "end": 19, "quote": "Fly-in Musterhausen"}],
                 "reason": "The member names a new event.",
             }],

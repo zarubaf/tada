@@ -1849,7 +1849,7 @@
                                       "type": "string"
                                     },
                                     "type": {
-                                      "const": "date_window",
+                                      "const": "date-window",
                                       "type": "string"
                                     }
                                   },
@@ -2047,7 +2047,7 @@
                                       "type": "string"
                                     },
                                     "type": {
-                                      "const": "date_window",
+                                      "const": "date-window",
                                       "type": "string"
                                     }
                                   },
@@ -2386,7 +2386,7 @@
                               "type": "string"
                             },
                             "kind": {
-                              "const": "create_event",
+                              "const": "create-event",
                               "type": "string"
                             },
                             "name": {
@@ -2430,7 +2430,7 @@
                               "type": "string"
                             },
                             "kind": {
-                              "const": "set_fact",
+                              "const": "set-fact",
                               "type": "string"
                             },
                             "state": {
@@ -2567,7 +2567,7 @@
                                               "type": "string"
                                             },
                                             "type": {
-                                              "const": "date_window",
+                                              "const": "date-window",
                                               "type": "string"
                                             }
                                           },
@@ -2765,7 +2765,7 @@
                                               "type": "string"
                                             },
                                             "type": {
-                                              "const": "date_window",
+                                              "const": "date-window",
                                               "type": "string"
                                             }
                                           },
@@ -2879,7 +2879,7 @@
                               "type": "string"
                             },
                             "kind": {
-                              "const": "add_field_definition",
+                              "const": "add-field-definition",
                               "type": "string"
                             },
                             "label": {
@@ -2985,7 +2985,7 @@
                                       ]
                                     },
                                     "type": {
-                                      "const": "date_window",
+                                      "const": "date-window",
                                       "type": "string"
                                     }
                                   },
@@ -3087,7 +3087,7 @@
                               "type": "string"
                             },
                             "kind": {
-                              "const": "add_choice_value",
+                              "const": "add-choice-value",
                               "type": "string"
                             },
                             "label": {
@@ -3117,7 +3117,7 @@
                               "type": "string"
                             },
                             "kind": {
-                              "const": "deprecate_field",
+                              "const": "deprecate-field",
                               "type": "string"
                             }
                           },
@@ -3142,7 +3142,7 @@
                               "type": "string"
                             },
                             "kind": {
-                              "const": "create_open_question",
+                              "const": "create-open-question",
                               "type": "string"
                             },
                             "owner": {
@@ -4030,7 +4030,7 @@
               "kind": {
                 "type": "string",
                 "enum": [
-                  "create_event"
+                  "create-event"
                 ]
               }
             }
@@ -4069,7 +4069,7 @@
               "kind": {
                 "type": "string",
                 "enum": [
-                  "set_fact"
+                  "set-fact"
                 ]
               }
             }
@@ -4113,7 +4113,7 @@
               "kind": {
                 "type": "string",
                 "enum": [
-                  "add_field_definition"
+                  "add-field-definition"
                 ]
               }
             }
@@ -4145,7 +4145,7 @@
               "kind": {
                 "type": "string",
                 "enum": [
-                  "add_choice_value"
+                  "add-choice-value"
                 ]
               }
             }
@@ -4169,7 +4169,7 @@
               "kind": {
                 "type": "string",
                 "enum": [
-                  "deprecate_field"
+                  "deprecate-field"
                 ]
               }
             }
@@ -4203,7 +4203,7 @@
               "kind": {
                 "type": "string",
                 "enum": [
-                  "create_open_question"
+                  "create-open-question"
                 ]
               }
             }
@@ -4756,7 +4756,7 @@
               "type": {
                 "type": "string",
                 "enum": [
-                  "date_window"
+                  "date-window"
                 ]
               }
             }

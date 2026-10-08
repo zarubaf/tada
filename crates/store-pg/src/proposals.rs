@@ -650,7 +650,7 @@ mod tests {
                 {
                     "id": ids[0],
                     "operation": {
-                        "kind": "add_field_definition", "id": field, "event_id": event.as_uuid(),
+                        "kind": "add-field-definition", "id": field, "event_id": event.as_uuid(),
                         "key": "visitors_total", "label": "Besucher total",
                         "value_type": {"type": "quantity", "unit": "person"},
                         "description": "The expected number of visitors of the whole event.",
@@ -662,7 +662,7 @@ mod tests {
                 {
                     "id": ids[1],
                     "operation": {
-                        "kind": "set_fact", "event_id": event.as_uuid(), "field_id": field,
+                        "kind": "set-fact", "event_id": event.as_uuid(), "field_id": field,
                         "state": {"state": "assumption", "approximate": true,
                                   "value": {"type": "quantity", "min": "20000", "max": "20000"}},
                     },
@@ -673,10 +673,10 @@ mod tests {
                 {
                     "id": ids[2],
                     "operation": {
-                        "kind": "set_fact", "event_id": event.as_uuid(),
+                        "kind": "set-fact", "event_id": event.as_uuid(),
                         "field_id": core_field("date_window"),
                         "state": {"state": "accepted",
-                                  "value": {"type": "date_window", "start": "2030-05-01",
+                                  "value": {"type": "date-window", "start": "2030-05-01",
                                             "end": "2030-05-31", "granularity": "month"}},
                     },
                     "evidence": [passage("im Mai 2030")],
@@ -1036,16 +1036,16 @@ mod tests {
             "proposals": [
                 {
                     "id": ids[0],
-                    "operation": {"kind": "create_event", "id": event, "key": "OPEN31", "name": "Open Day Testwil"},
+                    "operation": {"kind": "create-event", "id": event, "key": "OPEN31", "name": "Open Day Testwil"},
                     "evidence": [passage("Das Open Day")],
                     "reason": "The member names a new event.",
                 },
                 {
                     "id": ids[1],
                     "operation": {
-                        "kind": "set_fact", "event_id": event, "field_id": core_field("date_window"),
+                        "kind": "set-fact", "event_id": event, "field_id": core_field("date_window"),
                         "state": {"state": "assumption",
-                                  "value": {"type": "date_window", "start": "2030-05-01",
+                                  "value": {"type": "date-window", "start": "2030-05-01",
                                             "end": "2030-05-31", "granularity": "month"}},
                     },
                     "depends_on": [ids[0]],

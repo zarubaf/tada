@@ -51,16 +51,6 @@ pub enum ConflictReason {
     TargetChanged,
 }
 
-impl ConflictReason {
-    /// The API value (ADR 0044).
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::FactChanged => "fact-changed",
-            Self::TargetChanged => "target-changed",
-        }
-    }
-}
-
 /// A stored passage that does not match the text of its source version.
 #[derive(Debug, thiserror::Error)]
 #[error("a stored passage is outside the text of its source version")]

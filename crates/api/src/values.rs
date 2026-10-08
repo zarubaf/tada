@@ -1,6 +1,6 @@
 //! The DTOs of fact values, fact states, value types and passages (ADRs 0049 and 0050) that more than one resource uses.
 //!
-//! The `type` values are the ones of the `ValueInput` of a proposal, so a client can send a value back as it reads it.
+//! The `type` values are the ones of the `ValueInput` of a proposal (ADR 0044: kebab-case).
 
 use jiff::civil;
 use serde::Serialize;
@@ -23,7 +23,7 @@ pub enum FactState {
 
 /// A fact value with its mark "approximate". `type` names the value type. The list of types is open.
 #[derive(Debug, Serialize, ToSchema)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Value {
     /// A short text.
     Text {
@@ -166,7 +166,7 @@ impl From<domain::ReferenceTarget> for ReferenceTarget {
 
 /// The value type of a field, with its unit, currency or choices. The list of types is open.
 #[derive(Debug, Serialize, ToSchema)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum ValueType {
     Text,
     Boolean,

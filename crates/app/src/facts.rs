@@ -173,7 +173,7 @@ pub fn value_schema(value_type: &ValueType) -> Json {
                 None => json!({"enum": ["day", "week", "month"]}),
             };
             (
-                "date_window",
+                "date-window",
                 json!({"start": date(), "end": date(), "granularity": granularity}),
             )
         }
@@ -217,7 +217,7 @@ pub fn value_schema(value_type: &ValueType) -> Json {
 }
 
 /// The API name of a granularity (ADR 0044).
-pub fn granularity_name(granularity: Granularity) -> &'static str {
+fn granularity_name(granularity: Granularity) -> &'static str {
     match granularity {
         Granularity::Day => "day",
         Granularity::Week => "week",

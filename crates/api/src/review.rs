@@ -368,7 +368,7 @@ impl From<FactVersionRef> for CurrentFact {
 
 /// The change that a proposal suggests. `kind` names the operation. The list of kinds is open.
 #[derive(Debug, Serialize, ToSchema)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Operation {
     CreateEvent {
         id: Uuid,
