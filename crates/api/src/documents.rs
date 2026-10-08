@@ -43,7 +43,9 @@ const FILE_NAME_HEADER: HeaderName = HeaderName::from_static("x-file-name");
 const UPLOAD_MEDIA_TYPE: &str = "application/octet-stream";
 
 /// A download never runs as a page of tada (ADR 0009): no script, no plugin, no same origin.
-const DOWNLOAD_CSP: HeaderValue = HeaderValue::from_static("default-src 'none'; sandbox");
+/// Only a page of tada can frame it, so the text preview works and another site cannot frame it.
+const DOWNLOAD_CSP: HeaderValue =
+    HeaderValue::from_static("default-src 'none'; frame-ancestors 'self'; sandbox");
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
@@ -578,7 +580,8 @@ async fn download_document_version(
             HeaderValue::from_static("nosniff"),
         ),
         (header::CONTENT_SECURITY_POLICY, DOWNLOAD_CSP),
-        // Another site cannot embed the file, also if the cookie policy changes later.
+        // Blocks no-cors loads of the file by another site (for example `<img>` or `<script>`).
+        // It does not stop a frame: `frame-ancestors` in the CSP does.
         (
             HeaderName::from_static("cross-origin-resource-policy"),
             HeaderValue::from_static("same-origin"),

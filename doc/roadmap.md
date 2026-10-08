@@ -71,6 +71,10 @@ Work items, in this order:
    - Isolation tests with two organizations, the structured export, and a backup restoration in the operator's deployment repository (ADR 0033).
    - The privacy notice in the web client, from the template of ADR 0045.
    - The external review of the authentication code (ADR 0008).
+   - A sweep of orphan objects in the object storage ([ADR 0009](adr/0009-object-storage.md), [ADR 0045](adr/0045-data-protection.md)).
+     An orphan is an object that no document version refers to, for example after a crash or an unknown commit outcome.
+     The sweep also removes the parts of multipart uploads that a canceled request left incomplete.
+     A lifecycle rule of the bucket in the deployment repository can do the second part (ADR 0033).
 
 Demonstration:
 

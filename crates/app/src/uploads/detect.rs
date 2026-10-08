@@ -1,7 +1,7 @@
 //! Detection of the type of an upload from its content (ADR 0043, ADR 0055).
 //!
 //! This module is pure and does no I/O.
-//! `infer` is a pure crate without I/O, so it is a dependency of `app` and not of an adapter.
+//! `infer` runs without its default features: no file functions and no parser of compound files, so it is a dependency of `app` and not of an adapter.
 //! The upload code keeps the first `SNIFF_BYTES` of the stream for `detect`.
 //! It feeds each chunk of the whole stream to a `TextValidator`.
 

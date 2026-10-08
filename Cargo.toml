@@ -36,7 +36,7 @@ getrandom = "0.4.3"
 # HMAC-SHA-256 for the keys of the rate-limit counters (ADR 0056), from the RustCrypto family of sha2.
 hmac = "0.13.0"
 ipnet = "2.12.2"
-infer = "0.22.0"
+infer = { version = "0.22.0", default-features = false, features = ["alloc"] }
 jiff = { version = "0.2.37", features = ["serde", "tzdb-bundle-always"] }
 jiff-sqlx = { version = "0.2.0", features = ["postgres"] }
 json-subscriber = "0.3.0"
