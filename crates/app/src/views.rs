@@ -15,6 +15,7 @@ use tada_domain::facts::{
 use uuid::Uuid;
 
 use crate::caller::Actor;
+use crate::documents::{DocumentView, StoredDraft, VersionContent, VersionView};
 use crate::facts::{
     DatedEvidence, EventProfile, OpenProposalRef, OpenQuestionRef, ProfileEntry, value_schema,
 };
@@ -443,6 +444,158 @@ impl From<&SourcePassage> for PassageView {
             start: passage.start,
             end: passage.end,
             quote: passage.quote.clone(),
+        }
+    }
+}
+
+/// The documents of an event, the newest first.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct DocumentList {
+    pub documents: Vec<DocumentSummaryView>,
+    /// True if the event has more documents than the list shows.
+    pub more: bool,
+}
+
+/// A document with its newest version.
+#[derive(Clone, Serialize, JsonSchema)]
+pub struct DocumentSummaryView {
+    pub document_id: Uuid,
+    /// The readable ID, for example `DOC-001`.
+    pub readable_id: String,
+    pub name: String,
+    /// The record version of the document. A draft of this document expects it as `expected_version`.
+    pub version: i64,
+    pub newest_version: VersionSummaryView,
+}
+
+/// The name can contain personal data, so `Debug` leaves it out (ADR 0035).
+impl std::fmt::Debug for DocumentSummaryView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DocumentSummaryView")
+            .field("document_id", &self.document_id)
+            .field("version", &self.version)
+            .finish_non_exhaustive()
+    }
+}
+
+impl From<&DocumentView> for DocumentSummaryView {
+    fn from(document: &DocumentView) -> Self {
+        Self {
+            document_id: document.id.as_uuid(),
+            readable_id: document.readable_id(),
+            name: document.name.clone(),
+            version: document.version.get(),
+            newest_version: VersionSummaryView::from(&document.newest_version),
+        }
+    }
+}
+
+/// One version of a document. Only a draft has a status and Markdown; an upload is a file.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct VersionSummaryView {
+    pub version_id: Uuid,
+    pub number: u32,
+    /// `upload` or `draft`.
+    pub kind: &'static str,
+    /// The status of a draft: `draft`, `review`, `approved`, `superseded` or `archived`. Absent for an upload.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<&'static str>,
+}
+
+impl From<&VersionView> for VersionSummaryView {
+    fn from(version: &VersionView) -> Self {
+        let (kind, status) = match &version.content {
+            VersionContent::Upload(_) => ("upload", None),
+            VersionContent::Draft { status } => ("draft", Some(status.as_str())),
+        };
+        Self {
+            version_id: version.id.as_uuid(),
+            number: version.number,
+            kind,
+            status,
+        }
+    }
+}
+
+/// A draft version with its Markdown and its provenance manifest, so that an agent can write the next version.
+#[derive(Clone, Serialize, JsonSchema)]
+pub struct DraftVersionView {
+    pub version_id: Uuid,
+    pub document_id: Uuid,
+    pub number: u32,
+    /// `draft`, `review`, `approved`, `superseded` or `archived`. An approved version never changes.
+    pub status: &'static str,
+    pub markdown: String,
+    pub manifest: ManifestView,
+}
+
+/// The Markdown is document content, so `Debug` leaves it out (ADR 0035).
+impl std::fmt::Debug for DraftVersionView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DraftVersionView")
+            .field("version_id", &self.version_id)
+            .field("number", &self.number)
+            .field("status", &self.status)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The fact versions and source passages that a draft version cites (ADR 0051).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct ManifestView {
+    pub facts: Vec<CitedFactView>,
+    pub sources: Vec<CitedPassageView>,
+}
+
+/// An exact fact version that a draft cites. get_event_profile gives the current version of the fact.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct CitedFactView {
+    pub fact_id: Uuid,
+    pub version: i64,
+}
+
+/// A passage that a draft cites. get_source_passage gives its text.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct CitedPassageView {
+    pub source_version_id: Uuid,
+    pub start: u32,
+    pub end: u32,
+}
+
+impl From<&StoredDraft> for DraftVersionView {
+    fn from(draft: &StoredDraft) -> Self {
+        let status = match &draft.version.content {
+            VersionContent::Draft { status } => status.as_str(),
+            // `StoredDraft` holds a draft version only.
+            VersionContent::Upload(_) => "upload",
+        };
+        Self {
+            version_id: draft.version.id.as_uuid(),
+            document_id: draft.version.document_id.as_uuid(),
+            number: draft.version.number,
+            status,
+            markdown: draft.markdown.as_str().to_owned(),
+            manifest: ManifestView {
+                facts: draft
+                    .manifest
+                    .facts
+                    .iter()
+                    .map(|fact| CitedFactView {
+                        fact_id: fact.fact_id.as_uuid(),
+                        version: fact.version.get(),
+                    })
+                    .collect(),
+                sources: draft
+                    .manifest
+                    .sources
+                    .iter()
+                    .map(|source| CitedPassageView {
+                        source_version_id: source.source_version_id.as_uuid(),
+                        start: source.passage.start,
+                        end: source.passage.end,
+                    })
+                    .collect(),
+            },
         }
     }
 }
