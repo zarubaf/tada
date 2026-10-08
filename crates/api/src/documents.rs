@@ -11,8 +11,6 @@ use axum::body::Body;
 use axum::extract::{FromRequest, Request, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use futures::TryStreamExt;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -32,6 +30,7 @@ use uuid::Uuid;
 
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
+use crate::cursor;
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
 use crate::values::{FactState, Passage, Value, state_parts};
@@ -962,15 +961,12 @@ fn content_disposition(kind: &'static str, file_name: &str) -> Result<HeaderValu
 
 /// The cursor is opaque for clients (ADR 0044): the number of the readable ID, in Base64.
 fn encode_cursor(cursor: DocumentCursor) -> String {
-    URL_SAFE_NO_PAD.encode(cursor.0.to_string())
+    cursor::encode(cursor.0.to_string())
 }
 
 fn decode_cursor(text: &str) -> Result<DocumentCursor, ApiError> {
-    let invalid =
-        || ApiError::new(ProblemCode::MalformedRequest).with_detail("The cursor is not valid.");
-    let bytes = URL_SAFE_NO_PAD.decode(text).map_err(|_| invalid())?;
-    let text = String::from_utf8(bytes).map_err(|_| invalid())?;
-    Ok(DocumentCursor(text.parse().map_err(|_| invalid())?))
+    let text = cursor::decode_text(text)?;
+    Ok(DocumentCursor(text.parse().map_err(|_| cursor::invalid())?))
 }
 
 impl ApiState {

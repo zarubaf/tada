@@ -2,8 +2,6 @@
 
 use axum::extract::State;
 use axum::http::StatusCode;
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use tada_app::domain::ids::{InvitationId, UserId};
@@ -20,6 +18,7 @@ use uuid::Uuid;
 
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
+use crate::cursor;
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
 use crate::roles::OrganizationRole;
@@ -328,14 +327,12 @@ async fn revoke_invitation(
 
 /// The cursor is opaque for clients (ADR 0044): the user ID of the last member, in Base64.
 fn encode_cursor(cursor: MemberCursor) -> String {
-    URL_SAFE_NO_PAD.encode(cursor.0.as_uuid().as_bytes())
+    cursor::encode(cursor.0.as_uuid().as_bytes())
 }
 
 fn decode_cursor(text: &str) -> Result<MemberCursor, ApiError> {
-    let invalid =
-        || ApiError::new(ProblemCode::MalformedRequest).with_detail("The cursor is not valid.");
-    let bytes = URL_SAFE_NO_PAD.decode(text).map_err(|_| invalid())?;
-    let id = Uuid::from_slice(&bytes).map_err(|_| invalid())?;
+    let bytes = cursor::decode(text)?;
+    let id = Uuid::from_slice(&bytes).map_err(|_| cursor::invalid())?;
     Ok(MemberCursor(UserId::from_uuid(id)))
 }
 

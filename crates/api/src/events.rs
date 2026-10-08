@@ -2,8 +2,6 @@
 
 use axum::extract::State;
 use axum::http::StatusCode;
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use tada_app::access::AccessError;
@@ -20,6 +18,7 @@ use uuid::Uuid;
 
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
+use crate::cursor;
 use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::problem::{ApiError, Problem};
 
@@ -198,17 +197,14 @@ async fn get_event(
 
 /// The cursor is opaque for clients (ADR 0044): the key and the ID, in Base64.
 fn encode_cursor(cursor: &EventCursor) -> String {
-    URL_SAFE_NO_PAD.encode(format!("{} {}", cursor.key.as_str(), cursor.id))
+    cursor::encode(format!("{} {}", cursor.key.as_str(), cursor.id))
 }
 
 fn decode_cursor(text: &str) -> Result<EventCursor, ApiError> {
-    let invalid =
-        || ApiError::new(ProblemCode::MalformedRequest).with_detail("The cursor is not valid.");
-    let bytes = URL_SAFE_NO_PAD.decode(text).map_err(|_| invalid())?;
-    let text = String::from_utf8(bytes).map_err(|_| invalid())?;
-    let (key, id) = text.split_once(' ').ok_or_else(invalid)?;
+    let text = cursor::decode_text(text)?;
+    let (key, id) = text.split_once(' ').ok_or_else(cursor::invalid)?;
     Ok(EventCursor {
-        key: EventKey::parse(key).map_err(|_| invalid())?,
-        id: EventId::from_uuid(id.parse().map_err(|_| invalid())?),
+        key: EventKey::parse(key).map_err(|_| cursor::invalid())?,
+        id: EventId::from_uuid(id.parse().map_err(|_| cursor::invalid())?),
     })
 }

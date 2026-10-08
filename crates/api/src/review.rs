@@ -2,8 +2,6 @@
 
 use axum::extract::State;
 use axum::http::StatusCode;
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -34,6 +32,7 @@ use uuid::Uuid;
 use crate::ApiState;
 use crate::actors::Author;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
+use crate::cursor;
 use crate::documents::DraftRendering;
 use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::json_schema;
@@ -933,18 +932,15 @@ async fn reject_proposals(
 
 /// The cursor is opaque for clients (ADR 0044): the creation time and the ID, in Base64.
 fn encode_cursor(cursor: &ChangesetCursor) -> String {
-    URL_SAFE_NO_PAD.encode(format!("{} {}", cursor.created_at, cursor.id))
+    cursor::encode(format!("{} {}", cursor.created_at, cursor.id))
 }
 
 fn decode_cursor(text: &str) -> Result<ChangesetCursor, ApiError> {
-    let invalid =
-        || ApiError::new(ProblemCode::MalformedRequest).with_detail("The cursor is not valid.");
-    let bytes = URL_SAFE_NO_PAD.decode(text).map_err(|_| invalid())?;
-    let text = String::from_utf8(bytes).map_err(|_| invalid())?;
-    let (created_at, id) = text.split_once(' ').ok_or_else(invalid)?;
+    let text = cursor::decode_text(text)?;
+    let (created_at, id) = text.split_once(' ').ok_or_else(cursor::invalid)?;
     Ok(ChangesetCursor {
-        created_at: created_at.parse().map_err(|_| invalid())?,
-        id: ChangesetId::from_uuid(id.parse().map_err(|_| invalid())?),
+        created_at: created_at.parse().map_err(|_| cursor::invalid())?,
+        id: ChangesetId::from_uuid(id.parse().map_err(|_| cursor::invalid())?),
     })
 }
 
