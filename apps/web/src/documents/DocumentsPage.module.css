@@ -41,23 +41,4 @@
       align-items: end;
     }
   }
-
-  .failure {
-    padding: var(--space-3);
-    border: 1px solid var(--color-danger);
-    border-radius: var(--radius-md);
-    background: var(--color-danger-subtle);
-    color: var(--color-danger);
-  }
-
-  /* The live regions stay in the page: empty, they are hidden from the eye but not from the tree. */
-  .failure:empty,
-  .status:empty {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    padding: 0;
-    border: 0;
-  }
 }

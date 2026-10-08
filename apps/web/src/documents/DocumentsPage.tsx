@@ -7,7 +7,7 @@ import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
 import { FileButton } from "../ui/FileButton";
-import { useFocusAfterCommit } from "../ui/focus";
+import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Skeleton } from "../ui/Skeleton";
@@ -20,7 +20,7 @@ const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", tim
 
 type State =
   | { kind: "loading" }
-  | { kind: "failed"; message: string; requestId: string | undefined; retried: boolean }
+  | { kind: "failed"; message: string; requestId: string | undefined }
   | { kind: "loaded"; items: Document[]; nextCursor: string | undefined; loadingMore: boolean };
 
 const columns: Column<Document>[] = [
@@ -75,22 +75,21 @@ export function DocumentsPage({ api }: { api: Api }) {
   const heading = useRef<HTMLHeadingElement>(null);
   // The newest request. The answer of an older one is dropped, so that it cannot replace the list.
   const latest = useRef(0);
-  // Retries so far. After a retry, focus must not fall to the body when the error leaves.
-  const retries = useRef(0);
   // A file goes up: a second pick does nothing, also before the next render.
   const uploadRunning = useRef(false);
   const search = useRef<HTMLDivElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
+  const { retried, retry } = useRetry(() => heading.current);
 
+  /** Resolves to true when the list loaded. */
   const load = useCallback(
     async (q: string | undefined, cursor: string | undefined, previous: Document[]) => {
       const params = { path: { event_id: eventId }, query: { q, cursor } };
       const request = ++latest.current;
-      const retried = retries.current > 0;
       try {
         const { data, error } = await api.GET("/api/v1/events/{event_id}/documents", { params });
         if (request !== latest.current) {
-          return;
+          return false;
         }
         if (data) {
           const nextCursor = data.next_cursor ?? undefined;
@@ -100,30 +99,23 @@ export function DocumentsPage({ api }: { api: Api }) {
             nextCursor,
             loadingMore: false,
           });
-          if ((cursor !== undefined && nextCursor === undefined) || retried) {
-            // The last page arrived and the button leaves, or the retry button left with the
-            // error: focus goes to the heading.
-            retries.current = 0;
+          if (cursor !== undefined && nextCursor === undefined) {
+            // The last page arrived and the button leaves: focus goes to the heading.
             focusAfterCommit(() => heading.current);
           }
-        } else {
-          setState({
-            kind: "failed",
-            message: problemMessage(error),
-            requestId: error?.request_id,
-            retried,
-          });
+          return true;
         }
+        setState({
+          kind: "failed",
+          message: problemMessage(error),
+          requestId: error?.request_id,
+        });
       } catch {
         if (request === latest.current) {
-          setState({
-            kind: "failed",
-            message: problemMessage(undefined),
-            requestId: undefined,
-            retried,
-          });
+          setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
         }
       }
+      return false;
     },
     [api, eventId, focusAfterCommit],
   );
@@ -180,12 +172,11 @@ export function DocumentsPage({ api }: { api: Api }) {
         </FileButton>
       </div>
       <p className={styles.help}>{t("documents-upload-limits")}</p>
-      <LiveRegion kind="status" className={styles.status}>
-        {uploading ? t("documents-uploading") : uploaded}
-      </LiveRegion>
-      <LiveRegion kind="alert" className={styles.failure}>
+      <LiveRegion kind="status">{uploading ? t("documents-uploading") : uploaded}</LiveRegion>
+      <LiveRegion kind="alert" visuallyHidden>
         {uploadFailure}
       </LiveRegion>
+      {uploadFailure && <InlineError message={uploadFailure} announce="none" />}
       <search>
         <form className={styles.search} onSubmit={onSearch}>
           <div ref={search}>
@@ -210,12 +201,13 @@ export function DocumentsPage({ api }: { api: Api }) {
         <InlineError
           message={state.message}
           requestId={state.requestId}
-          takeFocus={state.retried}
-          onRetry={() => {
-            retries.current += 1;
-            setState({ kind: "loading" });
-            void load(query, undefined, []);
-          }}
+          announce={retried ? "focus" : "alert"}
+          onRetry={() =>
+            retry(() => {
+              setState({ kind: "loading" });
+              return load(query, undefined, []);
+            })
+          }
         />
       )}
       {state.kind === "loaded" && state.items.length === 0 && query === undefined && (

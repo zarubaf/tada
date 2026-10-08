@@ -54,6 +54,8 @@ function setup(lists: Record<string, Document[]> = { "": [programm, budget] }) {
     upload?: () => Response;
     /** Delays the answer of a list request. */
     list?: (q: string | null) => Promise<void> | undefined;
+    /** The number of list requests that fail before one succeeds. */
+    failures?: number;
   } = {};
   const fetch = async (request: Request) => {
     const url = new URL(request.url);
@@ -63,6 +65,10 @@ function setup(lists: Record<string, Document[]> = { "": [programm, budget] }) {
     if (url.pathname.endsWith("/documents")) {
       const q = url.searchParams.get("q");
       queries.push(q);
+      if (hooks.failures) {
+        hooks.failures -= 1;
+        return problem(500, "internal");
+      }
       const items = lists[q ?? ""] ?? [];
       await hooks.list?.(q);
       return json(200, { items });
@@ -155,6 +161,37 @@ describe("DocumentsPage", () => {
     expect(screen.queryByText("DOC-001")).not.toBeInTheDocument();
   });
 
+  it("moves focus to the heading when a retry succeeds", async () => {
+    const { hooks } = setup({ "": [programm, budget], Budget: [budget] });
+    await screen.findByRole("table");
+    hooks.failures = 1;
+    await user.type(screen.getByRole("searchbox", { name: "Dokumente suchen" }), "Budget");
+    await user.click(screen.getByRole("button", { name: "Suchen" }));
+    const retry = await screen.findByRole("button", { name: "Erneut versuchen" });
+    expect(retry.closest("[role=alert]")).not.toHaveFocus();
+
+    await user.click(retry);
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2, name: "Dokumente" })).toHaveFocus(),
+    );
+  });
+
+  it("moves focus to the message when a retry fails again", async () => {
+    const { hooks } = setup();
+    await screen.findByRole("table");
+    hooks.failures = 2;
+    await user.type(screen.getByRole("searchbox", { name: "Dokumente suchen" }), "x");
+    await user.click(screen.getByRole("button", { name: "Suchen" }));
+    await user.click(await screen.findByRole("button", { name: "Erneut versuchen" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Erneut versuchen" }).closest("[role=alert]"),
+      ).toHaveFocus(),
+    );
+  });
+
   it("shows the empty state when the event has no document", async () => {
     setup({ "": [] });
 
@@ -191,8 +228,11 @@ describe("DocumentsPage", () => {
         "Der Speicherplatz der Organisation reicht für diese Datei nicht aus.",
       ),
     );
-    // The button stays in the page, so it keeps focus; the browser check proves it (jsdom focuses
-    // the hidden input when a test uploads).
+    // The page shows the text once in the alert region and once in the message, which takes no
+    // focus and no role: the button stays in the page, so it keeps focus (the browser check proves
+    // it; jsdom focuses the hidden input when a test uploads).
+    expect(screen.getAllByText(/Speicherplatz der Organisation/)).toHaveLength(2);
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Datei hochladen" })).toBeInTheDocument();
   });
 });
