@@ -1,6 +1,6 @@
 //! Documents and their versions (ADR 0009, ADR 0043, ADR 0051, ADR 0055).
 //!
-//! A document belongs to one event, and access follows the event role (OP9).
+//! In Slice 1, a document belongs to one event, and access follows the event role (ADR 0052, ARCHITECTURE.md).
 //! Its readable ID `DOC-<n>` is local to the organization (ADR 0038).
 //! An upload becomes a document version and a source version of the kind `upload` (ADR 0050).
 //!
@@ -146,7 +146,7 @@ pub struct NewUpload {
     pub file_type: FileType,
     pub size_bytes: u64,
     pub sha256: [u8; 32],
-    /// The normalized text of a text file, for the search and for passages (OP10).
+    /// The normalized text of a text file, for the search and for passages (ADR 0050).
     pub text: Option<SourceText>,
     /// The author of the source version.
     pub author: Actor,
@@ -227,8 +227,9 @@ pub trait DocumentStore: Debug + Send + Sync {
     ) -> Result<Option<StoredVersion>, StoreError>;
 }
 
-/// The largest text file whose text tada stores for the search and for passages (OP10).
-/// PostgreSQL limits the search index of one text to 1 MB, so a larger text file is stored without its text.
+/// The largest text file whose text tada stores for the search and for passages (ADR 0050, ARCHITECTURE.md).
+/// The cap bounds the memory of each upload. A larger text file is stored without its text.
+/// Under the cap, the store still drops the searchable text if its search index exceeds the PostgreSQL limit.
 const MAX_SOURCE_TEXT_BYTES: usize = 1024 * 1024;
 
 /// What an upload learns from its stream while the object storage reads it (ADR 0043).
@@ -455,38 +456,49 @@ async fn upload(
             .unwrap_or_else(PoisonError::into_inner)
             .feed(chunk);
     }));
-    let result = match stores.blobs.put(&blob_key, body, limit).await {
-        Ok(size_bytes) => {
-            let inspection =
-                std::mem::take(&mut *inspection.lock().unwrap_or_else(PoisonError::into_inner));
-            match inspection.finish(&file_name) {
-                Ok((file_type, sha256, text)) => {
-                    let upload = NewUpload {
-                        target,
-                        version_id: DocumentVersionId::from_uuid(Uuid::now_v7()),
-                        source_version_id: SourceVersionId::from_uuid(Uuid::now_v7()),
-                        blob_key: blob_key.clone(),
-                        file_name,
-                        file_type,
-                        size_bytes,
-                        sha256,
-                        text,
-                        author: caller.actor(),
-                        uploaded_by: caller.user_id(),
-                        created_at: clock.now(),
-                    };
-                    publish(caller, &upload, stores.documents).await
-                }
-                Err(Rejected) => Err(UploadError::UnsupportedType),
-            }
+    let size_bytes = match stores.blobs.put(&blob_key, body, limit).await {
+        Ok(size_bytes) => size_bytes,
+        Err(error) => {
+            discard(stores.blobs, &blob_key).await;
+            return Err(error.into());
         }
-        Err(error) => Err(error.into()),
     };
-    if result.is_err() {
-        // A failed delete leaves an object without a version. No code reads it, and the original error matters more.
-        let _ = stores.blobs.delete(&blob_key).await;
+    let inspection =
+        std::mem::take(&mut *inspection.lock().unwrap_or_else(PoisonError::into_inner));
+    let result = match inspection.finish(&file_name) {
+        Ok((file_type, sha256, text)) => {
+            let upload = NewUpload {
+                target,
+                version_id: DocumentVersionId::from_uuid(Uuid::now_v7()),
+                source_version_id: SourceVersionId::from_uuid(Uuid::now_v7()),
+                blob_key: blob_key.clone(),
+                file_name,
+                file_type,
+                size_bytes,
+                sha256,
+                text,
+                author: caller.actor(),
+                uploaded_by: caller.user_id(),
+                created_at: clock.now(),
+            };
+            publish(caller, &upload, stores.documents).await
+        }
+        Err(Rejected) => Err(UploadError::UnsupportedType),
+    };
+    match &result {
+        // A store error leaves the outcome of the commit unknown: the version can exist, so its object stays (ADR 0009).
+        // An object without a version is harmless; a version without its object loses evidence.
+        Ok(_) | Err(UploadError::Store(_)) => {}
+        // Each other error is a definite rejection, and no version refers to the object.
+        Err(_) => discard(stores.blobs, &blob_key).await,
     }
     result
+}
+
+/// Deletes the object of a rejected upload.
+/// A failed delete leaves an object without a version. No code reads it, and the original error matters more.
+async fn discard(blobs: &dyn BlobStore, key: &BlobKey) {
+    let _ = blobs.delete(key).await;
 }
 
 /// Publishes the checked upload as a new version with an audit event.

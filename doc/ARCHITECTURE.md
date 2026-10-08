@@ -159,8 +159,16 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - tada shows unsupported pages and formats explicitly. OCR text alone cannot check traffic capacity, evacuation geometry or aviation safety.
 - The first formats: Markdown concepts, PDF preview and export, text PDFs and selected office files. Specialist formats stay downloadable originals.
 - A move to another storage provider keeps document IDs, version IDs, hashes and approvals, with a tested mapping manifest.
+- In Slice 1, each document belongs to exactly one event, and access follows the event role ([ADR 0052](adr/0052-event-roles-and-ownership.md)).
+  The `DOC` numbers stay unique in the organization ([ADR 0038](adr/0038-ids-and-time.md)).
+  Documents of the whole organization need a later ADR, because no access rule for them exists yet.
 - Each organization has a storage quota: the column `organization.storage_quota_bytes`, 5 GiB by default ([ADR 0043](adr/0043-upload-policy.md)).
-  It is a database value, not a setting. An operator changes it for one organization with SQL.
+  It is a value in the database, not an environment setting. An operator changes it for one organization with SQL.
+- The text of an uploaded plain text, Markdown or CSV file is the text of its source version: members can search and cite it ([ADR 0050](adr/0050-proposals-and-review.md)).
+  PDF and office files have no extracted text yet. An agent cites its own source text for facts from such files.
+- tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. A larger text file has no searchable text.
+  The PostgreSQL search index of one text is limited to 1 MB, and the index of a text with many unique words can be larger than the text.
+  If the index of a text under the cap is too large, tada stores the version without searchable text.
 
 ### Safe evolution
 

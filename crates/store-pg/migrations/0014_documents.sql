@@ -2,13 +2,13 @@
 -- Tables with organization data refer to each other through (organization_id, id) (ADR 0006).
 
 -- The storage quota of each organization, in bytes (ADR 0043).
--- It is a database value, not a setting: an operator changes it for one organization with SQL.
--- The default is 5 GiB (OP17).
+-- It is a value in the database, not an environment setting: an operator changes it for one organization with SQL.
+-- The default is 5 GiB.
 ALTER TABLE organization
     ADD COLUMN storage_quota_bytes bigint NOT NULL DEFAULT 5368709120 CHECK (storage_quota_bytes >= 0);
 
 -- A document: a file with a stable ID and the organization-local ID `DOC-<local_number>` (ADR 0038).
--- In Slice 1, each document belongs to one event, and access follows the event role (OP9).
+-- In Slice 1, each document belongs to one event, and access follows the event role (ADR 0052, ARCHITECTURE.md).
 -- `version` is the record version: it increases with each new document version.
 CREATE TABLE document (
     id uuid PRIMARY KEY,
@@ -51,6 +51,10 @@ CREATE TABLE document_version (
     UNIQUE (document_id, number),
     FOREIGN KEY (organization_id, document_id) REFERENCES document (organization_id, id),
     FOREIGN KEY (organization_id, source_version_id) REFERENCES source_version (organization_id, id),
+    -- The key of an object starts with the organization ID (ADR 0009), so a row cannot name an object of another organization.
+    CONSTRAINT document_version_blob_key_in_organization CHECK (
+        blob_key IS NULL OR starts_with(blob_key, organization_id::text || '/')
+    ),
     CONSTRAINT document_version_status_of_drafts CHECK ((kind = 'draft') = (status IS NOT NULL)),
     CONSTRAINT document_version_upload_file CHECK (
         kind <> 'upload' OR (

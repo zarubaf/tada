@@ -4,6 +4,11 @@ This file lists each category of personal data that tada stores (ADR 0045).
 Each new table or column with personal data updates this file in the same pull request.
 Logs hold no personal data (ADR 0035).
 
+A failed upload can leave its object in the object storage without a document version.
+Causes are a crash, a failed delete, or a commit with an unknown outcome.
+Such an object can hold personal data.
+Slice 1 has no job that finds and deletes these objects.
+
 | Category                 | Table and columns                                                                                                                 | Purpose                                                                                                                                                                      | Retention                                                                                                                                                            |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Display name             | `app_user.display_name`                                                                                                           | Shows the member to other members                                                                                                                                            | While the user exists. Slice 1 has no user deletion.                                                                                                                 |

@@ -33,6 +33,7 @@ url.workspace = true
 tada-app = { workspace = true, features = ["testing"] }
 tada-store-pg = { workspace = true, features = ["testing"] }
 tada-adapters = { workspace = true, features = ["testing"] }
+async-trait.workspace = true
 axum.workspace = true
 bytes.workspace = true
 futures.workspace = true

@@ -96,7 +96,8 @@ impl FileType {
     }
 
     /// Whether the browser may show the file inline.
-    /// Images are downloads only, so that no image metadata leaks (OP14).
+    /// Images are downloads only, so that no image metadata leaks.
+    /// Image previews from copies without metadata (ADR 0043) come later.
     pub fn inline_preview(self) -> bool {
         matches!(self, Self::Pdf | Self::Text)
     }
@@ -525,6 +526,25 @@ mod tests {
 
     #[test]
     fn each_type_comes_back_from_its_media_type() {
+        // A new type fails to compile here until it is in this match and in `ALL`.
+        let in_all = |file_type: FileType| match file_type {
+            FileType::Pdf
+            | FileType::Png
+            | FileType::Jpeg
+            | FileType::Webp
+            | FileType::Heic
+            | FileType::Text
+            | FileType::Markdown
+            | FileType::Csv
+            | FileType::Docx
+            | FileType::Xlsx
+            | FileType::Pptx
+            | FileType::Odt
+            | FileType::Ods
+            | FileType::Odp => FileType::ALL.contains(&file_type),
+        };
+        assert!(FileType::ALL.into_iter().all(in_all));
+        assert_eq!(FileType::ALL.len(), 14);
         for file_type in FileType::ALL {
             assert_eq!(
                 FileType::of_media_type(file_type.media_type()),

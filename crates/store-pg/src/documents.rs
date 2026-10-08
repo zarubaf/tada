@@ -3,8 +3,8 @@
 use async_trait::async_trait;
 use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
-use sqlx::PgConnection;
 use sqlx::types::Uuid;
+use sqlx::{Connection, PgConnection};
 use tada_app::audit::AuditEvent;
 use tada_app::blobs::BlobKey;
 use tada_app::caller::OrgScope;
@@ -14,6 +14,7 @@ use tada_app::documents::{
 };
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId, SourceVersionId, UserId};
+use tada_app::domain::sources::SourceText;
 use tada_app::store::StoreError;
 use tada_app::uploads::detect::FileType;
 
@@ -233,6 +234,10 @@ async fn versions(
 
 /// True if the files of the organization and `size` more bytes fit into its storage quota.
 /// It locks the organization row until the end of the transaction, so concurrent uploads check one after the other.
+///
+/// Lock order: a transaction that locks the organization row takes that lock first,
+/// before any row of the organization (counter, document, membership), so that two transactions cannot deadlock.
+/// The invitation transaction follows the same order.
 async fn fits_quota(
     conn: &mut PgConnection,
     scope: OrgScope,
@@ -359,6 +364,41 @@ async fn source_item(
     Ok(item)
 }
 
+/// True if the error is SQLSTATE 54000 `program_limit_exceeded`: here, the search index of a text is too long.
+fn is_text_too_long(error: &sqlx::Error) -> bool {
+    error
+        .as_database_error()
+        .and_then(|error| error.code())
+        .is_some_and(|code| code == "54000")
+}
+
+/// Writes the source version of `upload` with the text `text`.
+async fn insert_source_version(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    upload: &NewUpload,
+    item: Uuid,
+    text: Option<&SourceText>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "INSERT INTO source_version
+             (id, organization_id, source_item_id, kind, channel, author_actor, text, sha256, captured_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        upload.source_version_id.as_uuid(),
+        scope.organization_id().as_uuid(),
+        item,
+        UPLOAD,
+        upload.author.channel().as_str(),
+        actor::to_json(&upload.author),
+        text.map(SourceText::as_str),
+        &upload.sha256[..],
+        upload.created_at.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// Writes the source version and the document version of `upload`.
 async fn insert_version(
     conn: &mut PgConnection,
@@ -368,22 +408,17 @@ async fn insert_version(
 ) -> Result<(), sqlx::Error> {
     let organization = scope.organization_id().as_uuid();
     let item = source_item(conn, scope, document, event, upload.created_at).await?;
-    sqlx::query!(
-        "INSERT INTO source_version
-             (id, organization_id, source_item_id, kind, channel, author_actor, text, sha256, captured_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-        upload.source_version_id.as_uuid(),
-        organization,
-        item,
-        UPLOAD,
-        upload.author.channel().as_str(),
-        actor::to_json(&upload.author),
-        upload.text.as_ref().map(|text| text.as_str()),
-        &upload.sha256[..],
-        upload.created_at.to_sqlx() as _,
-    )
-    .execute(&mut *conn)
-    .await?;
+    // The search index of a text can exceed the PostgreSQL limit of 1 MB for a `tsvector` (SQLSTATE 54000),
+    // for example in a CSV file of many unique numbers. Then the version keeps its file, without searchable text.
+    let mut savepoint = conn.begin().await?;
+    match insert_source_version(&mut savepoint, scope, upload, item, upload.text.as_ref()).await {
+        Ok(()) => savepoint.commit().await?,
+        Err(error) if is_text_too_long(&error) => {
+            savepoint.rollback().await?;
+            insert_source_version(conn, scope, upload, item, None).await?;
+        }
+        Err(error) => return Err(error),
+    }
     let size =
         i64::try_from(upload.size_bytes).map_err(|error| sqlx::Error::Encode(Box::new(error)))?;
     sqlx::query!(
@@ -852,15 +887,12 @@ mod tests {
             "UPDATE document_version SET file_name = 'x.txt' WHERE id = $1",
             "UPDATE document_version SET size_bytes = 1 WHERE id = $1",
         ] {
-            let result = sqlx::query(change)
+            let error = sqlx::query(change)
                 .bind(first.version_id.as_uuid())
                 .execute(&test.database.pool)
-                .await;
-            match result {
-                // The statement that matches no row changes nothing.
-                Ok(done) => assert_eq!(done.rows_affected(), 0, "{change}"),
-                Err(error) => assert_eq!(sqlstate(&error), "23001", "{change}"),
-            }
+                .await
+                .unwrap_err();
+            assert_eq!(sqlstate(&error), "23001", "{change}");
         }
         let stored = test
             .database
@@ -870,6 +902,47 @@ mod tests {
             .unwrap();
         assert_eq!(stored.blob_key, first.blob_key);
         assert_eq!(stored.version.sha256, first.sha256);
+    }
+
+    #[tokio::test]
+    async fn keeps_a_text_without_search_index_if_the_index_is_too_long() {
+        let test = TestDatabase::start().await;
+        let f = fixture(&test, "testwil").await;
+        // Unique numbers give a search index that is larger than the text and larger than the PostgreSQL limit of 1 MB.
+        let mut text = String::new();
+        let mut number = 1_000_000_u32;
+        while text.len() < 700 * 1024 {
+            text.push_str(&format!("{number};"));
+            number += 1;
+        }
+        let upload = upload(&f, new_document(&f), "Inventar.csv", text.as_bytes());
+        let document = published(&test, &f, &upload).await;
+
+        assert_eq!(document.newest_version.sha256, upload.sha256);
+        let without_text: bool = test
+            .scalar(&format!(
+                "SELECT text IS NULL FROM source_version WHERE id = '{}'",
+                upload.source_version_id
+            ))
+            .await;
+        assert!(without_text);
+        assert_eq!(count(&test, "document_version").await, 1);
+    }
+
+    #[tokio::test]
+    async fn a_version_cannot_name_an_object_of_another_organization() {
+        let test = TestDatabase::start().await;
+        let a = fixture(&test, "testwil").await;
+        let b = fixture(&test, "musterhausen").await;
+        let mut foreign = upload(&a, new_document(&a), "Programm.txt", b"x");
+        foreign.blob_key = BlobKey::new(b.organization);
+        let error = test
+            .database
+            .publish(a.scope(), &foreign, &audit_of(&a, &foreign))
+            .await
+            .unwrap_err();
+        assert!(matches!(error, StoreError::Internal(_)), "{error:?}");
+        assert_eq!(count(&test, "document_version").await, 0);
     }
 
     #[tokio::test]

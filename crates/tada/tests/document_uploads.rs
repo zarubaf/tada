@@ -5,22 +5,27 @@
 
 use std::io;
 
+use async_trait::async_trait;
 use bytes::Bytes;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use sha2::{Digest, Sha256};
 use tada_adapters::clock::SystemClock;
 use tada_adapters::storage::testing::TestGarage;
+use tada_app::audit::AuditEvent;
 use tada_app::blobs::ByteStream;
+use tada_app::caller::OrgScope;
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::documents::{
-    DocumentStores, DocumentView, ReadDocumentError, UploadError, download, get_document,
+    DocumentCursor, DocumentStore, DocumentStores, DocumentView, NewUpload, Published,
+    ReadDocumentError, StoredVersion, UploadError, VersionView, download, get_document,
     list_documents, list_versions, upload_document, upload_version,
 };
 use tada_app::domain::identity::EventRole;
-use tada_app::domain::ids::{EventId, OrganizationId};
+use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId, OrganizationId};
 use tada_app::event_members::add_event_member;
 use tada_app::paging::PageLimit;
 use tada_app::problem::CommandError;
+use tada_app::store::StoreError;
 use tada_store_pg::testing::TestDatabase;
 
 /// The upload limit of the tests.
@@ -179,7 +184,7 @@ async fn uploads_a_pdf_as_the_first_version_of_doc_001() {
     let key = &f.garage.keys().await[0];
     assert!(key.starts_with(&format!("{}/", f.organization)), "{key}");
     assert!(!key.contains("Programm"), "{key}");
-    // The upload is a source version with the hash of the file, and a PDF has no text yet (OP10).
+    // The upload is a source version with the hash of the file, and a PDF has no text yet (ARCHITECTURE.md).
     let source: String = f
         .test
         .scalar(&format!(
@@ -446,7 +451,7 @@ async fn finds_documents_by_name_and_stores_the_text_of_a_text_file() {
     assert_eq!(rest.items[0].readable_id(), "DOC-001");
     assert_eq!(rest.next, None);
 
-    // The text of a text file is searchable and citable, in its normalized form (OP10).
+    // The text of a text file is searchable and citable, in its normalized form (ADR 0050).
     let text: String = f
         .test
         .scalar(&format!(
@@ -455,4 +460,123 @@ async fn finds_documents_by_name_and_stores_the_text_of_a_text_file() {
         ))
         .await;
     assert_eq!(text, "# Notizen\nFlugshow um 14 Uhr\n");
+}
+
+/// A document store whose publish commits and then reports a broken connection: the outcome is unknown to the caller.
+#[derive(Debug)]
+struct LostCommit<'a>(&'a dyn DocumentStore);
+
+#[async_trait]
+impl DocumentStore for LostCommit<'_> {
+    async fn publish(
+        &self,
+        scope: OrgScope,
+        upload: &NewUpload,
+        audit: &AuditEvent,
+    ) -> Result<Published, StoreError> {
+        self.0.publish(scope, upload, audit).await?;
+        Err(StoreError::Unavailable(
+            "the connection broke during the commit".into(),
+        ))
+    }
+
+    async fn list(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+        name: Option<&str>,
+        after: Option<DocumentCursor>,
+        limit: u32,
+    ) -> Result<Vec<DocumentView>, StoreError> {
+        self.0.list(scope, event, name, after, limit).await
+    }
+
+    async fn get(
+        &self,
+        scope: OrgScope,
+        id: DocumentId,
+    ) -> Result<Option<DocumentView>, StoreError> {
+        self.0.get(scope, id).await
+    }
+
+    async fn versions(
+        &self,
+        scope: OrgScope,
+        document: DocumentId,
+    ) -> Result<Vec<VersionView>, StoreError> {
+        self.0.versions(scope, document).await
+    }
+
+    async fn version(
+        &self,
+        scope: OrgScope,
+        id: DocumentVersionId,
+    ) -> Result<Option<StoredVersion>, StoreError> {
+        self.0.version(scope, id).await
+    }
+}
+
+#[tokio::test]
+async fn keeps_the_object_when_the_outcome_of_the_commit_is_unknown() {
+    let f = Fixture::start().await;
+    let content = pdf("Programm");
+    let lost = LostCommit(&f.test.database);
+    let stores = DocumentStores {
+        documents: &lost,
+        ..f.stores()
+    };
+    let error = upload_document(
+        &f.owner,
+        f.event,
+        "Programm.pdf",
+        body(&content),
+        LIMIT,
+        stores,
+        &SystemClock,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(error, UploadError::Store(_)), "{error:?}");
+
+    // The version was committed, and its object must stay readable.
+    let document = list_documents(
+        &f.owner,
+        f.event,
+        None,
+        None,
+        PageLimit::DEFAULT,
+        f.stores(),
+    )
+    .await
+    .unwrap()
+    .items
+    .remove(0);
+    assert_eq!(f.read(&f.owner, &document).await, content);
+}
+
+#[tokio::test]
+async fn rejects_an_interrupted_stream_and_keeps_nothing() {
+    let f = Fixture::start().await;
+    let broken = body(&pdf("Programm")).chain(futures::stream::once(async {
+        Err(io::Error::new(
+            io::ErrorKind::ConnectionReset,
+            "the client disconnected",
+        ))
+    }));
+    let error = upload_document(
+        &f.owner,
+        f.event,
+        "Programm.pdf",
+        Box::pin(broken),
+        LIMIT,
+        f.stores(),
+        &SystemClock,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(error, UploadError::Interrupted(_)), "{error:?}");
+    assert_eq!(error.code().as_str(), "malformed-request");
+    assert!(f.garage.keys().await.is_empty());
+    let versions: i64 = f.test.scalar("SELECT count(*) FROM document_version").await;
+    assert_eq!(versions, 0);
 }
