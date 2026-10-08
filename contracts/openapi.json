@@ -2124,7 +2124,7 @@
           "tokens"
         ],
         "summary": "Creates an API token for an MCP client of the member (ADR 0045).",
-        "description": "The member must confirm the current notice with `notice_version_confirmed`.\nA `propose` token needs the right to propose in an event.\nIf an owner switched off MCP tokens, the response is `forbidden`.\nThe response holds the secret; the member sees it once.",
+        "description": "The member must confirm the current notice with `notice_version_confirmed`.\nA `propose` token needs the right to propose in an event.\nIf an owner switched off MCP tokens, or the member lacks the right to propose, the response is `forbidden`.\nA client reads `GET /organization/features` to tell a switched-off MCP switch from a missing right.\nThe response holds the secret; the member sees it once.",
         "operationId": "create_token",
         "requestBody": {
           "content": {
@@ -4128,7 +4128,7 @@
               "null"
             ],
             "format": "int32",
-            "description": "The version of the notice that the member confirmed: `GetTokenNotice` gives it.\nA missing or an old version gives `validation-failed`.",
+            "description": "The version of the notice that the member confirmed: `GetTokenNotice` gives it.\nAny other version than the current one, also a missing one, gives `validation-failed` with the code `not-confirmed`.",
             "minimum": 0
           }
         }

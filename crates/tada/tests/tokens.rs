@@ -158,10 +158,14 @@ async fn the_secret_shows_once_and_a_revoked_token_stays_listed() {
     let anna = app.member("Anna Muster", OrganizationRole::Member).await;
     let ben = app.member("Ben Beispiel", OrganizationRole::Member).await;
 
-    let (status, created) = app
-        .post(&anna, "/api/v1/tokens", &app.new_token("read"))
-        .await;
-    assert_eq!(status, StatusCode::CREATED);
+    let request = support::request(Method::POST, "/api/v1/tokens")
+        .header(header::COOKIE, format!("{SESSION_COOKIE}={}", anna.cookie))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(app.new_token("read").to_string()))
+        .unwrap();
+    let (response, created) = app.app.send(request).await;
+    assert_eq!(response.status(), StatusCode::CREATED);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
     let secret = created["secret"].as_str().unwrap().to_owned();
     assert!(secret.starts_with("tada_pat_"));
     assert_eq!(created["token"]["name"], "Claude Code");
@@ -187,7 +191,15 @@ async fn the_secret_shows_once_and_a_revoked_token_stays_listed() {
     let (status, _) = app.post(&anna, &path, &json!({})).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     let (_, list) = app.get(&anna, "/api/v1/tokens").await;
-    assert!(!list["items"][0]["revoked_at"].is_null());
+    let revoked_at = list["items"][0]["revoked_at"].clone();
+    assert!(!revoked_at.is_null());
+
+    // A second revocation answers 204 and keeps the first revocation time.
+    app.app.clock.advance(jiff::SignedDuration::from_secs(60));
+    let (status, _) = app.post(&anna, &path, &json!({})).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, list) = app.get(&anna, "/api/v1/tokens").await;
+    assert_eq!(list["items"][0]["revoked_at"], revoked_at);
 
     app.app.test.assert_no_plaintext(&secret).await;
     support::logs::assert_clean(&[&secret, &anna.cookie, "anna.muster@example.org"]);

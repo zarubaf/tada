@@ -169,7 +169,7 @@ pub struct CreateTokenRequest {
     /// The expiry. It is in the future and at most one year away.
     pub expires_at: Timestamp,
     /// The version of the notice that the member confirmed: `GetTokenNotice` gives it.
-    /// A missing or an old version gives `validation-failed`.
+    /// Any other version than the current one, also a missing one, gives `validation-failed` with the code `not-confirmed`.
     pub notice_version_confirmed: Option<u32>,
 }
 
@@ -238,7 +238,8 @@ async fn list_tokens(
 ///
 /// The member must confirm the current notice with `notice_version_confirmed`.
 /// A `propose` token needs the right to propose in an event.
-/// If an owner switched off MCP tokens, the response is `forbidden`.
+/// If an owner switched off MCP tokens, or the member lacks the right to propose, the response is `forbidden`.
+/// A client reads `GET /organization/features` to tell a switched-off MCP switch from a missing right.
 /// The response holds the secret; the member sees it once.
 #[utoipa::path(
     post,
