@@ -134,6 +134,28 @@ impl TestGarage {
         }
     }
 
+    /// The keys of all objects in the bucket, in the order of the keys.
+    ///
+    /// # Panics
+    ///
+    /// If the request fails.
+    #[allow(clippy::unwrap_used)]
+    pub async fn keys(&self) -> Vec<String> {
+        let output = self
+            .storage
+            .client
+            .list_objects_v2()
+            .bucket(BUCKET)
+            .send()
+            .await
+            .unwrap();
+        output
+            .contents()
+            .iter()
+            .filter_map(|object| object.key().map(str::to_owned))
+            .collect()
+    }
+
     /// The number of multipart uploads that are neither complete nor aborted.
     ///
     /// # Panics
