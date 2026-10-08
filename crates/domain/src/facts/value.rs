@@ -214,6 +214,21 @@ impl Decimal {
     }
 }
 
+/// The decimal as text without a float, for example `-0.25`: the inverse of the parse of a proposal value.
+impl std::fmt::Display for Decimal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let sign = if self.units < 0 { "-" } else { "" };
+        let digits = self.units.unsigned_abs().to_string();
+        let scale = usize::from(self.scale);
+        if scale == 0 {
+            return write!(f, "{sign}{digits}");
+        }
+        let digits = format!("{digits:0>width$}", width = scale + 1);
+        let (whole, fraction) = digits.split_at(digits.len() - scale);
+        write!(f, "{sign}{whole}.{fraction}")
+    }
+}
+
 impl Ord for Decimal {
     fn cmp(&self, other: &Self) -> Ordering {
         self.millionths().cmp(&other.millionths())
@@ -502,6 +517,17 @@ mod tests {
     fn rejects_a_decimal_with_a_scale_above_six() {
         assert_eq!(Decimal::new(1, 7), Err(ValueError::ScaleTooLarge));
         assert!(Decimal::new(1, 6).is_ok());
+    }
+
+    #[test]
+    fn writes_a_decimal_as_text_without_a_float() {
+        let text = |units, scale| Decimal::new(units, scale).unwrap().to_string();
+        assert_eq!(text(20_000, 0), "20000");
+        assert_eq!(text(15, 1), "1.5");
+        assert_eq!(text(150, 2), "1.5");
+        assert_eq!(text(-25, 2), "-0.25");
+        assert_eq!(text(5, 3), "0.005");
+        assert_eq!(text(i64::MIN, 6), "-9223372036854.775808");
     }
 
     #[test]

@@ -80,6 +80,51 @@ impl Passage {
     }
 }
 
+/// A passage with the text around it, so that a reader sees the passage in its context.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Excerpt {
+    /// The text before the passage. It starts at most the given context before the passage.
+    pub before: String,
+    /// The text of the passage.
+    pub quote: String,
+    /// The text after the passage. It ends at most the given context after the passage.
+    pub after: String,
+}
+
+/// The excerpt can contain personal data, so `Debug` shows the lengths only (ADR 0035).
+impl std::fmt::Debug for Excerpt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let length = |text: &str| text.chars().count();
+        write!(
+            f,
+            "Excerpt({} + {} + {} characters)",
+            length(&self.before),
+            length(&self.quote),
+            length(&self.after)
+        )
+    }
+}
+
+impl Passage {
+    /// The passage in `text` with at most `context` characters before and after it.
+    /// `None` if the range of the passage is not in `text`.
+    pub fn excerpt(&self, text: &str, context: u32) -> Option<Excerpt> {
+        let offset = |chars: u32| byte_offset(text, chars);
+        let start = offset(self.start)?;
+        let end = offset(self.end)?;
+        if start > end {
+            return None;
+        }
+        let first = offset(self.start.saturating_sub(context)).unwrap_or(0);
+        let last = offset(self.end.saturating_add(context)).unwrap_or(text.len());
+        Some(Excerpt {
+            before: text[first..start].to_owned(),
+            quote: text[start..end].to_owned(),
+            after: text[end..last].to_owned(),
+        })
+    }
+}
+
 /// The byte offset of the character offset `chars` in `text`, or `None` after the end of the text.
 fn byte_offset(text: &str, chars: u32) -> Option<usize> {
     let chars = usize::try_from(chars).ok()?;
@@ -153,5 +198,18 @@ mod tests {
         let text = SourceText::normalize("Anna Muster");
         assert!(!format!("{text:?}").contains("Anna"));
         assert!(!format!("{:?}", passage(0, 4, "Anna")).contains("Anna"));
+    }
+
+    #[test]
+    fn an_excerpt_shows_the_passage_with_the_text_around_it() {
+        let excerpt = passage(13, 19, "öffnet").excerpt(TEXT, 5).unwrap();
+        assert_eq!(excerpt.before, "feld ");
+        assert_eq!(excerpt.quote, "öffnet");
+        assert_eq!(excerpt.after, " im M");
+        let whole = passage(4, 12, "Flugfeld").excerpt(TEXT, 100).unwrap();
+        assert_eq!(whole.before, "Das ");
+        assert_eq!(whole.after, " öffnet im Mai.\nDer Eintritt ist gratis.");
+        assert_eq!(passage(50, 53, "is.").excerpt(TEXT, 5), None);
+        assert!(!format!("{excerpt:?}").contains("öffnet"));
     }
 }

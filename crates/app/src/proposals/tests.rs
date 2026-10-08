@@ -239,7 +239,7 @@ fn proposal(id: Uuid, operation: Value, depends_on: &[Uuid], quote: &str) -> Val
 
 fn visitors(field: Uuid, value: Value) -> Value {
     json!({
-        "kind": "set_fact",
+        "kind": "set-fact",
         "event_id": open_day().as_uuid(),
         "field_id": field,
         "state": {"state": "assumption", "value": value, "approximate": true},
@@ -424,7 +424,7 @@ async fn a_cycle_is_rejected_and_nothing_is_stored() {
 
 fn new_field(id: Uuid, value_type: Value) -> Value {
     json!({
-        "kind": "add_field_definition",
+        "kind": "add-field-definition",
         "id": id,
         "event_id": open_day().as_uuid(),
         "key": "visitors_saturday",
@@ -563,7 +563,7 @@ async fn rejects_ids_that_are_taken_or_not_uuid_v7() {
 }
 
 fn new_event(id: Uuid) -> Value {
-    json!({"kind": "create_event", "id": id, "key": "OPEN30", "name": "Open Day Testwil"})
+    json!({"kind": "create-event", "id": id, "key": "OPEN30", "name": "Open Day Testwil"})
 }
 
 #[tokio::test]
@@ -628,7 +628,7 @@ async fn an_open_question_needs_an_owner_who_is_a_member_of_the_event() {
             vec![proposal(
                 Uuid::now_v7(),
                 json!({
-                    "kind": "create_open_question",
+                    "kind": "create-open-question",
                     "id": Uuid::now_v7(),
                     "event_id": open_day().as_uuid(),
                     "text": "Mai oder Juni?",
@@ -667,7 +667,7 @@ async fn a_choice_of_the_changeset_counts_and_a_shipped_field_does_not_change() 
             proposal(define, new_field(field, value_type.take()), &[], "Open Day"),
             proposal(
                 choice,
-                json!({"kind": "add_choice_value", "event_id": open_day().as_uuid(), "field_id": field, "key": "asphalt", "label": "Asphalt"}),
+                json!({"kind": "add-choice-value", "event_id": open_day().as_uuid(), "field_id": field, "key": "asphalt", "label": "Asphalt"}),
                 &[define],
                 "Open Day",
             ),
@@ -679,7 +679,7 @@ async fn a_choice_of_the_changeset_counts_and_a_shipped_field_does_not_change() 
             ),
             proposal(
                 Uuid::now_v7(),
-                json!({"kind": "deprecate_field", "event_id": open_day().as_uuid(), "field_id": core_field("audience")}),
+                json!({"kind": "deprecate-field", "event_id": open_day().as_uuid(), "field_id": core_field("audience")}),
                 &[],
                 "Open Day",
             ),
@@ -696,12 +696,12 @@ async fn a_choice_of_the_changeset_counts_and_a_shipped_field_does_not_change() 
 fn the_json_schema_of_a_new_changeset_names_each_operation_kind() {
     let schema = serde_json::to_string(&schemars::schema_for!(NewChangeset)).unwrap();
     for kind in [
-        "create_event",
-        "set_fact",
-        "add_field_definition",
-        "add_choice_value",
-        "deprecate_field",
-        "create_open_question",
+        "create-event",
+        "set-fact",
+        "add-field-definition",
+        "add-choice-value",
+        "deprecate-field",
+        "create-open-question",
     ] {
         assert!(schema.contains(&format!("\"{kind}\"")), "{kind}");
     }

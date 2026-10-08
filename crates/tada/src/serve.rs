@@ -54,6 +54,9 @@ pub async fn run(
             documents: Arc::new(db.clone()),
             blobs: storage,
             upload_max_bytes: uploads.max_bytes,
+            facts: Arc::new(db.clone()),
+            proposals: Arc::new(db.clone()),
+            review: Arc::new(db.clone()),
         },
         http.web_root.as_deref(),
     );

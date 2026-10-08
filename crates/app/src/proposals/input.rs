@@ -75,7 +75,7 @@ pub struct PassageInput {
 
 /// The change that a proposal suggests.
 #[derive(Clone, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum OperationInput {
     /// Create an event. Only a changeset without an event can create one.
     CreateEvent {
@@ -138,7 +138,7 @@ pub enum OperationInput {
 
 /// The state of a fact. An unknown fact has no value.
 #[derive(Clone, Deserialize, JsonSchema)]
-#[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum FactStateInput {
     Accepted {
         value: ValueInput,
@@ -156,7 +156,7 @@ pub enum FactStateInput {
 
 /// A fact value. Its type must match the value type of the field.
 #[derive(Clone, Deserialize, JsonSchema)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "type", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ValueInput {
     Text {
         text: String,
@@ -197,7 +197,7 @@ pub enum ValueInput {
 
 /// The value type of a new field. It never changes.
 #[derive(Clone, Deserialize, JsonSchema)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "type", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ValueTypeInput {
     Text,
     Boolean,
@@ -236,7 +236,7 @@ pub struct ChoiceInput {
 }
 
 #[derive(Clone, Copy, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum GranularityInput {
     Day,
     Week,
@@ -244,7 +244,7 @@ pub enum GranularityInput {
 }
 
 #[derive(Clone, Copy, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum ReferenceTargetInput {
     Document,
     Event,
@@ -693,12 +693,12 @@ mod tests {
     #[test]
     fn maps_a_fact_with_a_date_window() {
         let operation = json_operation(serde_json::json!({
-            "kind": "set_fact",
+            "kind": "set-fact",
             "event_id": Uuid::from_u128(1),
             "field_id": Uuid::from_u128(2),
             "state": {
                 "state": "assumption",
-                "value": {"type": "date_window", "start": "2030-05-01", "end": "2030-06-30", "granularity": "month"},
+                "value": {"type": "date-window", "start": "2030-05-01", "end": "2030-06-30", "granularity": "month"},
             },
         }))
         .unwrap();
@@ -725,7 +725,7 @@ mod tests {
     #[test]
     fn names_each_invalid_field_of_an_operation() {
         let errors = json_operation(serde_json::json!({
-            "kind": "set_fact",
+            "kind": "set-fact",
             "event_id": Uuid::from_u128(1),
             "field_id": Uuid::from_u128(2),
             "state": {"state": "accepted", "value": {"type": "quantity", "min": "30", "max": "2.0000001"}},
@@ -741,7 +741,7 @@ mod tests {
         );
 
         let errors = json_operation(serde_json::json!({
-            "kind": "add_field_definition",
+            "kind": "add-field-definition",
             "id": Uuid::from_u128(3),
             "event_id": Uuid::from_u128(1),
             "key": "Runway",
@@ -767,7 +767,7 @@ mod tests {
     #[test]
     fn a_new_event_gets_the_default_time_zone() {
         let operation = json_operation(serde_json::json!({
-            "kind": "create_event",
+            "kind": "create-event",
             "id": Uuid::from_u128(1),
             "key": "FLY30",
             "name": "Fly-in Musterhausen",
@@ -781,7 +781,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_input_fields() {
-        let input = serde_json::json!({"kind": "deprecate_field", "event_id": Uuid::from_u128(2), "field_id": Uuid::from_u128(1), "force": true});
+        let input = serde_json::json!({"kind": "deprecate-field", "event_id": Uuid::from_u128(2), "field_id": Uuid::from_u128(1), "force": true});
         assert!(serde_json::from_value::<OperationInput>(input).is_err());
     }
 

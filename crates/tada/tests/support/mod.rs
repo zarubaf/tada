@@ -78,6 +78,9 @@ pub fn api_state(
         documents: database.clone(),
         blobs: Arc::new(NoObjectStorage),
         upload_max_bytes: NonZeroU64::new(1024 * 1024).unwrap(),
+        facts: database.clone(),
+        proposals: database.clone(),
+        review: database.clone(),
     }
 }
 

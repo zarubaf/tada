@@ -78,6 +78,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | source version      | One immutable version of a source item, with its hash and capture time.                                                              |                          |
 | evidence link       | A link from a record to an exact location in a source version.                                                                       | citation (in code)       |
 | passage             | A range of characters in the normalized text of a source version, with its exact quote and, for a PDF, its page (ADR 0050).          |                          |
+| excerpt             | A passage with at most 100 characters of the text before and after it, so that a reviewer sees the passage in its context.           | snippet (of evidence)    |
 | provenance          | The set of evidence links and fact versions behind a record or a generated draft.                                                    |                          |
 | proposal            | A suggested change to accepted state, with its source, its author and the target record version. A proposal is never accepted state. | suggestion               |
 | review              | The act in which the owner accepts, edits or rejects a proposal. Silence is never acceptance.                                        | approval (of a proposal) |

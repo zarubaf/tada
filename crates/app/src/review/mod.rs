@@ -4,6 +4,8 @@
 //! Review results are append-only. The status of a proposal comes from its latest review result.
 //! Only a `MemberCaller` reviews: an AI client cannot accept proposals (ADR 0010, ADR 0039).
 
+mod read;
+
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
@@ -14,14 +16,18 @@ use tada_domain::ids::{
     ChangesetId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, SourceVersionId, UserId,
 };
 use tada_domain::proposals::{Operation, Proposal};
-use tada_domain::sources::Passage;
+use tada_domain::sources::{Passage, SourceText};
 
+pub use self::read::{
+    ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, get_changeset,
+};
 use crate::access::{self, AccessError};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::facts::FactStore;
 use crate::identity::IdentityStore;
+use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::{
     Changeset, FactStateInput, ProposalStore, state_from_input, value_error_code,
@@ -356,11 +362,12 @@ impl ApplyError {
     ];
 }
 
-impl From<AccessError> for ApplyError {
-    fn from(error: AccessError) -> Self {
+impl From<ReviewQueryError> for ApplyError {
+    fn from(error: ReviewQueryError) -> Self {
         match error {
-            AccessError::NotFound => Self::NotFound,
-            AccessError::Store(error) => Self::Store(error),
+            ReviewQueryError::NotFound => Self::NotFound,
+            ReviewQueryError::Forbidden => Self::Forbidden,
+            ReviewQueryError::Store(error) => Self::Store(error),
         }
     }
 }
@@ -429,7 +436,7 @@ pub async fn apply_changeset(
     clock: &dyn Clock,
 ) -> Result<Applied, ApplyError> {
     let scope = caller.scope();
-    let changeset = reviewable(caller, changeset_id, stores).await?;
+    let (changeset, _) = reviewable(caller, changeset_id, stores).await?;
     let results = stores.review.results(scope, changeset_id).await?;
 
     let given = selection(&changeset, &input.selected, "selected")?;
@@ -506,10 +513,10 @@ pub async fn reject_proposals(
     clock: &dyn Clock,
 ) -> Result<Rejected, ApplyError> {
     let scope = caller.scope();
-    let changeset = reviewable(caller, changeset_id, stores).await?;
+    let (changeset, _) = reviewable(caller, changeset_id, stores).await?;
     let results = stores.review.results(scope, changeset_id).await?;
 
-    let given = selection(&changeset, &ids, "ids")?;
+    let given = selection(&changeset, &ids, "proposal_ids")?;
     let is_open = |id: ProposalId| proposal_status(&results, id) == ProposalStatus::Open;
     if !given.iter().all(|id| is_open(*id)) {
         return Err(ApplyError::InvalidTransition);
@@ -533,10 +540,11 @@ pub async fn reject_proposals(
     }
 }
 
+/// The error of a review query, and of the access check of each review.
 #[derive(Debug, thiserror::Error)]
-pub enum ListChangesetsError {
-    /// The event is not in the caller's organization, or the caller has no event role in it.
-    #[error("the event does not exist or the caller cannot see it")]
+pub enum ReviewQueryError {
+    /// The event or the changeset is not in the caller's organization, or the caller cannot see it.
+    #[error("the event or the changeset does not exist or the caller cannot see it")]
     NotFound,
     /// Only event managers review (ADR 0052).
     #[error("the caller cannot review this event")]
@@ -545,7 +553,7 @@ pub enum ListChangesetsError {
     Store(#[from] StoreError),
 }
 
-impl ListChangesetsError {
+impl ReviewQueryError {
     /// All codes that the query can return, for the API contract (ADR 0037).
     pub const CODES: &[ProblemCode] = &[
         ProblemCode::Forbidden,
@@ -555,7 +563,7 @@ impl ListChangesetsError {
     ];
 }
 
-impl From<AccessError> for ListChangesetsError {
+impl From<AccessError> for ReviewQueryError {
     fn from(error: AccessError) -> Self {
         match error {
             AccessError::NotFound => Self::NotFound,
@@ -564,7 +572,7 @@ impl From<AccessError> for ListChangesetsError {
     }
 }
 
-impl CommandError for ListChangesetsError {
+impl CommandError for ReviewQueryError {
     fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
@@ -581,7 +589,14 @@ impl CommandError for ListChangesetsError {
     }
 }
 
-/// The changesets with open proposals that the caller can review, oldest first.
+/// The position of an open changeset in the list of open changesets, which is oldest first (ADR 0044).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChangesetCursor {
+    pub created_at: Timestamp,
+    pub id: ChangesetId,
+}
+
+/// One page of the changesets with open proposals that the caller can review, oldest first.
 ///
 /// `Some(event)` lists the changesets of one event and needs the right to review it.
 /// `None` is the Review Inbox: the changesets of each event that the caller reviews and, for owners and admins,
@@ -589,16 +604,28 @@ impl CommandError for ListChangesetsError {
 pub async fn list_open_changesets(
     caller: &MemberCaller,
     event_id: Option<EventId>,
+    after: Option<ChangesetCursor>,
+    limit: PageLimit,
     identity: &dyn IdentityStore,
     store: &dyn ReviewStore,
-) -> Result<Vec<OpenChangeset>, ListChangesetsError> {
+) -> Result<Page<OpenChangeset, ChangesetCursor>, ReviewQueryError> {
+    let visible = visible_open_changesets(caller, event_id, identity, store).await?;
+    Ok(page(visible, after, limit))
+}
+
+async fn visible_open_changesets(
+    caller: &MemberCaller,
+    event_id: Option<EventId>,
+    identity: &dyn IdentityStore,
+    store: &dyn ReviewStore,
+) -> Result<Vec<OpenChangeset>, ReviewQueryError> {
     let scope = caller.scope();
     if let Some(event) = event_id {
         if !access::event_access(caller, event, identity)
             .await?
             .can_review()
         {
-            return Err(ListChangesetsError::Forbidden);
+            return Err(ReviewQueryError::Forbidden);
         }
         return Ok(store.open_changesets(scope, Some(event)).await?);
     }
@@ -620,6 +647,36 @@ pub async fn list_open_changesets(
     Ok(visible)
 }
 
+/// The page after `after` of `changesets`, which are oldest first.
+/// The access of the caller filters the changesets, so the page comes after the filter.
+/// The open changesets of an organization are few, so the store gives them all.
+fn page(
+    changesets: Vec<OpenChangeset>,
+    after: Option<ChangesetCursor>,
+    limit: PageLimit,
+) -> Page<OpenChangeset, ChangesetCursor> {
+    let limit = limit.get() as usize;
+    let mut items: Vec<OpenChangeset> = changesets
+        .into_iter()
+        .filter(|changeset| {
+            after.is_none_or(|after| {
+                (changeset.created_at, changeset.id) > (after.created_at, after.id)
+            })
+        })
+        .take(limit + 1)
+        .collect();
+    let more = items.len() > limit;
+    items.truncate(limit);
+    let next = more
+        .then(|| items.last())
+        .flatten()
+        .map(|last| ChangesetCursor {
+            created_at: last.created_at,
+            id: last.id,
+        });
+    Page { items, next }
+}
+
 /// True if the caller reviews the event, or for `None`, the changesets of the organization.
 async fn can_review(
     caller: &MemberCaller,
@@ -636,14 +693,14 @@ async fn can_review(
     }
 }
 
-/// The changeset, if the caller can review it.
+/// The changeset with the text of its source version, if the caller can review it.
 async fn reviewable(
     caller: &MemberCaller,
     id: ChangesetId,
     stores: ReviewStores<'_>,
-) -> Result<Changeset, ApplyError> {
-    let Some((changeset, _)) = stores.proposals.get(caller.scope(), id).await? else {
-        return Err(ApplyError::NotFound);
+) -> Result<(Changeset, SourceText), ReviewQueryError> {
+    let Some((changeset, source)) = stores.proposals.get(caller.scope(), id).await? else {
+        return Err(ReviewQueryError::NotFound);
     };
     match changeset.event_id {
         Some(event) => {
@@ -651,14 +708,14 @@ async fn reviewable(
                 .await?
                 .can_review()
             {
-                return Err(ApplyError::Forbidden);
+                return Err(ReviewQueryError::Forbidden);
             }
         }
         // Only owners and admins see the changesets of the organization.
-        None if !access::sees_all_events(caller) => return Err(ApplyError::NotFound),
+        None if !access::sees_all_events(caller) => return Err(ReviewQueryError::NotFound),
         None => {}
     }
-    Ok(changeset)
+    Ok((changeset, source))
 }
 
 fn invalid(field: &'static str, code: &'static str) -> ApplyError {
@@ -1115,6 +1172,41 @@ mod tests {
         assert!(!debug.contains("Anna"), "{debug}");
     }
 
+    fn open(n: u128, time: &str) -> OpenChangeset {
+        OpenChangeset {
+            id: ChangesetId::from_uuid(Uuid::from_u128(n)),
+            event_id: None,
+            author: Actor::restore(
+                crate::caller::ActorKind::Member,
+                Uuid::from_u128(9),
+                None,
+                crate::caller::Channel::Web,
+                None,
+            ),
+            created_at: at(time),
+            open_proposals: 1,
+        }
+    }
+
+    #[test]
+    fn a_page_of_open_changesets_continues_after_its_cursor() {
+        let all = || {
+            vec![
+                open(1, "2030-05-01T00:00:00Z"),
+                open(2, "2030-05-01T00:00:00Z"),
+                open(3, "2030-05-02T00:00:00Z"),
+            ]
+        };
+        let two = PageLimit::new(2).unwrap();
+        let first = page(all(), None, two);
+        assert_eq!(first.items, all()[..2]);
+        let cursor = first.next.unwrap();
+        assert_eq!(cursor.id, ChangesetId::from_uuid(Uuid::from_u128(2)));
+        let second = page(all(), Some(cursor), two);
+        assert_eq!(second.items, all()[2..]);
+        assert_eq!(second.next, None);
+    }
+
     #[test]
     fn each_proposal_applies_after_its_dependencies() {
         // The changeset is in the order of the IDs, so a dependency can come later.
@@ -1140,15 +1232,12 @@ mod tests {
             assert!(ApplyError::CODES.contains(&error.code()), "{error:?}");
         }
         for error in [
-            ListChangesetsError::NotFound,
-            ListChangesetsError::Forbidden,
-            ListChangesetsError::Store(StoreError::Internal("test".into())),
-            ListChangesetsError::Store(StoreError::Unavailable("test".into())),
+            ReviewQueryError::NotFound,
+            ReviewQueryError::Forbidden,
+            ReviewQueryError::Store(StoreError::Internal("test".into())),
+            ReviewQueryError::Store(StoreError::Unavailable("test".into())),
         ] {
-            assert!(
-                ListChangesetsError::CODES.contains(&error.code()),
-                "{error:?}"
-            );
+            assert!(ReviewQueryError::CODES.contains(&error.code()), "{error:?}");
         }
     }
 }
