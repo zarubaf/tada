@@ -82,7 +82,7 @@ The page must name the next focus target in the same event that removes the elem
 - tada checks the fields on submit. A check when the member leaves a field is not built yet.
 - A form uses `noValidate`, so that each message comes from Fluent and not from the browser.
 - On submit with errors:
-  1. Each field shows its error below the input, in `--color-danger`, with the `alert-circle` icon.
+  1. Each field shows its error below the input, in `--color-danger`. The `alert-circle` icon next to the error is not built yet.
   2. Focus moves to the first field with `aria-invalid` (see the table in [Focus](#focus)).
   3. The screen reader reads the label and the error of that field.
 - An error message names the problem and the fix: „Das Datum liegt vor dem Beginn des Anlasses. Wählen Sie ein Datum ab 12.06.2027.“
