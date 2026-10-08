@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { Router, usePathname } from "../router/Router";
+import { Route, Router, Routes, usePathname } from "../router/Router";
 import { fakeApi, findAlert, json, problem } from "../sign-in/testing";
 import { ChooseOrganizationPage } from "./ChooseOrganizationPage";
 import { SessionProvider } from "./SessionProvider";
@@ -32,7 +32,11 @@ function renderPage(...responses: Response[]) {
   render(
     <Router>
       <SessionProvider api={api}>
-        <ChooseOrganizationPage api={api} />
+        <Routes>
+          <Route path="/choose-organization">
+            <ChooseOrganizationPage api={api} />
+          </Route>
+        </Routes>
         <Where />
       </SessionProvider>
     </Router>,
@@ -64,6 +68,14 @@ describe("ChooseOrganizationPage", () => {
       path: "/api/v1/session/organization",
       body: JSON.stringify({ organization_id: second.organization_id }),
     });
+  });
+
+  it("signs out, because the page has no shell", async () => {
+    const calls = renderPage(new Response(null, { status: 204 }));
+    await userEvent.click(await screen.findByRole("button", { name: "Abmelden" }));
+
+    expect(await screen.findByText("/sign-in")).toBeInTheDocument();
+    expect(calls[1]).toMatchObject({ method: "POST", path: "/api/v1/sign-out" });
   });
 
   it("shows the message of the problem and stays on the page", async () => {
