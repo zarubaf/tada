@@ -8,6 +8,7 @@ import { FileButton } from "../ui/FileButton";
 import { FileLink } from "../ui/FileLink";
 import { InlineError } from "../ui/InlineError";
 import { KnowledgeState } from "../ui/KnowledgeState";
+import { Markdown } from "../ui/Markdown";
 import { Skeleton } from "../ui/Skeleton";
 import { Switch } from "../ui/Switch";
 import styles from "./Gallery.module.css";
@@ -52,6 +53,19 @@ const rows: Row[] = [
     created: "01.03.2028, 14:12",
   },
 ];
+const markdownSample = `## Datenschutz der Fliegergruppe Testwil
+
+Die Fliegergruppe Testwil verarbeitet **Daten** für den Anlass „Tag der offenen Tür“.
+
+- Verantwortlich ist der Vorstand.
+- Fragen an [vorstand@example.org](mailto:vorstand@example.org).
+
+| Kategorie | Zweck |
+| --- | --- |
+| Anzeigename | Zeigt die Mitglieder |
+| Veranstaltungsbewilligungsverfahren | Plant den Anlass |
+
+Ein Bild erscheint als Text: ![Lageplan des Flugplatzes](https://example.org/plan.png)`;
 const columns: Column<Row>[] = [
   { id: "key", header: "Kürzel", cell: (row) => row.key, mono: true },
   { id: "name", header: "Name", cell: (row) => row.name },
@@ -160,6 +174,11 @@ export function Gallery() {
           requestId="01a1118e-3359-73dd-a500-feed65806a9d"
           onRetry={() => {}}
         />
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Markdown</h2>
+        <Markdown>{markdownSample}</Markdown>
       </section>
 
       <section className={styles.section}>
