@@ -180,7 +180,7 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - The text of an uploaded plain text, Markdown or CSV file is the text of its source version: members can search and cite it ([ADR 0050](adr/0050-proposals-and-review.md)).
   A proposal can cite a passage of such a file as its evidence.
   PDF and office files have no extracted text yet. An agent cites its own source text for facts from such files.
-- tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. A larger text file has no searchable text.
+- tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. tada stores a larger text file without its text: members cannot search or cite it, and the file stays downloadable.
   The PostgreSQL search index of one text is limited to 1 MB, and the index of a text with many unique words can be larger than the text.
   If the index of a text under the cap is too large, tada stores the version without searchable text.
 - The source text of a changeset has at most 100,000 characters after the normalization, else the request fails with `validation-failed`.
