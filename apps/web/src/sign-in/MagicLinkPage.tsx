@@ -29,6 +29,8 @@ export function MagicLinkPage({ api }: { api: Api }) {
     if (!token || busy || waiting) {
       return;
     }
+    // Clear the message first, so that an identical one is announced again.
+    setFailure(undefined);
     setBusy(true);
     try {
       const result = await api.POST("/api/v1/sign-in/magic-link", { body: { token } });

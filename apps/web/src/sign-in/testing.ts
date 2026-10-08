@@ -59,6 +59,33 @@ export function queryAlert(): HTMLElement | null {
   return shownAlerts()[0] ?? null;
 }
 
+/**
+ * Records what the alert regions show over time. A screen reader announces a region when its text
+ * changes, so an identical message needs an empty step before it. `stop` returns how many times
+ * a message appeared after an empty region.
+ */
+export function watchAlerts() {
+  const texts: string[] = [];
+  const read = () => {
+    const text = screen
+      .queryAllByRole("alert")
+      .map((alert) => alert.textContent?.trim() ?? "")
+      .join("");
+    if (text !== texts[texts.length - 1]) {
+      texts.push(text);
+    }
+  };
+  read();
+  const observer = new MutationObserver(read);
+  observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+  return {
+    stop(): number {
+      observer.disconnect();
+      return texts.filter((text, i) => text !== "" && (texts[i - 1] ?? "") === "").length;
+    },
+  };
+}
+
 /** Waits for the one alert that shows a text. */
 export function findAlert(): Promise<HTMLElement> {
   return waitFor(() => {

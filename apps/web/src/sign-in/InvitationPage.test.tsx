@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Router, usePathname } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 import { InvitationPage } from "./InvitationPage";
-import { fakeApi, findAlert, json, problem, queryAlert } from "./testing";
+import { fakeApi, findAlert, json, problem, queryAlert, watchAlerts } from "./testing";
 
 const membership = {
   organization_id: "0199b8e0-0000-7000-8000-0000000000a1",
@@ -108,6 +108,23 @@ describe("InvitationPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
 
     await waitFor(() => expect(queryAlert()).toHaveFocus());
+  });
+
+  it("announces a second identical failure of the accept while the button stays", async () => {
+    renderAt(
+      "#token=invite-token",
+      json(200, { organization_name: "Fliegergruppe Testwil", role: "member" }),
+      problem(503, "unavailable"),
+      problem(503, "unavailable"),
+    );
+    const button = await screen.findByRole("button", { name: "Einladung annehmen" });
+    const alerts = watchAlerts();
+    await userEvent.click(button);
+    await findAlert();
+    await userEvent.click(button);
+    await findAlert();
+    expect(alerts.stop()).toBe(2);
+    expect(button).toHaveFocus();
   });
 
   it("moves focus to the message when the accept fails for good", async () => {

@@ -31,6 +31,8 @@ export function ChooseOrganizationPage({ api }: { api: Api }) {
     if (busy || waiting) {
       return;
     }
+    // Clear the message first, so that an identical one is announced again.
+    setFailure(undefined);
     setBusy(true);
     setSignOutFailure(undefined);
     try {

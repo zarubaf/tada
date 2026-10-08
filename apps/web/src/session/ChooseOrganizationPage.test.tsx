@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { Route, Router, Routes, usePathname } from "../router/Router";
-import { fakeApi, findAlert, json, problem } from "../sign-in/testing";
+import { fakeApi, findAlert, json, problem, watchAlerts } from "../sign-in/testing";
 import { ChooseOrganizationPage } from "./ChooseOrganizationPage";
 import { SessionProvider } from "./SessionProvider";
 
@@ -76,6 +76,18 @@ describe("ChooseOrganizationPage", () => {
 
     expect(await screen.findByText("/sign-in")).toBeInTheDocument();
     expect(calls[1]).toMatchObject({ method: "POST", path: "/api/v1/sign-out" });
+  });
+
+  it("announces a second identical failure while the button stays", async () => {
+    renderPage(problem(503, "unavailable"), problem(503, "unavailable"));
+    const choice = await screen.findByRole("button", { name: /Fliegergruppe Testwil/ });
+    const alerts = watchAlerts();
+    await userEvent.click(choice);
+    await findAlert();
+    await userEvent.click(choice);
+    await findAlert();
+    expect(alerts.stop()).toBe(2);
+    expect(choice).toHaveFocus();
   });
 
   it("shows the message of the problem and stays on the page", async () => {

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Router, usePathname } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 import { MagicLinkPage } from "./MagicLinkPage";
-import { fakeApi, findAlert, json, problem, queryAlert } from "./testing";
+import { fakeApi, findAlert, json, problem, queryAlert, watchAlerts } from "./testing";
 
 const session = {
   user_id: "0199b8e0-0000-7000-8000-0000000000b1",
@@ -92,6 +92,18 @@ describe("MagicLinkPage", () => {
     expect(button).toHaveFocus();
     expect(button).toHaveAttribute("aria-disabled", "true");
     await waitFor(() => expect(button).not.toHaveAttribute("aria-disabled"));
+    expect(button).toHaveFocus();
+  });
+
+  it("announces a second identical failure while the button stays", async () => {
+    renderAt("#token=good", problem(503, "unavailable"), problem(503, "unavailable"));
+    const button = await screen.findByRole("button", { name: "Anmelden" });
+    const alerts = watchAlerts();
+    await userEvent.click(button);
+    await findAlert();
+    await userEvent.click(button);
+    await findAlert();
+    expect(alerts.stop()).toBe(2);
     expect(button).toHaveFocus();
   });
 
