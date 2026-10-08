@@ -8,17 +8,19 @@ A new component needs an entry here in the same pull request.
 
 ### Actions
 
-| Component   | Variants                          | Rules                                                                                           |
-| ----------- | --------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Button      | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap. |
-| IconButton  | quiet                             | Only in toolbars and rows. Always an accessible name and a tooltip.                             |
-| Link        | inline, standalone                | Inline links are underlined. A link never does what a button does.                              |
-| LinkButton  | primary                           | A link in the style of a button. Only for an action that opens a page, for example a form.      |
-| Menu        |                                   | For more than three secondary actions. The trigger is `dots-vertical`.                          |
-| CommandMenu |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                    |
+| Component    | Variants                          | Rules                                                                                                                |
+| ------------ | --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Button       | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap.                      |
+| IconButton   | quiet                             | Only in toolbars and rows. Always an accessible name and a tooltip.                                                  |
+| Link         | inline, standalone                | Inline links are underlined. A link never does what a button does.                                                   |
+| LinkButton   | primary                           | A link in the style of a button. Only for an action that opens a page, for example a form.                           |
+| Menu         |                                   | For more than three secondary actions, or the member menu. The trigger is `dots-vertical` or a text.                 |
+| ChoiceButton |                                   | A full-width button for one option of a choice, with a title and a detail line. For example the organization choice. |
+| CommandMenu  |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                                         |
 
 Button sizes follow `--control-height-*` of the density. The primary button uses `--color-accent` and `--color-text-on-accent`.
 The danger button is secondary in style with `--color-danger` text until a confirmation step.
+Row actions that remove or revoke something use the danger button.
 
 ### Input
 
@@ -35,36 +37,51 @@ The danger button is secondary in style with `--color-danger` text until a confi
 
 ### Display
 
-| Component      | Rules                                                                                                                                                 |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| KnowledgeState | Shows the state of knowledge of a value (see [tokens.md](tokens.md)). Used in each place where a fact appears.                                        |
-| StatusLabel    | Icon and text for a workflow status: „offen“, „in Arbeit“, „blockiert“ and „erledigt“.                                                                |
-| Badge          | A count, for example waiting proposals. Never decorative.                                                                                             |
-| Avatar         | Initials on `--color-bg-sunken`; a photo only if the member uploads one.                                                                              |
-| RecordId       | `ACT-042` in `--font-family-mono`, with a copy action.                                                                                                |
-| RelativeTime   | „vor 2 Stunden“ with the exact time in a tooltip.                                                                                                     |
-| Kbd            | A keyboard key in hints and the shortcut list.                                                                                                        |
-| Skeleton       | Gray blocks in the shape of the content. No shimmer animation with reduced motion.                                                                    |
-| DataTable      | A read-only table with a sticky header, `--row-height` rows, and monospace or tabular columns where needed.                                           |
-| LiveRegion     | A polite `status` or an assertive `alert` that is in the page before its text. Each screen has one of each; see [accessibility.md](accessibility.md). |
+| Component      | Rules                                                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| KnowledgeState | Shows the state of knowledge of a value (see [tokens.md](tokens.md)). Used in each place where a fact appears.                                                                                           |
+| StatusLabel    | Icon and text for a workflow status: „offen“, „in Arbeit“, „blockiert“ and „erledigt“.                                                                                                                   |
+| Badge          | A count, for example waiting proposals. Never decorative.                                                                                                                                                |
+| Avatar         | Initials on `--color-bg-sunken`; a photo only if the member uploads one.                                                                                                                                 |
+| RecordId       | `ACT-042` in `--font-family-mono`, with a copy action.                                                                                                                                                   |
+| RelativeTime   | „vor 2 Stunden“ with the exact time in a tooltip.                                                                                                                                                        |
+| Kbd            | A keyboard key in hints and the shortcut list.                                                                                                                                                           |
+| Skeleton       | Gray blocks in the shape of the content. No shimmer animation with reduced motion.                                                                                                                       |
+| DataTable      | A read-only table with a caption, a header that sticks to the page, `--row-height` rows, and monospace or tabular columns where needed. Below 28rem of container width, each row is a two-line list row. |
+| LiveRegion     | A polite `status` or an assertive `alert` that is in the page before its text. Each screen has one of each; see [accessibility.md](accessibility.md).                                                    |
 
-Focus moves are not a component. The hook `useFocusAfterCommit` in `apps/web/src/ui/focus.ts` is the only way to move focus after an action.
+Focus moves are not a component. The hooks `useFocusAfterCommit` and `useRetry` in `apps/web/src/ui/focus.ts` are the only way to move focus after an action.
 See [accessibility.md](accessibility.md#focus).
+
+### Navigation
+
+| Component | Rules                                                                                                                             |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| NavLink   | A navigation item. The current page has `aria-current="page"` and the current style. `large` gives the bottom bar a thumb target. |
+| SubNav    | The sub-navigation of a template, for example of the settings or of an event. It contains NavLink items.                          |
+| SkipLink  | „Zum Inhalt springen“, the first focusable element of each page. It moves to `main`.                                              |
+
+### Page
+
+| Component | Rules                                                                                                               |
+| --------- | ------------------------------------------------------------------------------------------------------------------- |
+| Page      | The `main` element of each template, with the page gutters. `width="form"` is the narrow column of the public page. |
+| PageTitle | The `h1` of a page, in `--font-size-2xl`. Focus moves to it after a route change.                                   |
 
 ### Containers
 
-| Component   | Rules                                                                                                                                        |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Panel       | A bordered area in the page flow. No shadow.                                                                                                 |
-| Sheet       | Opens from the right (medium, wide) or from the bottom (narrow). For details, filters and the evidence panel.                                |
-| Dialog      | Only for a destructive confirmation or a blocking task. Title, one sentence, two buttons. `ConfirmDialog` is the confirmation.               |
-| Popover     | For small forms and pickers that belong to one control.                                                                                      |
-| Tooltip     | Text only, no interactive content. Opens on hover and on focus.                                                                              |
-| Tabs        | For two to six views of one record. Not for navigation between pages.                                                                        |
-| Banner      | A message for a whole page or the app, for example „Synchronisation seit 3 Stunden unterbrochen“. Cannot be hidden while the problem exists. |
-| Toast       | Confirms the last action of the member, with an „Rückgängig“ action if possible. Never for errors that need an action.                       |
-| EmptyState  | A title, one sentence and one action, if the member can act there. No illustration.                                                          |
-| InlineError | A failed request in the area that failed: the message, the request ID and „Erneut versuchen“.                                                |
+| Component   | Rules                                                                                                                                           |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Panel       | A bordered area in the page flow. No shadow.                                                                                                    |
+| Sheet       | Opens from the right (medium, wide) or from the bottom (narrow). For details, filters and the evidence panel.                                   |
+| Dialog      | Only for a destructive confirmation or a blocking task. Title, one sentence, two buttons. `ConfirmDialog` is the confirmation.                  |
+| Popover     | For small forms and pickers that belong to one control.                                                                                         |
+| Tooltip     | Text only, no interactive content. Opens on hover and on focus.                                                                                 |
+| Tabs        | For two to six views of one record. Not for navigation between pages.                                                                           |
+| Banner      | A message for a whole page or the app, for example „Synchronisation seit 3 Stunden unterbrochen“. Cannot be hidden while the problem exists.    |
+| Toast       | Confirms the last action of the member, with an „Rückgängig“ action if possible. Never for errors that need an action.                          |
+| EmptyState  | A title, one sentence and one action, if the member can act there. No illustration.                                                             |
+| InlineError | A failed request in the area that failed: the message, the request ID and „Erneut versuchen“. `announce` sets how a screen reader learns of it. |
 
 ## Patterns for the main screens
 
@@ -122,7 +139,7 @@ See [accessibility.md](accessibility.md#focus).
 - One column, at most 40rem wide.
 - Group related fields under a heading. No more than seven fields in a group.
 - The actions are at the bottom: the primary action on the right on wide layouts, full width on narrow layouts.
-- Leaving a form with unsaved changes asks for a confirmation.
+- Leaving a form with unsaved changes asks for a confirmation. The web client does not do this yet.
 
 ### Empty, loading and error states
 
