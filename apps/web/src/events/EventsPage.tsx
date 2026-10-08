@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
 import { LOCALE, t } from "../i18n";
 import { useOptionalSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
+import { useFocusAfterCommit } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LinkButton } from "../ui/LinkButton";
 import { Skeleton } from "../ui/Skeleton";
@@ -37,6 +38,8 @@ export function EventsPage({ api }: { api: Api }) {
   // The server decides; the button only hides an action that would fail.
   const role = useOptionalSession()?.organization?.role;
   const canCreate = role === "owner" || role === "admin";
+  const heading = useRef<HTMLHeadingElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const load = useCallback(
     async (cursor: string | undefined, previous: Event[]) => {
@@ -44,12 +47,17 @@ export function EventsPage({ api }: { api: Api }) {
       try {
         const { data, error } = await api.GET("/api/v1/events", { params: { query } });
         if (data) {
+          const nextCursor = data.next_cursor ?? undefined;
           setState({
             kind: "loaded",
             events: [...previous, ...data.items],
-            nextCursor: data.next_cursor ?? undefined,
+            nextCursor,
             loadingMore: false,
           });
+          if (cursor !== undefined && nextCursor === undefined) {
+            // The last page arrived and the button leaves: focus goes to the heading.
+            focusAfterCommit(() => heading.current);
+          }
         } else {
           setState({
             kind: "failed",
@@ -61,7 +69,7 @@ export function EventsPage({ api }: { api: Api }) {
         setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
       }
     },
-    [api],
+    [api, focusAfterCommit],
   );
 
   useEffect(() => {
@@ -76,7 +84,9 @@ export function EventsPage({ api }: { api: Api }) {
   return (
     <main id="main" className={styles.page}>
       <div className={styles.toolbar}>
-        <h1 className={styles.title}>{t("events-title")}</h1>
+        <h1 ref={heading} tabIndex={-1} className={styles.title}>
+          {t("events-title")}
+        </h1>
         {canCreate && (
           <LinkButton to="/events/new" primary>
             {t("events-create")}
@@ -106,7 +116,7 @@ export function EventsPage({ api }: { api: Api }) {
           />
           {state.nextCursor !== undefined && (
             <Button
-              isDisabled={state.loadingMore}
+              isPending={state.loadingMore}
               onPress={() => {
                 setState({ ...state, loadingMore: true });
                 void load(state.nextCursor, state.events);

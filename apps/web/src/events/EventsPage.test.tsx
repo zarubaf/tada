@@ -107,6 +107,32 @@ describe("EventsPage", () => {
     expect(urls[1]).toContain("cursor=QUEgMDE");
     expect(screen.queryByRole("button", { name: "Weitere Anlässe laden" })).not.toBeInTheDocument();
   });
+
+  it("keeps focus on the button while more pages remain", async () => {
+    const { api } = fakeApi(
+      json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "c1" }),
+      json(200, { items: [event("BB", "Zweiter Anlass")], next_cursor: "c2" }),
+    );
+    render(<EventsPage api={api} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
+
+    expect(await screen.findByText("BB")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Weitere Anlässe laden" })).toHaveFocus();
+  });
+
+  it("moves focus to the heading when the last page arrives", async () => {
+    const { api } = fakeApi(
+      json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "c1" }),
+      json(200, { items: [event("BB", "Zweiter Anlass")] }),
+    );
+    render(<EventsPage api={api} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
+
+    expect(await screen.findByText("BB")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Anlässe" })).toHaveFocus();
+  });
 });
 
 describe("EventsPage toolbar", () => {

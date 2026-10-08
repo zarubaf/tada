@@ -8,8 +8,8 @@ export type FocusTarget = () => HTMLElement | null | undefined;
  *
  * Call the returned function in the same event as the state change that removes the focused
  * element, for example together with the state that closes a dialog. The target is looked up when
- * React has committed that change, so no timer is needed. A dialog from React Aria restores focus
- * to its trigger only if focus is on the body, so a focus move in the same commit wins.
+ * React has committed that change, so no timer is needed. React Aria 1.x restores a dialog's focus
+ * only if focus is on the body (current behavior, pinned by focus.test.tsx), so a move in the same commit wins.
  */
 export function useFocusAfterCommit(): (target: FocusTarget) => void {
   // A new object for each request, so that a second request to the same target runs again.
