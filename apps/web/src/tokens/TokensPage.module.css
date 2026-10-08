@@ -1,0 +1,93 @@
+@layer components {
+  .page {
+    display: grid;
+    align-content: start;
+    gap: var(--space-6);
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 40rem;
+  }
+
+  /* A table needs more than the 40rem of a form. */
+  .wide {
+    max-width: none;
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .subheading {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .notice {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-sunken);
+  }
+
+  .off {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .form {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .secret {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-sunken);
+  }
+
+  .secretLabel {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .secretValue {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+
+  .once {
+    color: var(--color-danger);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .code {
+    margin: 0;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-sunken);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-sm);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}

@@ -1,0 +1,23 @@
+@layer components {
+  .page {
+    display: grid;
+    align-content: start;
+    gap: var(--space-6);
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 40rem;
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .help {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+}

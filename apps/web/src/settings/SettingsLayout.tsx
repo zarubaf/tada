@@ -13,6 +13,8 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
       <SubNav label={t("settings-nav")}>
         <NavLink to="/settings/members">{t("settings-nav-members")}</NavLink>
         <NavLink to="/settings/telegram">{t("settings-nav-telegram")}</NavLink>
+        <NavLink to="/settings/tokens">{t("settings-nav-tokens")}</NavLink>
+        <NavLink to="/settings/organization">{t("settings-nav-organization")}</NavLink>
       </SubNav>
       {children}
     </Page>
