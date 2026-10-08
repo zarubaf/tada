@@ -199,6 +199,12 @@ mod tests {
             ("member", "web", r#"{"note": "free text"}"#),
             ("member", "web", r#"{"old_role": "chief"}"#),
             ("member", "web", "{}"),
+            ("member", "web", r#"{"old_role": null}"#),
+            (
+                "member",
+                "web",
+                r#"{"old_role": "member", "new_role": null}"#,
+            ),
             ("robot", "web", "null"),
             ("member", "fax", "null"),
         ] {

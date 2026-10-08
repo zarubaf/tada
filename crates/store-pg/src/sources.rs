@@ -413,22 +413,24 @@ mod tests {
             Uuid::now_v7(),
             Uuid::now_v7(),
         );
-        let pool = &test.database.pool;
+        // The current version of a fact must exist at the commit, so both rows go in one transaction.
+        let mut tx = test.database.pool.begin().await.unwrap();
         sqlx::query("INSERT INTO fact (id, organization_id, event_id, field_id, version) VALUES ($1, $2, $3, $4, 1)")
             .bind(fact).bind(organization).bind(event.as_uuid()).bind(field)
-            .execute(pool).await.unwrap();
+            .execute(&mut *tx).await.unwrap();
         sqlx::query(
             "INSERT INTO fact_version (id, organization_id, fact_id, number, state, approximate, created_at, accepted_by)
              VALUES ($1, $2, $3, 1, 'unknown', false, now(), $4)",
         )
         .bind(version).bind(organization).bind(fact).bind(crate::actor::to_json(&caller.actor()))
-        .execute(pool).await.unwrap();
+        .execute(&mut *tx).await.unwrap();
         sqlx::query(
             "INSERT INTO evidence_link (id, organization_id, fact_version_id, source_version_id, start_offset, end_offset, quote)
              VALUES ($1, $2, $3, $4, 0, 3, 'Das')",
         )
         .bind(Uuid::now_v7()).bind(organization).bind(version).bind(source.as_uuid())
-        .execute(pool).await.unwrap();
+        .execute(&mut *tx).await.unwrap();
+        tx.commit().await.unwrap();
     }
 
     /// Cites `source` as evidence of an open proposal in `event`.

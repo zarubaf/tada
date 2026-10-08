@@ -1336,3 +1336,76 @@ async fn a_fact_applies_with_the_evidence_of_another_source_version_of_its_event
     .unwrap();
     assert_eq!(links, [(earlier.as_uuid(), "20000 Besuchern".to_owned())]);
 }
+
+/// Source items, source versions, fact versions and evidence links never change, and each fact has its current
+/// version (ADR 0050).
+#[tokio::test]
+async fn sources_and_fact_versions_never_change() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let id = Uuid::now_v7();
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            id,
+            date_window(open_day.event, 5, None),
+            &[],
+            "im Mai 2030",
+        )],
+    )
+    .await;
+    apply(&test, &open_day.manager, &changeset, select(&[id]))
+        .await
+        .unwrap();
+    for statement in [
+        "UPDATE source_item SET kind = kind",
+        "DELETE FROM source_item",
+        "TRUNCATE source_item CASCADE",
+        "UPDATE source_version SET captured_at = now()",
+        "DELETE FROM source_version",
+        "TRUNCATE source_version CASCADE",
+        "UPDATE fact_version SET approximate = approximate",
+        "DELETE FROM fact_version",
+        "TRUNCATE fact_version CASCADE",
+        "UPDATE evidence_link SET quote = 'changed'",
+        "DELETE FROM evidence_link",
+        "TRUNCATE evidence_link",
+    ] {
+        let error = sqlx::query(sqlx::AssertSqlSafe(statement))
+            .execute(&test.database.pool)
+            .await
+            .unwrap_err();
+        assert_eq!(crate::testing::sqlstate(&error), "23001", "{statement}");
+    }
+    for table in [
+        "source_item",
+        "source_version",
+        "fact_version",
+        "evidence_link",
+    ] {
+        assert_eq!(count(&test, table).await, 1, "{table}");
+    }
+
+    // A fact without its current version fails at the commit.
+    let error = sqlx::query("UPDATE fact SET version = 2 WHERE organization_id = $1")
+        .bind(open_day.organization.as_uuid())
+        .execute(&test.database.pool)
+        .await
+        .unwrap_err();
+    assert_eq!(crate::testing::sqlstate(&error), "23503");
+    // A fact version names a proposal of its organization.
+    let other = test.create_organization("musterhausen").await;
+    let error = sqlx::query(
+        "INSERT INTO fact_version
+             (id, organization_id, fact_id, number, state, approximate, created_at, accepted_by, proposal_id)
+         SELECT $1, organization_id, fact_id, 2, 'unknown', false, now(), accepted_by, $2 FROM fact_version",
+    )
+    .bind(Uuid::now_v7())
+    .bind(other.as_uuid())
+    .execute(&test.database.pool)
+    .await
+    .unwrap_err();
+    assert_eq!(crate::testing::sqlstate(&error), "23503");
+}

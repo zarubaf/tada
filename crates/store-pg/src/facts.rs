@@ -457,7 +457,7 @@ mod tests {
         field
     }
 
-    /// Inserts a fact without versions.
+    /// Inserts a fact with an unknown first version, in one transaction: the current version of a fact must exist.
     async fn insert_fact(
         test: &TestDatabase,
         organization: OrganizationId,
@@ -465,6 +465,7 @@ mod tests {
         field: FieldDefinitionId,
     ) -> Result<FactId, sqlx::Error> {
         let fact = Uuid::now_v7();
+        let mut tx = test.database.pool.begin().await?;
         sqlx::query(
             "INSERT INTO fact (id, organization_id, event_id, field_id, version)
              VALUES ($1, $2, $3, $4, 1)",
@@ -473,8 +474,20 @@ mod tests {
         .bind(organization.as_uuid())
         .bind(event.as_uuid())
         .bind(field.as_uuid())
-        .execute(&test.database.pool)
+        .execute(&mut *tx)
         .await?;
+        sqlx::query(
+            "INSERT INTO fact_version
+                 (id, organization_id, fact_id, number, state, approximate, created_at, accepted_by)
+             VALUES ($1, $2, $3, 1, 'unknown', false, now(), $4)",
+        )
+        .bind(Uuid::now_v7())
+        .bind(organization.as_uuid())
+        .bind(fact)
+        .bind(actor::to_json(&author()))
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
         Ok(FactId::from_uuid(fact))
     }
 
@@ -680,7 +693,7 @@ mod tests {
         let error = sqlx::query(
             "INSERT INTO fact_version
                  (id, organization_id, fact_id, number, state, value, approximate, created_at, accepted_by)
-             VALUES ($1, $2, $3, 1, 'unknown', '{}', false, now(), '{}')",
+             VALUES ($1, $2, $3, 2, 'unknown', '{}', false, now(), '{}')",
         )
         .bind(Uuid::now_v7())
         .bind(testwil.as_uuid())
@@ -725,7 +738,6 @@ mod tests {
             .unwrap();
         let text = "Wir planen Mai oder Juni 2030.";
         let source = evidence(&test, scope, event, text, "Mai oder Juni 2030").await;
-        insert_version(&test, testwil, fact, 1, &FactState::Unknown, None).await;
         let window =
             DateWindow::new(date(2030, 5, 1), date(2030, 6, 30), Granularity::Month).unwrap();
         let assumption = FactState::Assumption(Valued {
@@ -736,7 +748,6 @@ mod tests {
         let hangar_fact = insert_fact(&test, testwil, event, hangars.id)
             .await
             .unwrap();
-        insert_version(&test, testwil, hangar_fact, 1, &FactState::Unknown, None).await;
 
         let profile = db.profile(scope, event).await.unwrap();
         let expected = [
@@ -792,7 +803,7 @@ mod tests {
                 .unwrap();
             let source = evidence(&test, scope_of(organization), event, name, name).await;
             let state = FactState::Accepted(venue(name));
-            insert_version(&test, organization, fact, 1, &state, Some(&source)).await;
+            insert_version(&test, organization, fact, 2, &state, Some(&source)).await;
         }
         add_event_field(&test, musterhausen, fly_in, "hangar_count").await;
 
