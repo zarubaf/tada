@@ -43,7 +43,8 @@ def git(*args: str) -> list[str]:
 
 
 def changed_files() -> set[str]:
-    files = set(git("diff", "--name-only", "HEAD"))
+    # `--no-renames` lists the old path too, so a move out of a web path still counts.
+    files = set(git("diff", "--name-only", "--no-renames", "HEAD"))
     files.update(git("ls-files", "--others", "--exclude-standard"))
     return files
 
