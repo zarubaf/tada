@@ -73,6 +73,7 @@ sign-in-title = Anmelden
 sign-in-text = Wir senden Ihnen einen Link per E-Mail. Mit dem Link melden Sie sich an.
 sign-in-email = E-Mail-Adresse (Pflichtfeld)
 sign-in-submit = Anmeldelink senden
+sign-in-error-email = Das ist keine gültige E-Mail-Adresse. Geben Sie eine Adresse wie name@example.org ein.
 sign-in-sent = Wenn die Adresse bekannt ist, erhalten Sie in Kürze eine E-Mail.
 problem-rate-limited = Zu viele Anfragen. Versuchen Sie es in einigen Minuten erneut.
 # $seconds: the wait that the server asks for (Retry-After).

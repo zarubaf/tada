@@ -1,8 +1,9 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import type { Api } from "../api/client";
 import { type Failure, failureOf, useWaiting } from "../api/failure";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
+import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { TextField } from "../ui/TextField";
@@ -18,9 +19,20 @@ export function SignInPage({ api }: { api: Api }) {
   const [sent, setSent] = useState(false);
   const [failure, setFailure] = useState<Failure>();
   const waiting = useWaiting(failure);
+  // The page checks the address itself, so that the message comes from Fluent, not the browser.
+  const [invalid, setInvalid] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    const wrong = !/^[^\s@]+@[^\s@]+$/.test(email.trim());
+    setInvalid(wrong);
+    if (wrong) {
+      // After a failed submit, focus goes to the first invalid field.
+      focusAfterCommit(() => firstInvalidField(form.current));
+      return;
+    }
     if (busy || waiting) {
       return;
     }
@@ -28,7 +40,7 @@ export function SignInPage({ api }: { api: Api }) {
     setSent(false);
     setFailure(undefined);
     try {
-      const result = await api.POST("/api/v1/sign-in/requests", { body: { email } });
+      const result = await api.POST("/api/v1/sign-in/requests", { body: { email: email.trim() } });
       if (result.error) {
         setFailure(failureOf(result));
       } else {
@@ -43,7 +55,7 @@ export function SignInPage({ api }: { api: Api }) {
   return (
     <PublicPage title={t("sign-in-title")}>
       <PublicText>{t("sign-in-text")}</PublicText>
-      <form className={formClass} onSubmit={(event) => void submit(event)}>
+      <form ref={form} className={formClass} onSubmit={(event) => void submit(event)} noValidate>
         <TextField
           label={t("sign-in-email")}
           type="email"
@@ -53,6 +65,7 @@ export function SignInPage({ api }: { api: Api }) {
           isRequired
           value={email}
           onChange={setEmail}
+          error={invalid ? t("sign-in-error-email") : undefined}
         />
         {/* isPending keeps the button focusable, also during a wait; isDisabled would drop focus. */}
         <Button type="submit" variant="primary" isPending={busy || waiting}>

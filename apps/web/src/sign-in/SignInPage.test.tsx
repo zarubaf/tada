@@ -74,6 +74,15 @@ describe("SignInPage", () => {
     );
   });
 
+  it("checks the address itself and moves focus to the field", async () => {
+    const calls = await submit("anna.muster");
+
+    expect(await screen.findByText(/keine gültige E-Mail-Adresse/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/E-Mail-Adresse/)).toHaveFocus();
+    expect(screen.getByLabelText(/E-Mail-Adresse/)).toBeInvalid();
+    expect(calls).toEqual([]);
+  });
+
   it("keeps the address after an error", async () => {
     await submit("anna.muster@example.org", problem(503, "unavailable"));
     expect(await findAlert()).toBeInTheDocument();
