@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO field_definition (id, organization_id, event_id, key, label_text, value_type,\n                                               description, module, status, created_at)\n                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9eb7c47810d6663331656e2fa7daa3b777f7c88e469560c908b019ac6b1643ea"
+}

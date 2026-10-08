@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO fact (id, organization_id, event_id, field_id, version) VALUES ($1, $2, $3, $4, 1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "14db5d78c3ada7d512d766d0aff1f84c5b400434924557653ccdb7531eb154bd"
+}

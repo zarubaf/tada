@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use jiff_sqlx::ToSqlx;
+use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
@@ -42,6 +43,42 @@ impl TryFrom<EventRow> for Event {
     }
 }
 
+/// Inserts a new event with `manager` as its first event manager, inside the transaction of the caller.
+/// An event has at least one event manager: the member who creates it (ADR 0052).
+/// The caller maps the constraints `event_pkey` and `event_key_unique`.
+pub(crate) async fn insert_event(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    event: &Event,
+    manager: UserId,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        event.id.as_uuid(),
+        scope.organization_id().as_uuid(),
+        event.key.as_str(),
+        event.name.as_str(),
+        event.time_zone.as_str(),
+        event.version.get(),
+        event.created_at.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!(
+        "INSERT INTO event_membership
+             (organization_id, event_id, user_id, event_role, version, created_at)
+         VALUES ($1, $2, $3, 'event-manager', 1, $4)",
+        scope.organization_id().as_uuid(),
+        event.id.as_uuid(),
+        manager.as_uuid(),
+        event.created_at.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 #[async_trait]
 impl EventStore for Database {
     async fn insert(
@@ -53,20 +90,7 @@ impl EventStore for Database {
     ) -> Result<Inserted, StoreError> {
         debug_assert_eq!(scope.organization_id(), event.organization_id);
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let result = sqlx::query!(
-            "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)",
-            event.id.as_uuid(),
-            scope.organization_id().as_uuid(),
-            event.key.as_str(),
-            event.name.as_str(),
-            event.time_zone.as_str(),
-            event.version.get(),
-            event.created_at.to_sqlx() as _,
-        )
-        .execute(&mut *tx)
-        .await;
-        match result {
+        match insert_event(&mut tx, scope, event, manager).await {
             Ok(_) => {}
             Err(sqlx::Error::Database(error)) if error.constraint() == Some("event_pkey") => {
                 return Ok(Inserted::IdTaken);
@@ -76,19 +100,6 @@ impl EventStore for Database {
             }
             Err(error) => return Err(store_error(error)),
         }
-        // An event has at least one event manager: its creator (ADR 0052).
-        sqlx::query!(
-            "INSERT INTO event_membership
-                 (organization_id, event_id, user_id, event_role, version, created_at)
-             VALUES ($1, $2, $3, 'event-manager', 1, $4)",
-            scope.organization_id().as_uuid(),
-            event.id.as_uuid(),
-            manager.as_uuid(),
-            event.created_at.to_sqlx() as _,
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(store_error)?;
         for entry in audit {
             audit::record(&mut tx, entry).await.map_err(store_error)?;
         }

@@ -21,6 +21,10 @@ pub enum AuditAction {
     EventMembershipChangeRole,
     EventMembershipRemove,
     ChangesetCreate,
+    ProposalAccept,
+    ProposalReject,
+    /// An apply found that the target of the proposal changed after the proposal (ADR 0050).
+    ProposalConflict,
     ApiTokenCreate,
     ApiTokenRevoke,
     /// An owner switched a feature of the organization on (ADR 0036).
@@ -44,6 +48,9 @@ impl AuditAction {
             Self::EventMembershipChangeRole => "event_membership.change_role",
             Self::EventMembershipRemove => "event_membership.remove",
             Self::ChangesetCreate => "changeset.create",
+            Self::ProposalAccept => "proposal.accept",
+            Self::ProposalReject => "proposal.reject",
+            Self::ProposalConflict => "proposal.conflict",
             Self::ApiTokenCreate => "api_token.create",
             Self::ApiTokenRevoke => "api_token.revoke",
             Self::OrganizationFeatureEnable => "organization_feature.enable",
@@ -69,6 +76,7 @@ impl AuditAction {
             | Self::EventMembershipChangeRole
             | Self::EventMembershipRemove => "event_membership",
             Self::ChangesetCreate => "changeset",
+            Self::ProposalAccept | Self::ProposalReject | Self::ProposalConflict => "proposal",
             Self::ApiTokenCreate | Self::ApiTokenRevoke => "api_token",
             // A feature has no ID of its own: the record ID is its organization.
             // Slice 1 has one feature, `mcp-tokens`; a second feature needs its name in the event.
