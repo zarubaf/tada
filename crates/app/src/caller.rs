@@ -3,8 +3,10 @@
 use std::marker::PhantomData;
 
 pub use tada_domain::identity::OrganizationRole;
-use tada_domain::ids::{OrganizationId, UserId};
+use tada_domain::ids::{ApiTokenId, OrganizationId, UserId};
 use uuid::Uuid;
+
+use crate::tokens::TokenScope;
 
 /// The way a request reached tada (ADR 0039).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -207,15 +209,110 @@ impl crate::access::Principal for MemberCaller {
     }
 }
 
+/// An AI client that acts for a member through a personal API token (ADR 0039).
+/// Only an `Authenticator` creates it.
+///
+/// It never gives its member back: code that has an `AiCaller` cannot call a command that takes
+/// a `MemberCaller`, for example the review of proposals. It has the rights of its member,
+/// limited by the scope of its token.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AiCaller {
+    principal: MemberCaller,
+    token_id: ApiTokenId,
+    scope: TokenScope,
+}
+
+impl AiCaller {
+    /// For tests of other crates only. Production code gets a caller from an authenticator.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new(principal: MemberCaller, token_id: ApiTokenId, scope: TokenScope) -> Self {
+        let MemberCaller {
+            user_id,
+            organization_id,
+            role,
+            ..
+        } = principal;
+        Self::create(user_id, organization_id, role, token_id, scope)
+    }
+
+    /// For the token authenticator of this crate (ADR 0062).
+    /// It builds the member here, so the token module never holds a `MemberCaller`
+    /// that it could give to a command (`scripts/check_no_dev_auth.py`).
+    pub(crate) fn create(
+        user_id: UserId,
+        organization_id: OrganizationId,
+        role: OrganizationRole,
+        token_id: ApiTokenId,
+        scope: TokenScope,
+    ) -> Self {
+        Self {
+            principal: MemberCaller {
+                user_id,
+                organization_id,
+                role,
+                channel: Channel::ApiToken,
+                request_id: None,
+            },
+            token_id,
+            scope,
+        }
+    }
+
+    /// Names the request of this caller, for the actor of audit records.
+    /// The channel is always `api-token`.
+    #[must_use]
+    pub fn with_request(self, request_id: Option<Uuid>) -> Self {
+        Self {
+            principal: self.principal.with_request(Channel::ApiToken, request_id),
+            ..self
+        }
+    }
+
+    /// The AI client, for the member that it acts for, through the channel `api-token`.
+    pub fn actor(&self) -> Actor {
+        Actor {
+            kind: ActorKind::Ai,
+            id: self.token_id.as_uuid(),
+            principal: Some(self.principal.user_id.as_uuid()),
+            channel: Channel::ApiToken,
+            request_id: self.principal.request_id,
+        }
+    }
+
+    /// The token that the client showed.
+    pub fn token_id(&self) -> ApiTokenId {
+        self.token_id
+    }
+
+    /// The scope of the token that the client showed.
+    pub fn token_scope(&self) -> TokenScope {
+        self.scope
+    }
+}
+
+impl crate::access::Principal for AiCaller {
+    fn user_id(&self) -> UserId {
+        self.principal.user_id
+    }
+
+    fn scope(&self) -> OrgScope {
+        self.principal.scope()
+    }
+
+    fn organization_role(&self) -> OrganizationRole {
+        self.principal.role
+    }
+}
+
 /// The organization boundary of a repository call (ADR 0006). Only a caller can give one,
 /// so a repository method that takes it cannot run without a scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OrgScope(OrganizationId);
 
 impl OrgScope {
-    /// The scope of the membership check of a session (ADR 0056).
-    /// The check runs before a `MemberCaller` exists, because it decides if one exists.
-    pub(crate) fn for_session(organization_id: OrganizationId) -> Self {
+    /// The scope of the membership check of a credential: a session or an API token (ADR 0056).
+    /// The check runs before a caller exists, because it decides if one exists.
+    pub(crate) fn for_credential(organization_id: OrganizationId) -> Self {
         Self(organization_id)
     }
 
@@ -339,6 +436,34 @@ mod tests {
         assert_eq!(actor.principal(), None);
         assert_eq!(actor.channel(), Channel::Telegram);
         assert_eq!(actor.request_id(), Some(request));
+    }
+
+    fn ai(scope: TokenScope) -> AiCaller {
+        AiCaller::new(member(), ApiTokenId::from_uuid(Uuid::from_u128(4)), scope)
+    }
+
+    #[test]
+    fn an_ai_actor_names_the_token_the_member_and_the_api_token_channel() {
+        let request = Uuid::from_u128(3);
+        let actor = ai(TokenScope::Read).with_request(Some(request)).actor();
+        assert_eq!(actor.kind(), ActorKind::Ai);
+        assert_eq!(actor.id(), Uuid::from_u128(4));
+        assert_eq!(actor.principal(), Some(Uuid::from_u128(1)));
+        assert_eq!(actor.channel(), Channel::ApiToken);
+        assert_eq!(actor.request_id(), Some(request));
+        assert_eq!(ai(TokenScope::Read).actor().request_id(), None);
+    }
+
+    #[test]
+    fn an_ai_caller_has_the_rights_of_its_member_and_the_scope_of_its_token() {
+        use crate::access::Principal;
+
+        let ai = ai(TokenScope::Propose);
+        assert_eq!(Principal::user_id(&ai), member().user_id());
+        assert_eq!(Principal::scope(&ai), member().scope());
+        assert_eq!(ai.organization_role(), OrganizationRole::Member);
+        assert_eq!(ai.token_id(), ApiTokenId::from_uuid(Uuid::from_u128(4)));
+        assert_eq!(ai.token_scope(), TokenScope::Propose);
     }
 
     #[test]

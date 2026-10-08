@@ -105,6 +105,27 @@ impl IdentityStore for Database {
             .map(|name| EventRole::parse(name).ok_or(InvalidRow("event_role")))
             .transpose()?)
     }
+
+    async fn event_roles_of(
+        &self,
+        scope: OrgScope,
+        user: UserId,
+    ) -> Result<Vec<EventRole>, StoreError> {
+        let roles = sqlx::query_scalar!(
+            "SELECT event_role FROM event_membership
+             WHERE organization_id = $1 AND user_id = $2
+             ORDER BY event_id",
+            scope.organization_id().as_uuid(),
+            user.as_uuid(),
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(roles
+            .iter()
+            .map(|name| EventRole::parse(name).ok_or(InvalidRow("event_role")))
+            .collect::<Result<_, _>>()?)
+    }
 }
 
 #[cfg(test)]

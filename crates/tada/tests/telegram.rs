@@ -16,7 +16,7 @@ use axum::routing::post;
 use axum::{Json, Router};
 use serde_json::{Value, json};
 use tada_adapters::clock::SystemClock;
-use tada_app::auth::{Authenticator, Credential};
+use tada_app::auth::{Authenticated, Authenticator, Credential};
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::caller::{ServiceCaller, TelegramGateway};
 use tada_app::session::SessionAuthenticator;
@@ -139,10 +139,15 @@ async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
 /// The member of a session cookie, as the session authenticator finds it.
 async fn authenticate(test: &TestDatabase, cookie: &str) -> MemberCaller {
     let database = Arc::new(test.database.clone());
-    SessionAuthenticator::new(database.clone(), database, Arc::new(SystemClock))
-        .authenticate(Some(Credential::Session(cookie)))
-        .await
-        .unwrap()
+    let authenticated =
+        SessionAuthenticator::new(database.clone(), database, Arc::new(SystemClock))
+            .authenticate(Some(Credential::Session(cookie)))
+            .await
+            .unwrap();
+    let Authenticated::Member(member) = authenticated else {
+        panic!("a session gives a member");
+    };
+    member
 }
 
 async fn call(

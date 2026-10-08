@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use async_trait::async_trait;
 
-use crate::caller::MemberCaller;
+use crate::caller::{AiCaller, MemberCaller};
 use crate::problem::{CommandError, ProblemCode};
 use crate::store::StoreError;
 
@@ -27,15 +27,24 @@ impl Debug for Credential<'_> {
     }
 }
 
+/// The caller of a valid credential (ADR 0039).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Authenticated {
+    /// A member with a session.
+    Member(MemberCaller),
+    /// An AI client of a member with a personal API token: an AI can be behind any token.
+    Ai(AiCaller),
+}
+
 #[async_trait]
 pub trait Authenticator: Debug + Send + Sync {
-    /// Returns the member of `credential`. It returns `Unauthenticated` if the credential is missing
+    /// Returns the caller of `credential`. It returns `Unauthenticated` if the credential is missing
     /// or invalid, and `OrganizationRequired` if the session has no organization or the membership
     /// in it no longer exists.
     async fn authenticate(
         &self,
         credential: Option<Credential<'_>>,
-    ) -> Result<MemberCaller, AuthenticationError>;
+    ) -> Result<Authenticated, AuthenticationError>;
 }
 
 #[derive(Debug, thiserror::Error)]

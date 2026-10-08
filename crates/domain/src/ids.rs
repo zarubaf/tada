@@ -82,6 +82,10 @@ id_type!(
     /// The ID of an open question.
     OpenQuestionId
 );
+id_type!(
+    /// The ID of a personal API token (ADR 0039).
+    ApiTokenId
+);
 
 /// Returns true if `uuid` can be the ID of a new record: a UUIDv7 (ADR 0038).
 pub fn is_record_id(uuid: Uuid) -> bool {

@@ -115,7 +115,7 @@ description = "Write the screenshot baselines again, after an intended design ch
 run = "uv run --quiet scripts/check_browser.py --update-snapshots"
 
 [tasks."check:no-dev-auth"]
-description = "Fail if the Rust sources contain a way around the session authenticator"
+description = "Fail if the Rust sources contain a way around the session and token authenticators"
 run = "uv run --quiet scripts/check_no_dev_auth.py"
 
 [tasks."check:scoped-ports"]

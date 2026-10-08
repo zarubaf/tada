@@ -28,23 +28,42 @@ pub use self::input::{
 use self::input::{text_error_code, value_error_code};
 use crate::access::{self, AccessError, Principal};
 use crate::audit::{AuditAction, AuditEvent};
-use crate::caller::{Actor, MemberCaller, OrgScope};
+use crate::caller::{Actor, AiCaller, MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::facts::FactStore;
 use crate::identity::IdentityStore;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
+use crate::tokens::TokenScope;
 
 /// A caller that can create proposals (ADR 0039): a member, or an AI client of a member.
 /// A service identity cannot propose. The Telegram gateway proposes through a `MemberCaller` with the channel Telegram.
 pub trait MayPropose: Principal {
     /// The author of the changeset and of its audit event.
     fn actor(&self) -> Actor;
+
+    /// True if the credential of the caller allows proposals at all. The event role decides the rest.
+    fn credential_allows_proposals(&self) -> bool;
 }
 
 impl MayPropose for MemberCaller {
     fn actor(&self) -> Actor {
         MemberCaller::actor(self)
+    }
+
+    fn credential_allows_proposals(&self) -> bool {
+        true
+    }
+}
+
+/// An AI client proposes only with a `propose` token (ADR 0039), and only where its member can propose (ADR 0052).
+impl MayPropose for AiCaller {
+    fn actor(&self) -> Actor {
+        AiCaller::actor(self)
+    }
+
+    fn credential_allows_proposals(&self) -> bool {
+        self.token_scope() == TokenScope::Propose
     }
 }
 
@@ -280,6 +299,9 @@ async fn authorize(
     event_id: Option<EventId>,
     identity: &dyn IdentityStore,
 ) -> Result<(), ProposeError> {
+    if !caller.credential_allows_proposals() {
+        return Err(ProposeError::Forbidden);
+    }
     let allowed = match event_id {
         Some(event) => access::event_access(caller, event, identity)
             .await?

@@ -242,6 +242,14 @@ mod tests {
         ) -> Result<Option<EventRole>, StoreError> {
             Ok(None)
         }
+
+        async fn event_roles_of(
+            &self,
+            _: OrgScope,
+            _: UserId,
+        ) -> Result<Vec<EventRole>, StoreError> {
+            unreachable!()
+        }
     }
 
     fn caller(role: OrganizationRole) -> MemberCaller {

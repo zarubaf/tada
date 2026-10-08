@@ -161,8 +161,10 @@ mod tests {
 
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
-    use tada_app::auth::{AuthenticationError, Credential};
-    use tada_app::caller::MemberCaller;
+    use tada_app::auth::{Authenticated, AuthenticationError, Credential};
+    use tada_app::caller::{AiCaller, MemberCaller, OrganizationRole};
+    use tada_app::domain::ids::{ApiTokenId, OrganizationId, UserId};
+    use tada_app::tokens::TokenScope;
     use tower::ServiceExt;
 
     use super::*;
@@ -175,8 +177,32 @@ mod tests {
         async fn authenticate(
             &self,
             _credential: Option<Credential<'_>>,
-        ) -> Result<MemberCaller, AuthenticationError> {
+        ) -> Result<Authenticated, AuthenticationError> {
             Err(AuthenticationError::Unauthenticated)
+        }
+    }
+
+    /// An authenticator that finds an AI client of an owner for each request.
+    #[derive(Debug)]
+    struct AiClient;
+
+    #[async_trait::async_trait]
+    impl Authenticator for AiClient {
+        async fn authenticate(
+            &self,
+            _credential: Option<Credential<'_>>,
+        ) -> Result<Authenticated, AuthenticationError> {
+            let owner = MemberCaller::new(
+                UserId::from_uuid(uuid::Uuid::now_v7()),
+                OrganizationId::from_uuid(uuid::Uuid::now_v7()),
+                OrganizationRole::Owner,
+            );
+            let token = ApiTokenId::from_uuid(uuid::Uuid::now_v7());
+            Ok(Authenticated::Ai(AiCaller::new(
+                owner,
+                token,
+                TokenScope::Propose,
+            )))
         }
     }
 
@@ -323,6 +349,15 @@ mod tests {
             _: tada_app::domain::ids::EventId,
             _: tada_app::domain::ids::UserId,
         ) -> Result<Option<tada_app::domain::identity::EventRole>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn event_roles_of(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<Vec<tada_app::domain::identity::EventRole>, tada_app::store::StoreError>
         {
             unreachable!()
         }
@@ -575,6 +610,20 @@ mod tests {
         assert!(body.contains("\"code\":\"not-found\""));
         let (status, _) = get(&router, "/api/v1/events").await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn the_rest_api_rejects_an_ai_client() {
+        let router = router(
+            ApiState {
+                authenticator: Arc::new(AiClient),
+                ..state()
+            },
+            None,
+        );
+        let (status, body) = get(&router, "/api/v1/events").await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert!(body.contains("\"code\":\"unauthenticated\""));
     }
 
     #[tokio::test]

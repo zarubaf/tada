@@ -27,6 +27,7 @@ pub mod sign_in;
 pub mod sources;
 pub mod store;
 pub mod telegram;
+pub mod tokens;
 pub mod uploads;
 
 pub use tada_domain as domain;

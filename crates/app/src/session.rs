@@ -11,7 +11,7 @@ use jiff::{SignedDuration, Timestamp};
 use tada_domain::identity::DisplayName;
 use tada_domain::ids::{OrganizationId, UserId};
 
-use crate::auth::{AuthenticationError, Authenticator, Credential};
+use crate::auth::{Authenticated, AuthenticationError, Authenticator, Credential};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::{IdentityStore, Membership};
@@ -208,7 +208,7 @@ pub async fn choose_organization(
         .await?
         .ok_or(ChooseOrganizationError::Unauthenticated)?;
     identity
-        .membership(OrgScope::for_session(organization_id), session.user_id)
+        .membership(OrgScope::for_credential(organization_id), session.user_id)
         .await?
         .ok_or(ChooseOrganizationError::NotFound)?;
     sessions
@@ -256,7 +256,7 @@ impl Authenticator for SessionAuthenticator {
     async fn authenticate(
         &self,
         credential: Option<Credential<'_>>,
-    ) -> Result<MemberCaller, AuthenticationError> {
+    ) -> Result<Authenticated, AuthenticationError> {
         // API tokens have their own authenticator.
         let Some(Credential::Session(token)) = credential else {
             return Err(AuthenticationError::Unauthenticated);
@@ -270,13 +270,17 @@ impl Authenticator for SessionAuthenticator {
         // The membership can change between two requests, so each request reads it.
         let Some(role) = self
             .identity
-            .membership(OrgScope::for_session(organization_id), session.user_id)
+            .membership(OrgScope::for_credential(organization_id), session.user_id)
             .await?
         else {
             self.sessions.set_organization(token, None).await?;
             return Err(AuthenticationError::OrganizationRequired);
         };
-        Ok(MemberCaller::create(session.user_id, organization_id, role))
+        Ok(Authenticated::Member(MemberCaller::create(
+            session.user_id,
+            organization_id,
+            role,
+        )))
     }
 }
 
@@ -453,6 +457,14 @@ mod tests {
         ) -> Result<Option<EventRole>, StoreError> {
             unreachable!()
         }
+
+        async fn event_roles_of(
+            &self,
+            _: OrgScope,
+            _: UserId,
+        ) -> Result<Vec<EventRole>, StoreError> {
+            unreachable!()
+        }
     }
 
     fn anna() -> UserId {
@@ -501,9 +513,14 @@ mod tests {
         }
 
         async fn authenticate(&self, token: &str) -> Result<MemberCaller, AuthenticationError> {
-            self.authenticator
+            match self
+                .authenticator
                 .authenticate(Some(Credential::Session(token)))
-                .await
+                .await?
+            {
+                Authenticated::Member(caller) => Ok(caller),
+                Authenticated::Ai(_) => panic!("a session gives a member"),
+            }
         }
 
         async fn choose(

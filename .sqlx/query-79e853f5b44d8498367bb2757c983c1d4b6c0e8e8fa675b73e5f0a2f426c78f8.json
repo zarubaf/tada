@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT revoked_at IS NULL AS \"active!\" FROM api_token\n             WHERE organization_id = $1 AND user_id = $2 AND id = $3\n             FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "active!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "79e853f5b44d8498367bb2757c983c1d4b6c0e8e8fa675b73e5f0a2f426c78f8"
+}

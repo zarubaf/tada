@@ -21,6 +21,12 @@ pub enum AuditAction {
     EventMembershipChangeRole,
     EventMembershipRemove,
     ChangesetCreate,
+    ApiTokenCreate,
+    ApiTokenRevoke,
+    /// An owner switched a feature of the organization on (ADR 0036).
+    OrganizationFeatureEnable,
+    /// An owner switched a feature of the organization off (ADR 0036).
+    OrganizationFeatureDisable,
 }
 
 impl AuditAction {
@@ -38,6 +44,10 @@ impl AuditAction {
             Self::EventMembershipChangeRole => "event_membership.change_role",
             Self::EventMembershipRemove => "event_membership.remove",
             Self::ChangesetCreate => "changeset.create",
+            Self::ApiTokenCreate => "api_token.create",
+            Self::ApiTokenRevoke => "api_token.revoke",
+            Self::OrganizationFeatureEnable => "organization_feature.enable",
+            Self::OrganizationFeatureDisable => "organization_feature.disable",
         }
     }
 
@@ -59,6 +69,12 @@ impl AuditAction {
             | Self::EventMembershipChangeRole
             | Self::EventMembershipRemove => "event_membership",
             Self::ChangesetCreate => "changeset",
+            Self::ApiTokenCreate | Self::ApiTokenRevoke => "api_token",
+            // A feature has no ID of its own: the record ID is its organization.
+            // Slice 1 has one feature, `mcp-tokens`; a second feature needs its name in the event.
+            Self::OrganizationFeatureEnable | Self::OrganizationFeatureDisable => {
+                "organization_feature"
+            }
         }
     }
 }

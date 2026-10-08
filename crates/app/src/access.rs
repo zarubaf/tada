@@ -146,6 +146,23 @@ pub async fn event_access(
     .ok_or(AccessError::NotFound)
 }
 
+/// True if `caller` can propose in at least one event of its organization (ADR 0052):
+/// an owner or admin, or a member with the role event contributor or event manager in an event.
+/// For example, only such a member can create a `propose` token.
+pub async fn proposes_in_some_event(
+    caller: &impl Principal,
+    identity: &dyn IdentityStore,
+) -> Result<bool, StoreError> {
+    if sees_all_events(caller) {
+        return Ok(true);
+    }
+    Ok(identity
+        .event_roles_of(caller.scope(), caller.user_id())
+        .await?
+        .into_iter()
+        .any(|role| EventAccess::from(role).can_propose()))
+}
+
 /// The access of the member `user`, who is not the caller, in the event `event`, or `None` if the user has none.
 /// It also serves an event that a changeset creates and that does not exist yet: there, only owners and admins have access.
 /// For example, the owner of a work record must be a member of its event (ADR 0052).
@@ -218,6 +235,20 @@ mod tests {
                 return Ok(None);
             }
             Ok(self.roles.lock().unwrap().get(&(event, user)).copied())
+        }
+
+        async fn event_roles_of(
+            &self,
+            scope: OrgScope,
+            user: UserId,
+        ) -> Result<Vec<EventRole>, StoreError> {
+            let roles = self.roles.lock().unwrap();
+            Ok(self
+                .events
+                .iter()
+                .filter(|(organization, _)| *organization == scope.organization_id())
+                .filter_map(|(_, event)| roles.get(&(*event, user)).copied())
+                .collect())
         }
     }
 
@@ -355,6 +386,40 @@ mod tests {
         let elsewhere = caller(musterhausen(), OrganizationRole::Member).scope();
         let other = member_access(elsewhere, open_day(), bruno, &identity).await;
         assert_eq!(other.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn contributors_managers_owners_and_admins_propose_in_some_event() {
+        let identity = identity();
+        let member = caller(testwil(), OrganizationRole::Member);
+        let proposes = |caller: MemberCaller| {
+            let identity = &identity;
+            async move { proposes_in_some_event(&caller, identity).await.unwrap() }
+        };
+        assert!(!proposes(member.clone()).await, "no event role");
+        for (role, expected) in [
+            (EventRole::EventViewer, false),
+            (EventRole::EventContributor, true),
+            (EventRole::EventManager, true),
+        ] {
+            identity
+                .roles
+                .lock()
+                .unwrap()
+                .insert((open_day(), anna()), role);
+            assert_eq!(proposes(member.clone()).await, expected, "{role:?}");
+        }
+        identity.roles.lock().unwrap().clear();
+        for role in [OrganizationRole::Owner, OrganizationRole::Admin] {
+            assert!(proposes(caller(testwil(), role)).await, "{role:?}");
+        }
+        identity
+            .roles
+            .lock()
+            .unwrap()
+            .insert((open_day(), anna()), EventRole::EventManager);
+        let elsewhere = caller(musterhausen(), OrganizationRole::Member);
+        assert!(!proposes(elsewhere).await, "a role in another organization");
     }
 
     #[test]
