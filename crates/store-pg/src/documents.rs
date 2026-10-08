@@ -604,12 +604,14 @@ impl DocumentStore for Database {
         .await
         .map_err(store_error)?;
         // The offsets count characters of the normalized text, and `substr` counts characters too.
+        // A draft cites only source versions with text (ADR 0051), so a cited version without text is a broken
+        // row: the read fails instead of a manifest that differs from the stored one.
         let sources = sqlx::query!(
             r#"SELECT m.source_version_id, m.start_offset, m.end_offset,
-                      substr(s.text, m.start_offset + 1, m.end_offset - m.start_offset) AS "quote!"
+                      substr(s.text, m.start_offset + 1, m.end_offset - m.start_offset) AS quote
                FROM document_manifest_source m
                JOIN source_version s ON s.organization_id = m.organization_id AND s.id = m.source_version_id
-               WHERE m.organization_id = $1 AND m.document_version_id = $2 AND s.text IS NOT NULL
+               WHERE m.organization_id = $1 AND m.document_version_id = $2
                ORDER BY m.source_version_id, m.start_offset, m.end_offset"#,
             organization,
             id.as_uuid(),
@@ -639,7 +641,7 @@ impl DocumentStore for Database {
                         passage: Passage {
                             start: offset(row.start_offset)?,
                             end: offset(row.end_offset)?,
-                            quote: row.quote,
+                            quote: row.quote.ok_or(InvalidRow("source_version.text"))?,
                             page: None,
                         },
                     })

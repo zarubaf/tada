@@ -603,3 +603,51 @@ async fn a_source_outside_the_citable_reach_of_the_event_renders_hidden() {
     assert_eq!(rendering.draft.links, *links);
     assert_eq!(rendering.draft.markdown.as_str(), markdown);
 }
+
+/// A draft cites only source versions with text, so a cited source version without text is a broken store:
+/// the read fails, and never shows a manifest that differs from the stored one.
+#[tokio::test]
+async fn a_cited_source_without_text_fails_the_read_of_the_draft() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let (_, facts) = accepted_fact(&test, &open_day).await;
+    let source = facts.source_version_id.as_uuid();
+    let document = Uuid::now_v7();
+    let version = add_draft(
+        &test,
+        &open_day,
+        new_document(document),
+        document,
+        &format!("Es ist [ein Open Day](tada:source/{source}#4-12).\n"),
+    )
+    .await;
+    let without_text = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO source_version
+             (id, organization_id, source_item_id, kind, channel, author_actor, text, sha256, captured_at)
+         SELECT $1, organization_id, source_item_id, 'upload', channel, author_actor, NULL, sha256, captured_at
+         FROM source_version WHERE id = $2",
+    )
+    .bind(without_text)
+    .bind(source)
+    .execute(&test.database.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO document_manifest_source
+             (organization_id, document_version_id, source_version_id, start_offset, end_offset)
+         VALUES ($1, $2, $3, 0, 4)",
+    )
+    .bind(open_day.organization.as_uuid())
+    .bind(version.as_uuid())
+    .bind(without_text)
+    .execute(&test.database.pool)
+    .await
+    .unwrap();
+
+    let result = DocumentStore::draft(&test.database, open_day.owner.scope(), version).await;
+    assert!(
+        matches!(result, Err(tada_app::store::StoreError::Internal(_))),
+        "{result:?}"
+    );
+}

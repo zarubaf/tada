@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT m.source_version_id, m.start_offset, m.end_offset,\n                      substr(s.text, m.start_offset + 1, m.end_offset - m.start_offset) AS \"quote!\"\n               FROM document_manifest_source m\n               JOIN source_version s ON s.organization_id = m.organization_id AND s.id = m.source_version_id\n               WHERE m.organization_id = $1 AND m.document_version_id = $2 AND s.text IS NOT NULL\n               ORDER BY m.source_version_id, m.start_offset, m.end_offset",
+  "query": "SELECT m.source_version_id, m.start_offset, m.end_offset,\n                      substr(s.text, m.start_offset + 1, m.end_offset - m.start_offset) AS quote\n               FROM document_manifest_source m\n               JOIN source_version s ON s.organization_id = m.organization_id AND s.id = m.source_version_id\n               WHERE m.organization_id = $1 AND m.document_version_id = $2\n               ORDER BY m.source_version_id, m.start_offset, m.end_offset",
   "describe": {
     "columns": [
       {
@@ -38,7 +38,7 @@
       },
       {
         "ordinal": 3,
-        "name": "quote!",
+        "name": "quote",
         "type_info": "Text",
         "origin": "Expression"
       }
@@ -56,5 +56,5 @@
       null
     ]
   },
-  "hash": "cc462cf811ab00f7b3dd3c5323b4431d6f61187ea14496ef035b64155ddeadb9"
+  "hash": "34ca2181ab1b697bd04bff07bafb8b031ca04d7c37a5e51ab556678228ccc408"
 }
