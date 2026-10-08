@@ -2,6 +2,7 @@ import { IconAlertTriangle } from "@tabler/icons-react";
 import { type ReactNode, type Ref, useId } from "react";
 import type { ApplyEdit, Proposal } from "../api/client";
 import { Excerpt } from "../evidence/Excerpt";
+import { isEditable } from "../facts/valueDraft";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
@@ -48,7 +49,7 @@ export function editableField(
     return undefined;
   }
   const field = fields.get(operation.field_id);
-  return field && field.valueType.type !== "reference" ? field : undefined;
+  return field && isEditable(field.valueType) ? field : undefined;
 }
 
 function Hint({ show, children }: { show: boolean; children: string }) {
@@ -187,6 +188,7 @@ export function ProposalCard(props: ProposalCardProps) {
             variant={props.primaryAccept ? "primary" : "secondary"}
             isPending={isPending}
             isDisabled={conflicting}
+            aria-label={t("inbox-accept")}
             aria-describedby={conflicting ? conflictId : undefined}
             onPress={props.onAccept}
           >
@@ -196,6 +198,7 @@ export function ProposalCard(props: ProposalCardProps) {
           {isFact && (
             <Button
               ref={props.editButtonRef}
+              aria-label={t("inbox-edit")}
               isDisabled={conflicting || !field}
               aria-describedby={conflicting ? conflictId : field ? undefined : unavailableId}
               onPress={props.onEdit}
@@ -204,7 +207,12 @@ export function ProposalCard(props: ProposalCardProps) {
               <Hint show={active}>E</Hint>
             </Button>
           )}
-          <Button variant="danger" isPending={isPending} onPress={props.onReject}>
+          <Button
+            variant="danger"
+            isPending={isPending}
+            aria-label={t("inbox-reject")}
+            onPress={props.onReject}
+          >
             {t("inbox-reject")}
             <Hint show={active}>R</Hint>
           </Button>

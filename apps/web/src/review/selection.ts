@@ -22,15 +22,15 @@ export function select(
   const open = openById(proposals);
   const result = new Set(selected);
   const added: string[] = [];
-  const pending = open.has(id) ? [id] : [];
+  // Each proposal enters the queue once, so a shared dependency counts once.
+  const queued = new Set(open.has(id) ? [id] : []);
+  const pending = [...queued];
   while (pending.length > 0) {
     const current = pending.pop() as string;
-    if (result.has(current) && current !== id) {
-      continue;
-    }
     result.add(current);
     for (const dependency of open.get(current)?.depends_on ?? []) {
-      if (open.has(dependency) && !result.has(dependency)) {
+      if (open.has(dependency) && !result.has(dependency) && !queued.has(dependency)) {
+        queued.add(dependency);
         added.push(dependency);
         pending.push(dependency);
       }

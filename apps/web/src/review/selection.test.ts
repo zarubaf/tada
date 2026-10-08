@@ -29,6 +29,18 @@ describe("select", () => {
     expect(result.added.sort()).toEqual(["fact", "field"]);
   });
 
+  it("reports a shared dependency once", () => {
+    // top needs left and base, left needs base.
+    const diamond = [
+      proposal("base"),
+      proposal("left", ["base"]),
+      proposal("top", ["base", "left"]),
+    ];
+    const result = select(diamond, new Set(), "top");
+    expect([...result.selected].sort()).toEqual(["base", "left", "top"]);
+    expect(result.added.sort()).toEqual(["base", "left"]);
+  });
+
   it("does not report a dependency that was selected before", () => {
     const result = select(proposals, new Set(["field"]), "fact");
     expect([...result.selected].sort()).toEqual(["fact", "field"]);

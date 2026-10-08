@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { type Api, type OpenChangeset, problemMessage } from "../api/client";
@@ -37,12 +38,18 @@ const PAGE_SIZE = 200;
 export function InboxProvider({ api, children }: { api: Api; children: ReactNode }) {
   const organizationId = useOptionalSession()?.organization?.organization_id;
   const [state, setState] = useState<InboxState>({ kind: "loading" });
+  // Only the newest request may set the state, so a late answer of another organization is dropped.
+  const latest = useRef(0);
 
   const reload = useCallback(async () => {
+    const request = ++latest.current;
     try {
       const { data, error } = await api.GET("/api/v1/changesets", {
         params: { query: { status: "open", limit: PAGE_SIZE } },
       });
+      if (request !== latest.current) {
+        return false;
+      }
       if (data) {
         setState({
           kind: "loaded",
@@ -53,16 +60,19 @@ export function InboxProvider({ api, children }: { api: Api; children: ReactNode
       }
       setState({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
     } catch {
-      setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+      if (request === latest.current) {
+        setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+      }
     }
     return false;
   }, [api]);
 
   useEffect(() => {
+    setState({ kind: "loading" });
     if (organizationId === undefined) {
+      latest.current += 1;
       return;
     }
-    setState({ kind: "loading" });
     void reload();
   }, [organizationId, reload]);
 

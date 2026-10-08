@@ -41,6 +41,21 @@ describe("shortcutOf", () => {
     expect(shortcutOf(press("a", document.createElement(tag)))).toBeUndefined();
   });
 
+  it.each(["text", "search", "email", "number", "date", "password", "url", "tel"])(
+    "ignores a key typed in an input of type %s",
+    (type) => {
+      const input = document.createElement("input");
+      input.type = type;
+      expect(shortcutOf(press("a", input))).toBeUndefined();
+    },
+  );
+
+  it.each(["checkbox", "radio"])("accepts a key while focus is on a %s", (type) => {
+    const input = document.createElement("input");
+    input.type = type;
+    expect(shortcutOf(press("a", input))).toBe("a");
+  });
+
   it("ignores a key typed in a contenteditable element", () => {
     const editable = document.createElement("div");
     editable.setAttribute("contenteditable", "true");

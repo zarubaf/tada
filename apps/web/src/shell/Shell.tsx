@@ -57,12 +57,12 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           </div>
         )}
         <nav className={styles.nav} aria-label={t("shell-nav")}>
-          <NavLink to="/events" large>
-            {t("nav-events")}
-          </NavLink>
           <NavLink to="/inbox" large>
             {t("nav-inbox")}
             <InboxCount />
+          </NavLink>
+          <NavLink to="/events" large>
+            {t("nav-events")}
           </NavLink>
           <NavLink to="/settings/members" within="/settings" large>
             {t("nav-settings")}

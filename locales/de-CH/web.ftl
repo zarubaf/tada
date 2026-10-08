@@ -508,7 +508,6 @@ inbox-source-page = Seite { $page }
 inbox-status-accepted = Angenommen
 inbox-status-accepted-with-edit = Mit Änderung angenommen
 inbox-status-rejected = Abgelehnt
-inbox-status-conflict = Konflikt
 inbox-status-withdrawn = Zurückgezogen
 inbox-accept = Annehmen
 inbox-edit = Bearbeiten und annehmen
@@ -582,6 +581,7 @@ inbox-summary-dependencies =
     }
 inbox-summary-accept = Auswahl annehmen
 inbox-summary-reject = Auswahl ablehnen
+inbox-apply-blocked = Dieser Vorschlag hat einen Konflikt. Er lässt sich nicht annehmen.
 inbox-summary-blocked = Die Auswahl enthält einen Konflikt. Sie lässt sich nicht annehmen.
 # $count: the number of dependencies that the selection added.
 inbox-dependencies-added =

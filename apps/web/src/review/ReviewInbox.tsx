@@ -1,6 +1,6 @@
 import { IconClockExclamation } from "@tabler/icons-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import type { Api, Author, OpenChangeset } from "../api/client";
+import type { Api, OpenChangeset } from "../api/client";
 import { formatDateTime } from "../facts/formatValue";
 import { t } from "../i18n";
 import { Link, useNavigate, useParams } from "../router/Router";
@@ -10,15 +10,12 @@ import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
+import { authorName } from "./authorName";
 import { ChangesetDetail } from "./ChangesetDetail";
 import { type Scopes, useEventScopes } from "./eventScopes";
 import { useInbox } from "./InboxProvider";
 import styles from "./ReviewInbox.module.css";
 import { shortcutOf } from "./shortcuts";
-
-function authorName(author: Author): string {
-  return author.kind === "member" ? t("inbox-author-member") : t(`evidence-author-${author.kind}`);
-}
 
 function ListItem({
   item,

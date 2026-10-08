@@ -2,7 +2,6 @@ import { type KeyboardEvent, type Ref, useCallback, useEffect, useRef, useState 
 import {
   type Api,
   type ApplyEdit,
-  type Author,
   type Changeset,
   type Field,
   type Problem,
@@ -17,6 +16,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { Skeleton } from "../ui/Skeleton";
+import { authorName } from "./authorName";
 import styles from "./ChangesetDetail.module.css";
 import { conflictOf } from "./conflict";
 import type { Scopes } from "./eventScopes";
@@ -45,10 +45,6 @@ export interface ChangesetDetailProps {
 }
 
 type Reviewed = Pick<ReviewResult, "proposals">;
-
-function authorName(author: Author): string {
-  return author.kind === "member" ? t("inbox-author-member") : t(`evidence-author-${author.kind}`);
-}
 
 /** Loads the changeset and, for an event, the field catalog behind its facts. */
 async function loadChangeset(
@@ -245,7 +241,7 @@ export function ChangesetDetail({
 
   const apply = (ids: ReadonlySet<string>, edits: ApplyEdit[] = []) => {
     if (conflictIn(ids)) {
-      fail(t("inbox-summary-blocked"));
+      fail(t(ids.size > 1 ? "inbox-summary-blocked" : "inbox-apply-blocked"));
       return;
     }
     return review(
@@ -297,7 +293,12 @@ export function ChangesetDetail({
     if (key === "a" && targets(active?.id).length > 0) {
       event.preventDefault();
       void apply(closureOf(targets(active?.id)));
-    } else if (key === "e" && active && editableField(active, fields)) {
+    } else if (
+      key === "e" &&
+      active &&
+      editableField(active, fields) &&
+      !conflictOf(active, proposals)
+    ) {
       event.preventDefault();
       setEditingId(active.id);
     } else if (key === "r" && targets(active?.id).length > 0) {

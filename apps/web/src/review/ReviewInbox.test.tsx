@@ -345,6 +345,73 @@ describe("the detail", () => {
   });
 });
 
+describe("a draft proposal", () => {
+  const DRAFT_CS = "0199b8e0-0000-7000-8000-000000000c09";
+  const draftProposal = (id: string, document: object, draft: object | null) =>
+    proposal(id, {
+      operation: {
+        kind: "create-document-draft",
+        event_id: EVENT.id,
+        markdown: "# Titel",
+        document,
+      },
+      draft,
+    });
+  const rendering = {
+    markdown: "# Titel",
+    lint_warnings: [{ line: 1, kind: "number" }],
+    links: {},
+  };
+
+  function server() {
+    CHANGESETS.set(DRAFT_CS, {
+      ...newChangeset,
+      id: DRAFT_CS,
+      proposals: [
+        draftProposal(
+          "0199b8e0-0000-7000-8000-0000000001d1",
+          { kind: "new", id: "0199b8e0-0000-7000-8000-0000000000d1", name: "Ablauf Samstag" },
+          rendering,
+        ),
+        draftProposal(
+          "0199b8e0-0000-7000-8000-0000000001d2",
+          {
+            kind: "existing",
+            document_id: "0199b8e0-0000-7000-8000-0000000000d2",
+            expected_version: 2,
+          },
+          null,
+        ),
+      ],
+    });
+    return renderAt(`/inbox/${DRAFT_CS}`);
+  }
+
+  afterEach(() => CHANGESETS.delete("0199b8e0-0000-7000-8000-000000000c09"));
+
+  it("shows a new draft by its title, a note and the lint warnings", async () => {
+    server();
+
+    const card = await screen.findByRole("article", { name: "Dokumentenentwurf „Ablauf Samstag“" });
+    expect(
+      within(card).getByText("Das Dokument entsteht, wenn Sie den Entwurf annehmen."),
+    ).toBeInTheDocument();
+    expect(within(card).getByText("1 Hinweis der Prüfung")).toBeInTheDocument();
+  });
+
+  it("links an existing document and renders without a draft", async () => {
+    server();
+
+    const card = await screen.findByRole("article", {
+      name: "Entwurf für ein bestehendes Dokument",
+    });
+    expect(within(card).getByRole("link", { name: "Dokument öffnen" })).toHaveAttribute(
+      "href",
+      "/documents/0199b8e0-0000-7000-8000-0000000000d2",
+    );
+  });
+});
+
 describe("the selection", () => {
   it("selects the dependency of a selected proposal and says so", async () => {
     renderAt(`/inbox/${CS_NEW}`);
@@ -417,8 +484,50 @@ describe("the keyboard", () => {
 
     expect(applyCalls(server)).toHaveLength(0);
     expect(
-      await screen.findByText("Die Auswahl enthält einen Konflikt. Sie lässt sich nicht annehmen."),
+      await screen.findByText("Dieser Vorschlag hat einen Konflikt. Er lässt sich nicht annehmen."),
     ).toBeInTheDocument();
+  });
+
+  it("does not open the edit form on E for a conflicting proposal", async () => {
+    renderAt(`/inbox/${CS_OLD}`);
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    await userEvent.click(within(card).getByText("Flugplatz Testwil"));
+
+    await userEvent.keyboard("e");
+
+    expect(within(card).queryByRole("textbox", { name: "Text" })).not.toBeInTheDocument();
+  });
+
+  it("applies the selection on A while focus is on a selection checkbox", async () => {
+    const server = renderAt(`/inbox/${CS_NEW}`);
+    const box = await screen.findByRole("checkbox", { name: "Offene Frage anlegen auswählen" });
+    box.focus();
+
+    await userEvent.keyboard(" ");
+    expect(box).toBeChecked();
+    await userEvent.keyboard("a");
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(applyCalls(server)[0]?.body).toEqual({ selected: [P_QUESTION], edits: [] });
+  });
+
+  it("names the proposal, not a selection, when a single conflict blocks A", async () => {
+    renderAt(`/inbox/${CS_OLD}`);
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    await userEvent.click(within(card).getByText("Flugplatz Testwil"));
+
+    await userEvent.keyboard("a");
+
+    expect(await screen.findByText(/Dieser Vorschlag hat einen Konflikt/)).toBeInTheDocument();
+    expect(screen.queryByText(/Die Auswahl enthält einen Konflikt/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the shortcut hint out of the accessible name of the buttons", async () => {
+    renderAt(`/inbox/${CS_NEW}`);
+    const card = await screen.findByRole("article", { name: "Feld „Hangar“ hinzufügen" });
+
+    expect(within(card).getByRole("button", { name: "Annehmen" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Ablehnen" })).toBeInTheDocument();
   });
 
   it("moves through the list on J and K and keeps focus in the list", async () => {
@@ -479,7 +588,11 @@ describe("edit and accept", () => {
     const { server, card, form } = await openEditForm();
     await userEvent.clear(form);
 
-    await userEvent.click(within(card).getByRole("button", { name: "Bearbeiten und annehmen" }));
+    await userEvent.click(
+      within(form.closest("form") as HTMLElement).getByRole("button", {
+        name: "Bearbeiten und annehmen",
+      }),
+    );
 
     expect(await within(card).findByText("Geben Sie einen Wert ein.")).toBeInTheDocument();
     await waitFor(() => expect(form).toHaveFocus());
@@ -488,11 +601,15 @@ describe("edit and accept", () => {
   });
 
   it("sends the edited value with the dependency", async () => {
-    const { server, card, form } = await openEditForm();
+    const { server, form } = await openEditForm();
     await userEvent.clear(form);
     await userEvent.type(form, "Hangar 5");
 
-    await userEvent.click(within(card).getByRole("button", { name: "Bearbeiten und annehmen" }));
+    await userEvent.click(
+      within(form.closest("form") as HTMLElement).getByRole("button", {
+        name: "Bearbeiten und annehmen",
+      }),
+    );
 
     await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
     const body = applyCalls(server)[0]?.body as { selected: string[]; edits: unknown[] };

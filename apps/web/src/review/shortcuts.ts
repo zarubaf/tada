@@ -17,7 +17,10 @@ export interface KeyPress {
   repeat: boolean;
 }
 
-const TEXT_CONTROLS = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
+// A checkbox, a radio button and a button take no text, so the keys keep working there.
+const TEXT_INPUT =
+  "input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'])";
+const TEXT_CONTROLS = `${TEXT_INPUT}, textarea, select, [contenteditable]:not([contenteditable='false'])`;
 const DIALOGS = "[role='dialog'], [role='alertdialog']";
 
 /** The shortcut that the key press means, or nothing. */
