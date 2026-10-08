@@ -1,0 +1,107 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, type Page, test } from "@playwright/test";
+import {
+  fakeSession,
+  fontsLoaded,
+  sessionInfo,
+  sessionWithRole,
+  setTheme,
+  themes,
+  viewports,
+} from "./fixtures";
+
+// Invented members with long German names and umlauts (doc/design/principles.md).
+const members = [
+  {
+    user_id: sessionInfo.user_id,
+    display_name: "Anna Muster",
+    email: "anna.muster@example.org",
+    role: "owner",
+    version: 1,
+  },
+  {
+    user_id: "0199b8e0-0000-7000-8000-0000000000b2",
+    display_name: "Bernhard Beispiel-Schmidlin-Äbischer",
+    email: "bernhard.beispiel-schmidlin@example.org",
+    role: "member",
+    version: 2,
+  },
+];
+
+const invitations = [
+  {
+    id: "0199b8e0-0000-7000-8000-0000000000c1",
+    email: "cäcilia.probst@example.org",
+    display_name: "Cäcilia Probst",
+    role: "admin",
+    created_at: "2028-03-02T09:00:00Z",
+  },
+];
+
+async function fakeMembers(page: Page, withEmail: boolean): Promise<void> {
+  await page.route("**/api/v1/members*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: members.map((m) => ({ ...m, email: withEmail ? m.email : null })),
+      }),
+    }),
+  );
+  await page.route("**/api/v1/invitations", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: invitations }),
+    }),
+  );
+}
+
+const states = [
+  { name: "owner", role: "owner" },
+  { name: "member", role: "member" },
+] as const;
+
+for (const viewport of viewports) {
+  for (const theme of themes) {
+    for (const state of states) {
+      test(`members, ${state.name}, ${theme}, ${viewport.name} px: no axe violation, screenshot`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        await fakeSession(page, sessionWithRole(state.role));
+        await fakeMembers(page, state.role !== "member");
+        await page.goto("/settings/members");
+        await setTheme(page, theme);
+        await expect(page.getByRole("heading", { level: 1, name: "Mitglieder" })).toBeVisible();
+        await expect(page.getByRole("table", { name: "Mitglieder" })).toBeVisible();
+        if (state.role === "owner") {
+          await expect(page.getByRole("table", { name: "Offene Einladungen" })).toBeVisible();
+          await expect(page.getByRole("button", { name: "Einladen" })).toBeVisible();
+        } else {
+          await expect(page.getByRole("button", { name: "Einladen" })).toHaveCount(0);
+        }
+
+        const results = await new AxeBuilder({ page })
+          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+          .analyze();
+        expect(results.violations).toEqual([]);
+
+        await fontsLoaded(page);
+        await expect(page).toHaveScreenshot(`members-${state.name}-${theme}-${viewport.name}.png`, {
+          fullPage: true,
+        });
+      });
+    }
+  }
+}
+
+test("the navigation item Einstellungen leads to the members", async ({ page }) => {
+  await fakeSession(page, sessionWithRole("owner"));
+  await fakeMembers(page, true);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/events");
+  await page.getByRole("link", { name: "Einstellungen" }).click();
+  await expect(page).toHaveURL(/\/settings\/members$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Mitglieder" })).toBeVisible();
+});
