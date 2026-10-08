@@ -13,6 +13,7 @@ A new component needs an entry here in the same pull request.
 | Button      | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap. |
 | IconButton  | quiet                             | Only in toolbars and rows. Always an accessible name and a tooltip.                             |
 | Link        | inline, standalone                | Inline links are underlined. A link never does what a button does.                              |
+| LinkButton  | primary                           | A link in the style of a button. Only for an action that opens a page, for example a form.      |
 | Menu        |                                   | For more than three secondary actions. The trigger is `dots-vertical`.                          |
 | CommandMenu |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                    |
 
@@ -52,7 +53,7 @@ The danger button is secondary in style with `--color-danger` text until a confi
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Panel       | A bordered area in the page flow. No shadow.                                                                                                 |
 | Sheet       | Opens from the right (medium, wide) or from the bottom (narrow). For details, filters and the evidence panel.                                |
-| Dialog      | Only for a destructive confirmation or a blocking task. Title, one sentence, two buttons.                                                    |
+| Dialog      | Only for a destructive confirmation or a blocking task. Title, one sentence, two buttons. `ConfirmDialog` is the confirmation.               |
 | Popover     | For small forms and pickers that belong to one control.                                                                                      |
 | Tooltip     | Text only, no interactive content. Opens on hover and on focus.                                                                              |
 | Tabs        | For two to six views of one record. Not for navigation between pages.                                                                        |

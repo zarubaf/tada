@@ -1,0 +1,54 @@
+@layer components {
+  .members {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .failure {
+    padding: var(--space-3);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius-md);
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+
+  /* The live region stays in the page: empty, it is hidden from the eye but not from the tree. */
+  .failure:empty {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+  }
+
+  .add {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 40rem;
+  }
+
+  /* Narrow: one column with a full-width button. Medium and wide: one row. */
+  .addForm {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  @media (width >= 40rem) {
+    /* --bp-medium */
+    .addForm {
+      grid-template-columns: 1fr 1fr auto;
+      align-items: end;
+    }
+  }
+}

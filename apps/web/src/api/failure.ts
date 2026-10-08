@@ -1,7 +1,7 @@
-// One rule that maps a failed request of a page without a session to what the page shows.
+// One rule that maps a failed request to what the page shows, including the wait of a 429.
 import { useEffect, useState } from "react";
-import { type Problem, problemMessage } from "../api/client";
 import { t } from "../i18n";
+import { type Problem, problemMessage } from "./client";
 
 export interface Failure {
   /** A new value for each failure, so that a page can mount its alert again and move focus to it. */

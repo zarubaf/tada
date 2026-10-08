@@ -108,3 +108,52 @@ choose-organization-title = Organisation wählen
 choose-organization-text = Wählen Sie die Organisation, mit der Sie arbeiten.
 choose-organization-empty-title = Keine Organisation
 choose-organization-empty-text = Sie sind noch in keiner Organisation Mitglied. Bitten Sie eine Administration um eine Einladung.
+
+## Event screens (create, event page and event memberships)
+
+events-create = Anlass erfassen
+event-create-title = Anlass erfassen
+event-create-submit = Anlass erfassen
+event-create-key-help = Zwei bis acht Grossbuchstaben oder Ziffern, zum Beispiel FLY28.
+event-create-time-zone-help = Eine IANA-Zeitzone, zum Beispiel Europe/Zurich.
+event-error-key = Das Kürzel hat 2 bis 8 Grossbuchstaben oder Ziffern.
+event-error-key-taken = Dieses Kürzel ist schon vergeben.
+event-error-name = Der Name hat 1 bis 200 Zeichen.
+event-error-time_zone = Diese Zeitzone ist unbekannt.
+event-nav = Anlass
+event-nav-overview = Übersicht
+event-nav-members = Mitglieder
+event-overview-placeholder = Hier erscheint die Übersicht des Anlasses.
+event-loading = Anlass wird geladen
+problem-not-found = Das gibt es nicht, oder Sie dürfen es nicht sehen.
+problem-validation-failed = Die Eingabe ist ungültig.
+problem-record-version-conflict = Jemand hat diesen Eintrag inzwischen geändert. Versuchen Sie es erneut.
+problem-invalid-transition = Diese Änderung ist im aktuellen Zustand nicht möglich.
+
+## Event memberships
+
+event-members-title = Mitglieder des Anlasses
+event-members-column-name = Name
+event-members-column-role = Rolle
+event-members-column-actions = Aktionen
+event-members-loading = Mitglieder werden geladen
+# $name: the display name of the member.
+event-members-role-of = Rolle von { $name }
+event-members-remove = Entfernen
+event-members-remove-of = { $name } entfernen
+event-members-add-title = Rolle vergeben
+event-members-add-member = Mitglied
+event-members-add-placeholder = Mitglied wählen
+event-members-add-submit = Mitglied hinzufügen
+event-members-add-none = Alle Mitglieder der Organisation haben schon eine Rolle in diesem Anlass.
+role-event-manager = Anlassleitung
+role-event-contributor = Mitarbeit
+role-event-viewer = Lesezugriff
+# The refusal to remove or demote the last event manager (`invalid-transition` on this page).
+event-members-last-manager = Ein Anlass braucht mindestens eine Anlassleitung. Geben Sie zuerst jemand anderem diese Rolle.
+event-members-conflict = Jemand hat diese Mitglieder inzwischen geändert. Die Liste ist neu geladen. Versuchen Sie es erneut.
+# $name: the display name of the member.
+event-members-remove-title = { $name } entfernen?
+event-members-remove-text = { $name } verliert die Rolle in diesem Anlass und sieht den Anlass nicht mehr.
+event-members-remove-self = Sie entfernen Ihre eigene Rolle als Anlassleitung. Danach können Sie die Mitglieder dieses Anlasses womöglich nicht mehr verwalten.
+event-members-remove-cancel = Abbrechen

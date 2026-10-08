@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import type { Api, InvitationPreview } from "../api/client";
+import { type Failure, failureOf, invalidFailure, useWaiting } from "../api/failure";
 import { t } from "../i18n";
 import { useNavigate } from "../router/Router";
 import { useRefreshSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { InlineError } from "../ui/InlineError";
-import { type Failure, failureOf, invalidFailure, useWaiting } from "./failure";
 import { takeFragmentToken } from "./fragment";
 import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
 

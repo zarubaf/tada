@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
 import { LOCALE, t } from "../i18n";
+import { useOptionalSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
 import { InlineError } from "../ui/InlineError";
+import { LinkButton } from "../ui/LinkButton";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventsPage.module.css";
 
@@ -32,6 +34,9 @@ type State =
 /** „Anlässe“: the events that the member can see, in the order of their keys. */
 export function EventsPage({ api }: { api: Api }) {
   const [state, setState] = useState<State>({ kind: "loading" });
+  // The server decides; the button only hides an action that would fail.
+  const role = useOptionalSession()?.organization?.role;
+  const canCreate = role === "owner" || role === "admin";
 
   const load = useCallback(
     async (cursor: string | undefined, previous: Event[]) => {
@@ -70,7 +75,14 @@ export function EventsPage({ api }: { api: Api }) {
 
   return (
     <main id="main" className={styles.page}>
-      <h1 className={styles.title}>{t("events-title")}</h1>
+      <div className={styles.toolbar}>
+        <h1 className={styles.title}>{t("events-title")}</h1>
+        {canCreate && (
+          <LinkButton to="/events/new" primary>
+            {t("events-create")}
+          </LinkButton>
+        )}
+      </div>
       {state.kind === "loading" && (
         <div className={styles.skeleton} role="status" aria-label={t("events-loading")}>
           <Skeleton />

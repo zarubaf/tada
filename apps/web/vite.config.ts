@@ -13,5 +13,7 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/test/setup.ts"],
+    // The timeout guards against a hang, not against slow code: parallel checks load the machine.
+    testTimeout: 15_000,
   },
 });

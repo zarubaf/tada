@@ -12,6 +12,14 @@
     }
   }
 
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
   .title {
     font-size: var(--font-size-2xl);
     font-weight: var(--font-weight-semibold);
