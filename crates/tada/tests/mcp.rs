@@ -15,11 +15,12 @@ use secrecy::ExposeSecret;
 use serde_json::{Value, json};
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::clock::Clock;
+use tada_app::domain::RecordVersion;
 use tada_app::domain::facts::core_catalog;
 use tada_app::domain::identity::{DisplayName, Email, EventRole};
 use tada_app::domain::ids::{EventId, OrganizationId, ProposalId, UserId};
 use tada_app::domain::sources::SourceText;
-use tada_app::event_members::add_event_member;
+use tada_app::event_members::{add_event_member, change_event_role};
 use tada_app::proposals::{Changeset, Created, NewChangeset, ProposeStores, create_changeset};
 use tada_app::review::{ApplyInput, ReviewStores, apply_changeset};
 use tada_app::search::{SearchRequest, search_sources};
@@ -979,6 +980,23 @@ async fn only_a_propose_token_of_a_member_who_can_propose_in_the_event_proposes(
 
     let body = mcp.propose_with(&token, secret).await;
     assert_eq!(body["result"]["isError"], false, "{body}");
+
+    // The role counts at each call, not when the token was made.
+    let database = &mcp.test.database;
+    change_event_role(
+        &mcp.owner,
+        mcp.secret,
+        mcp.anna,
+        EventRole::EventViewer,
+        RecordVersion::FIRST,
+        database,
+        database,
+    )
+    .await
+    .unwrap();
+    let again = changeset(mcp.secret, SOURCE, proposals(mcp.secret));
+    let body = mcp.propose_with(&token, again).await;
+    assert_eq!(problem(&body)["code"], "forbidden", "{body}");
 }
 
 /// The tool takes each operation of the `app` input, also a document draft (ADR 0051).
