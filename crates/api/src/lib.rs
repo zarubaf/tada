@@ -2,6 +2,7 @@
 
 mod client_ip;
 mod contract;
+mod documents;
 mod event_members;
 mod events;
 mod extract;
@@ -25,7 +26,9 @@ use axum::response::Response;
 use axum::routing::any;
 use ipnet::IpNet;
 use tada_app::auth::Authenticator;
+use tada_app::blobs::BlobStore;
 use tada_app::clock::Clock;
+use tada_app::documents::DocumentStore;
 use tada_app::event_members::EventMemberStore;
 use tada_app::events::EventStore;
 use tada_app::health::DependencyCheck;
@@ -64,6 +67,11 @@ pub struct ApiState {
     pub members: Arc<dyn MemberStore>,
     /// `TADA_PUBLIC_URL`. Its origin is the only `Origin` of a state-changing request (ADR 0008).
     pub public_url: PublicUrl,
+    pub documents: Arc<dyn DocumentStore>,
+    /// The object storage of the document files (ADR 0009).
+    pub blobs: Arc<dyn BlobStore>,
+    /// `TADA_UPLOAD_MAX_BYTES`: the largest file of one upload (ADR 0043).
+    pub upload_max_bytes: u64,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -78,7 +86,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(telegram::routes())
                 .merge(sign_in::routes())
                 .merge(event_members::routes())
-                .merge(members::routes()),
+                .merge(members::routes())
+                .merge(documents::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -93,6 +102,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(sign_in::problem_codes())
         .chain(event_members::problem_codes())
         .chain(members::problem_codes())
+        .chain(documents::problem_codes())
         .collect()
 }
 
@@ -553,6 +563,94 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct NoDocuments;
+
+    #[async_trait::async_trait]
+    impl DocumentStore for NoDocuments {
+        async fn publish(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::documents::NewUpload,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::documents::Published, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn list(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: Option<&str>,
+            _: Option<tada_app::documents::DocumentCursor>,
+            _: u32,
+        ) -> Result<Vec<tada_app::documents::DocumentView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn get(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::DocumentId,
+        ) -> Result<Option<tada_app::documents::DocumentView>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn versions(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::DocumentId,
+        ) -> Result<Vec<tada_app::documents::VersionView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn version(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::DocumentVersionId,
+        ) -> Result<Option<tada_app::documents::StoredVersion>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+    }
+
+    #[derive(Debug)]
+    struct NoBlobs;
+
+    #[async_trait::async_trait]
+    impl BlobStore for NoBlobs {
+        async fn put(
+            &self,
+            _: &tada_app::blobs::BlobKey,
+            _: tada_app::blobs::ByteStream,
+            _: u64,
+        ) -> Result<u64, tada_app::blobs::BlobError> {
+            unreachable!()
+        }
+
+        async fn get(
+            &self,
+            _: &tada_app::blobs::BlobKey,
+        ) -> Result<Option<tada_app::blobs::ByteStream>, tada_app::blobs::BlobError> {
+            unreachable!()
+        }
+
+        async fn head(
+            &self,
+            _: &tada_app::blobs::BlobKey,
+        ) -> Result<Option<u64>, tada_app::blobs::BlobError> {
+            unreachable!()
+        }
+
+        async fn delete(
+            &self,
+            _: &tada_app::blobs::BlobKey,
+        ) -> Result<(), tada_app::blobs::BlobError> {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
@@ -568,6 +666,9 @@ mod tests {
             event_members: Arc::new(NoEventMembers),
             members: Arc::new(NoMembers),
             public_url: PublicUrl::parse("https://tada.example.org").unwrap(),
+            documents: Arc::new(NoDocuments),
+            blobs: Arc::new(NoBlobs),
+            upload_max_bytes: 1,
         }
     }
 

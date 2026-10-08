@@ -23,6 +23,7 @@ use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
 use tada_api::ApiState;
 pub use tada_api::SESSION_COOKIE;
 use tada_app::auth::Authenticator;
+use tada_app::blobs::{BlobError, BlobKey, BlobStore, ByteStream};
 use tada_app::clock::Clock;
 use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::outbound::SendOutbound;
@@ -73,6 +74,39 @@ pub fn api_state(
         event_members: database.clone(),
         members: database.clone(),
         public_url: public_url(),
+        documents: database.clone(),
+        blobs: Arc::new(NoObjectStorage),
+        upload_max_bytes: 1024 * 1024,
+    }
+}
+
+/// The object storage of the tests without Garage. Each call fails as if the storage were down.
+/// A test of documents sets the `blobs` of `api_state` to a `TestGarage`.
+#[derive(Debug)]
+pub struct NoObjectStorage;
+
+impl NoObjectStorage {
+    fn down() -> BlobError {
+        BlobError::Storage("this test has no object storage".into())
+    }
+}
+
+#[async_trait::async_trait]
+impl BlobStore for NoObjectStorage {
+    async fn put(&self, _: &BlobKey, _: ByteStream, _: u64) -> Result<u64, BlobError> {
+        Err(Self::down())
+    }
+
+    async fn get(&self, _: &BlobKey) -> Result<Option<ByteStream>, BlobError> {
+        Err(Self::down())
+    }
+
+    async fn head(&self, _: &BlobKey) -> Result<Option<u64>, BlobError> {
+        Err(Self::down())
+    }
+
+    async fn delete(&self, _: &BlobKey) -> Result<(), BlobError> {
+        Err(Self::down())
     }
 }
 

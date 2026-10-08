@@ -30,6 +30,17 @@ pub fn pdf(title: &str) -> Vec<u8> {
     pdf
 }
 
+/// The start of a PNG image: its signature and its header chunk.
+/// The type detection reads only the signature (ADR 0055).
+pub fn png() -> Vec<u8> {
+    let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+    png.extend_from_slice(
+        b"\x00\x00\x00\x0dIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00",
+    );
+    png.extend_from_slice(&[0; 4]);
+    png
+}
+
 /// The start of an ELF executable: a program that tada must never accept.
 pub fn executable() -> Vec<u8> {
     let mut elf = vec![0x7f, b'E', b'L', b'F', 2, 1, 1, 0];

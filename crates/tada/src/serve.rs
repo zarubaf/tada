@@ -17,7 +17,7 @@ use crate::settings::ServeSettings;
 use crate::shutdown;
 
 pub async fn run(
-    (database, http, storage, public_url, sign_in): ServeSettings,
+    (database, http, storage, public_url, sign_in, uploads): ServeSettings,
 ) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
@@ -28,9 +28,10 @@ pub async fn run(
         access_key_id: storage.access_key_id,
         secret_access_key: storage.secret_access_key,
     });
+    let storage = Arc::new(storage);
     let router = tada_api::router(
         ApiState {
-            dependencies: vec![Arc::new(db.clone()), Arc::new(storage)],
+            dependencies: vec![Arc::new(db.clone()), storage.clone()],
             authenticator: Arc::new(SessionAuthenticator::new(
                 Arc::new(db.clone()),
                 Arc::new(db.clone()),
@@ -50,6 +51,9 @@ pub async fn run(
             event_members: Arc::new(db.clone()),
             members: Arc::new(db.clone()),
             public_url,
+            documents: Arc::new(db.clone()),
+            blobs: storage,
+            upload_max_bytes: uploads.max_bytes,
         },
         http.web_root.as_deref(),
     );

@@ -65,6 +65,7 @@ tuple_section!(A, B);
 tuple_section!(A, B, C);
 tuple_section!(A, B, C, D);
 tuple_section!(A, B, C, D, E);
+tuple_section!(A, B, C, D, E, F);
 
 /// Reads the section `S` from the environment.
 pub fn load<S: Section>(
@@ -207,7 +208,7 @@ mod tests {
     use super::*;
     use tada_adapters::mail::SmtpTls;
 
-    use crate::settings::sections::Database;
+    use crate::settings::sections::{Database, Uploads};
 
     fn secret_file(content: &str) -> NamedTempFile {
         let mut file = NamedTempFile::new().unwrap();
@@ -302,6 +303,14 @@ mod tests {
     fn uses_the_default_of_a_setting_that_is_not_set() {
         let loaded = load_from::<(Logging,)>(&[]).unwrap();
         assert_eq!(loaded.settings.0.filter, "info");
+    }
+
+    #[test]
+    fn the_upload_limit_is_100_mb_by_default_and_never_zero() {
+        let loaded = load_from::<(Uploads,)>(&[]).unwrap();
+        assert_eq!(loaded.settings.0.max_bytes, 100_000_000);
+        let errors = load_from::<(Uploads,)>(&[("TADA_UPLOAD_MAX_BYTES", "0")]).unwrap_err();
+        assert_eq!(errors.0, ["TADA_UPLOAD_MAX_BYTES must be 1 or more"]);
     }
 
     #[test]
