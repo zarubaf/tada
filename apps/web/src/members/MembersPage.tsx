@@ -237,12 +237,13 @@ export function MembersPage({ api }: { api: Api }) {
       cell: (member) =>
         member.user_id === session.user.id ? (
           // Each member can leave.
-          <Button onPress={() => setConfirming({ kind: "member", item: member })}>
+          <Button variant="danger" onPress={() => setConfirming({ kind: "member", item: member })}>
             {t("members-leave")}
           </Button>
         ) : (
           canRemove(role, member.role) && (
             <Button
+              variant="danger"
               aria-label={t("members-remove-of", { name: member.display_name })}
               onPress={() => setConfirming({ kind: "member", item: member })}
             >
@@ -276,6 +277,7 @@ export function MembersPage({ api }: { api: Api }) {
       header: t("members-column-actions"),
       cell: (invitation) => (
         <Button
+          variant="danger"
           aria-label={t("invitations-revoke-of", { name: invitation.display_name })}
           onPress={() => setConfirming({ kind: "invitation", item: invitation })}
         >

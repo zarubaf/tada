@@ -2,7 +2,8 @@ import { Button as AriaButton, type ButtonProps as AriaButtonProps } from "react
 import styles from "./Button.module.css";
 
 export interface ButtonProps extends Omit<AriaButtonProps, "className" | "style"> {
-  variant?: "primary" | "secondary";
+  /** `danger` is for a destructive action before its confirmation step. */
+  variant?: "primary" | "secondary" | "danger";
 }
 
 /** A button. At most one primary button in a view (doc/design/components.md). */

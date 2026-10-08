@@ -214,6 +214,7 @@ export function EventMembersPage({ api }: { api: Api }) {
       header: t("event-members-column-actions"),
       cell: (item) => (
         <Button
+          variant="danger"
           aria-label={t("event-members-remove-of", { name: item.display_name })}
           onPress={() => setRemoving(item)}
         >
