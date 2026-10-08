@@ -194,6 +194,8 @@ pub struct StoredVersion {
 pub struct StoredDraft {
     pub event_id: EventId,
     pub version: VersionView,
+    /// The status of the draft, so that a reader of a draft never meets an upload.
+    pub status: DraftStatus,
     pub markdown: DraftMarkdown,
     /// The fact versions and source passages that the draft cites, fixed with its proposal.
     pub manifest: ProvenanceManifest,

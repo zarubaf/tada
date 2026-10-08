@@ -646,11 +646,16 @@ impl DocumentStore for Database {
                 })
                 .collect::<Result<_, InvalidRow>>()?,
         };
+        let version = row.view()?;
+        let VersionContent::Draft { status } = version.content else {
+            return Err(InvalidRow("document_version.kind").into());
+        };
         Ok(Some(StoredDraft {
             event_id: EventId::from_uuid(row.event_id),
             markdown: DraftMarkdown::parse(&markdown)
                 .map_err(|_| InvalidRow("document_version.markdown"))?,
-            version: row.view()?,
+            status,
+            version,
             manifest,
         }))
     }

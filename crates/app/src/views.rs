@@ -564,16 +564,11 @@ pub struct CitedPassageView {
 
 impl From<&StoredDraft> for DraftVersionView {
     fn from(draft: &StoredDraft) -> Self {
-        let status = match &draft.version.content {
-            VersionContent::Draft { status } => status.as_str(),
-            // `StoredDraft` holds a draft version only.
-            VersionContent::Upload(_) => "upload",
-        };
         Self {
             version_id: draft.version.id.as_uuid(),
             document_id: draft.version.document_id.as_uuid(),
             number: draft.version.number,
-            status,
+            status: draft.status.as_str(),
             markdown: draft.markdown.as_str().to_owned(),
             manifest: ManifestView {
                 facts: draft

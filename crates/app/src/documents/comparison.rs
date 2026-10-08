@@ -186,6 +186,7 @@ mod tests {
                     status: DraftStatus::Draft,
                 },
             },
+            status: DraftStatus::Draft,
             markdown: DraftMarkdown::parse(markdown).unwrap(),
             manifest: ProvenanceManifest {
                 facts,

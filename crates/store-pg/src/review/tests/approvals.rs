@@ -370,7 +370,7 @@ async fn an_unknown_that_becomes_known_changes_the_facts() {
 /// The checks of a draft proposal let it cite only the sources of its event, so this test stores a draft that
 /// cites a source of another event without these checks, as a store with older data or a changed rule could have.
 #[tokio::test]
-async fn a_reader_without_access_to_a_cited_source_gets_hidden() {
+async fn a_source_outside_the_citable_reach_of_the_event_renders_hidden() {
     let test = TestDatabase::start().await;
     let open_day = open_day(&test).await;
     let (fact, facts) = accepted_fact(&test, &open_day).await;
