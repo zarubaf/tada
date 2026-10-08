@@ -445,6 +445,13 @@ async fn the_profile_keeps_open_proposals_apart_from_accepted_facts() {
         changeset.source_version_id.as_uuid().to_string()
     );
     assert_eq!(evidence["quote"], "im Mai 2030");
+    assert_eq!(evidence["captured_at"], "2030-05-18T08:00:00Z");
+    let olga = mcp.owner.user_id().as_uuid();
+    assert_eq!(
+        accepted[0]["accepted_by"],
+        json!({"kind": "member", "id": olga, "channel": "web"})
+    );
+    assert_eq!(accepted[0]["accepted_at"], "2030-05-18T08:00:00Z");
 
     let open = profile["open_proposals"].as_array().unwrap();
     assert_eq!(open.len(), 1, "{profile}");
