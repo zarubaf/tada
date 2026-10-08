@@ -78,7 +78,7 @@ pub struct Changeset {
     /// `None` for a changeset of the organization, for example one that creates an event.
     pub event_id: Option<EventId>,
     pub author: Actor,
-    /// The source version of the intake text. The evidence of each proposal points into it.
+    /// The source version of the intake text. The evidence of a proposal can also cite other source versions.
     pub source_version_id: SourceVersionId,
     pub created_at: Timestamp,
     pub proposals: Vec<Proposal>,
@@ -206,7 +206,9 @@ impl CommandError for ProposeError {
 ///
 /// 1. A changeset of an event needs the right to propose in the event (ADR 0052).
 ///    A changeset of the organization, for example a new event, needs an owner or admin as principal.
-/// 2. Each proposal has at least one passage, and each passage matches the source text (ADR 0040).
+/// 2. Each proposal has at least one passage, and each passage matches the text of its source version (ADR 0040).
+///    A passage names no source version for the source text of the changeset. A passage of another source version
+///    must be readable in the event of the proposal (`access::event_source_reach`), for example a text file of the event.
 /// 3. Each new ID is a UUIDv7 and is free (ADR 0038).
 /// 4. The dependencies stay inside the changeset, have no cycle, and include the proposals that create the records that a proposal uses.
 /// 5. Each value matches the value type of its field. A new field of the same changeset counts.
@@ -242,6 +244,7 @@ pub async fn create_changeset(
     }
     check_structure(event_id, &proposals)?;
     check_catalog(scope, event_id, &proposals, stores).await?;
+    check_cited_sources(caller, source_version_id, &proposals, stores).await?;
     let drafts = drafts::check_drafts(caller, &proposals, stores).await?;
     check_free_ids(id, &proposals, stores.proposals).await?;
 
@@ -392,19 +395,22 @@ fn parse(
             errors.push(FieldError::new(path("evidence"), "evidence-missing"));
         }
         let mut evidence = Vec::new();
-        for (number, passage) in proposal.evidence.into_iter().enumerate() {
+        for (number, input) in proposal.evidence.into_iter().enumerate() {
             let passage = Passage {
-                start: passage.start,
-                end: passage.end,
-                quote: passage.quote,
-                page: passage.page,
+                start: input.start,
+                end: input.end,
+                quote: input.quote,
+                page: input.page,
             };
-            // The source of a changeset is a member text, which has no pages (ADR 0050).
-            let checked = match passage.page {
-                Some(_) => Err(PassageError::Page),
-                None => passage.check(source.as_str()),
-            };
-            match checked {
+            // `check_cited_sources` checks a passage of another source version.
+            if let Some(cited) = input.source_version_id {
+                evidence.push(Evidence {
+                    source_version_id: SourceVersionId::from_uuid(cited),
+                    passage,
+                });
+                continue;
+            }
+            match check_passage(&passage, source) {
                 Ok(()) => evidence.push(Evidence {
                     source_version_id,
                     passage,
@@ -441,6 +447,73 @@ fn parse(
     }
     finish(errors)?;
     Ok((ChangesetId::from_uuid(id), proposals))
+}
+
+/// Checks each passage that cites a source version other than the source text of the changeset `intake`.
+///
+/// The source version must be readable in the event of the proposal, so a proposal never shows a text of another
+/// event to the members of its event: `unknown-source` for any other ID, also of another organization.
+/// A source version without a text, for example a PDF, gives `no-text`.
+async fn check_cited_sources(
+    caller: &impl MayPropose,
+    intake: SourceVersionId,
+    proposals: &[Proposal],
+    stores: ProposeStores<'_>,
+) -> Result<(), ProposeError> {
+    let mut errors = Vec::new();
+    for (index, proposal) in proposals.iter().enumerate() {
+        let cited: Vec<SourceVersionId> = proposal
+            .evidence
+            .iter()
+            .map(|evidence| evidence.source_version_id)
+            .filter(|id| *id != intake)
+            .collect();
+        if cited.is_empty() {
+            continue;
+        }
+        let event = proposal.operation.event_id();
+        let texts: HashMap<SourceVersionId, Option<SourceText>> =
+            match access::event_source_reach(caller, event, stores.identity).await {
+                Ok(reach) => stores
+                    .sources
+                    .texts(caller.scope(), &reach, &cited)
+                    .await?
+                    .into_iter()
+                    .map(|source| (source.id, source.text))
+                    .collect(),
+                // A new event of the changeset has no sources yet.
+                Err(AccessError::NotFound) => HashMap::new(),
+                Err(AccessError::Store(error)) => return Err(error.into()),
+            };
+        for (number, evidence) in proposal.evidence.iter().enumerate() {
+            if evidence.source_version_id == intake {
+                continue;
+            }
+            let code = match texts.get(&evidence.source_version_id) {
+                None => Some("unknown-source"),
+                Some(None) => Some("no-text"),
+                Some(Some(text)) => check_passage(&evidence.passage, text)
+                    .err()
+                    .map(passage_error_code),
+            };
+            if let Some(code) = code {
+                errors.push(FieldError::new(
+                    format!("proposals/{index}/evidence/{number}"),
+                    code,
+                ));
+            }
+        }
+    }
+    finish(errors)
+}
+
+/// Checks a passage against the text of its source version. The source versions with a text are member texts and
+/// text files, which have no pages (ADR 0050).
+fn check_passage(passage: &Passage, text: &SourceText) -> Result<(), PassageError> {
+    match passage.page {
+        Some(_) => Err(PassageError::Page),
+        None => passage.check(text.as_str()),
+    }
 }
 
 fn passage_error_code(error: PassageError) -> &'static str {

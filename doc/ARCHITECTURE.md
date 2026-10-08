@@ -103,6 +103,12 @@ tada does not copy every tool into PostgreSQL.
 - Source items, source versions, evidence links, proposals and accepted records are separate tables.
 - A link to a source is not evidence, because documents change and messages disappear.
   Evidence is the exact source version or a snapshot, with its hash, capture time and a locator such as a page or a passage.
+- One domain type holds evidence: `domain::sources::Evidence`, a passage with the ID of its source version.
+  Proposals, fact versions and the source links of drafts use it ([ADR 0050](adr/0050-proposals-and-review.md), [ADR 0051](adr/0051-document-drafts-and-provenance.md)).
+  A passage of a proposal cites the source text of its changeset by default.
+  It can also cite another source version with a text, for example an uploaded text file, if the source version is readable in the event of the proposal (`app::access::event_source_reach`).
+  Otherwise the passage could show a text of another event to the members of the event.
+  A draft version has no source version, so a passage cannot cite a draft.
 - Audit messages contain no raw personal data.
 - [doc/data-inventory.md](data-inventory.md) lists each category of personal data that tada stores.
 - Retention and deletion rules cover originals, snapshots, extracted facts, embeddings and backups.
@@ -170,6 +176,7 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - Each organization has a storage quota: the column `organization.storage_quota_bytes`, 5 GiB by default ([ADR 0043](adr/0043-upload-policy.md)).
   It is a value in the database, not an environment setting. An operator changes it for one organization with SQL.
 - The text of an uploaded plain text, Markdown or CSV file is the text of its source version: members can search and cite it ([ADR 0050](adr/0050-proposals-and-review.md)).
+  A proposal can cite a passage of such a file as its evidence.
   PDF and office files have no extracted text yet. An agent cites its own source text for facts from such files.
 - tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. A larger text file has no searchable text.
   The PostgreSQL search index of one text is limited to 1 MB, and the index of a text with many unique words can be larger than the text.

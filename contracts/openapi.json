@@ -2739,7 +2739,7 @@
                       "description": "The passages of the source text that support the proposal. Each proposal has at least one.",
                       "items": {
                         "additionalProperties": false,
-                        "description": "A passage of the source text: a range of characters and its exact quote.",
+                        "description": "A passage of a source version: a range of characters and its exact quote.",
                         "properties": {
                           "end": {
                             "description": "The offset after the last character.",
@@ -2759,6 +2759,14 @@
                           "quote": {
                             "description": "The exact text from `start` to `end`.",
                             "type": "string"
+                          },
+                          "source_version_id": {
+                            "description": "The source version of the passage. Leave it out for the source text of the changeset.\nAnother source version must be readable in the event of the proposal and have a text,\nfor example a text file that a member uploaded to the event.",
+                            "format": "uuid",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           },
                           "start": {
                             "description": "The offset of the first character.",
@@ -5220,12 +5228,18 @@
       },
       "ProposalEvidence": {
         "type": "object",
-        "description": "One passage of the source text of a changeset, with the text around it.",
+        "description": "One passage of a source version, with the text around it.",
         "required": [
+          "source_version_id",
           "passage",
           "excerpt"
         ],
         "properties": {
+          "source_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The source version of the passage: the source text of the changeset or another source version,\nfor example a text file of the event."
+          },
           "passage": {
             "$ref": "#/components/schemas/Passage"
           },

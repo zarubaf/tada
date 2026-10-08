@@ -59,10 +59,15 @@ pub struct NewProposal {
     pub reason: String,
 }
 
-/// A passage of the source text: a range of characters and its exact quote.
+/// A passage of a source version: a range of characters and its exact quote.
 #[derive(Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PassageInput {
+    /// The source version of the passage. Leave it out for the source text of the changeset.
+    /// Another source version must be readable in the event of the proposal and have a text,
+    /// for example a text file that a member uploaded to the event.
+    #[serde(default)]
+    pub source_version_id: Option<Uuid>,
     /// The offset of the first character.
     pub start: u32,
     /// The offset after the last character.

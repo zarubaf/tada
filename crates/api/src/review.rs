@@ -277,9 +277,12 @@ pub struct Proposal {
     pub current: Option<CurrentFact>,
 }
 
-/// One passage of the source text of a changeset, with the text around it.
+/// One passage of a source version, with the text around it.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ProposalEvidence {
+    /// The source version of the passage: the source text of the changeset or another source version,
+    /// for example a text file of the event.
+    pub source_version_id: Uuid,
     pub passage: Passage,
     pub excerpt: Excerpt,
 }
@@ -592,6 +595,7 @@ impl From<AppProposalReview> for Proposal {
                 .iter()
                 .zip(review.excerpts)
                 .map(|(evidence, excerpt)| ProposalEvidence {
+                    source_version_id: evidence.source_version_id.as_uuid(),
                     passage: (&evidence.passage).into(),
                     excerpt: excerpt.into(),
                 })
@@ -724,6 +728,7 @@ fn review_stores(state: &ApiState) -> ReviewStores<'_> {
         facts: state.facts.as_ref(),
         proposals: state.proposals.as_ref(),
         review: state.review.as_ref(),
+        sources: state.sources.as_ref(),
     }
 }
 

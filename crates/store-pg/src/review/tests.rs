@@ -63,6 +63,7 @@ fn stores(test: &TestDatabase) -> ReviewStores<'_> {
         facts: &test.database,
         proposals: &test.database,
         review: &test.database,
+        sources: &test.database,
     }
 }
 
@@ -1256,4 +1257,82 @@ async fn a_deprecated_field_takes_no_choice_and_no_second_deprecation() {
         let result = apply(&test, &open_day.manager, changeset, select(&[*id])).await;
         assert!(matches!(result, Err(ApplyError::Conflict(_))), "{result:?}");
     }
+}
+
+/// A proposal cites a passage of an earlier source version of its event, not of its own source text.
+/// The fact version links the earlier source version, and the review shows the excerpt of that text.
+#[tokio::test]
+async fn a_fact_applies_with_the_evidence_of_another_source_version_of_its_event() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let first = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            Uuid::now_v7(),
+            date_window(open_day.event, 5, None),
+            &[],
+            "im Mai 2030",
+        )],
+    )
+    .await;
+    let earlier = first.source_version_id;
+    let mut cited = passage("20000 Besuchern");
+    cited["source_version_id"] = json!(earlier.as_uuid());
+    let id = Uuid::now_v7();
+    let mut second = proposal(
+        id,
+        json!({
+            "kind": "set-fact", "event_id": open_day.event.as_uuid(),
+            "field_id": core_field("visitor_estimate"),
+            "state": {"state": "assumption",
+                      "value": {"type": "quantity", "min": "20000", "max": "20000"}},
+        }),
+        &[],
+        "Mai",
+    );
+    second["evidence"] = json!([cited]);
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![second],
+    )
+    .await;
+    assert_eq!(
+        changeset.proposals[0].evidence[0].source_version_id,
+        earlier
+    );
+
+    let stored = test
+        .database
+        .get(open_day.owner.scope(), changeset.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.0.proposals, changeset.proposals);
+    let review = tada_app::review::get_changeset(
+        &open_day.manager,
+        changeset.id,
+        stores(&test),
+        &FixedClock,
+    )
+    .await
+    .unwrap();
+    assert_eq!(review.proposals[0].excerpts[0].quote, "20000 Besuchern");
+
+    apply(&test, &open_day.manager, &changeset, select(&[id]))
+        .await
+        .unwrap();
+    let links: Vec<(Uuid, String)> = sqlx::query_as(
+        "SELECT e.source_version_id, e.quote FROM evidence_link e
+         JOIN fact_version v ON v.id = e.fact_version_id
+         WHERE v.proposal_id = $1",
+    )
+    .bind(id)
+    .fetch_all(&test.database.pool)
+    .await
+    .unwrap();
+    assert_eq!(links, [(earlier.as_uuid(), "20000 Besuchern".to_owned())]);
 }

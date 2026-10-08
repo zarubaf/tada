@@ -1,14 +1,18 @@
 //! The review of one changeset: its proposals with their evidence, status and current values (ADR 0050).
 
+use std::collections::HashMap;
+
 use jiff::Timestamp;
 use tada_domain::ids::{ChangesetId, EventId, SourceVersionId};
 use tada_domain::proposals::{Operation, Proposal};
-use tada_domain::sources::Excerpt;
+use tada_domain::sources::{Excerpt, SourceText};
 
 use super::{ProposalStatus, ReviewQueryError, ReviewStores, proposal_status, reviewable};
+use crate::access;
 use crate::caller::{Actor, MemberCaller};
 use crate::clock::Clock;
 use crate::facts::FactVersionRef;
+use crate::proposals::Changeset;
 use crate::store::StoreError;
 
 /// Each excerpt of the evidence shows at most this number of characters before and after its passage.
@@ -66,6 +70,7 @@ pub async fn get_changeset(
 ) -> Result<ChangesetReview, ReviewQueryError> {
     let scope = caller.scope();
     let (changeset, source) = reviewable(caller, id, stores).await?;
+    let texts = evidence_texts(caller, &changeset, source, stores).await?;
     let results = stores.review.results(scope, id).await?;
     let now = clock.now();
     let mut proposals = Vec::new();
@@ -85,7 +90,10 @@ pub async fn get_changeset(
         let excerpts = proposal
             .evidence
             .iter()
-            .map(|evidence| evidence.passage.excerpt(source.as_str(), EXCERPT_CONTEXT))
+            .map(|evidence| {
+                let text = texts.get(&evidence.source_version_id)?;
+                evidence.passage.excerpt(text.as_str(), EXCERPT_CONTEXT)
+            })
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| StoreError::Internal(Box::new(PassageOutsideText)))?;
         proposals.push(ProposalReview {
@@ -106,6 +114,37 @@ pub async fn get_changeset(
         created_at: changeset.created_at,
         proposals,
     })
+}
+
+/// The text of each source version that the evidence of the changeset cites: the source text of the changeset,
+/// and each other source version in the reach of the caller (`access::source_reach`).
+/// A reviewer of the changeset reads the evidence of its event, so a missing text is an inconsistent store.
+async fn evidence_texts(
+    caller: &MemberCaller,
+    changeset: &Changeset,
+    source: SourceText,
+    stores: ReviewStores<'_>,
+) -> Result<HashMap<SourceVersionId, SourceText>, StoreError> {
+    let mut texts = HashMap::from([(changeset.source_version_id, source)]);
+    let mut cited: Vec<SourceVersionId> = changeset
+        .proposals
+        .iter()
+        .flat_map(|proposal| &proposal.evidence)
+        .map(|evidence| evidence.source_version_id)
+        .filter(|id| !texts.contains_key(id))
+        .collect();
+    cited.sort();
+    cited.dedup();
+    if cited.is_empty() {
+        return Ok(texts);
+    }
+    let reach = access::source_reach(caller, stores.identity).await?;
+    for version in stores.sources.texts(caller.scope(), &reach, &cited).await? {
+        if let Some(text) = version.text {
+            texts.insert(version.id, text);
+        }
+    }
+    Ok(texts)
 }
 
 /// The reason of a conflict: a fact with another version, or another change of the target.

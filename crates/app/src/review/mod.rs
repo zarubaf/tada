@@ -32,6 +32,7 @@ use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::{
     Changeset, FactStateInput, ProposalStore, state_from_input, value_error_code,
 };
+use crate::sources::SourceStore;
 use crate::store::StoreError;
 
 /// An open proposal older than this shows as stale (ADR 0050). It does not change.
@@ -305,6 +306,8 @@ pub struct ReviewStores<'a> {
     pub facts: &'a dyn FactStore,
     pub proposals: &'a dyn ProposalStore,
     pub review: &'a dyn ReviewStore,
+    /// The source versions that the evidence of a proposal cites besides the source text of its changeset.
+    pub sources: &'a dyn SourceStore,
 }
 
 /// The input of an apply: the selected proposals and the edited values.

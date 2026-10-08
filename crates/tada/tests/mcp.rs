@@ -230,6 +230,7 @@ impl Mcp {
             facts: &self.test.database,
             proposals: &self.test.database,
             review: &self.test.database,
+            sources: &self.test.database,
         };
         let input = ApplyInput {
             selected: selected

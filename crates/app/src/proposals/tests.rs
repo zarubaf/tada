@@ -1332,3 +1332,86 @@ async fn a_draft_needs_a_name_a_version_and_text() {
         )]
     );
 }
+
+/// A fact of the open day whose evidence is the passage "Das Flugfeld" of the source version `source`.
+fn fact_citing(source: SourceVersionId, quote: &str) -> NewChangeset {
+    let mut input = one_fact();
+    input.proposals[0].evidence = vec![
+        serde_json::from_value(json!({
+            "source_version_id": source.as_uuid(),
+            "start": 7,
+            "end": 19,
+            "quote": quote,
+        }))
+        .unwrap(),
+    ];
+    input
+}
+
+#[tokio::test]
+async fn a_fact_cites_a_passage_of_a_text_file_of_its_event() {
+    let (memory, [source, ..]) = memory_with_targets();
+    let anna = contributor(&memory);
+    let created = create_changeset(
+        &anna,
+        fact_citing(source, "Das Flugfeld"),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    let changeset = changeset_of(created.unwrap());
+    let evidence = &changeset.proposals[0].evidence[0];
+    assert_eq!(evidence.source_version_id, source);
+    assert_eq!(evidence.passage.quote, "Das Flugfeld");
+}
+
+#[tokio::test]
+async fn a_fact_cannot_cite_a_source_of_another_event_or_without_text() {
+    let (memory, [_, elsewhere, organization]) = memory_with_targets();
+    let pdf = SourceVersionId::from_uuid(Uuid::now_v7());
+    memory.sources.lock().unwrap().push((
+        Some(open_day()),
+        SourceVersionText {
+            id: pdf,
+            text: None,
+        },
+    ));
+    let anna = contributor(&memory);
+    let unknown = SourceVersionId::from_uuid(Uuid::now_v7());
+    for (source, code) in [
+        (elsewhere, "unknown-source"),
+        (organization, "unknown-source"),
+        (unknown, "unknown-source"),
+        (pdf, "no-text"),
+    ] {
+        let result = create_changeset(
+            &anna,
+            fact_citing(source, "Das Flugfeld"),
+            stores(&memory),
+            &FixedClock,
+        )
+        .await;
+        assert_eq!(
+            invalid_fields(result),
+            [("proposals/0/evidence/0".to_owned(), code)]
+        );
+    }
+    assert!(memory.inserted.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_cited_passage_must_match_its_source_version() {
+    let (memory, [source, ..]) = memory_with_targets();
+    let anna = contributor(&memory);
+    let result = create_changeset(
+        &anna,
+        fact_citing(source, "Das Festzelt"),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/0/evidence/0".to_owned(), "quote-mismatch")]
+    );
+}
