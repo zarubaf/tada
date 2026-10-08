@@ -32,6 +32,8 @@ export default {
           "none",
           "transparent",
           "unset",
+          // The system colors of forced colors (ADR 0022, doc/design/accessibility.md).
+          "/^(Canvas|CanvasText|GrayText|Highlight|HighlightText)$/",
         ],
         ignoreFunctions: false,
       },

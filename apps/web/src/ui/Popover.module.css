@@ -29,4 +29,13 @@
     background: var(--color-accent-subtle);
     color: var(--color-accent-text);
   }
+
+  /* Forced colors replace the background: the focused option uses the system highlight. */
+  @media (forced-colors: active) {
+    .item[data-focused] {
+      forced-color-adjust: none;
+      background: Highlight;
+      color: HighlightText;
+    }
+  }
 }

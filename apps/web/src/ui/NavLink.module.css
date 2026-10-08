@@ -19,6 +19,15 @@
     color: var(--color-accent-text);
   }
 
+  /* Forced colors replace the background: the current item keeps a mark of its own. */
+  @media (forced-colors: active) {
+    .link[aria-current="page"] {
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+    }
+  }
+
   .large {
     min-height: var(--control-height-lg);
   }

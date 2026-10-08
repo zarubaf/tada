@@ -35,4 +35,11 @@
     cursor: default;
     opacity: 0.5;
   }
+
+  @media (forced-colors: active) {
+    .trigger[data-disabled] {
+      border-color: GrayText;
+      color: GrayText;
+    }
+  }
 }

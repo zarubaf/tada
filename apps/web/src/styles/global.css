@@ -58,6 +58,18 @@
   }
 
   /*
+   * Forced colors (ADR 0022): the system replaces the colors, so focus rings use Highlight. An
+   * important declaration in the first layer wins over the later layers (see below).
+   */
+  @media (forced-colors: active) {
+    :focus-visible,
+    [data-focus-visible] {
+      /* biome-ignore lint/complexity/noImportantStyles: see the comment above */
+      outline-color: Highlight !important;
+    }
+  }
+
+  /*
    * Reduced motion wins over each component. An important declaration in the first layer wins over
    * the later layers, because the layer order reverses for important declarations.
    */

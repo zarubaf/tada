@@ -183,4 +183,15 @@
     --shadow-1: 0 4px 12px oklch(0% 0 0 / 0.4);
     --shadow-2: 0 8px 32px oklch(0% 0 0 / 0.5);
   }
+
+  /*
+   * More contrast (ADR 0022): borders and muted text take the stronger value of their theme.
+   * The selector matches each theme and comes last, so it wins over the theme rules.
+   */
+  @media (prefers-contrast: more) {
+    :root:is([data-theme], :not([data-theme])) {
+      --color-border-subtle: var(--color-border-control);
+      --color-text-muted: var(--color-text);
+    }
+  }
 }
