@@ -81,33 +81,33 @@ pub fn api_state(
     }
 }
 
-/// The object storage of the tests without Garage. Each call fails as if the storage were down.
-/// A test of documents sets the `blobs` of `api_state` to a `TestGarage`.
+/// The object storage of the tests without Garage.
+/// A test that reaches it forgot to set the `blobs` of `api_state` to a `TestGarage`, so it panics with that hint.
 #[derive(Debug)]
 pub struct NoObjectStorage;
 
 impl NoObjectStorage {
-    fn down() -> BlobError {
-        BlobError::Storage("this test has no object storage".into())
+    fn missing() -> ! {
+        panic!("this test has no object storage; set `ApiState::blobs` to a `TestGarage`")
     }
 }
 
 #[async_trait::async_trait]
 impl BlobStore for NoObjectStorage {
     async fn put(&self, _: &BlobKey, _: ByteStream, _: u64) -> Result<u64, BlobError> {
-        Err(Self::down())
+        Self::missing()
     }
 
     async fn get(&self, _: &BlobKey) -> Result<Option<ByteStream>, BlobError> {
-        Err(Self::down())
+        Self::missing()
     }
 
     async fn head(&self, _: &BlobKey) -> Result<Option<u64>, BlobError> {
-        Err(Self::down())
+        Self::missing()
     }
 
     async fn delete(&self, _: &BlobKey) -> Result<(), BlobError> {
-        Err(Self::down())
+        Self::missing()
     }
 }
 

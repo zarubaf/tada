@@ -17,11 +17,13 @@ use support::files::{executable, pdf, png};
 use tada_adapters::clock::SystemClock;
 use tada_adapters::storage::testing::TestGarage;
 use tada_api::ApiState;
-use tada_app::caller::{MemberCaller, OrganizationRole};
+use tada_app::auth::{Authenticated, AuthenticationError, Authenticator, Credential};
+use tada_app::caller::{AiCaller, MemberCaller, OrganizationRole};
 use tada_app::domain::identity::EventRole;
-use tada_app::domain::ids::{EventId, OrganizationId};
+use tada_app::domain::ids::{ApiTokenId, EventId, OrganizationId};
 use tada_app::event_members::add_event_member;
 use tada_app::session::SessionAuthenticator;
+use tada_app::tokens::TokenScope;
 use tada_store_pg::testing::TestDatabase;
 use tower::ServiceExt;
 
@@ -31,6 +33,7 @@ const LIMIT: u64 = 3 * 1024 * 1024;
 /// The API on PostgreSQL and Garage, with one organization, one event and its owner.
 struct Api {
     router: Router,
+    state: ApiState,
     test: TestDatabase,
     _garage: TestGarage,
     organization: OrganizationId,
@@ -58,7 +61,8 @@ impl Api {
             ..support::api_state(&test, authenticator, clock)
         };
         Self {
-            router: tada_api::router(state, None),
+            router: tada_api::router(state.clone(), None),
+            state,
             test,
             _garage: garage,
             organization,
@@ -449,4 +453,74 @@ async fn another_organization_gets_404_on_each_document_route() {
     assert_eq!(status, StatusCode::NOT_FOUND);
     let (status, _) = api.upload(&cookie, "Fremd.pdf", &pdf("Fremd")).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn refuses_an_upload_without_the_origin_of_tada() {
+    let api = Api::start().await;
+    let path = format!("/api/v1/events/{}/documents", api.event);
+    for origin in [None, Some("https://evil.example.net")] {
+        let mut request = upload(&api.owner_cookie, &path, "Programm.pdf", &pdf("Programm"));
+        match origin {
+            None => request.headers_mut().remove(header::ORIGIN),
+            Some(origin) => request
+                .headers_mut()
+                .insert(header::ORIGIN, origin.parse().unwrap()),
+        };
+        let (status, problem) = api.json(request).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{origin:?}");
+        assert_eq!(problem["code"], "forbidden");
+    }
+    let count: i64 = api
+        .test
+        .scalar("SELECT count(*) FROM document_version")
+        .await;
+    assert_eq!(count, 0);
+}
+
+/// An authenticator that finds an AI client of the owner for each request.
+#[derive(Debug)]
+struct AiClient(MemberCaller);
+
+#[async_trait::async_trait]
+impl Authenticator for AiClient {
+    async fn authenticate(
+        &self,
+        _credential: Option<Credential<'_>>,
+    ) -> Result<Authenticated, AuthenticationError> {
+        let token = ApiTokenId::from_uuid(uuid::Uuid::now_v7());
+        Ok(Authenticated::Ai(AiCaller::new(
+            self.0.clone(),
+            token,
+            TokenScope::Propose,
+        )))
+    }
+}
+
+#[tokio::test]
+async fn refuses_an_ai_client_on_upload_and_download() {
+    let api = Api::start().await;
+    let (_, document) = api
+        .upload(&api.owner_cookie, "Programm.pdf", &pdf("Programm"))
+        .await;
+    let ai = tada_api::router(
+        ApiState {
+            authenticator: Arc::new(AiClient(api.owner.clone())),
+            ..api.state.clone()
+        },
+        None,
+    );
+    let path = format!("/api/v1/events/{}/documents", api.event);
+    for request in [
+        upload(&api.owner_cookie, &path, "Plan.pdf", &pdf("Plan")),
+        get(&api.owner_cookie, &content_path(&document)),
+    ] {
+        let response = ai.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+    let count: i64 = api
+        .test
+        .scalar("SELECT count(*) FROM document_version")
+        .await;
+    assert_eq!(count, 1);
 }
