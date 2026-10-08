@@ -30,6 +30,11 @@
     outline-offset: 2px;
   }
 
+  .checkbox[data-disabled] {
+    cursor: default;
+    opacity: 0.5;
+  }
+
   @media (forced-colors: active) {
     .checkbox[data-selected] .box {
       background: Highlight;

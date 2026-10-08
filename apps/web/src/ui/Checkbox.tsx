@@ -6,12 +6,18 @@ export interface CheckboxProps {
   label: string;
   isSelected: boolean;
   onChange: (selected: boolean) => void;
+  isDisabled?: boolean;
 }
 
 /** A checkbox with its label to the right. */
-export function Checkbox({ label, isSelected, onChange }: CheckboxProps) {
+export function Checkbox({ label, isSelected, onChange, isDisabled }: CheckboxProps) {
   return (
-    <AriaCheckbox className={styles.checkbox} isSelected={isSelected} onChange={onChange}>
+    <AriaCheckbox
+      className={styles.checkbox}
+      isSelected={isSelected}
+      onChange={onChange}
+      isDisabled={isDisabled}
+    >
       <span className={styles.box} aria-hidden="true">
         {isSelected ? "✓" : ""}
       </span>
