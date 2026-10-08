@@ -357,8 +357,13 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: tada_app::domain::ids::UserId,
-        ) -> Result<Vec<tada_app::domain::identity::EventRole>, tada_app::store::StoreError>
-        {
+        ) -> Result<
+            Vec<(
+                tada_app::domain::ids::EventId,
+                tada_app::domain::identity::EventRole,
+            )>,
+            tada_app::store::StoreError,
+        > {
             unreachable!()
         }
     }

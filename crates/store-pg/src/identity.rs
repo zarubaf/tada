@@ -110,9 +110,9 @@ impl IdentityStore for Database {
         &self,
         scope: OrgScope,
         user: UserId,
-    ) -> Result<Vec<EventRole>, StoreError> {
-        let roles = sqlx::query_scalar!(
-            "SELECT event_role FROM event_membership
+    ) -> Result<Vec<(EventId, EventRole)>, StoreError> {
+        let rows = sqlx::query!(
+            "SELECT event_id, event_role FROM event_membership
              WHERE organization_id = $1 AND user_id = $2
              ORDER BY event_id",
             scope.organization_id().as_uuid(),
@@ -121,9 +121,12 @@ impl IdentityStore for Database {
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
-        Ok(roles
+        Ok(rows
             .iter()
-            .map(|name| EventRole::parse(name).ok_or(InvalidRow("event_role")))
+            .map(|row| {
+                let role = EventRole::parse(&row.event_role).ok_or(InvalidRow("event_role"))?;
+                Ok::<_, InvalidRow>((EventId::from_uuid(row.event_id), role))
+            })
             .collect::<Result<_, _>>()?)
     }
 }

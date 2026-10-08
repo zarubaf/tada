@@ -160,7 +160,7 @@ pub async fn proposes_in_some_event(
         .event_roles_of(caller.scope(), caller.user_id())
         .await?
         .into_iter()
-        .any(|role| EventAccess::from(role).can_propose()))
+        .any(|(_, role)| EventAccess::from(role).can_propose()))
 }
 
 /// The access of the member `user`, who is not the caller, in the event `event`, or `None` if the user has none.
@@ -241,13 +241,13 @@ mod tests {
             &self,
             scope: OrgScope,
             user: UserId,
-        ) -> Result<Vec<EventRole>, StoreError> {
+        ) -> Result<Vec<(EventId, EventRole)>, StoreError> {
             let roles = self.roles.lock().unwrap();
             Ok(self
                 .events
                 .iter()
                 .filter(|(organization, _)| *organization == scope.organization_id())
-                .filter_map(|(_, event)| roles.get(&(*event, user)).copied())
+                .filter_map(|(_, event)| roles.get(&(*event, user)).map(|role| (*event, *role)))
                 .collect())
         }
     }
