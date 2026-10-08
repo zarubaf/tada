@@ -117,13 +117,7 @@ impl Tools {
         Extension(parts): Extension<Parts>,
     ) -> Result<Json<EventList>, ToolError> {
         let caller = caller(&parts)?;
-        let page = events::list_events(
-            caller,
-            None,
-            PageLimit::new(PageLimit::MAX).unwrap_or_default(),
-            &*self.events,
-        )
-        .await?;
+        let page = events::list_events(caller, None, PageLimit::LARGEST, &*self.events).await?;
         Ok(Json(EventList {
             events: page.items.iter().map(EventView::from).collect(),
             more: page.next.is_some(),
@@ -246,7 +240,7 @@ The list holds at most the 200 newest documents and has no next page. If more is
             event.id,
             None,
             None,
-            PageLimit::new(PageLimit::MAX).unwrap_or_default(),
+            PageLimit::LARGEST,
             self.document_reads(),
         )
         .await?;
