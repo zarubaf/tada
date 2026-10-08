@@ -38,7 +38,7 @@ Each proposal has at least one passage in evidence: start and end count characte
 A passage without source_version_id cites source_text. A passage with source_version_id cites another source version that the member can read in the event, for example a hit of search_sources. \
 depends_on lists the proposals of the same changeset that create the records that a proposal uses, for example the new field of a fact. \
 Each id is a new UUIDv7. Send the same changeset with the same id again to retry safely. \
-If a check fails, tada stores nothing: the error data gives the problem code and, for validation-failed, each invalid value as a JSON pointer and a code.",
+If a check fails, tada stores nothing: the result has isError, the problem code and, for validation-failed, each invalid value as a JSON pointer and a code.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,

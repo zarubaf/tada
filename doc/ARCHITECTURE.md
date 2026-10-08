@@ -48,6 +48,8 @@ Optional later adapters: Microsoft Graph (mail, calendar, SharePoint), Nextcloud
 | `apps/web`       | React web client, German UI, design system.                                                                                          | [0005](adr/0005-web-client.md), [0018](adr/0018-design-system-foundation.md)–[0024](adr/0024-frontend-quality-gates.md)                |
 | Runtime          | One image that follows the platform contract. Each operator deploys it from a separate repository.                                   | [0025](adr/0025-platform-contract.md), [0028](adr/0028-images-and-registry.md), [0033](adr/0033-deployment-outside-this-repository.md) |
 
+An MCP tool answers a refusal of `app`, also invalid arguments, as a tool result with `isError`, the problem code and the JSON pointers of the invalid values; only `internal` and `unavailable` are JSON-RPC errors.
+
 Search uses PostgreSQL full-text search first.
 pgvector comes only if an evaluation shows a benefit.
 

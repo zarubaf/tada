@@ -5,10 +5,13 @@ use std::sync::Arc;
 
 use axum::http::request::Parts;
 use rmcp::handler::server::router::tool::ToolRouter;
-use rmcp::handler::server::tool::Extension;
+use rmcp::handler::server::tool::{Extension, IntoCallToolResult, ToolCallContext};
 use rmcp::handler::server::wrapper::{Json, Parameters};
-use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
-use rmcp::{ServerHandler, tool, tool_handler, tool_router};
+use rmcp::model::{
+    CallToolRequestParams, CallToolResponse, Implementation, ServerCapabilities, ServerConfig,
+};
+use rmcp::service::RequestContext;
+use rmcp::{ErrorData, RoleServer, ServerHandler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use tada_app::caller::AiCaller;
@@ -236,6 +239,24 @@ impl Tools {
 
 #[tool_handler(router = Self::all_tools())]
 impl ServerHandler for Tools {
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResponse, ErrorData> {
+        let call = ToolCallContext::new(self, request, context);
+        match Self::all_tools().call(call).await? {
+            // rmcp answers arguments that do not match the input schema with a text that can repeat input values
+            // (ADR 0037). Each refusal of a tool has structured content, so the result without it is that answer.
+            CallToolResponse::Complete(result)
+                if result.is_error == Some(true) && result.structured_content.is_none() =>
+            {
+                ToolError::problem(ProblemCode::MalformedRequest, &[]).into_call_tool_result()
+            }
+            response => Ok(response),
+        }
+    }
+
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("tada", env!("CARGO_PKG_VERSION")))

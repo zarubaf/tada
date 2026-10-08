@@ -204,7 +204,7 @@ impl Mcp {
     /// The structured result of a successful tool call.
     async fn result(&self, name: &str, arguments: Value) -> Value {
         let body = self.call(name, arguments).await;
-        assert!(body["error"].is_null(), "{body}");
+        assert_eq!(body["result"]["isError"], false, "{body}");
         body["result"]["structuredContent"].clone()
     }
 
@@ -299,6 +299,15 @@ impl Mcp {
             .map(|hit| json!(hit.source_version_id.as_uuid()))
             .collect()
     }
+}
+
+/// The structured content of a tool result with `isError`: a refusal of the call, with its problem code.
+fn problem(body: &Value) -> &Value {
+    assert!(body["error"].is_null(), "not a tool result: {body}");
+    assert_eq!(body["result"]["isError"], true, "{body}");
+    let content = &body["result"]["structuredContent"];
+    assert!(content["errors"].is_array(), "{body}");
+    content
 }
 
 /// Sends a request and returns the status and the JSON body. Each response must forbid the referrer (ADR 0008).
@@ -506,11 +515,11 @@ async fn the_profile_keeps_open_proposals_apart_from_accepted_facts() {
     let body = mcp
         .call("get_event_profile", json!({"event_key": "SECRET30"}))
         .await;
-    assert_eq!(body["error"]["data"]["code"], "not-found", "{body}");
+    assert_eq!(problem(&body)["code"], "not-found", "{body}");
     let body = mcp
         .call("get_event_profile", json!({"event_key": "NONE30"}))
         .await;
-    assert_eq!(body["error"]["data"]["code"], "not-found", "{body}");
+    assert_eq!(problem(&body)["code"], "not-found", "{body}");
 }
 
 #[tokio::test]
@@ -548,7 +557,7 @@ async fn search_never_returns_a_source_of_another_organization_or_of_an_event_wi
                 json!({"source_version_id": source, "start": 0, "end": 3}),
             )
             .await;
-        assert_eq!(body["error"]["data"]["code"], "not-found", "{body}");
+        assert_eq!(problem(&body)["code"], "not-found", "{body}");
     }
 
     let result = mcp
@@ -564,11 +573,11 @@ async fn search_never_returns_a_source_of_another_organization_or_of_an_event_wi
             json!({"event_key": "SECRET30", "query": "Flugfeld"}),
         )
         .await;
-    assert_eq!(body["error"]["data"]["code"], "not-found", "{body}");
+    assert_eq!(problem(&body)["code"], "not-found", "{body}");
     let body = mcp.call("search_sources", json!({"query": " "})).await;
-    assert_eq!(body["error"]["data"]["code"], "validation-failed", "{body}");
+    assert_eq!(problem(&body)["code"], "validation-failed", "{body}");
     assert_eq!(
-        body["error"]["data"]["errors"],
+        problem(&body)["errors"],
         json!([{"pointer": "/query", "code": "empty"}]),
         "a JSON pointer as in the API: {body}"
     );
@@ -608,7 +617,7 @@ async fn a_member_reads_the_organization_source_that_the_facts_of_its_event_cite
     let source = changeset.source_version_id.as_uuid();
     let citation = json!({"source_version_id": source, "start": 14, "end": 24});
     let body = mcp.call("get_source_passage", citation.clone()).await;
-    assert_eq!(body["error"]["data"]["code"], "not-found", "{body}");
+    assert_eq!(problem(&body)["code"], "not-found", "{body}");
 
     // As a viewer of the new event, she reads the text that its facts cite.
     mcp.add_role(EventId::from_uuid(event), EventRole::EventViewer)
@@ -754,15 +763,18 @@ async fn reads_of_sources_leave_no_text_in_the_log() {
         mcp.result("get_source_passage", citation).await["quote"],
         "Das Ope"
     );
-    // A rejected input repeats the value in its serde message; rmcp would log it below `error`.
+    // The serde message of rmcp repeats the value; the server answers with the problem code only (ADR 0037).
     let wrong =
         json!({"source_version_id": hit["source_version_id"], "start": "Flugfeld", "end": 1});
     let body = mcp.call("get_source_passage", wrong).await;
-    assert_eq!(body["result"]["isError"], true, "{body}");
-    assert!(
-        body.to_string().contains("Flugfeld"),
-        "the client sees its input: {body}"
+    assert_eq!(
+        problem(&body),
+        &json!({"code": "malformed-request", "errors": []})
     );
+    assert!(!body.to_string().contains("Flugfeld"), "{body}");
+    // An unknown tool stays a JSON-RPC error.
+    let body = mcp.call("accept_changeset", json!({})).await;
+    assert_eq!(body["error"]["code"], -32602, "{body}");
 
     logs::assert_clean(&["Flugfeld", "Das Ope", "text-search query"]);
 }
@@ -847,7 +859,7 @@ async fn a_changeset_through_mcp_waits_in_the_review_inbox_with_the_ai_as_author
     arguments["id"] = json!(changeset_id);
 
     let body = mcp.propose_with(&token, arguments.clone()).await;
-    assert!(body["error"].is_null(), "{body}");
+    assert_eq!(body["result"]["isError"], false, "{body}");
     let result = &body["result"]["structuredContent"];
     assert_eq!(result["changeset_id"], changeset_id.to_string());
     assert_eq!(result["link"], format!("/inbox/{changeset_id}"));
@@ -907,7 +919,7 @@ async fn a_proposal_without_evidence_is_rejected_without_its_text() {
     let body = mcp
         .propose_with(&token, changeset(mcp.secret, SOURCE, no_evidence))
         .await;
-    let data = &body["error"]["data"];
+    let data = &problem(&body);
     assert_eq!(data["code"], "validation-failed", "{body}");
     assert_eq!(
         data["errors"],
@@ -927,7 +939,7 @@ async fn a_proposal_without_evidence_is_rejected_without_its_text() {
         .propose_with(&token, changeset(mcp.secret, &long, proposals))
         .await;
     assert_eq!(
-        body["error"]["data"]["errors"],
+        problem(&body)["errors"],
         json!([{"pointer": "/source_text", "code": "length"}]),
         "{body}"
     );
@@ -958,15 +970,15 @@ async fn only_a_propose_token_of_a_member_who_can_propose_in_the_event_proposes(
     // A contributor of SECRET30 is still a viewer of OPEN30.
     let open_day = changeset(mcp.open_day, SOURCE, proposals(mcp.open_day));
     let body = mcp.propose_with(&token, open_day).await;
-    assert_eq!(body["error"]["data"]["code"], "forbidden", "{body}");
+    assert_eq!(problem(&body)["code"], "forbidden", "{body}");
 
     // A `read` token never proposes, also in an event where the member can.
     let secret = changeset(mcp.secret, SOURCE, proposals(mcp.secret));
     let body = mcp.propose_with(&mcp.token, secret.clone()).await;
-    assert_eq!(body["error"]["data"]["code"], "forbidden", "{body}");
+    assert_eq!(problem(&body)["code"], "forbidden", "{body}");
 
     let body = mcp.propose_with(&token, secret).await;
-    assert!(body["error"].is_null(), "{body}");
+    assert_eq!(body["result"]["isError"], false, "{body}");
 }
 
 /// The tool takes each operation of the `app` input, also a document draft (ADR 0051).
@@ -984,7 +996,7 @@ async fn an_agent_proposes_a_document_draft() {
     let body = mcp
         .propose_with(&token, changeset(mcp.secret, SOURCE, proposals))
         .await;
-    assert!(body["error"].is_null(), "{body}");
+    assert_eq!(body["result"]["isError"], false, "{body}");
     let link = &body["result"]["structuredContent"]["link"];
     assert!(link.as_str().unwrap().starts_with("/inbox/"), "{body}");
 }
