@@ -1,5 +1,7 @@
 import { lazy, Suspense } from "react";
 import { type Api, createApi } from "./api/client";
+import { DocumentPage } from "./documents/DocumentPage";
+import { DocumentsPage } from "./documents/DocumentsPage";
 import { CreateEventForm } from "./events/CreateEventForm";
 import { EventMembersPage } from "./events/EventMembersPage";
 import { EventPage } from "./events/EventPage";
@@ -74,6 +76,14 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   <EventPage api={api}>
                     <EventMembersPage api={api} />
                   </EventPage>
+                </Route>
+                <Route path="/events/:eventId/documents">
+                  <EventPage api={api}>
+                    <DocumentsPage api={api} />
+                  </EventPage>
+                </Route>
+                <Route path="/documents/:documentId">
+                  <DocumentPage api={api} />
                 </Route>
                 {/* Settings (Task 20) */}
                 <Route path="/settings/members">

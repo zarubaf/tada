@@ -3,6 +3,8 @@
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
+import { FileButton } from "../ui/FileButton";
+import { FileLink } from "../ui/FileLink";
 import { InlineError } from "../ui/InlineError";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./Gallery.module.css";
@@ -109,6 +111,22 @@ export function Gallery() {
             Anlass erfassen
           </Button>
           <Button isDisabled>Erneut versuchen</Button>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Dateien</h2>
+        <div className={styles.row}>
+          <FileButton onSelect={() => {}}>Datei hochladen</FileButton>
+          <FileButton isPending onSelect={() => {}}>
+            Datei hochladen
+          </FileButton>
+          <FileLink download href="/beispiel.pdf">
+            Herunterladen
+          </FileLink>
+          <FileLink newTab href="/beispiel.pdf">
+            Vorschau in neuem Tab öffnen
+          </FileLink>
         </div>
       </section>
 

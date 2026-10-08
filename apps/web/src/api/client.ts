@@ -17,6 +17,8 @@ export type TelegramLinkRequest = components["schemas"]["TelegramLinkRequest"];
 export type Invitation = components["schemas"]["Invitation"];
 export type OrganizationRole = components["schemas"]["OrganizationRole"];
 export type EventRole = components["schemas"]["EventRole"];
+export type Document = components["schemas"]["Document"];
+export type DocumentVersion = components["schemas"]["DocumentVersion"];
 
 /** The problem codes that the session handles for every call (ADR 0037). */
 export const SESSION_PROBLEMS = ["unauthenticated", "organization-required"] as const;
