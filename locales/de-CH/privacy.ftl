@@ -31,6 +31,8 @@ privacy-template =
 
     - Angaben zu Mitgliedern: Anzeigename, E-Mail-Adresse, Mitgliedschaften und Rollen.
     - Angaben zur Anmeldung: Sitzungen mit dem Browser, Einladungen und Anmeldelinks.
+    - Zähler für Anmeldeversuche: pro E-Mail-Adresse und pro IP-Adresse, als verschlüsselter Schlüssel.
+      Wir bewahren sie höchstens zwei Stunden auf.
     - Inhalte der Anlässe: Fakten, Vorschläge, Prüfungen, offene Fragen, Entwürfe und hochgeladene Dateien.
     - Quellentexte, zum Beispiel eingefügte E-Mails oder Notizen.
       Sie können Namen und Kontaktdaten von Dritten enthalten.
@@ -53,9 +55,14 @@ privacy-template =
     Anlässe, Fakten, Quellen mit ihren Textstellen und Dokumente.
     Das können Personendaten sein.
     Der Verein verlangt einen KI-Tarif, der die Eingaben nicht zum Training nutzt.
-    Ein Zitat, das als Beleg dient, kann den ganzen Text eines Änderungsvorschlags der Organisation zeigen.
-    Alle, die den Anlass lesen dürfen, sehen dann diesen Text.
     Die Organisationsleitung kann API-Token ausschalten.
+
+    # Zitate als Belege
+
+    Ein Vorschlag belegt seinen Inhalt mit einem Zitat aus einer Quelle.
+    Das Zitat kann den ganzen Text einer Eingabe zeigen, die für die ganze Organisation gilt und nicht für einen einzelnen Anlass.
+    Alle, die den Anlass lesen dürfen, sehen dann diesen Text.
+    Das gilt in der Web-Oberfläche und für die KI-Clients der Mitglieder.
 
     # Hochgeladene Dateien
 

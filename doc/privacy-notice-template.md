@@ -28,11 +28,13 @@ This file does not repeat it.
   The template names no provider.
 - The purposes of the processing.
 - The categories of data, as in [the data inventory](data-inventory.md).
+  They include the counters of sign-in attempts: keyed hashes of the email address and the IP address, kept for two hours at most.
 - Telegram, as an optional channel.
 - The AI clients of members.
   They read the data of the member through the read tools of MCP.
-  A quote that serves as evidence can show the whole text of a proposal of the organization.
-  Each reader of the event then sees this text.
+- Quotes as evidence.
+  A quote can show the whole text of an organization-level changeset, which is not bound to one event.
+  Each reader of the event then sees this text, in the web client and in AI clients.
 - No scan of uploaded files for malware.
 - The retention of backups and logs.
 - The rights to access, correction and deletion, with a contact.
