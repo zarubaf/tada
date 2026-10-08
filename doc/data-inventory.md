@@ -7,7 +7,9 @@ Logs hold no direct identifiers. They can hold record IDs, also user IDs (ADR 00
 A failed upload can leave its object in the object storage without a document version.
 Causes are a crash, a failed delete, or a commit with an unknown outcome.
 Such an object can hold personal data.
-Slice 1 has no job that finds and deletes these objects.
+A canceled request, for example a client that disconnects during an upload, can leave the parts of an incomplete multipart upload in the object storage.
+These parts are not objects and can hold personal data too.
+Slice 1 has no job that finds and deletes these objects or parts.
 
 | Category                 | Table and columns                                                                                                                                            | Purpose                                                                                                                                                                                                                     | Retention                                                                                                                                                                                    |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
