@@ -14,7 +14,7 @@ import { PartiesPage } from "./parties/PartiesPage";
 import { PrivacyPage } from "./privacy/PrivacyPage";
 import { InboxProvider } from "./review/InboxProvider";
 import { ReviewInbox } from "./review/ReviewInbox";
-import { Redirect, Route, Router, Routes } from "./router/Router";
+import { Route, Router, Routes } from "./router/Router";
 import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
 import { SessionProvider } from "./session/SessionProvider";
 import { OrganizationPage } from "./settings/OrganizationPage";
@@ -28,6 +28,7 @@ import { TokensPage } from "./tokens/TokensPage";
 import { SkipLink } from "./ui/SkipLink";
 import { ActionsPage } from "./work/ActionsPage";
 import { CommitmentsPage } from "./work/CommitmentsPage";
+import { MyWorkPage } from "./work/MyWorkPage";
 import { WorkstreamsPage } from "./work/WorkstreamsPage";
 
 const defaultApi = createApi();
@@ -56,7 +57,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
               <Shell api={api}>
                 <Routes>
                   <Route path="/">
-                    <Redirect to="/events" />
+                    <MyWorkPage api={api} />
                   </Route>
                   <Route path="/events">
                     <EventsPage api={api} />

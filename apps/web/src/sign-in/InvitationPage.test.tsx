@@ -85,7 +85,7 @@ describe("InvitationPage", () => {
     expect(screen.queryByRole("heading", { name: "Verantwortlich" })).not.toBeInTheDocument();
   });
 
-  it("accepts only after the click, then opens the events", async () => {
+  it("accepts only after the click, then opens My Work", async () => {
     const calls = renderAt(
       "#token=invite-token",
       json(200, { organization_name: "Fliegergruppe Testwil", role: "member" }),
@@ -96,7 +96,7 @@ describe("InvitationPage", () => {
     expect(calls.some((call) => call.path.endsWith("/accept"))).toBe(false);
     await userEvent.click(button);
 
-    expect(await screen.findByText("/events")).toBeInTheDocument();
+    expect(await screen.findByText("/")).toBeInTheDocument();
     expect(calls.find((call) => call.path.endsWith("/accept"))?.body).toBe(
       JSON.stringify({ token: "invite-token" }),
     );

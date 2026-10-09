@@ -76,6 +76,23 @@ describe("Shell", () => {
     expect(screen.queryByRole("button", { name: /Organisation/ })).not.toBeInTheDocument();
   });
 
+  it("links Meine Arbeit to / and marks it as current there only", async () => {
+    renderShellAt("/", json(200, info([first], first)));
+
+    const link = await screen.findByRole("link", { name: "Meine Arbeit" });
+    expect(link).toHaveAttribute("href", "/");
+    expect(link).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("does not mark Meine Arbeit as current on the events list", async () => {
+    renderShell(json(200, info([first], first)));
+
+    expect(await screen.findByRole("link", { name: "Meine Arbeit" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
   it.each(["/settings/members", "/settings/telegram"])(
     "marks Einstellungen as current on %s",
     async (path) => {

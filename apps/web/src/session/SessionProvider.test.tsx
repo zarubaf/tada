@@ -190,10 +190,10 @@ describe("SessionProvider", () => {
     },
   );
 
-  it("sends a signed-in member from the sign-in page to the events", async () => {
+  it("sends a signed-in member from the sign-in page to My Work", async () => {
     const { api } = fakeApi(json(200, info));
     renderPublic("/sign-in", api);
 
-    await vi.waitFor(() => expect(screen.getByTestId("path")).toHaveTextContent("/events"));
+    await vi.waitFor(() => expect(screen.getByTestId("path")).toHaveTextContent(/^\/$/));
   });
 });

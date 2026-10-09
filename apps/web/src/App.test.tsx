@@ -35,10 +35,15 @@ function renderAt(path: string) {
 afterEach(() => window.history.replaceState(null, "", "/"));
 
 describe("App", () => {
-  it("redirects / to the events page", async () => {
+  it("shows My Work at /", async () => {
     renderAt("/");
+    expect(await screen.findByRole("heading", { name: "Meine Arbeit" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("keeps the events list at /events", async () => {
+    renderAt("/events");
     expect(await screen.findByRole("heading", { name: "Anlässe" })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/events");
   });
 
   it("shows the not-found page for an unknown path", async () => {

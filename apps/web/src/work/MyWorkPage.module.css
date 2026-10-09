@@ -1,0 +1,21 @@
+@layer components {
+  .page {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+}

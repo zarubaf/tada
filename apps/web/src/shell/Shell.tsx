@@ -58,6 +58,9 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           </div>
         )}
         <nav className={styles.nav} aria-label={t("shell-nav")}>
+          <NavLink to="/" exact large>
+            {t("nav-my-work")}
+          </NavLink>
           <NavLink to="/inbox" large>
             {t("nav-inbox")}
             <InboxCount />
@@ -65,7 +68,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           <NavLink to="/events" large>
             {t("nav-events")}
           </NavLink>
-          {/* The bottom bar has room for three items; on narrow layouts the member menu has these. */}
+          {/* The bottom bar has room for four items (My Work, Inbox, Events, Settings); on narrow layouts the member menu has these. */}
           <div className={styles.registers}>
             <NavLink to="/persons">{t("nav-persons")}</NavLink>
             <NavLink to="/institutions">{t("nav-institutions")}</NavLink>

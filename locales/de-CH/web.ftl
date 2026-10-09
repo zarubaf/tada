@@ -98,6 +98,7 @@ not-found-text = Diese Adresse gibt es nicht. Prüfen Sie den Link oder wählen 
 session-loading = Sitzung wird geladen
 skip-link = Zum Inhalt springen
 shell-nav = Hauptnavigation
+nav-my-work = Meine Arbeit
 nav-events = Anlässe
 nav-persons = Personen
 nav-institutions = Institutionen
@@ -862,3 +863,17 @@ workstream-status-closed = geschlossen
 
 combobox-loading = Suche läuft
 combobox-empty = Keine Treffer
+
+## My Work
+
+my-work-title = Meine Arbeit
+my-work-loading = Meine Arbeit wird geladen
+my-work-empty-title = Nichts offen
+my-work-empty-text = Sie haben keine offenen Aufgaben und Zusagen. Neue Einträge, die Ihnen gehören, erscheinen hier.
+my-work-overdue = überfällig
+# $count: the number of proposals that the member reviews.
+my-work-review =
+    { $count ->
+        [one] 1 Vorschlag wartet auf Ihre Prüfung
+       *[other] { $count } Vorschläge warten auf Ihre Prüfung
+    }

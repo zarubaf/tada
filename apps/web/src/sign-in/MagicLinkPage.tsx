@@ -36,7 +36,7 @@ export function MagicLinkPage({ api }: { api: Api }) {
       const result = await api.POST("/api/v1/sign-in/magic-link", { body: { token } });
       if (!result.error) {
         await refresh();
-        navigate("/events", { replace: true });
+        navigate("/", { replace: true });
         return;
       }
       setFailure(failureOf(result, t("magic-link-invalid")));

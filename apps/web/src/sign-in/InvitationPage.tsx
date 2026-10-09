@@ -80,7 +80,7 @@ export function InvitationPage({ api }: { api: Api }) {
       const result = await api.POST("/api/v1/invitations/accept", { body: { token } });
       if (!result.error) {
         await refresh();
-        navigate("/events", { replace: true });
+        navigate("/", { replace: true });
         return;
       }
       setFailure(failureOf(result, t("invitation-invalid")));

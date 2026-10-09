@@ -27,7 +27,7 @@ for (const viewport of viewports) {
         await page.setViewportSize(viewport);
         await fakeSession(page);
         await fakeEvents(page, state.status, state.body);
-        await page.goto("/");
+        await page.goto("/events");
         await setTheme(page, theme);
         await expect(page.getByRole("heading", { name: "Anlässe" })).toBeVisible();
         // The skeleton is a labelled status; the live regions have no label.
@@ -62,7 +62,7 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page);
       await fakeEvents(page, 200, { items: events });
-      await page.goto("/");
+      await page.goto("/events");
       await setTheme(page, theme);
       await expect(page.getByRole("table")).toBeVisible();
       await fontsLoaded(page);
