@@ -145,9 +145,12 @@ impl Mcp {
             facts: database.clone(),
             sources: database.clone(),
             proposals: database.clone(),
-            documents: database,
+            documents: database.clone(),
             clock: clock.clone(),
             public_url: support::public_url(),
+            workstreams: database.clone(),
+            parties: database.clone(),
+            work: database,
         };
         let router = tada::serve::routes(api, mcp, None);
         let mcp = Self {
@@ -232,6 +235,9 @@ impl Mcp {
             proposals: &self.test.database,
             sources: &self.test.database,
             documents: &self.test.database,
+            workstreams: &self.test.database,
+            parties: &self.test.database,
+            work: &self.test.database,
         };
         match create_changeset(&self.owner, input, stores, &*self.clock)
             .await
@@ -250,6 +256,7 @@ impl Mcp {
             proposals: &self.test.database,
             review: &self.test.database,
             sources: &self.test.database,
+            workstreams: &self.test.database,
         };
         let input = ApplyInput {
             selected: selected

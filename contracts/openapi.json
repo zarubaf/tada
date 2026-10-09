@@ -4248,13 +4248,88 @@
             "description": "The input of `ApplyChangeset`.",
             "properties": {
               "edits": {
-                "description": "The values that the reviewer changes before the acceptance. Only a proposal that sets a fact has a value.",
+                "description": "The changes of the reviewer before the acceptance: the value of a proposal that sets a fact,\nor fields of a proposal that creates an action, a commitment, a person or an institution.",
                 "items": {
                   "additionalProperties": false,
-                  "description": "A value that the reviewer changes before the acceptance.",
+                  "description": "A change of the reviewer before the acceptance. A `set-fact` proposal takes `state`;\na proposal that creates an action, a commitment, a person or an institution takes `fields`.",
                   "properties": {
+                    "fields": {
+                      "additionalProperties": false,
+                      "description": "The fields of the new record that the reviewer replaces.",
+                      "properties": {
+                        "condition": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "description": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "due_date": {
+                          "description": "A date as `YYYY-MM-DD`.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "email": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "owner": {
+                          "description": "The user ID of a contributor or a manager of the event.",
+                          "format": "uuid",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "phone": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "text": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "workstream": {
+                          "description": "An active workstream of the event.",
+                          "format": "uuid",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
                     "proposal_id": {
-                      "description": "A selected proposal that sets a fact.",
+                      "description": "A selected proposal.",
                       "format": "uuid",
                       "type": "string"
                     },
@@ -4675,8 +4750,7 @@
                     }
                   },
                   "required": [
-                    "proposal_id",
-                    "state"
+                    "proposal_id"
                   ],
                   "type": "object"
                 },
@@ -6214,6 +6288,360 @@
                             "event_id",
                             "document",
                             "markdown"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Create a person of the organization. Search the persons first: propose a new one only if none matches.\nA person belongs to no event, so the operation has no `event_id`.",
+                          "properties": {
+                            "email": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "id": {
+                              "description": "The UUIDv7 of the new person.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create-person",
+                              "type": "string"
+                            },
+                            "name": {
+                              "description": "1 to 200 characters.",
+                              "type": "string"
+                            },
+                            "phone": {
+                              "description": "1 to 50 characters, as written.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Create an institution of the organization. Search the institutions first: propose a new one only if none matches.\nAn institution belongs to no event, so the operation has no `event_id`.",
+                          "properties": {
+                            "email": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "id": {
+                              "description": "The UUIDv7 of the new institution.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "institution_kind": {
+                              "description": "`kind` names the operation, so the kind of the institution has this name.",
+                              "enum": [
+                                "authority",
+                                "company",
+                                "club",
+                                "other"
+                              ],
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create-institution",
+                              "type": "string"
+                            },
+                            "name": {
+                              "description": "1 to 200 characters.",
+                              "type": "string"
+                            },
+                            "phone": {
+                              "description": "1 to 50 characters, as written.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "name",
+                            "institution_kind"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Create an action of the event. It starts `open`.",
+                          "properties": {
+                            "description": {
+                              "description": "1 to 4000 characters.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "due": {
+                              "description": "The due date as `YYYY-MM-DD`.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "id": {
+                              "description": "The UUIDv7 of the new action.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create-action",
+                              "type": "string"
+                            },
+                            "owner": {
+                              "description": "The user ID of a member with the contributor or manager role in the event.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "title": {
+                              "description": "1 to 200 characters.",
+                              "type": "string"
+                            },
+                            "workstream": {
+                              "description": "An active workstream of the event.",
+                              "format": "uuid",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "event_id",
+                            "title",
+                            "owner"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Create a commitment of the event. With a condition it starts `conditional`, else `firm`.\nNever invent a signature or an approval: a commitment with an open condition stays conditional.",
+                          "properties": {
+                            "condition": {
+                              "description": "The condition of the promise, 1 to 500 characters, for example \"subject to a signed order\".",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "due": {
+                              "description": "The due date as `YYYY-MM-DD`.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "id": {
+                              "description": "The UUIDv7 of the new commitment.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create-commitment",
+                              "type": "string"
+                            },
+                            "owner": {
+                              "description": "The user ID of the member who follows the commitment up: a contributor or manager of the event.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "promisor": {
+                              "description": "The person or institution that promises. It can be a new person or institution of the same changeset;\nthen the proposal depends on the proposal that creates it.",
+                              "oneOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "person": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "person"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "institution": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "institution"
+                                  ],
+                                  "type": "object"
+                                }
+                              ]
+                            },
+                            "text": {
+                              "description": "What the promisor promises, 1 to 500 characters.",
+                              "type": "string"
+                            },
+                            "workstream": {
+                              "description": "An active workstream of the event.",
+                              "format": "uuid",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "event_id",
+                            "text",
+                            "promisor",
+                            "owner"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Change the status of an action of the event.",
+                          "properties": {
+                            "action_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "description": "The current version of the action.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "kind": {
+                              "const": "change-action-status",
+                              "type": "string"
+                            },
+                            "status": {
+                              "enum": [
+                                "open",
+                                "in-progress",
+                                "blocked",
+                                "done",
+                                "canceled"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "action_id",
+                            "status",
+                            "expected_version"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Set or clear the due date of an action of the event.",
+                          "properties": {
+                            "action_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "due": {
+                              "description": "The new due date as `YYYY-MM-DD`. Leave it out to clear the due date.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "description": "The current version of the action.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "kind": {
+                              "const": "change-action-due",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "action_id",
+                            "expected_version"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Change the status of a commitment of the event.\n`firm` means that the condition is met; the evidence must show it, for example the signed order.\nThe reason of the proposal becomes the reason of the firm commitment, so it has at most 500 characters.",
+                          "properties": {
+                            "commitment_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "description": "The current version of the commitment.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "kind": {
+                              "const": "change-commitment-status",
+                              "type": "string"
+                            },
+                            "status": {
+                              "enum": [
+                                "conditional",
+                                "firm",
+                                "fulfilled",
+                                "broken",
+                                "withdrawn"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "commitment_id",
+                            "status",
+                            "expected_version"
                           ],
                           "type": "object"
                         }
@@ -7882,6 +8310,24 @@
           }
         }
       },
+      "NewLocalRecord": {
+        "type": "object",
+        "description": "A new record with its readable ID.",
+        "required": [
+          "id",
+          "local_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_id": {
+            "type": "string",
+            "description": "The readable ID, for example `ACT-001`, `COM-001`, `PER-001` or `INS-001` (ADR 0038)."
+          }
+        }
+      },
       "NewOpenQuestion": {
         "type": "object",
         "description": "A new open question with its event-local ID.",
@@ -8234,6 +8680,305 @@
                 "type": "string",
                 "enum": [
                   "create-document-draft"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A new person of the organization. It belongs to no event.",
+            "required": [
+              "id",
+              "name",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create-person"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A new institution of the organization. It belongs to no event.",
+            "required": [
+              "id",
+              "name",
+              "institution_kind",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "institution_kind": {
+                "type": "string",
+                "description": "`authority`, `company`, `club` or `other`. `kind` names the operation, so this field has another name."
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create-institution"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A new action of the event. It starts `open`.",
+            "required": [
+              "id",
+              "event_id",
+              "title",
+              "owner",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "owner": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The user ID of the member who owns the action."
+              },
+              "workstream": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "due": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create-action"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A new commitment of the event. With a condition it starts `conditional`, else `firm`.",
+            "required": [
+              "id",
+              "event_id",
+              "text",
+              "promisor",
+              "owner",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "text": {
+                "type": "string"
+              },
+              "promisor": {
+                "$ref": "#/components/schemas/ProposalPromisor"
+              },
+              "owner": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The user ID of the member who follows the commitment up."
+              },
+              "workstream": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "due": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              },
+              "condition": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create-commitment"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "action_id",
+              "status",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "action_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "description": "`open`, `in-progress`, `blocked`, `done` or `canceled`."
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The version of the action that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "change-action-status"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "action_id",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "action_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "due": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date",
+                "description": "The new due date. It is absent if the proposal clears the due date."
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The version of the action that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "change-action-due"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "commitment_id",
+              "status",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "commitment_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "description": "`conditional`, `firm`, `fulfilled`, `broken` or `withdrawn`."
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The version of the commitment that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "change-commitment-status"
                 ]
               }
             }
@@ -8646,6 +9391,35 @@
           }
         }
       },
+      "ProposalPromisor": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "person"
+            ],
+            "properties": {
+              "person": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "institution"
+            ],
+            "properties": {
+              "institution": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "description": "The party that makes a commitment: `{\"person\": \"<uuid>\"}` or `{\"institution\": \"<uuid>\"}`.\nIt can be a new person or institution of the same changeset."
+      },
       "ProposalStatus": {
         "type": "string",
         "description": "The status of a proposal from its latest review result (ADR 0050). The list of values is open.",
@@ -8785,7 +9559,11 @@
         "required": [
           "proposals",
           "open_questions",
-          "documents"
+          "documents",
+          "actions",
+          "commitments",
+          "persons",
+          "institutions"
         ],
         "properties": {
           "proposals": {
@@ -8807,6 +9585,34 @@
               "$ref": "#/components/schemas/NewDocument"
             },
             "description": "The new documents with their organization-local IDs."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewLocalRecord"
+            },
+            "description": "The new actions with their event-local IDs."
+          },
+          "commitments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewLocalRecord"
+            },
+            "description": "The new commitments with their event-local IDs."
+          },
+          "persons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewLocalRecord"
+            },
+            "description": "The new persons with their organization-local IDs."
+          },
+          "institutions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewLocalRecord"
+            },
+            "description": "The new institutions with their organization-local IDs."
           }
         }
       },

@@ -4,6 +4,7 @@
 //! Review results are append-only. The status of a proposal comes from its latest review result.
 //! Only a `MemberCaller` reviews: an AI client cannot accept proposals (ADR 0010, ADR 0039).
 
+mod edits;
 mod read;
 
 use std::collections::{HashMap, HashSet};
@@ -13,11 +14,14 @@ use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
 use tada_domain::facts::{ChoiceValue, FactState, Label, ValueType, Valued};
 use tada_domain::ids::{
-    ChangesetId, DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, UserId,
+    ActionId, ChangesetId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId,
+    OpenQuestionId, PersonId, ProposalId, UserId,
 };
 use tada_domain::proposals::{Operation, Proposal};
 use tada_domain::sources::{Evidence, SourceText};
+use tada_domain::work::{CommitmentStatus, FirmReason};
 
+pub use self::edits::RecordEditInput;
 pub use self::read::{
     ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, get_changeset,
 };
@@ -30,10 +34,12 @@ use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::{
-    Changeset, FactStateInput, ProposalStore, state_from_input, value_error_code,
+    Changeset, FactStateInput, ProposalStore, owner_refusal, state_from_input, value_error_code,
+    workstream_refusal,
 };
 use crate::sources::SourceStore;
 use crate::store::StoreError;
+use crate::workstreams::WorkstreamStore;
 
 /// An open proposal older than this shows as stale (ADR 0050). It does not change.
 pub const STALE_AFTER: SignedDuration = SignedDuration::from_hours(14 * 24);
@@ -154,14 +160,20 @@ pub enum StepEvidence {
     /// The reviewer edited the value. The store keeps the edited state as a source version of the kind
     /// `review`, with the reviewer as author, and links it as the evidence (ADR 0050).
     Edit,
+    /// The reviewer edited fields of a new record. The store keeps the edited operation as a source version of the
+    /// kind `review`, with the reviewer as author. The record keeps the evidence of the proposal and the review text.
+    RecordEdit(Vec<Evidence>),
 }
 
-/// One proposal of an apply, with the operation to apply. An edit changes the state of a `SetFact`.
+/// One proposal of an apply, with the operation to apply. An edit changes the state of a `SetFact`
+/// or the fields of a new record.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ApplyStep {
     pub proposal_id: ProposalId,
     pub operation: Operation,
     pub evidence: StepEvidence,
+    /// The reason of a proposal that makes a commitment firm. The commitment keeps it (ADR 0068).
+    pub firm_reason: Option<FirmReason>,
 }
 
 /// An operation can hold an edited value with personal data, so `Debug` names the kind of the operation only (ADR 0035).
@@ -175,6 +187,13 @@ impl Debug for ApplyStep {
             Operation::DeprecateField { .. } => "DeprecateField",
             Operation::CreateOpenQuestion { .. } => "CreateOpenQuestion",
             Operation::CreateDocumentDraft { .. } => "CreateDocumentDraft",
+            Operation::CreatePerson { .. } => "CreatePerson",
+            Operation::CreateInstitution { .. } => "CreateInstitution",
+            Operation::CreateAction { .. } => "CreateAction",
+            Operation::CreateCommitment { .. } => "CreateCommitment",
+            Operation::ChangeActionStatus { .. } => "ChangeActionStatus",
+            Operation::ChangeActionDue { .. } => "ChangeActionDue",
+            Operation::ChangeCommitmentStatus { .. } => "ChangeCommitmentStatus",
         };
         f.debug_struct("ApplyStep")
             .field("proposal_id", &self.proposal_id)
@@ -213,6 +232,14 @@ pub enum LocalRecord {
     OpenQuestion(OpenQuestionId),
     /// A document: `DOC-<n>`, local to the organization.
     Document(DocumentId),
+    /// A person: `PER-<n>`, local to the organization.
+    Person(PersonId),
+    /// An institution: `INS-<n>`, local to the organization.
+    Institution(InstitutionId),
+    /// An action: `ACT-<n>`, local to its event.
+    Action(ActionId),
+    /// A commitment: `COM-<n>`, local to its event.
+    Commitment(CommitmentId),
 }
 
 /// The result of `ReviewStore::apply`. Each result other than `Applied` changed nothing.
@@ -308,6 +335,8 @@ pub struct ReviewStores<'a> {
     pub review: &'a dyn ReviewStore,
     /// The source versions that the evidence of a proposal cites besides the source text of its changeset.
     pub sources: &'a dyn SourceStore,
+    /// The workstreams that an edit gives a new record.
+    pub workstreams: &'a dyn WorkstreamStore,
 }
 
 /// The input of an apply: the selected proposals and the edited values.
@@ -317,11 +346,13 @@ pub struct ApplyInput {
     pub edits: Vec<Edit>,
 }
 
-/// A value that the reviewer changes before the acceptance. Only a proposal that sets a fact has a value.
+/// A change of the reviewer before the acceptance: the state of a proposal that sets a fact,
+/// or the fields of a proposal that creates a work record or a party.
 #[derive(Clone)]
 pub struct Edit {
     pub proposal_id: ProposalId,
-    pub state: FactStateInput,
+    pub state: Option<FactStateInput>,
+    pub fields: Option<RecordEditInput>,
 }
 
 /// A value can contain personal data, so `Debug` shows the proposal only (ADR 0035).
@@ -338,7 +369,7 @@ impl Debug for Edit {
 pub struct Applied {
     /// The applied proposals with their new status, in the order of the apply.
     pub proposals: Vec<(ProposalId, ProposalStatus)>,
-    /// The local IDs of the new open questions and documents.
+    /// The local IDs of the new records.
     pub local_ids: Vec<NewLocalId>,
 }
 
@@ -455,7 +486,7 @@ pub async fn apply_changeset(
     let given = selection(&changeset, &input.selected, "selected")?;
     let selected = to_apply(&changeset.proposals, &given, &results)?;
     let edits = parse_edits(&changeset, &selected, input.edits)?;
-    check_edits(scope, &changeset, &selected, &edits, stores.facts).await?;
+    check_edits(scope, &changeset, &selected, &edits, stores).await?;
 
     let now = clock.now();
     let steps: Vec<ApplyStep> = apply_order(&changeset.proposals, &selected)
@@ -880,10 +911,19 @@ fn apply_order<'a>(proposals: &'a [Proposal], selected: &HashSet<ProposalId>) ->
     order
 }
 
-/// The edited states by proposal, each with the position of its edit in the input.
-type Edits = HashMap<ProposalId, (usize, FactState<Valued>)>;
+/// The edited value of one proposal.
+enum Edited {
+    /// The state of a `SetFact`.
+    State(FactState<Valued>),
+    /// The operation of a new record with the edited fields.
+    Record(Operation),
+}
 
-/// Maps the edits to fact states. Each edit names a selected proposal that sets a fact, at most once.
+/// The edited values by proposal, each with the position of its edit in the input.
+type Edits = HashMap<ProposalId, (usize, Edited)>;
+
+/// Maps the edits to fact states and edited operations. Each edit names a selected proposal at most once:
+/// a `state` for a proposal that sets a fact, `fields` for a proposal that creates a work record or a party.
 fn parse_edits(
     changeset: &Changeset,
     selected: &HashSet<ProposalId>,
@@ -900,7 +940,10 @@ fn parse_edits(
         let code = match proposal {
             None => Some("unknown"),
             Some(_) if !selected.contains(&edit.proposal_id) => Some("not-selected"),
-            Some(proposal) if !matches!(proposal.operation, Operation::SetFact { .. }) => {
+            Some(proposal)
+                if !matches!(proposal.operation, Operation::SetFact { .. })
+                    && edits::editable_fields(&proposal.operation).is_empty() =>
+            {
                 Some("not-editable")
             }
             Some(_) if parsed.contains_key(&edit.proposal_id) => Some("duplicate"),
@@ -910,15 +953,51 @@ fn parse_edits(
             errors.push(FieldError::new(path("proposal_id"), code));
             continue;
         }
-        match state_from_input(edit.state) {
-            Ok(state) => {
-                parsed.insert(edit.proposal_id, (index, state));
+        let Some(proposal) = proposal else {
+            continue;
+        };
+        let is_fact = matches!(proposal.operation, Operation::SetFact { .. });
+        let nested = |prefix: &str, nested: Vec<FieldError>| {
+            nested
+                .into_iter()
+                .map(|error| FieldError::new(path(&format!("{prefix}{}", error.field)), error.code))
+                .collect::<Vec<_>>()
+        };
+        let edited = match (is_fact, edit.state, edit.fields) {
+            (true, Some(state), None) => state_from_input(state)
+                .map(Edited::State)
+                .map_err(|errors| nested("state/", errors)),
+            (false, None, Some(fields)) => edits::edit_record(&proposal.operation, fields)
+                .map(Edited::Record)
+                .map_err(|errors| nested("", errors)),
+            (true, state, fields) => Err([
+                state
+                    .is_none()
+                    .then(|| FieldError::new(path("state"), "missing")),
+                fields
+                    .is_some()
+                    .then(|| FieldError::new(path("fields"), "not-editable")),
+            ]
+            .into_iter()
+            .flatten()
+            .collect()),
+            (false, state, fields) => Err([
+                fields
+                    .is_none()
+                    .then(|| FieldError::new(path("fields"), "missing")),
+                state
+                    .is_some()
+                    .then(|| FieldError::new(path("state"), "not-editable")),
+            ]
+            .into_iter()
+            .flatten()
+            .collect()),
+        };
+        match edited {
+            Ok(edited) => {
+                parsed.insert(edit.proposal_id, (index, edited));
             }
-            Err(nested) => {
-                errors.extend(nested.into_iter().map(|error| {
-                    FieldError::new(path(&format!("state/{}", error.field)), error.code)
-                }))
-            }
+            Err(nested) => errors.extend(nested),
         }
     }
     finish(errors)?;
@@ -927,22 +1006,25 @@ fn parse_edits(
 
 /// Checks each edited value against the value type of its field: a field of the catalog of the event,
 /// or a new field of the selection, with the new choices of the selection.
+/// Checks each edited owner and workstream of a new record like the direct command does (ADR 0068).
 async fn check_edits(
     scope: OrgScope,
     changeset: &Changeset,
     selected: &HashSet<ProposalId>,
     edits: &Edits,
-    facts: &dyn FactStore,
+    stores: ReviewStores<'_>,
 ) -> Result<(), ApplyError> {
     let mut value_types: HashMap<FieldDefinitionId, ValueType> = HashMap::new();
     let mut events = HashSet::new();
     for proposal in &changeset.proposals {
-        if edits.contains_key(&proposal.id) {
-            events.insert(proposal.operation.event_id());
+        if let (Some((_, Edited::State(_))), Some(event)) =
+            (edits.get(&proposal.id), proposal.operation.event_id())
+        {
+            events.insert(event);
         }
     }
     for event in events {
-        for field in facts.catalog(scope, event).await? {
+        for field in stores.facts.catalog(scope, event).await? {
             value_types.insert(field.id, field.value_type);
         }
     }
@@ -974,28 +1056,82 @@ async fn check_edits(
     }
     let mut errors = Vec::new();
     for proposal in &changeset.proposals {
-        let (Some((index, state)), Operation::SetFact { field_id, .. }) =
-            (edits.get(&proposal.id), &proposal.operation)
-        else {
-            continue;
-        };
-        let value = match state {
-            FactState::Accepted(valued) | FactState::Assumption(valued) => &valued.value,
-            FactState::Unknown => continue,
-        };
-        let checked = match value_types.get(field_id) {
-            Some(value_type) => value.check(value_type).map_err(value_error_code),
-            None => Err("unknown-field"),
-        };
-        if let Err(code) = checked {
-            errors.push(FieldError::new(format!("edits/{index}/state/value"), code));
+        match (edits.get(&proposal.id), &proposal.operation) {
+            (Some((index, Edited::State(state))), Operation::SetFact { field_id, .. }) => {
+                let value = match state {
+                    FactState::Accepted(valued) | FactState::Assumption(valued) => &valued.value,
+                    FactState::Unknown => continue,
+                };
+                let checked = match value_types.get(field_id) {
+                    Some(value_type) => value.check(value_type).map_err(value_error_code),
+                    None => Err("unknown-field"),
+                };
+                if let Err(code) = checked {
+                    errors.push(FieldError::new(format!("edits/{index}/state/value"), code));
+                }
+            }
+            (Some((index, Edited::Record(edited))), proposed) => {
+                let path = |field: &str| format!("edits/{index}/fields/{field}");
+                for (field, code) in edited_work_refusals(scope, proposed, edited, stores).await? {
+                    errors.push(FieldError::new(path(field), code));
+                }
+            }
+            _ => {}
         }
     }
     finish(errors)
 }
 
+/// The refusals of an edited owner and an edited workstream of a new action or commitment, as (field, code).
+async fn edited_work_refusals(
+    scope: OrgScope,
+    proposed: &Operation,
+    edited: &Operation,
+    stores: ReviewStores<'_>,
+) -> Result<Vec<(&'static str, &'static str)>, StoreError> {
+    let work = |operation: &Operation| match operation {
+        Operation::CreateAction {
+            event_id,
+            owner,
+            workstream,
+            ..
+        }
+        | Operation::CreateCommitment {
+            event_id,
+            owner,
+            workstream,
+            ..
+        } => Some((*event_id, *owner, *workstream)),
+        _ => None,
+    };
+    let (Some((event, old_owner, old_workstream)), Some((_, owner, workstream))) =
+        (work(proposed), work(edited))
+    else {
+        return Ok(Vec::new());
+    };
+    let mut refusals = Vec::new();
+    if owner != old_owner
+        && let Some(code) = owner_refusal(scope, event, owner, stores.identity).await?
+    {
+        refusals.push(("owner", code));
+    }
+    if workstream != old_workstream
+        && let Some(code) = workstream_refusal(scope, event, workstream, stores.workstreams).await?
+    {
+        refusals.push(("workstream", code));
+    }
+    Ok(refusals)
+}
+
 fn step(proposal: &Proposal, edits: &Edits) -> ApplyStep {
-    match (&proposal.operation, edits.get(&proposal.id)) {
+    let firm_reason = match proposal.operation {
+        Operation::ChangeCommitmentStatus {
+            status: CommitmentStatus::Firm,
+            ..
+        } => FirmReason::parse(proposal.reason.as_str()).ok(),
+        _ => None,
+    };
+    let (operation, evidence) = match (&proposal.operation, edits.get(&proposal.id)) {
         (
             Operation::SetFact {
                 event_id,
@@ -1003,33 +1139,42 @@ fn step(proposal: &Proposal, edits: &Edits) -> ApplyStep {
                 expected_version,
                 ..
             },
-            Some((_, state)),
-        ) => ApplyStep {
-            proposal_id: proposal.id,
-            operation: Operation::SetFact {
+            Some((_, Edited::State(state))),
+        ) => (
+            Operation::SetFact {
                 event_id: *event_id,
                 field_id: *field_id,
                 state: state.clone(),
                 expected_version: *expected_version,
             },
-            evidence: StepEvidence::Edit,
-        },
-        _ => ApplyStep {
-            proposal_id: proposal.id,
-            operation: proposal.operation.clone(),
-            evidence: StepEvidence::Proposal(proposal.evidence.clone()),
-        },
+            StepEvidence::Edit,
+        ),
+        (_, Some((_, Edited::Record(edited)))) => (
+            edited.clone(),
+            StepEvidence::RecordEdit(proposal.evidence.clone()),
+        ),
+        _ => (
+            proposal.operation.clone(),
+            StepEvidence::Proposal(proposal.evidence.clone()),
+        ),
+    };
+    ApplyStep {
+        proposal_id: proposal.id,
+        operation,
+        evidence,
+        firm_reason,
     }
 }
 
 fn step_status(step: &ApplyStep) -> ProposalStatus {
     match step.evidence {
-        StepEvidence::Edit => ProposalStatus::AcceptedWithEdit,
+        StepEvidence::Edit | StepEvidence::RecordEdit(_) => ProposalStatus::AcceptedWithEdit,
         StepEvidence::Proposal(_) => ProposalStatus::Accepted,
     }
 }
 
-/// The audit events of one step: the acceptance and, for a new event, the event and its first event manager.
+/// The audit events of one step: the acceptance and, for a new event, the event and its first event manager,
+/// and for a work record or a party its creation or change.
 fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEvent> {
     let scope = Some(caller.scope());
     let mut events = vec![AuditEvent::new(
@@ -1038,8 +1183,39 @@ fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEvent> {
         Some(step.proposal_id.as_uuid()),
         scope,
     )];
-    if let Operation::CreateEvent { id, .. } = step.operation {
-        events.extend(crate::events::creation_audit(caller, id));
+    let record = match step.operation {
+        Operation::CreateEvent { id, .. } => {
+            events.extend(crate::events::creation_audit(caller, id));
+            None
+        }
+        Operation::CreatePerson { id, .. } => Some((AuditAction::PersonCreate, id.as_uuid())),
+        Operation::CreateInstitution { id, .. } => {
+            Some((AuditAction::InstitutionCreate, id.as_uuid()))
+        }
+        Operation::CreateAction { id, .. } => Some((AuditAction::ActionCreate, id.as_uuid())),
+        Operation::CreateCommitment { id, .. } => {
+            Some((AuditAction::CommitmentCreate, id.as_uuid()))
+        }
+        Operation::ChangeActionStatus { action_id, .. }
+        | Operation::ChangeActionDue { action_id, .. } => {
+            Some((AuditAction::ActionChange, action_id.as_uuid()))
+        }
+        Operation::ChangeCommitmentStatus {
+            commitment_id,
+            status,
+            ..
+        } => Some((
+            if status == CommitmentStatus::Firm {
+                AuditAction::CommitmentFirm
+            } else {
+                AuditAction::CommitmentChange
+            },
+            commitment_id.as_uuid(),
+        )),
+        _ => None,
+    };
+    if let Some((action, id)) = record {
+        events.push(AuditEvent::new(caller.actor(), action, Some(id), scope));
     }
     events
 }
@@ -1185,6 +1361,7 @@ mod tests {
                 expected_version: None,
             },
             evidence: StepEvidence::Edit,
+            firm_reason: None,
         };
         let debug = format!("{step:?}");
         assert!(debug.contains("SetFact"), "{debug}");

@@ -12,6 +12,7 @@ use tada_domain::events::Event;
 use tada_domain::facts::{
     CORE_CATALOG_VERSION, FactState, FieldDefinition, FieldStatus, Label, Valued,
 };
+use tada_domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus};
 use uuid::Uuid;
 
 use crate::caller::Actor;
@@ -57,25 +58,78 @@ pub struct EventList {
 pub struct EntityView {
     pub name: &'static str,
     pub description: &'static str,
+    /// The statuses of a record of this kind. It is absent for a kind without a status.
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    pub statuses: &'static [&'static str],
 }
 
-/// The kinds of records that an agent can read in Slice 1 (ADR 0049).
-const ENTITIES: [EntityView; 4] = [
+const ACTION_STATUSES: [&str; 5] = [
+    ActionStatus::Open.as_str(),
+    ActionStatus::InProgress.as_str(),
+    ActionStatus::Blocked.as_str(),
+    ActionStatus::Done.as_str(),
+    ActionStatus::Canceled.as_str(),
+];
+
+const COMMITMENT_STATUSES: [&str; 5] = [
+    CommitmentStatus::Conditional.as_str(),
+    CommitmentStatus::Firm.as_str(),
+    CommitmentStatus::Fulfilled.as_str(),
+    CommitmentStatus::Broken.as_str(),
+    CommitmentStatus::Withdrawn.as_str(),
+];
+
+const WORKSTREAM_STATUSES: [&str; 2] = [
+    WorkstreamStatus::Active.as_str(),
+    WorkstreamStatus::Closed.as_str(),
+];
+
+/// The kinds of records that an agent can read (ADR 0049, ADR 0068, ADR 0069).
+const ENTITIES: [EntityView; 9] = [
     EntityView {
         name: "event",
-        description: "One occurrence of an event, with its key, name and time zone. Facts, open questions and documents belong to it.",
+        description: "One occurrence of an event, with its key, name and time zone. Facts, open questions, documents, workstreams, actions and commitments belong to it.",
+        statuses: &[],
     },
     EntityView {
         name: "fact",
         description: "The value of one field in one event, with a state: accepted, assumption or unknown. Each fact version cites the source passages that support it.",
+        statuses: &[],
     },
     EntityView {
         name: "open_question",
         description: "A question that the team must answer, with an owner and an event-local ID such as QST-001.",
+        statuses: &[],
     },
     EntityView {
         name: "source_version",
         description: "An immutable text, for example the words of a member or a document. Evidence and citations point to a range of characters in it.",
+        statuses: &[],
+    },
+    EntityView {
+        name: "workstream",
+        description: "A part of the work of an event with a lead, for example ground operations. A closed workstream takes no new actions or commitments.",
+        statuses: &WORKSTREAM_STATUSES,
+    },
+    EntityView {
+        name: "action",
+        description: "A task of an event with one owner, an optional workstream and an optional due date, and an event-local ID such as ACT-001. Transitions: open and in-progress change into each other; open and in-progress change to blocked; blocked changes to open or in-progress; open, in-progress and blocked change to done or canceled; done changes to open; canceled is final.",
+        statuses: &ACTION_STATUSES,
+    },
+    EntityView {
+        name: "commitment",
+        description: "A promise of one person or one institution in an event, with the owner who follows it up and an event-local ID such as COM-001. With a condition it starts conditional, else firm. Only evidence that the condition is met makes it firm; never invent a signature or an approval. Conditional changes to firm; conditional and firm change to fulfilled, broken or withdrawn, which are final.",
+        statuses: &COMMITMENT_STATUSES,
+    },
+    EntityView {
+        name: "person",
+        description: "A person of the organization that a commitment names, with an ID such as PER-001. Search the persons before you propose a new one.",
+        statuses: &[],
+    },
+    EntityView {
+        name: "institution",
+        description: "An authority, a company, a club or another body of the organization that a commitment names, with an ID such as INS-001. Search the institutions before you propose a new one.",
+        statuses: &[],
     },
 ];
 

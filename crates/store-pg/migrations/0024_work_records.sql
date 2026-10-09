@@ -151,3 +151,8 @@ ALTER TABLE proposal ADD CONSTRAINT proposal_target_kind_check
         'event', 'fact', 'field_definition', 'open_question', 'document',
         'workstream', 'action', 'commitment', 'person', 'institution'
     ));
+
+-- A person or an institution belongs to the organization, so a proposal that creates one has no event.
+ALTER TABLE proposal ALTER COLUMN event_id DROP NOT NULL;
+ALTER TABLE proposal ADD CONSTRAINT proposal_event_of_target
+    CHECK ((event_id IS NULL) = (target_kind IN ('person', 'institution')));

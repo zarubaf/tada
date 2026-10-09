@@ -17,12 +17,21 @@ use tada_domain::facts::{
     FieldKey, Granularity, KeyError, Label, MinorUnits, ModuleKey, Range, ReferenceId,
     ReferenceTarget, ShortText, TextError, Unit, ValueError, ValueType, Valued,
 };
-use tada_domain::ids::{DocumentId, EventId, FieldDefinitionId, OpenQuestionId, UserId};
+use tada_domain::identity::Email;
+use tada_domain::ids::{
+    ActionId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId, OpenQuestionId,
+    PersonId, UserId, WorkstreamId,
+};
+use tada_domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_domain::proposals::{DraftDocument, Operation, QuestionText};
+use tada_domain::work::{
+    ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
+};
 use uuid::Uuid;
 
 use super::{MAX_PASSAGES, MAX_PROPOSALS};
 use crate::events::{key_error_code, name_error_code};
+use crate::parties::email_code;
 use crate::problem::FieldError;
 
 /// A new changeset: the text of one intake and the proposals that it supports.
@@ -159,6 +168,142 @@ pub enum OperationInput {
         /// A number, date or amount outside a `tada:` link gives a lint warning for the reviewer.
         markdown: String,
     },
+    /// Create a person of the organization. Search the persons first: propose a new one only if none matches.
+    /// A person belongs to no event, so the operation has no `event_id`.
+    CreatePerson {
+        /// The UUIDv7 of the new person.
+        id: Uuid,
+        /// 1 to 200 characters.
+        name: String,
+        #[serde(default)]
+        email: Option<String>,
+        /// 1 to 50 characters, as written.
+        #[serde(default)]
+        phone: Option<String>,
+    },
+    /// Create an institution of the organization. Search the institutions first: propose a new one only if none matches.
+    /// An institution belongs to no event, so the operation has no `event_id`.
+    CreateInstitution {
+        /// The UUIDv7 of the new institution.
+        id: Uuid,
+        /// 1 to 200 characters.
+        name: String,
+        /// `kind` names the operation, so the kind of the institution has this name.
+        #[serde(rename = "institution_kind")]
+        kind: InstitutionKindInput,
+        #[serde(default)]
+        email: Option<String>,
+        /// 1 to 50 characters, as written.
+        #[serde(default)]
+        phone: Option<String>,
+    },
+    /// Create an action of the event. It starts `open`.
+    CreateAction {
+        /// The UUIDv7 of the new action.
+        id: Uuid,
+        event_id: Uuid,
+        /// 1 to 200 characters.
+        title: String,
+        /// 1 to 4000 characters.
+        #[serde(default)]
+        description: Option<String>,
+        /// The user ID of a member with the contributor or manager role in the event.
+        owner: Uuid,
+        /// An active workstream of the event.
+        #[serde(default)]
+        workstream: Option<Uuid>,
+        /// The due date as `YYYY-MM-DD`.
+        #[serde(default)]
+        due: Option<String>,
+    },
+    /// Create a commitment of the event. With a condition it starts `conditional`, else `firm`.
+    /// Never invent a signature or an approval: a commitment with an open condition stays conditional.
+    CreateCommitment {
+        /// The UUIDv7 of the new commitment.
+        id: Uuid,
+        event_id: Uuid,
+        /// What the promisor promises, 1 to 500 characters.
+        text: String,
+        /// The person or institution that promises. It can be a new person or institution of the same changeset;
+        /// then the proposal depends on the proposal that creates it.
+        promisor: PartyInput,
+        /// The user ID of the member who follows the commitment up: a contributor or manager of the event.
+        owner: Uuid,
+        /// An active workstream of the event.
+        #[serde(default)]
+        workstream: Option<Uuid>,
+        /// The due date as `YYYY-MM-DD`.
+        #[serde(default)]
+        due: Option<String>,
+        /// The condition of the promise, 1 to 500 characters, for example "subject to a signed order".
+        #[serde(default)]
+        condition: Option<String>,
+    },
+    /// Change the status of an action of the event.
+    ChangeActionStatus {
+        event_id: Uuid,
+        action_id: Uuid,
+        status: ActionStatusInput,
+        /// The current version of the action.
+        expected_version: i64,
+    },
+    /// Set or clear the due date of an action of the event.
+    ChangeActionDue {
+        event_id: Uuid,
+        action_id: Uuid,
+        /// The new due date as `YYYY-MM-DD`. Leave it out to clear the due date.
+        #[serde(default)]
+        due: Option<String>,
+        /// The current version of the action.
+        expected_version: i64,
+    },
+    /// Change the status of a commitment of the event.
+    /// `firm` means that the condition is met; the evidence must show it, for example the signed order.
+    /// The reason of the proposal becomes the reason of the firm commitment, so it has at most 500 characters.
+    ChangeCommitmentStatus {
+        event_id: Uuid,
+        commitment_id: Uuid,
+        status: CommitmentStatusInput,
+        /// The current version of the commitment.
+        expected_version: i64,
+    },
+}
+
+/// The party that makes a commitment: `{"person": "<uuid>"}` or `{"institution": "<uuid>"}`.
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum PartyInput {
+    Person(Uuid),
+    Institution(Uuid),
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum InstitutionKindInput {
+    Authority,
+    Company,
+    Club,
+    Other,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ActionStatusInput {
+    Open,
+    InProgress,
+    Blocked,
+    Done,
+    Canceled,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum CommitmentStatusInput {
+    Conditional,
+    Firm,
+    Fulfilled,
+    Broken,
+    Withdrawn,
 }
 
 /// The document of a draft.
@@ -317,7 +462,11 @@ redacted_debug!(
     ValueTypeInput,
     ChoiceInput,
     GranularityInput,
-    ReferenceTargetInput
+    ReferenceTargetInput,
+    PartyInput,
+    InstitutionKindInput,
+    ActionStatusInput,
+    CommitmentStatusInput
 );
 
 /// Collects the invalid fields of one input, with paths relative to it.
@@ -337,6 +486,29 @@ impl Errors {
         code: impl FnOnce(E) -> &'static str,
     ) -> Option<T> {
         result.map_err(|error| self.push(field, code(error))).ok()
+    }
+
+    /// `Some(None)` without `input`, the parsed value, or `None` after it adds the error at `field`.
+    fn optional<T, E>(
+        &mut self,
+        field: &'static str,
+        input: Option<String>,
+        parse: impl FnOnce(&str) -> Result<T, E>,
+        code: impl FnOnce(E) -> &'static str,
+    ) -> Option<Option<T>> {
+        match input {
+            None => Some(None),
+            Some(text) => self.take(field, parse(&text), code).map(Some),
+        }
+    }
+
+    /// The expected version of a change, or `None` after it adds the error at `expected_version`.
+    fn version(&mut self, number: i64) -> Option<RecordVersion> {
+        let version = RecordVersion::new(number);
+        if version.is_none() {
+            self.push("expected_version", "invalid");
+        }
+        version
     }
 
     /// Adds the errors of a nested input under `prefix`.
@@ -554,8 +726,198 @@ impl TryFrom<OperationInput> for Operation {
                     })
                 })()
             }
+            OperationInput::CreatePerson {
+                id,
+                name,
+                email,
+                phone,
+            } => {
+                let name = errors.take("name", PartyName::parse(&name), text_error_code);
+                let email = errors.optional("email", email, Email::parse, email_code);
+                let phone = errors.optional("phone", phone, PhoneNumber::parse, text_error_code);
+                (|| {
+                    Some(Operation::CreatePerson {
+                        id: PersonId::from_uuid(id),
+                        name: name?,
+                        email: email?,
+                        phone: phone?,
+                    })
+                })()
+            }
+            OperationInput::CreateInstitution {
+                id,
+                name,
+                kind,
+                email,
+                phone,
+            } => {
+                let name = errors.take("name", PartyName::parse(&name), text_error_code);
+                let email = errors.optional("email", email, Email::parse, email_code);
+                let phone = errors.optional("phone", phone, PhoneNumber::parse, text_error_code);
+                (|| {
+                    Some(Operation::CreateInstitution {
+                        id: InstitutionId::from_uuid(id),
+                        name: name?,
+                        kind: kind.into(),
+                        email: email?,
+                        phone: phone?,
+                    })
+                })()
+            }
+            OperationInput::CreateAction {
+                id,
+                event_id,
+                title,
+                description,
+                owner,
+                workstream,
+                due,
+            } => {
+                let title = errors.take("title", ActionTitle::parse(&title), text_error_code);
+                let description = errors.optional(
+                    "description",
+                    description,
+                    ActionDescription::parse,
+                    text_error_code,
+                );
+                let due = errors.optional("due", due, parse_date, |_| "date");
+                (|| {
+                    Some(Operation::CreateAction {
+                        id: ActionId::from_uuid(id),
+                        event_id: EventId::from_uuid(event_id),
+                        title: title?,
+                        description: description?,
+                        owner: UserId::from_uuid(owner),
+                        workstream: workstream.map(WorkstreamId::from_uuid),
+                        due: due?,
+                    })
+                })()
+            }
+            OperationInput::CreateCommitment {
+                id,
+                event_id,
+                text,
+                promisor,
+                owner,
+                workstream,
+                due,
+                condition,
+            } => {
+                let text = errors.take("text", CommitmentText::parse(&text), text_error_code);
+                let due = errors.optional("due", due, parse_date, |_| "date");
+                let condition = errors.optional(
+                    "condition",
+                    condition,
+                    ConditionText::parse,
+                    text_error_code,
+                );
+                (|| {
+                    Some(Operation::CreateCommitment {
+                        id: CommitmentId::from_uuid(id),
+                        event_id: EventId::from_uuid(event_id),
+                        text: text?,
+                        promisor: promisor.into(),
+                        owner: UserId::from_uuid(owner),
+                        workstream: workstream.map(WorkstreamId::from_uuid),
+                        due: due?,
+                        condition: condition?,
+                    })
+                })()
+            }
+            OperationInput::ChangeActionStatus {
+                event_id,
+                action_id,
+                status,
+                expected_version,
+            } => errors.version(expected_version).map(|expected_version| {
+                Operation::ChangeActionStatus {
+                    event_id: EventId::from_uuid(event_id),
+                    action_id: ActionId::from_uuid(action_id),
+                    status: status.into(),
+                    expected_version,
+                }
+            }),
+            OperationInput::ChangeActionDue {
+                event_id,
+                action_id,
+                due,
+                expected_version,
+            } => {
+                let due = errors.optional("due", due, parse_date, |_| "date");
+                let expected_version = errors.version(expected_version);
+                (|| {
+                    Some(Operation::ChangeActionDue {
+                        event_id: EventId::from_uuid(event_id),
+                        action_id: ActionId::from_uuid(action_id),
+                        due: due?,
+                        expected_version: expected_version?,
+                    })
+                })()
+            }
+            OperationInput::ChangeCommitmentStatus {
+                event_id,
+                commitment_id,
+                status,
+                expected_version,
+            } => errors.version(expected_version).map(|expected_version| {
+                Operation::ChangeCommitmentStatus {
+                    event_id: EventId::from_uuid(event_id),
+                    commitment_id: CommitmentId::from_uuid(commitment_id),
+                    status: status.into(),
+                    expected_version,
+                }
+            }),
         };
         errors.finish(operation)
+    }
+}
+
+/// A calendar date as `YYYY-MM-DD`.
+pub(crate) fn parse_date(text: &str) -> Result<civil::Date, jiff::Error> {
+    text.parse::<civil::Date>()
+}
+
+impl From<PartyInput> for Party {
+    fn from(input: PartyInput) -> Self {
+        match input {
+            PartyInput::Person(id) => Self::Person(PersonId::from_uuid(id)),
+            PartyInput::Institution(id) => Self::Institution(InstitutionId::from_uuid(id)),
+        }
+    }
+}
+
+impl From<InstitutionKindInput> for InstitutionKind {
+    fn from(input: InstitutionKindInput) -> Self {
+        match input {
+            InstitutionKindInput::Authority => Self::Authority,
+            InstitutionKindInput::Company => Self::Company,
+            InstitutionKindInput::Club => Self::Club,
+            InstitutionKindInput::Other => Self::Other,
+        }
+    }
+}
+
+impl From<ActionStatusInput> for ActionStatus {
+    fn from(input: ActionStatusInput) -> Self {
+        match input {
+            ActionStatusInput::Open => Self::Open,
+            ActionStatusInput::InProgress => Self::InProgress,
+            ActionStatusInput::Blocked => Self::Blocked,
+            ActionStatusInput::Done => Self::Done,
+            ActionStatusInput::Canceled => Self::Canceled,
+        }
+    }
+}
+
+impl From<CommitmentStatusInput> for CommitmentStatus {
+    fn from(input: CommitmentStatusInput) -> Self {
+        match input {
+            CommitmentStatusInput::Conditional => Self::Conditional,
+            CommitmentStatusInput::Firm => Self::Firm,
+            CommitmentStatusInput::Fulfilled => Self::Fulfilled,
+            CommitmentStatusInput::Broken => Self::Broken,
+            CommitmentStatusInput::Withdrawn => Self::Withdrawn,
+        }
     }
 }
 

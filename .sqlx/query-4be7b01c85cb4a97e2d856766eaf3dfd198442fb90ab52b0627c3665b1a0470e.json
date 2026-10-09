@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE commitment\n                 SET status = $5, firm_reason = coalesce($6, firm_reason), version = version + 1, updated_at = $7\n                 WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4\n                 RETURNING version",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4be7b01c85cb4a97e2d856766eaf3dfd198442fb90ab52b0627c3665b1a0470e"
+}

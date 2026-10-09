@@ -6,6 +6,7 @@ mod drafts;
 mod input;
 #[cfg(test)]
 mod tests;
+mod work;
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -24,10 +25,12 @@ use tada_domain::sources::{Evidence, Passage, PassageError, SourceText};
 use uuid::Uuid;
 
 pub use self::input::{
-    ChoiceInput, DraftDocumentInput, FactStateInput, GranularityInput, NewChangeset, NewProposal,
-    OperationInput, PassageInput, ReferenceTargetInput, ValueInput, ValueTypeInput,
+    ActionStatusInput, ChoiceInput, CommitmentStatusInput, DraftDocumentInput, FactStateInput,
+    GranularityInput, InstitutionKindInput, NewChangeset, NewProposal, OperationInput, PartyInput,
+    PassageInput, ReferenceTargetInput, ValueInput, ValueTypeInput,
 };
-pub(crate) use self::input::{state_from_input, text_error_code, value_error_code};
+pub(crate) use self::input::{parse_date, state_from_input, text_error_code, value_error_code};
+pub(crate) use self::work::{owner_refusal, workstream_refusal};
 use crate::access::{self, AccessError, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, AiCaller, MemberCaller, OrgScope};
@@ -36,10 +39,13 @@ use crate::documents::DocumentStore;
 use crate::drafts::DraftProvenance;
 use crate::facts::FactStore;
 use crate::identity::IdentityStore;
+use crate::parties::PartyStore;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::sources::SourceStore;
 use crate::store::StoreError;
 use crate::tokens::TokenScope;
+use crate::work::WorkStore;
+use crate::workstreams::WorkstreamStore;
 
 /// A caller that can create proposals (ADR 0039): a member, or an AI client of a member.
 /// A service identity cannot propose. The Telegram gateway proposes through a `MemberCaller` with the channel Telegram.
@@ -175,6 +181,12 @@ pub struct ProposeStores<'a> {
     pub sources: &'a dyn SourceStore,
     /// The existing documents of drafts.
     pub documents: &'a dyn DocumentStore,
+    /// The workstreams of new actions and commitments.
+    pub workstreams: &'a dyn WorkstreamStore,
+    /// The promisors of new commitments.
+    pub parties: &'a dyn PartyStore,
+    /// The actions and commitments whose status or due date a proposal changes.
+    pub work: &'a dyn WorkStore,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -295,7 +307,7 @@ pub async fn create_changeset(
     }
     check_structure(event_id, &proposals)?;
     check_catalog(scope, event_id, &proposals, stores).await?;
-    check_cited_sources(caller, source_version_id, &proposals, stores).await?;
+    check_cited_sources(caller, event_id, source_version_id, &proposals, stores).await?;
     let drafts = drafts::check_drafts(caller, &proposals, stores).await?;
     check_free_ids(id, &proposals, stores.proposals).await?;
 
@@ -512,26 +524,30 @@ fn parse(
 ///
 /// The source version must be citable in the event of the proposal (`access::citable_reach`), so a proposal never shows a text of another
 /// event to the members of its event: `unknown-source` for any other ID, also of another organization.
+/// A person or an institution has no event: its proposal can cite the source versions of the event of the changeset.
 /// A source version without a text, for example a PDF, gives `no-text`.
 async fn check_cited_sources(
     caller: &impl MayPropose,
+    changeset_event: Option<EventId>,
     intake: SourceVersionId,
     proposals: &[Proposal],
     stores: ProposeStores<'_>,
 ) -> Result<(), ProposeError> {
+    let event_of = |proposal: &Proposal| proposal.operation.event_id().or(changeset_event);
     // All cited source versions of one event, so that each event needs one reach and one read.
+    // A proposal without an event cites nothing that it can read.
     let mut cited: HashMap<EventId, Vec<SourceVersionId>> = HashMap::new();
     for proposal in proposals {
-        cited
-            .entry(proposal.operation.event_id())
-            .or_default()
-            .extend(
-                proposal
-                    .evidence
-                    .iter()
-                    .map(|evidence| evidence.source_version_id)
-                    .filter(|id| *id != intake),
-            );
+        let Some(event) = event_of(proposal) else {
+            continue;
+        };
+        cited.entry(event).or_default().extend(
+            proposal
+                .evidence
+                .iter()
+                .map(|evidence| evidence.source_version_id)
+                .filter(|id| *id != intake),
+        );
     }
     let mut texts: HashMap<(EventId, SourceVersionId), Option<SourceText>> = HashMap::new();
     for (event, ids) in cited {
@@ -545,12 +561,13 @@ async fn check_cited_sources(
     }
     let mut errors = Vec::new();
     for (index, proposal) in proposals.iter().enumerate() {
-        let event = proposal.operation.event_id();
+        let event = event_of(proposal);
         for (number, evidence) in proposal.evidence.iter().enumerate() {
             if evidence.source_version_id == intake {
                 continue;
             }
-            let code = match texts.get(&(event, evidence.source_version_id)) {
+            let text = event.and_then(|event| texts.get(&(event, evidence.source_version_id)));
+            let code = match text {
                 None => Some("unknown-source"),
                 Some(None) => Some("no-text"),
                 Some(Some(text)) => check_passage(&evidence.passage, text)
@@ -650,20 +667,26 @@ fn check_structure(event_id: Option<EventId>, proposals: &[Proposal]) -> Result<
             errors.push(FieldError::new(path(index, "depends_on"), "duplicate"));
         }
         // A changeset of an event works in that event only. A changeset of the organization works in its new events only.
-        let in_scope = match event_id {
-            Some(event) => !creates_event && operation.event_id() == event,
-            None => new_events.contains(&operation.event_id()),
+        // A person or an institution belongs to the organization, so each changeset can create one.
+        let in_scope = match (event_id, operation.event_id()) {
+            (_, None) => true,
+            (Some(event), Some(operation_event)) => !creates_event && operation_event == event,
+            (None, Some(operation_event)) => new_events.contains(&operation_event),
         };
         if !in_scope {
             errors.push(FieldError::new(path(index, "operation"), "event-mismatch"));
         }
         // A proposal that uses a new record of the changeset depends on the proposal that creates it.
         let uses = [
-            (!creates_event).then(|| operation.event_id().as_uuid()),
+            operation
+                .event_id()
+                .filter(|_| !creates_event)
+                .map(EventId::as_uuid),
             operation
                 .field_id()
                 .filter(|_| !matches!(operation, Operation::AddFieldDefinition { .. }))
                 .map(FieldDefinitionId::as_uuid),
+            operation.promisor().map(|promisor| promisor.as_uuid()),
         ];
         let record_creators = uses
             .into_iter()
@@ -709,7 +732,8 @@ struct CatalogField {
 }
 
 /// Checks each operation against the field catalog, with the new fields and choices of the changeset,
-/// and checks that the owner of each new open question is a member of its event.
+/// checks that the owner of each new open question is a member of its event,
+/// and checks the proposals of work records and parties (`work::check_work`).
 async fn check_catalog(
     scope: OrgScope,
     event_id: Option<EventId>,
@@ -861,6 +885,7 @@ async fn check_catalog(
             errors.push(FieldError::new(path(index, "owner"), "unknown-member"));
         }
     }
+    errors.extend(work::check_work(scope, proposals, stores).await?);
     finish(errors)
 }
 

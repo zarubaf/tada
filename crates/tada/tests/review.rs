@@ -607,6 +607,9 @@ mod review {
             proposals: database,
             sources: database,
             documents: database,
+            workstreams: database,
+            parties: database,
+            work: database,
         };
         let caller = MemberCaller::new(owner.user, owner.organization, OrganizationRole::Owner);
         create_changeset(&caller, input, stores, api.clock.as_ref())
@@ -635,5 +638,101 @@ mod review {
             .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(inbox["items"], json!([]));
+    }
+}
+
+mod work {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_proposal_through_http_creates_a_conditional_commitment_that_stays_conditional() {
+        let api = Api::start().await;
+        let owner = api.member("testwil", OrganizationRole::Owner).await;
+        let contributor = api.member("testwil", OrganizationRole::Member).await;
+        let event = api.create_event(&owner.cookie, "TEST30").await;
+        api.add_to_event(&owner.cookie, &event, &contributor, "event-contributor")
+            .await;
+
+        // The contributor proposes a new supplier and its conditional commitment.
+        let (person, commitment) = (Uuid::now_v7(), Uuid::now_v7());
+        let mut new_person = proposal(
+            json!({"kind": "create-person", "id": person, "name": "Moritz Muster"}),
+            "Wer klärt die Bewilligung?",
+        );
+        let mut promise = proposal(
+            json!({
+                "kind": "create-commitment", "id": commitment, "event_id": event,
+                "text": "Klärt die Bewilligung", "promisor": {"person": person},
+                "owner": contributor.user.as_uuid(), "due": "2030-04-30",
+                "condition": "wenn der Ort feststeht",
+            }),
+            "Der Ort ist noch offen.",
+        );
+        new_person["id"] = json!(Uuid::now_v7());
+        promise["depends_on"] = json!([new_person["id"]]);
+        let (status, changeset) = api
+            .post(
+                &contributor.cookie,
+                &format!("/api/v1/events/{event}/changesets"),
+                &json!({"source_text": SOURCE, "proposals": [new_person, promise]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::CREATED, "{changeset}");
+        let changeset = changeset["id"].as_str().unwrap();
+
+        let (status, review) = api
+            .get(&owner.cookie, &format!("/api/v1/changesets/{changeset}"))
+            .await;
+        assert_eq!(status, StatusCode::OK);
+        let operation = review["proposals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|proposal| &proposal["operation"])
+            .find(|operation| operation["kind"] == "create-commitment")
+            .unwrap();
+        assert_eq!(operation["promisor"], json!({"person": person}));
+        assert_eq!(operation["due"], "2030-04-30");
+
+        let (status, result) = api
+            .post(
+                &owner.cookie,
+                &format!("/api/v1/changesets/{changeset}/apply"),
+                &json!({"selected": [promise["id"]]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(
+            result["commitments"],
+            json!([{"id": commitment, "local_id": "COM-001"}])
+        );
+        assert_eq!(
+            result["persons"],
+            json!([{"id": person, "local_id": "PER-001"}])
+        );
+        assert_eq!(result["actions"], json!([]));
+        assert_eq!(result["institutions"], json!([]));
+
+        let path = format!("/api/v1/events/{event}/commitments/{commitment}");
+        let (status, read) = api.get(&contributor.cookie, &path).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(read["status"], "conditional");
+        assert_eq!(read["condition"], "wenn der Ort feststeht");
+        assert_eq!(read["evidence"][0]["quote"], "Der Ort ist noch offen.");
+        assert_eq!(read["evidence"][0]["record_version"], 1);
+
+        // Only "make firm" or an accepted proposal of that change makes it firm (ADR 0068).
+        let (status, problem) = api
+            .send(
+                &contributor.cookie,
+                Method::PATCH,
+                &path,
+                Some(&json!({"status": "firm", "expected_version": 1})),
+            )
+            .await;
+        assert_eq!(problem["code"], "invalid-transition", "{status} {problem}");
+        let (_, read) = api.get(&contributor.cookie, &path).await;
+        assert_eq!(read["status"], "conditional");
+        assert_eq!(read["version"], 1);
     }
 }

@@ -59,8 +59,12 @@ Operations in proposals (`domain::proposals::Operation`):
 - A `CreateCommitment` names its promisor as a person or an institution.
 - A change to `firm` through a proposal is the AI path for "condition met".
   The owner reviews it. The evidence is the passage, for example the signed order.
+  The reason of the proposal becomes the reason of the firm commitment, so it has at most 500 characters.
 - The review edit supports the text fields, the due date and the condition text of the create operations.
   An edit of the owner or the workstream is a field edit too. The same rules as for a direct command apply.
+  An edit cannot remove the condition of a proposed commitment. An edit that adds a condition makes the commitment start `conditional`.
+  The record keeps the passages of the proposal and the edited values as a source version of the kind `review`.
+- A proposal that names a workstream conflicts if the workstream closes before the apply.
 - The operations listed here cover the proposals of 2a.
 
 Not in 2a:
