@@ -536,6 +536,7 @@ pub struct DownloadQuery {
 /// The response has the media type that tada detected, `X-Content-Type-Options: nosniff`, a
 /// `Content-Security-Policy` that allows nothing, and the file name in `Content-Disposition`
 /// (RFC 6266). `disposition=inline` applies only to PDF and plain text (ADR 0009, ADR 0043).
+/// A draft version has no file, so it is not found here; `RenderDocumentVersion` reads it.
 #[utoipa::path(
     get,
     path = "/document-versions/{version_id}/content",

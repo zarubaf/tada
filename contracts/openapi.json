@@ -1490,7 +1490,7 @@
           "documents"
         ],
         "summary": "Downloads the file of a document version.",
-        "description": "The response has the media type that tada detected, `X-Content-Type-Options: nosniff`, a\n`Content-Security-Policy` that allows nothing, and the file name in `Content-Disposition`\n(RFC 6266). `disposition=inline` applies only to PDF and plain text (ADR 0009, ADR 0043).",
+        "description": "The response has the media type that tada detected, `X-Content-Type-Options: nosniff`, a\n`Content-Security-Policy` that allows nothing, and the file name in `Content-Disposition`\n(RFC 6266). `disposition=inline` applies only to PDF and plain text (ADR 0009, ADR 0043).\nA draft version has no file, so it is not found here; `RenderDocumentVersion` reads it.",
         "operationId": "download_document_version",
         "parameters": [
           {
