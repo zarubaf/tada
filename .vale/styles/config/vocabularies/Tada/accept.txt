@@ -162,3 +162,5 @@ trixie
 (?i)redactions?
 (?i)participations?
 worktree
+promisor
+promisors

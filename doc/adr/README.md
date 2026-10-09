@@ -82,6 +82,9 @@ The ADRs are the authority for the decisions in this project.
 | [0064](0064-one-proposal-input-for-http-and-mcp.md)      | One proposal input for HTTP and MCP                      | Proposed                  |
 | [0065](0065-worker-deletes-ended-rate-limit-counters.md) | The worker deletes ended rate-limit counters             | Proposed                  |
 | [0066](0066-problem-status-in-app.md)                    | The HTTP status of a problem code lives in `app`         | Proposed                  |
+| [0067](0067-workstreams-and-review-routing.md)           | Workstreams and review routing                           | Proposed                  |
+| [0068](0068-actions-and-commitments.md)                  | Actions and commitments                                  | Proposed                  |
+| [0069](0069-persons-and-institutions.md)                 | Persons and institutions                                 | Proposed                  |
 
 ## New ADR
 

@@ -68,7 +68,7 @@ pgvector comes only if an evaluation shows a benefit.
 
 1. A connector captures a source item once and stores an immutable source version.
 2. The AI extracts a proposal: a patch, source spans, the model and prompt version, assumptions and the target record version.
-3. tada routes the proposal to the owner of the workstream, not to the PM.
+3. tada routes the proposal to its reviewers: the owner of the target record, the lead of the workstream, or the event managers. It computes them from the current state ([ADR 0067](adr/0067-workstreams-and-review-routing.md)).
 4. The owner accepts, edits or rejects it. Silence is never acceptance.
 5. If the target record changed, the proposal goes into conflict and needs a new evaluation.
 
@@ -104,6 +104,7 @@ tada does not copy every tool into PostgreSQL.
 - Each record has a UUID, an organization ID, an event scope where it applies, an event-local ID, an owner, a status, timestamps and a record version.
 - Shared people and resources have organization scope. Event notes and assignments have event scope.
 - Source items, source versions, evidence links, proposals and accepted records are separate tables.
+- The table `record_evidence` keeps the evidence of each accepted change of an action, a commitment, a person or an institution ([ADR 0068](adr/0068-actions-and-commitments.md)).
 - A link to a source is not evidence, because documents change and messages disappear.
   Evidence is the exact source version or a snapshot, with its hash, capture time and a locator such as a page or a passage.
 - One domain type holds evidence: `domain::sources::Evidence`, a passage with the ID of its source version.
