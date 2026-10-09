@@ -50,6 +50,8 @@ Duplicate candidates:
 - The review of a create operation shows the records of the organization with a similar name.
 - The Rust code finds them with a normalized name match: it converts the names to lowercase, removes accents, folds `ß` to `ss`, turns each character that is not a letter or a digit into a space, and compares the words.
   So "Tent-Works Ltd." and "Tent Works Ltd" match.
+  Two names match if they are equal, if all words of one name are words of the other, or if they share a word of at least four characters.
+  Words of legal forms, for example `AG`, `GmbH` or `Verein`, do not count, because many names share them.
   It needs no PostgreSQL extension.
 - The list queries support the parameter `q` for a name search with the same normalization.
 
