@@ -97,4 +97,11 @@ describe("Markdown", () => {
     expect(screen.getByRole("link", { name: "Beispiel" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Skript" })).not.toBeInTheDocument();
   });
+
+  it("shifts the headings to the level that the page needs, and stops at h6", () => {
+    render(<Markdown headingLevel={5}>{"# Eins\n\n## Zwei\n\n### Drei"}</Markdown>);
+    expect(screen.getByRole("heading", { level: 5, name: "Eins" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 6, name: "Zwei" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 6, name: "Drei" })).toBeInTheDocument();
+  });
 });

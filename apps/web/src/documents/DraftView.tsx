@@ -23,6 +23,13 @@ export interface DraftEnvironment {
 
 export interface DraftViewProps extends DraftEnvironment {
   draft: DraftRendering;
+  /**
+   * The level of a `#` heading of the draft, and of „Quellen“: one below the heading that the
+   * draft sits under on the page.
+   */
+  headingLevel?: 2 | 3 | 4 | 5 | 6;
+  /** Called when the text is in the page. */
+  onShown?: () => void;
   /** The facts and fields of the event: the value types come from the fields. */
   profile: ProfileState;
 }
@@ -111,7 +118,15 @@ function FactLink({
  * source shows its words with a number, and a target that the reader cannot see shows „entfernt“.
  * The sources of the numbers follow the text.
  */
-export function DraftView({ api, eventId, timeZone, draft, profile }: DraftViewProps) {
+export function DraftView({
+  api,
+  eventId,
+  timeZone,
+  draft,
+  profile,
+  headingLevel = 2,
+  onShown,
+}: DraftViewProps) {
   const sourcesId = useId();
   const [shown, setShown] = useState<Shown>();
   // The evidence buttons, so that focus returns to the one that opened the sheet.
@@ -161,14 +176,17 @@ export function DraftView({ api, eventId, timeZone, draft, profile }: DraftViewP
   if (profile.kind === "loading") {
     return <Skeleton />;
   }
+  const Heading = `h${headingLevel}` as const;
   return (
     <div className={styles.draft}>
-      <LazyMarkdown renderLink={renderLink}>{draft.markdown}</LazyMarkdown>
+      <LazyMarkdown renderLink={renderLink} headingLevel={headingLevel} onShown={onShown}>
+        {draft.markdown}
+      </LazyMarkdown>
       {numbers.size > 0 && (
         <section className={styles.sources} aria-labelledby={sourcesId}>
-          <h4 id={sourcesId} className={styles.heading}>
+          <Heading id={sourcesId} className={styles.heading}>
             {t("draft-sources")}
-          </h4>
+          </Heading>
           <ol className={styles.list}>
             {[...numbers].map(([href, number]) => {
               const target = draft.links[href];
@@ -213,5 +231,6 @@ export function ProposalDraft({
   draft: DraftRendering;
 }) {
   const { profile } = useEventProfile(environment.api, environment.eventId);
-  return <DraftView {...environment} draft={draft} profile={profile} />;
+  // The card of the proposal has a title at h3 and sections at h4.
+  return <DraftView {...environment} draft={draft} profile={profile} headingLevel={5} />;
 }

@@ -400,7 +400,7 @@ describe("a draft proposal", () => {
   const FACT_LINK = "tada:fact/0199b8e0-0000-7000-8000-0000000002a1?v=2";
   const HIDDEN_LINK = "tada:fact/0199b8e0-0000-7000-8000-0000000002a2?v=1";
   const rendering = {
-    markdown: `Der Ort ist [](${FACT_LINK}).\n\nEs kommen 500 Gäste.\n\nDas Konto ist [](${HIDDEN_LINK}).`,
+    markdown: `# Konzept\n\nDer Ort ist [](${FACT_LINK}).\n\nEs kommen 500 Gäste.\n\nDas Konto ist [](${HIDDEN_LINK}).`,
     lint_warnings: [
       { line: 3, kind: "number" },
       { line: 3, kind: "robot" },
@@ -469,6 +469,8 @@ describe("a draft proposal", () => {
     expect(await within(card).findByText("Flugplatz Testwil")).toBeInTheDocument();
     expect(within(card).getByText("Annahme")).toBeInTheDocument();
     expect(within(card).getByText("entfernt")).toBeInTheDocument();
+    // The card has h3 for its title and h4 for its sections: the draft sits below them.
+    expect(within(card).getByRole("heading", { level: 5, name: "Konzept" })).toBeInTheDocument();
   });
 
   it("links an existing document and renders without a draft", async () => {

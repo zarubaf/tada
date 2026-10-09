@@ -130,7 +130,9 @@ function DiffBody({
       <header className={styles.header}>
         <p className={styles.key}>{document.readable_id}</p>
         <h2 ref={heading} tabIndex={-1} className={styles.title}>
-          {t("document-diff-title", { from: numberOf(from), to: numberOf(to) })}
+          {numberOf(from) !== "" && numberOf(to) !== ""
+            ? t("document-diff-title", { from: numberOf(from), to: numberOf(to) })
+            : t("document-diff-title-plain")}
         </h2>
       </header>
       {!diff ? (

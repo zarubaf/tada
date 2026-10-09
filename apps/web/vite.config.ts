@@ -10,9 +10,18 @@ const policy = readFileSync(
 
 // The development server needs two more rights: React Refresh starts with an inline script, and
 // hot reload talks over a WebSocket.
-const developmentPolicy = policy
-  .replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")
-  .replace("connect-src 'self'", "connect-src 'self' ws:");
+function widen(text: string, directive: string, extra: string): string {
+  if (!text.includes(directive)) {
+    throw new Error(`content-security-policy.txt has no "${directive}" to widen for development`);
+  }
+  return text.replace(directive, `${directive} ${extra}`);
+}
+
+const developmentPolicy = widen(
+  widen(policy, "script-src 'self'", "'unsafe-inline'"),
+  "connect-src 'self'",
+  "ws:",
+);
 
 // The API and the MCP server run on `tada serve` (TADA_PORT 8080). In production, serve delivers the built files itself (ADR 0005).
 // An MCP client in development uses `http://localhost:5173/mcp`, the URL that the token page shows (ADR 0040).

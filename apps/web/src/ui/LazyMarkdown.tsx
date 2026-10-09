@@ -52,12 +52,15 @@ function Shown({ onShown }: { onShown: () => void }) {
 export function LazyMarkdown({
   children,
   renderLink,
+  headingLevel,
   onShown,
   load = loadMarkdown,
 }: {
   children: string;
   /** Renders a `tada:` link; see `Markdown`. */
   renderLink?: MarkdownProps["renderLink"];
+  /** The level of a `#` heading; see `Markdown`. */
+  headingLevel?: MarkdownProps["headingLevel"];
   /** Called when the text is in the page, for example to show an action only after it. */
   onShown?: () => void;
   /** For tests: the loader of the chunk. */
@@ -98,7 +101,9 @@ export function LazyMarkdown({
     <div ref={area} tabIndex={-1}>
       <ChunkBoundary key={failures} fallback={fallback}>
         <Suspense fallback={<Skeleton />}>
-          <Lazy renderLink={renderLink}>{children}</Lazy>
+          <Lazy renderLink={renderLink} headingLevel={headingLevel}>
+            {children}
+          </Lazy>
           <Shown onShown={shown} />
         </Suspense>
       </ChunkBoundary>

@@ -23,6 +23,7 @@ import { Skeleton } from "../ui/Skeleton";
 import styles from "./DocumentPage.module.css";
 import { DraftView } from "./DraftView";
 import { formatSize, hashPrefix } from "./format";
+import { LintWarnings } from "./LintWarnings";
 import { useCanApprove } from "./useCanApprove";
 import { diffPath, isApprovable, newestVersion, previousDraft } from "./versions";
 
@@ -313,6 +314,8 @@ function DocumentBody({
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState<string>();
   const [failed, setFailed] = useState<string>();
+  // The draft whose text is in the page. An approval cannot be undone: the button waits for it.
+  const [shownDraft, setShownDraft] = useState<string>();
 
   /** The button stays while it runs and when the call fails, so focus stays on it. */
   const approve = async () => {
@@ -398,7 +401,7 @@ function DocumentBody({
         >
           {t("document-preview-title")}
         </h3>
-        {newest && isApprovable(newest) && canApprove && (
+        {newest && isApprovable(newest) && canApprove && shownDraft === newest.id && (
           <div>
             <Button variant="primary" isPending={approving} onPress={() => void approve()}>
               {t("document-approve")}
@@ -420,11 +423,16 @@ function DocumentBody({
           />
         )}
         {newest?.kind === "draft" && rendering.state.kind === "loaded" && (
+          <LintWarnings warnings={rendering.state.draft.lint_warnings} />
+        )}
+        {newest?.kind === "draft" && rendering.state.kind === "loaded" && (
           <DraftView
+            onShown={() => setShownDraft(newest.id)}
             api={api}
             eventId={document.event_id}
             timeZone={event.time_zone}
             draft={rendering.state.draft}
+            headingLevel={4}
             profile={profile}
           />
         )}

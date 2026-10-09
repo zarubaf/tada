@@ -58,6 +58,10 @@ interface Options {
   approve?: () => Response;
   /** The rendering of the draft fails. */
   renderingFails?: boolean;
+  /** The rendering of the draft never arrives. */
+  renderingHangs?: boolean;
+  /** Someone approves the draft while the member looks at it: the next read shows it approved. */
+  approvedMeanwhile?: boolean;
 }
 
 function setup(versions: DocumentVersion[], options: Options = {}) {
@@ -80,6 +84,11 @@ function setup(versions: DocumentVersion[], options: Options = {}) {
     memberships: [{ organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" }],
   };
   const calls: { method: string; path: string; body: unknown }[] = [];
+  let approvedByOthers = false;
+  const current = () =>
+    approvedByOthers
+      ? versions.map((v) => (v.id === newest.id ? { ...v, status: "approved" as const } : v))
+      : versions;
   const fetch = async (request: Request) => {
     const { pathname } = new URL(request.url);
     const body = request.method === "POST" ? await request.clone().json() : undefined;
@@ -88,16 +97,20 @@ function setup(versions: DocumentVersion[], options: Options = {}) {
       return json(200, session);
     }
     if (pathname.endsWith("/approve")) {
+      approvedByOthers = options.approvedMeanwhile === true;
       return (options.approve ?? (() => json(200, { ...newest, status: "approved" })))();
     }
     if (pathname.endsWith("/rendering")) {
+      if (options.renderingHangs) {
+        return new Promise<Response>(() => undefined);
+      }
       return options.renderingFails
         ? json(500, { type: "", code: "internal", title: "", status: 500, instance: "" })
         : json(200, {
             version: newest,
             draft: {
-              markdown: `Der Ort ist [](${DRAFT_LINK}).\n\nEs gibt [Hinweise](https://example.org).`,
-              lint_warnings: [],
+              markdown: `# Konzept\n\nDer Ort ist [](${DRAFT_LINK}).\n\nEs gibt [Hinweise](https://example.org).`,
+              lint_warnings: [{ line: 3, kind: "number" }],
               links: {
                 [DRAFT_LINK]: {
                   kind: "fact",
@@ -122,7 +135,7 @@ function setup(versions: DocumentVersion[], options: Options = {}) {
       return json(200, { items: [] });
     }
     if (pathname.endsWith("/versions")) {
-      return json(200, { items: versions });
+      return json(200, { items: current() });
     }
     if (pathname.endsWith(`/events/${EVENT_ID}`)) {
       return json(200, {
@@ -144,7 +157,7 @@ function setup(versions: DocumentVersion[], options: Options = {}) {
         failures.documents -= 1;
         return json(500, { type: "", code: "internal", title: "", status: 500, instance: "" });
       }
-      return json(200, document);
+      return json(200, { ...document, newest_version: current()[current().length - 1] });
     }
     throw new Error(`unexpected ${request.method} ${pathname}`);
   };
@@ -375,6 +388,56 @@ describe("DocumentPage", () => {
     expect(within(table).getByRole("link", { name: "Unterschiede zu Version 2" })).toHaveAttribute(
       "href",
       `/documents/${DOCUMENT_ID}/diff?from=v2&to=v3`,
+    );
+  });
+
+  it("puts the headings of a draft below the heading of the preview", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft]);
+
+    // h2 document, h3 preview: the `#` of the draft is h4.
+    expect(await screen.findByRole("heading", { level: 4, name: "Konzept" })).toBeInTheDocument();
+  });
+
+  it("shows the lint warnings of the draft next to it, before an approval", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft], { manager: true });
+
+    expect(
+      await screen.findByText("Zeile 3: Zahl ausserhalb eines Fakt-Links"),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["fails", { renderingFails: true }],
+    ["is not yet there", { renderingHangs: true }],
+  ])("offers no approval while the draft %s", async (_name, options) => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft], { manager: true, ...options });
+
+    await screen.findByRole("table", { name: "Versionen" });
+    // The membership call has answered once the button could show: give it the time.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.queryByRole("button", { name: "Version freigeben" })).not.toBeInTheDocument();
+  });
+
+  it("reads the document again after a conflict and moves focus to the heading when the button left", async () => {
+    const { calls } = setup([version(1, "Programm.pdf", "application/pdf"), draft], {
+      manager: true,
+      approvedMeanwhile: true,
+      approve: () =>
+        json(409, { type: "", code: "invalid-transition", title: "", status: 409, instance: "" }),
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Version freigeben" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Version freigeben" })).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nicht mehr freigegeben werden/);
+    const reads = calls.filter(
+      (call) => call.method === "GET" && call.path.endsWith(`/documents/${DOCUMENT_ID}`),
+    );
+    expect(reads.length).toBeGreaterThanOrEqual(2);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2, name: "Programm Flugtag.pdf" })).toHaveFocus(),
     );
   });
 });

@@ -80,9 +80,14 @@ function json(body: unknown) {
 
 const api = createApi((async () => json({ items: [] })) as unknown as typeof globalThis.fetch);
 
-function show(rendering: DraftRendering, profile: ProfileState = loaded) {
+function show(
+  rendering: DraftRendering,
+  profile: ProfileState = loaded,
+  headingLevel: 2 | 3 | 4 | 5 | 6 = 2,
+) {
   return render(
     <DraftView
+      headingLevel={headingLevel}
       api={api}
       eventId={EVENT_ID}
       timeZone="Europe/Zurich"
@@ -240,5 +245,41 @@ describe("DraftView", () => {
     show(draft("Text", {}), { kind: "loading" });
 
     expect(screen.queryByText("Text")).not.toBeInTheDocument();
+  });
+
+  it("puts its headings and „Quellen“ at the level that the page gives", async () => {
+    show(
+      draft(`# Konzept\n\nZahl aus [dem Protokoll](${sourceLink}).`, {
+        [sourceLink]: {
+          kind: "source",
+          source_version_id: SOURCE,
+          passage: { start: 0, end: 5, quote: "Hallo" },
+        },
+      }),
+      loaded,
+      4,
+    );
+
+    expect(await screen.findByRole("heading", { level: 4, name: "Konzept" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 4, name: "Quellen" })).toBeInTheDocument();
+  });
+
+  it("tells the page when the text is in it", async () => {
+    let shown = 0;
+    render(
+      <DraftView
+        api={api}
+        eventId={EVENT_ID}
+        timeZone="Europe/Zurich"
+        draft={draft("Text", {})}
+        profile={loaded}
+        onShown={() => {
+          shown += 1;
+        }}
+      />,
+    );
+
+    await screen.findByText("Text");
+    expect(shown).toBe(1);
   });
 });

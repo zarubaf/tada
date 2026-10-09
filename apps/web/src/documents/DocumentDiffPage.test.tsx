@@ -200,6 +200,8 @@ describe("DocumentDiffPage", () => {
     setup(`/documents/${DOCUMENT_ID}/diff`);
 
     expect(await screen.findByText(/zwei Entwurfsversionen/)).toBeInTheDocument();
+    // No blank version numbers in the heading.
+    expect(screen.getByRole("heading", { level: 2, name: "Unterschiede" })).toBeInTheDocument();
   });
 
   it("shows the failure with a retry that moves focus to the heading", async () => {

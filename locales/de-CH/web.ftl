@@ -256,6 +256,7 @@ document-diff-link-to = Unterschiede zu Version { $number }
 document-diff-back = Zurück zum Dokument
 # $from: the number of the older version. $to: the number of the newer version.
 document-diff-title = Unterschiede: Version { $from } zu Version { $to }
+document-diff-title-plain = Unterschiede
 document-diff-missing = Wählen Sie zwei Entwurfsversionen in der Liste der Versionen aus.
 document-diff-facts = Fakten
 document-diff-facts-none = Die Entwürfe nennen dieselben Fakten.
