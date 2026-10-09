@@ -598,6 +598,7 @@ mod tests {
             anna.user_id(),
             RecordVersion::FIRST,
             &fixture.test.database,
+            &*fixture.clock,
         )
         .await
         .unwrap();
