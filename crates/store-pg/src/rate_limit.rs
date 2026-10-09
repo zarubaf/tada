@@ -100,7 +100,7 @@ impl Database {
 ///
 /// The cleanup keeps the previous window, so a process whose clock is up to one window behind never
 /// writes a counter that another process deletes. It skips locked rows, so two processes at a window
-/// boundary never wait for each other, and cannot deadlock (ADR 0025, ADR 0056).
+/// boundary never wait for each other, and cannot deadlock (ADR 0025, ADR 0065).
 async fn delete_ended_counters(conn: &mut PgConnection, now: Timestamp) -> Result<u64, StoreError> {
     let ended = RateWindow::containing(now)
         .start

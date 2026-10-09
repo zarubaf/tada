@@ -2,6 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-10-09
+- Amends: [0056](0056-sign-in-details.md)
 
 ## Context
 
@@ -19,11 +20,16 @@ The promise of two hours is then false.
 - The first loop of the worker in each rate-limit window deletes the counters whose window ended more than one window ago.
   The set of counters that the cleanup can delete changes only when a new window starts.
 - The worker uses the same cleanup as a sign-in request.
-  It keeps the previous window and skips locked rows, as ADR 0056 requires.
+- The cleanup keeps the counters of the previous window.
+  So a process whose clock is up to one window behind never writes a counter that another process deletes.
+- The cleanup skips locked rows (`FOR UPDATE SKIP LOCKED`).
+  So two processes at a window boundary never wait for each other and cannot deadlock (ADR 0025).
 - Each sign-in request continues to delete ended counters.
 - A failed cleanup writes a warning to the log.
   The worker records only a successful cleanup, so the next loop tries again.
 
+This changes one sentence of ADR 0056: "This needs no scheduled job, because schedules come only in Slice 2."
+ADR 0056 does not say how the cleanup handles the previous window and locked rows; this ADR states these rules.
 The rest of ADR 0056 does not change.
 
 ## Consequences
