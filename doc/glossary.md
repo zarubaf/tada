@@ -103,6 +103,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | approved version | A draft version with the status `approved`. Nobody can overwrite it.                                                                                       | final          |
 | storage quota    | The largest total size of the uploaded files of one organization (ADR 0043).                                                                               |                |
 | export           | All data of one organization as files (ADR 0059): JSON Lines, CSV, the original files and a manifest with hashes. An operator makes it with `tada export`. | dump, backup   |
+| backup           | A copy of the database and the object storage of one installation. The operator makes and restores it outside tada (ADR 0033).                             |                |
 
 ## AI and automation
 
