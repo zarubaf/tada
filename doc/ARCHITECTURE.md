@@ -68,7 +68,8 @@ pgvector comes only if an evaluation shows a benefit.
 
 1. A connector captures a source item once and stores an immutable source version.
 2. The AI extracts a proposal: a patch, source spans, the model and prompt version, assumptions and the target record version.
-3. tada routes the proposal to its reviewers: the owner of the target record, the lead of the workstream, or the event managers. It computes them from the current state ([ADR 0067](adr/0067-workstreams-and-review-routing.md)).
+3. tada routes the proposal to its reviewers: the owner of the target record, the lead of the workstream, or the event managers. A dependency also goes to the reviewers of the proposals that depend on it.
+   It computes the reviewers from the current state at each read and each apply, and a member without a current event role is no reviewer ([ADR 0067](adr/0067-workstreams-and-review-routing.md)).
 4. The owner accepts, edits or rejects it. Silence is never acceptance.
 5. If the target record changed, the proposal goes into conflict and needs a new evaluation.
 
@@ -105,6 +106,7 @@ tada does not copy every tool into PostgreSQL.
 - Shared people and resources have organization scope. Event notes and assignments have event scope.
 - Source items, source versions, evidence links, proposals and accepted records are separate tables.
 - The table `record_evidence` keeps the evidence of each accepted change of an action, a commitment, a person or an institution ([ADR 0068](adr/0068-actions-and-commitments.md)).
+  A reader sees this evidence through `app::access::source_reach`, so evidence from an organization changeset is visible only to owners and admins.
 - A link to a source is not evidence, because documents change and messages disappear.
   Evidence is the exact source version or a snapshot, with its hash, capture time and a locator such as a page or a passage.
 - One domain type holds evidence: `domain::sources::Evidence`, a passage with the ID of its source version.
@@ -129,6 +131,9 @@ tada does not copy every tool into PostgreSQL.
   For example, the text of an organization changeset has no event, and the members of the event that it creates read it through the evidence.
   `app::access::source_reach` holds this rule. Search and the reads of citations use it.
   A new citation in a proposal or a draft uses the reach of its own event (`app::access::event_source_reach`).
+- Each member with an event role reads the persons and institutions of the organization, and the membership list of the event with names and roles.
+  Only the owner, the workstream lead or an event manager changes an action or a commitment ([ADR 0067](adr/0067-workstreams-and-review-routing.md)). Only owners and admins change persons and institutions ([ADR 0069](adr/0069-persons-and-institutions.md)).
+  The API tells each client `can_change` and `next_statuses` for each record, so a client does not repeat these rules.
 - A document copied into an event does not widen access. Both the source access and the event membership must allow disclosure.
 - Unknown event attribution goes to a triage queue. AI can suggest an event, but it never shows a message to more than one event team on its own.
 
