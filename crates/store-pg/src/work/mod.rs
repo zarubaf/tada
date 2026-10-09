@@ -31,7 +31,7 @@ use tada_app::work::{
 
 use crate::Database;
 use crate::audit;
-use crate::error::{InvalidRow, store_error};
+use crate::error::{InvalidRow, store_error, violates};
 use crate::local_ids::next_local_number;
 
 struct ActionRow {
@@ -232,10 +232,6 @@ impl Select {
 /// The first number that a page starts after. A cursor beyond the largest number gives an empty page.
 fn after_number(after: Option<NumberCursor>) -> i64 {
     after.map_or(0, |cursor| i64::try_from(cursor.0).unwrap_or(i64::MAX))
-}
-
-fn violates(error: &sqlx::Error, constraint: &str) -> bool {
-    matches!(error, sqlx::Error::Database(error) if error.constraint() == Some(constraint))
 }
 
 async fn select_actions(

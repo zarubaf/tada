@@ -335,7 +335,7 @@ pub struct ListCommitmentsQuery {
 /// The input of `CreateAction`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateActionRequest {
-    /// The UUIDv7 of the new action. A client that sends it can retry the request safely.
+    /// The UUIDv7 of the new action. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry.
     pub id: Option<Uuid>,
     /// 1 to 200 characters.
     #[schema(example = "Generator bestellen")]
@@ -387,7 +387,7 @@ pub struct PromisorInput {
 /// The input of `CreateCommitment`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateCommitmentRequest {
-    /// The UUIDv7 of the new commitment. A client that sends it can retry the request safely.
+    /// The UUIDv7 of the new commitment. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry.
     pub id: Option<Uuid>,
     /// 1 to 500 characters.
     #[schema(example = "Generator delivery Friday 15:00")]

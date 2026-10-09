@@ -159,6 +159,8 @@ pub struct ListPartiesQuery {
 /// The input of `CreatePerson`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreatePersonRequest {
+    /// The UUIDv7 of the new person. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry.
+    pub id: Option<Uuid>,
     /// 1 to 200 characters.
     #[schema(example = "Beat Muster")]
     pub name: String,
@@ -172,6 +174,8 @@ pub struct CreatePersonRequest {
 /// The input of `CreateInstitution`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateInstitutionRequest {
+    /// The UUIDv7 of the new institution. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry.
+    pub id: Option<Uuid>,
     /// 1 to 200 characters.
     #[schema(example = "Testwil Generatoren AG")]
     pub name: String,
@@ -284,6 +288,7 @@ async fn create_person(
     Json(request): Json<CreatePersonRequest>,
 ) -> Result<(StatusCode, axum::Json<Person>), ApiError> {
     let input = NewPerson {
+        id: request.id,
         name: request.name,
         email: request.email,
         phone: request.phone,
@@ -418,6 +423,7 @@ async fn create_institution(
     Json(request): Json<CreateInstitutionRequest>,
 ) -> Result<(StatusCode, axum::Json<Institution>), ApiError> {
     let input = NewInstitution {
+        id: request.id,
         name: request.name,
         kind: request.kind,
         email: request.email,

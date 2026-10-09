@@ -104,7 +104,7 @@ pub struct WorkstreamPage {
 /// The input of `CreateWorkstream`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateWorkstreamRequest {
-    /// The UUIDv7 of the new workstream. A client that sends it can retry the request safely.
+    /// The UUIDv7 of the new workstream. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry.
     pub id: Option<Uuid>,
     /// 1 to 200 characters, unique in the event whatever its case.
     #[schema(example = "Gelände")]

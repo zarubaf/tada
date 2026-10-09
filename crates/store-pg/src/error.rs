@@ -22,6 +22,11 @@ pub(crate) fn store_error(error: sqlx::Error) -> StoreError {
     }
 }
 
+/// True if `error` breaks the constraint `constraint`, for example a primary key that a client ID takes.
+pub(crate) fn violates(error: &sqlx::Error, constraint: &str) -> bool {
+    matches!(error, sqlx::Error::Database(error) if error.constraint() == Some(constraint))
+}
+
 /// A row that breaks a rule of the domain types. The constraints should make this impossible.
 #[derive(Debug, thiserror::Error)]
 #[error("the column {0} holds an invalid value")]
