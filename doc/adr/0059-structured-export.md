@@ -94,6 +94,10 @@ The import:
 - A new table or a new column needs a decision in the list of `store-pg`; the export fails until it has one.
 - The export holds all rows in memory. This is enough at club scale; a larger organization needs a streaming export.
 - An import into another installation must use the same schema version. A production import needs a new ADR.
+- The CSV files hold the text of members and AI clients unchanged, so a cell can start with `=`, `+`, `-` or `@`.
+  The export does not neutralize spreadsheet formulas, and a spreadsheet program can run such a cell as a formula.
+  Import a CSV file as text, and do not open it directly in a spreadsheet program.
+  The JSON Lines files are the authority of the export.
 
 ## Alternatives
 
