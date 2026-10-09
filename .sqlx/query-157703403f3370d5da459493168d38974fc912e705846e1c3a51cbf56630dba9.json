@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT source_version_id FROM record_evidence\n             WHERE organization_id = $1\n               AND (action_id = ANY($2) OR commitment_id = ANY($3)\n                    OR person_id = ANY($4) OR institution_id = ANY($5))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_version_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "record_evidence",
+            "name": "source_version_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray",
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "157703403f3370d5da459493168d38974fc912e705846e1c3a51cbf56630dba9"
+}
