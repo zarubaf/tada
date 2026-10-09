@@ -1,5 +1,5 @@
 //! An organization that its owner fills through the API, on a database with a shared Garage.
-//! The export test uses it.
+//! The export and isolation tests use it.
 
 use std::num::NonZeroU64;
 use std::sync::Arc;
@@ -17,6 +17,8 @@ use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::session::SessionAuthenticator;
 use tada_app::telegram::{TelegramName, TelegramUserId, claim_link_code};
+use tada_app::tokens::TokenAuthenticator;
+use tada_mcp::McpState;
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
@@ -26,21 +28,36 @@ use super::files::pdf;
 /// The source text of each changeset of `Client::propose`.
 pub const SOURCE: &str = "Das Open Day findet im Mai 2030 auf dem Flugfeld statt.";
 
-/// The API of one database on a shared Garage.
+/// The API and the MCP server of one database on a shared Garage, as `serve` connects them.
 pub fn router(test: &TestDatabase, garage: &TestGarage) -> Router {
     let database = Arc::new(test.database.clone());
     let clock = Arc::new(SystemClock);
     let authenticator = Arc::new(SessionAuthenticator::new(
         database.clone(),
-        database,
+        database.clone(),
         clock.clone(),
     ));
-    let state = ApiState {
+    let api = ApiState {
         blobs: Arc::new(garage.storage.clone()),
         upload_max_bytes: NonZeroU64::new(1024 * 1024).unwrap(),
-        ..super::api_state(test, authenticator, clock)
+        ..super::api_state(test, authenticator, clock.clone())
     };
-    tada_api::router(state, None)
+    let mcp = McpState {
+        authenticator: Arc::new(TokenAuthenticator::new(
+            database.clone(),
+            database.clone(),
+            clock.clone(),
+        )),
+        events: database.clone(),
+        identity: database.clone(),
+        facts: database.clone(),
+        sources: database.clone(),
+        proposals: database.clone(),
+        documents: database,
+        clock,
+        public_url: super::public_url(),
+    };
+    tada::serve::routes(api, mcp, None)
 }
 
 /// A member of one organization who calls the API.
