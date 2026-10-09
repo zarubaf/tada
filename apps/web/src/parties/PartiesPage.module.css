@@ -1,0 +1,46 @@
+@layer components {
+  .toolbar {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .search {
+    max-width: 24rem;
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* One column, at most 40rem wide (doc/design/components.md, „Forms“). */
+  .form {
+    container-type: inline-size;
+    display: grid;
+    gap: var(--space-4);
+    max-width: 40rem;
+  }
+
+  /* The primary action is full width in a narrow form and on the right in a wide one (ADR 0019). */
+  .actions {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  @container (width >= 28rem) {
+    .actions {
+      grid-auto-flow: column;
+      justify-content: end;
+    }
+  }
+}

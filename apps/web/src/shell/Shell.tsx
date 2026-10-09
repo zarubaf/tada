@@ -65,6 +65,11 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           <NavLink to="/events" large>
             {t("nav-events")}
           </NavLink>
+          {/* The bottom bar has room for three items; on narrow layouts the member menu has these. */}
+          <div className={styles.registers}>
+            <NavLink to="/persons">{t("nav-persons")}</NavLink>
+            <NavLink to="/institutions">{t("nav-institutions")}</NavLink>
+          </div>
           <NavLink to="/settings/members" within="/settings" large>
             {t("nav-settings")}
           </NavLink>
@@ -77,11 +82,13 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
             trigger={user.displayName}
             label={t("member-menu")}
             items={[
+              { id: "persons", label: t("nav-persons") },
+              { id: "institutions", label: t("nav-institutions") },
               { id: "privacy", label: t("nav-privacy") },
               { id: "sign-out", label: t("sign-out") },
             ]}
             onAction={(id) =>
-              id === "privacy" ? navigate("/privacy") : void signOut().then(setFailure)
+              id === "sign-out" ? void signOut().then(setFailure) : navigate(`/${id}`)
             }
             placement="top end"
           />

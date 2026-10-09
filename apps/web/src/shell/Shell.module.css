@@ -51,6 +51,11 @@
     background: var(--color-bg-surface);
   }
 
+  /* Hidden in the bottom bar; the member menu leads to the registers there. */
+  .registers {
+    display: none;
+  }
+
   .member {
     display: grid;
     grid-column: 3;
@@ -88,6 +93,10 @@
       padding: var(--space-4);
       border-right: 1px solid var(--color-border-subtle);
       border-bottom: 0;
+    }
+
+    .registers {
+      display: contents;
     }
 
     .nav {

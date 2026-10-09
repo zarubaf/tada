@@ -10,6 +10,7 @@ import { EventPage } from "./events/EventPage";
 import { EventsPage } from "./events/EventsPage";
 import { MembersPage } from "./members/MembersPage";
 import { NotFoundPage } from "./NotFoundPage";
+import { PartiesPage } from "./parties/PartiesPage";
 import { PrivacyPage } from "./privacy/PrivacyPage";
 import { InboxProvider } from "./review/InboxProvider";
 import { ReviewInbox } from "./review/ReviewInbox";
@@ -97,6 +98,13 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   <Route path="/privacy">
                     <PrivacyPage api={api} />
+                  </Route>
+                  {/* The register of persons and institutions */}
+                  <Route path="/persons">
+                    <PartiesPage api={api} kind="person" />
+                  </Route>
+                  <Route path="/institutions">
+                    <PartiesPage api={api} kind="institution" />
                   </Route>
                   {/* The Review Inbox */}
                   <Route path="/inbox">

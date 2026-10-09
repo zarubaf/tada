@@ -99,6 +99,8 @@ session-loading = Sitzung wird geladen
 skip-link = Zum Inhalt springen
 shell-nav = Hauptnavigation
 nav-events = Anlässe
+nav-persons = Personen
+nav-institutions = Institutionen
 nav-inbox = Eingang
 # $count: the number of changesets that wait for a review.
 nav-inbox-count = { $count } offen
@@ -695,3 +697,46 @@ org-privacy-error-too-long = Der Text ist zu lang. Erlaubt sind 20 000 Zeichen.
 org-privacy-conflict = Jemand hat die Datenschutzerklärung inzwischen geändert. Laden Sie die Seite neu, um den neuen Text zu sehen. Kopieren Sie Ihren Text vorher.
 org-privacy-owner-only = Nur die Organisationsleitung ändert die Datenschutzerklärung.
 org-privacy-read = Datenschutzerklärung lesen
+
+## Persons and institutions (ADR 0069)
+
+persons-title = Personen
+institutions-title = Institutionen
+parties-search = Nach Name suchen
+parties-loading = Einträge werden geladen
+parties-load-more = Weitere Einträge laden
+parties-loaded-more = Weitere Einträge geladen.
+parties-empty-title = Noch keine Einträge erfasst
+parties-empty-text = Erfassen Sie den ersten Eintrag mit dem Formular unter der Liste.
+parties-no-match-title = Keine Treffer
+parties-no-match-text = Ändern Sie den Suchbegriff.
+parties-column-id = ID
+parties-column-name = Name
+parties-column-kind = Art
+parties-column-email = E-Mail-Adresse
+parties-column-phone = Telefon
+parties-column-actions = Aktionen
+parties-edit = Bearbeiten
+# $name: the name of the record.
+parties-edit-of = { $name } bearbeiten
+# $name: the name of the saved record.
+parties-saved = „{ $name }“ gespeichert.
+parties-conflict = Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.
+person-create-title = Person erfassen
+institution-create-title = Institution erfassen
+# $name: the name of the record.
+party-change-title = „{ $name }“ bearbeiten
+party-name = Name (Pflichtfeld)
+party-kind = Art
+party-email = E-Mail-Adresse
+party-phone = Telefon
+party-create = Erfassen
+party-save = Speichern
+party-cancel = Abbrechen
+party-error-name = Der Name hat 1 bis 200 Zeichen.
+party-error-email = Das ist keine gültige E-Mail-Adresse.
+party-error-phone = Die Telefonnummer hat 1 bis 50 Zeichen.
+institution-kind-authority = Behörde
+institution-kind-company = Firma
+institution-kind-club = Verein
+institution-kind-other = Andere
