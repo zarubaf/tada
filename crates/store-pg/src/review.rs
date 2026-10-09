@@ -31,6 +31,7 @@ use tada_app::store::StoreError;
 use crate::Database;
 use crate::documents::{DOCUMENT_COUNTER, DRAFT};
 use crate::error::{InvalidRow, store_error};
+use crate::local_ids::next_local_number;
 use crate::sources::{TextItem, TextKind};
 use crate::{actor, audit, drafts, events, sources, values};
 
@@ -697,27 +698,6 @@ async fn write_step(
     )
     .await?;
     Ok(local_id)
-}
-
-/// The next local number of `kind` in its scope: an event, or the organization (ADR 0038).
-/// The counter changes in the transaction of the caller, so a rollback takes no number and a number is never given twice.
-async fn next_local_number(
-    conn: &mut PgConnection,
-    scope: OrgScope,
-    counter_scope: Uuid,
-    kind: &str,
-) -> Result<i64, sqlx::Error> {
-    sqlx::query_scalar!(
-        r#"INSERT INTO local_id_counter (organization_id, scope_id, kind, next)
-           VALUES ($1, $2, $3, 2)
-           ON CONFLICT (organization_id, scope_id, kind) DO UPDATE SET next = local_id_counter.next + 1
-           RETURNING next - 1 AS "number!""#,
-        scope.organization_id().as_uuid(),
-        counter_scope,
-        kind,
-    )
-    .fetch_one(&mut *conn)
-    .await
 }
 
 /// The document of a draft step and the number of its new version, with the `DOC-<n>` of a new document.
