@@ -1,4 +1,4 @@
-import { IconAlertTriangle } from "@tabler/icons-react";
+import { IconAlertTriangle, IconClockExclamation } from "@tabler/icons-react";
 import { type ReactNode, type Ref, useId } from "react";
 import type { ApplyEdit, Proposal } from "../api/client";
 import type { DraftEnvironment } from "../documents/DraftView";
@@ -12,6 +12,7 @@ import type { Conflict } from "./conflict";
 import { EditForm } from "./EditForm";
 import { type FieldInfo, OperationDetails, operationTitle } from "./OperationView";
 import styles from "./ProposalCard.module.css";
+import type { RecordNames } from "./recordNames";
 
 export interface ProposalCardProps {
   proposal: Proposal;
@@ -19,6 +20,11 @@ export interface ProposalCardProps {
   /** Where a draft of the proposal is read. */
   draftEnvironment: DraftEnvironment | undefined;
   conflict: Conflict | undefined;
+  /** The names behind the IDs of a work proposal. */
+  names: RecordNames;
+  /** The existing record that the member chose instead of a new one, or nothing. */
+  linkedRecord: string | undefined;
+  onLink: (recordId: string | undefined) => void;
   /** The titles of the proposals this one needs. */
   needs: string[];
   /** The titles of the selected proposals that need this one. */
@@ -79,11 +85,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function ProposalCard(props: ProposalCardProps) {
   const { proposal, fields, conflict, needs, neededBy, selected, active, isPending, isEditing } =
     props;
+  const duplicates = proposal.duplicates ?? [];
   const titleId = useId();
   const conflictId = useId();
   const unavailableId = useId();
   const title = operationTitle(proposal.operation, fields);
-  const isOpen = proposal.status === "open";
+  // The member reviews an open proposal only when the routing gives it to them (ADR 0067).
+  const isOpen = proposal.status === "open" && proposal.routed_to_me;
+  const elsewhere = proposal.status === "open" && !proposal.routed_to_me;
   const field = editableField(proposal, fields);
   const isFact = proposal.operation.kind === "set-fact";
   const conflicting = isOpen && conflict !== undefined;
@@ -112,7 +121,14 @@ export function ProposalCard(props: ProposalCardProps) {
         <h3 id={titleId} className={styles.title}>
           {title}
         </h3>
-        {!isOpen && (
+        {proposal.status === "open" && proposal.overdue && (
+          <span className={styles.overdue}>
+            <IconClockExclamation size={16} stroke={1.5} aria-hidden="true" />
+            {t("inbox-overdue")}
+          </span>
+        )}
+        {elsewhere && <span className={styles.status}>{t("inbox-other-review")}</span>}
+        {proposal.status !== "open" && (
           <span className={styles.status}>
             {proposal.status === "conflict" ? (
               <KnowledgeState state="conflict" />
@@ -135,7 +151,24 @@ export function ProposalCard(props: ProposalCardProps) {
           proposal={proposal}
           fields={fields}
           draftEnvironment={props.draftEnvironment}
+          names={props.names}
         />
+        {isOpen && duplicates.length > 0 && (
+          <fieldset className={styles.duplicates}>
+            <legend>{t("inbox-duplicates")}</legend>
+            {duplicates.map((duplicate) => (
+              <Checkbox
+                key={duplicate.id}
+                label={t("inbox-use-existing", {
+                  name: duplicate.name,
+                  id: duplicate.local_id,
+                })}
+                isSelected={props.linkedRecord === duplicate.id}
+                onChange={(on) => props.onLink(on ? duplicate.id : undefined)}
+              />
+            ))}
+          </fieldset>
+        )}
         {needs.length > 0 && (
           <p className={styles.note}>{t("inbox-depends-on", { titles: needs.join(", ") })}</p>
         )}

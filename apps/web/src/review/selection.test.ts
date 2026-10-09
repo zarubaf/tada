@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Proposal } from "../api/client";
-import { deselect, select } from "./selection";
+import { dependentsOf, deselect, select } from "./selection";
 
 function proposal(id: string, dependsOn: string[] = [], status: Proposal["status"] = "open") {
   return {
@@ -70,5 +70,16 @@ describe("deselect", () => {
   it("keeps the dependencies of the proposal", () => {
     const all = new Set(["field", "fact"]);
     expect([...deselect(proposals, all, "fact")]).toEqual(["field"]);
+  });
+});
+
+describe("dependentsOf", () => {
+  it("lists the open proposals that need a proposal, all the way up", () => {
+    expect(dependentsOf(proposals, "field").sort()).toEqual(["fact", "note"]);
+  });
+
+  it("leaves out a proposal that is not open", () => {
+    const closed = [proposal("field"), proposal("fact", ["field"], "rejected")];
+    expect(dependentsOf(closed, "field")).toEqual([]);
   });
 });

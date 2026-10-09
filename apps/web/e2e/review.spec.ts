@@ -46,11 +46,13 @@ function proposal(id: string, extra: object) {
     evidence: [evidence],
     status: "open",
     stale: false,
+    overdue: false,
+    routed_to_me: true,
     ...extra,
   };
 }
 
-const changesets = {
+const changesets: Record<string, unknown> = {
   [CS_OLD]: {
     id: CS_OLD,
     event_id: event?.id,
@@ -181,6 +183,62 @@ const changesets = {
   },
 };
 
+const CS_WORK = "0199b8e0-0000-7000-8000-000000000c06";
+const NEW_PERSON = "0199b8e0-0000-7000-8000-0000000005a1";
+
+// A new person who may exist already, a commitment with a condition and a change for another reviewer.
+changesets[CS_WORK] = {
+  id: CS_WORK,
+  event_id: event?.id,
+  author: ai,
+  source_version_id: SOURCE,
+  created_at: "2028-03-07T09:00:00Z",
+  proposals: [
+    proposal("0199b8e0-0000-7000-8000-0000000001d1", {
+      overdue: true,
+      duplicates: [
+        {
+          id: "0199b8e0-0000-7000-8000-0000000005a2",
+          local_id: "PER-004",
+          name: "Hans Beispiel",
+          kind: "person",
+        },
+      ],
+      operation: {
+        kind: "create-person",
+        id: NEW_PERSON,
+        name: "Hans Beispiel",
+        email: "hans@example.org",
+        phone: null,
+      },
+    }),
+    proposal("0199b8e0-0000-7000-8000-0000000001d2", {
+      depends_on: ["0199b8e0-0000-7000-8000-0000000001d1"],
+      operation: {
+        kind: "create-commitment",
+        id: "0199b8e0-0000-7000-8000-0000000005b1",
+        event_id: event?.id,
+        text: "Hans stellt den Hangar bereit.",
+        promisor: { person: NEW_PERSON },
+        owner: "0199b8e0-0000-7000-8000-0000000000b1",
+        workstream: null,
+        due_date: "2028-04-01",
+        condition: "Wenn die Gemeinde zustimmt",
+      },
+    }),
+    proposal("0199b8e0-0000-7000-8000-0000000001d3", {
+      routed_to_me: false,
+      operation: {
+        kind: "change-action-status",
+        event_id: event?.id,
+        action_id: "0199b8e0-0000-7000-8000-0000000005c1",
+        status: "blocked",
+        expected_version: 1,
+      },
+    }),
+  ],
+};
+
 const items = [
   {
     id: CS_OLD,
@@ -236,7 +294,7 @@ async function fakeInbox(page: Page): Promise<unknown[]> {
   );
   await page.route(/\/api\/v1\/changesets\?/, (route) => route.fulfill(json({ items })));
   await page.route(/\/api\/v1\/changesets\/[^/]+$/, (route) => {
-    const id = route.request().url().split("/").pop() as keyof typeof changesets;
+    const id = route.request().url().split("/").pop() as string;
     return route.fulfill(json(changesets[id]));
   });
   await page.route(/\/api\/v1\/changesets\/[^/]+\/apply$/, (route) => {
@@ -253,6 +311,7 @@ const states = [
   { name: "detail", path: `/inbox/${CS_NEW}` },
   { name: "conflict", path: `/inbox/${CS_OLD}` },
   { name: "draft", path: `/inbox/${CS_DRAFT}` },
+  { name: "work", path: `/inbox/${CS_WORK}` },
 ] as const;
 
 for (const viewport of viewports) {
@@ -350,5 +409,7 @@ test("inbox keyboard flow: J and K move, A applies, typing does not trigger a ke
   await card.getByText("Hangar 3").click();
   await page.keyboard.press("a");
   await expect(page.getByText("1 Vorschlag angenommen.")).toBeVisible();
-  expect(applies).toEqual([{ selected: expect.arrayContaining([P_FACT, P_FIELD]), edits: [] }]);
+  expect(applies).toEqual([
+    { selected: expect.arrayContaining([P_FACT, P_FIELD]), edits: [], links: [] },
+  ]);
 });

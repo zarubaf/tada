@@ -64,3 +64,20 @@ export function deselect(
   }
   return result;
 }
+
+/** The open proposals that need `id`, directly or through others. */
+export function dependentsOf(proposals: Proposal[], id: string): string[] {
+  const open = proposals.filter((p) => p.status === "open");
+  const found = new Set<string>();
+  const pending = [id];
+  while (pending.length > 0) {
+    const current = pending.pop() as string;
+    for (const proposal of open) {
+      if (proposal.depends_on.includes(current) && !found.has(proposal.id)) {
+        found.add(proposal.id);
+        pending.push(proposal.id);
+      }
+    }
+  }
+  return [...found];
+}

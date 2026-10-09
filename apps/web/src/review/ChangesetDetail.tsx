@@ -23,13 +23,15 @@ import type { Scopes } from "./eventScopes";
 import { useInbox } from "./InboxProvider";
 import { fieldInfos, operationTitle } from "./OperationView";
 import { editableField, ProposalCard } from "./ProposalCard";
-import { deselect, select } from "./selection";
+import type { RecordNames } from "./recordNames";
+import { loadRecordNames } from "./recordNames";
+import { dependentsOf, deselect, select } from "./selection";
 import { shortcutOf } from "./shortcuts";
 
 type State =
   | { kind: "loading" }
   | { kind: "failed"; message: string; requestId: string | undefined }
-  | { kind: "loaded"; changeset: Changeset; fields: Field[] };
+  | { kind: "loaded"; changeset: Changeset; fields: Field[]; names: RecordNames };
 
 export interface ChangesetDetailProps {
   api: Api;
@@ -63,14 +65,15 @@ async function loadChangeset(
       };
     }
     const eventId = changeset.data.event_id;
+    const names = await loadRecordNames(api, changeset.data);
     if (!eventId) {
-      return { kind: "loaded", changeset: changeset.data, fields: [] };
+      return { kind: "loaded", changeset: changeset.data, fields: [], names };
     }
     const fields = await api.GET("/api/v1/events/{event_id}/fields", {
       params: { path: { event_id: eventId } },
     });
     return fields.data
-      ? { kind: "loaded", changeset: changeset.data, fields: fields.data.items }
+      ? { kind: "loaded", changeset: changeset.data, fields: fields.data.items, names }
       : {
           kind: "failed",
           message: problemMessage(fields.error),
@@ -79,6 +82,15 @@ async function loadChangeset(
   } catch {
     return { kind: "failed", message: problemMessage(undefined), requestId: undefined };
   }
+}
+
+/** The message for a refused link, or nothing for any other problem (ADR 0069). */
+function linkMessage(problem: Problem | undefined): string | undefined {
+  const codes = problem?.errors?.map((error) => error.code) ?? [];
+  if (codes.includes("invalid-link")) {
+    return t("inbox-link-invalid");
+  }
+  return codes.includes("dependents-not-selected") ? t("inbox-link-dependents-missing") : undefined;
 }
 
 /** The number of proposals that a review accepted. */
@@ -106,6 +118,8 @@ export function ChangesetDetail({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [activeId, setActiveId] = useState<string>();
   const [editingId, setEditingId] = useState<string>();
+  // The existing record that the member chose for a proposed person or institution, by proposal.
+  const [links, setLinks] = useState<ReadonlyMap<string, string>>(new Map());
   // The proposals that the confirmation dialog will reject.
   const [rejecting, setRejecting] = useState<string[]>();
   const [busy, setBusy] = useState(false);
@@ -134,6 +148,7 @@ export function ChangesetDetail({
         next.changeset.proposals.filter((p) => p.status === "open").map((p) => p.id),
       );
       setSelected((current) => new Set([...current].filter((id) => open.has(id))));
+      setLinks((current) => new Map([...current].filter(([id]) => open.has(id))));
     } else {
       fail(next.message);
     }
@@ -178,7 +193,7 @@ export function ChangesetDetail({
     );
   }
 
-  const { changeset, fields: catalog } = state;
+  const { changeset, fields: catalog, names } = state;
   const title = scopes.title(changeset.event_id);
   const timeZone = scopes.timeZone(changeset.event_id);
   const { proposals } = changeset;
@@ -190,7 +205,8 @@ export function ChangesetDetail({
     const proposal = proposals.find((candidate) => candidate.id === id);
     return proposal ? operationTitle(proposal.operation, fields) : id;
   };
-  const open = proposals.filter((proposal) => proposal.status === "open");
+  // The member reviews the proposals that the routing gives them; the others show read-only.
+  const open = proposals.filter((proposal) => proposal.status === "open" && proposal.routed_to_me);
   const active = open.find((proposal) => proposal.id === activeId) ?? open[0];
 
   /** The proposals that an accept of `ids` would take: the selection or one proposal, and what they need. */
@@ -227,7 +243,7 @@ export function ChangesetDetail({
       if (data) {
         await afterReview(message(data));
       } else {
-        fail(problemMessage(error));
+        fail(linkMessage(error) ?? problemMessage(error));
         setRejecting(undefined);
         if (error?.code === "record-version-conflict" || error?.code === "invalid-transition") {
           // The server recorded the conflict; the proposals show it now.
@@ -242,7 +258,21 @@ export function ChangesetDetail({
     }
   };
 
-  const apply = (ids: ReadonlySet<string>, edits: ApplyEdit[] = []) => {
+  /** The proposals of `ids` plus, for each linked one, the proposals that need it (ADR 0069). */
+  const withLinkedDependents = (ids: ReadonlySet<string>) =>
+    [...links.keys()]
+      .filter((id) => ids.has(id))
+      .reduce<ReadonlySet<string>>(
+        (all, id) =>
+          dependentsOf(proposals, id).reduce(
+            (acc, dependent) => select(proposals, acc, dependent).selected,
+            all,
+          ),
+        ids,
+      );
+
+  const apply = (chosen: ReadonlySet<string>, edits: ApplyEdit[] = []) => {
+    const ids = withLinkedDependents(chosen);
     if (conflictIn(ids)) {
       fail(t(ids.size > 1 ? "inbox-summary-blocked" : "inbox-apply-blocked"));
       return;
@@ -251,7 +281,13 @@ export function ChangesetDetail({
       () =>
         api.POST("/api/v1/changesets/{changeset_id}/apply", {
           params: { path: { changeset_id: changesetId } },
-          body: { selected: [...ids], edits },
+          body: {
+            selected: [...ids],
+            edits,
+            links: [...links]
+              .filter(([id]) => ids.has(id))
+              .map(([proposal_id, record_id]) => ({ proposal_id, record_id })),
+          },
         }),
       (result) => t("inbox-applied", { count: acceptedCount(result) }),
     );
@@ -286,6 +322,30 @@ export function ChangesetDetail({
       const removed = selected.size - next.size - 1;
       announce(removed > 0 ? t("inbox-dependents-removed", { count: removed }) : undefined);
     }
+  };
+
+  /** Chooses an existing record for a proposal, or takes the choice back. */
+  const link = (id: string, recordId: string | undefined) => {
+    const next = new Map(links);
+    if (recordId === undefined) {
+      next.delete(id);
+      setLinks(next);
+      return;
+    }
+    next.set(id, recordId);
+    setLinks(next);
+    // The server refuses a link whose dependents are not selected, so the inbox selects them.
+    const dependents = dependentsOf(proposals, id).filter((other) => !selected.has(other));
+    const result = [id, ...dependents].reduce(
+      (all, other) => select(proposals, all, other).selected,
+      selected,
+    );
+    setSelected(result);
+    announce(
+      dependents.length > 0
+        ? t("inbox-link-dependents-added", { count: dependents.length })
+        : undefined,
+    );
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -358,6 +418,9 @@ export function ChangesetDetail({
                 fields={fields}
                 draftEnvironment={draftEnvironment}
                 conflict={conflictOf(proposal, proposals)}
+                names={names}
+                linkedRecord={links.get(proposal.id)}
+                onLink={(recordId) => link(proposal.id, recordId)}
                 needs={proposal.depends_on.map(titleOf)}
                 neededBy={proposals
                   .filter(
