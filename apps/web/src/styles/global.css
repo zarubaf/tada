@@ -1,6 +1,3 @@
-/* The cascade layers, in this order (ADR 0019). */
-@layer reset, tokens, components;
-
 @import url("./tokens.css");
 
 @layer reset {

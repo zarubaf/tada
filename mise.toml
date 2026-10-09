@@ -60,7 +60,7 @@ run = "gitleaks git --redact --no-banner ."
 
 [tasks."check:scripts"]
 description = "Lint and format-check Python scripts"
-run = ["ruff check .", "ruff format --check .", "uv run --quiet scripts/test_check_data_inventory.py"]
+run = ["ruff check .", "ruff format --check .", "uv run --quiet scripts/test_check_data_inventory.py", "uv run --quiet scripts/test_check_css_layers.py"]
 
 [tasks."check:rust-format"]
 description = "Check Rust formatting"
@@ -104,6 +104,8 @@ run = [
   "pnpm install --frozen-lockfile",
   "pnpm run check",
   "uv run --quiet ../../scripts/check_bundle_size.py",
+  # The layer order must be the first rule of the built CSS (ADR 0019).
+  "uv run --quiet ../../scripts/check_css_layers.py",
   # The production build must not contain the component gallery (ADR 0024).
   "! grep -rq Komponenten dist/assets",
 ]
