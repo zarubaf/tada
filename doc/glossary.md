@@ -9,33 +9,33 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 ## Organization and people
 
-| Term                      | Meaning                                                                                                                                    | Avoid                                    |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| organization              | The tenant: a club or association. It owns all its data. Data never crosses an organization boundary.                                      | club (in code), tenant (in UI)           |
-| organization slug         | The unique key of an organization, for example `testwil`: 2 to 32 lowercase letters, digits and hyphens (ADR 0036).                        | short name                               |
-| privacy notice            | The text that tells members and invitees how the organization handles personal data. Without an own text, the template applies (ADR 0045). | privacy policy                           |
-| user                      | A person with a stable internal UUID. Email and Telegram are linked credentials, not identities.                                           | account                                  |
-| member                    | A user with an organization membership and one organization role: owner, admin or member.                                                  |                                          |
-| external identity         | A credential linked to a user, for example a Telegram user ID or an email address.                                                         |                                          |
-| link code                 | A single-use code that a member sends to the bot to link a Telegram account. The member confirms the link in the web client (ADR 0011).    |                                          |
-| invitation                | A single-use link that makes a person a member of an organization with one organization role (ADR 0008, ADR 0056).                         | invite (as a noun)                       |
-| invitee                   | The person whom an invitation names. The invitee accepts the invitation and becomes a member (ADR 0056).                                   |                                          |
-| magic link                | A single-use sign-in link that tada sends to the email address of a member. It expires after 15 minutes (ADR 0008).                        | login link                               |
-| session                   | The signed-in state of one browser, stored in the `session` table and named by a cookie (ADR 0008).                                        | login                                    |
-| organizing committee (OK) | The Organisationskomitee of one event: the people who plan it. Write "OK" only after you define it in a document.                          | committee                                |
-| project manager (PM)      | The person who coordinates an event and makes the final decisions.                                                                         |                                          |
-| event manager             | The event role with all rights in one event: review, apply, field definitions, memberships and document approval (ADR 0052).               | admin (that is an organization role)     |
-| event contributor         | The event role that reads the event, creates proposals and work records, and changes its own work records.                                 | editor                                   |
-| event viewer              | The event role that only reads the event.                                                                                                  | guest                                    |
-| event membership          | The record that gives one member one event role in one event (ADR 0052).                                                                   | participation (that gives no access)     |
-| workstream                | One area of work in an event, for example catering or ground operations.                                                                   | team, department                         |
-| workstream lead           | The member who owns a workstream and reviews its proposals.                                                                                |                                          |
-| volunteer                 | A person who receives assignments for an event.                                                                                            | helper                                   |
-| supplier                  | An external party that provides goods or services. Suppliers have no access to internal records.                                           | vendor                                   |
-| person                    | A record of a human being in an organization. A person can exist without a user account.                                                   | contact                                  |
-| institution               | A record of an organization outside the tenant, for example an authority, a company or another club.                                       | organization (that is the tenant), party |
-| participation             | A person or an institution in an event, with a participation role and a status: invited, interested, confirmed or declined. Not access.    | membership                               |
-| participation role        | The involvement of a person or an institution in an event, for example organizing committee member, sponsor or authority. Gives no access. | role (alone)                             |
+| Term                      | Meaning                                                                                                                                              | Avoid                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| organization              | The tenant: a club or association. It owns all its data. Data never crosses an organization boundary.                                                | club (in code), tenant (in UI)           |
+| organization slug         | The unique key of an organization, for example `testwil`: 2 to 32 lowercase letters, digits and hyphens (ADR 0036).                                  | short name                               |
+| privacy notice            | The text that tells members and invitees how the organization handles personal data. Without an own text, the template applies (ADR 0045).           | privacy policy                           |
+| user                      | A person with a stable internal UUID. Email and Telegram are linked credentials, not identities.                                                     | account                                  |
+| member                    | A user with an organization membership and one organization role: owner, admin or member.                                                            |                                          |
+| external identity         | A credential linked to a user, for example a Telegram user ID or an email address.                                                                   |                                          |
+| link code                 | A single-use code that a member sends to the bot to link a Telegram account. The member confirms the link in the web client (ADR 0011).              |                                          |
+| invitation                | A single-use link that makes a person a member of an organization with one organization role (ADR 0008, ADR 0056).                                   | invite (as a noun)                       |
+| invitee                   | The person whom an invitation names. The invitee accepts the invitation and becomes a member (ADR 0056).                                             |                                          |
+| magic link                | A single-use sign-in link that tada sends to the email address of a member. It expires after 15 minutes (ADR 0008).                                  | login link                               |
+| session                   | The signed-in state of one browser, stored in the `session` table and named by a cookie (ADR 0008).                                                  | login                                    |
+| organizing committee (OK) | The Organisationskomitee of one event: the people who plan it. Write "OK" only after you define it in a document.                                    | committee                                |
+| project manager (PM)      | The person who coordinates an event and makes the final decisions.                                                                                   |                                          |
+| event manager             | The event role with all rights in one event: review, apply, field definitions, memberships and document approval (ADR 0052).                         | admin (that is an organization role)     |
+| event contributor         | The event role that reads the event, creates proposals and work records, and changes its own work records.                                           | editor                                   |
+| event viewer              | The event role that only reads the event.                                                                                                            | guest                                    |
+| event membership          | The record that gives one member one event role in one event (ADR 0052).                                                                             | participation (that gives no access)     |
+| workstream                | One area of work in an event, for example catering or ground operations. The German UI calls it „Arbeitsbereich“.                                    | team, department                         |
+| workstream lead           | The member who owns a workstream and reviews the proposals routed to it (ADR 0067). The German UI calls it „Arbeitsbereichsleitung“.                 |                                          |
+| volunteer                 | A person who receives assignments for an event.                                                                                                      | helper                                   |
+| supplier                  | An external party that provides goods or services. Suppliers have no access to internal records.                                                     | vendor                                   |
+| person                    | A record of a human being in an organization. A person can exist without a user account. The German UI calls it „Person“.                            | contact                                  |
+| institution               | A record of an organization outside the tenant, for example an authority, a company or another club (kinds: „Behörde“, „Firma“, „Verein“, „Andere“). | organization (that is the tenant), party |
+| participation             | A person or an institution in an event, with a participation role and a status: invited, interested, confirmed or declined. Not access.              | membership                               |
+| participation role        | The involvement of a person or an institution in an event, for example organizing committee member, sponsor or authority. Gives no access.           | role (alone)                             |
 
 ## Events
 
@@ -57,17 +57,20 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 ## Work
 
-| Term        | Meaning                                                                                                 | Avoid     |
-| ----------- | ------------------------------------------------------------------------------------------------------- | --------- |
-| action      | A piece of work with one owner, a status and a due date. The German UI calls it „Aufgabe“.              | todo      |
-| milestone   | A date by which a set of actions must be complete.                                                      | deadline  |
-| commitment  | A promise from a person or a supplier, with its conditions. A conditional commitment stays conditional. | agreement |
-| decision    | An approved statement with its exact wording, approver and evidence.                                    |           |
-| risk        | A possible problem with a likelihood, an impact and an owner.                                           | issue     |
-| requirement | A condition that the event must meet, for example from an authority.                                    |           |
-| resource    | A shared item, for example radios or a generator.                                                       | asset     |
-| reservation | A booking of a resource for a period.                                                                   |           |
-| assignment  | A volunteer allocated to an action or a shift.                                                          |           |
+| Term        | Meaning                                                                                                                                                                                                                                                                     | Avoid            |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| action      | A piece of work with one owner, a status and a due date. Statuses: open, in progress, blocked, done, canceled („offen“, „in Arbeit“, „blockiert“, „erledigt“, „abgebrochen“). The German UI calls it „Aufgabe“.                                                             | todo             |
+| milestone   | A date by which a set of actions must be complete.                                                                                                                                                                                                                          | deadline         |
+| commitment  | A promise from a person or an institution, with its conditions. A conditional commitment stays conditional. Statuses: conditional, firm, fulfilled, broken, withdrawn („bedingt“, „verbindlich“, „erfüllt“, „gebrochen“, „zurückgezogen“). The German UI calls it „Zusage“. | agreement        |
+| promisor    | The person or the institution that makes a commitment. A commitment has exactly one (ADR 0068).                                                                                                                                                                             | supplier (alone) |
+| make firm   | The command that changes a conditional commitment to firm. It needs a reason (ADR 0068).                                                                                                                                                                                    | confirm          |
+| My Work     | The start page after sign-in: the open actions and commitments of the member and the number of proposals to review. The German UI calls it „Meine Arbeit“.                                                                                                                  | dashboard        |
+| decision    | An approved statement with its exact wording, approver and evidence.                                                                                                                                                                                                        |                  |
+| risk        | A possible problem with a likelihood, an impact and an owner.                                                                                                                                                                                                               | issue            |
+| requirement | A condition that the event must meet, for example from an authority.                                                                                                                                                                                                        |                  |
+| resource    | A shared item, for example radios or a generator.                                                                                                                                                                                                                           | asset            |
+| reservation | A booking of a resource for a period.                                                                                                                                                                                                                                       |                  |
+| assignment  | A volunteer allocated to an action or a shift.                                                                                                                                                                                                                              |                  |
 
 ## Evidence and review
 
@@ -89,6 +92,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | changeset           | The proposals of one intake, reviewed together. A proposal can depend on another proposal of its changeset.                          | batch                    |
 | apply               | The command that accepts selected proposals of a changeset and their dependencies, all or nothing (ADR 0050).                        | merge (of proposals)     |
 | stale               | The mark of an open proposal that is older than 14 days. A stale proposal does not change.                                           | expired                  |
+| overdue proposal    | An open proposal that is older than 3 days. The event managers see it in their inbox even if another member reviews it (ADR 0067).   | stale                    |
 | Review Inbox        | The list of changesets with open proposals that a member can review.                                                                 | approval queue           |
 | provenance manifest | The list of fact versions and source passages that one document version uses, extracted from its `tada:` links.                      | citations list           |
 | legal redaction     | The audited replacement of personal data with a tombstone, the only exception to immutability (ADR 0045).                            | deletion (for evidence)  |
