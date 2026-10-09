@@ -20,10 +20,13 @@ use tada_app::documents::DocumentStore;
 use tada_app::events::EventStore;
 use tada_app::facts::FactStore;
 use tada_app::identity::IdentityStore;
+use tada_app::parties::PartyStore;
 use tada_app::proposals::ProposalStore;
 use tada_app::public_url::PublicUrl;
 use tada_app::sources::SourceStore;
 use tada_app::tokens::TokenAuthenticator;
+use tada_app::work::WorkStore;
+use tada_app::workstreams::WorkstreamStore;
 
 /// The path of the MCP server under the public URL (ADR 0040).
 pub const PATH: &str = "/mcp";
@@ -43,6 +46,10 @@ pub struct McpState {
     pub clock: Arc<dyn Clock>,
     /// `TADA_PUBLIC_URL`. Its origin is the only `Origin` that a request can have.
     pub public_url: PublicUrl,
+    /// The workstreams, promisors and work records that proposals name.
+    pub workstreams: Arc<dyn WorkstreamStore>,
+    pub parties: Arc<dyn PartyStore>,
+    pub work: Arc<dyn WorkStore>,
 }
 
 /// The MCP server with the Streamable HTTP transport. Mount it at `PATH`.

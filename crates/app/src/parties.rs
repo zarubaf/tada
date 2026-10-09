@@ -379,7 +379,7 @@ fn text_code(error: TextError) -> &'static str {
     }
 }
 
-fn email_code(error: EmailError) -> &'static str {
+pub(crate) fn email_code(error: EmailError) -> &'static str {
     match error {
         EmailError::Shape => "shape",
         EmailError::TooLong => "too-long",

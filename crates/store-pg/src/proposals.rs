@@ -15,12 +15,17 @@ use tada_app::domain::RecordVersion;
 use tada_app::domain::documents::{DocumentName, DraftMarkdown};
 use tada_app::domain::events::{EventKey, EventName, EventTimeZone};
 use tada_app::domain::facts::{ChoiceKey, Description, FieldKey, ModuleKey, ShortText};
+use tada_app::domain::identity::Email;
 use tada_app::domain::ids::{
-    ChangesetId, DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId,
-    SourceVersionId, UserId,
+    ActionId, ChangesetId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId,
+    OpenQuestionId, PersonId, ProposalId, SourceVersionId, UserId, WorkstreamId,
 };
+use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_app::domain::proposals::{DraftDocument, Operation, Proposal, QuestionText, Reason};
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
+use tada_app::domain::work::{
+    ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
+};
 use tada_app::drafts::DraftProvenance;
 use tada_app::facts::{OpenProposalRef, OpenQuestionRef};
 use tada_app::proposals::{Changeset, Inserted, ProposalStore};
@@ -82,6 +87,63 @@ enum OperationRecord {
         document: DocumentRecord,
         markdown: String,
     },
+    CreatePerson {
+        id: Uuid,
+        name: String,
+        email: Option<String>,
+        phone: Option<String>,
+    },
+    CreateInstitution {
+        id: Uuid,
+        name: String,
+        institution_kind: String,
+        email: Option<String>,
+        phone: Option<String>,
+    },
+    CreateAction {
+        id: Uuid,
+        event_id: Uuid,
+        title: String,
+        description: Option<String>,
+        owner: Uuid,
+        workstream: Option<Uuid>,
+        due: Option<String>,
+    },
+    CreateCommitment {
+        id: Uuid,
+        event_id: Uuid,
+        text: String,
+        promisor: PartyRecord,
+        owner: Uuid,
+        workstream: Option<Uuid>,
+        due: Option<String>,
+        condition: Option<String>,
+    },
+    ChangeActionStatus {
+        event_id: Uuid,
+        action_id: Uuid,
+        status: String,
+        expected_version: i64,
+    },
+    ChangeActionDue {
+        event_id: Uuid,
+        action_id: Uuid,
+        due: Option<String>,
+        expected_version: i64,
+    },
+    ChangeCommitmentStatus {
+        event_id: Uuid,
+        commitment_id: Uuid,
+        status: String,
+        expected_version: i64,
+    },
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", content = "id", rename_all = "snake_case")]
+enum PartyRecord {
+    Person(Uuid),
+    Institution(Uuid),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -190,6 +252,102 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             },
             markdown: markdown.as_str().to_owned(),
         },
+        Operation::CreatePerson {
+            id,
+            name,
+            email,
+            phone,
+        } => OperationRecord::CreatePerson {
+            id: id.as_uuid(),
+            name: name.as_str().to_owned(),
+            email: email.as_ref().map(|email| email.as_str().to_owned()),
+            phone: phone.as_ref().map(|phone| phone.as_str().to_owned()),
+        },
+        Operation::CreateInstitution {
+            id,
+            name,
+            kind,
+            email,
+            phone,
+        } => OperationRecord::CreateInstitution {
+            id: id.as_uuid(),
+            name: name.as_str().to_owned(),
+            institution_kind: kind.as_str().to_owned(),
+            email: email.as_ref().map(|email| email.as_str().to_owned()),
+            phone: phone.as_ref().map(|phone| phone.as_str().to_owned()),
+        },
+        Operation::CreateAction {
+            id,
+            event_id,
+            title,
+            description,
+            owner,
+            workstream,
+            due,
+        } => OperationRecord::CreateAction {
+            id: id.as_uuid(),
+            event_id: event_id.as_uuid(),
+            title: title.as_str().to_owned(),
+            description: description.as_ref().map(|text| text.as_str().to_owned()),
+            owner: owner.as_uuid(),
+            workstream: workstream.map(WorkstreamId::as_uuid),
+            due: due.map(|date| date.to_string()),
+        },
+        Operation::CreateCommitment {
+            id,
+            event_id,
+            text,
+            promisor,
+            owner,
+            workstream,
+            due,
+            condition,
+        } => OperationRecord::CreateCommitment {
+            id: id.as_uuid(),
+            event_id: event_id.as_uuid(),
+            text: text.as_str().to_owned(),
+            promisor: match promisor {
+                Party::Person(id) => PartyRecord::Person(id.as_uuid()),
+                Party::Institution(id) => PartyRecord::Institution(id.as_uuid()),
+            },
+            owner: owner.as_uuid(),
+            workstream: workstream.map(WorkstreamId::as_uuid),
+            due: due.map(|date| date.to_string()),
+            condition: condition.as_ref().map(|text| text.as_str().to_owned()),
+        },
+        Operation::ChangeActionStatus {
+            event_id,
+            action_id,
+            status,
+            expected_version,
+        } => OperationRecord::ChangeActionStatus {
+            event_id: event_id.as_uuid(),
+            action_id: action_id.as_uuid(),
+            status: status.as_str().to_owned(),
+            expected_version: expected_version.get(),
+        },
+        Operation::ChangeActionDue {
+            event_id,
+            action_id,
+            due,
+            expected_version,
+        } => OperationRecord::ChangeActionDue {
+            event_id: event_id.as_uuid(),
+            action_id: action_id.as_uuid(),
+            due: due.map(|date| date.to_string()),
+            expected_version: expected_version.get(),
+        },
+        Operation::ChangeCommitmentStatus {
+            event_id,
+            commitment_id,
+            status,
+            expected_version,
+        } => OperationRecord::ChangeCommitmentStatus {
+            event_id: event_id.as_uuid(),
+            commitment_id: commitment_id.as_uuid(),
+            status: status.as_str().to_owned(),
+            expected_version: expected_version.get(),
+        },
     };
     serde_json::to_value(record).expect("an operation record is valid JSON")
 }
@@ -295,7 +453,112 @@ pub(crate) fn operation_from_json(
             },
             markdown: DraftMarkdown::parse(&markdown).map_err(|_| invalid())?,
         },
+        OperationRecord::CreatePerson {
+            id,
+            name,
+            email,
+            phone,
+        } => Operation::CreatePerson {
+            id: PersonId::from_uuid(id),
+            name: PartyName::parse(&name).map_err(|_| invalid())?,
+            email: parsed(email, Email::parse)?,
+            phone: parsed(phone, PhoneNumber::parse)?,
+        },
+        OperationRecord::CreateInstitution {
+            id,
+            name,
+            institution_kind,
+            email,
+            phone,
+        } => Operation::CreateInstitution {
+            id: InstitutionId::from_uuid(id),
+            name: PartyName::parse(&name).map_err(|_| invalid())?,
+            kind: InstitutionKind::parse(&institution_kind).ok_or_else(invalid)?,
+            email: parsed(email, Email::parse)?,
+            phone: parsed(phone, PhoneNumber::parse)?,
+        },
+        OperationRecord::CreateAction {
+            id,
+            event_id,
+            title,
+            description,
+            owner,
+            workstream,
+            due,
+        } => Operation::CreateAction {
+            id: ActionId::from_uuid(id),
+            event_id: EventId::from_uuid(event_id),
+            title: ActionTitle::parse(&title).map_err(|_| invalid())?,
+            description: parsed(description, ActionDescription::parse)?,
+            owner: UserId::from_uuid(owner),
+            workstream: workstream.map(WorkstreamId::from_uuid),
+            due: parsed(due, |text| text.parse())?,
+        },
+        OperationRecord::CreateCommitment {
+            id,
+            event_id,
+            text,
+            promisor,
+            owner,
+            workstream,
+            due,
+            condition,
+        } => Operation::CreateCommitment {
+            id: CommitmentId::from_uuid(id),
+            event_id: EventId::from_uuid(event_id),
+            text: CommitmentText::parse(&text).map_err(|_| invalid())?,
+            promisor: match promisor {
+                PartyRecord::Person(id) => Party::Person(PersonId::from_uuid(id)),
+                PartyRecord::Institution(id) => Party::Institution(InstitutionId::from_uuid(id)),
+            },
+            owner: UserId::from_uuid(owner),
+            workstream: workstream.map(WorkstreamId::from_uuid),
+            due: parsed(due, |text| text.parse())?,
+            condition: parsed(condition, ConditionText::parse)?,
+        },
+        OperationRecord::ChangeActionStatus {
+            event_id,
+            action_id,
+            status,
+            expected_version,
+        } => Operation::ChangeActionStatus {
+            event_id: EventId::from_uuid(event_id),
+            action_id: ActionId::from_uuid(action_id),
+            status: ActionStatus::parse(&status).ok_or_else(invalid)?,
+            expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+        },
+        OperationRecord::ChangeActionDue {
+            event_id,
+            action_id,
+            due,
+            expected_version,
+        } => Operation::ChangeActionDue {
+            event_id: EventId::from_uuid(event_id),
+            action_id: ActionId::from_uuid(action_id),
+            due: parsed(due, |text| text.parse())?,
+            expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+        },
+        OperationRecord::ChangeCommitmentStatus {
+            event_id,
+            commitment_id,
+            status,
+            expected_version,
+        } => Operation::ChangeCommitmentStatus {
+            event_id: EventId::from_uuid(event_id),
+            commitment_id: CommitmentId::from_uuid(commitment_id),
+            status: CommitmentStatus::parse(&status).ok_or_else(invalid)?,
+            expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+        },
     })
+}
+
+/// Parses an optional stored text. Any error is an invalid operation record.
+fn parsed<T, E>(
+    text: Option<String>,
+    parse: impl FnOnce(&str) -> Result<T, E>,
+) -> Result<Option<T>, InvalidRow> {
+    text.map(|text| parse(&text).map_err(|_| InvalidRow(OPERATION)))
+        .transpose()
 }
 
 /// The columns `target_kind`, `target_id` and `expected_version` of a proposal.
@@ -317,6 +580,29 @@ fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>) {
             ("field_definition", field_id.as_uuid(), None)
         }
         Operation::CreateOpenQuestion { id, .. } => ("open_question", id.as_uuid(), None),
+        Operation::CreatePerson { id, .. } => ("person", id.as_uuid(), None),
+        Operation::CreateInstitution { id, .. } => ("institution", id.as_uuid(), None),
+        Operation::CreateAction { id, .. } => ("action", id.as_uuid(), None),
+        Operation::CreateCommitment { id, .. } => ("commitment", id.as_uuid(), None),
+        Operation::ChangeActionStatus {
+            action_id,
+            expected_version,
+            ..
+        }
+        | Operation::ChangeActionDue {
+            action_id,
+            expected_version,
+            ..
+        } => ("action", action_id.as_uuid(), Some(expected_version.get())),
+        Operation::ChangeCommitmentStatus {
+            commitment_id,
+            expected_version,
+            ..
+        } => (
+            "commitment",
+            commitment_id.as_uuid(),
+            Some(expected_version.get()),
+        ),
         Operation::CreateDocumentDraft { document, .. } => match document {
             DraftDocument::New { id, .. } => ("document", id.as_uuid(), None),
             DraftDocument::Existing {
@@ -338,7 +624,8 @@ impl ProposalStore for Database {
         // It returns only the given IDs that exist, and never an organization.
         // The new record of a proposal reserves its ID: else a second changeset could propose the same record,
         // and only one of the two could apply. The target of a fact is its field, which is not a new record.
-        // The target of a draft for an existing document is that document, which exists already.
+        // The target of a draft for an existing document, or of a change of an action or a commitment,
+        // is that record, which exists already.
         sqlx::query_scalar!(
             r#"SELECT id AS "id!" FROM changeset WHERE id = ANY($1)
                UNION SELECT id FROM proposal WHERE id = ANY($1)
@@ -346,7 +633,12 @@ impl ProposalStore for Database {
                UNION SELECT id FROM event WHERE id = ANY($1)
                UNION SELECT id FROM field_definition WHERE id = ANY($1)
                UNION SELECT id FROM open_question WHERE id = ANY($1)
-               UNION SELECT id FROM document WHERE id = ANY($1)"#,
+               UNION SELECT id FROM document WHERE id = ANY($1)
+               UNION SELECT id FROM person WHERE id = ANY($1)
+               UNION SELECT id FROM institution WHERE id = ANY($1)
+               UNION SELECT id FROM workstream WHERE id = ANY($1)
+               UNION SELECT id FROM action WHERE id = ANY($1)
+               UNION SELECT id FROM commitment WHERE id = ANY($1)"#,
             ids,
         )
         .fetch_all(&self.pool)
@@ -534,7 +826,7 @@ async fn insert_changeset(
             proposal.id.as_uuid(),
             organization,
             changeset.id.as_uuid(),
-            proposal.operation.event_id().as_uuid(),
+            proposal.operation.event_id().map(EventId::as_uuid),
             operation_to_json(&proposal.operation),
             OPERATION_VERSION,
             target_kind,
@@ -719,6 +1011,9 @@ mod tests {
             proposals: &test.database,
             sources: &test.database,
             documents: &test.database,
+            workstreams: &test.database,
+            parties: &test.database,
+            work: &test.database,
         }
     }
 
@@ -1332,6 +1627,56 @@ mod tests {
                 event_id: event,
                 text: QuestionText::parse("Welcher Samstag?").unwrap(),
                 owner: UserId::from_uuid(Uuid::now_v7()),
+            },
+            Operation::CreatePerson {
+                id: PersonId::from_uuid(Uuid::now_v7()),
+                name: PartyName::parse("Moritz Muster").unwrap(),
+                email: Some(Email::parse("moritz@example.org").unwrap()),
+                phone: Some(PhoneNumber::parse("+41 79 000 00 00").unwrap()),
+            },
+            Operation::CreateInstitution {
+                id: InstitutionId::from_uuid(Uuid::now_v7()),
+                name: PartyName::parse("Zeltbau AG").unwrap(),
+                kind: InstitutionKind::Company,
+                email: None,
+                phone: None,
+            },
+            Operation::CreateAction {
+                id: ActionId::from_uuid(Uuid::now_v7()),
+                event_id: event,
+                title: ActionTitle::parse("Bewilligung klären").unwrap(),
+                description: Some(ActionDescription::parse("Mit der Gemeinde.\nBald.").unwrap()),
+                owner: UserId::from_uuid(Uuid::now_v7()),
+                workstream: Some(WorkstreamId::from_uuid(Uuid::now_v7())),
+                due: Some(jiff::civil::date(2030, 4, 30)),
+            },
+            Operation::CreateCommitment {
+                id: CommitmentId::from_uuid(Uuid::now_v7()),
+                event_id: event,
+                text: CommitmentText::parse("Liefert das Zelt").unwrap(),
+                promisor: Party::Institution(InstitutionId::from_uuid(Uuid::now_v7())),
+                owner: UserId::from_uuid(Uuid::now_v7()),
+                workstream: None,
+                due: None,
+                condition: Some(ConditionText::parse("wenn unterschrieben").unwrap()),
+            },
+            Operation::ChangeActionStatus {
+                event_id: event,
+                action_id: ActionId::from_uuid(Uuid::now_v7()),
+                status: ActionStatus::InProgress,
+                expected_version: RecordVersion::new(2).unwrap(),
+            },
+            Operation::ChangeActionDue {
+                event_id: event,
+                action_id: ActionId::from_uuid(Uuid::now_v7()),
+                due: None,
+                expected_version: RecordVersion::FIRST,
+            },
+            Operation::ChangeCommitmentStatus {
+                event_id: event,
+                commitment_id: CommitmentId::from_uuid(Uuid::now_v7()),
+                status: CommitmentStatus::Firm,
+                expected_version: RecordVersion::FIRST,
             },
         ];
         for operation in operations {

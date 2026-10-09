@@ -57,6 +57,9 @@ If a check fails, tada stores nothing: the result has isError, the problem code 
             proposals: &*self.proposals,
             sources: &*self.sources,
             documents: &*self.documents,
+            workstreams: &*self.workstreams,
+            parties: &*self.parties,
+            work: &*self.work,
         };
         let created = proposals::create_changeset(caller, input, stores, &*self.clock).await?;
         let (changeset, existing) = match created {

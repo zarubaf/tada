@@ -21,6 +21,7 @@ use crate::testing::TestDatabase;
 
 mod approvals;
 mod drafts;
+mod work;
 
 const SOURCE: &str = "Das Open Day findet im Mai 2030 statt. Wir rechnen mit 20000 Besuchern.";
 
@@ -55,6 +56,9 @@ fn propose_stores(test: &TestDatabase) -> ProposeStores<'_> {
         proposals: &test.database,
         sources: &test.database,
         documents: &test.database,
+        workstreams: &test.database,
+        parties: &test.database,
+        work: &test.database,
     }
 }
 
@@ -65,6 +69,7 @@ fn stores(test: &TestDatabase) -> ReviewStores<'_> {
         proposals: &test.database,
         review: &test.database,
         sources: &test.database,
+        workstreams: &test.database,
     }
 }
 
@@ -426,7 +431,8 @@ async fn an_edit_is_the_evidence_of_its_value_and_keeps_the_proposal() {
         selected: vec![ProposalId::from_uuid(id)],
         edits: vec![Edit {
             proposal_id: ProposalId::from_uuid(id),
-            state: edit,
+            state: Some(edit),
+            fields: None,
         }],
     };
     let applied = apply(&test, &open_day.manager, &changeset, input)
@@ -508,10 +514,11 @@ async fn an_edit_must_match_the_value_type_of_its_field() {
         selected: vec![ProposalId::from_uuid(id)],
         edits: vec![Edit {
             proposal_id: ProposalId::from_uuid(id),
-            state: FactStateInput::Accepted {
+            state: Some(FactStateInput::Accepted {
                 value: ValueInput::Boolean { value: true },
                 approximate: false,
-            },
+            }),
+            fields: None,
         }],
     };
     let result = apply(&test, &open_day.manager, &changeset, input).await;

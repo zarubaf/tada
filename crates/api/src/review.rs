@@ -6,6 +6,7 @@ use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tada_app::domain::ids::{ChangesetId, EventId, LocalIdKind, ProposalId};
+use tada_app::domain::parties::Party as DomainParty;
 use tada_app::domain::proposals::{
     DraftDocument as DomainDraftDocument, Operation as DomainOperation,
 };
@@ -19,8 +20,8 @@ use tada_app::proposals::{
 use tada_app::review::{
     self as app, Applied, ApplyError, ApplyInput, ChangesetCursor, ChangesetReview,
     ConflictReason as AppConflictReason, Edit, LocalRecord, OpenChangeset as AppOpenChangeset,
-    ProposalReview as AppProposalReview, ProposalStatus as AppProposalStatus, ReviewQueryError,
-    ReviewStores,
+    ProposalReview as AppProposalReview, ProposalStatus as AppProposalStatus, RecordEditInput,
+    ReviewQueryError, ReviewStores,
 };
 use utoipa::openapi::RefOr;
 use utoipa::openapi::schema::Schema;
@@ -397,6 +398,98 @@ pub enum Operation {
         /// The Markdown of the draft.
         markdown: String,
     },
+    /// A new person of the organization. It belongs to no event.
+    CreatePerson {
+        id: Uuid,
+        name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        email: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        phone: Option<String>,
+    },
+    /// A new institution of the organization. It belongs to no event.
+    CreateInstitution {
+        id: Uuid,
+        name: String,
+        /// `authority`, `company`, `club` or `other`. `kind` names the operation, so this field has another name.
+        institution_kind: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        email: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        phone: Option<String>,
+    },
+    /// A new action of the event. It starts `open`.
+    CreateAction {
+        id: Uuid,
+        event_id: Uuid,
+        title: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+        /// The user ID of the member who owns the action.
+        owner: Uuid,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        workstream: Option<Uuid>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        due: Option<jiff::civil::Date>,
+    },
+    /// A new commitment of the event. With a condition it starts `conditional`, else `firm`.
+    CreateCommitment {
+        id: Uuid,
+        event_id: Uuid,
+        text: String,
+        promisor: ProposalPromisor,
+        /// The user ID of the member who follows the commitment up.
+        owner: Uuid,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        workstream: Option<Uuid>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        due: Option<jiff::civil::Date>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        condition: Option<String>,
+    },
+    ChangeActionStatus {
+        event_id: Uuid,
+        action_id: Uuid,
+        /// `open`, `in-progress`, `blocked`, `done` or `canceled`.
+        status: String,
+        /// The version of the action that the proposal expects.
+        expected_version: i64,
+    },
+    ChangeActionDue {
+        event_id: Uuid,
+        action_id: Uuid,
+        /// The new due date. It is absent if the proposal clears the due date.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        due: Option<jiff::civil::Date>,
+        /// The version of the action that the proposal expects.
+        expected_version: i64,
+    },
+    ChangeCommitmentStatus {
+        event_id: Uuid,
+        commitment_id: Uuid,
+        /// `conditional`, `firm`, `fulfilled`, `broken` or `withdrawn`.
+        status: String,
+        /// The version of the commitment that the proposal expects.
+        expected_version: i64,
+    },
+}
+
+/// The party that makes a commitment: `{"person": "<uuid>"}` or `{"institution": "<uuid>"}`.
+/// It can be a new person or institution of the same changeset.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProposalPromisor {
+    Person(Uuid),
+    Institution(Uuid),
+}
+
+impl From<DomainParty> for ProposalPromisor {
+    fn from(party: DomainParty) -> Self {
+        match party {
+            DomainParty::Person(id) => Self::Person(id.as_uuid()),
+            DomainParty::Institution(id) => Self::Institution(id.as_uuid()),
+        }
+    }
 }
 
 /// The document of a draft.
@@ -516,6 +609,99 @@ impl From<&DomainOperation> for Operation {
                 document: document.into(),
                 markdown: markdown.as_str().to_owned(),
             },
+            DomainOperation::CreatePerson {
+                id,
+                name,
+                email,
+                phone,
+            } => Self::CreatePerson {
+                id: id.as_uuid(),
+                name: name.as_str().to_owned(),
+                email: email.as_ref().map(|email| email.as_str().to_owned()),
+                phone: phone.as_ref().map(|phone| phone.as_str().to_owned()),
+            },
+            DomainOperation::CreateInstitution {
+                id,
+                name,
+                kind,
+                email,
+                phone,
+            } => Self::CreateInstitution {
+                id: id.as_uuid(),
+                name: name.as_str().to_owned(),
+                institution_kind: kind.as_str().to_owned(),
+                email: email.as_ref().map(|email| email.as_str().to_owned()),
+                phone: phone.as_ref().map(|phone| phone.as_str().to_owned()),
+            },
+            DomainOperation::CreateAction {
+                id,
+                event_id,
+                title,
+                description,
+                owner,
+                workstream,
+                due,
+            } => Self::CreateAction {
+                id: id.as_uuid(),
+                event_id: event_id.as_uuid(),
+                title: title.as_str().to_owned(),
+                description: description.as_ref().map(|text| text.as_str().to_owned()),
+                owner: owner.as_uuid(),
+                workstream: workstream.map(|id| id.as_uuid()),
+                due: *due,
+            },
+            DomainOperation::CreateCommitment {
+                id,
+                event_id,
+                text,
+                promisor,
+                owner,
+                workstream,
+                due,
+                condition,
+            } => Self::CreateCommitment {
+                id: id.as_uuid(),
+                event_id: event_id.as_uuid(),
+                text: text.as_str().to_owned(),
+                promisor: (*promisor).into(),
+                owner: owner.as_uuid(),
+                workstream: workstream.map(|id| id.as_uuid()),
+                due: *due,
+                condition: condition.as_ref().map(|text| text.as_str().to_owned()),
+            },
+            DomainOperation::ChangeActionStatus {
+                event_id,
+                action_id,
+                status,
+                expected_version,
+            } => Self::ChangeActionStatus {
+                event_id: event_id.as_uuid(),
+                action_id: action_id.as_uuid(),
+                status: status.as_str().to_owned(),
+                expected_version: expected_version.get(),
+            },
+            DomainOperation::ChangeActionDue {
+                event_id,
+                action_id,
+                due,
+                expected_version,
+            } => Self::ChangeActionDue {
+                event_id: event_id.as_uuid(),
+                action_id: action_id.as_uuid(),
+                due: *due,
+                expected_version: expected_version.get(),
+            },
+            DomainOperation::ChangeCommitmentStatus {
+                event_id,
+                commitment_id,
+                status,
+                expected_version,
+            } => Self::ChangeCommitmentStatus {
+                event_id: event_id.as_uuid(),
+                commitment_id: commitment_id.as_uuid(),
+                status: status.as_str().to_owned(),
+                expected_version: expected_version.get(),
+            },
         }
     }
 }
@@ -566,19 +752,27 @@ impl From<AppProposalReview> for Proposal {
 pub struct ApplyChangesetRequest {
     /// The proposals to accept. tada adds the dependencies of each one that an earlier apply did not accept.
     pub selected: Vec<Uuid>,
-    /// The values that the reviewer changes before the acceptance. Only a proposal that sets a fact has a value.
+    /// The changes of the reviewer before the acceptance: the value of a proposal that sets a fact,
+    /// or fields of a proposal that creates an action, a commitment, a person or an institution.
     #[serde(default)]
     pub edits: Vec<EditRequest>,
 }
 
-/// A value that the reviewer changes before the acceptance.
+/// A change of the reviewer before the acceptance. A `set-fact` proposal takes `state`;
+/// a proposal that creates an action, a commitment, a person or an institution takes `fields`.
 #[derive(Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EditRequest {
-    /// A selected proposal that sets a fact.
+    /// A selected proposal.
     pub proposal_id: Uuid,
     /// The state and value that the reviewer accepts instead of the proposed one.
-    pub state: FactStateInput,
+    // The schema stays the one of a fact state: an absent field is the only way to leave it out.
+    #[serde(default)]
+    #[schemars(with = "FactStateInput")]
+    pub state: Option<FactStateInput>,
+    /// The fields of the new record that the reviewer replaces.
+    #[serde(default)]
+    pub fields: Option<RecordEditInput>,
 }
 
 /// The body contains values, so `Debug` shows the name of the type only (ADR 0035).
@@ -618,6 +812,14 @@ pub struct ReviewResult {
     pub open_questions: Vec<NewOpenQuestion>,
     /// The new documents with their organization-local IDs.
     pub documents: Vec<NewDocument>,
+    /// The new actions with their event-local IDs.
+    pub actions: Vec<NewLocalRecord>,
+    /// The new commitments with their event-local IDs.
+    pub commitments: Vec<NewLocalRecord>,
+    /// The new persons with their organization-local IDs.
+    pub persons: Vec<NewLocalRecord>,
+    /// The new institutions with their organization-local IDs.
+    pub institutions: Vec<NewLocalRecord>,
 }
 
 /// A proposal with its new status.
@@ -643,23 +845,71 @@ pub struct NewDocument {
     pub readable_id: String,
 }
 
+/// A new record with its readable ID.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct NewLocalRecord {
+    pub id: Uuid,
+    /// The readable ID, for example `ACT-001`, `COM-001`, `PER-001` or `INS-001` (ADR 0038).
+    pub local_id: String,
+}
+
+impl NewLocalRecord {
+    fn new(id: Uuid, kind: LocalIdKind, number: u64) -> Self {
+        Self {
+            id,
+            local_id: kind.readable_id(number),
+        }
+    }
+}
+
 impl From<Applied> for ReviewResult {
     fn from(applied: Applied) -> Self {
         let mut open_questions = Vec::new();
         let mut documents = Vec::new();
+        let (mut actions, mut commitments) = (Vec::new(), Vec::new());
+        let (mut persons, mut institutions) = (Vec::new(), Vec::new());
         for local in applied.local_ids {
+            let number = local.local_number;
             match local.record {
                 LocalRecord::OpenQuestion(id) => open_questions.push(NewOpenQuestion {
                     id: id.as_uuid(),
-                    local_id: LocalIdKind::OpenQuestion.readable_id(local.local_number),
+                    local_id: LocalIdKind::OpenQuestion.readable_id(number),
                 }),
                 LocalRecord::Document(id) => documents.push(NewDocument {
                     id: id.as_uuid(),
-                    readable_id: LocalIdKind::Document.readable_id(local.local_number),
+                    readable_id: LocalIdKind::Document.readable_id(number),
                 }),
+                LocalRecord::Action(id) => {
+                    actions.push(NewLocalRecord::new(
+                        id.as_uuid(),
+                        LocalIdKind::Action,
+                        number,
+                    ));
+                }
+                LocalRecord::Commitment(id) => commitments.push(NewLocalRecord::new(
+                    id.as_uuid(),
+                    LocalIdKind::Commitment,
+                    number,
+                )),
+                LocalRecord::Person(id) => {
+                    persons.push(NewLocalRecord::new(
+                        id.as_uuid(),
+                        LocalIdKind::Person,
+                        number,
+                    ));
+                }
+                LocalRecord::Institution(id) => institutions.push(NewLocalRecord::new(
+                    id.as_uuid(),
+                    LocalIdKind::Institution,
+                    number,
+                )),
             }
         }
         Self {
+            actions,
+            commitments,
+            persons,
+            institutions,
             proposals: applied
                 .proposals
                 .into_iter()
@@ -681,6 +931,7 @@ fn review_stores(state: &ApiState) -> ReviewStores<'_> {
         proposals: state.proposals.as_ref(),
         review: state.review.as_ref(),
         sources: state.sources.as_ref(),
+        workstreams: state.workstreams.as_ref(),
     }
 }
 
@@ -720,6 +971,9 @@ async fn create_changeset(
         proposals: state.proposals.as_ref(),
         sources: state.sources.as_ref(),
         documents: state.documents.as_ref(),
+        workstreams: state.workstreams.as_ref(),
+        parties: state.parties.as_ref(),
+        work: state.work.as_ref(),
     };
     match proposals::create_changeset(&caller, input, stores, state.clock.as_ref()).await? {
         Created::New(changeset) => Ok((StatusCode::CREATED, axum::Json(changeset.into()))),
@@ -871,6 +1125,7 @@ async fn apply_changeset(
             .map(|edit| Edit {
                 proposal_id: ProposalId::from_uuid(edit.proposal_id),
                 state: edit.state,
+                fields: edit.fields,
             })
             .collect(),
     };
@@ -928,6 +1183,10 @@ async fn reject_proposals(
             .collect(),
         open_questions: Vec::new(),
         documents: Vec::new(),
+        actions: Vec::new(),
+        commitments: Vec::new(),
+        persons: Vec::new(),
+        institutions: Vec::new(),
     }))
 }
 

@@ -23,6 +23,7 @@ use tada_app::events::{self, EventStore};
 use tada_app::facts::{self, FactStore};
 use tada_app::identity::IdentityStore;
 use tada_app::paging::PageLimit;
+use tada_app::parties::PartyStore;
 use tada_app::problem::{FieldError, ProblemCode};
 use tada_app::proposals::ProposalStore;
 use tada_app::search::{self, SearchRequest};
@@ -31,6 +32,8 @@ use tada_app::views::{
     DocumentList, DocumentSummaryView, DraftVersionView, EventList, EventSchema, EventView,
     PassageView, ProfileView, SearchHitView, SearchResult,
 };
+use tada_app::work::WorkStore;
+use tada_app::workstreams::WorkstreamStore;
 use uuid::Uuid;
 
 use crate::McpState;
@@ -72,6 +75,9 @@ pub(crate) struct Tools {
     pub(crate) proposals: Arc<dyn ProposalStore>,
     pub(crate) documents: Arc<dyn DocumentStore>,
     pub(crate) clock: Arc<dyn Clock>,
+    pub(crate) workstreams: Arc<dyn WorkstreamStore>,
+    pub(crate) parties: Arc<dyn PartyStore>,
+    pub(crate) work: Arc<dyn WorkStore>,
 }
 
 /// The input of the tools that read one event.
@@ -101,6 +107,9 @@ impl Tools {
             proposals: state.proposals.clone(),
             documents: state.documents.clone(),
             clock: state.clock.clone(),
+            workstreams: state.workstreams.clone(),
+            parties: state.parties.clone(),
+            work: state.work.clone(),
         }
     }
 

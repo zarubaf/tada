@@ -53,9 +53,12 @@ pub fn router(test: &TestDatabase, garage: &TestGarage) -> Router {
         facts: database.clone(),
         sources: database.clone(),
         proposals: database.clone(),
-        documents: database,
+        documents: database.clone(),
         clock,
         public_url: super::public_url(),
+        workstreams: database.clone(),
+        parties: database.clone(),
+        work: database,
     };
     tada::serve::routes(api, mcp, None)
 }

@@ -36,6 +36,8 @@ Proposals:
 
 - The operations `CreatePerson` and `CreateInstitution` create these records.
   The proposal carries the UUID of the new record (ADR 0050).
+- These operations name no event, because the records belong to the organization.
+  A changeset of an event and a changeset of the organization can both contain them.
 - The agent searches the existing persons and institutions before it proposes a new one (ADR 0040). The MCP instructions say this.
 
 Duplicate candidates:

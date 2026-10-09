@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO institution\n                     (id, organization_id, local_number, name, kind, email, phone, version, created_at, updated_at)\n                 VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "28eb1e7cd86f4645c25401e6d90f9e6ae4d766653c7dda936aee457b79619104"
+}

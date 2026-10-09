@@ -81,6 +81,9 @@ pub async fn run(
         documents: Arc::new(db.clone()),
         clock: Arc::new(SystemClock),
         public_url,
+        workstreams: Arc::new(db.clone()),
+        parties: Arc::new(db.clone()),
+        work: Arc::new(db.clone()),
     };
 
     let router = routes(api, mcp, http.web_root.as_deref());

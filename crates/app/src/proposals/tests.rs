@@ -19,6 +19,10 @@ use crate::facts::{EventProfile, FactVersionRef};
 use crate::identity::{Membership, UserRef};
 use crate::sources::{SourceHit, SourceVersionRef, SourceVersionText};
 use crate::tokens::TokenScope;
+use crate::work::{ActionView, CommitmentView};
+use crate::workstreams::Workstream;
+
+mod work;
 
 const SOURCE: &str =
     "Das Open Day findet im Mai oder Juni 2030 statt.\r\nWir rechnen mit 20000 Besuchern pro Tag.";
@@ -62,6 +66,13 @@ struct Memory {
     sources: Mutex<Vec<(Option<EventId>, SourceVersionText)>>,
     /// The documents of Testwil, with their events.
     documents: Mutex<Vec<(DocumentId, EventId)>>,
+    /// The workstreams of Testwil.
+    workstreams: Mutex<Vec<Workstream>>,
+    /// The IDs of the persons and institutions of Testwil.
+    parties: Mutex<Vec<Uuid>>,
+    /// The actions and commitments of Testwil.
+    actions: Mutex<Vec<ActionView>>,
+    commitments: Mutex<Vec<CommitmentView>>,
 }
 
 #[async_trait]
@@ -384,6 +395,9 @@ fn stores(memory: &Memory) -> ProposeStores<'_> {
         proposals: memory,
         sources: memory,
         documents: memory,
+        workstreams: memory,
+        parties: memory,
+        work: memory,
     }
 }
 

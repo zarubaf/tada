@@ -91,6 +91,15 @@ pub enum Party {
     Institution(InstitutionId),
 }
 
+impl Party {
+    pub fn as_uuid(self) -> uuid::Uuid {
+        match self {
+            Self::Person(id) => id.as_uuid(),
+            Self::Institution(id) => id.as_uuid(),
+        }
+    }
+}
+
 /// The form of a name for matching: Unicode NFKC, lowercase, without diacritics, with single spaces.
 pub fn normalized_name(input: &str) -> String {
     let folded: String = input

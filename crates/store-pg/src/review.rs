@@ -35,6 +35,8 @@ use crate::local_ids::next_local_number;
 use crate::sources::{TextItem, TextKind};
 use crate::{actor, audit, drafts, events, sources, values};
 
+mod records;
+
 /// The kind of the event-local IDs of open questions (ADR 0038).
 const OPEN_QUESTION_PREFIX: &str = LocalIdKind::OpenQuestion.prefix();
 
@@ -48,6 +50,10 @@ const RECORD_CONSTRAINTS: &[&str] = &[
     "open_question_pkey",
     "fact_event_id_field_id_key",
     "document_pkey",
+    "person_pkey",
+    "institution_pkey",
+    "action_pkey",
+    "commitment_pkey",
 ];
 
 #[async_trait]
@@ -226,9 +232,10 @@ async fn lock_open(
 }
 
 /// Locks the existing field definitions and facts that the plan uses or changes, the local ID counters
-/// that it moves and the existing documents of its drafts, before any check. It keeps the lock order of the crate
-/// documentation: fields, then facts, then counters, then documents, each kind in the order of its keys. So two applies take their row locks in the same order and
-/// cannot deadlock on them. The plan order follows the dependencies and the client IDs.
+/// that it moves, the existing documents of its drafts, the workstreams of its new work records and the actions and
+/// commitments that it changes, before any check. It keeps the lock order of the crate documentation: fields, then
+/// facts, then counters, then documents, then workstreams, actions and commitments, each kind in the order of its keys.
+/// So two applies take their row locks in the same order and cannot deadlock on them. The plan order follows the dependencies and the client IDs.
 /// A missing counter row is inserted here, so the lock covers it; a rollback removes it again.
 /// Inserts of other new rows can still wait on each other; a deadlock there maps to `Unavailable`,
 /// so the client retries.
@@ -242,8 +249,13 @@ async fn lock_targets(
     // The counters to move, as (scope, kind): `QST` in an event, `DOC` in the organization (ADR 0038).
     let (mut counter_scopes, mut counter_kinds) = (Vec::new(), Vec::new());
     let mut documents = Vec::new();
+    let mut work = records::WorkLocks::default();
     let organization = scope.organization_id().as_uuid();
     for step in steps {
+        if let Some((counter_scope, kind)) = work.add(scope, &step.operation) {
+            counter_scopes.push(counter_scope);
+            counter_kinds.push(kind);
+        }
         match &step.operation {
             Operation::SetFact {
                 event_id, field_id, ..
@@ -269,7 +281,15 @@ async fn lock_targets(
                     documents.push(document_id.as_uuid());
                 }
             },
-            Operation::CreateEvent { .. } | Operation::AddFieldDefinition { .. } => {}
+            Operation::CreateEvent { .. }
+            | Operation::AddFieldDefinition { .. }
+            | Operation::CreatePerson { .. }
+            | Operation::CreateInstitution { .. }
+            | Operation::CreateAction { .. }
+            | Operation::CreateCommitment { .. }
+            | Operation::ChangeActionStatus { .. }
+            | Operation::ChangeActionDue { .. }
+            | Operation::ChangeCommitmentStatus { .. } => {}
         }
     }
     // Shipped fields have no organization and change only with `tada migrate`, so they need no lock.
@@ -327,7 +347,7 @@ async fn lock_targets(
     )
     .fetch_all(&mut *conn)
     .await?;
-    Ok(())
+    work.lock(conn, scope).await
 }
 
 /// The proposals whose targets do not have the expected versions (ADR 0050).
@@ -342,6 +362,7 @@ async fn check_versions(
     let mut new_records: HashSet<Uuid> = HashSet::new();
     let mut fact_versions: HashMap<(EventId, FieldDefinitionId), Option<i64>> = HashMap::new();
     let mut document_versions: HashMap<DocumentId, i64> = HashMap::new();
+    let mut record_versions: HashMap<Uuid, i64> = HashMap::new();
     let mut conflicts = Vec::new();
     for step in steps {
         let matches = match &step.operation {
@@ -471,6 +492,15 @@ async fn check_versions(
                     current == Some(expected_version.get())
                 }
             },
+            operation @ (Operation::CreatePerson { .. }
+            | Operation::CreateInstitution { .. }
+            | Operation::CreateAction { .. }
+            | Operation::CreateCommitment { .. }
+            | Operation::ChangeActionStatus { .. }
+            | Operation::ChangeActionDue { .. }
+            | Operation::ChangeCommitmentStatus { .. }) => {
+                records::matches(conn, scope, operation, &new_records, &mut record_versions).await?
+            }
         };
         if let Some(record) = step.operation.new_record() {
             new_records.insert(record.as_uuid());
@@ -514,7 +544,7 @@ async fn field_of_event(
     .transpose()
 }
 
-/// Writes one step and its review result. Returns the event-local ID of a new open question.
+/// Writes one step and its review result. Returns the local ID of a new record.
 async fn write_step(
     conn: &mut PgConnection,
     scope: OrgScope,
@@ -666,9 +696,14 @@ async fn write_step(
             expected_version,
         } => {
             let evidence = match &step.evidence {
-                StepEvidence::Proposal(evidence) => evidence.clone(),
+                StepEvidence::Proposal(evidence) | StepEvidence::RecordEdit(evidence) => {
+                    evidence.clone()
+                }
                 StepEvidence::Edit => {
-                    let evidence = insert_review_text(conn, scope, plan, *event_id, state).await?;
+                    let (state, value, approximate) = values::fact_state_to_columns(state);
+                    let json = serde_json::json!({"state": state, "value": value, "approximate": approximate});
+                    let evidence =
+                        insert_review_text(conn, scope, plan, Some(*event_id), &json).await?;
                     edit_source = Some(evidence.source_version_id);
                     vec![evidence]
                 }
@@ -682,9 +717,20 @@ async fn write_step(
             };
             insert_fact_version(conn, scope, plan, step, fact).await?;
         }
+        Operation::CreatePerson { .. }
+        | Operation::CreateInstitution { .. }
+        | Operation::CreateAction { .. }
+        | Operation::CreateCommitment { .. }
+        | Operation::ChangeActionStatus { .. }
+        | Operation::ChangeActionDue { .. }
+        | Operation::ChangeCommitmentStatus { .. } => {
+            let written = records::write_record(conn, scope, plan, step).await?;
+            local_id = written.local_id;
+            edit_source = written.edit_source;
+        }
     }
     let outcome = match step.evidence {
-        StepEvidence::Edit => ReviewOutcome::AcceptedWithEdit,
+        StepEvidence::Edit | StepEvidence::RecordEdit(_) => ReviewOutcome::AcceptedWithEdit,
         StepEvidence::Proposal(_) => ReviewOutcome::Accepted,
     };
     insert_result(
@@ -847,26 +893,26 @@ async fn insert_draft(
     Ok(())
 }
 
-/// Stores an edited state as a source version of the kind `review` with the reviewer as author (ADR 0050).
+/// Stores an edit as a source version of the kind `review` with the reviewer as author (ADR 0050).
 /// Returns it with the passage of its whole text, the evidence of the edited value.
 ///
-/// The text is the JSON object `{"state", "value", "approximate"}` with the columns of `values::fact_state_to_columns`.
-/// A source version never changes, so this format is a stable contract: a change of the value codec must keep it,
-/// or add a new format next to it that readers tell apart.
+/// The text of an edited fact is the JSON object `{"state", "value", "approximate"}` with the columns of
+/// `values::fact_state_to_columns`. The text of an edited record is the edited operation in the format of
+/// `proposals::operation_to_json`. A source version never changes, so these formats are stable contracts:
+/// a change of a codec must keep them, or add a new format next to them that readers tell apart.
+/// A person or an institution has no event, so the review text of its edit has none either.
 async fn insert_review_text(
     conn: &mut PgConnection,
     scope: OrgScope,
     plan: &ApplyPlan,
-    event: EventId,
-    state: &FactState<Valued>,
+    event: Option<EventId>,
+    json: &serde_json::Value,
 ) -> Result<Evidence, sqlx::Error> {
-    let (state, value, approximate) = values::fact_state_to_columns(state);
-    let json = serde_json::json!({"state": state, "value": value, "approximate": approximate});
     let text = SourceText::normalize(&json.to_string());
     let version = SourceVersionId::from_uuid(Uuid::now_v7());
     let item = TextItem {
         kind: TextKind::Review,
-        event: Some(event),
+        event,
         version,
     };
     sources::insert_text(conn, scope, item, &text, &plan.reviewer, plan.now).await?;

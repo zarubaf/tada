@@ -23,6 +23,7 @@ use tada_app::domain::sources::SourceText;
 use tada_app::events::EventStore;
 use tada_app::facts::FactStore;
 use tada_app::identity::IdentityStore;
+use tada_app::parties::PartyStore;
 use tada_app::problem::{CommandError, ProblemCode};
 use tada_app::proposals::{ProposalStore, ProposeError, ProposeStores};
 use tada_app::sources::SourceStore;
@@ -31,13 +32,25 @@ use tada_app::telegram::{
     member_for, propose_fact,
 };
 
+use tada_app::work::WorkStore;
+use tada_app::workstreams::WorkstreamStore;
+
 use crate::bot_error::{BotFailure, salvage};
 use crate::command::{Incomplete, ProposeCommand, parse_propose};
 use crate::messages::Messages;
 
 /// The ports that the gateway reads and writes. One database adapter implements all of them.
 pub trait Ports:
-    TelegramLinks + IdentityStore + EventStore + FactStore + ProposalStore + SourceStore + DocumentStore
+    TelegramLinks
+    + IdentityStore
+    + EventStore
+    + FactStore
+    + ProposalStore
+    + SourceStore
+    + DocumentStore
+    + WorkstreamStore
+    + PartyStore
+    + WorkStore
 {
 }
 
@@ -49,6 +62,9 @@ impl<T> Ports for T where
         + ProposalStore
         + SourceStore
         + DocumentStore
+        + WorkstreamStore
+        + PartyStore
+        + WorkStore
 {
 }
 
@@ -227,6 +243,9 @@ impl Gateway {
                 proposals: ports,
                 sources: ports,
                 documents: ports,
+                workstreams: ports,
+                parties: ports,
+                work: ports,
             };
             let message = FactMessage {
                 source,

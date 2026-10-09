@@ -6,6 +6,8 @@
 
 use std::collections::{HashMap, VecDeque};
 
+use jiff::civil::Date;
+
 use crate::RecordVersion;
 use crate::documents::{DocumentName, DraftMarkdown};
 use crate::events::{EventKey, EventName, EventTimeZone};
@@ -13,10 +15,18 @@ use crate::facts::{
     ChoiceKey, Description, FactState, FieldKey, ModuleKey, ShortText, TextError, ValueType,
     Valued, checked_text,
 };
-use crate::ids::{DocumentId, EventId, FieldDefinitionId, OpenQuestionId, ProposalId, UserId};
+use crate::identity::Email;
+use crate::ids::{
+    ActionId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId, OpenQuestionId,
+    PersonId, ProposalId, UserId, WorkstreamId,
+};
+use crate::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use crate::sources::Evidence;
+use crate::work::{
+    ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
+};
 
-/// The change that a proposal suggests. Slice 1 has these operations.
+/// The change that a proposal suggests.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operation {
     /// Create an event of layer 1 (ADR 0049).
@@ -70,6 +80,63 @@ pub enum Operation {
         document: DraftDocument,
         markdown: DraftMarkdown,
     },
+    /// Create a person of the organization (ADR 0069). A person belongs to no event.
+    CreatePerson {
+        id: PersonId,
+        name: PartyName,
+        email: Option<Email>,
+        phone: Option<PhoneNumber>,
+    },
+    /// Create an institution of the organization (ADR 0069). An institution belongs to no event.
+    CreateInstitution {
+        id: InstitutionId,
+        name: PartyName,
+        kind: InstitutionKind,
+        email: Option<Email>,
+        phone: Option<PhoneNumber>,
+    },
+    /// Create an action of an event with its owner (ADR 0068). It starts `open`.
+    CreateAction {
+        id: ActionId,
+        event_id: EventId,
+        title: ActionTitle,
+        description: Option<ActionDescription>,
+        owner: UserId,
+        workstream: Option<WorkstreamId>,
+        due: Option<Date>,
+    },
+    /// Create a commitment of an event (ADR 0068). It starts `conditional` with a condition, else `firm`.
+    CreateCommitment {
+        id: CommitmentId,
+        event_id: EventId,
+        text: CommitmentText,
+        promisor: Party,
+        owner: UserId,
+        workstream: Option<WorkstreamId>,
+        due: Option<Date>,
+        condition: Option<ConditionText>,
+    },
+    /// Change the status of an action. `expected_version` is the current version of the action.
+    ChangeActionStatus {
+        event_id: EventId,
+        action_id: ActionId,
+        status: ActionStatus,
+        expected_version: RecordVersion,
+    },
+    /// Set or clear the due date of an action.
+    ChangeActionDue {
+        event_id: EventId,
+        action_id: ActionId,
+        due: Option<Date>,
+        expected_version: RecordVersion,
+    },
+    /// Change the status of a commitment. A change to `firm` is the AI path for "condition met" (ADR 0068).
+    ChangeCommitmentStatus {
+        event_id: EventId,
+        commitment_id: CommitmentId,
+        status: CommitmentStatus,
+        expected_version: RecordVersion,
+    },
 }
 
 /// The document of a draft: a new document, or an existing document of the event at its current version.
@@ -102,6 +169,10 @@ pub enum NewRecord {
     Field(FieldDefinitionId),
     OpenQuestion(OpenQuestionId),
     Document(DocumentId),
+    Person(PersonId),
+    Institution(InstitutionId),
+    Action(ActionId),
+    Commitment(CommitmentId),
 }
 
 impl NewRecord {
@@ -111,6 +182,10 @@ impl NewRecord {
             Self::Field(id) => id.as_uuid(),
             Self::OpenQuestion(id) => id.as_uuid(),
             Self::Document(id) => id.as_uuid(),
+            Self::Person(id) => id.as_uuid(),
+            Self::Institution(id) => id.as_uuid(),
+            Self::Action(id) => id.as_uuid(),
+            Self::Commitment(id) => id.as_uuid(),
         }
     }
 }
@@ -126,24 +201,45 @@ impl Operation {
                 document: DraftDocument::New { id, .. },
                 ..
             } => Some(NewRecord::Document(*id)),
+            Self::CreatePerson { id, .. } => Some(NewRecord::Person(*id)),
+            Self::CreateInstitution { id, .. } => Some(NewRecord::Institution(*id)),
+            Self::CreateAction { id, .. } => Some(NewRecord::Action(*id)),
+            Self::CreateCommitment { id, .. } => Some(NewRecord::Commitment(*id)),
             Self::SetFact { .. }
             | Self::AddChoiceValue { .. }
             | Self::DeprecateField { .. }
-            | Self::CreateDocumentDraft { .. } => None,
+            | Self::CreateDocumentDraft { .. }
+            | Self::ChangeActionStatus { .. }
+            | Self::ChangeActionDue { .. }
+            | Self::ChangeCommitmentStatus { .. } => None,
         }
     }
 
-    /// The event that the operation works in. Each operation names it, so each proposal belongs to one event.
-    /// For `CreateEvent`, it is the new event.
-    pub fn event_id(&self) -> EventId {
+    /// The event that the operation works in. For `CreateEvent`, it is the new event.
+    /// A person or an institution belongs to the organization, so its operations have no event (ADR 0069).
+    pub fn event_id(&self) -> Option<EventId> {
         match self {
-            Self::CreateEvent { id, .. } => *id,
+            Self::CreateEvent { id, .. } => Some(*id),
             Self::SetFact { event_id, .. }
             | Self::AddFieldDefinition { event_id, .. }
             | Self::AddChoiceValue { event_id, .. }
             | Self::DeprecateField { event_id, .. }
             | Self::CreateOpenQuestion { event_id, .. }
-            | Self::CreateDocumentDraft { event_id, .. } => *event_id,
+            | Self::CreateDocumentDraft { event_id, .. }
+            | Self::CreateAction { event_id, .. }
+            | Self::CreateCommitment { event_id, .. }
+            | Self::ChangeActionStatus { event_id, .. }
+            | Self::ChangeActionDue { event_id, .. }
+            | Self::ChangeCommitmentStatus { event_id, .. } => Some(*event_id),
+            Self::CreatePerson { .. } | Self::CreateInstitution { .. } => None,
+        }
+    }
+
+    /// The promisor of a new commitment, which can be a new record of the same changeset.
+    pub fn promisor(&self) -> Option<Party> {
+        match self {
+            Self::CreateCommitment { promisor, .. } => Some(*promisor),
+            _ => None,
         }
     }
 
@@ -154,9 +250,7 @@ impl Operation {
             | Self::AddChoiceValue { field_id, .. }
             | Self::DeprecateField { field_id, .. } => Some(*field_id),
             Self::AddFieldDefinition { id, .. } => Some(*id),
-            Self::CreateEvent { .. }
-            | Self::CreateOpenQuestion { .. }
-            | Self::CreateDocumentDraft { .. } => None,
+            _ => None,
         }
     }
 }

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id!\" FROM changeset WHERE id = ANY($1)\n               UNION SELECT id FROM proposal WHERE id = ANY($1)\n               UNION SELECT target_id FROM proposal WHERE target_id = ANY($1) AND target_kind <> 'fact'\n               UNION SELECT id FROM event WHERE id = ANY($1)\n               UNION SELECT id FROM field_definition WHERE id = ANY($1)\n               UNION SELECT id FROM open_question WHERE id = ANY($1)\n               UNION SELECT id FROM document WHERE id = ANY($1)\n               UNION SELECT id FROM person WHERE id = ANY($1)\n               UNION SELECT id FROM institution WHERE id = ANY($1)\n               UNION SELECT id FROM workstream WHERE id = ANY($1)\n               UNION SELECT id FROM action WHERE id = ANY($1)\n               UNION SELECT id FROM commitment WHERE id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "bfb54036487af88aaa01618a2315773e06dcdc2315f6f54a61e05b39096de89b"
+}
