@@ -180,7 +180,7 @@ impl std::fmt::Debug for RedeemMagicLinkRequest {
 }
 
 /// Signs in with the token of a magic link. The token works once.
-/// The response sets the session cookie.
+/// The response sets the session cookie. The new session ends the session that the request sends.
 #[utoipa::path(
     post,
     path = "/sign-in/magic-link",
@@ -194,11 +194,13 @@ impl std::fmt::Debug for RedeemMagicLinkRequest {
 )]
 async fn redeem_magic_link(
     State(state): State<ApiState>,
+    replaced: Option<SessionToken>,
     headers: HeaderMap,
     Json(body): Json<RedeemMagicLinkRequest>,
 ) -> Result<Response, ApiError> {
     let result = app::redeem_magic_link(
         &body.token,
+        replaced.as_ref().map(SessionToken::as_str),
         user_agent(&headers),
         state.sign_in.as_ref(),
         state.clock.as_ref(),
@@ -385,7 +387,7 @@ async fn preview_invitation(
 }
 
 /// Accepts an invitation. The token works once. The response sets the cookie of a new session
-/// in the organization of the invitation.
+/// in the organization of the invitation. The new session ends the session that the request sends.
 #[utoipa::path(
     post,
     path = "/invitations/accept",
@@ -399,11 +401,13 @@ async fn preview_invitation(
 )]
 async fn accept_invitation(
     State(state): State<ApiState>,
+    replaced: Option<SessionToken>,
     headers: HeaderMap,
     Json(body): Json<InvitationTokenRequest>,
 ) -> Result<Response, ApiError> {
     let result = app::accept_invitation(
         &body.token,
+        replaced.as_ref().map(SessionToken::as_str),
         user_agent(&headers),
         request_id(),
         state.sign_in.as_ref(),

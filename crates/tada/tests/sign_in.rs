@@ -348,6 +348,53 @@ async fn after_sign_out_the_old_cookie_is_unauthenticated() {
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
 }
 
+/// A sign-in ends the session token that the request already sends (ASVS 7.2.4), also a token of
+/// another user. Only the new token works afterwards.
+#[tokio::test]
+async fn a_sign_in_ends_the_session_that_the_request_sends() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let old = app.sign_in("anna@example.org").await;
+
+    let token = app.magic_link("anna@example.org").await;
+    let (response, _) = app
+        .post(
+            "/api/v1/sign-in/magic-link",
+            &json!({"token": token}),
+            Some(&old),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let new = session_cookie(&response).unwrap();
+    assert_ne!(new, old);
+
+    let (response, _) = app.get("/api/v1/session", Some(&old)).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let (response, _) = app.get("/api/v1/session", Some(&new)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+/// A failed sign-in keeps the session that the request sends.
+#[tokio::test]
+async fn a_failed_sign_in_keeps_the_session_that_the_request_sends() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let old = app.sign_in("anna@example.org").await;
+
+    let (response, _) = app
+        .post(
+            "/api/v1/sign-in/magic-link",
+            &json!({"token": "unknown"}),
+            Some(&old),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let (response, _) = app.get("/api/v1/session", Some(&old)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
 #[tokio::test]
 async fn each_response_forbids_the_referrer() {
     let app = App::start().await;
