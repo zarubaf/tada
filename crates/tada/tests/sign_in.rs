@@ -482,3 +482,48 @@ async fn x_forwarded_for_without_a_trusted_proxy_gives_one_warning() {
     );
     support::logs::assert_clean(&["198.51.100.23", "anna@example.org"]);
 }
+
+/// Common proxies pass the `X-Request-Id` of the client on. So the request ID of a trusted proxy goes
+/// to the log line only, and the intent and the job of the request get the ID of the server.
+#[tokio::test]
+async fn the_request_id_of_a_trusted_proxy_goes_to_the_log_line_only() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let mut state = support::session_state(&app.test, app.clock.clone());
+    state.trusted_proxies = vec!["10.0.0.0/8".parse().unwrap()];
+    let router = tada_api::router(state, None);
+    let chosen = "01920000-0000-7000-8000-000000000001";
+
+    let request = support::request_from(
+        "10.0.0.5".parse().unwrap(),
+        Method::POST,
+        "/api/v1/sign-in/requests",
+    )
+    .header(header::CONTENT_TYPE, "application/json")
+    .header("x-request-id", chosen)
+    .header("x-forwarded-for", "198.51.100.23")
+    .body(Body::from(json!({"email": "anna@example.org"}).to_string()))
+    .unwrap();
+    let (response, _) = support::send(&router, request).await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    let request_id = response.headers()["x-request-id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    assert_ne!(request_id, chosen);
+
+    for table in ["outbound_intent", "job"] {
+        let stored: uuid::Uuid = app
+            .test
+            .scalar(&format!("SELECT request_id FROM {table}"))
+            .await;
+        assert_eq!(stored.to_string(), request_id, "{table}");
+    }
+    let line = support::logs::lines_with_message("request completed")
+        .into_iter()
+        .find(|line| line["request_id"] == request_id.as_str())
+        .expect("the request line");
+    assert_eq!(line["proxy_request_id"], chosen);
+    support::logs::assert_clean(&["198.51.100.23", "anna@example.org"]);
+}

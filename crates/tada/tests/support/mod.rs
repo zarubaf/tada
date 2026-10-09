@@ -174,13 +174,18 @@ impl Clock for TestClock {
 
 /// The router of one `serve` process on the test database, with session sign-in.
 pub fn session_router(test: &TestDatabase, clock: Arc<dyn Clock>) -> Router {
+    tada_api::router(session_state(test, clock), None)
+}
+
+/// The state of `session_router`. A test changes a field if it needs another value.
+pub fn session_state(test: &TestDatabase, clock: Arc<dyn Clock>) -> ApiState {
     let database = Arc::new(test.database.clone());
     let authenticator = Arc::new(SessionAuthenticator::new(
         database.clone(),
         database,
         clock.clone(),
     ));
-    tada_api::router(api_state(test, authenticator, clock), None)
+    api_state(test, authenticator, clock)
 }
 
 /// Sends a request and returns the response with its JSON body.
