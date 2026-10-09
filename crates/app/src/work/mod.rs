@@ -18,7 +18,7 @@ use tada_domain::ids::{
 use tada_domain::parties::Party;
 use tada_domain::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
-    FirmReason,
+    FirmReason, InvalidTransition,
 };
 
 pub use self::actions::{
@@ -335,6 +335,12 @@ impl CommandError for WorkError {
             Self::Invalid(errors) => errors,
             _ => &[],
         }
+    }
+}
+
+impl From<InvalidTransition> for WorkError {
+    fn from(_: InvalidTransition) -> Self {
+        Self::InvalidTransition
     }
 }
 

@@ -72,7 +72,7 @@ pub(super) async fn check_work(
                 ..
             } => match stores.work.action(scope, *event_id, *action_id).await? {
                 None => refuse(operation("action_id"), "unknown-record"),
-                Some(current) if !current.fields.status.can_change_to(*status) => {
+                Some(current) if current.fields.status.change_to(*status).is_err() => {
                     refuse(operation("status"), "invalid-transition");
                 }
                 Some(_) => {}
@@ -103,7 +103,7 @@ pub(super) async fn check_work(
                     .await?
                 {
                     None => refuse(operation("commitment_id"), "unknown-record"),
-                    Some(current) if !current.fields.status.can_change_to(*status) => {
+                    Some(current) if current.fields.status.change_to(*status).is_err() => {
                         refuse(operation("status"), "invalid-transition");
                     }
                     Some(_) => {}
