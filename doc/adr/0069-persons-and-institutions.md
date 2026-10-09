@@ -19,6 +19,10 @@ Records:
 - A person (`PER`, organization scope) has a name (at most 200 characters), an optional email address, an optional phone number (at most 50) and an optional link to a user account.
 - An institution (`INS`, organization scope) has a name (at most 200), a kind (`authority`, `company`, `club` or `other`), an optional email address and an optional phone number.
 - Both have a record version. Readable IDs follow ADR 0038.
+- A create takes an optional client ID, and a change follows the conventions of ADR 0068.
+- The JSON name of the institution kind is `kind` in the direct API and `institution_kind` in the operation `CreateInstitution`, where `kind` is the tag of the operation.
+- Each view carries `can_change` and the evidence of the accepted changes that created or changed the record (ADR 0068).
+  The evidence follows the source reach of the caller. Evidence from a changeset of the organization is visible only to owners and admins.
 - Participations are not part of 2a.
 
 Permissions:
@@ -27,7 +31,7 @@ Permissions:
 | --------------------------------- | ---------------------------------------------------------- |
 | Create a person or an institution | a member with the contributor or manager role in any event |
 | Change a person or an institution | organization owner or admin                                |
-| Read persons and institutions     | each member with any event role                            |
+| Read persons and institutions     | each member with any event role, owners and admins         |
 
 - A member without an event role does not see persons and institutions (ADR 0052).
 - A record of another organization is invisible. A command that names one returns `validation-failed` with the field code `unknown-record`.
@@ -38,12 +42,14 @@ Proposals:
   The proposal carries the UUID of the new record (ADR 0050).
 - These operations name no event, because the records belong to the organization.
   A changeset of an event and a changeset of the organization can both contain them.
+  The routing takes the event from the changeset (ADR 0067): in an event changeset these proposals go to the event managers.
 - The agent searches the existing persons and institutions before it proposes a new one (ADR 0040). The MCP instructions say this.
 
 Duplicate candidates:
 
 - The review of a create operation shows the records of the organization with a similar name.
-- The Rust code finds them with a normalized name match: it converts the names to lowercase, removes accents and punctuation, and compares the words.
+- The Rust code finds them with a normalized name match: it converts the names to lowercase, removes accents, folds `ß` to `ss`, turns each character that is not a letter or a digit into a space, and compares the words.
+  So "Tent-Works Ltd." and "Tent Works Ltd" match.
   It needs no PostgreSQL extension.
 - The list queries support the parameter `q` for a name search with the same normalization.
 
