@@ -100,14 +100,23 @@ impl Party {
     }
 }
 
-/// The form of a name for matching: Unicode NFKC, lowercase, without diacritics, with single spaces.
+/// The form of a name for matching (ADR 0069): Unicode NFKC, lowercase, without diacritics, `ß` as `ss`,
+/// each character that is not a letter or a digit as a space, and single spaces.
+/// For example, "Müller-Bau AG" and "Müller Bau AG" both give "muller bau ag".
 pub fn normalized_name(input: &str) -> String {
-    let folded: String = input
+    let mut folded = String::with_capacity(input.len());
+    for c in input
         .nfkc()
         .flat_map(char::to_lowercase)
         .nfkd()
         .filter(|c| !is_combining_mark(*c))
-        .collect();
+    {
+        match c {
+            'ß' => folded.push_str("ss"),
+            c if c.is_alphanumeric() => folded.push(c),
+            _ => folded.push(' '),
+        }
+    }
     folded.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
@@ -121,6 +130,28 @@ mod tests {
         assert_eq!(normalized_name("muller ag"), "muller ag");
         assert_eq!(normalized_name("Mu\u{308}ller\tAG"), "muller ag");
         assert_eq!(normalized_name("ＡＢＣ"), "abc");
+    }
+
+    #[test]
+    fn normalized_name_treats_punctuation_as_spaces() {
+        assert_eq!(
+            normalized_name("Müller-Bau AG"),
+            normalized_name("Müller Bau AG")
+        );
+        assert_eq!(normalized_name("Müller-Bau AG"), "muller bau ag");
+        assert_eq!(
+            normalized_name("St. Gallen, Ost/West"),
+            "st gallen ost west"
+        );
+        assert_eq!(normalized_name("Meier & Söhne"), "meier sohne");
+        assert_eq!(normalized_name("D'Angelo"), "d angelo");
+        assert_eq!(normalized_name("Muster AG (Bern)"), "muster ag bern");
+    }
+
+    #[test]
+    fn normalized_name_folds_sharp_s() {
+        assert_eq!(normalized_name("Strasse"), normalized_name("Straße"));
+        assert_eq!(normalized_name("STRAẞE"), "strasse");
     }
 
     #[test]
