@@ -30,6 +30,7 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
         .routes(routes!(request_sign_in))
         .routes(routes!(redeem_magic_link))
+        .routes(routes!(preview_magic_link))
         .routes(routes!(get_session))
         .routes(routes!(choose_organization))
         .routes(routes!(sign_out))
@@ -46,6 +47,10 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         (
             "redeem_magic_link",
             codes(&[JSON_BODY, SignInError::CODES, SessionError::CODES]),
+        ),
+        (
+            "preview_magic_link",
+            codes(&[JSON_BODY, SignInError::CODES]),
         ),
         ("get_session", codes(&[SessionError::CODES])),
         (
@@ -207,6 +212,35 @@ async fn redeem_magic_link(
     )
     .await;
     new_session(&state, result).await
+}
+
+/// The account of a magic link, before the person signs in.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MagicLinkPreview {
+    /// The masked address of the account, for example `a…@example.org`.
+    pub email_hint: String,
+}
+
+/// Shows the masked address of the account of a magic link. It does not use the token. The person
+/// sees which account the link signs in to, for example the account of someone else (login CSRF).
+#[utoipa::path(
+    post,
+    path = "/sign-in/magic-link/preview",
+    operation_id = "preview_magic_link",
+    tag = "sign-in",
+    request_body = RedeemMagicLinkRequest,
+    responses(
+        (status = OK, description = "The account of the link.", body = MagicLinkPreview),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn preview_magic_link(
+    State(state): State<ApiState>,
+    Json(body): Json<RedeemMagicLinkRequest>,
+) -> Result<Response, ApiError> {
+    let email_hint =
+        app::preview_magic_link(&body.token, state.sign_in.as_ref(), state.clock.as_ref()).await?;
+    Ok(uncached(MagicLinkPreview { email_hint }))
 }
 
 /// The `User-Agent` of a request, for the list of sessions.

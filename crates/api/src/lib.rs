@@ -547,6 +547,15 @@ mod tests {
             unreachable!()
         }
 
+        async fn preview_magic_link(
+            &self,
+            _: &str,
+            _: jiff::Timestamp,
+        ) -> Result<Option<tada_app::domain::identity::Email>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
         async fn preview_invitation(
             &self,
             _: &str,

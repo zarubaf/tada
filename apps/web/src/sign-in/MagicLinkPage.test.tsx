@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Router, usePathname } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 import { MagicLinkPage } from "./MagicLinkPage";
-import { fakeApi, findAlert, json, problem, queryAlert, watchAlerts } from "./testing";
+import { fakeApiWith, findAlert, json, problem, queryAlert, watchAlerts } from "./testing";
+
+const PREVIEW = "/api/v1/sign-in/magic-link/preview";
 
 const session = {
   user_id: "0199b8e0-0000-7000-8000-0000000000b1",
@@ -21,9 +23,12 @@ function renderAt(hash: string, ...responses: Response[]) {
   return renderWith(problem(401, "unauthenticated"), hash, ...responses);
 }
 
+/** The preview of the link answers with `preview`; by default it is unavailable, so no hint shows. */
+let preview: () => Response = () => problem(503, "unavailable");
+
 function renderWith(first: Response, hash: string, ...responses: Response[]) {
   window.history.replaceState(null, "", `/sign-in/link${hash}`);
-  const { api, calls } = fakeApi(first, ...responses);
+  const { api, calls } = fakeApiWith({ [PREVIEW]: () => preview() }, first, ...responses);
   render(
     <Router>
       <SessionProvider api={api}>
@@ -35,7 +40,10 @@ function renderWith(first: Response, hash: string, ...responses: Response[]) {
   return calls;
 }
 
-afterEach(() => window.history.replaceState(null, "", "/"));
+afterEach(() => {
+  window.history.replaceState(null, "", "/");
+  preview = () => problem(503, "unavailable");
+});
 
 describe("MagicLinkPage", () => {
   it("removes the fragment and does not redeem the token on load", async () => {
@@ -43,7 +51,26 @@ describe("MagicLinkPage", () => {
     expect(await screen.findByRole("button", { name: "Anmelden" })).toBeInTheDocument();
     expect(window.location.hash).toBe("");
     expect(window.location.pathname).toBe("/sign-in/link");
-    expect(calls.map((call) => call.path)).toEqual(["/api/v1/session"]);
+    expect(calls.map((call) => call.path).sort()).toEqual([PREVIEW, "/api/v1/session"].sort());
+  });
+
+  it("names the masked address of the account before the click", async () => {
+    preview = () => json(200, { email_hint: "a…@example.org" });
+    const calls = renderAt("#token=secret-token");
+
+    expect(await screen.findByText(/Konto: a…@example.org/)).toBeVisible();
+    expect(calls.find((call) => call.path === PREVIEW)?.body).toBe(
+      JSON.stringify({ token: "secret-token" }),
+    );
+    expect(calls.some((call) => call.path === "/api/v1/sign-in/magic-link")).toBe(false);
+  });
+
+  it("shows the invalid-link message at once when the preview does not know the link", async () => {
+    preview = () => problem(401, "unauthenticated");
+    renderAt("#token=old");
+
+    expect(await findAlert()).toHaveTextContent("Dieser Link ist ungültig oder abgelaufen.");
+    expect(screen.queryByRole("button", { name: "Anmelden" })).not.toBeInTheDocument();
   });
 
   it("redeems the token in the body only after the click, then leaves the page", async () => {
@@ -69,7 +96,8 @@ describe("MagicLinkPage", () => {
   it("keeps the token when the session of a signed-in member loads after the first render", async () => {
     const calls = renderWith(json(200, session), "#token=secret-token");
     await screen.findByRole("button", { name: "Anmelden" });
-    await waitFor(() => expect(calls).toHaveLength(1));
+    // The session and the preview of the link.
+    await waitFor(() => expect(calls).toHaveLength(2));
     await act(async () => {});
     expect(screen.getByRole("button", { name: "Anmelden" })).toBeInTheDocument();
     expect(queryAlert()).not.toBeInTheDocument();
@@ -109,7 +137,7 @@ describe("MagicLinkPage", () => {
 
   it("keeps the token under StrictMode", async () => {
     window.history.replaceState(null, "", "/sign-in/link#token=secret-token");
-    const { api } = fakeApi(problem(401, "unauthenticated"));
+    const { api } = fakeApiWith({ [PREVIEW]: () => preview() }, problem(401, "unauthenticated"));
     render(
       <StrictMode>
         <Router>
