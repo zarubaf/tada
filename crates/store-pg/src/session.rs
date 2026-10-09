@@ -10,7 +10,7 @@ use jiff_sqlx::ToSqlx;
 use secrecy::SecretString;
 use sqlx::PgConnection;
 use tada_app::domain::ids::{OrganizationId, UserId};
-use tada_app::session::{SessionRow, SessionStore};
+use tada_app::session::{SessionRow, SessionStore, stored_user_agent};
 use tada_app::store::StoreError;
 
 use crate::Database;
@@ -34,7 +34,7 @@ pub(crate) async fn insert_session(
         user_id.as_uuid(),
         organization_id.map(OrganizationId::as_uuid),
         now.to_sqlx() as _,
-        user_agent,
+        user_agent.map(stored_user_agent),
     )
     .execute(conn)
     .await
@@ -117,7 +117,7 @@ mod tests {
     use jiff::SignedDuration;
     use secrecy::ExposeSecret;
     use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
-    use tada_app::session::IDLE_TIMEOUT;
+    use tada_app::session::{IDLE_TIMEOUT, USER_AGENT_MAX_CHARS};
 
     use super::*;
     use crate::testing::TestDatabase;
@@ -166,6 +166,21 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(hash, hash_token(token.expose_secret()));
+    }
+
+    #[tokio::test]
+    async fn cuts_a_long_user_agent_to_the_limit() {
+        let test = TestDatabase::start().await;
+        let user = anna(&test).await;
+        let long = format!("Firefox {}", "ü".repeat(10_000));
+        create(&test, user, None, Some(&long), now()).await;
+
+        let stored: String = sqlx::query_scalar("SELECT user_agent FROM session")
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap();
+        assert_eq!(stored.chars().count(), USER_AGENT_MAX_CHARS);
+        assert!(long.starts_with(&stored));
     }
 
     #[tokio::test]
