@@ -1,5 +1,6 @@
 //! Persons and institutions: the commands and queries, and the port (ADR 0069).
 
+use std::collections::HashSet;
 use std::fmt::Debug;
 
 use async_trait::async_trait;
@@ -177,18 +178,32 @@ pub trait PartyStore: EvidenceStore + Debug + Send + Sync {
 /// The shortest word that two names must share to match (ADR 0069).
 const SHARED_WORD_MIN_CHARS: usize = 4;
 
-/// True if two normalized names can name the same party: they are equal, one contains the other,
-/// or they share a word of at least four characters.
+/// Normalized words of legal forms and generic kinds. Many names share them, so they are no evidence of identity.
+const LEGAL_FORMS: &[&str] = &["ag", "gmbh", "kg", "sa", "sarl", "ev", "verein", "club"];
+
+/// True if two normalized names can name the same party (ADR 0069): they are equal, or, without the words of
+/// `LEGAL_FORMS`, the words of one name are all words of the other, or they share a word of at least four characters.
+/// It compares whole words, so "ag" does not match "hagen".
 pub fn names_match(a: &str, b: &str) -> bool {
     if a.is_empty() || b.is_empty() {
         return false;
     }
-    if a.contains(b) || b.contains(a) {
+    if a == b {
         return true;
     }
-    a.split(' ')
-        .filter(|word| word.chars().count() >= SHARED_WORD_MIN_CHARS)
-        .any(|word| b.split(' ').any(|other| other == word))
+    let significant = |name| -> HashSet<&str> {
+        str::split(name, ' ')
+            .filter(|word| !LEGAL_FORMS.contains(word))
+            .collect()
+    };
+    let (a, b) = (significant(a), significant(b));
+    if a.is_empty() || b.is_empty() {
+        return false;
+    }
+    a.is_subset(&b)
+        || b.is_subset(&a)
+        || a.intersection(&b)
+            .any(|word| word.chars().count() >= SHARED_WORD_MIN_CHARS)
 }
 
 /// The input of `create_person`, as the caller gives it.

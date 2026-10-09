@@ -702,3 +702,29 @@ fn names_match_on_equal_contained_and_shared_words() {
     assert!(!names_match("", "anna"));
     assert!(!names_match("anna", ""));
 }
+
+#[test]
+fn names_match_compares_words_not_substrings() {
+    // The words of one name are words of the other, in any order.
+    assert!(names_match("testwil generatoren ag", "generatoren testwil"));
+    assert!(names_match("ott", "hans ott"));
+    // A part of a word is no evidence of identity.
+    assert!(!names_match("ag", "hagen"));
+    assert!(!names_match("mull", "muller"));
+    assert!(!names_match("bau", "zeltbau ag"));
+}
+
+#[test]
+fn names_match_ignores_legal_forms() {
+    assert!(!names_match("muster ag", "beispiel ag"));
+    assert!(!names_match("zeltbau gmbh", "kuchen gmbh"));
+    assert!(!names_match("turnverein verein", "skiclub verein"));
+    assert!(!names_match(
+        &normalized_name("Muster Sàrl"),
+        &normalized_name("Beispiel Sàrl")
+    ));
+    assert!(!names_match("ag", "testwil ag"));
+    assert!(names_match("zeltbau ag", "zeltbau gmbh"));
+    // Two names of only a legal form match if they are equal.
+    assert!(names_match("ag", "ag"));
+}
