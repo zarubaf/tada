@@ -1,6 +1,6 @@
 import { IconAlertTriangle, IconClockExclamation } from "@tabler/icons-react";
-import { type ReactNode, type Ref, useId } from "react";
-import type { ApplyEdit, Proposal } from "../api/client";
+import { lazy, type ReactNode, type Ref, Suspense, useId } from "react";
+import type { Api, ApplyEdit, Proposal } from "../api/client";
 import type { DraftEnvironment } from "../documents/DraftView";
 import { Excerpt } from "../evidence/Excerpt";
 import { isEditable } from "../facts/valueDraft";
@@ -8,11 +8,18 @@ import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
 import { KnowledgeState } from "../ui/KnowledgeState";
+import { Skeleton } from "../ui/Skeleton";
 import type { Conflict } from "./conflict";
 import { EditForm } from "./EditForm";
 import { type FieldInfo, OperationDetails, operationTitle } from "./OperationView";
 import styles from "./ProposalCard.module.css";
+import { type FieldErrors, type Fields, isRecordOperation } from "./recordEdit";
 import type { RecordNames } from "./recordNames";
+
+// The form loads when a member opens it, to keep the first load small (ADR 0019).
+const RecordEditForm = lazy(() =>
+  import("./RecordEditForm").then((module) => ({ default: module.RecordEditForm })),
+);
 
 export interface ProposalCardProps {
   proposal: Proposal;
@@ -43,6 +50,13 @@ export interface ProposalCardProps {
   onEdit: () => void;
   onReject: () => void;
   onEditSubmit: (state: ApplyEdit["state"]) => void;
+  /** The form of a record proposal: the API for its pickers, the event and the refused fields. */
+  api: Api;
+  eventId: string | null | undefined;
+  recordErrors: FieldErrors;
+  onRecordEditSubmit: (fields: Fields) => void;
+  /** False when a proposal that needs this one goes to another reviewer. */
+  canLink: boolean;
   onEditCancel: () => void;
   /** For the focus that returns to „Bearbeiten und annehmen“ when the form closes. */
   editButtonRef: Ref<HTMLButtonElement>;
@@ -59,6 +73,11 @@ export function editableField(
   }
   const field = fields.get(operation.field_id);
   return field && isEditable(field.valueType) ? field : undefined;
+}
+
+/** True when the reviewer can change the proposal before the acceptance. */
+export function canEdit(proposal: Proposal, fields: Map<string, FieldInfo>): boolean {
+  return isRecordOperation(proposal.operation) || editableField(proposal, fields) !== undefined;
 }
 
 function Hint({ show, children }: { show: boolean; children: string }) {
@@ -153,7 +172,10 @@ export function ProposalCard(props: ProposalCardProps) {
           draftEnvironment={props.draftEnvironment}
           names={props.names}
         />
-        {isOpen && duplicates.length > 0 && (
+        {isOpen && duplicates.length > 0 && !props.canLink && (
+          <p className={styles.note}>{t("inbox-link-other-reviewer")}</p>
+        )}
+        {isOpen && duplicates.length > 0 && props.canLink && (
           <fieldset className={styles.duplicates}>
             <legend>{t("inbox-duplicates")}</legend>
             {duplicates.map((duplicate) => (
@@ -212,6 +234,20 @@ export function ProposalCard(props: ProposalCardProps) {
         )}
       </Section>
 
+      {isOpen && isEditing && isRecordOperation(proposal.operation) && (
+        <Suspense fallback={<Skeleton />}>
+          <RecordEditForm
+            api={props.api}
+            eventId={props.eventId}
+            proposal={proposal}
+            isPending={isPending}
+            serverErrors={props.recordErrors}
+            onSubmit={props.onRecordEditSubmit}
+            onCancel={props.onEditCancel}
+          />
+        </Suspense>
+      )}
+
       {isOpen && isEditing && field && (
         <EditForm
           proposal={proposal}
@@ -235,12 +271,14 @@ export function ProposalCard(props: ProposalCardProps) {
             {t("inbox-accept")}
             <Hint show={active}>A</Hint>
           </Button>
-          {isFact && (
+          {(isFact || isRecordOperation(proposal.operation)) && (
             <Button
               ref={props.editButtonRef}
               aria-label={t("inbox-edit")}
-              isDisabled={conflicting || !field}
-              aria-describedby={conflicting ? conflictId : field ? undefined : unavailableId}
+              isDisabled={conflicting || !canEdit(proposal, fields)}
+              aria-describedby={
+                conflicting ? conflictId : canEdit(proposal, fields) ? undefined : unavailableId
+              }
               onPress={props.onEdit}
             >
               {t("inbox-edit")}

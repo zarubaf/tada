@@ -22,7 +22,8 @@ import { conflictOf } from "./conflict";
 import type { Scopes } from "./eventScopes";
 import { useInbox } from "./InboxProvider";
 import { fieldInfos, operationTitle } from "./OperationView";
-import { editableField, ProposalCard } from "./ProposalCard";
+import { canEdit, ProposalCard } from "./ProposalCard";
+import { editFieldErrors } from "./recordEdit";
 import type { RecordNames } from "./recordNames";
 import { loadRecordNames } from "./recordNames";
 import { dependentsOf, deselect, select } from "./selection";
@@ -118,6 +119,8 @@ export function ChangesetDetail({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [activeId, setActiveId] = useState<string>();
   const [editingId, setEditingId] = useState<string>();
+  // The fields of a record edit that the server refused in the last apply.
+  const [recordErrors, setRecordErrors] = useState<ReturnType<typeof editFieldErrors>>({});
   // The existing record that the member chose for a proposed person or institution, by proposal.
   const [links, setLinks] = useState<ReadonlyMap<string, string>>(new Map());
   // The proposals that the confirmation dialog will reject.
@@ -222,6 +225,7 @@ export function ChangesetDetail({
     announce(message);
     setSelected(new Set());
     setEditingId(undefined);
+    setRecordErrors({});
     setRejecting(undefined);
     await Promise.all([reload(), inbox.reload()]);
     focusAfterCommit(() => heading.current);
@@ -243,7 +247,13 @@ export function ChangesetDetail({
       if (data) {
         await afterReview(message(data));
       } else {
-        fail(linkMessage(error) ?? problemMessage(error));
+        const refused = editFieldErrors(error);
+        setRecordErrors(refused);
+        fail(
+          Object.keys(refused).length > 0
+            ? undefined
+            : (linkMessage(error) ?? problemMessage(error)),
+        );
         setRejecting(undefined);
         if (error?.code === "record-version-conflict" || error?.code === "invalid-transition") {
           // The server recorded the conflict; the proposals show it now.
@@ -356,12 +366,7 @@ export function ChangesetDetail({
     if (key === "a" && targets(active?.id).length > 0) {
       event.preventDefault();
       void apply(closureOf(targets(active?.id)));
-    } else if (
-      key === "e" &&
-      active &&
-      editableField(active, fields) &&
-      !conflictOf(active, proposals)
-    ) {
+    } else if (key === "e" && active && canEdit(active, fields) && !conflictOf(active, proposals)) {
       event.preventDefault();
       setEditingId(active.id);
     } else if (key === "r" && targets(active?.id).length > 0) {
@@ -440,8 +445,20 @@ export function ChangesetDetail({
                 onEditSubmit={(edit) =>
                   void apply(closureOf([proposal.id]), [{ proposal_id: proposal.id, state: edit }])
                 }
+                api={api}
+                eventId={changeset.event_id}
+                recordErrors={editingId === proposal.id ? recordErrors : {}}
+                onRecordEditSubmit={(edited) =>
+                  void apply(closureOf([proposal.id]), [
+                    { proposal_id: proposal.id, fields: edited },
+                  ])
+                }
+                canLink={dependentsOf(proposals, proposal.id).every(
+                  (id) => proposals.find((other) => other.id === id)?.routed_to_me,
+                )}
                 onEditCancel={() => {
                   setEditingId(undefined);
+                  setRecordErrors({});
                   focusAfterCommit(() => editButtons.current.get(proposal.id));
                 }}
                 editButtonRef={(button) => {

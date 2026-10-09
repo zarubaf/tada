@@ -657,6 +657,11 @@ inbox-link-dependents-added =
         [one] 1 Vorschlag, der den Eintrag braucht, mitgewählt.
        *[other] { $count } Vorschläge, die den Eintrag brauchen, mitgewählt.
     }
+inbox-edit-error-condition = Die Bedingung hat 1 bis 500 Zeichen.
+inbox-edit-error-condition-condition-fixed = Die Bedingung bleibt bestehen. Nur „Verbindlich machen“ beendet sie.
+inbox-edit-error-email = Die E-Mail-Adresse ist ungültig.
+inbox-edit-error-phone = Die Telefonnummer hat 1 bis 50 Zeichen.
+inbox-link-other-reviewer = Ein anderer Prüfer muss die Vorschläge annehmen, die diesen Eintrag brauchen. Darum kann hier kein bestehender Eintrag verwendet werden.
 inbox-link-invalid = Dieser Eintrag passt nicht zum Vorschlag. Wählen Sie einen anderen oder legen Sie die Person oder Institution neu an.
 inbox-link-dependents-missing = Wählen Sie auch die Vorschläge, die den bestehenden Eintrag brauchen.
 inbox-field-unknown = Feld
