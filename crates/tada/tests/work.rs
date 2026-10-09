@@ -145,6 +145,7 @@ async fn a_contributor_creates_and_changes_an_action() {
         .await;
     assert_eq!(action["local_id"], "ACT-001");
     assert_eq!(action["status"], "open");
+    assert_eq!(action["evidence"], json!([]));
     assert_eq!(action["due_date"], "2030-06-01");
     assert_eq!(action["version"], 1);
 

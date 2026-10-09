@@ -7,11 +7,13 @@ use tada_domain::parties::PartyName;
 use tada_domain::work::{WorkstreamName, WorkstreamStatus};
 
 use super::*;
+use crate::access::SourceReach;
 use crate::audit::AuditAction;
 use crate::caller::MemberCaller;
 use crate::identity::{Membership, UserRef};
 use crate::parties::{InstitutionFields, InstitutionView, PersonFields, PersonView};
 use crate::records::{Changed, Created, NumberCursor};
+use crate::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 use crate::workstreams::{
     Changed as WorkstreamChanged, Created as WorkstreamCreated, Workstream, WorkstreamUpdate,
 };
@@ -165,9 +167,13 @@ impl IdentityStore for Memory {
     async fn event_roles_of(
         &self,
         _: OrgScope,
-        _: UserId,
+        user: UserId,
     ) -> Result<Vec<(EventId, EventRole)>, StoreError> {
-        unreachable!()
+        Ok(roles()
+            .get(&user)
+            .map(|role| (open_day(), *role))
+            .into_iter()
+            .collect())
     }
 }
 
@@ -223,6 +229,18 @@ fn person_view(id: PersonId) -> PersonView {
         phone: None,
         user_id: None,
         version: RecordVersion::FIRST,
+    }
+}
+
+#[async_trait]
+impl EvidenceStore for Memory {
+    async fn evidence_of(
+        &self,
+        _: OrgScope,
+        _: &[RecordRef],
+        _: &SourceReach,
+    ) -> Result<Vec<(RecordRef, RecordEvidenceView)>, StoreError> {
+        Ok(Vec::new())
     }
 }
 
@@ -437,7 +455,6 @@ impl WorkStore for Memory {
             },
             fields: commitment.fields.clone(),
             version: RecordVersion::FIRST,
-            evidence: Vec::new(),
         };
         all.push(view.clone());
         self.audit.lock().unwrap().push(audit.action());
@@ -563,7 +580,9 @@ fn field(name: &str, code: &'static str) -> Vec<(String, &'static str)> {
 }
 
 async fn action_by(memory: &Memory, by: u128, input: NewAction) -> Result<ActionView, WorkError> {
-    create_action(&caller(by), open_day(), input, memory.ports()).await
+    create_action(&caller(by), open_day(), input, memory.ports())
+        .await
+        .map(|shown| shown.record)
 }
 
 async fn change_action_by(
@@ -572,7 +591,9 @@ async fn change_action_by(
     id: ActionId,
     change: ActionChange,
 ) -> Result<ActionView, WorkError> {
-    super::change_action(&caller(by), open_day(), id, change, memory.ports()).await
+    super::change_action(&caller(by), open_day(), id, change, memory.ports())
+        .await
+        .map(|shown| shown.record)
 }
 
 async fn change_commitment_by(
@@ -581,7 +602,9 @@ async fn change_commitment_by(
     id: CommitmentId,
     change: CommitmentChange,
 ) -> Result<CommitmentView, WorkError> {
-    super::change_commitment(&caller(by), open_day(), id, change, memory.ports()).await
+    super::change_commitment(&caller(by), open_day(), id, change, memory.ports())
+        .await
+        .map(|shown| shown.record)
 }
 
 async fn firm_by(
@@ -595,7 +618,9 @@ async fn firm_by(
         reason: reason.to_owned(),
         expected_version,
     };
-    make_commitment_firm(&caller(by), open_day(), id, input, memory.ports()).await
+    make_commitment_firm(&caller(by), open_day(), id, input, memory.ports())
+        .await
+        .map(|shown| shown.record)
 }
 
 #[tokio::test]
@@ -745,7 +770,8 @@ async fn a_change_without_a_field_is_invalid() {
         memory.ports(),
     )
     .await
-    .unwrap();
+    .unwrap()
+    .record;
     let result = change_commitment_by(
         &memory,
         OWNER,
@@ -797,7 +823,8 @@ async fn an_invalid_status_change_is_refused() {
         memory.ports(),
     )
     .await
-    .unwrap();
+    .unwrap()
+    .record;
     let back = change_commitment_by(
         &memory,
         OWNER,
@@ -840,7 +867,8 @@ async fn a_change_to_the_same_status_is_refused() {
         memory.ports(),
     )
     .await
-    .unwrap();
+    .unwrap()
+    .record;
     let same = change_commitment_by(
         &memory,
         OWNER,
@@ -871,7 +899,8 @@ async fn a_conditional_commitment_stays_conditional_after_a_change() {
         memory.ports(),
     )
     .await
-    .unwrap();
+    .unwrap()
+    .record;
     assert_eq!(commitment.fields.status, CommitmentStatus::Conditional);
     assert_eq!(commitment.local_id(), "COM-001");
     let change = CommitmentChange {
@@ -902,7 +931,8 @@ async fn only_make_firm_makes_a_commitment_firm() {
         memory.ports(),
     )
     .await
-    .unwrap();
+    .unwrap()
+    .record;
     let firm = CommitmentChange {
         status: Some(CommitmentStatus::Firm),
         ..commitment_change(commitment.version)
@@ -943,7 +973,8 @@ async fn only_make_firm_makes_a_commitment_firm() {
         memory.ports(),
     )
     .await
-    .unwrap();
+    .unwrap()
+    .record;
     assert_eq!(plain.fields.status, CommitmentStatus::Firm);
     assert_eq!(plain.fields.firm_reason, None);
 }
@@ -958,7 +989,8 @@ async fn make_firm_needs_a_reason() {
         memory.ports(),
     )
     .await
-    .unwrap();
+    .unwrap()
+    .record;
     let empty = firm_by(&memory, OWNER, commitment.id, "  ", commitment.version).await;
     assert_eq!(fields(empty), field("reason", "empty"));
     let long = firm_by(
@@ -1072,7 +1104,7 @@ async fn a_list_pages_and_filters_by_owner() {
         after: None,
         limit: PageLimit::new(1).unwrap(),
     };
-    let first = list_actions(&caller(VIEWER), open_day(), query, &memory, &memory)
+    let first = list_actions(&caller(VIEWER), open_day(), query, memory.ports())
         .await
         .unwrap();
     assert_eq!(first.items.len(), 1);
@@ -1084,11 +1116,10 @@ async fn a_list_pages_and_filters_by_owner() {
             after: first.next,
             ..query
         },
-        &memory,
-        &memory,
+        memory.ports(),
     )
     .await
     .unwrap();
-    assert_eq!(second.items[0].local_number, 3);
+    assert_eq!(second.items[0].record.local_number, 3);
     assert_eq!(second.next, None);
 }

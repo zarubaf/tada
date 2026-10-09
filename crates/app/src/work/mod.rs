@@ -12,9 +12,7 @@ use jiff::Timestamp;
 use jiff::civil::Date;
 use tada_domain::RecordVersion;
 use tada_domain::events::EventKey;
-use tada_domain::ids::{
-    ActionId, CommitmentId, EventId, LocalIdKind, ProposalId, SourceVersionId, UserId, WorkstreamId,
-};
+use tada_domain::ids::{ActionId, CommitmentId, EventId, LocalIdKind, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
@@ -37,7 +35,7 @@ use crate::identity::IdentityStore;
 use crate::paging::PageLimit;
 use crate::parties::{PartyRef, PartyStore};
 use crate::problem::{CommandError, FieldError, ProblemCode};
-use crate::records::{Changed, Created, NumberCursor};
+use crate::records::{Changed, Created, EvidenceStore, NumberCursor};
 use crate::store::StoreError;
 use crate::workstreams::WorkstreamStore;
 
@@ -86,8 +84,6 @@ pub struct CommitmentView {
     pub promisor: PartyRef,
     pub fields: CommitmentFields,
     pub version: RecordVersion,
-    /// The evidence of the accepted proposals that created or changed the commitment.
-    pub evidence: Vec<RecordEvidenceView>,
 }
 
 impl CommitmentView {
@@ -107,21 +103,6 @@ pub struct CommitmentFields {
     pub status: CommitmentStatus,
     /// The reason that made the commitment firm. A conditional commitment has none.
     pub firm_reason: Option<FirmReason>,
-}
-
-/// A passage that supports one version of a work record (ADR 0068).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RecordEvidenceView {
-    /// The record version that the accepted change produced.
-    pub record_version: RecordVersion,
-    pub proposal_id: ProposalId,
-    pub source_version_id: SourceVersionId,
-    /// The capture time of the source version.
-    pub captured_at: Timestamp,
-    pub start_offset: u32,
-    pub end_offset: u32,
-    pub quote: String,
-    pub page: Option<u32>,
 }
 
 /// A new action, checked, before the store gives it its number.
@@ -173,7 +154,7 @@ pub struct MyWork {
 /// The repository port for actions and commitments. Each method stays inside `scope`.
 /// A create or a change records its audit event in the same transaction.
 #[async_trait]
-pub trait WorkStore: Debug + Send + Sync {
+pub trait WorkStore: EvidenceStore + Debug + Send + Sync {
     /// Inserts an action with the version 1 and gives it the next number of its event (ADR 0038).
     async fn create_action(
         &self,

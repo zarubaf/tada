@@ -5,7 +5,9 @@ use tada_domain::identity::{EventRole, OrganizationRole};
 use tada_domain::ids::{EventId, OrganizationId};
 
 use super::*;
+use crate::access::SourceReach;
 use crate::identity::{Membership, UserRef};
+use crate::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 
 fn testwil() -> OrganizationId {
     OrganizationId::from_uuid(Uuid::from_u128(10))
@@ -103,6 +105,18 @@ impl IdentityStore for Memory {
 
 fn next_number<T>(items: &[T]) -> u64 {
     items.len() as u64 + 1
+}
+
+#[async_trait]
+impl EvidenceStore for Memory {
+    async fn evidence_of(
+        &self,
+        _: OrgScope,
+        _: &[RecordRef],
+        _: &SourceReach,
+    ) -> Result<Vec<(RecordRef, RecordEvidenceView)>, StoreError> {
+        Ok(Vec::new())
+    }
 }
 
 #[async_trait]
@@ -295,6 +309,7 @@ async fn person(memory: &Memory, name: &str) -> PersonView {
     create_person(&anna(), new_person(name), memory, memory, &FixedClock)
         .await
         .unwrap()
+        .record
 }
 
 #[tokio::test]
@@ -308,7 +323,8 @@ async fn a_contributor_creates_a_person() {
     };
     let created = create_person(&anna(), input, &memory, &memory, &FixedClock)
         .await
-        .unwrap();
+        .unwrap()
+        .record;
     assert_eq!(created.name.as_str(), "Beat Muster");
     assert_eq!(created.email.unwrap().as_str(), "beat.muster@example.org");
     assert_eq!(created.user_id, Some(user(2)));
@@ -329,7 +345,8 @@ async fn a_client_chooses_the_id_of_a_new_party() {
     };
     let created = create_person(&anna(), input.clone(), &memory, &memory, &FixedClock)
         .await
-        .unwrap();
+        .unwrap()
+        .record;
     assert_eq!(created.id.as_uuid(), id);
     let again = create_person(&anna(), input, &memory, &memory, &FixedClock)
         .await
@@ -387,7 +404,8 @@ async fn the_first_person_is_per_001() {
         &FixedClock,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .record;
     assert_eq!(institution.local_id(), "INS-001");
 }
 
@@ -397,14 +415,22 @@ async fn only_an_owner_or_admin_changes_a_person() {
     let created = person(&memory, "Beat Muster").await;
     let renamed = rename("Beat Beispiel", created.version);
 
-    let error = change_person(&anna(), created.id, renamed.clone(), &memory, &FixedClock)
-        .await
-        .unwrap_err();
+    let error = change_person(
+        &anna(),
+        created.id,
+        renamed.clone(),
+        &memory,
+        &memory,
+        &FixedClock,
+    )
+    .await
+    .unwrap_err();
     assert_eq!(error.code(), ProblemCode::Forbidden);
 
-    let changed = change_person(&carla(), created.id, renamed, &memory, &FixedClock)
+    let changed = change_person(&carla(), created.id, renamed, &memory, &memory, &FixedClock)
         .await
-        .unwrap();
+        .unwrap()
+        .record;
     assert_eq!(changed.name.as_str(), "Beat Beispiel");
     assert_eq!(changed.version.get(), 2);
     assert_eq!(
@@ -423,16 +449,18 @@ async fn a_change_keeps_what_it_does_not_name_and_clears_what_it_empties() {
     };
     let created = create_person(&anna(), input, &memory, &memory, &FixedClock)
         .await
-        .unwrap();
+        .unwrap()
+        .record;
     let change = PersonChange {
         name: None,
         email: Some(None),
         phone: None,
         expected_version: created.version,
     };
-    let changed = change_person(&carla(), created.id, change, &memory, &FixedClock)
+    let changed = change_person(&carla(), created.id, change, &memory, &memory, &FixedClock)
         .await
-        .unwrap();
+        .unwrap()
+        .record;
     assert_eq!(changed.name.as_str(), "Beat Muster");
     assert_eq!(changed.email, None);
     assert_eq!(changed.phone.unwrap().as_str(), "+41 00 000 00 00");
@@ -449,7 +477,7 @@ async fn a_change_without_a_field_is_invalid() {
         phone: None,
         expected_version: created.version,
     };
-    let error = change_person(&carla(), created.id, empty, &memory, &FixedClock)
+    let error = change_person(&carla(), created.id, empty, &memory, &memory, &FixedClock)
         .await
         .unwrap_err();
     assert!(
@@ -471,7 +499,8 @@ async fn a_change_without_a_field_is_invalid() {
         &FixedClock,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .record;
     let empty = InstitutionChange {
         name: None,
         kind: None,
@@ -479,9 +508,16 @@ async fn a_change_without_a_field_is_invalid() {
         phone: None,
         expected_version: institution.version,
     };
-    let error = change_institution(&carla(), institution.id, empty, &memory, &FixedClock)
-        .await
-        .unwrap_err();
+    let error = change_institution(
+        &carla(),
+        institution.id,
+        empty,
+        &memory,
+        &memory,
+        &FixedClock,
+    )
+    .await
+    .unwrap_err();
     assert!(
         matches!(&error, PartyError::Invalid(errors) if errors.is_empty()),
         "{error:?}"
@@ -498,6 +534,7 @@ async fn a_stale_version_conflicts() {
         created.id,
         rename("Beat Beispiel", created.version),
         &memory,
+        &memory,
         &FixedClock,
     )
     .await
@@ -506,6 +543,7 @@ async fn a_stale_version_conflicts() {
         &carla(),
         created.id,
         rename("Beat Zweiter", created.version),
+        &memory,
         &memory,
         &FixedClock,
     )
@@ -566,7 +604,8 @@ async fn each_member_with_an_event_role_reads_but_a_member_without_one_does_not(
     for who in [anna(), bruno(), carla()] {
         let found = get_person(&who, created.id, &memory, &memory)
             .await
-            .unwrap();
+            .unwrap()
+            .record;
         assert_eq!(found, created);
     }
     let error = get_person(&dino(), created.id, &memory, &memory)
@@ -621,7 +660,7 @@ async fn the_list_filters_by_name_and_pages_by_number() {
     )
     .await
     .unwrap();
-    let names: Vec<_> = found.items.iter().map(|p| p.name.as_str()).collect();
+    let names: Vec<_> = found.items.iter().map(|p| p.record.name.as_str()).collect();
     assert_eq!(names, ["Beat Müller", "Clara MÜLLER"]);
 }
 
