@@ -36,9 +36,12 @@ struct FakeBotApi {
     batches: Arc<Mutex<VecDeque<Vec<Value>>>>,
     replies: Arc<Mutex<Vec<String>>>,
     replied: Arc<Notify>,
+    /// The `offset` of each `getUpdates` call.
+    offsets: Arc<Mutex<Vec<Value>>>,
 }
 
-async fn get_updates(State(api): State<FakeBotApi>) -> Json<Value> {
+async fn get_updates(State(api): State<FakeBotApi>, Json(body): Json<Value>) -> Json<Value> {
+    api.offsets.lock().unwrap().push(body["offset"].clone());
     let batch = api.batches.lock().unwrap().pop_front();
     if batch.is_none() {
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -578,4 +581,68 @@ async fn an_event_key_in_two_organizations_of_the_member_is_ambiguous() {
         "{replies:?}"
     );
     assert!(club.open_changesets().await.is_empty());
+}
+
+#[tokio::test]
+async fn an_update_that_does_not_decode_is_skipped_alone_and_stays_out_of_the_log() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+    // The date is not a number, so the Bot API client cannot decode the batch.
+    // The update after it in the same batch decodes and gets its reply.
+    let mut broken = update(5, "/vorschlag TEST30 venue Geheimnis im Hangar 3");
+    broken["message"]["date"] = json!("gestern");
+
+    let api = FakeBotApi::default();
+    api.batches
+        .lock()
+        .unwrap()
+        .push_back(vec![broken, update(6, "not-a-code")]);
+    let server = Router::new()
+        .route("/{bot}/getUpdates", post(get_updates))
+        .route("/{bot}/sendMessage", post(send_message))
+        .with_state(api.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, server).await.unwrap() });
+    let gateway = Gateway::new(
+        &format!("http://{address}"),
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    );
+    let (replied, seen, asked) = (
+        api.replied.clone(),
+        api.replies.clone(),
+        api.offsets.clone(),
+    );
+    let stop = async move {
+        while seen.lock().unwrap().is_empty() {
+            replied.notified().await;
+        }
+        // Wait for the next request, which shows the new offset.
+        while asked.lock().unwrap().len() < 2 {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(20), gateway.run(stop))
+        .await
+        .unwrap();
+
+    support::logs::assert_clean(&[
+        "Geheimnis",
+        "gestern",
+        "Testperson",
+        "Muster",
+        "7130429",
+        "test-token",
+    ]);
+    let replies = api.replies.lock().unwrap().clone();
+    assert_eq!(replies.len(), 1, "{replies:?}");
+    assert!(replies[0].starts_with("Dieser Code ist ungültig"));
+    let offsets = api.offsets.lock().unwrap().clone();
+    assert_eq!(
+        offsets[1],
+        json!(7),
+        "the next request must ask for the updates after the batch: {offsets:?}"
+    );
 }

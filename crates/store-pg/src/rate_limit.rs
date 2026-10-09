@@ -15,6 +15,7 @@ use sqlx::PgConnection;
 use tada_app::rate_limit::{RateDecision, RateLimit, RateSubject, RateWindow, WINDOW};
 use tada_app::store::StoreError;
 
+use crate::Database;
 use crate::error::store_error;
 
 /// Counts requests in fixed windows. Each process with the same key counts in the same rows.
@@ -34,36 +35,17 @@ impl PgRateLimiter {
         Self { key }
     }
 
-    /// Deletes the counters of the windows that ended more than one window ago and counts one
+    /// Deletes the counters of the windows that ended (`delete_ended_counters`) and counts one
     /// request against each of `limits` in the window of `now`. The caller commits the transaction
     /// of `conn`.
-    ///
-    /// The cleanup keeps the previous window, so a process whose clock is up to one window behind
-    /// never writes a counter that another process deletes. It skips locked rows, so two processes
-    /// at a window boundary never wait for each other, and cannot deadlock (ADR 0025, ADR 0056).
     pub(crate) async fn hit(
         &self,
         conn: &mut PgConnection,
         limits: &[RateLimit<'_>],
         now: Timestamp,
     ) -> Result<RateDecision, StoreError> {
+        delete_ended_counters(&mut *conn, now).await?;
         let window = RateWindow::containing(now);
-        let ended = window
-            .start
-            .saturating_sub(WINDOW)
-            .unwrap_or(Timestamp::MIN);
-        sqlx::query!(
-            "DELETE FROM rate_limit_counter
-             WHERE (key, window_start) IN (
-                 SELECT key, window_start FROM rate_limit_counter
-                 WHERE window_start < $1
-                 FOR UPDATE SKIP LOCKED
-             )",
-            ended.to_sqlx() as _,
-        )
-        .execute(&mut *conn)
-        .await
-        .map_err(store_error)?;
         let mut decision = RateDecision::Allowed;
         for limit in limits {
             let count = sqlx::query_scalar!(
@@ -99,6 +81,44 @@ impl PgRateLimiter {
         }
         Ok(mac.finalize().into_bytes().into())
     }
+}
+
+impl Database {
+    /// Deletes the counters of the windows that ended, as each sign-in request does. The worker calls it
+    /// once in each window, so a counter stays at most two windows also without a later sign-in (ADR 0065).
+    /// Returns the number of deleted counters.
+    pub async fn delete_ended_rate_limit_counters(
+        &self,
+        now: Timestamp,
+    ) -> Result<u64, StoreError> {
+        let mut conn = self.pool.acquire().await.map_err(store_error)?;
+        delete_ended_counters(&mut conn, now).await
+    }
+}
+
+/// Deletes the counters of the windows that ended more than one window before the window of `now`.
+///
+/// The cleanup keeps the previous window, so a process whose clock is up to one window behind never
+/// writes a counter that another process deletes. It skips locked rows, so two processes at a window
+/// boundary never wait for each other, and cannot deadlock (ADR 0025, ADR 0056).
+async fn delete_ended_counters(conn: &mut PgConnection, now: Timestamp) -> Result<u64, StoreError> {
+    let ended = RateWindow::containing(now)
+        .start
+        .saturating_sub(WINDOW)
+        .unwrap_or(Timestamp::MIN);
+    sqlx::query!(
+        "DELETE FROM rate_limit_counter
+             WHERE (key, window_start) IN (
+                 SELECT key, window_start FROM rate_limit_counter
+                 WHERE window_start < $1
+                 FOR UPDATE SKIP LOCKED
+             )",
+        ended.to_sqlx() as _,
+    )
+    .execute(conn)
+    .await
+    .map(|done| done.rows_affected())
+    .map_err(store_error)
 }
 
 #[cfg(test)]
@@ -220,6 +240,27 @@ mod tests {
         let eight = at("2030-05-18T08:00:00Z");
         let nine = at("2030-05-18T09:00:00Z");
         assert_eq!(windows(&test).await, [eight, eight, nine, nine]);
+    }
+
+    /// The worker deletes the ended counters without a sign-in request, so no counter stays longer than
+    /// two windows (ADR 0065).
+    #[tokio::test]
+    async fn the_sweep_deletes_the_counters_of_windows_that_ended_one_window_ago() {
+        let test = TestDatabase::start().await;
+        let anna = Email::parse("anna@example.org").unwrap();
+        let at = |time: &str| time.parse::<Timestamp>().unwrap();
+        let limits = sign_in_limits(&anna, IP.parse().unwrap());
+        hit(&test, &limiter(), &limits, at("2030-05-18T07:30:00Z")).await;
+        hit(&test, &limiter(), &limits, at("2030-05-18T08:30:00Z")).await;
+
+        let deleted = test
+            .database
+            .delete_ended_rate_limit_counters(at("2030-05-18T09:00:01Z"))
+            .await
+            .unwrap();
+        assert_eq!(deleted, 2);
+        let eight = at("2030-05-18T08:00:00Z");
+        assert_eq!(windows(&test).await, [eight, eight]);
     }
 
     /// Two processes at the hour boundary: the one with the later clock does not wait for the

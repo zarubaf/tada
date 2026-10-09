@@ -299,7 +299,10 @@ async fn a_document_has_at_most_one_approved_version() {
     let second = add_draft(&test, &open_day, existing(document, 1), document, "Zwei.\n").await;
     approve(&test, &open_day.manager, first, 2).await.unwrap();
 
-    let error = sqlx::query("UPDATE document_version SET status = 'approved' WHERE id = $1")
+    let error = sqlx::query(
+        "UPDATE document_version SET status = 'approved', approved_by = uploaded_by, approved_at = now()
+         WHERE id = $1",
+    )
         .bind(second.as_uuid())
         .execute(&test.database.pool)
         .await

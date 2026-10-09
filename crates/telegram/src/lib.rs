@@ -1,6 +1,7 @@
 //! The Telegram gateway (ADR 0011). It turns updates of the Bot API into `app` commands and contains
 //! no domain rules.
 
+mod bot_error;
 mod command;
 mod messages;
 
@@ -30,6 +31,7 @@ use tada_app::telegram::{
     member_for, propose_fact,
 };
 
+use crate::bot_error::{BotFailure, salvage};
 use crate::command::{Incomplete, ProposeCommand, parse_propose};
 use crate::messages::Messages;
 
@@ -97,20 +99,35 @@ impl Gateway {
                 () = &mut stop => return,
                 response = self.bot.get_updates(&params) => response,
             };
-            match response {
-                Ok(response) => {
-                    for update in response.result {
-                        offset = Some(i64::from(update.update_id) + 1);
-                        self.handle(update).await;
-                    }
-                }
+            let updates = match response {
+                Ok(response) => response.result,
                 Err(error) => {
-                    tracing::warn!(%error, "the Bot API request failed");
-                    tokio::select! {
-                        () = &mut stop => return,
-                        () = tokio::time::sleep(RETRY_DELAY) => {}
+                    tracing::warn!(error = %BotFailure(&error), "the Bot API request failed");
+                    match salvage(&error) {
+                        // An answer that does not move the offset forward must not loop without a pause.
+                        Some(batch) if offset.is_none_or(|current| batch.next_offset > current) => {
+                            if batch.skipped > 0 {
+                                tracing::warn!(
+                                    skipped = batch.skipped,
+                                    "the gateway skips updates that do not decode"
+                                );
+                            }
+                            offset = Some(batch.next_offset);
+                            batch.updates
+                        }
+                        _ => {
+                            tokio::select! {
+                                () = &mut stop => return,
+                                () = tokio::time::sleep(RETRY_DELAY) => {}
+                            }
+                            continue;
+                        }
                     }
                 }
+            };
+            for update in updates {
+                offset = offset.max(Some(i64::from(update.update_id) + 1));
+                self.handle(update).await;
             }
         }
     }
@@ -137,7 +154,7 @@ impl Gateway {
             .text(reply)
             .build();
         if let Err(error) = self.bot.send_message(&params).await {
-            tracing::warn!(%error, "cannot send the reply");
+            tracing::warn!(error = %BotFailure(&error), "cannot send the reply");
         }
     }
 

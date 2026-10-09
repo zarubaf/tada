@@ -1266,12 +1266,119 @@ mod tests {
             .unwrap();
         // The status of a draft can change: it is not content.
         let changed = sqlx::query(
-            "UPDATE document_version SET status = 'review' WHERE document_id = $1 AND number = 2",
+            "UPDATE document_version SET status = 'approved', approved_by = uploaded_by, approved_at = now()
+             WHERE document_id = $1 AND number = 2",
         )
         .bind(document.id.as_uuid())
         .execute(&test.database.pool)
         .await
         .unwrap();
         assert_eq!(changed.rows_affected(), 1);
+    }
+
+    /// The approval record of a version never changes, and the status moves only forward (ADR 0051):
+    /// draft to review, draft or review to approved, approved to superseded, and each status but archived to
+    /// archived.
+    #[tokio::test]
+    async fn the_approval_of_a_version_never_changes_and_its_status_moves_only_forward() {
+        let test = TestDatabase::start().await;
+        let f = fixture(&test, "testwil").await;
+        let first = upload(&f, new_document(&f), "Programm.txt", b"Version eins");
+        let document = published(&test, &f, &first).await;
+        // A new draft version with the number `number`.
+        let insert = |number: i32| {
+            let id = Uuid::now_v7();
+            let query = sqlx::query(
+                "INSERT INTO document_version
+                     (id, organization_id, document_id, number, kind, sha256, uploaded_by, status, created_at, markdown)
+                 VALUES ($1, $2, $3, $4, 'draft', decode(repeat('00', 32), 'hex'), $5, 'draft', now(), 'Text')",
+            )
+            .bind(id)
+            .bind(f.organization.as_uuid())
+            .bind(document.id.as_uuid())
+            .bind(number)
+            .bind(f.caller.user_id().as_uuid())
+            .execute(&test.database.pool);
+            async move {
+                query.await.unwrap();
+                id
+            }
+        };
+        let update = |id: Uuid, change: &str| {
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "UPDATE document_version SET {change} WHERE id = $1"
+            )))
+            .bind(id)
+            .execute(&test.database.pool)
+        };
+        let refuses = |id: Uuid, state: &'static str, changes: Vec<&'static str>| async move {
+            for change in changes {
+                let error = update(id, change).await.unwrap_err();
+                assert_eq!(sqlstate(&error), "23001", "{state}: {change}");
+            }
+        };
+        let approve = "status = 'approved', approved_by = uploaded_by, approved_at = now()";
+        let set_approval = "approved_by = uploaded_by, approved_at = now()";
+
+        let draft = insert(2).await;
+        refuses(
+            draft,
+            "draft",
+            vec!["status = 'superseded'", "status = 'approved'", set_approval],
+        )
+        .await;
+        update(draft, "status = 'review'").await.unwrap();
+        refuses(
+            draft,
+            "review",
+            vec!["status = 'draft'", "status = 'superseded'", set_approval],
+        )
+        .await;
+        update(draft, approve).await.unwrap();
+        refuses(
+            draft,
+            "approved",
+            vec![
+                "approved_at = approved_at + interval '1 second'",
+                "approved_by = NULL, approved_at = NULL",
+                "status = 'draft'",
+                "status = 'review'",
+                "status = 'archived', approved_at = approved_at + interval '1 second'",
+                approve,
+            ],
+        )
+        .await;
+        update(draft, "status = 'superseded'").await.unwrap();
+        refuses(
+            draft,
+            "superseded",
+            vec![
+                "status = 'approved'",
+                "status = 'draft'",
+                "status = 'review'",
+                "approved_at = now() + interval '1 day'",
+            ],
+        )
+        .await;
+        update(draft, "status = 'archived'").await.unwrap();
+        refuses(
+            draft,
+            "archived",
+            vec![
+                "status = 'draft'",
+                "status = 'review'",
+                "status = 'approved'",
+                "status = 'superseded'",
+                "approved_at = now() + interval '1 day'",
+            ],
+        )
+        .await;
+
+        // A draft and a version in review can be archived without an approval.
+        let other = insert(3).await;
+        update(other, "status = 'archived'").await.unwrap();
+        let review = insert(4).await;
+        update(review, "status = 'review'").await.unwrap();
+        update(review, "status = 'archived'").await.unwrap();
     }
 }

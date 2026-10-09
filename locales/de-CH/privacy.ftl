@@ -30,8 +30,8 @@ privacy-template =
     # Welche Daten wir bearbeiten
 
     - Angaben zu Mitgliedern: Anzeigename, E-Mail-Adresse, Mitgliedschaften und Rollen.
-    - Angaben zur Anmeldung: Sitzungen mit dem Browser, Einladungen und Anmeldelinks.
-    - Zähler für Anmeldeversuche: pro E-Mail-Adresse und pro IP-Adresse, als verschlüsselter Schlüssel.
+    - Angaben zur Anmeldung: Sitzungen mit der Kennung des Browsers, Einladungen und Anmeldelinks.
+    - Zähler für Anmeldeversuche: pro E-Mail-Adresse und pro IP-Adresse, als Prüfwert mit geheimem Schlüssel (HMAC).
       Wir bewahren sie höchstens zwei Stunden auf.
     - Inhalte der Anlässe: Fakten, Vorschläge, Prüfungen, offene Fragen, Entwürfe und hochgeladene Dateien.
     - Quellentexte, zum Beispiel eingefügte E-Mails oder Notizen.
@@ -45,8 +45,14 @@ privacy-template =
 
     Telegram ist ein freiwilliger Kanal.
     Wer ihn nutzt, verknüpft sein Telegram-Konto mit tada.
-    Dann speichert tada die Telegram-Kennung und den Namen des Kontos.
-    Ohne diese Verknüpfung nutzt tada Telegram nicht.
+    Dazu sendet das Konto dem Bot einen Code, und das Mitglied bestätigt die Verknüpfung in tada.
+    Sobald ein Konto einen gültigen Code sendet, speichert tada dessen Telegram-Kennung und Namen, auch vor der Bestätigung.
+    Ohne einen solchen Code nutzt tada Telegram nicht.
+
+    Ein verknüpftes Mitglied kann mit dem Befehl /vorschlag einen Wert für einen Anlass vorschlagen.
+    tada speichert die ganze Nachricht als Quellentext beim Anlass.
+    Alle, die den Anlass lesen dürfen, sehen diesen Text, auch über die KI-Clients der Mitglieder.
+    Die Nachricht und die Antwort des Bots, zum Beispiel mit dem Namen des Anlasses, gehen über Telegram.
 
     # KI-Clients der Mitglieder
 
@@ -54,12 +60,14 @@ privacy-template =
     Der KI-Client liest über Lesewerkzeuge (MCP) alles, was das Mitglied selbst sehen darf:
     Anlässe, Fakten, Quellen mit ihren Textstellen und Dokumente.
     Das können Personendaten sein.
+    Der KI-Client kann auch Vorschläge machen.
+    Den Text eines solchen Vorschlags speichert tada als Quellentext.
     Der Verein verlangt einen KI-Tarif, der die Eingaben nicht zum Training nutzt.
     Die Organisationsleitung kann API-Token ausschalten.
 
     # Zitate als Belege
 
-    Ein Vorschlag belegt seinen Inhalt mit einem Zitat aus einer Quelle.
+    Ein Vorschlag oder ein Entwurf belegt seinen Inhalt mit einem Zitat aus einer Quelle.
     Das Zitat kann den ganzen Text einer Eingabe zeigen, die für die ganze Organisation gilt und nicht für einen einzelnen Anlass.
     Alle, die den Anlass lesen dürfen, sehen dann diesen Text.
     Das gilt in der Web-Oberfläche und für die KI-Clients der Mitglieder.
@@ -74,10 +82,12 @@ privacy-template =
     - Backups bewahren wir [Dauer der Backups] auf.
     - Protokolle des Betriebs bewahren wir [Dauer der Protokolle] auf.
     - Gelöschte Daten bleiben bis zum Ablauf der Backups in den Backups.
+    - Exporte der Daten bewahren wir wie Backups auf.
 
     # Ihre Rechte
 
     Sie haben das Recht auf Auskunft, auf Berichtigung und auf Löschung Ihrer Daten.
+    Sie haben auch das Recht, Ihre Daten in einem gängigen Format zu erhalten.
     Wir beantworten Ihre Anfrage innerhalb von 30 Tagen.
     Schreiben Sie an [Kontakt für Anfragen].
     Sie können sich auch an den Eidgenössischen Datenschutz- und Öffentlichkeitsbeauftragten wenden.
