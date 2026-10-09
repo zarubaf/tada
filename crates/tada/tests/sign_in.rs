@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 use support::{MailApp, SESSION_COOKIE, session_cookie};
 use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
 use tada_app::domain::ids::OrganizationId;
+use tada_app::rate_limit::MAIL_COOLDOWN;
 
 const LINK: &str = "https://tada.example.org/sign-in/link#token=";
 const SECOND: SignedDuration = SignedDuration::from_secs(1);
@@ -357,6 +358,8 @@ async fn a_sign_in_ends_the_session_that_the_request_sends() {
     app.user("anna@example.org", &[testwil]).await;
     let old = app.sign_in("anna@example.org").await;
 
+    // One mail for each address in each cooldown.
+    app.clock.advance(MAIL_COOLDOWN);
     let token = app.magic_link("anna@example.org").await;
     let (response, _) = app
         .post(
@@ -404,6 +407,8 @@ async fn a_sign_in_and_a_sign_out_end_the_other_magic_links() {
     app.user("anna@example.org", &[testwil]).await;
 
     let first = app.magic_link("anna@example.org").await;
+    // One mail for each address in each cooldown; the first link is still valid after it.
+    app.clock.advance(MAIL_COOLDOWN);
     let second = app.magic_link("anna@example.org").await;
     let (response, _) = app.redeem(&second).await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -415,6 +420,7 @@ async fn a_sign_in_and_a_sign_out_end_the_other_magic_links() {
         "the sign-in ends the other links"
     );
 
+    app.clock.advance(MAIL_COOLDOWN);
     let third = app.magic_link("anna@example.org").await;
     let (response, _) = app
         .post("/api/v1/sign-out", &json!({}), Some(&cookie))
