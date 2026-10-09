@@ -5,34 +5,30 @@ import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
 import { InlineError } from "../ui/InlineError";
 import { Skeleton } from "../ui/Skeleton";
+import styles from "./RegisterView.module.css";
 import type { Register } from "./useRegister";
-import styles from "./Work.module.css";
+import type { RegisterPaging } from "./useRegisterPage";
 
 export interface RegisterViewProps<T extends { id: string }> {
   register: Register<T>;
+  /** The state of the page: it receives the retry and the next page. */
+  page: RegisterPaging;
   /** The name of the table. */
   label: string;
   columns: Column<T>[];
   loadingLabel: string;
   empty: { title: string; text: string };
-  /** For a failure to load the next page. */
-  onFailure: (message: string) => void;
-  /** Moves focus to the heading of the page after a retry. */
-  onRetry: (load: () => Promise<boolean>) => void;
-  retried: boolean;
   children?: ReactNode;
 }
 
 /** The states of a register: loading, failed, empty and the table with „Weitere laden“. */
 export function RegisterView<T extends { id: string }>({
   register,
+  page,
   label,
   columns,
   loadingLabel,
   empty,
-  onFailure,
-  onRetry,
-  retried,
 }: RegisterViewProps<T>) {
   const { state } = register;
   const [loadingMore, setLoadingMore] = useState(false);
@@ -52,12 +48,12 @@ export function RegisterView<T extends { id: string }>({
         message={state.message}
         requestId={state.requestId}
         onRetry={() =>
-          onRetry(() => {
+          page.retry(() => {
             register.setLoading();
             return register.reload();
           })
         }
-        announce={retried ? "focus" : "alert"}
+        announce={page.retried ? "focus" : "alert"}
       />
     );
   }
@@ -76,14 +72,11 @@ export function RegisterView<T extends { id: string }>({
                 return;
               }
               setLoadingMore(true);
-              const failure = await register.loadMore();
+              await page.loadMore(register);
               setLoadingMore(false);
-              if (failure) {
-                onFailure(failure);
-              }
             }}
           >
-            {t("work-load-more")}
+            {t("register-load-more")}
           </Button>
         </div>
       )}

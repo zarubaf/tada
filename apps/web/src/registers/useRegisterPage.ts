@@ -1,9 +1,16 @@
-// The state that the three register pages share: the form to edit, the two live regions and the
-// focus targets.
+// The state that the register pages share: the form to edit, the two live regions and the focus
+// targets.
 import { useRef, useState } from "react";
 import { t } from "../i18n";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
-import type { SaveFailure } from "./fieldErrors";
+import type { SaveFailure } from "./saveFailure";
+import type { Register } from "./useRegister";
+
+/** What `RegisterView` needs of the state of the page. */
+export type RegisterPaging = Pick<
+  ReturnType<typeof useRegisterPage>,
+  "retry" | "retried" | "loadMore"
+>;
 
 export function useRegisterPage<T>(reload: () => Promise<boolean>) {
   const [editing, setEditing] = useState<T>();
@@ -50,7 +57,19 @@ export function useRegisterPage<T>(reload: () => Promise<boolean>) {
         void reload();
       }
     },
-    loadMoreFailed: setFailure,
-    savedMessage: (name: string) => t("work-saved", { name }),
+    /** Loads the next page, tells the member and keeps focus when the button goes away. */
+    loadMore: async (register: Pick<Register<{ id: string }>, "loadMore">) => {
+      start();
+      const result = await register.loadMore();
+      if ("failure" in result) {
+        setFailure(result.failure);
+        return;
+      }
+      setConfirmation(t("register-loaded-more"));
+      if (result.last) {
+        focusAfterCommit(() => heading.current);
+      }
+    },
+    savedMessage: (name: string) => t("register-saved", { name }),
   };
 }

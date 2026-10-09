@@ -3,6 +3,9 @@ import type { Api, Commitment } from "../api/client";
 import { useEventContext } from "../events/eventContext";
 import { formatDate } from "../facts/formatValue";
 import { t } from "../i18n";
+import { RegisterView } from "../registers/RegisterView";
+import { useRegister } from "../registers/useRegister";
+import { useRegisterPage } from "../registers/useRegisterPage";
 import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import type { Column } from "../ui/DataTable";
@@ -12,9 +15,6 @@ import { CommitmentForm } from "./CommitmentForm";
 import { DirectoryGate } from "./DirectoryGate";
 import { type Directory, useDirectory } from "./directory";
 import { MakeFirmDialog } from "./MakeFirmDialog";
-import { RegisterView } from "./RegisterView";
-import { useRegister } from "./useRegister";
-import { useRegisterPage } from "./useRegisterPage";
 import styles from "./Work.module.css";
 import { CommitmentStatusLabel } from "./WorkStatus";
 
@@ -142,13 +142,11 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
       </h2>
       <RegisterView
         register={register}
+        page={page}
         label={t("commitments-title")}
         columns={columns}
         loadingLabel={t("commitments-loading")}
         empty={{ title: t("commitments-empty-title"), text: t("commitments-empty-text") }}
-        onFailure={page.loadMoreFailed}
-        onRetry={page.retry}
-        retried={page.retried}
       />
       <section className={styles.section} aria-labelledby="commitment-form-title">
         <h2

@@ -1,13 +1,14 @@
 import { type FormEvent, useRef, useState } from "react";
 import { type Api, type Commitment, type CommitmentStatus, problemMessage } from "../api/client";
 import { t } from "../i18n";
+import { type SaveFailure, saveFailure } from "../registers/saveFailure";
 import { Button } from "../ui/Button";
 import { ComboBox } from "../ui/ComboBox";
 import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { Select } from "../ui/Select";
 import { TextField } from "../ui/TextField";
 import type { Directory } from "./directory";
-import { blankToNull, fieldErrors, type SaveFailure, saveFailure } from "./fieldErrors";
+import { blankToNull, fieldErrors } from "./fieldErrors";
 import { NO_WORKSTREAM, OwnerSelect, WorkstreamSelect } from "./fields";
 import { usePromisorSearch } from "./usePromisorSearch";
 import styles from "./Work.module.css";

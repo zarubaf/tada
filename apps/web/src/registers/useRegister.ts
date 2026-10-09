@@ -1,5 +1,5 @@
-// The loaded rows of a register with paging, shared by the pages of workstreams, actions and
-// commitments.
+// The loaded rows of a register with paging, shared by the pages of workstreams, actions,
+// commitments, persons and institutions.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Problem, problemMessage } from "../api/client";
 
@@ -18,8 +18,8 @@ export interface Register<T> {
   setLoading: () => void;
   /** Loads the first page again. Resolves to true when it loaded. */
   reload: () => Promise<boolean>;
-  /** Loads the next page. Resolves to the message of a failure, or nothing. */
-  loadMore: () => Promise<string | undefined>;
+  /** Loads the next page. Resolves to the message of a failure, or to whether it was the last. */
+  loadMore: () => Promise<{ failure: string } | { last: boolean }>;
   replace: (item: T) => void;
   append: (item: T) => void;
 }
@@ -55,12 +55,12 @@ export function useRegister<T extends { id: string }>(
 
   const loadMore = async () => {
     if (state.kind !== "loaded" || state.nextCursor === undefined) {
-      return undefined;
+      return { last: true };
     }
     try {
       const { data, error } = await fetchPage(state.nextCursor);
       if (!data) {
-        return problemMessage(error);
+        return { failure: problemMessage(error) };
       }
       const added = data.items;
       setState((current) =>
@@ -72,10 +72,10 @@ export function useRegister<T extends { id: string }>(
             }
           : current,
       );
+      return { last: data.next_cursor == null };
     } catch {
-      return problemMessage(undefined);
+      return { failure: problemMessage(undefined) };
     }
-    return undefined;
   };
 
   const update = (change: (items: T[]) => T[]) =>

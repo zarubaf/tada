@@ -125,6 +125,27 @@ describe("PartiesPage", () => {
     expect(calls.some((c) => c.call === "GET /api/v1/persons?q=probst")).toBe(true);
   });
 
+  it("loads the next page, announces it and keeps focus when the last page is in", async () => {
+    let requests = 0;
+    const { calls } = setup({
+      answers: {
+        "GET /persons": () =>
+          json(200, requests++ === 0 ? { items: [beat], next_cursor: "c2" } : { items: [clara] }),
+      },
+    });
+    const table = await screen.findByRole("table", { name: "Personen" });
+
+    await user.click(screen.getByRole("button", { name: "Weitere Einträge laden" }));
+
+    expect(await within(table).findByText("Clara Probst")).toBeInTheDocument();
+    expect(calls.some((c) => c.call === "GET /api/v1/persons?cursor=c2")).toBe(true);
+    expect(screen.getByText("Weitere Einträge geladen.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Weitere Einträge laden" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Personen" })).toHaveFocus();
+  });
+
   it("lists institutions with their kind", async () => {
     setup({ kind: "institution" });
 

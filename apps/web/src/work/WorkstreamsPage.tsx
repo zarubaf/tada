@@ -1,6 +1,7 @@
 import type { Api, Workstream } from "../api/client";
 import { useEventContext } from "../events/eventContext";
 import { t } from "../i18n";
+import { useRegisterPage } from "../registers/useRegisterPage";
 import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
@@ -8,7 +9,6 @@ import { EmptyState } from "../ui/EmptyState";
 import { LiveRegion } from "../ui/LiveRegion";
 import { DirectoryGate } from "./DirectoryGate";
 import { type Directory, useDirectory } from "./directory";
-import { useRegisterPage } from "./useRegisterPage";
 import styles from "./Work.module.css";
 import { WorkstreamForm } from "./WorkstreamForm";
 
@@ -45,7 +45,7 @@ function Workstreams({
   const { editing } = page;
 
   const saved = (workstream: Workstream) => {
-    page.setConfirmation(t("work-saved", { name: workstream.name }));
+    page.setConfirmation(t("register-saved", { name: workstream.name }));
     if (editing) {
       page.closeForm();
     }
