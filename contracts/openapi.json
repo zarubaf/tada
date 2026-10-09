@@ -6002,7 +6002,7 @@
       },
       "OrganizationFeatureName": {
         "type": "string",
-        "description": "A switch of the organization.",
+        "description": "A switch of the organization. The list of features is open: a client ignores a feature that it does not know.",
         "enum": [
           "mcp-tokens"
         ]

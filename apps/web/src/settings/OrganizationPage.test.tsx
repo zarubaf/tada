@@ -77,6 +77,21 @@ describe("OrganizationPage", () => {
     expect(await screen.findByText("MCP-Token sind ausgeschaltet.")).toBeTruthy();
   });
 
+  it("ignores a feature that it does not know, because the list of features is open", async () => {
+    setup({
+      answers: {
+        "GET /api/v1/organization/features": () =>
+          json(200, {
+            items: [
+              { feature: "model-calls", enabled: false, version: 1 },
+              { feature: "mcp-tokens", enabled: true, version: 2 },
+            ],
+          }),
+      },
+    });
+    expect(await mcpSwitch()).toHaveProperty("checked", true);
+  });
+
   it("shows a member the state but does not let the member change it", async () => {
     const { calls } = setup({ role: "member" });
 

@@ -81,7 +81,7 @@ impl From<ApiTokenScope> for TokenScope {
     }
 }
 
-/// A switch of the organization.
+/// A switch of the organization. The list of features is open: a client ignores a feature that it does not know.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum OrganizationFeatureName {
