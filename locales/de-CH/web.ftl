@@ -135,6 +135,8 @@ problem-rate-limited-minutes =
     } erneut.
 magic-link-title = Anmelden
 magic-link-text = Mit dem Klick melden Sie sich in tada an.
+# $email: the masked address of the account, for example „a…@example.org“.
+magic-link-account = Konto: { $email }. Ist das nicht Ihre E-Mail-Adresse, melden Sie sich nicht an.
 magic-link-submit = Anmelden
 magic-link-invalid = Dieser Link ist ungültig oder abgelaufen.
 to-sign-in = Zur Anmeldung

@@ -56,6 +56,10 @@ const NOT_ORGANIZATION_SCOPED: &[(&str, &str)] = &[
         "It names an email address before any session, and each address gets the same answer.",
     ),
     (
+        "preview_magic_link",
+        "The token of the link names the user, before any session; it shows a masked address only.",
+    ),
+    (
         "redeem_magic_link",
         "The token of the link selects the user; the session gets its organization afterward.",
     ),

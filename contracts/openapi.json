@@ -471,6 +471,56 @@
         ]
       }
     },
+    "/api/v1/sign-in/magic-link/preview": {
+      "post": {
+        "tags": [
+          "sign-in"
+        ],
+        "summary": "Shows the masked address of the account of a magic link. It does not use the token. The person\nsees which account the link signs in to, for example the account of someone else (login CSRF).",
+        "operationId": "preview_magic_link",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemMagicLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The account of the link.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MagicLinkPreview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "forbidden",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/session": {
       "get": {
         "tags": [
@@ -8218,6 +8268,19 @@
           "money",
           "raw-html"
         ]
+      },
+      "MagicLinkPreview": {
+        "type": "object",
+        "description": "The account of a magic link, before the person signs in.",
+        "required": [
+          "email_hint"
+        ],
+        "properties": {
+          "email_hint": {
+            "type": "string",
+            "description": "The masked address of the account, for example `a…@example.org`."
+          }
+        }
       },
       "MakeFirmRequest": {
         "type": "object",

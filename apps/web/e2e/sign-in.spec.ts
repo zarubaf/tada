@@ -29,8 +29,9 @@ const publicPages = [
     path: "/sign-in/link",
     hash: "#token=invented-token",
     heading: "Anmelden",
-    ready: "Mit dem Klick melden Sie sich in tada an.",
-    prepare: async (_page: Page) => {},
+    ready: "Konto: a…@example.org.",
+    prepare: (page: Page) =>
+      fakePost(page, "/api/v1/sign-in/magic-link/preview", 200, { email_hint: "a…@example.org" }),
   },
   {
     name: "magic link, invalid",

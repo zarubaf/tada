@@ -434,6 +434,44 @@ async fn a_sign_in_and_a_sign_out_end_the_other_magic_links() {
     );
 }
 
+/// Login CSRF by link: a member sends a victim the own magic link. The confirmation page names the
+/// masked address of the account, so the victim sees that it is not the own one. The preview does
+/// not use the token.
+#[tokio::test]
+async fn a_magic_link_preview_names_the_masked_address() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("mallory.muster@example.org", &[testwil]).await;
+    let token = app.magic_link("mallory.muster@example.org").await;
+
+    let (response, preview) = app
+        .post(
+            "/api/v1/sign-in/magic-link/preview",
+            &json!({"token": token}),
+            None,
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK, "{preview}");
+    assert_eq!(preview, json!({"email_hint": "m…@example.org"}));
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+
+    let (response, _) = app.redeem(&token).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "the preview keeps the token"
+    );
+    let (response, problem) = app
+        .post(
+            "/api/v1/sign-in/magic-link/preview",
+            &json!({"token": token}),
+            None,
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(problem["code"], "unauthenticated");
+}
+
 #[tokio::test]
 async fn each_response_forbids_the_referrer() {
     let app = App::start().await;

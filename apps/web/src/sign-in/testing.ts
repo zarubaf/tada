@@ -33,13 +33,26 @@ export function problem(status: number, code: string, headers: Record<string, st
 
 /** A fake server: each call returns the next response and records the call. */
 export function fakeApi(...responses: Response[]) {
+  return fakeApiWith({}, ...responses);
+}
+
+/**
+ * `fakeApi` with fixed answers for some paths: a call of such a path gets its answer and does not
+ * take the next response. The fake records it all the same.
+ */
+export function fakeApiWith(routes: Record<string, () => Response>, ...responses: Response[]) {
   const calls: { method: string; path: string; body: string }[] = [];
   const fetch = vi.fn(async (request: Request) => {
+    const path = new URL(request.url).pathname;
     calls.push({
       method: request.method,
-      path: new URL(request.url).pathname,
+      path,
       body: await request.clone().text(),
     });
+    const route = routes[path];
+    if (route) {
+      return route();
+    }
     const response = responses.shift();
     if (!response) {
       throw new Error("no more responses");

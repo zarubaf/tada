@@ -24,7 +24,7 @@ use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::audit::record;
-use crate::error::store_error;
+use crate::error::{InvalidRow, store_error};
 use crate::identity::organization_role;
 use crate::rate_limit::{PgRateLimiter, delete_ended_counters};
 use crate::session::{delete_session, insert_session};
@@ -168,6 +168,28 @@ impl SignInStore for Database {
             .map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
         Ok(Some(session))
+    }
+
+    async fn preview_magic_link(
+        &self,
+        token: &str,
+        now: Timestamp,
+    ) -> Result<Option<Email>, StoreError> {
+        let email = sqlx::query_scalar!(
+            "SELECT e.email FROM magic_link l
+             JOIN email_identity e ON e.user_id = l.user_id
+             WHERE l.token_hash = $1 AND l.expires_at > $2",
+            hash_token(token),
+            now.to_sqlx() as _,
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        email
+            .map(|email| {
+                Email::parse(&email).map_err(|_| InvalidRow("email_identity.email").into())
+            })
+            .transpose()
     }
 
     async fn preview_invitation(

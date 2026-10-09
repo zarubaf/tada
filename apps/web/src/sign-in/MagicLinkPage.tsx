@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Api } from "../api/client";
 import { type Failure, failureOf, invalidFailure, useWaiting } from "../api/failure";
 import { t } from "../i18n";
@@ -13,6 +13,8 @@ import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
 /**
  * The page that a magic link opens. A GET shows only a confirmation: mail scanners and link
  * previews open links, and they must not use up the token (ADR 0008). The click signs in.
+ * The page names the masked address of the account, so that a person who got the link of someone
+ * else sees it before the click (login CSRF).
  */
 export function MagicLinkPage({ api }: { api: Api }) {
   // The first render reads and removes the fragment. A later render must keep the token.
@@ -21,7 +23,33 @@ export function MagicLinkPage({ api }: { api: Api }) {
     token ? undefined : invalidFailure(t("magic-link-invalid")),
   );
   const [busy, setBusy] = useState(false);
+  // The masked address of the account of the link, when the preview loaded.
+  const [emailHint, setEmailHint] = useState<string>();
   const waiting = useWaiting(failure);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    let current = true;
+    api
+      .POST("/api/v1/sign-in/magic-link/preview", { body: { token } })
+      .then((result) => {
+        if (!current) {
+          return;
+        }
+        if (result.data) {
+          setEmailHint(result.data.email_hint);
+        } else if (result.error?.code === "unauthenticated") {
+          setFailure(invalidFailure(t("magic-link-invalid")));
+        }
+        // Another failure leaves the button: the click decides.
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [api, token]);
   const refresh = useRefreshSession();
   const navigate = useNavigate();
 
@@ -51,6 +79,7 @@ export function MagicLinkPage({ api }: { api: Api }) {
       {!failure?.final && (
         <>
           <PublicText>{t("magic-link-text")}</PublicText>
+          {emailHint && <PublicText>{t("magic-link-account", { email: emailHint })}</PublicText>}
           <Button variant="primary" isPending={busy || waiting} onPress={() => void signIn()}>
             {t("magic-link-submit")}
           </Button>

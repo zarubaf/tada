@@ -41,6 +41,15 @@ pub trait SignInStore: Debug + Send + Sync {
         now: Timestamp,
     ) -> Result<Option<SecretString>, StoreError>;
 
+    /// The address of the user of the magic link of `token`, if the link is valid at `now`.
+    /// It does not use the token.
+    /// Infrastructure query (ADR 0039): sign-in has no organization yet, and the token names the user.
+    async fn preview_magic_link(
+        &self,
+        token: &str,
+        now: Timestamp,
+    ) -> Result<Option<Email>, StoreError>;
+
     /// What the pending invitation of `token` is for, if the token is valid at `now`.
     /// It does not use the token.
     /// Infrastructure query (ADR 0039): the token names the invitation, and the invitation names its organization.
@@ -244,6 +253,33 @@ pub async fn redeem_magic_link(
         .ok_or(SignInError::Unauthenticated)
 }
 
+/// The masked form of an address for the confirmation page of a magic link: the first character of
+/// the local part and the domain, for example `a…@example.org`. It shows the person which account
+/// the link signs in to, and gives the holder of the link little more than the domain.
+pub fn email_hint(email: &Email) -> String {
+    let (local, domain) = email
+        .as_str()
+        .split_once('@')
+        .unwrap_or((email.as_str(), ""));
+    let first = local.chars().next().map(String::from).unwrap_or_default();
+    format!("{first}…@{domain}")
+}
+
+/// The masked address of the account of the magic link of `token`, for its confirmation page.
+/// A member who sends a victim the own link then cannot hide the account (login CSRF).
+/// The token stays valid.
+pub async fn preview_magic_link(
+    token: &str,
+    store: &dyn SignInStore,
+    clock: &dyn Clock,
+) -> Result<String, SignInError> {
+    store
+        .preview_magic_link(token, clock.now())
+        .await?
+        .map(|email| email_hint(&email))
+        .ok_or(SignInError::Unauthenticated)
+}
+
 /// Shows what the invitation of `token` is for. The token stays valid.
 pub async fn preview_invitation(
     token: &str,
@@ -355,6 +391,15 @@ mod tests {
             Ok((token == "valid").then(|| SecretString::from("session")))
         }
 
+        async fn preview_magic_link(
+            &self,
+            token: &str,
+            now: Timestamp,
+        ) -> Result<Option<Email>, StoreError> {
+            assert_eq!(now, NOW);
+            Ok((token == "valid").then(|| Email::parse("anna.muster@example.org").unwrap()))
+        }
+
         async fn preview_invitation(
             &self,
             token: &str,
@@ -463,6 +508,21 @@ mod tests {
         let store = MemoryStore::default();
         let result = redeem_magic_link("used", None, None, &store, &FixedClock).await;
         assert!(matches!(result, Err(SignInError::Unauthenticated)));
+    }
+
+    #[tokio::test]
+    async fn a_magic_link_preview_masks_the_address() {
+        let store = MemoryStore::default();
+        let hint = preview_magic_link("valid", &store, &FixedClock)
+            .await
+            .unwrap();
+        assert_eq!(hint, "a…@example.org");
+        let result = preview_magic_link("used", &store, &FixedClock).await;
+        assert!(matches!(result, Err(SignInError::Unauthenticated)));
+        assert_eq!(
+            email_hint(&Email::parse("ü@example.org").unwrap()),
+            "ü…@example.org"
+        );
     }
 
     #[test]
