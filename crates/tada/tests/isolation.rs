@@ -35,7 +35,7 @@ use tada_app::caller::{OrganizationRole, ServiceCaller, TelegramGateway};
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::outbound::SEND_JOB;
-use tada_app::telegram::{TelegramName, TelegramUserId, claim_link_code};
+use tada_app::telegram::{TelegramName, TelegramUserId, accept_link_claim, claim_link_code};
 use tada_store_pg::Database;
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
@@ -43,6 +43,14 @@ use uuid::Uuid;
 /// The operations that no organization scopes, with the reason.
 /// Each other operation of the OpenAPI document needs a case in `attempts`.
 const NOT_ORGANIZATION_SCOPED: &[(&str, &str)] = &[
+    (
+        "get_telegram_link",
+        "A Telegram link belongs to the user, not to an organization, and shows only the own link.",
+    ),
+    (
+        "remove_telegram_link",
+        "A Telegram link belongs to the user, not to an organization, and the member removes only the own link.",
+    ),
     (
         "request_sign_in",
         "It names an email address before any session, and each address gets the same answer.",
@@ -898,7 +906,18 @@ impl World {
                 TelegramUserId(1003),
                 &TelegramName("Testperson Musterhausen".to_owned()),
                 &test.database,
-                &SystemClock,
+                &SystemClock
+            )
+            .await
+            .unwrap()
+            .is_some()
+        );
+        assert!(
+            accept_link_claim(
+                &ServiceCaller::<TelegramGateway>::new(),
+                TelegramUserId(1003),
+                &test.database,
+                &SystemClock
             )
             .await
             .unwrap()

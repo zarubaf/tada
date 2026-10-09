@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, claimed_by AS \"claimed_by!\", claimed_name AS \"claimed_name!\",\n                      claimed_at AS \"claimed_at!: jiff_sqlx::Timestamp\"\n               FROM telegram_link_code\n               WHERE organization_id = $1 AND user_id = $2 AND claimed_by IS NOT NULL\n                 AND confirmed_at IS NULL AND expires_at > $3\n               ORDER BY claimed_at",
+  "query": "SELECT id, claimed_by AS \"claimed_by!\", claimed_name AS \"claimed_name!\",\n                      claimed_at AS \"claimed_at!: jiff_sqlx::Timestamp\"\n               FROM telegram_link_code\n               WHERE organization_id = $1 AND user_id = $2 AND accepted_at IS NOT NULL\n                 AND confirmed_at IS NULL AND expires_at > $3\n               ORDER BY claimed_at",
   "describe": {
     "columns": [
       {
@@ -62,5 +62,5 @@
       true
     ]
   },
-  "hash": "b644c45b394a3a9a76cd2ad0f8b1099f8f8f70edfd0ba3c4bf60337cd2b2481a"
+  "hash": "67b09d745a35afda6c80dfd86bacf85181057606ab2a29f9a99e659ccce9a29f"
 }

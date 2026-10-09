@@ -8,7 +8,9 @@ use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
 use tada_app::domain::ids::UserId;
 use tada_app::store::StoreError;
-use tada_app::telegram::{Confirmed, LinkRequest, TelegramLinks, TelegramName, TelegramUserId};
+use tada_app::telegram::{
+    Confirmed, LinkRequest, LinkTarget, TelegramLink, TelegramLinks, TelegramName, TelegramUserId,
+};
 
 use crate::Database;
 use crate::error::store_error;
@@ -45,14 +47,43 @@ impl TelegramLinks for Database {
         account: TelegramUserId,
         name: &TelegramName,
         now: Timestamp,
-    ) -> Result<bool, StoreError> {
-        let result = sqlx::query!(
-            "UPDATE telegram_link_code
-             SET claimed_by = $2, claimed_name = $3, claimed_at = $4
-             WHERE code_hash = $1 AND claimed_by IS NULL AND expires_at > $4",
+    ) -> Result<Option<LinkTarget>, StoreError> {
+        let target = sqlx::query!(
+            "WITH claimed AS (
+                 UPDATE telegram_link_code
+                 SET claimed_by = $2, claimed_name = $3, claimed_at = $4
+                 WHERE code_hash = $1 AND claimed_by IS NULL AND expires_at > $4
+                 RETURNING organization_id, user_id
+             )
+             SELECT u.display_name AS user_name, o.name AS organization_name
+             FROM claimed c
+             JOIN app_user u ON u.id = c.user_id
+             JOIN organization o ON o.id = c.organization_id",
             hash_token(code),
             account.0,
             name.0,
+            now.to_sqlx() as _,
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(target.map(|row| LinkTarget {
+            user_name: row.user_name,
+            organization_name: row.organization_name,
+        }))
+    }
+
+    async fn accept(&self, account: TelegramUserId, now: Timestamp) -> Result<bool, StoreError> {
+        // Only the newest claim: the bot named its tada account in the last reply.
+        let result = sqlx::query!(
+            "UPDATE telegram_link_code SET accepted_at = $2
+             WHERE id = (
+                 SELECT id FROM telegram_link_code
+                 WHERE claimed_by = $1 AND expires_at > $2
+                 ORDER BY claimed_at DESC, id DESC
+                 LIMIT 1
+             ) AND accepted_at IS NULL AND confirmed_at IS NULL",
+            account.0,
             now.to_sqlx() as _,
         )
         .execute(&self.pool)
@@ -71,7 +102,7 @@ impl TelegramLinks for Database {
             r#"SELECT id, claimed_by AS "claimed_by!", claimed_name AS "claimed_name!",
                       claimed_at AS "claimed_at!: jiff_sqlx::Timestamp"
                FROM telegram_link_code
-               WHERE organization_id = $1 AND user_id = $2 AND claimed_by IS NOT NULL
+               WHERE organization_id = $1 AND user_id = $2 AND accepted_at IS NOT NULL
                  AND confirmed_at IS NULL AND expires_at > $3
                ORDER BY claimed_at"#,
             scope.organization_id().as_uuid(),
@@ -102,7 +133,7 @@ impl TelegramLinks for Database {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         let claimed = sqlx::query_scalar!(
             r#"UPDATE telegram_link_code SET confirmed_at = $4
-               WHERE id = $3 AND organization_id = $1 AND user_id = $2 AND claimed_by IS NOT NULL
+               WHERE id = $3 AND organization_id = $1 AND user_id = $2 AND accepted_at IS NOT NULL
                  AND confirmed_at IS NULL AND expires_at > $4
                RETURNING claimed_by AS "claimed_by!""#,
             scope.organization_id().as_uuid(),
@@ -143,6 +174,52 @@ impl TelegramLinks for Database {
         .await
         .map_err(store_error)?;
         Ok(user.map(UserId::from_uuid))
+    }
+
+    async fn link_of(&self, user_id: UserId) -> Result<Option<TelegramLink>, StoreError> {
+        let row = sqlx::query!(
+            r#"SELECT telegram_user_id, linked_at AS "linked_at: jiff_sqlx::Timestamp"
+               FROM telegram_identity WHERE user_id = $1"#,
+            user_id.as_uuid(),
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(row.map(|row| TelegramLink {
+            telegram_user_id: TelegramUserId(row.telegram_user_id),
+            linked_at: row.linked_at.to_jiff(),
+        }))
+    }
+
+    async fn unlink_user(&self, user_id: UserId) -> Result<(), StoreError> {
+        sqlx::query!(
+            "DELETE FROM telegram_identity WHERE user_id = $1",
+            user_id.as_uuid()
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(())
+    }
+
+    async fn unlink_account(&self, account: TelegramUserId) -> Result<(), StoreError> {
+        let mut tx = self.pool.begin().await.map_err(store_error)?;
+        sqlx::query!(
+            "DELETE FROM telegram_identity WHERE telegram_user_id = $1",
+            account.0
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        sqlx::query!(
+            "DELETE FROM telegram_link_code WHERE claimed_by = $1 AND confirmed_at IS NULL",
+            account.0
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        tx.commit().await.map_err(store_error)?;
+        Ok(())
     }
 
     async fn record_update(&self, update_id: i64) -> Result<bool, StoreError> {
@@ -200,17 +277,33 @@ mod tests {
             .unwrap();
         assert_eq!(code.len(), 43, "256 bits in Base64");
 
+        let target = db
+            .claim(&code, TelegramUserId(42), &name("Alice"), now)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            target.user_name, "Anna Muster",
+            "the claim names the tada account"
+        );
+        assert_eq!(target.organization_name, "testwil");
         assert!(
-            db.claim(&code, TelegramUserId(42), &name("Alice"), now)
+            db.claim(&code, TelegramUserId(43), &name("Mallory"), now)
                 .await
                 .unwrap()
-        );
-        assert!(
-            !db.claim(&code, TelegramUserId(43), &name("Mallory"), now)
-                .await
-                .unwrap(),
+                .is_none(),
             "a code works once"
         );
+        assert!(
+            db.requests(alice.scope(), alice.user_id(), now)
+                .await
+                .unwrap()
+                .is_empty(),
+            "the Telegram account did not accept yet"
+        );
+        assert!(!db.accept(TelegramUserId(43), now).await.unwrap());
+        assert!(db.accept(TelegramUserId(42), now).await.unwrap());
+        assert!(!db.accept(TelegramUserId(42), now).await.unwrap(), "once");
 
         let requests = db
             .requests(alice.scope(), alice.user_id(), now)
@@ -267,6 +360,7 @@ mod tests {
         db.claim(&code, TelegramUserId(42), &name("Alice"), now)
             .await
             .unwrap();
+        db.accept(TelegramUserId(42), now).await.unwrap();
         let request = db
             .requests(alice.scope(), alice.user_id(), now)
             .await
@@ -304,9 +398,10 @@ mod tests {
             .unwrap();
         let later = now + SignedDuration::from_mins(11);
         assert!(
-            !db.claim(&code, TelegramUserId(42), &name("Alice"), later)
+            db.claim(&code, TelegramUserId(42), &name("Alice"), later)
                 .await
                 .unwrap()
+                .is_none()
         );
 
         let code = db
@@ -320,6 +415,7 @@ mod tests {
         db.claim(&code, TelegramUserId(42), &name("Alice"), now)
             .await
             .unwrap();
+        db.accept(TelegramUserId(42), now).await.unwrap();
         let request = db
             .requests(alice.scope(), alice.user_id(), now)
             .await
@@ -361,6 +457,7 @@ mod tests {
             db.claim(&code, TelegramUserId(42), &name("Alice"), now)
                 .await
                 .unwrap();
+            db.accept(TelegramUserId(42), now).await.unwrap();
         }
         let first = db
             .requests(alice.scope(), alice.user_id(), now)
@@ -391,6 +488,69 @@ mod tests {
                 .len(),
             1,
             "the failed confirmation rolled back"
+        );
+    }
+
+    /// Both sides can end a link: the member by user, the Telegram account by account. The account
+    /// also rejects its open claims.
+    #[tokio::test]
+    async fn a_link_ends_by_user_or_by_account() {
+        let test = TestDatabase::start().await;
+        let organization = test.create_organization("testwil").await;
+        let (alice, bob) = (
+            member(&test, organization).await,
+            member(&test, organization).await,
+        );
+        let db = &test.database;
+        let now = Timestamp::now();
+        for (caller, account) in [(&alice, 42), (&bob, 43)] {
+            let code = db
+                .create_code(
+                    caller.scope(),
+                    caller.user_id(),
+                    now + SignedDuration::from_mins(10),
+                )
+                .await
+                .unwrap();
+            db.claim(&code, TelegramUserId(account), &name("Alice"), now)
+                .await
+                .unwrap();
+            db.accept(TelegramUserId(account), now).await.unwrap();
+            let request = db
+                .requests(caller.scope(), caller.user_id(), now)
+                .await
+                .unwrap()
+                .remove(0);
+            db.confirm(caller.scope(), caller.user_id(), request.id, now)
+                .await
+                .unwrap();
+        }
+        let link = db.link_of(alice.user_id()).await.unwrap().unwrap();
+        assert_eq!(link.telegram_user_id, TelegramUserId(42));
+
+        db.unlink_user(alice.user_id()).await.unwrap();
+        assert_eq!(db.link_of(alice.user_id()).await.unwrap(), None);
+        assert_eq!(
+            db.user_of(TelegramUserId(43)).await.unwrap(),
+            Some(bob.user_id())
+        );
+
+        let code = db
+            .create_code(
+                alice.scope(),
+                alice.user_id(),
+                now + SignedDuration::from_mins(10),
+            )
+            .await
+            .unwrap();
+        db.claim(&code, TelegramUserId(43), &name("Bob"), now)
+            .await
+            .unwrap();
+        db.unlink_account(TelegramUserId(43)).await.unwrap();
+        assert_eq!(db.user_of(TelegramUserId(43)).await.unwrap(), None);
+        assert!(
+            !db.accept(TelegramUserId(43), now).await.unwrap(),
+            "the claim is gone"
         );
     }
 

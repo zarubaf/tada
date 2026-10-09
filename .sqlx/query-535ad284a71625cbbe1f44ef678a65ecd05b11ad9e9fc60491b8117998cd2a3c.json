@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE telegram_link_code SET accepted_at = $2\n             WHERE id = (\n                 SELECT id FROM telegram_link_code\n                 WHERE claimed_by = $1 AND expires_at > $2\n                 ORDER BY claimed_at DESC, id DESC\n                 LIMIT 1\n             ) AND accepted_at IS NULL AND confirmed_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "535ad284a71625cbbe1f44ef678a65ecd05b11ad9e9fc60491b8117998cd2a3c"
+}

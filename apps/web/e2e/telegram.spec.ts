@@ -12,7 +12,17 @@ const requests = [
   },
 ];
 
-async function fakeTelegram(page: Page, items: unknown[]): Promise<void> {
+// An invented link of the member.
+const linked = { telegram_user_id: 4711, linked_at: "2028-03-01T09:00:00Z" };
+
+async function fakeTelegram(page: Page, items: unknown[], link: unknown = null): Promise<void> {
+  await page.route("**/api/v1/telegram/link", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ link }),
+    }),
+  );
   await page.route("**/api/v1/telegram/link-requests", (route) =>
     route.fulfill({
       status: 200,
@@ -30,9 +40,10 @@ async function fakeTelegram(page: Page, items: unknown[]): Promise<void> {
 }
 
 const states = [
-  { name: "empty", items: [], withCode: false },
-  { name: "request", items: requests, withCode: false },
-  { name: "code", items: requests, withCode: true },
+  { name: "empty", items: [], withCode: false, link: null },
+  { name: "request", items: requests, withCode: false, link: null },
+  { name: "code", items: requests, withCode: true, link: null },
+  { name: "linked", items: [], withCode: false, link: linked },
 ] as const;
 
 for (const viewport of viewports) {
@@ -43,7 +54,7 @@ for (const viewport of viewports) {
       }) => {
         await page.setViewportSize(viewport);
         await fakeSession(page);
-        await fakeTelegram(page, [...state.items]);
+        await fakeTelegram(page, [...state.items], state.link);
         await page.goto("/settings/telegram");
         await setTheme(page, theme);
         await expect(
@@ -53,6 +64,9 @@ for (const viewport of viewports) {
           await expect(page.getByRole("table", { name: "Offene Anfragen" })).toBeVisible();
         } else {
           await expect(page.getByText("Keine offenen Anfragen")).toBeVisible();
+        }
+        if (state.link) {
+          await expect(page.getByRole("button", { name: "Verknüpfung aufheben" })).toBeVisible();
         }
         if (state.withCode) {
           await page.getByRole("button", { name: "Code erstellen" }).click();

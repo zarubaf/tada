@@ -216,8 +216,8 @@ pub trait MemberStore: Debug + Send + Sync {
     ) -> Result<bool, StoreError>;
 
     /// Removes the organization membership of `member` with its event memberships and its API tokens, if
-    /// `remover` allows it for the locked rows. The same transaction ends all sessions of `member`, in
-    /// each organization, and revokes the pending invitations that `member` created, at `now`, with an
+    /// `remover` allows it for the locked rows. The same transaction ends all sessions and the Telegram
+    /// link of `member`, in each organization, and revokes the pending invitations that `member` created, at `now`, with an
     /// `InvitationRevoke` event of the actor of `audit` for each one. The store adds the old role to `audit`.
     /// The audit event `organization_membership.remove` implies the deletion of the tokens; no event names them.
     async fn remove(
@@ -592,8 +592,8 @@ pub async fn revoke_invitation(
 
 /// Removes the organization membership of `member` and its event memberships.
 ///
-/// The removal also ends all sessions of the member, in each organization, and the API tokens of
-/// the membership. tada cannot tell a stolen session from the member's own one, so a removal is
+/// The removal also ends all sessions and the Telegram link of the member, in each organization, and
+/// the API tokens of the membership. tada cannot tell a stolen session from the member's own one, so a removal is
 /// the remedy for a stolen session: a kept session could choose the organization again after a new
 /// invitation. The member signs in again with a magic link.
 /// The pending invitations that the member created stop working too: a member who expects the

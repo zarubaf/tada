@@ -28,15 +28,15 @@ use tada_app::problem::{CommandError, ProblemCode};
 use tada_app::proposals::{ProposalStore, ProposeError, ProposeStores};
 use tada_app::sources::SourceStore;
 use tada_app::telegram::{
-    FactMessage, TelegramActError, TelegramLinks, TelegramName, TelegramUserId, claim_link_code,
-    member_for, propose_fact,
+    FactMessage, TelegramActError, TelegramLinks, TelegramName, TelegramUserId, accept_link_claim,
+    claim_link_code, member_for, propose_fact, unlink_account,
 };
 
 use tada_app::work::WorkStore;
 use tada_app::workstreams::WorkstreamStore;
 
 use crate::bot_error::{BotFailure, salvage};
-use crate::command::{Incomplete, ProposeCommand, parse_propose};
+use crate::command::{Incomplete, LinkCommand, ProposeCommand, parse_link_command, parse_propose};
 use crate::messages::Messages;
 
 /// The ports that the gateway reads and writes. One database adapter implements all of them.
@@ -188,6 +188,9 @@ impl Gateway {
                 Err(Incomplete) => self.messages.get("telegram-proposal-usage"),
             };
         }
+        if let Some(command) = parse_link_command(source.as_str()) {
+            return self.link_command(account, command).await;
+        }
         // A deep link sends "/start <code>"; a member can also paste the code.
         let code = text.strip_prefix("/start").unwrap_or(text).trim();
         if code.is_empty() {
@@ -207,13 +210,52 @@ impl Gateway {
         )
         .await
         {
-            Ok(true) => {
+            Ok(Some(target)) => {
                 tracing::info!("a Telegram account claimed a link code");
-                self.messages.get("telegram-link-claimed")
+                // The account sees whom it would link to before it accepts (reverse phishing).
+                self.messages.get_with_all(
+                    "telegram-link-claimed",
+                    &[
+                        ("account", &target.user_name),
+                        ("organization", &target.organization_name),
+                    ],
+                )
             }
-            Ok(false) => self.messages.get("telegram-link-invalid"),
+            Ok(None) => self.messages.get("telegram-link-invalid"),
             Err(error) => {
                 tracing::warn!(%error, "cannot claim the link code");
+                self.messages.get("telegram-error")
+            }
+        }
+    }
+
+    /// The commands `/bestaetigen` and `/trennen` of the link (ADR 0011).
+    async fn link_command(&self, account: TelegramUserId, command: LinkCommand) -> String {
+        let ports = self.ports.as_ref();
+        let result = match command {
+            LinkCommand::Accept => {
+                accept_link_claim(&self.caller, account, ports, self.clock.as_ref())
+                    .await
+                    .map(|accepted| {
+                        if accepted {
+                            tracing::info!("a Telegram account accepted a link claim");
+                            "telegram-link-accepted"
+                        } else {
+                            "telegram-link-nothing-to-accept"
+                        }
+                    })
+            }
+            LinkCommand::Unlink => unlink_account(&self.caller, account, ports)
+                .await
+                .map(|()| {
+                    tracing::info!("a Telegram account ended its link");
+                    "telegram-unlinked"
+                }),
+        };
+        match result {
+            Ok(id) => self.messages.get(id),
+            Err(error) => {
+                tracing::warn!(%error, "cannot run the link command");
                 self.messages.get("telegram-error")
             }
         }

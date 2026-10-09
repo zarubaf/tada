@@ -22,8 +22,8 @@ use tada_app::caller::{ServiceCaller, TelegramGateway};
 use tada_app::domain::ids::UserId;
 use tada_app::session::SessionAuthenticator;
 use tada_app::telegram::{
-    TelegramName, TelegramUserId, claim_link_code, confirm_link, create_link_code,
-    list_link_requests,
+    TelegramName, TelegramUserId, accept_link_claim, claim_link_code, confirm_link,
+    create_link_code, list_link_requests,
 };
 use tada_store_pg::testing::TestDatabase;
 use tada_telegram::Gateway;
@@ -160,9 +160,12 @@ async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
         2,
         "the repeated update got a reply: {replies:?}"
     );
-    assert!(replies[0].starts_with("Danke. Bestätigen Sie die Verknüpfung"));
+    assert!(replies[0].starts_with("Dieser Code gehört zum tada-Konto"));
     assert!(replies[1].starts_with("Dieser Code ist ungültig"));
 
+    // The Telegram account accepts the claim (ADR 0011, reverse phishing).
+    let replies = converse(&test, vec![update(3, "/bestaetigen")], 1).await;
+    assert!(replies[0].starts_with("Danke. Bestätigen Sie die Verknüpfung"));
     let requests = list_link_requests(&member, &test.database, &SystemClock)
         .await
         .unwrap();
@@ -178,6 +181,88 @@ async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
         "test-token",
         "7130429",
     ]);
+}
+
+/// The attack (reverse phishing): a member sends a victim the deep link with the code of the
+/// member. The bot names the tada account of the code, and the link needs the consent of the
+/// Telegram account in the chat before the member can confirm it.
+#[tokio::test]
+async fn the_telegram_account_sees_the_tada_account_and_consents_first() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+    let (_, user, cookie) = test.member("testwil", OrganizationRole::Owner).await;
+    let attacker = authenticate(&test, &cookie).await;
+    let code = create_link_code(&attacker, &test.database, &SystemClock)
+        .await
+        .unwrap();
+    let name: String = test
+        .scalar(&format!(
+            "SELECT display_name FROM app_user WHERE id = '{}'",
+            user.as_uuid()
+        ))
+        .await;
+
+    let replies = converse(&test, vec![update(1, &format!("/start {}", code.code))], 1).await;
+    assert!(replies[0].contains(&name), "{}", replies[0]);
+    assert!(replies[0].contains("testwil"), "{}", replies[0]);
+    assert!(replies[0].contains("/bestaetigen"), "{}", replies[0]);
+    let requests = list_link_requests(&attacker, &test.database, &SystemClock)
+        .await
+        .unwrap();
+    assert!(
+        requests.is_empty(),
+        "no consent of the Telegram account yet"
+    );
+
+    let replies = converse(&test, vec![update(2, "/bestaetigen")], 1).await;
+    assert!(
+        replies[0].starts_with("Danke. Bestätigen Sie die Verknüpfung"),
+        "{}",
+        replies[0]
+    );
+    let requests = list_link_requests(&attacker, &test.database, &SystemClock)
+        .await
+        .unwrap();
+    assert_eq!(requests.len(), 1);
+}
+
+/// The Telegram account rejects a claim with /trennen; the member then has nothing to confirm.
+#[tokio::test]
+async fn the_telegram_account_rejects_a_claim() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+    let (_, _, cookie) = test.member("testwil", OrganizationRole::Owner).await;
+    let member = authenticate(&test, &cookie).await;
+    let code = create_link_code(&member, &test.database, &SystemClock)
+        .await
+        .unwrap();
+
+    let replies = converse(
+        &test,
+        vec![
+            update(1, &format!("/start {}", code.code)),
+            update(2, "/trennen"),
+            update(3, "/bestaetigen"),
+        ],
+        3,
+    )
+    .await;
+    assert!(
+        replies[1].contains("nicht mit tada verknüpft"),
+        "{}",
+        replies[1]
+    );
+    assert!(
+        replies[2].starts_with("Es gibt nichts zu bestätigen"),
+        "{}",
+        replies[2]
+    );
+    assert!(
+        list_link_requests(&member, &test.database, &SystemClock)
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 /// The member of a session cookie, as the session authenticator finds it.
@@ -258,6 +343,17 @@ async fn the_member_confirms_the_link_in_the_web_client() {
         )
         .await
         .unwrap()
+        .is_some()
+    );
+    assert!(
+        accept_link_claim(
+            &gateway,
+            TelegramUserId(7130429),
+            &test.database,
+            &SystemClock
+        )
+        .await
+        .unwrap()
     );
 
     let (_, _, page) = call(
@@ -313,6 +409,17 @@ async fn the_confirmation_needs_a_recent_sign_in() {
             &code,
             TelegramUserId(7130429),
             &name,
+            &test.database,
+            &SystemClock
+        )
+        .await
+        .unwrap()
+        .is_some()
+    );
+    assert!(
+        accept_link_claim(
+            &gateway,
+            TelegramUserId(7130429),
             &test.database,
             &SystemClock
         )
@@ -386,6 +493,15 @@ impl Club {
     /// A member of the club with the event role `role` (or none), linked to the Telegram account `account`.
     /// Returns the user ID.
     async fn linked_member(&self, role: Option<&str>, account: i64) -> UserId {
+        self.linked_member_with_cookie(role, account).await.0
+    }
+
+    /// `linked_member` with the session cookie of the member.
+    async fn linked_member_with_cookie(
+        &self,
+        role: Option<&str>,
+        account: i64,
+    ) -> (UserId, String) {
         let (_, user, cookie) = self.test.member("testwil", OrganizationRole::Member).await;
         if let Some(role) = role {
             let (status, _) = self
@@ -409,7 +525,18 @@ impl Club {
                 TelegramUserId(account),
                 &name,
                 &self.test.database,
-                &SystemClock,
+                &SystemClock
+            )
+            .await
+            .unwrap()
+            .is_some()
+        );
+        assert!(
+            accept_link_claim(
+                &ServiceCaller::<TelegramGateway>::new(),
+                TelegramUserId(account),
+                &self.test.database,
+                &SystemClock
             )
             .await
             .unwrap()
@@ -421,7 +548,7 @@ impl Club {
         confirm_link(&member, request.id, &self.test.database, &SystemClock)
             .await
             .unwrap();
-        user
+        (user, cookie)
     }
 
     /// The open changesets of the event.
@@ -455,6 +582,71 @@ async fn call_json(
     };
     let (response, value) = support::send(router, request.unwrap()).await;
     (response.status(), value)
+}
+
+/// A member sees the link in the web client and removes it; the account then acts as nobody.
+#[tokio::test]
+async fn a_member_unlinks_the_telegram_account_in_the_web_client() {
+    let club = Club::start().await;
+    let (_, cookie) = club
+        .linked_member_with_cookie(Some("event-contributor"), ACCOUNT)
+        .await;
+    let (status, link) = call_json(
+        &club.router,
+        &cookie,
+        Method::GET,
+        "/api/v1/telegram/link",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(link["link"]["telegram_user_id"], ACCOUNT);
+
+    let (status, _) = call_json(
+        &club.router,
+        &cookie,
+        Method::POST,
+        "/api/v1/telegram/link/remove",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, link) = call_json(
+        &club.router,
+        &cookie,
+        Method::GET,
+        "/api/v1/telegram/link",
+        None,
+    )
+    .await;
+    assert_eq!(link, json!({"link": null}));
+    let replies = converse(
+        &club.test,
+        vec![update(1, "/vorschlag TEST30 date_window 2030-06..2030-07")],
+        1,
+    )
+    .await;
+    assert!(replies[0].contains("nicht verknüpft"), "{}", replies[0]);
+}
+
+/// A lost or wrong link ends from Telegram too: /trennen removes the link of the account.
+#[tokio::test]
+async fn the_bot_unlinks_the_account() {
+    let club = Club::start().await;
+    club.linked_member(Some("event-contributor"), ACCOUNT).await;
+
+    let replies = converse(&club.test, vec![update(1, "/trennen")], 1).await;
+    assert!(
+        replies[0].contains("nicht mit tada verknüpft"),
+        "{}",
+        replies[0]
+    );
+    assert_eq!(
+        club.test
+            .scalar::<i64>("SELECT count(*) FROM telegram_identity")
+            .await,
+        0
+    );
 }
 
 #[tokio::test]

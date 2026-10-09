@@ -24,8 +24,15 @@ impl Messages {
 
     /// The text of the message `id` with one text argument.
     pub(crate) fn get_with(&self, id: &str, name: &str, value: &str) -> String {
+        self.get_with_all(id, &[(name, value)])
+    }
+
+    /// The text of the message `id` with text arguments.
+    pub(crate) fn get_with_all(&self, id: &str, values: &[(&str, &str)]) -> String {
         let mut args = FluentArgs::new();
-        args.set(name, value.to_owned());
+        for (name, value) in values {
+            args.set(*name, (*value).to_owned());
+        }
         self.format(id, Some(&args))
     }
 
@@ -55,6 +62,9 @@ mod tests {
         for id in [
             "telegram-help",
             "telegram-link-claimed",
+            "telegram-link-accepted",
+            "telegram-link-nothing-to-accept",
+            "telegram-unlinked",
             "telegram-link-invalid",
             "telegram-error",
             "telegram-proposal-usage",

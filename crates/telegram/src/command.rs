@@ -1,9 +1,35 @@
-//! The words of the command `/vorschlag <EVENTKEY> <field_key> <value…>`.
+//! The words of the command `/vorschlag <EVENTKEY> <field_key> <value…>`, and the commands of the
+//! link without arguments.
 
 use std::ops::Range;
 
 /// The name of the command. In a chat with several bots, Telegram can add `@botname`.
 const PROPOSE: &str = "/vorschlag";
+
+/// The command that accepts the newest claim of a link code (ADR 0011).
+const ACCEPT: &str = "/bestaetigen";
+/// The command that ends the link of the account and rejects its open claims.
+const UNLINK: &str = "/trennen";
+
+/// A command of the link, without arguments.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum LinkCommand {
+    Accept,
+    Unlink,
+}
+
+/// Returns `None` if `text` is not `/bestaetigen` or `/trennen`. Words after the command do not count.
+pub(crate) fn parse_link_command(text: &str) -> Option<LinkCommand> {
+    let (command, _) = word(text, 0)?;
+    let name = command.split_once('@').map_or(command, |(name, _)| name);
+    if name.eq_ignore_ascii_case(ACCEPT) {
+        Some(LinkCommand::Accept)
+    } else if name.eq_ignore_ascii_case(UNLINK) {
+        Some(LinkCommand::Unlink)
+    } else {
+        None
+    }
+}
 
 /// A parsed `/vorschlag` command. It borrows the message text.
 #[derive(Debug, PartialEq, Eq)]
@@ -87,6 +113,21 @@ mod tests {
     fn accepts_the_name_of_the_bot_and_any_case() {
         for text in ["/vorschlag@tada_bot A1 f x", "/Vorschlag A1 f x"] {
             assert!(parse_propose(text).unwrap().is_ok(), "{text}");
+        }
+    }
+
+    #[test]
+    fn finds_the_commands_of_the_link() {
+        assert_eq!(
+            parse_link_command("/bestaetigen"),
+            Some(LinkCommand::Accept)
+        );
+        assert_eq!(
+            parse_link_command("/Trennen@tada_bot"),
+            Some(LinkCommand::Unlink)
+        );
+        for text in ["/start code", "bestaetigen", "", "/vorschlag A1 f x"] {
+            assert_eq!(parse_link_command(text), None, "{text:?}");
         }
     }
 

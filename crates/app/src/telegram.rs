@@ -1,10 +1,13 @@
 //! Telegram identity linking (ADR 0011).
 //!
 //! 1. A member asks for a link code in the web client.
-//! 2. The member sends the code to the bot. The gateway claims the code for the sending Telegram account.
+//! 2. The member sends the code to the bot. The gateway claims the code for the sending Telegram
+//!    account and names the tada account of the code. The Telegram account accepts the claim with
+//!    `/bestaetigen`.
 //! 3. The member sees the Telegram account in the web client and confirms the link.
 //!
-//! A phishing link alone cannot bind an account, because only the member's own session can confirm.
+//! A phishing link alone cannot bind an account: the web session of the member confirms the
+//! Telegram account, and the Telegram account accepts the tada account. Both sides can end a link.
 
 use std::fmt::{self, Debug};
 use std::ops::Range;
@@ -67,7 +70,30 @@ impl Debug for LinkCode {
     }
 }
 
-/// A claimed code that waits for the confirmation of the member.
+/// The tada account of a link code, as the bot names it to the Telegram account that claims the
+/// code. The names are personal data, so `Debug` leaves them out (ADR 0035).
+#[derive(Clone, PartialEq, Eq)]
+pub struct LinkTarget {
+    /// The display name of the user who asked for the code.
+    pub user_name: String,
+    /// The name of the organization of the code.
+    pub organization_name: String,
+}
+
+impl Debug for LinkTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("LinkTarget(redacted)")
+    }
+}
+
+/// The Telegram account that is linked to a user.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TelegramLink {
+    pub telegram_user_id: TelegramUserId,
+    pub linked_at: Timestamp,
+}
+
+/// A claimed code that the Telegram account accepted, and that waits for the confirmation of the member.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkRequest {
     pub id: Uuid,
@@ -87,7 +113,8 @@ pub trait TelegramLinks: Debug + Send + Sync {
         expires_at: Timestamp,
     ) -> Result<String, StoreError>;
 
-    /// Marks an unexpired, unclaimed code as claimed by the account. Returns false for any other code.
+    /// Marks an unexpired, unclaimed code as claimed by the account and returns the tada account of
+    /// the code. Returns `None` for any other code.
     /// Infrastructure query (ADR 0039): the code finds its organization.
     async fn claim(
         &self,
@@ -95,9 +122,14 @@ pub trait TelegramLinks: Debug + Send + Sync {
         account: TelegramUserId,
         name: &TelegramName,
         now: Timestamp,
-    ) -> Result<bool, StoreError>;
+    ) -> Result<Option<LinkTarget>, StoreError>;
 
-    /// The claimed, unconfirmed and unexpired codes of the user.
+    /// Marks the newest claimed, unexpired code of the account as accepted, if it is not accepted
+    /// yet. Returns false if the account has no such code.
+    /// Infrastructure query (ADR 0039): a Telegram account has no organization before it names a user.
+    async fn accept(&self, account: TelegramUserId, now: Timestamp) -> Result<bool, StoreError>;
+
+    /// The claimed, accepted, unconfirmed and unexpired codes of the user.
     async fn requests(
         &self,
         scope: OrgScope,
@@ -105,7 +137,7 @@ pub trait TelegramLinks: Debug + Send + Sync {
         now: Timestamp,
     ) -> Result<Vec<LinkRequest>, StoreError>;
 
-    /// Binds the account of the request to the user, in one transaction with the confirmation.
+    /// Binds the account of an accepted request to the user, in one transaction with the confirmation.
     async fn confirm(
         &self,
         scope: OrgScope,
@@ -117,6 +149,18 @@ pub trait TelegramLinks: Debug + Send + Sync {
     /// The user that the Telegram account is linked to.
     /// Infrastructure query (ADR 0039): a Telegram account has no organization before it names a user.
     async fn user_of(&self, account: TelegramUserId) -> Result<Option<UserId>, StoreError>;
+
+    /// The Telegram account that is linked to the user.
+    /// Infrastructure query (ADR 0039): a link belongs to a user, not to an organization.
+    async fn link_of(&self, user_id: UserId) -> Result<Option<TelegramLink>, StoreError>;
+
+    /// Removes the link of the user, if any.
+    /// Infrastructure query (ADR 0039): a link belongs to a user, not to an organization.
+    async fn unlink_user(&self, user_id: UserId) -> Result<(), StoreError>;
+
+    /// Removes the link of the account, if any, and its claims that no member confirmed.
+    /// Infrastructure query (ADR 0039): a Telegram account has no organization before it names a user.
+    async fn unlink_account(&self, account: TelegramUserId) -> Result<(), StoreError>;
 
     /// Records an update ID. Returns false if the gateway saw it before.
     /// Infrastructure query (ADR 0039): a Telegram update ID has no organization.
@@ -187,7 +231,8 @@ pub async fn create_link_code(
     Ok(LinkCode { code, expires_at })
 }
 
-/// Step 2: the gateway claims a code for the Telegram account that sent it.
+/// Step 2: the gateway claims a code for the Telegram account that sent it. The result names the
+/// tada account of the code, so that the Telegram account sees whom it would link to.
 pub async fn claim_link_code(
     _caller: &ServiceCaller<TelegramGateway>,
     code: &str,
@@ -195,8 +240,44 @@ pub async fn claim_link_code(
     name: &TelegramName,
     links: &dyn TelegramLinks,
     clock: &dyn Clock,
-) -> Result<bool, StoreError> {
+) -> Result<Option<LinkTarget>, StoreError> {
     links.claim(code.trim(), account, name, clock.now()).await
+}
+
+/// Step 2, continued: the Telegram account accepts its newest claim, after the bot named the tada
+/// account. Without it, the member cannot confirm, so a member who sends a victim the own code
+/// cannot link the Telegram account of the victim. Returns false if nothing waits for acceptance.
+pub async fn accept_link_claim(
+    _caller: &ServiceCaller<TelegramGateway>,
+    account: TelegramUserId,
+    links: &dyn TelegramLinks,
+    clock: &dyn Clock,
+) -> Result<bool, StoreError> {
+    links.accept(account, clock.now()).await
+}
+
+/// The Telegram account ends its link and rejects its open claims, for example a claim of a code
+/// that names a stranger.
+pub async fn unlink_account(
+    _caller: &ServiceCaller<TelegramGateway>,
+    account: TelegramUserId,
+    links: &dyn TelegramLinks,
+) -> Result<(), StoreError> {
+    links.unlink_account(account).await
+}
+
+/// The Telegram account that is linked to the calling member, if any.
+pub async fn get_link(
+    caller: &MemberCaller,
+    links: &dyn TelegramLinks,
+) -> Result<Option<TelegramLink>, StoreError> {
+    links.link_of(caller.user_id()).await
+}
+
+/// The calling member ends the link, for example after the loss of the phone. A removal needs no
+/// recent sign-in, because it only takes access away.
+pub async fn unlink(caller: &MemberCaller, links: &dyn TelegramLinks) -> Result<(), StoreError> {
+    links.unlink_user(caller.user_id()).await
 }
 
 /// The open requests of the calling member, for the confirmation in step 3.

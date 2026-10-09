@@ -391,7 +391,7 @@ telegram-title = Telegram verknüpfen
 telegram-intro = Verknüpfen Sie Ihr Telegram-Konto mit tada, um tada im Chat zu nutzen.
 telegram-steps-title = So geht es
 telegram-step-create = Erstellen Sie hier einen Code.
-telegram-step-send = Senden Sie den Code dem Bot in Telegram.
+telegram-step-send = Senden Sie den Code dem Bot in Telegram. Der Bot nennt Ihr tada-Konto. Bestätigen Sie dort mit /bestaetigen.
 telegram-step-confirm = Bestätigen Sie die Anfrage hier in tada.
 telegram-check = Bestätigen Sie nur, wenn der Name Ihr eigenes Telegram-Konto zeigt. Eine Anfrage, die Sie nicht kennen, ignorieren Sie. Ohne Ihre Bestätigung verknüpft tada nichts.
 telegram-code-create = Code erstellen
@@ -402,7 +402,7 @@ telegram-requests-title = Offene Anfragen
 telegram-requests-loading = Anfragen werden geladen
 telegram-requests-refresh = Aktualisieren
 telegram-requests-empty-title = Keine offenen Anfragen
-telegram-requests-empty-text = Sobald der Bot Ihren Code erhält, erscheint hier das Telegram-Konto.
+telegram-requests-empty-text = Sobald Sie den Code im Bot mit /bestaetigen annehmen, erscheint hier das Telegram-Konto.
 telegram-column-name = Telegram-Name
 telegram-column-id = Telegram-ID
 telegram-column-claimed = Angefragt um
@@ -416,6 +416,12 @@ telegram-confirm-text = Verknüpfen Sie { $name } (Telegram-ID { $id }, angefrag
 telegram-confirm-submit = Verknüpfen
 telegram-confirm-cancel = Abbrechen
 telegram-linked = Telegram-Konto verknüpft.
+# $id: the Telegram user ID. $time: the date and time of the link.
+telegram-linked-account = Ihr tada-Konto ist mit dem Telegram-Konto { $id } verknüpft, seit { $time }.
+telegram-unlink = Verknüpfung aufheben
+telegram-unlink-title = Telegram-Verknüpfung aufheben?
+telegram-unlink-text = Danach handelt dieses Telegram-Konto nicht mehr als Sie. Sie können später ein Telegram-Konto neu verknüpfen.
+telegram-unlinked = Telegram-Verknüpfung aufgehoben.
 telegram-requests-refreshed = Anfragen aktualisiert.
 
 # The notice of ADR 0045. A changed text gets a new NOTICE_VERSION and a new line in NOTICE_TEXTS in crates/app/src/tokens/mod.rs; a test checks it.
