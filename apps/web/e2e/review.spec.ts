@@ -48,6 +48,7 @@ function proposal(id: string, extra: object) {
     stale: false,
     overdue: false,
     routed_to_me: true,
+    can_review: true,
     ...extra,
   };
 }
@@ -228,6 +229,7 @@ changesets[CS_WORK] = {
     }),
     proposal("0199b8e0-0000-7000-8000-0000000001d3", {
       routed_to_me: false,
+      can_review: false,
       operation: {
         kind: "change-action-status",
         event_id: event?.id,

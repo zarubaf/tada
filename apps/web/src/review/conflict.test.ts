@@ -20,6 +20,7 @@ function setFact(
     stale: false,
     overdue: false,
     routed_to_me: true,
+    can_review: true,
     operation: {
       kind: "set-fact",
       event_id: EVENT,

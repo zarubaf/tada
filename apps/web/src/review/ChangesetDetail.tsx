@@ -208,8 +208,8 @@ export function ChangesetDetail({
     const proposal = proposals.find((candidate) => candidate.id === id);
     return proposal ? operationTitle(proposal.operation, fields) : id;
   };
-  // The member reviews the proposals that the routing gives them; the others show read-only.
-  const open = proposals.filter((proposal) => proposal.status === "open" && proposal.routed_to_me);
+  // The member reviews the proposals that the server marks; the others show read-only.
+  const open = proposals.filter((proposal) => proposal.status === "open" && proposal.can_review);
   const active = open.find((proposal) => proposal.id === activeId) ?? open[0];
 
   /** The proposals that an accept of `ids` would take: the selection or one proposal, and what they need. */
@@ -454,7 +454,7 @@ export function ChangesetDetail({
                   ])
                 }
                 canLink={dependentsOf(proposals, proposal.id).every(
-                  (id) => proposals.find((other) => other.id === id)?.routed_to_me,
+                  (id) => proposals.find((other) => other.id === id)?.can_review,
                 )}
                 onEditCancel={() => {
                   setEditingId(undefined);
