@@ -1,0 +1,48 @@
+@layer components {
+  .label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    max-width: 100%;
+
+    /* A status word never breaks inside: the table gives the column the width it needs. */
+    white-space: nowrap;
+  }
+
+  .icon {
+    flex: none;
+  }
+
+  .label[data-tone="progress"] .icon {
+    color: var(--color-accent-text);
+  }
+
+  .label[data-tone="success"] .icon {
+    color: var(--color-success);
+  }
+
+  .label[data-tone="muted"] {
+    color: var(--color-text-muted);
+  }
+
+  /* A warning keeps the text color: its contrast is not enough for text on every background. */
+  .label[data-tone="warning"] {
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    background: var(--color-warning-subtle);
+  }
+
+  .label[data-tone="warning"] .icon {
+    color: var(--color-warning);
+  }
+
+  .label[data-tone="danger"] {
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    background: var(--color-danger-subtle);
+  }
+
+  .label[data-tone="danger"] .icon {
+    color: var(--color-danger);
+  }
+}

@@ -1,0 +1,76 @@
+@layer components {
+  .page {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* One column, at most 40rem wide (doc/design/components.md, „Forms“). */
+  .form {
+    container-type: inline-size;
+    display: grid;
+    gap: var(--space-4);
+    max-width: 40rem;
+  }
+
+  .dialogForm {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  /* The primary action is full width in a narrow form and on the right in a wide one (ADR 0019). */
+  .actions {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  @container (width >= 28rem) {
+    .actions {
+      grid-auto-flow: column;
+      justify-content: end;
+    }
+  }
+
+  .rowActions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* The condition and the reason of a commitment sit under its text. */
+  .condition {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .fixedLabel {
+    color: var(--color-text-muted);
+  }
+
+  .evidenceList {
+    display: grid;
+    gap: var(--space-4);
+    list-style: none;
+    padding: 0;
+  }
+
+  .meta {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+}

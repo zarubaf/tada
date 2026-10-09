@@ -171,6 +171,9 @@ event-nav = Anlass
 event-nav-overview = Übersicht
 event-nav-members = Mitglieder
 event-nav-documents = Dokumente
+event-nav-actions = Aufgaben
+event-nav-commitments = Zusagen
+event-nav-workstreams = Arbeitsbereiche
 event-overview-loading = Übersicht wird geladen
 event-overview-questions = Offene Fragen
 event-overview-questions-none = Es gibt keine offenen Fragen.
@@ -740,3 +743,117 @@ institution-kind-authority = Behörde
 institution-kind-company = Firma
 institution-kind-club = Verein
 institution-kind-other = Andere
+
+## Workstreams, actions and commitments (ADRs 0067 and 0068)
+
+work-loading = Daten des Anlasses werden geladen
+work-load-more = Weitere Einträge laden
+work-column-id = ID
+work-column-owner = Verantwortlich
+work-column-workstream = Arbeitsbereich
+work-column-due = Fällig
+work-column-status = Status
+work-column-actions = Aktionen
+work-edit = Bearbeiten
+# $id: the readable ID of the record.
+work-edit-of = { $id } bearbeiten
+work-create = Erfassen
+work-save = Speichern
+work-cancel = Abbrechen
+# $name: the readable ID or the name of the saved record.
+work-saved = „{ $name }“ gespeichert.
+work-conflict = Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.
+work-field-owner = Verantwortlich
+work-field-workstream = Arbeitsbereich
+work-field-due = Fällig am
+work-field-status = Status
+work-no-workstream = Kein Arbeitsbereich
+work-error-title = Der Titel hat 1 bis 200 Zeichen.
+work-error-title-too-long = Der Titel hat höchstens 200 Zeichen.
+work-error-description = Die Beschreibung hat 1 bis 4000 Zeichen.
+work-error-text = Der Text hat 1 bis 500 Zeichen.
+work-error-condition = Die Bedingung hat 1 bis 500 Zeichen.
+work-error-promisor = Wählen Sie eine Person oder eine Institution.
+work-error-promisor-unknown-record = Diese Person oder Institution gibt es nicht.
+work-error-owner = Wählen Sie ein Mitglied des Anlasses mit Mitarbeit oder Anlassleitung.
+work-error-workstream = Wählen Sie einen aktiven Arbeitsbereich dieses Anlasses.
+work-error-workstream-closed = Dieser Arbeitsbereich ist geschlossen.
+work-error-due = Das ist kein gültiges Datum.
+work-error-reason = Geben Sie einen Grund an. Er hat 1 bis 500 Zeichen.
+work-error-name = Der Name hat 1 bis 200 Zeichen.
+work-error-name-taken = Diesen Namen gibt es in diesem Anlass schon.
+work-error-lead = Wählen Sie ein Mitglied des Anlasses mit Mitarbeit oder Anlassleitung.
+
+actions-title = Aufgaben
+actions-loading = Aufgaben werden geladen
+actions-empty-title = Noch keine Aufgaben
+actions-empty-text = Erfassen Sie die erste Aufgabe mit dem Formular unter der Liste.
+action-column-title = Titel
+action-create-title = Aufgabe erfassen
+# $id: the readable ID of the action.
+action-change-title = { $id } bearbeiten
+action-field-title = Titel (Pflichtfeld)
+action-field-description = Beschreibung
+action-status-open = offen
+action-status-in-progress = in Arbeit
+action-status-blocked = blockiert
+action-status-done = erledigt
+action-status-canceled = abgebrochen
+
+commitments-title = Zusagen
+commitments-loading = Zusagen werden geladen
+commitments-empty-title = Noch keine Zusagen
+commitments-empty-text = Erfassen Sie die erste Zusage mit dem Formular unter der Liste.
+commitment-column-text = Zusage
+commitment-column-promisor = Zugesagt von
+# $condition: the condition text of the commitment.
+commitment-condition-line = Bedingung: { $condition }
+# $reason: why the commitment became firm.
+commitment-firm-reason-line = Verbindlich, weil: { $reason }
+commitment-create-title = Zusage erfassen
+# $id: the readable ID of the commitment.
+commitment-change-title = { $id } bearbeiten
+commitment-field-text = Zusage (Pflichtfeld)
+commitment-field-promisor = Zugesagt von (Pflichtfeld)
+commitment-field-promisor-placeholder = Person oder Institution wählen
+commitment-field-promisor-fixed = Zugesagt von
+commitment-field-condition = Bedingung
+commitment-field-condition-help = Mit einer Bedingung ist die Zusage bedingt. Ohne Bedingung ist sie verbindlich.
+commitment-field-condition-fixed = Bedingung
+commitment-status-conditional = bedingt
+commitment-status-firm = verbindlich
+commitment-status-fulfilled = erfüllt
+commitment-status-broken = gebrochen
+commitment-status-withdrawn = zurückgezogen
+commitment-evidence = Beleg
+# $id: the readable ID of the commitment.
+commitment-evidence-of = Beleg zu { $id }
+# $version: the record version that the evidence supports.
+commitment-evidence-version = Stützt die Version { $version } der Zusage
+make-firm = Verbindlich machen
+# $id: the readable ID of the commitment.
+make-firm-of = { $id } verbindlich machen
+# $id: the readable ID of the commitment.
+make-firm-title = { $id } verbindlich machen
+make-firm-text = Die Bedingung bleibt als Verlauf stehen. Der Grund wird mit der Zusage gespeichert.
+make-firm-reason = Grund (Pflichtfeld)
+make-firm-reason-help = Warum ist die Bedingung erfüllt?
+make-firm-submit = Verbindlich machen
+# $id: the readable ID of the commitment.
+make-firm-done = { $id } ist jetzt verbindlich.
+
+workstreams-title = Arbeitsbereiche
+workstreams-loading = Arbeitsbereiche werden geladen
+workstreams-empty-title = Noch keine Arbeitsbereiche
+workstreams-empty-text = Die Anlassleitung legt den ersten Arbeitsbereich an.
+workstream-column-name = Name
+workstream-column-lead = Arbeitsbereichsleitung
+workstream-create-title = Arbeitsbereich anlegen
+# $name: the name of the workstream.
+workstream-change-title = „{ $name }“ bearbeiten
+# $name: the name of the workstream.
+workstream-edit-of = { $name } bearbeiten
+workstream-field-name = Name (Pflichtfeld)
+workstream-field-lead = Arbeitsbereichsleitung
+workstream-status-active = aktiv
+workstream-status-closed = geschlossen
