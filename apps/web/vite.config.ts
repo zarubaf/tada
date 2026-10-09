@@ -37,7 +37,10 @@ function layerOrderFirst(): Plugin {
     generateBundle(_options, bundle) {
       for (const file of Object.values(bundle)) {
         if (file.type === "asset" && file.fileName.endsWith(".css")) {
-          file.source = `${layerOrder}${file.source.toString()}`;
+          // Vite gives CSS as a string; a byte array would turn into numbers with `toString`.
+          const css =
+            typeof file.source === "string" ? file.source : new TextDecoder().decode(file.source);
+          file.source = `${layerOrder}${css}`;
         }
       }
     },
