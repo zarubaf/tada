@@ -82,7 +82,8 @@ pub struct ApiState {
     pub sign_in: Arc<dyn SignInStore>,
     pub sign_in_requests: Arc<dyn SignInRequestStore>,
     pub clock: Arc<dyn Clock>,
-    /// The proxies whose `X-Request-Id` and `X-Forwarded-For` the server accepts (ADR 0008, ADR 0035).
+    /// The proxies whose `X-Forwarded-For` the server accepts, and whose `X-Request-Id` it logs
+    /// (ADR 0008, ADR 0035).
     pub trusted_proxies: Vec<IpNet>,
     pub event_members: Arc<dyn EventMemberStore>,
     pub members: Arc<dyn MemberStore>,
@@ -1444,6 +1445,45 @@ mod tests {
             get(&router, "/").await,
             (StatusCode::OK, "<html>tada</html>".to_owned())
         );
+    }
+
+    /// A proxy can pass the `X-Request-Id` of a client on. The client could then give its request
+    /// the ID of the request of another member, and the audit log would join the two.
+    #[tokio::test]
+    async fn the_request_id_never_comes_from_a_header_also_behind_a_trusted_proxy() {
+        let adapter = Router::new().nest_service(
+            "/mcp",
+            any(|request: Request<Body>| async move {
+                request
+                    .extensions()
+                    .get::<tada_app::caller::RequestId>()
+                    .map(|id| id.as_uuid().to_string())
+                    .unwrap_or_default()
+            }),
+        );
+        let mut state = state();
+        state.trusted_proxies = vec!["10.0.0.0/8".parse().unwrap()];
+        let router = router_with(state, None, adapter);
+        let chosen = "01920000-0000-7000-8000-000000000001";
+
+        let response = router
+            .oneshot(
+                Request::get("/mcp")
+                    .header(request_id::HEADER, chosen)
+                    .extension(axum::extract::ConnectInfo(SocketAddr::from((
+                        [10, 0, 0, 5],
+                        40000,
+                    ))))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_ne!(response.headers()[request_id::HEADER], chosen);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_ne!(&body[..], chosen.as_bytes());
     }
 
     #[tokio::test]
