@@ -12,6 +12,7 @@ The Git history keeps the done slices.
 Goal: workstream leads own their work directly, and the AI PM follows up without the PM.
 
 Slice 2 splits into the sub-slices 2a to 2f.
+The open sub-slices are 2b to 2f.
 Each sub-slice has its own design, plan, reviews and merge.
 The owner wants tada usable for a first real club event as soon as possible, so the sub-slices come in this order.
 
@@ -19,17 +20,6 @@ tada runs with invented data and public facts only until two gates close.
 The first gate, the review of the authentication code, is closed.
 [ADR 0070](adr/0070-ai-security-review-replaces-the-external-review.md) records the AI security review and its fixes.
 The second gate is the person features of [ADR 0045](adr/0045-data-protection.md), which sub-slice 2b delivers.
-
-### Slice 2a: Work records and distributed review
-
-Scope: workstreams, actions, commitments, persons, institutions, review routing to owners and workstream leads, and the "My Work" page.
-The decisions are in [ADR 0067](adr/0067-workstreams-and-review-routing.md), [ADR 0068](adr/0068-actions-and-commitments.md) and [ADR 0069](adr/0069-persons-and-institutions.md).
-
-Acceptance:
-
-- (3) The designated workstream lead can review a supplier proposal without the PM relaying the message.
-- (5) A conditional promise stays conditional; no signature or approval is invented.
-- (12) A simple club event can be organized without purchasing a separate task-management tool. Sub-slice 2a delivers a part of this criterion.
 
 ### Slice 2b: Person features
 
