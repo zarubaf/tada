@@ -18,7 +18,7 @@ export function invitableRoles(role: OrganizationRole | undefined): Organization
   return role === "admin" ? ROLES.filter((r) => r !== "owner") : [];
 }
 
-/** A manager removes members whose role is not higher than their own. */
+/** A manager removes members, and revokes invitations, whose role is not higher than their own. */
 export function canRemove(own: OrganizationRole | undefined, member: OrganizationRole): boolean {
   return own !== undefined && canManage(own) && ROLES.indexOf(member) >= ROLES.indexOf(own);
 }

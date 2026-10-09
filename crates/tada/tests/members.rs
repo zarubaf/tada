@@ -387,6 +387,33 @@ async fn a_removal_revokes_the_pending_invitations_of_the_member() {
     );
 }
 
+/// An admin cannot give the role owner, so an admin cannot revoke an owner invitation either
+/// (ADR 0056). An owner can.
+#[tokio::test]
+async fn an_admin_cannot_revoke_an_owner_invitation() {
+    let app = App::start().await;
+    let owner = app.member("Olga Owner", OrganizationRole::Owner).await;
+    let admin = app.member("Adam Admin", OrganizationRole::Admin).await;
+    let (_, invitation) = app.invite(&owner, "otto@example.org", "owner").await;
+    let path = format!(
+        "/api/v1/invitations/{}/revoke",
+        invitation["id"].as_str().unwrap()
+    );
+
+    let (status, problem) = app
+        .call(Some(&admin.cookie), Method::POST, &path, None)
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    assert_eq!(problem["code"], "forbidden");
+    let (_, page) = app.get(&owner, "/api/v1/invitations").await;
+    assert_eq!(page["items"], json!([invitation]));
+
+    let (status, _) = app
+        .call(Some(&owner.cookie), Method::POST, &path, None)
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+}
+
 #[tokio::test]
 async fn the_last_owner_cannot_leave_and_an_admin_cannot_remove_an_owner() {
     let app = App::start().await;

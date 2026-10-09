@@ -159,6 +159,19 @@ describe("MembersPage", () => {
     expect(within(invitations).getByText("clara@example.org")).toBeInTheDocument();
   });
 
+  it("offers an admin no revocation of an owner invitation", async () => {
+    const owner = { ...invitation, id: "i2", display_name: "Otto Owner", role: "owner" };
+    setup({ role: "admin", invitations: [invitation, owner] });
+
+    const invitations = await screen.findByRole("table", { name: "Offene Einladungen" });
+    expect(
+      within(invitations).getByRole("button", { name: "Einladung an Clara Probst widerrufen" }),
+    ).toBeInTheDocument();
+    expect(
+      within(invitations).queryByRole("button", { name: "Einladung an Otto Owner widerrufen" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps the live regions in the page from the start", async () => {
     setup({});
 

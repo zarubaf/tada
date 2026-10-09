@@ -341,7 +341,8 @@ pub enum RevokeInvitationError {
     /// No pending invitation of the organization has this ID.
     #[error("the pending invitation does not exist")]
     NotFound,
-    #[error("only owners and admins revoke invitations")]
+    /// The caller is no owner or admin, or the invitation has a higher role than the caller.
+    #[error("the caller cannot revoke this invitation")]
     Forbidden,
     #[error(transparent)]
     Store(#[from] StoreError),
@@ -556,6 +557,8 @@ pub async fn list_invitations(
 }
 
 /// Revokes a pending invitation. Its links stop working at once.
+/// Owners and admins revoke the invitations with a role up to their own role, the same roles that
+/// they can give (ADR 0056): an admin cannot revoke an owner invitation.
 pub async fn revoke_invitation(
     caller: &MemberCaller,
     id: InvitationId,
@@ -563,6 +566,12 @@ pub async fn revoke_invitation(
     clock: &dyn Clock,
 ) -> Result<(), RevokeInvitationError> {
     if !caller.organization_role().is_owner_or_admin() {
+        return Err(RevokeInvitationError::Forbidden);
+    }
+    let Some(invitation) = store.invitation(caller.scope(), id).await? else {
+        return Err(RevokeInvitationError::NotFound);
+    };
+    if !manages(caller.organization_role(), invitation.role) {
         return Err(RevokeInvitationError::Forbidden);
     }
     let audit = AuditEvent::new(
@@ -1015,6 +1024,28 @@ mod tests {
             .unwrap();
         assert!(page.items.iter().all(|m| m.email.is_none()));
         assert_eq!(page.next, None);
+    }
+
+    #[tokio::test]
+    async fn an_admin_cannot_revoke_an_owner_invitation() {
+        let Invited::New(invitation) = invite(Owner, Owner).await.unwrap() else {
+            panic!("not new");
+        };
+        let store = MemoryStore {
+            existing: Some(invitation.clone()),
+            ..MemoryStore::answering(InvitationInsert::Inserted)
+        };
+        let result = revoke_invitation(&caller(Admin), invitation.id, &store, &FixedClock).await;
+        assert!(
+            matches!(result, Err(RevokeInvitationError::Forbidden)),
+            "{result:?}"
+        );
+        let store = MemoryStore::answering(InvitationInsert::Inserted);
+        let result = revoke_invitation(&caller(Owner), invitation.id, &store, &FixedClock).await;
+        assert!(
+            matches!(result, Err(RevokeInvitationError::NotFound)),
+            "{result:?}"
+        );
     }
 
     #[tokio::test]
