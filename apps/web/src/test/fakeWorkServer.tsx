@@ -26,11 +26,19 @@ const members = [
   { user_id: CLARA, display_name: "Cäcilia Probst", role: "member", version: 1 },
 ];
 
-export const memberships = [
-  { user_id: ME, display_name: "Anna Muster", event_role: "event-contributor", version: 1 },
-  { user_id: BERND, display_name: "Bernd Beispiel", event_role: "event-manager", version: 1 },
-  { user_id: CLARA, display_name: "Cäcilia Probst", event_role: "event-viewer", version: 1 },
-];
+/** The event memberships; `manager` is the role of the signed-in member. */
+function memberships(manager: boolean) {
+  return [
+    {
+      user_id: ME,
+      display_name: "Anna Muster",
+      event_role: manager ? "event-manager" : "event-contributor",
+      version: 1,
+    },
+    { user_id: BERND, display_name: "Bernd Beispiel", event_role: "event-contributor", version: 1 },
+    { user_id: CLARA, display_name: "Cäcilia Probst", event_role: "event-viewer", version: 1 },
+  ];
+}
 
 export const ground = {
   id: "w1",
@@ -53,7 +61,7 @@ export function problem(status: number, code: string, errors?: unknown) {
 export interface Setup {
   /** The organization role of the signed-in member. */
   role?: string;
-  /** Whether the member sees the event memberships, as an event manager does. */
+  /** Whether the signed-in member is an event manager. Otherwise the member is a contributor. */
   eventManager?: boolean;
   workstreams?: unknown[];
   /** Answers by `METHOD /path-suffix`; the first match wins. */
@@ -73,7 +81,7 @@ export function renderWork(
     lists = {},
   }: Setup = {},
 ) {
-  const calls: { call: string; body: unknown }[] = [];
+  const calls: { call: string; query: string; body: unknown }[] = [];
   const own = { organization_id: "o1", name: "Fliegergruppe Testwil", role };
   const session = {
     user_id: ME,
@@ -86,6 +94,7 @@ export function renderWork(
     const text = request.method === "GET" ? "" : await request.clone().text();
     calls.push({
       call: `${request.method} ${url.pathname}`,
+      query: url.search,
       body: text === "" ? undefined : JSON.parse(text),
     });
     const answer = Object.entries(answers).find(([key]) => {
@@ -103,7 +112,7 @@ export function renderWork(
       return json(200, { items: members });
     }
     if (request.method === "GET" && path.endsWith("/memberships")) {
-      return eventManager ? json(200, { items: memberships }) : problem(403, "forbidden");
+      return json(200, { items: memberships(eventManager) });
     }
     if (request.method === "GET" && path.endsWith("/workstreams")) {
       return json(200, { items: workstreams });

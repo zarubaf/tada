@@ -1,72 +1,21 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { type Api, type Commitment, type CommitmentStatus, problemMessage } from "../api/client";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
+import { ComboBox } from "../ui/ComboBox";
 import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { Select } from "../ui/Select";
-import { Skeleton } from "../ui/Skeleton";
 import { TextField } from "../ui/TextField";
 import type { Directory } from "./directory";
 import { blankToNull, fieldErrors, type SaveFailure, saveFailure } from "./fieldErrors";
 import { NO_WORKSTREAM, OwnerSelect, WorkstreamSelect } from "./fields";
 import { commitmentStatusChoices } from "./status";
+import { usePromisorSearch } from "./usePromisorSearch";
 import styles from "./Work.module.css";
 
 const FIELDS = ["text", "condition", "promisor", "owner", "workstream", "due"] as const;
 type Field = (typeof FIELDS)[number];
 type FieldErrors = Partial<Record<Field, string>>;
-
-type Promisors =
-  | { kind: "loading" }
-  | { kind: "failed"; message: string }
-  /** The ID of an option is `person:{uuid}` or `institution:{uuid}`. */
-  | { kind: "loaded"; options: { id: string; label: string }[] };
-
-/** The persons and institutions of the organization, for the choice of the promisor. */
-function usePromisors(api: Api, enabled: boolean): Promisors {
-  const [state, setState] = useState<Promisors>({ kind: "loading" });
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-    let current = true;
-    void (async () => {
-      let next: Promisors;
-      try {
-        const query = { limit: 200 };
-        const [persons, institutions] = await Promise.all([
-          api.GET("/api/v1/persons", { params: { query } }),
-          api.GET("/api/v1/institutions", { params: { query } }),
-        ]);
-        next =
-          persons.data && institutions.data
-            ? {
-                kind: "loaded",
-                options: [
-                  ...persons.data.items.map((p) => ({
-                    id: `person:${p.id}`,
-                    label: `${p.name} (${p.local_id})`,
-                  })),
-                  ...institutions.data.items.map((i) => ({
-                    id: `institution:${i.id}`,
-                    label: `${i.name} (${i.local_id})`,
-                  })),
-                ],
-              }
-            : { kind: "failed", message: problemMessage(persons.error ?? institutions.error) };
-      } catch {
-        next = { kind: "failed", message: problemMessage(undefined) };
-      }
-      if (current) {
-        setState(next);
-      }
-    })();
-    return () => {
-      current = false;
-    };
-  }, [api, enabled]);
-  return state;
-}
 
 /** The body of a change: only the fields that differ from the saved record. */
 function changes(
@@ -116,6 +65,9 @@ export function CommitmentForm({
   const [text, setText] = useState(record?.text ?? "");
   const [condition, setCondition] = useState("");
   const [promisor, setPromisor] = useState<string>();
+  const [promisorText, setPromisorText] = useState("");
+  // The label of the chosen option: the search stops while the text shows it.
+  const [promisorLabel, setPromisorLabel] = useState<string>();
   const [owner, setOwner] = useState(record?.owner_user_id ?? userId);
   const [workstream, setWorkstream] = useState(record?.workstream_id ?? NO_WORKSTREAM);
   const [due, setDue] = useState(record?.due_date ?? "");
@@ -125,7 +77,11 @@ export function CommitmentForm({
   const form = useRef<HTMLFormElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const focusInvalidField = () => focusAfterCommit(() => firstInvalidField(form.current));
-  const promisors = usePromisors(api, record === undefined);
+  const promisors = usePromisorSearch(
+    api,
+    promisorText,
+    record === undefined && promisorText !== promisorLabel,
+  );
   const path = { event_id: eventId };
 
   const submit = async (event: FormEvent) => {
@@ -175,6 +131,8 @@ export function CommitmentForm({
           setText("");
           setCondition("");
           setPromisor(undefined);
+          setPromisorText("");
+          setPromisorLabel(undefined);
           setDue("");
           setWorkstream(NO_WORKSTREAM);
           focusAfterCommit(() => form.current?.querySelector<HTMLElement>("input"));
@@ -221,18 +179,20 @@ export function CommitmentForm({
         </>
       ) : (
         <>
-          {promisors.kind === "loading" && <Skeleton />}
-          {promisors.kind === "loaded" && (
-            <Select
-              label={t("commitment-field-promisor")}
-              placeholder={t("commitment-field-promisor-placeholder")}
-              options={promisors.options}
-              value={promisor}
-              onChange={setPromisor}
-              error={errors.promisor}
-            />
-          )}
-          {promisors.kind === "failed" && <p role="alert">{promisors.message}</p>}
+          <ComboBox
+            label={t("commitment-field-promisor")}
+            placeholder={t("commitment-field-promisor-placeholder")}
+            options={promisors.options}
+            inputValue={promisorText}
+            onInputChange={setPromisorText}
+            selectedKey={promisor}
+            onSelectionChange={(id) => {
+              setPromisor(id);
+              setPromisorLabel(promisors.options.find((o) => o.id === id)?.label);
+            }}
+            isLoading={promisors.loading}
+            error={errors.promisor ?? promisors.failure}
+          />
           <TextField
             label={t("commitment-field-condition")}
             value={condition}

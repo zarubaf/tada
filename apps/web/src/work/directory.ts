@@ -36,8 +36,8 @@ export type DirectoryState =
 interface Loaded {
   names: Map<string, string>;
   workstreams: Workstream[];
-  /** The event members who may own a record. Without the list of memberships: nothing. */
-  contributors: Choice[] | undefined;
+  /** The event members who may own a record or lead a workstream. */
+  contributors: Choice[];
   eventManager: boolean;
 }
 
@@ -46,9 +46,8 @@ function failed(error: Problem | undefined): DirectoryState {
 }
 
 /**
- * Loads the directory of an event. The list of event memberships is for event managers only, so
- * a list that loads shows a manager. Anyone else can own a record or lead a workstream only as
- * themselves in the forms.
+ * Loads the directory of an event: the members of the organization for the names, the workstreams
+ * and the event memberships for the roles. Each member of the event reads the memberships.
  */
 export function useDirectory(
   api: Api,
@@ -58,6 +57,7 @@ export function useDirectory(
   const [loaded, setLoaded] = useState<Loaded>();
   const [error, setError] = useState<{ error: Problem | undefined }>();
 
+  const me = session.user.id;
   const reload = useCallback(async () => {
     try {
       const path = { event_id: eventId };
@@ -66,21 +66,25 @@ export function useDirectory(
         api.GET("/api/v1/events/{event_id}/workstreams", { params: { path } }),
         api.GET("/api/v1/events/{event_id}/memberships", { params: { path } }),
       ]);
-      if (!("members" in members) || !workstreams.data) {
-        setError({ error: "members" in members ? workstreams.error : members.error });
+      if (!("members" in members) || !workstreams.data || !memberships.data) {
+        setError({
+          error: "members" in members ? (workstreams.error ?? memberships.error) : members.error,
+        });
         return false;
       }
       const names = new Map(members.members.map((m) => [m.user_id, m.display_name]));
       setLoaded({
         names,
         workstreams: workstreams.data.items,
-        contributors: memberships.data?.items
+        contributors: memberships.data.items
           .filter((item) => item.event_role !== "event-viewer")
           .map((item) => ({
             id: item.user_id,
             label: names.get(item.user_id) ?? item.display_name,
           })),
-        eventManager: memberships.data !== undefined,
+        eventManager: memberships.data.items.some(
+          (item) => item.user_id === me && item.event_role === "event-manager",
+        ),
       });
       setError(undefined);
       return true;
@@ -88,13 +92,12 @@ export function useDirectory(
       setError({ error: undefined });
       return false;
     }
-  }, [api, eventId]);
+  }, [api, eventId, me]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  const me = session.user.id;
   const organizationManager = canManage(session.organization?.role);
   const state = useMemo<DirectoryState>(() => {
     if (loaded) {
@@ -107,9 +110,7 @@ export function useDirectory(
           workstreams: loaded.workstreams,
           isManager,
           nameOf,
-          assignees: loaded.contributors ?? [
-            { id: me, label: nameOf(me) || session.user.displayName },
-          ],
+          assignees: loaded.contributors,
           mayChange: (record) =>
             isManager ||
             record.owner_user_id === me ||
@@ -118,7 +119,7 @@ export function useDirectory(
       };
     }
     return error ? failed(error.error) : { kind: "loading" };
-  }, [loaded, error, me, organizationManager, session.user.displayName]);
+  }, [loaded, error, me, organizationManager]);
 
   return { state, reload };
 }

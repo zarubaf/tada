@@ -857,3 +857,8 @@ workstream-field-name = Name (Pflichtfeld)
 workstream-field-lead = Arbeitsbereichsleitung
 workstream-status-active = aktiv
 workstream-status-closed = geschlossen
+
+## Search lists
+
+combobox-loading = Suche läuft
+combobox-empty = Keine Treffer

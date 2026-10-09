@@ -186,8 +186,8 @@ describe("ActionsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers the members with a role as owners to a manager", async () => {
-    render({ eventManager: true, lists: { "/actions": [] } });
+  it("offers the contributors and managers of the event as owners to a contributor", async () => {
+    render({ lists: { "/actions": [] } });
     await screen.findByText("Noch keine Aufgaben");
 
     await user.click(screen.getByRole("button", { name: /Verantwortlich/ }));
