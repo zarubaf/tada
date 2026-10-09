@@ -5,7 +5,8 @@ import { Router } from "../router/Router";
 import { SignInPage } from "./SignInPage";
 import { fakeApi, findAlert, json, problem, queryAlert } from "./testing";
 
-const SAME_MESSAGE = "Wenn die Adresse bekannt ist, erhalten Sie in Kürze eine E-Mail.";
+const SAME_MESSAGE =
+  "Wenn die Adresse bekannt ist, ist eine E-Mail mit einem Anmeldelink unterwegs oder schon in Ihrem Postfach. Verwenden Sie den Link in der neuesten E-Mail.";
 
 async function submit(address: string, ...responses: Response[]) {
   const { api, calls } = fakeApi(...responses);

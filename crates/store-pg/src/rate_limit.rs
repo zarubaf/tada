@@ -121,7 +121,7 @@ pub(crate) async fn delete_ended_counters(
 mod tests {
     use jiff::SignedDuration;
     use tada_app::domain::identity::Email;
-    use tada_app::rate_limit::{SIGN_IN_PER_IP, SignInLimits, sign_in_limits};
+    use tada_app::rate_limit::{MAIL_COOLDOWN, SIGN_IN_PER_IP, SignInLimits, sign_in_limits};
 
     use super::*;
     use crate::testing::TestDatabase;
@@ -200,7 +200,7 @@ mod tests {
             hit(&test, &limiter(), &limit, later).await,
             RateDecision::Limited { .. }
         ));
-        let next_cooldown = now() + SignedDuration::from_mins(5);
+        let next_cooldown = now() + MAIL_COOLDOWN;
         assert_eq!(
             hit(&test, &limiter(), &limit, next_cooldown).await,
             RateDecision::Allowed
