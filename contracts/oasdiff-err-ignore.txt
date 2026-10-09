@@ -1,4 +1,5 @@
 # Changes that oasdiff reports as breaking but that ADR 0017 allows: a new value of a list that the contract marks as open,
 # and that each client handles. Each line names the method, the path and the change as oasdiff prints them.
+# Remove an entry when the base of the comparison (main) contains the change.
 # The operation of a proposal: "The list of kinds is open." The web client shows an unknown kind with a general text.
 GET /api/v1/changesets/{changeset_id} added `subschema #8, subschema #9, subschema #10, subschema #11, subschema #12, subschema #13, subschema #14` to the `proposals/items/operation` response property `oneOf` list for the response status `200`
