@@ -49,7 +49,8 @@ Commitment (`COM`, event scope):
   - `fulfilled`, `broken` and `withdrawn` are final.
 - A command cannot remove the condition text of a conditional commitment.
   The only way to `firm` is the explicit "make firm" command, or an accepted proposal of that change.
-- The "make firm" command needs a reason. The audit log keeps it.
+- The "make firm" command needs a reason. The reason is stored on the commitment. The audit log records who made it firm and when.
+  The audit log holds no free text (ADR 0039).
 
 Operations in proposals (`domain::proposals::Operation`):
 

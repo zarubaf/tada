@@ -492,6 +492,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "workstream_id",
             "due_date",
             "status",
+            "firm_reason",
             "version",
             "created_at",
             "updated_at",
