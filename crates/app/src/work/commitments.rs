@@ -13,16 +13,16 @@ use super::checks::{
 };
 use super::{
     CommitmentFields, CommitmentView, NewCommitmentRecord, WorkError, WorkPorts, WorkQuery,
-    WorkStore,
 };
 use crate::access::{self, Principal};
 use crate::audit::AuditAction;
 use crate::caller::MemberCaller;
-use crate::identity::IdentityStore;
 use crate::paging::Page;
 use crate::problem::FieldError;
 use crate::proposals::text_error_code;
-use crate::records::{Checker, NumberCursor, audit, page, record_id};
+use crate::records::{
+    Checker, NumberCursor, RecordRef, Shown, audit, page, record_id, shown, shown_one,
+};
 
 /// The input of `create_commitment`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,7 +64,7 @@ pub async fn create_commitment(
     event: EventId,
     input: NewCommitment,
     ports: WorkPorts<'_>,
-) -> Result<CommitmentView, WorkError> {
+) -> Result<Shown<CommitmentView>, WorkError> {
     require_create(caller, event, ports.identity).await?;
     let scope = caller.scope();
     let id = CommitmentId::from_uuid(
@@ -102,12 +102,13 @@ pub async fn create_commitment(
         },
     };
     let audit = audit(caller, AuditAction::CommitmentCreate, id.as_uuid());
-    created(
+    let commitment = created(
         ports
             .work
             .create_commitment(scope, &commitment, ports.clock.now(), &audit)
             .await?,
-    )
+    )?;
+    Ok(Shown::created(commitment))
 }
 
 /// The current commitment, if the caller can change it.
@@ -143,9 +144,9 @@ async fn store_commitment_change(
     expected: RecordVersion,
     action: AuditAction,
     ports: WorkPorts<'_>,
-) -> Result<CommitmentView, WorkError> {
+) -> Result<Shown<CommitmentView>, WorkError> {
     let audit = audit(caller, action, id.as_uuid());
-    changed(
+    let commitment = changed(
         ports
             .work
             .change_commitment(
@@ -158,7 +159,15 @@ async fn store_commitment_change(
                 &audit,
             )
             .await?,
+    )?;
+    Ok(shown_one(
+        caller,
+        commitment,
+        RecordRef::Commitment(id),
+        ports.identity,
+        ports.work,
     )
+    .await?)
 }
 
 /// Changes a commitment: its owner, the lead of its workstream or an event manager can do it.
@@ -169,7 +178,7 @@ pub async fn change_commitment(
     id: CommitmentId,
     change: CommitmentChange,
     ports: WorkPorts<'_>,
-) -> Result<CommitmentView, WorkError> {
+) -> Result<Shown<CommitmentView>, WorkError> {
     let current = changeable_commitment(caller, event, id, ports).await?;
     let old = &current.fields;
     let CommitmentChange {
@@ -240,7 +249,7 @@ pub async fn make_commitment_firm(
     id: CommitmentId,
     input: FirmInput,
     ports: WorkPorts<'_>,
-) -> Result<CommitmentView, WorkError> {
+) -> Result<Shown<CommitmentView>, WorkError> {
     let current = changeable_commitment(caller, event, id, ports).await?;
     let reason = FirmReason::parse(&input.reason).map_err(|error| {
         WorkError::Invalid(vec![FieldError::new("reason", text_error_code(error))])
@@ -270,28 +279,44 @@ pub async fn get_commitment(
     caller: &impl Principal,
     event: EventId,
     id: CommitmentId,
-    identity: &dyn IdentityStore,
-    work: &dyn WorkStore,
-) -> Result<CommitmentView, WorkError> {
-    access::event_access(caller, event, identity).await?;
-    work.commitment(caller.scope(), event, id)
+    ports: WorkPorts<'_>,
+) -> Result<Shown<CommitmentView>, WorkError> {
+    access::event_access(caller, event, ports.identity).await?;
+    let commitment = ports
+        .work
+        .commitment(caller.scope(), event, id)
         .await?
-        .ok_or(WorkError::NotFound)
+        .ok_or(WorkError::NotFound)?;
+    Ok(shown_one(
+        caller,
+        commitment,
+        RecordRef::Commitment(id),
+        ports.identity,
+        ports.work,
+    )
+    .await?)
 }
 
-/// The commitments of the event that match `query`, in the order of their numbers.
+/// The commitments of the event that match `query`, in the order of their numbers, with their evidence.
 pub async fn list_commitments(
     caller: &impl Principal,
     event: EventId,
     query: WorkQuery<CommitmentStatus>,
-    identity: &dyn IdentityStore,
-    work: &dyn WorkStore,
-) -> Result<Page<CommitmentView, NumberCursor>, WorkError> {
-    access::event_access(caller, event, identity).await?;
-    let items = work
+    ports: WorkPorts<'_>,
+) -> Result<Page<Shown<CommitmentView>, NumberCursor>, WorkError> {
+    access::event_access(caller, event, ports.identity).await?;
+    let items = ports
+        .work
         .commitments(caller.scope(), event, &query.filter())
         .await?;
-    Ok(page(items, query.limit, |commitment| {
-        commitment.local_number
-    }))
+    let Page { items, next } = page(items, query.limit, |commitment| commitment.local_number);
+    let items = shown(
+        caller,
+        items,
+        |commitment| RecordRef::Commitment(commitment.id),
+        ports.identity,
+        ports.work,
+    )
+    .await?;
+    Ok(Page { items, next })
 }

@@ -4256,7 +4256,8 @@
           "title",
           "owner_user_id",
           "status",
-          "version"
+          "version",
+          "evidence"
         ],
         "properties": {
           "id": {
@@ -4306,6 +4307,13 @@
             "type": "integer",
             "format": "int64",
             "description": "The record version. A change needs it."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordEvidence"
+            },
+            "description": "The evidence of the accepted proposals that created or changed the action."
           }
         }
       },
@@ -7974,7 +7982,8 @@
           "local_id",
           "name",
           "kind",
-          "version"
+          "version",
+          "evidence"
         ],
         "properties": {
           "id": {
@@ -8008,6 +8017,13 @@
             "type": "integer",
             "format": "int64",
             "description": "The record version. A change needs it."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordEvidence"
+            },
+            "description": "The evidence of the accepted proposals that created or changed the institution,\nfrom the sources that the caller can read."
           }
         }
       },
@@ -9334,7 +9350,8 @@
           "id",
           "local_id",
           "name",
-          "version"
+          "version",
+          "evidence"
         ],
         "properties": {
           "id": {
@@ -9372,6 +9389,13 @@
             "type": "integer",
             "format": "int64",
             "description": "The record version. A change needs it."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordEvidence"
+            },
+            "description": "The evidence of the accepted proposals that created or changed the person,\nfrom the sources that the caller can read."
           }
         }
       },
@@ -9687,7 +9711,7 @@
       },
       "RecordEvidence": {
         "type": "object",
-        "description": "A passage that supports one version of a commitment.",
+        "description": "A passage that supports one version of a record.",
         "required": [
           "record_version",
           "proposal_id",

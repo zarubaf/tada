@@ -99,7 +99,7 @@ async fn a_taken_party_id_is_refused_in_each_organization() {
     let created = create_person(&owner_a, person("Beat Muster"), &database, &database, &Now)
         .await
         .unwrap();
-    assert_eq!(created.id.as_uuid(), id);
+    assert_eq!(created.record.id.as_uuid(), id);
     for caller in [&owner_a, &owner_b] {
         let error = create_person(caller, person("Anna Beispiel"), &database, &database, &Now)
             .await

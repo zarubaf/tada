@@ -13,10 +13,10 @@ use tada_app::domain::work::{
     ActionStatus as DomainActionStatus, CommitmentStatus as DomainStatus,
 };
 use tada_app::problem::ProblemCode;
-use tada_app::records::NumberCursor;
+use tada_app::records::{NumberCursor, RecordEvidenceView, Shown};
 use tada_app::work::{
     self as app, ActionChange, ActionView, CommitmentChange, CommitmentView, FirmInput, InEvent,
-    NewAction, NewCommitment, RecordEvidenceView, WorkError, WorkPorts, WorkQuery,
+    NewAction, NewCommitment, WorkError, WorkPorts, WorkQuery,
 };
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -154,10 +154,16 @@ pub struct Action {
     pub status: ActionStatus,
     /// The record version. A change needs it.
     pub version: i64,
+    /// The evidence of the accepted proposals that created or changed the action.
+    pub evidence: Vec<RecordEvidence>,
 }
 
-impl From<ActionView> for Action {
-    fn from(action: ActionView) -> Self {
+impl From<Shown<ActionView>> for Action {
+    fn from(shown: Shown<ActionView>) -> Self {
+        let Shown {
+            record: action,
+            evidence,
+        } = shown;
         let local_id = action.local_id();
         let fields = action.fields;
         Self {
@@ -171,6 +177,7 @@ impl From<ActionView> for Action {
             due_date: fields.due_date,
             status: fields.status.into(),
             version: action.version.get(),
+            evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
         }
     }
 }
@@ -193,7 +200,7 @@ pub struct Promisor {
     pub name: String,
 }
 
-/// A passage that supports one version of a commitment.
+/// A passage that supports one version of a record.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct RecordEvidence {
     /// The record version that the accepted change produced.
@@ -247,8 +254,12 @@ pub struct Commitment {
     pub evidence: Vec<RecordEvidence>,
 }
 
-impl From<CommitmentView> for Commitment {
-    fn from(commitment: CommitmentView) -> Self {
+impl From<Shown<CommitmentView>> for Commitment {
+    fn from(shown: Shown<CommitmentView>) -> Self {
+        let Shown {
+            record: commitment,
+            evidence,
+        } = shown;
         let local_id = commitment.local_id();
         let fields = commitment.fields;
         let (kind, id) = match commitment.promisor.party {
@@ -273,11 +284,7 @@ impl From<CommitmentView> for Commitment {
             status: fields.status.into(),
             firm_reason: fields.firm_reason.map(|text| text.as_str().to_owned()),
             version: commitment.version.get(),
-            evidence: commitment
-                .evidence
-                .into_iter()
-                .map(RecordEvidence::from)
-                .collect(),
+            evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
         }
     }
 }
@@ -488,14 +495,8 @@ async fn list_actions(
         after: query.cursor.as_deref().map(decode_cursor).transpose()?,
         limit: page_limit(query.limit)?,
     };
-    let page = app::list_actions(
-        &caller,
-        EventId::from_uuid(event_id),
-        query,
-        state.identity.as_ref(),
-        state.work.as_ref(),
-    )
-    .await?;
+    let page =
+        app::list_actions(&caller, EventId::from_uuid(event_id), query, ports(&state)).await?;
     Ok(axum::Json(ActionPage {
         items: page.items.into_iter().map(Action::from).collect(),
         next_cursor: page.next.as_ref().map(encode_cursor),
@@ -560,8 +561,7 @@ async fn get_action(
         &caller,
         EventId::from_uuid(event_id),
         ActionId::from_uuid(id),
-        state.identity.as_ref(),
-        state.work.as_ref(),
+        ports(&state),
     )
     .await?;
     Ok(axum::Json(action.into()))
@@ -637,14 +637,8 @@ async fn list_commitments(
         after: query.cursor.as_deref().map(decode_cursor).transpose()?,
         limit: page_limit(query.limit)?,
     };
-    let page = app::list_commitments(
-        &caller,
-        EventId::from_uuid(event_id),
-        query,
-        state.identity.as_ref(),
-        state.work.as_ref(),
-    )
-    .await?;
+    let page =
+        app::list_commitments(&caller, EventId::from_uuid(event_id), query, ports(&state)).await?;
     Ok(axum::Json(CommitmentPage {
         items: page.items.into_iter().map(Commitment::from).collect(),
         next_cursor: page.next.as_ref().map(encode_cursor),
@@ -709,8 +703,7 @@ async fn get_commitment(
         &caller,
         EventId::from_uuid(event_id),
         CommitmentId::from_uuid(id),
-        state.identity.as_ref(),
-        state.work.as_ref(),
+        ports(&state),
     )
     .await?;
     Ok(axum::Json(commitment.into()))
@@ -845,11 +838,9 @@ async fn my_work(
     State(state): State<ApiState>,
     Caller(caller): Caller,
 ) -> Result<axum::Json<MyWork>, ApiError> {
-    let view =
-        tada_app::my_work::my_work(&caller, state.identity.as_ref(), state.work.as_ref()).await?;
+    let view = tada_app::my_work::my_work(&caller, ports(&state)).await?;
     Ok(axum::Json(MyWork {
         actions: view
-            .work
             .actions
             .into_iter()
             .map(|InEvent { event_key, record }| MyAction {
@@ -858,7 +849,6 @@ async fn my_work(
             })
             .collect(),
         commitments: view
-            .work
             .commitments
             .into_iter()
             .map(|InEvent { event_key, record }| MyCommitment {

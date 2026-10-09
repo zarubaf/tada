@@ -11,8 +11,10 @@ use tada_domain::work::{
 };
 
 use super::*;
+use crate::access::SourceReach;
 use crate::parties::{InstitutionFields, InstitutionView, PartyRef, PersonFields, PersonView};
 use crate::records::{Changed, Created, NumberCursor};
+use crate::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 use crate::work::{
     ActionFields, CommitmentFields, MyWork, NewActionRecord, NewCommitmentRecord, WorkFilter,
 };
@@ -63,6 +65,18 @@ impl WorkstreamStore for Memory {
 
     async fn list(&self, _: OrgScope, _: EventId) -> Result<Vec<Workstream>, StoreError> {
         unreachable!()
+    }
+}
+
+#[async_trait]
+impl EvidenceStore for Memory {
+    async fn evidence_of(
+        &self,
+        _: OrgScope,
+        _: &[RecordRef],
+        _: &SourceReach,
+    ) -> Result<Vec<(RecordRef, RecordEvidenceView)>, StoreError> {
+        Ok(Vec::new())
     }
 }
 
@@ -523,7 +537,6 @@ fn existing_commitment(memory: &Memory, status: CommitmentStatus) -> CommitmentI
             firm_reason: None,
         },
         version: RecordVersion::FIRST,
-        evidence: Vec::new(),
     });
     id
 }

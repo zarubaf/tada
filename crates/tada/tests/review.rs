@@ -721,6 +721,27 @@ mod work {
         assert_eq!(read["evidence"][0]["quote"], "Der Ort ist noch offen.");
         assert_eq!(read["evidence"][0]["record_version"], 1);
 
+        // The new person shows its evidence to a reader of the source (ADR 0069).
+        let (status, read_person) = api
+            .get(&contributor.cookie, &format!("/api/v1/persons/{person}"))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{read_person}");
+        assert_eq!(
+            read_person["evidence"][0]["quote"],
+            "Wer klärt die Bewilligung?"
+        );
+        // A member of another event reads the person, but not the source of its evidence.
+        let other_event = api.create_event(&owner.cookie, "TEST31").await;
+        let outsider = api.member("testwil", OrganizationRole::Member).await;
+        api.add_to_event(&owner.cookie, &other_event, &outsider, "event-viewer")
+            .await;
+        let (status, outside) = api
+            .get(&outsider.cookie, &format!("/api/v1/persons/{person}"))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{outside}");
+        assert_eq!(outside["name"], "Moritz Muster");
+        assert_eq!(outside["evidence"], json!([]));
+
         // Only "make firm" or an accepted proposal of that change makes it firm (ADR 0068).
         let (status, problem) = api
             .send(

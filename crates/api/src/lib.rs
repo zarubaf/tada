@@ -1058,6 +1058,24 @@ mod tests {
     struct NoParties;
 
     #[async_trait::async_trait]
+    impl tada_app::records::EvidenceStore for NoParties {
+        async fn evidence_of(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &[tada_app::records::RecordRef],
+            _: &tada_app::access::SourceReach,
+        ) -> Result<
+            Vec<(
+                tada_app::records::RecordRef,
+                tada_app::records::RecordEvidenceView,
+            )>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
     impl tada_app::parties::PartyStore for NoParties {
         async fn create_person(
             &self,
@@ -1213,6 +1231,24 @@ mod tests {
 
     #[derive(Debug)]
     struct NoWork;
+
+    #[async_trait::async_trait]
+    impl tada_app::records::EvidenceStore for NoWork {
+        async fn evidence_of(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &[tada_app::records::RecordRef],
+            _: &tada_app::access::SourceReach,
+        ) -> Result<
+            Vec<(
+                tada_app::records::RecordRef,
+                tada_app::records::RecordEvidenceView,
+            )>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+    }
 
     #[async_trait::async_trait]
     impl WorkStore for NoWork {

@@ -1,5 +1,7 @@
 //! The `SourceStore` adapter (ADR 0050): source items, source versions and their full-text search.
 
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
@@ -78,7 +80,8 @@ impl SourceStore for Database {
         query: &str,
         limit: u32,
     ) -> Result<Vec<SourceHit>, StoreError> {
-        let rows = readable_versions(&self.pool, scope, reach, None, Some(query), limit).await?;
+        let rows =
+            readable_versions(&self.pool, scope, reach, None, Some(query), limit, true).await?;
         // A source version without text never matches a query; the filter only drops the `None`.
         rows.into_iter()
             .filter_map(|row| Some((row.id, row.captured_at, row.text?)))
@@ -105,8 +108,16 @@ impl SourceStore for Database {
         reach: &SourceReach,
         id: SourceVersionId,
     ) -> Result<Option<String>, StoreError> {
-        let rows =
-            readable_versions(&self.pool, scope, reach, Some(&[id.as_uuid()]), None, 1).await?;
+        let rows = readable_versions(
+            &self.pool,
+            scope,
+            reach,
+            Some(&[id.as_uuid()]),
+            None,
+            1,
+            true,
+        )
+        .await?;
         Ok(rows.into_iter().find_map(|row| row.text))
     }
 
@@ -118,7 +129,8 @@ impl SourceStore for Database {
     ) -> Result<Vec<SourceVersionText>, StoreError> {
         let ids: Vec<Uuid> = ids.iter().map(|id| id.as_uuid()).collect();
         let limit = u32::try_from(ids.len()).unwrap_or(u32::MAX);
-        let rows = readable_versions(&self.pool, scope, reach, Some(&ids), None, limit).await?;
+        let rows =
+            readable_versions(&self.pool, scope, reach, Some(&ids), None, limit, true).await?;
         Ok(rows
             .into_iter()
             .map(|row| SourceVersionText {
@@ -137,9 +149,21 @@ struct ReadableVersion {
     text: Option<String>,
 }
 
+/// The source versions of `ids` that `reach` can read, without their texts.
+pub(crate) async fn readable_source_ids(
+    pool: &PgPool,
+    scope: OrgScope,
+    reach: &SourceReach,
+    ids: &[Uuid],
+) -> Result<HashSet<Uuid>, StoreError> {
+    let limit = u32::try_from(ids.len()).unwrap_or(u32::MAX);
+    let rows = readable_versions(pool, scope, reach, Some(ids), None, limit, false).await?;
+    Ok(rows.into_iter().map(|row| row.id).collect())
+}
+
 /// The source versions inside `reach`: the one query that applies the rule of `SourceReach`.
 /// `ids` limits the result to these source versions, and `query` to the matches of a web-search query, the best first.
-/// A source version without text never matches a query.
+/// A source version without text never matches a query. Without `with_text`, no row has a text.
 async fn readable_versions(
     pool: &PgPool,
     scope: OrgScope,
@@ -147,6 +171,7 @@ async fn readable_versions(
     ids: Option<&[Uuid]>,
     query: Option<&str>,
     limit: u32,
+    with_text: bool,
 ) -> Result<Vec<ReadableVersion>, StoreError> {
     let (organization, events) = match reach {
         SourceReach::Organization => (true, Vec::new()),
@@ -159,7 +184,8 @@ async fn readable_versions(
     }
     sqlx::query_as!(
         ReadableVersion,
-        r#"SELECT v.id, v.captured_at AS "captured_at: jiff_sqlx::Timestamp", v.text
+        r#"SELECT v.id, v.captured_at AS "captured_at: jiff_sqlx::Timestamp",
+                  CASE WHEN $7 THEN v.text END AS text
            FROM source_version v
            JOIN source_item i ON i.organization_id = v.organization_id AND i.id = v.source_item_id
            WHERE v.organization_id = $1
@@ -183,6 +209,7 @@ async fn readable_versions(
         ids,
         query,
         i64::from(limit),
+        with_text,
     )
     .fetch_all(pool)
     .await

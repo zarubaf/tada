@@ -9,7 +9,7 @@ use tada_app::parties::{
     PartyReadError, PersonChange, PersonView,
 };
 use tada_app::problem::ProblemCode;
-use tada_app::records::NumberCursor;
+use tada_app::records::{NumberCursor, Shown};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -20,6 +20,7 @@ use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::cursor;
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
+use crate::work::RecordEvidence;
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
@@ -80,10 +81,17 @@ pub struct Person {
     pub user_id: Option<Uuid>,
     /// The record version. A change needs it.
     pub version: i64,
+    /// The evidence of the accepted proposals that created or changed the person,
+    /// from the sources that the caller can read.
+    pub evidence: Vec<RecordEvidence>,
 }
 
-impl From<PersonView> for Person {
-    fn from(person: PersonView) -> Self {
+impl From<Shown<PersonView>> for Person {
+    fn from(shown: Shown<PersonView>) -> Self {
+        let Shown {
+            record: person,
+            evidence,
+        } = shown;
         Self {
             id: person.id.as_uuid(),
             local_id: person.local_id(),
@@ -92,6 +100,7 @@ impl From<PersonView> for Person {
             phone: person.phone.map(|phone| phone.as_str().to_owned()),
             user_id: person.user_id.map(UserId::as_uuid),
             version: person.version.get(),
+            evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
         }
     }
 }
@@ -109,10 +118,17 @@ pub struct Institution {
     pub phone: Option<String>,
     /// The record version. A change needs it.
     pub version: i64,
+    /// The evidence of the accepted proposals that created or changed the institution,
+    /// from the sources that the caller can read.
+    pub evidence: Vec<RecordEvidence>,
 }
 
-impl From<InstitutionView> for Institution {
-    fn from(institution: InstitutionView) -> Self {
+impl From<Shown<InstitutionView>> for Institution {
+    fn from(shown: Shown<InstitutionView>) -> Self {
+        let Shown {
+            record: institution,
+            evidence,
+        } = shown;
         Self {
             id: institution.id.as_uuid(),
             local_id: institution.local_id(),
@@ -121,6 +137,7 @@ impl From<InstitutionView> for Institution {
             email: institution.email.map(|email| email.as_str().to_owned()),
             phone: institution.phone.map(|phone| phone.as_str().to_owned()),
             version: institution.version.get(),
+            evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
         }
     }
 }
@@ -362,6 +379,7 @@ async fn change_person(
         &caller,
         PersonId::from_uuid(person_id),
         change,
+        state.identity.as_ref(),
         state.parties.as_ref(),
         state.clock.as_ref(),
     )
@@ -498,6 +516,7 @@ async fn change_institution(
         &caller,
         InstitutionId::from_uuid(institution_id),
         change,
+        state.identity.as_ref(),
         state.parties.as_ref(),
         state.clock.as_ref(),
     )

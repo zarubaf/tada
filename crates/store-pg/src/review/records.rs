@@ -6,30 +6,22 @@
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
-use tada_app::domain::ids::{EventId, LocalIdKind, ProposalId, SourceVersionId, WorkstreamId};
+use tada_app::domain::ids::{EventId, LocalIdKind, SourceVersionId, WorkstreamId};
 use tada_app::domain::parties::Party;
 use tada_app::domain::proposals::Operation;
-use tada_app::domain::sources::Evidence;
 use tada_app::domain::work::{ActionStatus, CommitmentStatus};
 use tada_app::parties::{InstitutionFields, PersonFields};
+use tada_app::records::RecordRef;
 use tada_app::review::{ApplyPlan, ApplyStep, LocalRecord, NewLocalId, StepEvidence};
 use tada_app::work::{ActionFields, CommitmentFields, NewActionRecord, NewCommitmentRecord};
 
 use super::insert_review_text;
+use crate::evidence::insert_evidence;
 use crate::parties::{insert_institution, insert_person};
 use crate::proposals::operation_to_json;
 use crate::work::{
     action_in, commitment_in, insert_action, insert_commitment, update_action, update_commitment,
 };
-
-/// The record that a passage of `record_evidence` supports.
-#[derive(Debug, Clone, Copy)]
-enum RecordRef {
-    Action(Uuid),
-    Commitment(Uuid),
-    Person(Uuid),
-    Institution(Uuid),
-}
 
 /// What a step wrote besides the record: the readable ID of a new record, and the review text of an edit.
 #[derive(Debug, Default)]
@@ -81,7 +73,7 @@ pub(super) async fn write_record(
             };
             let number = insert_person(conn, scope, *id, &fields, None, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Person(*id), number)?);
-            (RecordRef::Person(id.as_uuid()), 1)
+            (RecordRef::Person(*id), 1)
         }
         Operation::CreateInstitution {
             id,
@@ -98,7 +90,7 @@ pub(super) async fn write_record(
             };
             let number = insert_institution(conn, scope, *id, &fields, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Institution(*id), number)?);
-            (RecordRef::Institution(id.as_uuid()), 1)
+            (RecordRef::Institution(*id), 1)
         }
         Operation::CreateAction {
             id,
@@ -123,7 +115,7 @@ pub(super) async fn write_record(
             };
             let number = insert_action(conn, scope, &action, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Action(*id), number)?);
-            (RecordRef::Action(id.as_uuid()), 1)
+            (RecordRef::Action(*id), 1)
         }
         Operation::CreateCommitment {
             id,
@@ -151,7 +143,7 @@ pub(super) async fn write_record(
             };
             let number = insert_commitment(conn, scope, &commitment, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Commitment(*id), number)?);
-            (RecordRef::Commitment(id.as_uuid()), 1)
+            (RecordRef::Commitment(*id), 1)
         }
         Operation::ChangeActionStatus {
             event_id,
@@ -184,7 +176,7 @@ pub(super) async fn write_record(
             )
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
-            (RecordRef::Action(action_id.as_uuid()), version)
+            (RecordRef::Action(*action_id), version)
         }
         Operation::ChangeActionDue {
             event_id,
@@ -210,7 +202,7 @@ pub(super) async fn write_record(
             )
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
-            (RecordRef::Action(action_id.as_uuid()), version)
+            (RecordRef::Action(*action_id), version)
         }
         Operation::ChangeCommitmentStatus {
             event_id,
@@ -248,7 +240,7 @@ pub(super) async fn write_record(
             )
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
-            (RecordRef::Commitment(commitment_id.as_uuid()), version)
+            (RecordRef::Commitment(*commitment_id), version)
         }
         _ => {
             return Err(sqlx::Error::Protocol(
@@ -266,53 +258,6 @@ fn local_id(record: LocalRecord, number: i64) -> Result<NewLocalId, sqlx::Error>
         local_number: u64::try_from(number)
             .map_err(|error| sqlx::Error::Decode(Box::new(error)))?,
     })
-}
-
-/// One row of `record_evidence` for each passage, with the record version that the step produced.
-async fn insert_evidence(
-    conn: &mut PgConnection,
-    scope: OrgScope,
-    record: RecordRef,
-    version: i64,
-    proposal: ProposalId,
-    evidence: &[Evidence],
-) -> Result<(), sqlx::Error> {
-    let (action, commitment, person, institution) = match record {
-        RecordRef::Action(id) => (Some(id), None, None, None),
-        RecordRef::Commitment(id) => (None, Some(id), None, None),
-        RecordRef::Person(id) => (None, None, Some(id), None),
-        RecordRef::Institution(id) => (None, None, None, Some(id)),
-    };
-    let offset =
-        |value: u32| i32::try_from(value).map_err(|error| sqlx::Error::Encode(Box::new(error)));
-    for Evidence {
-        source_version_id,
-        passage,
-    } in evidence
-    {
-        sqlx::query!(
-            "INSERT INTO record_evidence
-                 (id, organization_id, action_id, commitment_id, person_id, institution_id, record_version,
-                  proposal_id, source_version_id, start_offset, end_offset, quote, page)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
-            Uuid::now_v7(),
-            scope.organization_id().as_uuid(),
-            action,
-            commitment,
-            person,
-            institution,
-            version,
-            proposal.as_uuid(),
-            source_version_id.as_uuid(),
-            offset(passage.start)?,
-            offset(passage.end)?,
-            passage.quote,
-            passage.page.map(offset).transpose()?,
-        )
-        .execute(&mut *conn)
-        .await?;
-    }
-    Ok(())
 }
 
 /// The version check of `check_versions` for one work step: a new record whose ID is free and whose workstream

@@ -10,15 +10,14 @@ use super::checks::{
     changed, check_owner, check_workstream, created, parse_description, parse_title,
     require_change, require_create,
 };
-use super::{
-    ActionFields, ActionView, NewActionRecord, WorkError, WorkPorts, WorkQuery, WorkStore,
-};
+use super::{ActionFields, ActionView, NewActionRecord, WorkError, WorkPorts, WorkQuery};
 use crate::access::{self, Principal};
 use crate::audit::AuditAction;
 use crate::caller::MemberCaller;
-use crate::identity::IdentityStore;
 use crate::paging::Page;
-use crate::records::{Checker, NumberCursor, audit, page, record_id};
+use crate::records::{
+    Checker, NumberCursor, RecordRef, Shown, audit, page, record_id, shown, shown_one,
+};
 
 /// The input of `create_action`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,7 +49,7 @@ pub async fn create_action(
     event: EventId,
     input: NewAction,
     ports: WorkPorts<'_>,
-) -> Result<ActionView, WorkError> {
+) -> Result<Shown<ActionView>, WorkError> {
     require_create(caller, event, ports.identity).await?;
     let scope = caller.scope();
     let id =
@@ -78,12 +77,13 @@ pub async fn create_action(
         },
     };
     let audit = audit(caller, AuditAction::ActionCreate, id.as_uuid());
-    created(
+    let action = created(
         ports
             .work
             .create_action(scope, &action, ports.clock.now(), &audit)
             .await?,
-    )
+    )?;
+    Ok(Shown::created(action))
 }
 
 /// Changes an action: its owner, the lead of its workstream or an event manager can do it.
@@ -93,7 +93,7 @@ pub async fn change_action(
     id: ActionId,
     change: ActionChange,
     ports: WorkPorts<'_>,
-) -> Result<ActionView, WorkError> {
+) -> Result<Shown<ActionView>, WorkError> {
     let access = access::event_access(caller, event, ports.identity).await?;
     let scope = caller.scope();
     let current = ports
@@ -167,7 +167,7 @@ pub async fn change_action(
         status,
     };
     let audit = audit(caller, AuditAction::ActionChange, id.as_uuid());
-    changed(
+    let action = changed(
         ports
             .work
             .change_action(
@@ -180,32 +180,60 @@ pub async fn change_action(
                 &audit,
             )
             .await?,
+    )?;
+    Ok(shown_one(
+        caller,
+        action,
+        RecordRef::Action(id),
+        ports.identity,
+        ports.work,
     )
+    .await?)
 }
 
-/// One action of the event. Each reader of the event sees it.
+/// One action of the event, with its evidence. Each reader of the event sees it.
 pub async fn get_action(
     caller: &impl Principal,
     event: EventId,
     id: ActionId,
-    identity: &dyn IdentityStore,
-    work: &dyn WorkStore,
-) -> Result<ActionView, WorkError> {
-    access::event_access(caller, event, identity).await?;
-    work.action(caller.scope(), event, id)
+    ports: WorkPorts<'_>,
+) -> Result<Shown<ActionView>, WorkError> {
+    access::event_access(caller, event, ports.identity).await?;
+    let action = ports
+        .work
+        .action(caller.scope(), event, id)
         .await?
-        .ok_or(WorkError::NotFound)
+        .ok_or(WorkError::NotFound)?;
+    Ok(shown_one(
+        caller,
+        action,
+        RecordRef::Action(id),
+        ports.identity,
+        ports.work,
+    )
+    .await?)
 }
 
-/// The actions of the event that match `query`, in the order of their numbers.
+/// The actions of the event that match `query`, in the order of their numbers, with their evidence.
 pub async fn list_actions(
     caller: &impl Principal,
     event: EventId,
     query: WorkQuery<ActionStatus>,
-    identity: &dyn IdentityStore,
-    work: &dyn WorkStore,
-) -> Result<Page<ActionView, NumberCursor>, WorkError> {
-    access::event_access(caller, event, identity).await?;
-    let items = work.actions(caller.scope(), event, &query.filter()).await?;
-    Ok(page(items, query.limit, |action| action.local_number))
+    ports: WorkPorts<'_>,
+) -> Result<Page<Shown<ActionView>, NumberCursor>, WorkError> {
+    access::event_access(caller, event, ports.identity).await?;
+    let items = ports
+        .work
+        .actions(caller.scope(), event, &query.filter())
+        .await?;
+    let Page { items, next } = page(items, query.limit, |action| action.local_number);
+    let items = shown(
+        caller,
+        items,
+        |action| RecordRef::Action(action.id),
+        ports.identity,
+        ports.work,
+    )
+    .await?;
+    Ok(Page { items, next })
 }

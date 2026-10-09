@@ -1,6 +1,8 @@
 //! The apply of proposals that create or change work records and parties (ADR 0068, ADR 0069).
 
-use tada_app::domain::ids::{CommitmentId, LocalIdKind};
+use tada_app::access::SourceReach;
+use tada_app::domain::ids::{CommitmentId, LocalIdKind, PersonId};
+use tada_app::records::{EvidenceStore, RecordRef};
 use tada_app::review::{LocalRecord, RecordEditInput};
 
 use super::*;
@@ -128,25 +130,38 @@ async fn applying_a_commitment_writes_its_evidence_with_version_1() {
     assert_eq!(audit_actions(&test, person_id).await, ["person.create"]);
     assert_eq!(audit_actions(&test, second).await, ["proposal.accept"]);
 
-    // The view of the commitment shows the evidence with the capture time of its source version.
-    let view = tada_app::work::WorkStore::commitment(
-        &test.database,
-        open_day.manager.scope(),
-        open_day.event,
-        CommitmentId::from_uuid(commitment_id),
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    assert_eq!(view.evidence.len(), 1);
-    assert_eq!(
-        view.evidence[0].source_version_id,
-        changeset.source_version_id
-    );
-    assert_eq!(
-        view.evidence[0].record_version,
-        tada_app::domain::RecordVersion::FIRST
-    );
+    // The commitment and the person show the evidence with the capture time of its source version.
+    let commitment = RecordRef::Commitment(CommitmentId::from_uuid(commitment_id));
+    let person = RecordRef::Person(PersonId::from_uuid(person_id));
+    let evidence = test
+        .database
+        .evidence_of(
+            open_day.manager.scope(),
+            &[commitment, person],
+            &SourceReach::Events(vec![open_day.event]),
+        )
+        .await
+        .unwrap();
+    let records: Vec<_> = evidence.iter().map(|(record, _)| *record).collect();
+    assert_eq!(records, [person, commitment]);
+    for (_, passage) in &evidence {
+        assert_eq!(passage.source_version_id, changeset.source_version_id);
+        assert_eq!(
+            passage.record_version,
+            tada_app::domain::RecordVersion::FIRST
+        );
+    }
+    // A person belongs to the organization, but a member of another event does not read the source of its evidence.
+    let elsewhere = test
+        .database
+        .evidence_of(
+            open_day.manager.scope(),
+            &[person],
+            &SourceReach::Events(Vec::new()),
+        )
+        .await
+        .unwrap();
+    assert!(elsewhere.is_empty());
 }
 
 fn commitment_status(event: EventId, id: Uuid, status: &str, expected_version: i64) -> Value {

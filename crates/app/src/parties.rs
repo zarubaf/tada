@@ -18,7 +18,10 @@ use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::text_error_code;
-use crate::records::{Changed, Checker, Created, NumberCursor, audit, page, record_id};
+use crate::records::{
+    Changed, Checker, Created, EvidenceStore, NumberCursor, RecordRef, Shown, audit, page,
+    record_id, shown, shown_one,
+};
 use crate::store::StoreError;
 
 /// A person of the organization, as the commands and queries show it.
@@ -90,7 +93,7 @@ pub struct InstitutionFields {
 /// The repository port for persons and institutions. Each method stays inside `scope`.
 /// A create or a change records its audit event in the same transaction.
 #[async_trait]
-pub trait PartyStore: Debug + Send + Sync {
+pub trait PartyStore: EvidenceStore + Debug + Send + Sync {
     /// Inserts a person and gives it the next number of the organization (ADR 0038).
     async fn create_person(
         &self,
@@ -424,7 +427,7 @@ pub async fn create_person(
     identity: &dyn IdentityStore,
     store: &dyn PartyStore,
     clock: &dyn Clock,
-) -> Result<PersonView, PartyError> {
+) -> Result<Shown<PersonView>, PartyError> {
     require_create(caller, identity).await?;
     let id = PersonId::from_uuid(new_id(input.id)?);
     let mut check = Checker::default();
@@ -439,7 +442,7 @@ pub async fn create_person(
     let name = check.finish(name).map_err(PartyError::Invalid)?;
     let audit = audit(caller, AuditAction::PersonCreate, id.as_uuid());
     let fields = PersonFields { name, email, phone };
-    created(
+    let person = created(
         store
             .create_person(
                 caller.scope(),
@@ -450,7 +453,8 @@ pub async fn create_person(
                 &audit,
             )
             .await?,
-    )
+    )?;
+    Ok(Shown::created(person))
 }
 
 /// Changes a person. Only an owner or an admin can do it.
@@ -458,9 +462,10 @@ pub async fn change_person(
     caller: &MemberCaller,
     id: PersonId,
     change: PersonChange,
+    identity: &dyn IdentityStore,
     store: &dyn PartyStore,
     clock: &dyn Clock,
-) -> Result<PersonView, PartyError> {
+) -> Result<Shown<PersonView>, PartyError> {
     require_change(caller)?;
     let scope = caller.scope();
     let current = store.person(scope, id).await?.ok_or(PartyError::NotFound)?;
@@ -490,7 +495,7 @@ pub async fn change_person(
     let name = check.finish(name).map_err(PartyError::Invalid)?;
     let audit = audit(caller, AuditAction::PersonChange, id.as_uuid());
     let fields = PersonFields { name, email, phone };
-    changed(
+    let person = changed(
         store
             .change_person(
                 scope,
@@ -501,7 +506,8 @@ pub async fn change_person(
                 &audit,
             )
             .await?,
-    )
+    )?;
+    Ok(shown_one(caller, person, RecordRef::Person(id), identity, store).await?)
 }
 
 /// The persons whose name contains `query`, in the order of their numbers.
@@ -513,13 +519,22 @@ pub async fn list_persons(
     limit: PageLimit,
     identity: &dyn IdentityStore,
     store: &dyn PartyStore,
-) -> Result<Page<PersonView, NumberCursor>, PartyReadError> {
+) -> Result<Page<Shown<PersonView>, NumberCursor>, PartyReadError> {
     require_read(caller, identity).await?;
     let query = normalized_query(query);
     let items = store
         .persons(caller.scope(), query.as_deref(), after, limit.get() + 1)
         .await?;
-    Ok(page(items, limit, |person| person.local_number))
+    let Page { items, next } = page(items, limit, |person| person.local_number);
+    let items = shown(
+        caller,
+        items,
+        |person| RecordRef::Person(person.id),
+        identity,
+        store,
+    )
+    .await?;
+    Ok(Page { items, next })
 }
 
 pub async fn get_person(
@@ -527,12 +542,13 @@ pub async fn get_person(
     id: PersonId,
     identity: &dyn IdentityStore,
     store: &dyn PartyStore,
-) -> Result<PersonView, PartyReadError> {
+) -> Result<Shown<PersonView>, PartyReadError> {
     require_read(caller, identity).await?;
-    store
+    let person = store
         .person(caller.scope(), id)
         .await?
-        .ok_or(PartyReadError::NotFound)
+        .ok_or(PartyReadError::NotFound)?;
+    Ok(shown_one(caller, person, RecordRef::Person(id), identity, store).await?)
 }
 
 /// Creates an institution. The permission is the one of `create_person`.
@@ -542,7 +558,7 @@ pub async fn create_institution(
     identity: &dyn IdentityStore,
     store: &dyn PartyStore,
     clock: &dyn Clock,
-) -> Result<InstitutionView, PartyError> {
+) -> Result<Shown<InstitutionView>, PartyError> {
     require_create(caller, identity).await?;
     let id = InstitutionId::from_uuid(new_id(input.id)?);
     let mut check = Checker::default();
@@ -558,11 +574,12 @@ pub async fn create_institution(
         email,
         phone,
     };
-    created(
+    let institution = created(
         store
             .create_institution(caller.scope(), id, &fields, clock.now(), &audit)
             .await?,
-    )
+    )?;
+    Ok(Shown::created(institution))
 }
 
 /// Changes an institution. Only an owner or an admin can do it.
@@ -570,9 +587,10 @@ pub async fn change_institution(
     caller: &MemberCaller,
     id: InstitutionId,
     change: InstitutionChange,
+    identity: &dyn IdentityStore,
     store: &dyn PartyStore,
     clock: &dyn Clock,
-) -> Result<InstitutionView, PartyError> {
+) -> Result<Shown<InstitutionView>, PartyError> {
     require_change(caller)?;
     let scope = caller.scope();
     let current = store
@@ -618,7 +636,7 @@ pub async fn change_institution(
         email,
         phone,
     };
-    changed(
+    let institution = changed(
         store
             .change_institution(
                 scope,
@@ -629,7 +647,15 @@ pub async fn change_institution(
                 &audit,
             )
             .await?,
+    )?;
+    Ok(shown_one(
+        caller,
+        institution,
+        RecordRef::Institution(id),
+        identity,
+        store,
     )
+    .await?)
 }
 
 /// The institutions whose name contains `query`. The permission is the one of `list_persons`.
@@ -640,13 +666,22 @@ pub async fn list_institutions(
     limit: PageLimit,
     identity: &dyn IdentityStore,
     store: &dyn PartyStore,
-) -> Result<Page<InstitutionView, NumberCursor>, PartyReadError> {
+) -> Result<Page<Shown<InstitutionView>, NumberCursor>, PartyReadError> {
     require_read(caller, identity).await?;
     let query = normalized_query(query);
     let items = store
         .institutions(caller.scope(), query.as_deref(), after, limit.get() + 1)
         .await?;
-    Ok(page(items, limit, |institution| institution.local_number))
+    let Page { items, next } = page(items, limit, |institution| institution.local_number);
+    let items = shown(
+        caller,
+        items,
+        |institution| RecordRef::Institution(institution.id),
+        identity,
+        store,
+    )
+    .await?;
+    Ok(Page { items, next })
 }
 
 pub async fn get_institution(
@@ -654,12 +689,20 @@ pub async fn get_institution(
     id: InstitutionId,
     identity: &dyn IdentityStore,
     store: &dyn PartyStore,
-) -> Result<InstitutionView, PartyReadError> {
+) -> Result<Shown<InstitutionView>, PartyReadError> {
     require_read(caller, identity).await?;
-    store
+    let institution = store
         .institution(caller.scope(), id)
         .await?
-        .ok_or(PartyReadError::NotFound)
+        .ok_or(PartyReadError::NotFound)?;
+    Ok(shown_one(
+        caller,
+        institution,
+        RecordRef::Institution(id),
+        identity,
+        store,
+    )
+    .await?)
 }
 
 /// The normalized search text, or `None` if it has no characters.

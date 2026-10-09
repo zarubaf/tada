@@ -5,7 +5,9 @@ use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::domain::parties::InstitutionKind;
 use tada_app::parties::{InstitutionFields, PartyStore};
 
-use tada_app::access::EventReach;
+use tada_app::access::{EventReach, SourceReach};
+use tada_app::domain::ids::{ProposalId, SourceVersionId};
+use tada_app::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 
 use super::*;
 use crate::testing::TestDatabase;
@@ -341,7 +343,6 @@ async fn a_commitment_keeps_its_condition_and_its_firm_reason() {
     assert_eq!(commitment.fields.status, CommitmentStatus::Conditional);
     assert_eq!(commitment.promisor.local_id, "INS-001");
     assert_eq!(commitment.promisor.party, Party::Institution(f.supplier));
-    assert!(commitment.evidence.is_empty());
 
     // The schema refuses a conditional commitment with a firm reason.
     let refused = sqlx::query("UPDATE commitment SET firm_reason = 'x' WHERE id = $1")
@@ -378,7 +379,8 @@ async fn a_commitment_keeps_its_condition_and_its_firm_reason() {
     );
 }
 
-/// Task 8 writes the evidence of accepted proposals; the read shows it with the capture time.
+/// The apply writes the evidence of accepted proposals; the read shows it with the capture time,
+/// as far as the caller can read the source.
 #[tokio::test]
 async fn a_commitment_shows_its_evidence() {
     let f = Fixture::start().await;
@@ -462,24 +464,33 @@ async fn a_commitment_shows_its_evidence() {
     .await
     .unwrap();
 
+    let record = RecordRef::Commitment(commitment.id);
     let read = db
-        .commitment(f.scope, f.event, commitment.id)
+        .evidence_of(f.scope, &[record], &SourceReach::Events(vec![f.event]))
         .await
-        .unwrap()
         .unwrap();
     assert_eq!(
-        read.evidence,
-        [RecordEvidenceView {
-            record_version: RecordVersion::FIRST,
-            proposal_id: ProposalId::from_uuid(proposal),
-            source_version_id: SourceVersionId::from_uuid(version),
-            captured_at: "2030-05-02T08:00:00Z".parse().unwrap(),
-            start_offset: 0,
-            end_offset: 23,
-            quote: "Lieferung Freitag 15:00".to_owned(),
-            page: None,
-        }]
+        read,
+        [(
+            record,
+            RecordEvidenceView {
+                record_version: RecordVersion::FIRST,
+                proposal_id: ProposalId::from_uuid(proposal),
+                source_version_id: SourceVersionId::from_uuid(version),
+                captured_at: "2030-05-02T08:00:00Z".parse().unwrap(),
+                start_offset: 0,
+                end_offset: 23,
+                quote: "Lieferung Freitag 15:00".to_owned(),
+                page: None,
+            }
+        )]
     );
+    // A caller who cannot read the source of the event sees no passage of it.
+    let hidden = db
+        .evidence_of(f.scope, &[record], &SourceReach::Events(Vec::new()))
+        .await
+        .unwrap();
+    assert!(hidden.is_empty());
 }
 
 #[tokio::test]

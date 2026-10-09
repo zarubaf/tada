@@ -13,8 +13,7 @@ use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::events::EventKey;
 use tada_app::domain::ids::{
-    ActionId, CommitmentId, EventId, InstitutionId, LocalIdKind, PersonId, ProposalId,
-    SourceVersionId, UserId, WorkstreamId,
+    ActionId, CommitmentId, EventId, InstitutionId, LocalIdKind, PersonId, UserId, WorkstreamId,
 };
 use tada_app::domain::parties::{Party, PartyName};
 use tada_app::domain::work::{
@@ -26,7 +25,7 @@ use tada_app::records::{Changed, Created, NumberCursor};
 use tada_app::store::StoreError;
 use tada_app::work::{
     ActionFields, ActionView, CommitmentFields, CommitmentView, InEvent, MyWork, NewActionRecord,
-    NewCommitmentRecord, RecordEvidenceView, WorkFilter, WorkStore,
+    NewCommitmentRecord, WorkFilter, WorkStore,
 };
 
 use crate::Database;
@@ -117,7 +116,7 @@ impl CommitmentRow {
         })
     }
 
-    fn into_view(self, evidence: Vec<RecordEvidenceView>) -> Result<CommitmentView, InvalidRow> {
+    fn into_view(self) -> Result<CommitmentView, InvalidRow> {
         Ok(CommitmentView {
             id: CommitmentId::from_uuid(self.id),
             local_number: u64::try_from(self.local_number)
@@ -146,38 +145,6 @@ impl CommitmentRow {
                     .map_err(|_| InvalidRow("commitment.firm_reason"))?,
             },
             version: RecordVersion::new(self.version).ok_or(InvalidRow("commitment.version"))?,
-            evidence,
-        })
-    }
-}
-
-struct EvidenceRow {
-    commitment_id: Uuid,
-    record_version: i64,
-    proposal_id: Uuid,
-    source_version_id: Uuid,
-    captured_at: jiff_sqlx::Timestamp,
-    start_offset: i32,
-    end_offset: i32,
-    quote: String,
-    page: Option<i32>,
-}
-
-impl TryFrom<EvidenceRow> for RecordEvidenceView {
-    type Error = InvalidRow;
-
-    fn try_from(row: EvidenceRow) -> Result<Self, InvalidRow> {
-        let offset = |value: i32| u32::try_from(value).map_err(|_| InvalidRow("record_evidence"));
-        Ok(Self {
-            record_version: RecordVersion::new(row.record_version)
-                .ok_or(InvalidRow("record_evidence.record_version"))?,
-            proposal_id: ProposalId::from_uuid(row.proposal_id),
-            source_version_id: SourceVersionId::from_uuid(row.source_version_id),
-            captured_at: row.captured_at.to_jiff(),
-            start_offset: offset(row.start_offset)?,
-            end_offset: offset(row.end_offset)?,
-            quote: row.quote,
-            page: row.page.map(offset).transpose()?,
         })
     }
 }
@@ -274,7 +241,7 @@ async fn select_actions(
         .collect::<Result<_, _>>()?)
 }
 
-/// The commitments of `select` with their promisors and their evidence.
+/// The commitments of `select` with their promisors.
 async fn select_commitments(
     conn: &mut PgConnection,
     scope: OrgScope,
@@ -316,36 +283,9 @@ async fn select_commitments(
     )
     .fetch_all(&mut *conn)
     .await?;
-    let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
-    let evidence = sqlx::query_as!(
-        EvidenceRow,
-        r#"SELECT e.commitment_id AS "commitment_id!", e.record_version, e.proposal_id,
-                  e.source_version_id, v.captured_at AS "captured_at: jiff_sqlx::Timestamp",
-                  e.start_offset, e.end_offset, e.quote, e.page
-           FROM record_evidence e
-           JOIN source_version v
-               ON v.organization_id = e.organization_id AND v.id = e.source_version_id
-           WHERE e.organization_id = $1 AND e.commitment_id = ANY($2)
-           ORDER BY e.record_version, e.start_offset, e.id"#,
-        organization,
-        &ids,
-    )
-    .fetch_all(&mut *conn)
-    .await?;
-    let mut by_commitment: HashMap<Uuid, Vec<RecordEvidenceView>> = HashMap::new();
-    for row in evidence {
-        let id = row.commitment_id;
-        by_commitment
-            .entry(id)
-            .or_default()
-            .push(RecordEvidenceView::try_from(row)?);
-    }
     Ok(rows
         .into_iter()
-        .map(|row| {
-            let evidence = by_commitment.remove(&row.id).unwrap_or_default();
-            row.into_view(evidence)
-        })
+        .map(|row| row.into_view())
         .collect::<Result<_, _>>()?)
 }
 
