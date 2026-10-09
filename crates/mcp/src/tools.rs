@@ -44,6 +44,8 @@ const INSTRUCTIONS: &str = "tada holds the planning data of the events of a club
 Accepted facts are confirmed; assumptions are not confirmed; unknowns have no value. \
 Rules: use the existing fields of get_event_schema first. Never fill in an unknown value and never present an assumption or an open proposal as accepted. \
 Cite each statement with the source_version_id and the passage (start, end) that supports it; get_source_passage gives the exact quote. \
+Before you propose a new person or institution, search for it with search_parties and use the existing one. \
+For a conditional promise, propose create-commitment with a condition; never treat a condition as met without evidence. \
 Propose changes with propose_changeset; the member reviews them in tada, and no tool accepts, rejects or deletes.";
 
 /// The description of `list_events`, with the page size of `app`.
@@ -86,7 +88,7 @@ pub(crate) struct Tools {
 pub(crate) struct EventInput {
     /// The key of the event, for example `FLY28`, from `list_events`.
     #[schemars(regex(pattern = EventKey::PATTERN))]
-    event_key: String,
+    pub(crate) event_key: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -268,7 +270,7 @@ An upload version has no Markdown and is not found here.",
 impl Tools {
     /// All tools of the server.
     fn all_tools() -> ToolRouter<Self> {
-        Self::read_tools() + Self::document_tools() + Self::propose_tools()
+        Self::read_tools() + Self::document_tools() + Self::work_tools() + Self::propose_tools()
     }
 
     fn document_reads(&self) -> DocumentReads<'_> {
@@ -281,7 +283,7 @@ impl Tools {
     }
 
     /// The event with the key `key`, if the caller can read it.
-    async fn event(
+    pub(crate) async fn event(
         &self,
         caller: &AiCaller,
         key: &str,
