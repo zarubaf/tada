@@ -26,7 +26,7 @@ use crate::audit::record;
 use crate::error::store_error;
 use crate::identity::organization_role;
 use crate::rate_limit::{PgRateLimiter, delete_ended_counters};
-use crate::session::insert_session;
+use crate::session::{delete_session, insert_session};
 use crate::token::hash_token;
 
 /// Queues a magic-link intent for the user of `email` if that user has a membership.
@@ -112,6 +112,7 @@ impl SignInStore for Database {
     async fn redeem_magic_link(
         &self,
         token: &str,
+        replaced: Option<&str>,
         user_agent: Option<&str>,
         now: Timestamp,
     ) -> Result<Option<SecretString>, StoreError> {
@@ -156,6 +157,9 @@ impl SignInStore for Database {
             now,
         )
         .await?;
+        if let Some(replaced) = replaced {
+            delete_session(&mut tx, replaced).await?;
+        }
         tx.commit().await.map_err(store_error)?;
         Ok(Some(session))
     }
@@ -190,6 +194,7 @@ impl SignInStore for Database {
     async fn accept_invitation(
         &self,
         token: &str,
+        replaced: Option<&str>,
         user_agent: Option<&str>,
         request_id: Option<Uuid>,
         now: Timestamp,
@@ -258,6 +263,9 @@ impl SignInStore for Database {
         // The session starts in the organization of the invitation (ADR 0056).
         let session =
             insert_session(&mut tx, user_id, Some(organization_id), user_agent, now).await?;
+        if let Some(replaced) = replaced {
+            delete_session(&mut tx, replaced).await?;
+        }
         tx.commit().await.map_err(store_error)?;
         Ok(Some(session))
     }
@@ -554,7 +562,7 @@ mod tests {
 
         let session = test
             .database
-            .redeem_magic_link(&token, Some("Firefox"), now())
+            .redeem_magic_link(&token, None, Some("Firefox"), now())
             .await
             .unwrap()
             .unwrap();
@@ -571,7 +579,7 @@ mod tests {
 
         let again = test
             .database
-            .redeem_magic_link(&token, None, now())
+            .redeem_magic_link(&token, None, None, now())
             .await
             .unwrap();
         assert!(again.is_none());
@@ -591,7 +599,7 @@ mod tests {
 
         let session = test
             .database
-            .redeem_magic_link(&token, None, now())
+            .redeem_magic_link(&token, None, None, now())
             .await
             .unwrap()
             .unwrap();
@@ -615,7 +623,7 @@ mod tests {
 
         let session = test
             .database
-            .redeem_magic_link(&token, None, now())
+            .redeem_magic_link(&token, None, None, now())
             .await
             .unwrap();
         assert!(session.is_none());
@@ -632,7 +640,7 @@ mod tests {
 
         let session = test
             .database
-            .redeem_magic_link(&token, None, now())
+            .redeem_magic_link(&token, None, None, now())
             .await
             .unwrap();
         assert!(session.is_none());
@@ -692,7 +700,7 @@ mod tests {
         assert!(preview.is_none());
         let session = test
             .database
-            .accept_invitation(&token, None, None, now())
+            .accept_invitation(&token, None, None, None, now())
             .await
             .unwrap();
         assert!(session.is_none());
@@ -725,7 +733,7 @@ mod tests {
         );
         let session = test
             .database
-            .accept_invitation(&token, None, None, now())
+            .accept_invitation(&token, None, None, None, now())
             .await
             .unwrap();
         assert!(session.is_none());
@@ -744,7 +752,7 @@ mod tests {
         let request = Uuid::now_v7();
         let session = test
             .database
-            .accept_invitation(&mailed, Some("Firefox"), Some(request), now())
+            .accept_invitation(&mailed, None, Some("Firefox"), Some(request), now())
             .await
             .unwrap()
             .unwrap();
@@ -785,7 +793,7 @@ mod tests {
 
         let again = test
             .database
-            .accept_invitation(&printed, None, None, now())
+            .accept_invitation(&printed, None, None, None, now())
             .await
             .unwrap();
         assert!(again.is_none(), "the printed token stopped working");

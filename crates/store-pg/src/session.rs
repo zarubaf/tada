@@ -42,6 +42,19 @@ pub(crate) async fn insert_session(
     Ok(token.secret)
 }
 
+/// Ends the session of `token` in the transaction of `conn`, for example the session that a new
+/// sign-in replaces (ASVS 7.2.4). An unknown token changes nothing.
+pub(crate) async fn delete_session(conn: &mut PgConnection, token: &str) -> Result<(), StoreError> {
+    sqlx::query!(
+        "DELETE FROM session WHERE token_hash = $1",
+        hash_token(token)
+    )
+    .execute(conn)
+    .await
+    .map_err(store_error)?;
+    Ok(())
+}
+
 #[async_trait]
 impl SessionStore for Database {
     async fn find(&self, token: &str, now: Timestamp) -> Result<Option<SessionRow>, StoreError> {
@@ -101,14 +114,8 @@ impl SessionStore for Database {
     }
 
     async fn delete(&self, token: &str) -> Result<(), StoreError> {
-        sqlx::query!(
-            "DELETE FROM session WHERE token_hash = $1",
-            hash_token(token)
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(store_error)?;
-        Ok(())
+        let mut conn = self.pool.acquire().await.map_err(store_error)?;
+        delete_session(&mut conn, token).await
     }
 }
 

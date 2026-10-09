@@ -30,10 +30,12 @@ pub trait SignInStore: Debug + Send + Sync {
     /// transaction starts a session for its user and returns the session token.
     /// The organization of the session is `initial_organization` of the user's memberships.
     /// A user without a membership gets no session, and the link is used up all the same.
+    /// A new session ends the session of `replaced` in the same transaction (ASVS 7.2.4).
     /// Infrastructure query (ADR 0039): sign-in has no organization yet, and the token names the user.
     async fn redeem_magic_link(
         &self,
         token: &str,
+        replaced: Option<&str>,
         user_agent: Option<&str>,
         now: Timestamp,
     ) -> Result<Option<SecretString>, StoreError>;
@@ -50,12 +52,14 @@ pub trait SignInStore: Debug + Send + Sync {
     /// Accepts the pending invitation of `token` if the token is valid at `now`, in one transaction:
     /// it finds or creates the user of the address, gives the membership the role of
     /// `accepted_role`, marks the invitation accepted, deletes all its tokens, records the audit
-    /// event and starts a session in the organization of the invitation.
+    /// event and starts a session in the organization of the invitation. A new session ends the
+    /// session of `replaced` (ASVS 7.2.4).
     /// It returns the session token, or `None` for an unknown, used or expired token.
     /// Infrastructure query (ADR 0039): the token names the invitation, and the invitation names its organization.
     async fn accept_invitation(
         &self,
         token: &str,
+        replaced: Option<&str>,
         user_agent: Option<&str>,
         request_id: Option<Uuid>,
         now: Timestamp,
@@ -214,14 +218,16 @@ impl CommandError for SignInError {
 }
 
 /// Uses the token of a magic link once and returns the token of the new session.
+/// The new session replaces the session `replaced` that the request sends, if any (ASVS 7.2.4).
 pub async fn redeem_magic_link(
     token: &str,
+    replaced: Option<&str>,
     user_agent: Option<&str>,
     store: &dyn SignInStore,
     clock: &dyn Clock,
 ) -> Result<SecretString, SignInError> {
     store
-        .redeem_magic_link(token, user_agent, clock.now())
+        .redeem_magic_link(token, replaced, user_agent, clock.now())
         .await?
         .ok_or(SignInError::Unauthenticated)
 }
@@ -239,15 +245,17 @@ pub async fn preview_invitation(
 }
 
 /// Accepts the invitation of `token` once and returns the token of the new session.
+/// The new session replaces the session `replaced` that the request sends, if any (ASVS 7.2.4).
 pub async fn accept_invitation(
     token: &str,
+    replaced: Option<&str>,
     user_agent: Option<&str>,
     request_id: Option<Uuid>,
     store: &dyn SignInStore,
     clock: &dyn Clock,
 ) -> Result<SecretString, SignInError> {
     store
-        .accept_invitation(token, user_agent, request_id, clock.now())
+        .accept_invitation(token, replaced, user_agent, request_id, clock.now())
         .await?
         .ok_or(SignInError::Unauthenticated)
 }
@@ -327,6 +335,7 @@ mod tests {
             &self,
             token: &str,
             _: Option<&str>,
+            _: Option<&str>,
             now: Timestamp,
         ) -> Result<Option<SecretString>, StoreError> {
             self.redeemed_at.lock().unwrap().push(now);
@@ -349,6 +358,7 @@ mod tests {
         async fn accept_invitation(
             &self,
             token: &str,
+            _: Option<&str>,
             _: Option<&str>,
             request_id: Option<Uuid>,
             now: Timestamp,
@@ -428,7 +438,7 @@ mod tests {
     #[tokio::test]
     async fn a_redeem_uses_the_time_of_the_clock() {
         let store = MemoryStore::default();
-        let session = redeem_magic_link("valid", None, &store, &FixedClock)
+        let session = redeem_magic_link("valid", None, None, &store, &FixedClock)
             .await
             .unwrap();
         assert_eq!(session.expose_secret(), "session");
@@ -438,7 +448,7 @@ mod tests {
     #[tokio::test]
     async fn an_invalid_token_is_unauthenticated() {
         let store = MemoryStore::default();
-        let result = redeem_magic_link("used", None, &store, &FixedClock).await;
+        let result = redeem_magic_link("used", None, None, &store, &FixedClock).await;
         assert!(matches!(result, Err(SignInError::Unauthenticated)));
     }
 
@@ -478,12 +488,12 @@ mod tests {
     async fn an_acceptance_uses_the_time_of_the_clock_and_the_request() {
         let store = MemoryStore::default();
         let request = Uuid::from_u128(7);
-        let session = accept_invitation("valid", None, Some(request), &store, &FixedClock)
+        let session = accept_invitation("valid", None, None, Some(request), &store, &FixedClock)
             .await
             .unwrap();
         assert_eq!(session.expose_secret(), "session");
         assert_eq!(*store.accepted.lock().unwrap(), [(Some(request), NOW)]);
-        let result = accept_invitation("used", None, None, &store, &FixedClock).await;
+        let result = accept_invitation("used", None, None, None, &store, &FixedClock).await;
         assert!(matches!(result, Err(SignInError::Unauthenticated)));
     }
 

@@ -358,7 +358,7 @@
         "tags": [
           "sign-in"
         ],
-        "summary": "Signs in with the token of a magic link. The token works once.\nThe response sets the session cookie.",
+        "summary": "Signs in with the token of a magic link. The token works once.\nThe response sets the session cookie. The new session ends the session that the request sends.",
         "operationId": "redeem_magic_link",
         "requestBody": {
           "content": {
@@ -574,7 +574,7 @@
         "tags": [
           "sign-in"
         ],
-        "summary": "Accepts an invitation. The token works once. The response sets the cookie of a new session\nin the organization of the invitation.",
+        "summary": "Accepts an invitation. The token works once. The response sets the cookie of a new session\nin the organization of the invitation. The new session ends the session that the request sends.",
         "operationId": "accept_invitation",
         "requestBody": {
           "content": {

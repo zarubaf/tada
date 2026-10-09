@@ -512,6 +512,7 @@ mod tests {
             &self,
             _: &str,
             _: Option<&str>,
+            _: Option<&str>,
             _: jiff::Timestamp,
         ) -> Result<Option<secrecy::SecretString>, tada_app::store::StoreError> {
             unreachable!()
@@ -529,6 +530,7 @@ mod tests {
         async fn accept_invitation(
             &self,
             _: &str,
+            _: Option<&str>,
             _: Option<&str>,
             _: Option<uuid::Uuid>,
             _: jiff::Timestamp,
