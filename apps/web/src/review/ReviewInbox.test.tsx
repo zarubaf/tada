@@ -60,6 +60,8 @@ function proposal(id: string, extra: object) {
     evidence: [evidence],
     status: "open",
     stale: false,
+    overdue: false,
+    routed_to_me: true,
     ...extra,
   };
 }
@@ -186,7 +188,61 @@ const orgChangeset = {
   ],
 };
 
+const CS_WORK = "0199b8e0-0000-7000-8000-000000000c04";
+const P_PERSON = "0199b8e0-0000-7000-8000-0000000001c1";
+const P_COMMITMENT = "0199b8e0-0000-7000-8000-0000000001c2";
+const P_OTHER = "0199b8e0-0000-7000-8000-0000000001c3";
+const NEW_PERSON = "0199b8e0-0000-7000-8000-0000000005a1";
+const OLD_PERSON = "0199b8e0-0000-7000-8000-0000000005a2";
+
+/** A new person who may exist already, a commitment of that person, and a proposal for another reviewer. */
+const workChangeset = {
+  id: CS_WORK,
+  event_id: EVENT.id,
+  author: AI,
+  source_version_id: evidence.source_version_id,
+  created_at: "2028-03-07T09:00:00Z",
+  proposals: [
+    proposal(P_PERSON, {
+      overdue: true,
+      duplicates: [{ id: OLD_PERSON, local_id: "PER-004", name: "Hans Beispiel", kind: "person" }],
+      operation: {
+        kind: "create-person",
+        id: NEW_PERSON,
+        name: "Hans Beispiel",
+        email: "hans@example.org",
+        phone: null,
+      },
+    }),
+    proposal(P_COMMITMENT, {
+      depends_on: [P_PERSON],
+      operation: {
+        kind: "create-commitment",
+        id: "0199b8e0-0000-7000-8000-0000000005b1",
+        event_id: EVENT.id,
+        text: "Hans stellt den Hangar bereit.",
+        promisor: { person: NEW_PERSON },
+        owner: SESSION.user_id,
+        workstream: null,
+        due_date: "2028-04-01",
+        condition: "Wenn die Gemeinde zustimmt",
+      },
+    }),
+    proposal(P_OTHER, {
+      routed_to_me: false,
+      operation: {
+        kind: "change-action-status",
+        event_id: EVENT.id,
+        action_id: "0199b8e0-0000-7000-8000-0000000005c1",
+        status: "blocked",
+        expected_version: 1,
+      },
+    }),
+  ],
+};
+
 const CHANGESETS = new Map<string, unknown>([
+  [CS_WORK, workChangeset],
   [CS_OLD, oldChangeset],
   [CS_NEW, newChangeset],
   [CS_ORG, orgChangeset],
@@ -208,6 +264,21 @@ const problem = (code: string, status: number) =>
       status,
       instance: "urn:uuid:01a11165-c361-77e9-a636-584f1ee6643c",
       request_id: "01a11165-c361-77e9-a636-584f1ee6643c",
+    },
+    "application/problem+json",
+  );
+
+const problemWith = (code: string, status: number, errors: object[]) =>
+  json(
+    status,
+    {
+      type: `https://github.com/zarubaf/tada/blob/main/doc/problems.md#${code}`,
+      code,
+      title: "A problem.",
+      status,
+      instance: "urn:uuid:01a11165-c361-77e9-a636-584f1ee6643c",
+      request_id: "01a11165-c361-77e9-a636-584f1ee6643c",
+      errors,
     },
     "application/problem+json",
   );
@@ -582,7 +653,7 @@ describe("the keyboard", () => {
     await userEvent.keyboard("a");
 
     await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
-    expect(applyCalls(server)[0]?.body).toEqual({ selected: [P_QUESTION], edits: [] });
+    expect(applyCalls(server)[0]?.body).toEqual({ selected: [P_QUESTION], edits: [], links: [] });
   });
 
   it("names the proposal, not a selection, when a single conflict blocks A", async () => {
@@ -746,5 +817,106 @@ describe("a failed apply", () => {
     const alert = await screen.findByText(/Der Dienst ist im Moment nicht erreichbar/);
     expect(alert).toBeInTheDocument();
     expect(accept).toHaveFocus();
+  });
+});
+
+describe("work records", () => {
+  it("a create-commitment proposal shows its condition", async () => {
+    renderAt(`/inbox/${CS_WORK}`);
+
+    const card = await screen.findByRole("article", { name: "Zusage anlegen" });
+    expect(within(card).getByText("Bedingung")).toBeInTheDocument();
+    expect(within(card).getByText("Wenn die Gemeinde zustimmt")).toBeInTheDocument();
+    expect(within(card).getByText("Hans stellt den Hangar bereit.")).toBeInTheDocument();
+    expect(within(card).getByText("Hans Beispiel")).toBeInTheDocument();
+  });
+
+  it("shows the new status of an action with the status label", async () => {
+    renderAt(`/inbox/${CS_WORK}`);
+
+    const card = await screen.findByRole("article", { name: "Status einer Aufgabe ändern" });
+    expect(within(card).getByText("blockiert")).toBeInTheDocument();
+  });
+
+  it("an overdue proposal shows the overdue badge", async () => {
+    renderAt(`/inbox/${CS_WORK}`);
+
+    const card = await screen.findByRole("article", { name: "Person „Hans Beispiel“ anlegen" });
+    expect(within(card).getByText("Überfällig")).toBeInTheDocument();
+    const commitment = screen.getByRole("article", { name: "Zusage anlegen" });
+    expect(within(commitment).queryByText("Überfällig")).not.toBeInTheDocument();
+  });
+
+  it("shows a proposal for another reviewer without controls", async () => {
+    renderAt(`/inbox/${CS_WORK}`);
+
+    const card = await screen.findByRole("article", { name: "Status einer Aufgabe ändern" });
+    expect(within(card).getByText("Andere Prüfung")).toBeInTheDocument();
+    expect(within(card).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("lists the duplicate candidates with their readable ID", async () => {
+    renderAt(`/inbox/${CS_WORK}`);
+
+    expect(
+      await screen.findByRole("checkbox", {
+        name: "Bestehenden Eintrag verwenden: Hans Beispiel (PER-004)",
+      }),
+    ).not.toBeChecked();
+  });
+
+  it("choosing a duplicate sends a link in the apply request", async () => {
+    const server = renderAt(`/inbox/${CS_WORK}`);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", {
+        name: "Bestehenden Eintrag verwenden: Hans Beispiel (PER-004)",
+      }),
+    );
+
+    // The server refuses a link without the dependents, so the inbox selects them and says so.
+    expect(screen.getByRole("checkbox", { name: "Zusage anlegen auswählen" })).toBeChecked();
+    expect(
+      screen.getByText("1 Vorschlag, der den Eintrag braucht, mitgewählt."),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Auswahl annehmen" }));
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    const body = applyCalls(server)[0]?.body as { selected: string[]; links: unknown[] };
+    expect([...body.selected].sort()).toEqual([P_PERSON, P_COMMITMENT].sort());
+    expect(body.links).toEqual([{ proposal_id: P_PERSON, record_id: OLD_PERSON }]);
+  });
+
+  it("sends no link when the member did not choose a duplicate", async () => {
+    const server = renderAt(`/inbox/${CS_WORK}`);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "Person „Hans Beispiel“ anlegen auswählen" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Auswahl annehmen" }));
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(applyCalls(server)[0]?.body).toMatchObject({ links: [] });
+  });
+
+  it("names an invalid link", async () => {
+    const server = renderAt(
+      `/inbox/${CS_WORK}`,
+      fakeServer({
+        "POST /api/v1/changesets/:id/apply": () =>
+          problemWith("validation-failed", 422, [{ pointer: "/links/0", code: "invalid-link" }]),
+      }),
+    );
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", {
+        name: "Bestehenden Eintrag verwenden: Hans Beispiel (PER-004)",
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Auswahl annehmen" }));
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(await screen.findByText(/Dieser Eintrag passt nicht/)).toBeInTheDocument();
   });
 });

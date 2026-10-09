@@ -626,6 +626,39 @@ inbox-op-create-question = Offene Frage anlegen
 inbox-op-create-draft = Dokumentenentwurf „{ $name }“
 inbox-op-create-draft-existing = Entwurf für ein bestehendes Dokument
 inbox-op-unknown = Änderung ohne Darstellung
+inbox-op-create-person = Person „{ $name }“ anlegen
+inbox-op-create-institution = Institution „{ $name }“ anlegen
+inbox-op-create-action = Aufgabe „{ $title }“ anlegen
+inbox-op-create-commitment = Zusage anlegen
+inbox-op-change-action-status = Status einer Aufgabe ändern
+inbox-op-change-action-due = Fälligkeit einer Aufgabe ändern
+inbox-op-change-commitment-status = Status einer Zusage ändern
+inbox-name-unknown = Nicht lesbar
+inbox-due-removed = Keine Fälligkeit
+inbox-row-email = E-Mail
+inbox-row-phone = Telefon
+inbox-row-institution-kind = Art
+inbox-row-title = Titel
+inbox-row-owner = Verantwortlich
+inbox-row-workstream = Arbeitsbereich
+inbox-row-due = Fällig
+inbox-row-commitment = Zusage
+inbox-row-promisor = Zusagende Partei
+inbox-row-condition = Bedingung
+inbox-row-action = Aufgabe
+inbox-row-new-status = Neuer Status
+inbox-row-new-due = Neue Fälligkeit
+inbox-overdue = Überfällig
+inbox-other-review = Andere Prüfung
+inbox-duplicates = Ähnliche Einträge
+inbox-use-existing = Bestehenden Eintrag verwenden: { $name } ({ $id })
+inbox-link-dependents-added =
+    { $count ->
+        [one] 1 Vorschlag, der den Eintrag braucht, mitgewählt.
+       *[other] { $count } Vorschläge, die den Eintrag brauchen, mitgewählt.
+    }
+inbox-link-invalid = Dieser Eintrag passt nicht zum Vorschlag. Wählen Sie einen anderen oder legen Sie die Person oder Institution neu an.
+inbox-link-dependents-missing = Wählen Sie auch die Vorschläge, die den bestehenden Eintrag brauchen.
 inbox-field-unknown = Feld
 inbox-row-key = Kürzel
 inbox-row-name = Name
