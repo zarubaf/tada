@@ -485,7 +485,7 @@ impl WorkStore for Memory {
         unreachable!()
     }
 
-    async fn my_open_work(&self, _: OrgScope, _: UserId) -> Result<MyWork, StoreError> {
+    async fn my_open_work(&self, _: OrgScope, _: UserId, _: bool) -> Result<MyWork, StoreError> {
         unreachable!()
     }
 }

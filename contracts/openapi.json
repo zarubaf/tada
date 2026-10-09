@@ -3999,6 +3999,44 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/me/work": {
+      "get": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Lists the open actions and commitments that the caller owns.\nIt leaves out the events where the caller has no event role.",
+        "operationId": "my_work",
+        "responses": {
+          "200": {
+            "description": "The open work of the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyWork"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
@@ -7753,6 +7791,77 @@
           },
           "role": {
             "$ref": "#/components/schemas/OrganizationRole"
+          }
+        }
+      },
+      "MyAction": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Action"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_key"
+            ],
+            "properties": {
+              "event_key": {
+                "type": "string",
+                "description": "The key of the event: with `local_id` it forms the full reference, for example `FLY28/ACT-042`."
+              }
+            }
+          }
+        ],
+        "description": "An action in \"My Work\", with the key of its event."
+      },
+      "MyCommitment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Commitment"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_key"
+            ],
+            "properties": {
+              "event_key": {
+                "type": "string",
+                "description": "The key of the event: with `local_id` it forms the full reference, for example `FLY28/COM-003`."
+              }
+            }
+          }
+        ],
+        "description": "A commitment in \"My Work\", with the key of its event."
+      },
+      "MyWork": {
+        "type": "object",
+        "description": "The open work of the caller.",
+        "required": [
+          "actions",
+          "commitments",
+          "review_count"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyAction"
+            },
+            "description": "The actions with the status `open`, `in-progress` or `blocked`.\nDue date first, a record without a due date last, then event key and readable ID."
+          },
+          "commitments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCommitment"
+            },
+            "description": "The commitments with the status `conditional` or `firm`, in the same order."
+          },
+          "review_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The number of proposals that the caller reviews.",
+            "minimum": 0
           }
         }
       },

@@ -10,6 +10,7 @@ use sqlx::types::Uuid;
 use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
+use tada_app::domain::events::EventKey;
 use tada_app::domain::ids::{
     ActionId, CommitmentId, EventId, InstitutionId, LocalIdKind, PersonId, ProposalId,
     SourceVersionId, UserId, WorkstreamId,
@@ -22,7 +23,7 @@ use tada_app::domain::work::{
 use tada_app::parties::PartyRef;
 use tada_app::store::StoreError;
 use tada_app::work::{
-    ActionFields, ActionView, CommitmentFields, CommitmentView, MyWork, NewActionRecord,
+    ActionFields, ActionView, CommitmentFields, CommitmentView, InEvent, MyWork, NewActionRecord,
     NewCommitmentRecord, RecordEvidenceView, WorkChanged, WorkCreated, WorkCursor, WorkFilter,
     WorkStore,
 };
@@ -398,12 +399,60 @@ enum Table {
     Commitment,
 }
 
-/// Sorts open records by due date; records without a due date come last.
-fn by_due_date<T>(items: &mut [T], key: impl Fn(&T) -> (Option<jiff::civil::Date>, EventId, u64)) {
-    items.sort_by_key(|item| {
-        let (due, event, number) = key(item);
-        (due.is_none(), due, event.as_uuid(), number)
-    });
+/// The keys of the events that `user` can read now: the events with an event role of the user,
+/// or all events of the organization if `all_events` is set.
+async fn event_keys_of(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    user: UserId,
+    all_events: bool,
+) -> Result<HashMap<Uuid, EventKey>, StoreError> {
+    let rows = sqlx::query!(
+        "SELECT e.id, e.key
+         FROM event e
+         WHERE e.organization_id = $1
+           AND ($3 OR EXISTS (SELECT 1 FROM event_membership m
+                              WHERE m.organization_id = e.organization_id
+                                AND m.event_id = e.id AND m.user_id = $2))",
+        scope.organization_id().as_uuid(),
+        user.as_uuid(),
+        all_events,
+    )
+    .fetch_all(&mut *conn)
+    .await
+    .map_err(store_error)?;
+    rows.into_iter()
+        .map(|row| {
+            let key = EventKey::parse(&row.key).map_err(|_| InvalidRow("event key"))?;
+            Ok((row.id, key))
+        })
+        .collect()
+}
+
+/// Keeps the records of the events in `keys` and sorts them: due date first, none last,
+/// then event key and number.
+fn in_events<T>(
+    items: Vec<T>,
+    keys: &HashMap<Uuid, EventKey>,
+    sort: impl Fn(&T) -> (Option<jiff::civil::Date>, EventId, u64),
+) -> Vec<InEvent<T>> {
+    let mut found: Vec<_> = items
+        .into_iter()
+        .filter_map(|record| {
+            let (due, event, number) = sort(&record);
+            let event_key = keys.get(&event.as_uuid())?.clone();
+            Some((
+                (due.is_none(), due, event_key.clone(), number),
+                event_key,
+                record,
+            ))
+        })
+        .collect();
+    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found
+        .into_iter()
+        .map(|(_, event_key, record)| InEvent { event_key, record })
+        .collect()
 }
 
 #[async_trait]
@@ -660,19 +709,23 @@ impl WorkStore for Database {
         select_commitments(&mut conn, scope, &Select::filter(event, filter, status)).await
     }
 
-    async fn my_open_work(&self, scope: OrgScope, user: UserId) -> Result<MyWork, StoreError> {
+    async fn my_open_work(
+        &self,
+        scope: OrgScope,
+        user: UserId,
+        all_events: bool,
+    ) -> Result<MyWork, StoreError> {
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        let mut actions = select_actions(&mut conn, scope, &Select::open_of(user)).await?;
-        let mut commitments = select_commitments(&mut conn, scope, &Select::open_of(user)).await?;
-        by_due_date(&mut actions, |a| {
-            (a.fields.due_date, a.event_id, a.local_number)
-        });
-        by_due_date(&mut commitments, |c| {
-            (c.fields.due_date, c.event_id, c.local_number)
-        });
+        let keys = event_keys_of(&mut conn, scope, user, all_events).await?;
+        let actions = select_actions(&mut conn, scope, &Select::open_of(user)).await?;
+        let commitments = select_commitments(&mut conn, scope, &Select::open_of(user)).await?;
         Ok(MyWork {
-            actions,
-            commitments,
+            actions: in_events(actions, &keys, |a| {
+                (a.fields.due_date, a.event_id, a.local_number)
+            }),
+            commitments: in_events(commitments, &keys, |c| {
+                (c.fields.due_date, c.event_id, c.local_number)
+            }),
         })
     }
 }
@@ -711,6 +764,19 @@ mod tests {
                     &Email::parse("anna@example.org").unwrap(),
                 )
                 .await;
+            test.add_membership(testwil, owner, OrganizationRole::Owner)
+                .await;
+            sqlx::query(
+                "INSERT INTO event_membership
+                     (organization_id, event_id, user_id, event_role, created_at)
+                 VALUES ($1, $2, $3, 'event-manager', now())",
+            )
+            .bind(testwil.as_uuid())
+            .bind(event.as_uuid())
+            .bind(owner.as_uuid())
+            .execute(&test.database.pool)
+            .await
+            .unwrap();
             let caller = MemberCaller::new(owner, testwil, OrganizationRole::Owner);
             let scope = caller.scope();
             let supplier = InstitutionId::from_uuid(Uuid::now_v7());
@@ -961,7 +1027,7 @@ mod tests {
             WorkChanged::NotFound
         );
         assert!(
-            db.my_open_work(stranger, f.owner)
+            db.my_open_work(stranger, f.owner, false)
                 .await
                 .unwrap()
                 .actions
@@ -1155,11 +1221,30 @@ mod tests {
         let work = f
             .test
             .database
-            .my_open_work(f.scope, f.owner)
+            .my_open_work(f.scope, f.owner, false)
             .await
             .unwrap();
-        let ids: Vec<_> = work.actions.iter().map(|action| action.id).collect();
+        let ids: Vec<_> = work.actions.iter().map(|a| a.record.id).collect();
         assert_eq!(ids, [early.id, late.id, undated.id]);
-        assert_eq!(work.commitments, [commitment]);
+        let commitments: Vec<_> = work.commitments.iter().map(|c| &c.record).collect();
+        assert_eq!(commitments, [&commitment]);
+    }
+
+    #[tokio::test]
+    async fn my_open_work_reads_all_events_for_a_member_who_acts_as_manager_everywhere() {
+        let f = Fixture::start().await;
+        f.action("Ohne Rolle", None).await;
+        sqlx::query("DELETE FROM event_membership WHERE user_id = $1")
+            .bind(f.owner.as_uuid())
+            .execute(&f.test.database.pool)
+            .await
+            .unwrap();
+        let db = &f.test.database;
+
+        let by_role = db.my_open_work(f.scope, f.owner, false).await.unwrap();
+        assert!(by_role.actions.is_empty());
+        let everywhere = db.my_open_work(f.scope, f.owner, true).await.unwrap();
+        assert_eq!(everywhere.actions.len(), 1);
+        assert_eq!(everywhere.actions[0].event_key.as_str(), "TEST30");
     }
 }
