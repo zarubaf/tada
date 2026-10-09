@@ -34,8 +34,25 @@ impl TestDatabase {
     /// # Panics
     ///
     /// If Docker is not available or a migration fails.
-    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    #[allow(clippy::unwrap_used)]
     pub async fn start() -> Self {
+        let test = Self::start_empty().await;
+        test.database.migrate().await.unwrap();
+        test.database
+            .sync_catalog(&core_catalog(), CORE_CATALOG_VERSION)
+            .await
+            .unwrap();
+        test
+    }
+
+    /// Starts a new container with an empty database: no migration and no catalog.
+    /// The schema upgrade test applies the old migrations itself (ADR 0006).
+    ///
+    /// # Panics
+    ///
+    /// If Docker is not available.
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    pub async fn start_empty() -> Self {
         let container = Postgres::default()
             .with_tag(POSTGRES_TAG)
             .start()
@@ -50,16 +67,17 @@ impl TestDatabase {
             Duration::from_secs(60),
         )
         .unwrap();
-        database.migrate().await.unwrap();
-        database
-            .sync_catalog(&core_catalog(), CORE_CATALOG_VERSION)
-            .await
-            .unwrap();
         Self {
             database,
             url,
             _container: container,
         }
+    }
+
+    /// The connection pool, for tests that run SQL of their own, for example old migrations and fixtures.
+    #[must_use]
+    pub fn pool(&self) -> &sqlx::PgPool {
+        &self.database.pool
     }
 
     /// The URL of the database for a process under test. The password of the user is `postgres`.
