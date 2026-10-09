@@ -1,0 +1,194 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id, c.event_id, c.local_number, c.text, c.condition, c.person_id, c.institution_id,\n                  COALESCE(p.local_number, i.local_number) AS \"promisor_number?\",\n                  COALESCE(p.name, i.name) AS \"promisor_name?\",\n                  c.owner_user_id, c.workstream_id, c.due_date AS \"due_date: jiff_sqlx::Date\",\n                  c.status, c.firm_reason, c.version\n           FROM commitment c\n           LEFT JOIN person p ON p.organization_id = c.organization_id AND p.id = c.person_id\n           LEFT JOIN institution i\n               ON i.organization_id = c.organization_id AND i.id = c.institution_id\n           WHERE c.organization_id = $1\n             AND ($2::uuid IS NULL OR c.event_id = $2)\n             AND ($3::uuid IS NULL OR c.id = $3)\n             AND ($4::uuid IS NULL OR c.owner_user_id = $4)\n             AND ($5::text IS NULL OR c.status = $5)\n             AND ($6::uuid IS NULL OR c.workstream_id = $6)\n             AND c.local_number > $7\n             AND (NOT $8 OR c.status IN ('conditional', 'firm'))\n           ORDER BY c.event_id, c.local_number\n           LIMIT $9",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "local_number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "local_number"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "text",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "text"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "condition",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "condition"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "person_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "institution_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "institution_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "promisor_number?",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "promisor_name?",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 9,
+        "name": "owner_user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "owner_user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "workstream_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "workstream_id"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "due_date: jiff_sqlx::Date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "due_date"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "firm_reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "firm_reason"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "commitment",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Int8",
+        "Bool",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      null,
+      null,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "00a20f1793d2b5e7e2a059f6fea3beb9265663e1273034f54c29362f950d01ea"
+}

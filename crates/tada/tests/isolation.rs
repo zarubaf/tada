@@ -346,6 +346,100 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
             json!({"name": "Bar", "expected_version": 1}),
             Expect::NotFound,
         )],
+        // Actions and commitments. An unknown ID in B stands for a record of B: the lookup is by event.
+        "list_actions" => vec![
+            get(
+                api(format!("/events/{}/actions", t.b_event)),
+                Expect::NotFound,
+            ),
+            get(
+                api(format!("/events/{}/actions?owner=me", t.a_event)),
+                READS,
+            ),
+        ],
+        "create_action" => vec![
+            post(
+                api(format!("/events/{}/actions", t.b_event)),
+                json!({"title": "Zaun stellen", "owner_user_id": t.a_member}),
+                Expect::NotFound,
+            ),
+            post(
+                api(format!("/events/{}/actions", t.a_event)),
+                json!({"title": "Zaun stellen", "owner_user_id": t.b_member}),
+                Expect::Refused,
+            ),
+        ],
+        "get_action" => vec![get(
+            api(format!("/events/{}/actions/{}", t.b_event, Uuid::now_v7())),
+            Expect::NotFound,
+        )],
+        "change_action" => vec![patch(
+            api(format!("/events/{}/actions/{}", t.b_event, Uuid::now_v7())),
+            json!({"title": "Bar", "expected_version": 1}),
+            Expect::NotFound,
+        )],
+        "list_commitments" => vec![
+            get(
+                api(format!("/events/{}/commitments", t.b_event)),
+                Expect::NotFound,
+            ),
+            get(api(format!("/events/{}/commitments", t.a_event)), READS),
+        ],
+        "create_commitment" => vec![
+            post(
+                api(format!("/events/{}/commitments", t.b_event)),
+                json!({
+                    "text": "Strom ab Freitag",
+                    "promisor": {"kind": "institution", "id": t.b_institution},
+                    "owner_user_id": t.a_member,
+                }),
+                Expect::NotFound,
+            ),
+            post(
+                api(format!("/events/{}/commitments", t.a_event)),
+                json!({
+                    "text": "Strom ab Freitag",
+                    "promisor": {"kind": "institution", "id": t.b_institution},
+                    "owner_user_id": t.a_member,
+                }),
+                Expect::Refused,
+            ),
+            post(
+                api(format!("/events/{}/commitments", t.a_event)),
+                json!({
+                    "text": "Strom ab Freitag",
+                    "promisor": {"kind": "person", "id": t.b_person},
+                    "owner_user_id": t.a_member,
+                }),
+                Expect::Refused,
+            ),
+        ],
+        "get_commitment" => vec![get(
+            api(format!(
+                "/events/{}/commitments/{}",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            Expect::NotFound,
+        )],
+        "change_commitment" => vec![patch(
+            api(format!(
+                "/events/{}/commitments/{}",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            json!({"text": "Bar", "expected_version": 1}),
+            Expect::NotFound,
+        )],
+        "make_commitment_firm" => vec![post(
+            api(format!(
+                "/events/{}/commitments/{}/firm",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            json!({"reason": "Signed", "expected_version": 1}),
+            Expect::NotFound,
+        )],
         // Members and invitations.
         "list_members" => vec![get(api("/members".into()), reads(&t.a_member))],
         "remove_member" => vec![post(
