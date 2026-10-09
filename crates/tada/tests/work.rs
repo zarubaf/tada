@@ -364,3 +364,130 @@ async fn a_closed_workstream_cannot_be_set() {
         json!([{"pointer": "/workstream", "code": "closed"}])
     );
 }
+
+/// A workstream of another event or another organization is unknown in the event (Review Focus 2).
+#[tokio::test]
+async fn a_workstream_of_another_event_or_organization_is_unknown() {
+    let api = Api::start().await;
+    let e = api.event().await;
+    // A workstream of a second event of Testwil.
+    let second = api
+        .created(
+            &e.owner,
+            "/api/v1/events",
+            &json!({"key": "TEST31", "name": "Flugtag Testwil"}),
+        )
+        .await;
+    let second = second["id"].as_str().unwrap();
+    api.created(
+        &e.owner,
+        &format!("/api/v1/events/{second}/memberships"),
+        &json!({"user_id": e.ben.as_uuid(), "event_role": "event-contributor"}),
+    )
+    .await;
+    let other_event = api
+        .created(
+            &e.owner,
+            &format!("/api/v1/events/{second}/workstreams"),
+            &json!({"name": "Gelände", "lead_user_id": e.ben.as_uuid()}),
+        )
+        .await;
+    // A workstream of an event of Musterhausen.
+    let (_, stranger, stranger_cookie) = api
+        .test
+        .member("musterhausen", OrganizationRole::Owner)
+        .await;
+    let foreign_event = api
+        .created(
+            &stranger_cookie,
+            "/api/v1/events",
+            &json!({"key": "TEST30", "name": "Open Day Musterhausen"}),
+        )
+        .await;
+    let other_organization = api
+        .created(
+            &stranger_cookie,
+            &format!(
+                "/api/v1/events/{}/workstreams",
+                foreign_event["id"].as_str().unwrap()
+            ),
+            &json!({"name": "Gelände", "lead_user_id": stranger.as_uuid()}),
+        )
+        .await;
+
+    let actions = format!("/api/v1/events/{}/actions", e.id);
+    let commitments = format!("/api/v1/events/{}/commitments", e.id);
+    let supplier = api
+        .institution(&e.ben_cookie, "Testwil Generatoren AG")
+        .await;
+    let action = api
+        .created(
+            &e.ben_cookie,
+            &actions,
+            &json!({"title": "Zaun stellen", "owner_user_id": e.ben.as_uuid()}),
+        )
+        .await;
+    let commitment = api
+        .created(
+            &e.ben_cookie,
+            &commitments,
+            &json!({
+                "text": "Generator delivery Friday 15:00",
+                "promisor": {"kind": "institution", "id": supplier},
+                "owner_user_id": e.ben.as_uuid(),
+            }),
+        )
+        .await;
+    let unknown = json!([{"pointer": "/workstream", "code": "unknown-record"}]);
+
+    for workstream in [&other_event, &other_organization] {
+        let id = &workstream["id"];
+        let attempts = [
+            (
+                Method::POST,
+                actions.clone(),
+                json!({"title": "Zaun", "owner_user_id": e.ben.as_uuid(), "workstream_id": id}),
+            ),
+            (
+                Method::POST,
+                commitments.clone(),
+                json!({
+                    "text": "Strom ab Freitag",
+                    "promisor": {"kind": "institution", "id": supplier},
+                    "owner_user_id": e.ben.as_uuid(),
+                    "workstream_id": id,
+                }),
+            ),
+            (
+                Method::PATCH,
+                record(&e, "actions", &action),
+                json!({"workstream_id": id, "expected_version": 1}),
+            ),
+            (
+                Method::PATCH,
+                record(&e, "commitments", &commitment),
+                json!({"workstream_id": id, "expected_version": 1}),
+            ),
+        ];
+        for (method, path, body) in attempts {
+            let (status, problem) = api.send(&e.owner, method, &path, Some(&body)).await;
+            assert_eq!(
+                status,
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "{path}: {problem}"
+            );
+            assert_eq!(problem["code"], "validation-failed");
+            assert_eq!(problem["errors"], unknown, "{path}");
+        }
+    }
+
+    // Nothing changed: one record of each kind, still at version 1 without a workstream.
+    for (list, record) in [(&actions, &action), (&commitments, &commitment)] {
+        let (status, page) = api.get(&e.viewer, list).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(page["items"].as_array().unwrap().len(), 1);
+        assert_eq!(page["items"][0]["id"], record["id"]);
+        assert_eq!(page["items"][0]["version"], 1);
+        assert_eq!(page["items"][0]["workstream_id"], Value::Null);
+    }
+}
