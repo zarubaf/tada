@@ -6,260 +6,20 @@
 
 mod support;
 
-use std::collections::BTreeMap;
-use std::num::NonZeroU64;
 use std::path::Path;
-use std::sync::Arc;
 
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Method, StatusCode, header};
 use jiff::Timestamp;
-use serde_json::{Value, json};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
-use support::SESSION_COOKIE;
+use support::export::{contains, export, files};
 use support::files::pdf;
+use support::organization::{Client, fill, organization, router};
 use tada::export::{ExportCommand, execute};
 use tada_adapters::clock::SystemClock;
 use tada_adapters::storage::testing::TestGarage;
-use tada_api::ApiState;
-use tada_app::caller::{OrganizationRole, ServiceCaller, TelegramGateway};
-use tada_app::domain::identity::{DisplayName, Email, OrganizationSlug};
+use tada_app::domain::identity::OrganizationSlug;
 use tada_app::domain::ids::{OrganizationId, UserId};
-use tada_app::session::SessionAuthenticator;
-use tada_app::telegram::{TelegramName, TelegramUserId, claim_link_code};
 use tada_store_pg::testing::TestDatabase;
-use uuid::Uuid;
-
-const SOURCE: &str = "Das Open Day findet im Mai 2030 auf dem Flugfeld statt.";
-
-/// The API of one database on a shared Garage.
-fn router(test: &TestDatabase, garage: &TestGarage) -> Router {
-    let database = Arc::new(test.database.clone());
-    let clock = Arc::new(SystemClock);
-    let authenticator = Arc::new(SessionAuthenticator::new(
-        database.clone(),
-        database,
-        clock.clone(),
-    ));
-    let state = ApiState {
-        blobs: Arc::new(garage.storage.clone()),
-        upload_max_bytes: NonZeroU64::new(1024 * 1024).unwrap(),
-        ..support::api_state(test, authenticator, clock)
-    };
-    tada_api::router(state, None)
-}
-
-/// A member of one organization who calls the API.
-struct Client {
-    router: Router,
-    cookie: String,
-}
-
-impl Client {
-    async fn call(&self, request: axum::http::request::Builder, body: Body) -> (StatusCode, Value) {
-        let request = request
-            .header(header::COOKIE, format!("{SESSION_COOKIE}={}", self.cookie))
-            .body(body)
-            .unwrap();
-        let (response, value) = support::send(&self.router, request).await;
-        (response.status(), value)
-    }
-
-    async fn get(&self, path: &str) -> Value {
-        let (status, value) = self
-            .call(support::request(Method::GET, path), Body::empty())
-            .await;
-        assert_eq!(status, StatusCode::OK, "{path}: {value}");
-        value
-    }
-
-    async fn post(&self, path: &str, body: &Value) -> Value {
-        let request =
-            support::request(Method::POST, path).header(header::CONTENT_TYPE, "application/json");
-        let (status, value) = self.call(request, Body::from(body.to_string())).await;
-        assert!(status.is_success(), "{path}: {status} {value}");
-        value
-    }
-
-    async fn upload(&self, path: &str, name: &str, content: Vec<u8>) -> Value {
-        let request = support::request(Method::POST, path)
-            .header(header::CONTENT_TYPE, "application/octet-stream")
-            .header("x-file-name", name);
-        let (status, value) = self.call(request, Body::from(content)).await;
-        assert_eq!(status, StatusCode::CREATED, "{value}");
-        value
-    }
-
-    async fn create_event(&self, key: &str, name: &str) -> String {
-        let event = self
-            .post("/api/v1/events", &json!({"key": key, "name": name}))
-            .await;
-        event["id"].as_str().unwrap().to_owned()
-    }
-
-    /// Proposes one operation with the passage `quote` of `SOURCE` as evidence. Returns the changeset.
-    async fn propose(&self, event: &str, operation: Value, quote: &str) -> Value {
-        let start = SOURCE[..SOURCE.find(quote).unwrap()].chars().count();
-        let body = json!({
-            "source_text": SOURCE,
-            "proposals": [{
-                "id": Uuid::now_v7(),
-                "operation": operation,
-                "evidence": [{"start": start, "end": start + quote.chars().count(), "quote": quote}],
-                "reason": "The member wrote it.",
-            }],
-        });
-        self.post(&format!("/api/v1/events/{event}/changesets"), &body)
-            .await
-    }
-
-    async fn apply(&self, changeset: &Value) {
-        let path = format!(
-            "/api/v1/changesets/{}/apply",
-            changeset["id"].as_str().unwrap()
-        );
-        self.post(&path, &json!({"selected": changeset["proposal_ids"]}))
-            .await;
-    }
-
-    /// A proposal that sets the date window of the event to May 2030.
-    async fn date_operation(&self, event: &str) -> Value {
-        let fields = self.get(&format!("/api/v1/events/{event}/fields")).await;
-        let field = fields["items"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|field| field["key"] == "date_window")
-            .unwrap()["id"]
-            .clone();
-        json!({
-            "kind": "set-fact", "event_id": event, "field_id": field, "expected_version": null,
-            "state": {"state": "accepted", "value": {"type": "date-window",
-                "start": "2030-05-01", "end": "2030-05-31", "granularity": "month"}},
-        })
-    }
-}
-
-/// An organization with an owner who calls the API.
-async fn organization(
-    test: &TestDatabase,
-    garage: &TestGarage,
-    slug: &str,
-) -> (OrganizationId, UserId, Client) {
-    let (organization, user, cookie) = test.member(slug, OrganizationRole::Owner).await;
-    let client = Client {
-        router: router(test, garage),
-        cookie,
-    };
-    (organization, user, client)
-}
-
-/// The data of organization A that the test compares after the import.
-struct Filled {
-    event: String,
-    upload: String,
-    draft: String,
-    secrets: Vec<String>,
-}
-
-/// Fills organization A: two events, facts, an applied and an open changeset, an upload with two
-/// versions, an approved draft, a Telegram link, an API token and an invitation.
-async fn fill_a(test: &TestDatabase, client: &Client, organization: OrganizationId) -> Filled {
-    let event = client.create_event("OPEN30", "Open Day Testwil").await;
-    let second = client.create_event("FLY30", "Fly-in Testwil").await;
-
-    let operation = client.date_operation(&event).await;
-    let applied = client.propose(&event, operation, "im Mai 2030").await;
-    client.apply(&applied).await;
-    let operation = client.date_operation(&second).await;
-    client.propose(&second, operation, "im Mai 2030").await;
-    let profile = client.get(&format!("/api/v1/events/{event}/profile")).await;
-    let fact = profile["facts"][0]["id"].as_str().unwrap().to_owned();
-
-    let documents = format!("/api/v1/events/{event}/documents");
-    let upload = client
-        .upload(&documents, "Programm.pdf", pdf("Programm Testwil eins"))
-        .await;
-    let upload = upload["id"].as_str().unwrap().to_owned();
-    client
-        .upload(
-            &format!("/api/v1/documents/{upload}/versions"),
-            "Programm.pdf",
-            pdf("Programm Testwil zwei"),
-        )
-        .await;
-
-    let draft = Uuid::now_v7();
-    let operation = json!({
-        "kind": "create-document-draft", "event_id": event,
-        "document": {"new": {"id": draft, "name": "Konzept Testwil"}},
-        "markdown": format!("Das Open Day ist am [](tada:fact/{fact}?v=1).\n"),
-    });
-    let changeset = client.propose(&event, operation, "Das Open Day").await;
-    client.apply(&changeset).await;
-    let document = client.get(&format!("/api/v1/documents/{draft}")).await;
-    let version = document["newest_version"]["id"].as_str().unwrap();
-    client
-        .post(
-            &format!("/api/v1/document-versions/{version}/approve"),
-            &json!({"expected_version": 1}),
-        )
-        .await;
-
-    let code = client.post("/api/v1/telegram/link-codes", &json!({})).await;
-    let code = code["code"].as_str().unwrap().to_owned();
-    assert!(
-        claim_link_code(
-            &ServiceCaller::<TelegramGateway>::new(),
-            &code,
-            TelegramUserId(424_242),
-            &TelegramName("Testperson Testwil".to_owned()),
-            &test.database,
-            &SystemClock,
-        )
-        .await
-        .unwrap()
-    );
-    let requests = client.get("/api/v1/telegram/link-requests").await;
-    let request = requests["items"][0]["id"].as_str().unwrap();
-    client
-        .post(
-            &format!("/api/v1/telegram/link-requests/{request}/confirm"),
-            &json!({}),
-        )
-        .await;
-    let open_code = client.post("/api/v1/telegram/link-codes", &json!({})).await;
-
-    let expires = Timestamp::now() + jiff::SignedDuration::from_hours(24);
-    let token = client
-        .post(
-            "/api/v1/tokens",
-            &json!({"name": "Claude Code", "scope": "read", "expires_at": expires.to_string(),
-                    "notice_version_confirmed": 1}),
-        )
-        .await;
-
-    test.queue_invitation(
-        organization,
-        &Email::parse("invited@example.org").unwrap(),
-        &DisplayName::parse("Invited Testwil").unwrap(),
-        OrganizationRole::Member,
-    )
-    .await;
-
-    Filled {
-        event,
-        upload,
-        draft: draft.to_string(),
-        secrets: vec![
-            client.cookie.clone(),
-            code,
-            open_code["code"].as_str().unwrap().to_owned(),
-            token["secret"].as_str().unwrap().to_owned(),
-        ],
-    }
-}
 
 /// Adds a row to each secret table that the API does not fill in this test.
 async fn add_secret_rows(test: &TestDatabase, organization: OrganizationId, user: UserId) {
@@ -298,56 +58,8 @@ async fn secret_hashes(test: &TestDatabase) -> Vec<String> {
     hashes
 }
 
-/// All files of the export by their path relative to the export.
-fn files(root: &Path) -> BTreeMap<String, Vec<u8>> {
-    let mut files = BTreeMap::new();
-    let mut directories = vec![root.to_owned()];
-    while let Some(directory) = directories.pop() {
-        for entry in std::fs::read_dir(directory).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                directories.push(path);
-            } else {
-                let relative = path
-                    .strip_prefix(root)
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_owned();
-                files.insert(relative, std::fs::read(path).unwrap());
-            }
-        }
-    }
-    files
-}
-
-fn contains(haystack: &[u8], needle: &str) -> bool {
-    haystack
-        .windows(needle.len())
-        .any(|window| window == needle.as_bytes())
-}
-
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
-async fn export(
-    test: &TestDatabase,
-    garage: &TestGarage,
-    slug: &str,
-    output: &Path,
-) -> tada_app::export::ExportSummary {
-    execute(
-        &test.database,
-        &garage.storage,
-        &SystemClock,
-        ExportCommand {
-            organization_slug: OrganizationSlug::parse(slug).unwrap(),
-            output: output.to_owned(),
-        },
-    )
-    .await
-    .unwrap()
 }
 
 /// The results of queries of the facts, the document versions, the draft manifests and the approvals of the organization.
@@ -373,7 +85,7 @@ async fn compared_rows(test: &TestDatabase, organization: OrganizationId) -> Vec
 async fn an_export_holds_one_organization_without_secrets_and_rebuilds_its_data() {
     let (test, garage) = tokio::join!(TestDatabase::start(), TestGarage::start());
     let (a, owner_a, client_a) = organization(&test, &garage, "testwil").await;
-    let filled = fill_a(&test, &client_a, a).await;
+    let filled = fill(&test, &client_a, a, 424_242).await;
     add_secret_rows(&test, a, owner_a).await;
     let (b, owner_b, client_b) = organization(&test, &garage, "musterhausen").await;
     let event_b = client_b.create_event("FLY31", "Fly-in Musterhausen").await;
