@@ -1,0 +1,8 @@
+/*
+ * The cascade layers, in this order (ADR 0019). The first mention of a layer fixes its rank.
+ * main.tsx imports this file first, which is enough for the development server. The build joins the
+ * CSS of all chunks in the order of the chunks, so vite.config.ts puts this statement at the start
+ * of the built CSS. This is the only place that names the order; scripts/check_css_layers.py
+ * checks the built page.
+ */
+@layer reset, tokens, components;

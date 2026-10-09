@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
+import { defineConfig, type Plugin } from "vitest/config";
 
 // The policy of the built client. `tada serve` sends the same file with the web files (ADR 0058).
 const policy = readFileSync(
@@ -23,10 +23,31 @@ const developmentPolicy = widen(
   "ws:",
 );
 
+// The build joins the CSS of all chunks, shared chunks first, so a layer block of a component
+// would come before the layer order and fix a wrong rank. The statement starts the built CSS.
+const layerOrder = readFileSync(new URL("./src/styles/layers.css", import.meta.url), "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .trim();
+
+function layerOrderFirst(): Plugin {
+  return {
+    name: "tada-layer-order-first",
+    apply: "build",
+    enforce: "post",
+    generateBundle(_options, bundle) {
+      for (const file of Object.values(bundle)) {
+        if (file.type === "asset" && file.fileName.endsWith(".css")) {
+          file.source = `${layerOrder}${file.source.toString()}`;
+        }
+      }
+    },
+  };
+}
+
 // The API and the MCP server run on `tada serve` (TADA_PORT 8080). In production, serve delivers the built files itself (ADR 0005).
 // An MCP client in development uses `http://localhost:5173/mcp`, the URL that the token page shows (ADR 0040).
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), layerOrderFirst()],
   // One CSS file for all chunks: the settings pages load on demand, and the order of the CSS layers
   // must stay the same as without the split.
   build: { cssCodeSplit: false },
