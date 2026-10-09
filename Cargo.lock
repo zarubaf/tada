@@ -3731,6 +3731,7 @@ dependencies = [
  "sha2 0.11.0",
  "sqlx",
  "tada-app",
+ "tada-store-pg",
  "testcontainers-modules",
  "thiserror",
  "tokio",

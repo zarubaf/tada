@@ -30,6 +30,8 @@ uuid.workspace = true
 
 [dev-dependencies]
 tada-app = { workspace = true, features = ["testing"] }
+# The integration tests in `tests/` use the test database of this crate.
+tada-store-pg = { workspace = true, features = ["testing"] }
 testcontainers-modules.workspace = true
 tokio.workspace = true
 
