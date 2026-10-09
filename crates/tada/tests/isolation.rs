@@ -23,6 +23,7 @@ use std::time::Duration;
 use axum::body::Body;
 use axum::http::{Method, StatusCode, header};
 use jiff::{SignedDuration, Timestamp};
+use secrecy::SecretString;
 use serde_json::{Value, json};
 use support::export::{contains, export, files};
 use support::files::pdf;
@@ -33,8 +34,9 @@ use tada_adapters::storage::testing::TestGarage;
 use tada_app::caller::{OrganizationRole, ServiceCaller, TelegramGateway};
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::jobs::{Handlers, Ran, run_next};
-use tada_app::outbound::{SEND_JOB, SendOutbound};
+use tada_app::outbound::SEND_JOB;
 use tada_app::telegram::{TelegramName, TelegramUserId, claim_link_code};
+use tada_store_pg::Database;
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
@@ -64,11 +66,12 @@ const NOT_ORGANIZATION_SCOPED: &[(&str, &str)] = &[
     ),
 ];
 
-/// The job kinds that the isolation test runs.
+/// The job kinds that the isolation test runs. Each kind of a handler of the worker needs a case.
 const JOB_KINDS: &[&str] = &[SEND_JOB];
 
-/// A text that only the records of organization B hold.
-const B_MARKER: &str = "Musterhausen";
+/// The slug and the name of organization B, and a word that only the texts of B hold.
+/// The checks ignore the case of letters.
+const B_MARKER: &str = "musterhausen";
 
 /// The records that the cases use. `Default` gives empty values for the coverage test.
 #[derive(Debug, Clone, Default)]
@@ -543,6 +546,31 @@ fn each_operation_has_an_isolation_case_or_a_reason() {
     }
 }
 
+/// The handlers of the worker, with a mailer into memory.
+fn worker_handlers(database: &Database, mailer: Arc<MemoryMailer>) -> Handlers {
+    tada::worker::handlers(
+        database,
+        mailer,
+        Arc::new(FluentMailTexts::new().unwrap()),
+        Arc::new(SystemClock),
+        support::public_url(),
+    )
+}
+
+/// A new job kind of the worker fails here until it has an isolation case.
+#[tokio::test]
+async fn each_job_kind_of_the_worker_has_an_isolation_case() {
+    // The pool connects at the first query; this test makes none.
+    let database = Database::connect_lazy(
+        "postgres://tada@127.0.0.1:1/tada",
+        &SecretString::from("unused"),
+    )
+    .unwrap();
+    let kinds = worker_handlers(&database, Arc::new(MemoryMailer::new())).kinds();
+    let covered: BTreeSet<&str> = JOB_KINDS.iter().copied().collect();
+    assert_eq!(kinds, covered, "each job kind needs an isolation case");
+}
+
 /// The UUIDs in `text`, in the hyphenated form.
 fn uuids(text: &str) -> BTreeSet<String> {
     let bytes = text.as_bytes();
@@ -825,7 +853,7 @@ impl World {
     /// Fails if `text` shows a record or a text of B.
     fn assert_hides_b(&self, label: &str, text: &str) {
         assert!(
-            !text.contains(B_MARKER),
+            !text.to_lowercase().contains(B_MARKER),
             "{label}: shows a text of B: {text}"
         );
         for id in &self.b_ids {
@@ -880,9 +908,10 @@ impl World {
                     assert!(body.to_string().contains(id.as_str()), "{label}: {body}");
                 }
             }
+            // A member can be refused, for example with 403, but never fail with a server error.
             Expect::Writes => {
                 assert!(
-                    status.is_success() || !actor.owner,
+                    status.is_success() || (!actor.owner && status.is_client_error()),
                     "{label}: {status} {body}"
                 );
             }
@@ -1126,7 +1155,8 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
         export(&world.test, &world.garage, slug, &output).await;
         for (path, content) in files(&output) {
             if let Some(marker) = marker {
-                assert!(!contains(&content, marker), "{slug}: {path} holds {marker}");
+                let content = String::from_utf8_lossy(&content).to_lowercase();
+                assert!(!content.contains(marker), "{slug}: {path} holds {marker}");
             }
             for id in other_ids {
                 assert!(
@@ -1138,7 +1168,9 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
     }
     world.assert_b_unchanged("the export").await;
 
-    // The jobs: each job kind that the operations queued has a case.
+    // The jobs: each job kind that the operations queued has a case. This guards a kind that the
+    // worker would run without a handler; `each_job_kind_of_the_worker_has_an_isolation_case`
+    // checks the handlers.
     let kinds: String = world
         .test
         .scalar("SELECT coalesce(string_agg(DISTINCT kind, ','), '') FROM job")
@@ -1179,13 +1211,7 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
         .await;
     let b_rows = rows(&world.test, world.b).await;
     let mailer = Arc::new(MemoryMailer::new());
-    let handlers = Handlers::default().with(Arc::new(SendOutbound::new(
-        Arc::new(world.test.database.clone()),
-        mailer.clone(),
-        Arc::new(FluentMailTexts::new().unwrap()),
-        Arc::new(SystemClock),
-        support::public_url(),
-    )));
+    let handlers = worker_handlers(&world.test.database, mailer.clone());
     let ran = run_next(
         &world.test.database,
         &handlers,
