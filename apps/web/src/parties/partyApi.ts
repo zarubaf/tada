@@ -13,15 +13,13 @@ export interface PartyInput {
   phone: string | null;
 }
 
-export interface Page {
-  items: Party[];
-  nextCursor: string | undefined;
-}
-
 type Answer<T> = Promise<{ data?: T; error?: Problem | undefined; response: Response }>;
 
 export interface PartyApi {
-  list(query: { q?: string; cursor?: string }): Answer<Page>;
+  list(query: {
+    q?: string;
+    cursor?: string;
+  }): Answer<{ items: Party[]; next_cursor?: string | null }>;
   create(input: PartyInput): Answer<Party>;
   change(record: Party, input: PartyInput): Answer<Party>;
 }
@@ -35,20 +33,13 @@ function optional(input: PartyInput) {
   };
 }
 
-function page(data: { items: Party[]; next_cursor?: string | null }): Page {
-  return { items: data.items, nextCursor: data.next_cursor ?? undefined };
-}
-
 export function partyApi(api: Api, kind: PartyKind): PartyApi {
   return kind === "person" ? personApi(api) : institutionApi(api);
 }
 
 function personApi(api: Api): PartyApi {
   return {
-    async list(query) {
-      const { data, error, response } = await api.GET("/api/v1/persons", { params: { query } });
-      return { ...(data && { data: page(data) }), error, response };
-    },
+    list: (query) => api.GET("/api/v1/persons", { params: { query } }),
     create: (input) => api.POST("/api/v1/persons", { body: optional(input) }),
     change: (record, input) =>
       api.PATCH("/api/v1/persons/{person_id}", {
@@ -60,12 +51,7 @@ function personApi(api: Api): PartyApi {
 
 function institutionApi(api: Api): PartyApi {
   return {
-    async list(query) {
-      const { data, error, response } = await api.GET("/api/v1/institutions", {
-        params: { query },
-      });
-      return { ...(data && { data: page(data) }), error, response };
-    },
+    list: (query) => api.GET("/api/v1/institutions", { params: { query } }),
     create: (input) =>
       api.POST("/api/v1/institutions", {
         body: { ...optional(input), kind: input.kind ?? "other" },

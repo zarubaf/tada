@@ -1,7 +1,7 @@
 import { type FormEvent, useRef, useState } from "react";
 import { type Problem, problemMessage } from "../api/client";
-import { failureOf } from "../api/failure";
 import { hasMessage, t } from "../i18n";
+import { type SaveFailure, saveFailure } from "../registers/saveFailure";
 import { Button } from "../ui/Button";
 import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { Select } from "../ui/Select";
@@ -34,8 +34,8 @@ function blankToNull(text: string): string | null {
 
 /**
  * „Person erfassen“, „Institution erfassen“ and the change of a record. The page owns the live
- * regions, so the form reports the result: `onSaved` for a saved record, `onFailed` with the
- * message of any other failure and the problem code.
+ * regions, so the form reports the result: `onSaved` for a saved record, `onFailed` for any other
+ * failure.
  */
 export function PartyForm({
   api,
@@ -51,7 +51,7 @@ export function PartyForm({
   /** The record to change. Without it, the form creates a record. */
   record?: Party;
   onSaved: (record: Party) => void;
-  onFailed: (message: string, code: string | undefined) => void;
+  onFailed: (failure: SaveFailure) => void;
   onStart: () => void;
   onCancel?: () => void;
 }) {
@@ -104,11 +104,11 @@ export function PartyForm({
         if (Object.keys(invalid).length > 0) {
           focusInvalidField();
         } else {
-          onFailed(failureOf({ error, response }).message, error?.code);
+          onFailed(saveFailure({ error, response }));
         }
       }
     } catch {
-      onFailed(problemMessage(undefined), undefined);
+      onFailed({ message: problemMessage(undefined), conflict: false });
     }
     setBusy(false);
   };

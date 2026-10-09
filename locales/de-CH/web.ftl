@@ -734,8 +734,6 @@ persons-title = Personen
 institutions-title = Institutionen
 parties-search = Nach Name suchen
 parties-loading = Einträge werden geladen
-parties-load-more = Weitere Einträge laden
-parties-loaded-more = Weitere Einträge geladen.
 parties-empty-title = Noch keine Einträge erfasst
 parties-empty-text = Erfassen Sie den ersten Eintrag mit dem Formular unter der Liste.
 parties-no-match-title = Keine Treffer
@@ -750,8 +748,6 @@ parties-edit = Bearbeiten
 # $name: the name of the record.
 parties-edit-of = { $name } bearbeiten
 # $name: the name of the saved record.
-parties-saved = „{ $name }“ gespeichert.
-parties-conflict = Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.
 person-create-title = Person erfassen
 institution-create-title = Institution erfassen
 # $name: the name of the record.
@@ -774,7 +770,8 @@ institution-kind-other = Andere
 ## Workstreams, actions and commitments (ADRs 0067 and 0068)
 
 work-loading = Daten des Anlasses werden geladen
-work-load-more = Weitere Einträge laden
+register-load-more = Weitere Einträge laden
+register-loaded-more = Weitere Einträge geladen.
 work-column-id = ID
 work-column-owner = Verantwortlich
 work-column-workstream = Arbeitsbereich
@@ -788,8 +785,8 @@ work-create = Erfassen
 work-save = Speichern
 work-cancel = Abbrechen
 # $name: the readable ID or the name of the saved record.
-work-saved = „{ $name }“ gespeichert.
-work-conflict = Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.
+register-saved = „{ $name }“ gespeichert.
+register-conflict = Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.
 work-field-owner = Verantwortlich
 work-field-workstream = Arbeitsbereich
 work-field-due = Fällig am

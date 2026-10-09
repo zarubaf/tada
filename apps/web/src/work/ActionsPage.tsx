@@ -3,6 +3,9 @@ import type { Action, Api } from "../api/client";
 import { useEventContext } from "../events/eventContext";
 import { formatDate } from "../facts/formatValue";
 import { t } from "../i18n";
+import { RegisterView } from "../registers/RegisterView";
+import { useRegister } from "../registers/useRegister";
+import { useRegisterPage } from "../registers/useRegisterPage";
 import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import type { Column } from "../ui/DataTable";
@@ -10,9 +13,6 @@ import { LiveRegion } from "../ui/LiveRegion";
 import { ActionForm } from "./ActionForm";
 import { DirectoryGate } from "./DirectoryGate";
 import { type Directory, useDirectory } from "./directory";
-import { RegisterView } from "./RegisterView";
-import { useRegister } from "./useRegister";
-import { useRegisterPage } from "./useRegisterPage";
 import styles from "./Work.module.css";
 import { ActionStatusLabel } from "./WorkStatus";
 
@@ -101,13 +101,11 @@ function Actions({ api, eventId, directory }: { api: Api; eventId: string; direc
       </h2>
       <RegisterView
         register={register}
+        page={page}
         label={t("actions-title")}
         columns={columns}
         loadingLabel={t("actions-loading")}
         empty={{ title: t("actions-empty-title"), text: t("actions-empty-text") }}
-        onFailure={page.loadMoreFailed}
-        onRetry={page.retry}
-        retried={page.retried}
       />
       <section className={styles.section} aria-labelledby="action-form-title">
         <h2 id="action-form-title" ref={page.formHeading} tabIndex={-1} className={styles.heading}>

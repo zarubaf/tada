@@ -1,10 +1,11 @@
 import { type FormEvent, useState } from "react";
 import { type Api, type Commitment, problemMessage } from "../api/client";
 import { t } from "../i18n";
+import { type SaveFailure, saveFailure } from "../registers/saveFailure";
 import { Button } from "../ui/Button";
 import { TaskDialog, TaskDialogActions } from "../ui/TaskDialog";
 import { TextField } from "../ui/TextField";
-import { fieldErrors, type SaveFailure, saveFailure } from "./fieldErrors";
+import { fieldErrors } from "./fieldErrors";
 import styles from "./Work.module.css";
 
 /**

@@ -1,12 +1,13 @@
 import { type FormEvent, useRef, useState } from "react";
 import { type Api, problemMessage, type Workstream, type WorkstreamStatus } from "../api/client";
 import { t } from "../i18n";
+import { type SaveFailure, saveFailure } from "../registers/saveFailure";
 import { Button } from "../ui/Button";
 import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { Select } from "../ui/Select";
 import { TextField } from "../ui/TextField";
 import type { Directory } from "./directory";
-import { fieldErrors, type SaveFailure, saveFailure } from "./fieldErrors";
+import { fieldErrors } from "./fieldErrors";
 import { OwnerSelect } from "./fields";
 import styles from "./Work.module.css";
 
