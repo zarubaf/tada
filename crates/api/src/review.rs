@@ -19,7 +19,7 @@ use tada_app::proposals::{
 };
 use tada_app::review::{
     self as app, Applied, ApplyError, ApplyInput, ChangesetCursor, ChangesetReview,
-    ConflictReason as AppConflictReason, Edit, InboxChangeset, LocalRecord,
+    ConflictReason as AppConflictReason, Edit, InboxChangeset, Link, LocalRecord,
     ProposalReview as AppProposalReview, ProposalStatus as AppProposalStatus, RecordEditInput,
     ReviewQueryError, ReviewStores,
 };
@@ -37,6 +37,7 @@ use crate::cursor;
 use crate::documents::DraftRendering;
 use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::json_schema;
+use crate::parties::PartyRef;
 use crate::problem::{ApiError, Problem};
 use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts};
 
@@ -234,6 +235,11 @@ pub struct Proposal {
     /// of each `tada:` link. It is absent for each other operation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub draft: Option<DraftRendering>,
+    /// For an open `create-person` or `create-institution` proposal: at most 5 existing records of the same kind
+    /// with a similar name (ADR 0069). The reviewer can link the proposal to one of them. It is absent for each
+    /// other proposal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duplicates: Option<Vec<PartyRef>>,
 }
 
 /// One passage of a source version, with the text around it.
@@ -751,6 +757,9 @@ impl From<AppProposalReview> for Proposal {
             conflict_reason: review.conflict.map(ConflictReason::from),
             current: review.current.map(CurrentFact::from),
             draft: review.draft.map(DraftRendering::from),
+            duplicates: review
+                .duplicates
+                .map(|parties| parties.into_iter().map(PartyRef::from).collect()),
         }
     }
 }
@@ -765,6 +774,22 @@ pub struct ApplyChangesetRequest {
     /// or fields of a proposal that creates an action, a commitment, a person or an institution.
     #[serde(default)]
     pub edits: Vec<EditRequest>,
+    /// Proposed persons and institutions that use an existing record instead of a new one (ADR 0069).
+    #[serde(default)]
+    pub links: Vec<LinkRequest>,
+}
+
+/// The reviewer links a proposal that creates a person or an institution to an existing record of the same kind.
+/// tada creates no record for it, and the other selected proposals use the existing record.
+/// An invalid link gives `validation-failed` with the field code `invalid-link`; a link whose proposal has open
+/// dependents outside the selection gives `dependents-not-selected`.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LinkRequest {
+    /// A selected `create-person` or `create-institution` proposal.
+    pub proposal_id: Uuid,
+    /// The existing person or institution of the organization.
+    pub record_id: Uuid,
 }
 
 /// A change of the reviewer before the acceptance. A `set-fact` proposal takes `state`;
@@ -1143,6 +1168,14 @@ async fn apply_changeset(
                 proposal_id: ProposalId::from_uuid(edit.proposal_id),
                 state: edit.state,
                 fields: edit.fields,
+            })
+            .collect(),
+        links: request
+            .links
+            .into_iter()
+            .map(|link| Link {
+                proposal_id: ProposalId::from_uuid(link.proposal_id),
+                record_id: link.record_id,
             })
             .collect(),
     };

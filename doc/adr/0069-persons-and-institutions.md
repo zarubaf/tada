@@ -48,9 +48,11 @@ Proposals:
 Duplicate candidates:
 
 - The review of a create operation shows the records of the organization with a similar name.
+  The review shows them for an open proposal only, at most 5, and only records of the same kind as the proposal.
 - The Rust code finds them with a normalized name match: it converts the names to lowercase, removes accents, folds `ß` to `ss`, turns each character that is not a letter or a digit into a space, and compares the words.
   So "Tent-Works Ltd." and "Tent Works Ltd" match.
-  Two names match if they are equal, if all words of one name are words of the other, or if they share a word of at least four characters.
+  Two names match if they are equal or if all words of one name are words of the other.
+  They also match if they share a word of at least four characters.
   Words of legal forms, for example `AG`, `GmbH` or `Verein`, do not count, because many names share them.
   It needs no PostgreSQL extension.
 - The list queries support the parameter `q` for a name search with the same normalization.
@@ -58,10 +60,16 @@ Duplicate candidates:
 Linking:
 
 - The apply request carries `links: [{ proposal_id, record_id }]`.
-- A link is valid only if the proposal is a `CreatePerson` or a `CreateInstitution` and the record is of the same kind and of the same organization. Otherwise the request fails and changes nothing.
-- A linked proposal gets the review result `accepted-with-edit`. Its review source version names the chosen record.
+- A link is valid only if the proposal is a selected `CreatePerson` or `CreateInstitution` without an edit and without a second link.
+  The record must be of the same kind and of the same organization.
+  Otherwise the apply returns `validation-failed` with the field `links/{i}` and the code `invalid-link`, and nothing changes.
+- Each open proposal that depends on the linked proposal must be in the same apply, else the code is `dependents-not-selected`.
+  A later apply does not know the link, so it would look for the proposed record.
+  The reviewer can reject such a proposal first.
+- A linked proposal gets the review result `accepted-with-edit`.
+  Its review source version names the chosen record, for example `linked to PER-007`.
 - Proposals that depend on the linked proposal resolve the proposed UUID to the linked record in the same transaction.
-- A linked proposal creates no new record and takes no readable ID.
+- A linked proposal creates no new record and takes no readable ID, and its evidence does not go to the existing record.
 
 ## Consequences
 

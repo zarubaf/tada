@@ -21,6 +21,7 @@ use crate::testing::TestDatabase;
 
 mod approvals;
 mod drafts;
+mod links;
 mod work;
 
 const SOURCE: &str = "Das Open Day findet im Mai 2030 statt. Wir rechnen mit 20000 Besuchern.";
@@ -187,6 +188,7 @@ async fn propose(
 fn select(ids: &[Uuid]) -> ApplyInput {
     ApplyInput {
         selected: ids.iter().copied().map(ProposalId::from_uuid).collect(),
+        links: Vec::new(),
         edits: Vec::new(),
     }
 }
@@ -431,6 +433,7 @@ async fn an_edit_is_the_evidence_of_its_value_and_keeps_the_proposal() {
     .unwrap();
     let input = ApplyInput {
         selected: vec![ProposalId::from_uuid(id)],
+        links: Vec::new(),
         edits: vec![Edit {
             proposal_id: ProposalId::from_uuid(id),
             state: Some(edit),
@@ -514,6 +517,7 @@ async fn an_edit_must_match_the_value_type_of_its_field() {
     .await;
     let input = ApplyInput {
         selected: vec![ProposalId::from_uuid(id)],
+        links: Vec::new(),
         edits: vec![Edit {
             proposal_id: ProposalId::from_uuid(id),
             state: Some(FactStateInput::Accepted {

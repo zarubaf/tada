@@ -4,9 +4,11 @@ use std::collections::HashMap;
 
 use jiff::Timestamp;
 use tada_domain::ids::{ChangesetId, EventId, SourceVersionId};
+use tada_domain::parties::Party;
 use tada_domain::proposals::{Operation, Proposal};
 use tada_domain::sources::{Excerpt, SourceText};
 
+use super::links::duplicates;
 use super::{
     ProposalStatus, ReviewQueryError, ReviewStores, Reviewable, proposal_status, reviewable,
 };
@@ -15,6 +17,7 @@ use crate::caller::{Actor, MemberCaller};
 use crate::clock::Clock;
 use crate::documents::{DraftRendering, resolve_links};
 use crate::facts::FactVersionRef;
+use crate::parties::PartyRef;
 use crate::proposals::Changeset;
 use crate::store::StoreError;
 
@@ -55,6 +58,9 @@ pub struct ProposalReview {
     /// A draft proposal as the reviewer sees it: its Markdown, its lint warnings and the target of each link.
     /// `None` for each other operation.
     pub draft: Option<DraftRendering>,
+    /// The existing records of the same kind with a similar name, for an open proposal that creates a person or an
+    /// institution (ADR 0069). `None` for each other proposal.
+    pub duplicates: Option<Vec<PartyRef>>,
 }
 
 /// Why a proposal conflicts.
@@ -140,6 +146,17 @@ pub async fn get_changeset(
             }
             _ => None,
         };
+        let proposed = match &proposal.operation {
+            Operation::CreatePerson { id, name, .. } => Some((Party::Person(*id), name)),
+            Operation::CreateInstitution { id, name, .. } => Some((Party::Institution(*id), name)),
+            _ => None,
+        };
+        let duplicates = match proposed {
+            Some((party, name)) if status == ProposalStatus::Open => {
+                Some(duplicates(scope, party, name, stores.parties).await?)
+            }
+            _ => None,
+        };
         let excerpts = proposal
             .evidence
             .iter()
@@ -159,6 +176,7 @@ pub async fn get_changeset(
             excerpts,
             current,
             draft,
+            duplicates,
             proposal,
         });
     }

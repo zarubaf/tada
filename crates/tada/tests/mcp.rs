@@ -271,6 +271,7 @@ impl Mcp {
                 .copied()
                 .map(ProposalId::from_uuid)
                 .collect(),
+            links: Vec::new(),
             edits: Vec::new(),
         };
         apply_changeset(&self.owner, changeset.id, input, stores, &*self.clock)
