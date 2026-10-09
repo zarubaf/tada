@@ -128,4 +128,29 @@ describe("Shell", () => {
     await vi.waitFor(() => expect(window.location.pathname).toBe("/sign-in"));
     expect(calls[1]).toMatchObject({ method: "POST", path: "/api/v1/sign-out" });
   });
+
+  it("links to the persons and institutions in the navigation", async () => {
+    renderShell(json(200, info([first], first)));
+
+    expect(await screen.findByRole("link", { name: "Personen" })).toHaveAttribute(
+      "href",
+      "/persons",
+    );
+    expect(screen.getByRole("link", { name: "Institutionen" })).toHaveAttribute(
+      "href",
+      "/institutions",
+    );
+  });
+
+  it.each([
+    ["Personen", "/persons"],
+    ["Institutionen", "/institutions"],
+  ])("leads to %s from the member menu", async (name, path) => {
+    renderShell(json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Anna Muster" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe(path));
+  });
 });
