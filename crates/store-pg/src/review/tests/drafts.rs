@@ -492,7 +492,10 @@ async fn the_markdown_and_the_manifest_of_a_draft_version_never_change() {
         assert_eq!(sqlstate(&error), "23001", "{change}");
     }
     // The status of a draft is not content: it can change.
-    sqlx::query("UPDATE document_version SET status = 'review' WHERE kind = 'draft'")
+    sqlx::query(
+        "UPDATE document_version SET status = 'approved', approved_by = uploaded_by, approved_at = now()
+         WHERE kind = 'draft'",
+    )
         .execute(&test.database.pool)
         .await
         .unwrap();

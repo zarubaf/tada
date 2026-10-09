@@ -1266,12 +1266,75 @@ mod tests {
             .unwrap();
         // The status of a draft can change: it is not content.
         let changed = sqlx::query(
-            "UPDATE document_version SET status = 'review' WHERE document_id = $1 AND number = 2",
+            "UPDATE document_version SET status = 'approved', approved_by = uploaded_by, approved_at = now()
+             WHERE document_id = $1 AND number = 2",
         )
         .bind(document.id.as_uuid())
         .execute(&test.database.pool)
         .await
         .unwrap();
         assert_eq!(changed.rows_affected(), 1);
+    }
+
+    /// The approval record of a version never changes, and the status moves only forward (ADR 0051).
+    #[tokio::test]
+    async fn the_approval_of_a_version_never_changes_and_its_status_moves_only_forward() {
+        let test = TestDatabase::start().await;
+        let f = fixture(&test, "testwil").await;
+        let first = upload(&f, new_document(&f), "Programm.txt", b"Version eins");
+        let document = published(&test, &f, &first).await;
+        let draft = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO document_version
+                 (id, organization_id, document_id, number, kind, sha256, uploaded_by, status, created_at, markdown)
+             VALUES ($1, $2, $3, 2, 'draft', decode(repeat('00', 32), 'hex'), $4, 'draft', now(), 'Text')",
+        )
+        .bind(draft)
+        .bind(f.organization.as_uuid())
+        .bind(document.id.as_uuid())
+        .bind(f.caller.user_id().as_uuid())
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
+        let update = |change: &str| {
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "UPDATE document_version SET {change} WHERE id = $1"
+            )))
+            .bind(draft)
+            .execute(&test.database.pool)
+        };
+        let approve = "status = 'approved', approved_by = uploaded_by, approved_at = now()";
+
+        for change in [
+            "status = 'review'",
+            "status = 'superseded'",
+            "status = 'archived'",
+            "status = 'approved'",
+            "approved_by = uploaded_by, approved_at = now()",
+        ] {
+            let error = update(change).await.unwrap_err();
+            assert_eq!(sqlstate(&error), "23001", "draft: {change}");
+        }
+        update(approve).await.unwrap();
+        for change in [
+            "approved_at = approved_at + interval '1 second'",
+            "approved_by = NULL, approved_at = NULL",
+            "status = 'draft'",
+            "status = 'review'",
+            "status = 'archived'",
+            approve,
+        ] {
+            let error = update(change).await.unwrap_err();
+            assert_eq!(sqlstate(&error), "23001", "approved: {change}");
+        }
+        update("status = 'superseded'").await.unwrap();
+        for change in [
+            "status = 'approved'",
+            "status = 'draft'",
+            "approved_at = now() + interval '1 day'",
+        ] {
+            let error = update(change).await.unwrap_err();
+            assert_eq!(sqlstate(&error), "23001", "superseded: {change}");
+        }
     }
 }
