@@ -250,7 +250,16 @@ impl Operation {
             | Self::AddChoiceValue { field_id, .. }
             | Self::DeprecateField { field_id, .. } => Some(*field_id),
             Self::AddFieldDefinition { id, .. } => Some(*id),
-            _ => None,
+            Self::CreateEvent { .. }
+            | Self::CreateOpenQuestion { .. }
+            | Self::CreateDocumentDraft { .. }
+            | Self::CreatePerson { .. }
+            | Self::CreateInstitution { .. }
+            | Self::CreateAction { .. }
+            | Self::CreateCommitment { .. }
+            | Self::ChangeActionStatus { .. }
+            | Self::ChangeActionDue { .. }
+            | Self::ChangeCommitmentStatus { .. } => None,
         }
     }
 }
