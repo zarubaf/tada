@@ -352,7 +352,7 @@ telegram-confirm-cancel = Abbrechen
 telegram-linked = Telegram-Konto verknüpft.
 telegram-requests-refreshed = Anfragen aktualisiert.
 
-# The notice of ADR 0045. A changed text gets a new NOTICE_VERSION in crates/app/src/tokens/mod.rs.
+# The notice of ADR 0045. A changed text gets a new NOTICE_VERSION and a new line in NOTICE_TEXTS in crates/app/src/tokens/mod.rs; a test checks it.
 token-notice-title = Hinweis zum API-Token
 token-notice-access = Mit dem Token erhält Ihr eigener KI-Client Zugriff auf die Personendaten, die Sie in tada sehen können.
 token-notice-policy = Die Richtlinie des Vereins verlangt einen KI-Tarif, der die eingegebenen Daten nicht zum Training verwendet.

@@ -32,6 +32,14 @@ use crate::store::StoreError;
 pub const TOKEN_PREFIX: &str = "tada_pat_";
 /// The version of the token notice of ADR 0045. A changed notice text gets a new version.
 pub const NOTICE_VERSION: u32 = 1;
+/// Each version of the token notice with the SHA-256 of its text (the `token-notice-*` messages of
+/// `locales/de-CH/web.ftl`), oldest first. A changed text adds a line with the next version and changes
+/// `NOTICE_VERSION`. Never change a line. A test fails when the text and the newest line disagree.
+#[cfg(test)]
+const NOTICE_TEXTS: &[(u32, &str)] = &[(
+    1,
+    "35f604e0d2ce1c7e5c0ce5c4404605d7f2b2961b5a7a41479697457128aa09d6",
+)];
 /// The longest time from the creation of a token to its expiry.
 pub const MAX_LIFETIME: SignedDuration = SignedDuration::from_hours(365 * 24);
 
