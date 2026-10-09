@@ -79,6 +79,7 @@ CREATE INDEX action_open_of_owner ON action (organization_id, owner_user_id)
     WHERE status IN ('open', 'in-progress', 'blocked');
 
 -- A commitment of an event: a promise of one person or one institution. A conditional one names its condition.
+-- `firm_reason` is the reason that made a conditional commitment firm. A conditional commitment has none yet.
 CREATE TABLE commitment (
     id uuid PRIMARY KEY,
     organization_id uuid NOT NULL,
@@ -92,11 +93,13 @@ CREATE TABLE commitment (
     workstream_id uuid,
     due_date date,
     status text NOT NULL CHECK (status IN ('conditional', 'firm', 'fulfilled', 'broken', 'withdrawn')),
+    firm_reason text,
     version bigint NOT NULL CHECK (version >= 1),
     created_at timestamptz NOT NULL,
     updated_at timestamptz NOT NULL,
     CHECK (num_nonnulls(person_id, institution_id) = 1),
     CHECK (status <> 'conditional' OR condition IS NOT NULL),
+    CHECK (status <> 'conditional' OR firm_reason IS NULL),
     UNIQUE (organization_id, id),
     UNIQUE (event_id, local_number),
     FOREIGN KEY (organization_id, event_id) REFERENCES event (organization_id, id),
