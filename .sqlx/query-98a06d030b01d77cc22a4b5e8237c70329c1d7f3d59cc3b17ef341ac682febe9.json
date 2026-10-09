@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE api_token SET last_used_at = greatest(last_used_at, $3)\n             WHERE organization_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "98a06d030b01d77cc22a4b5e8237c70329c1d7f3d59cc3b17ef341ac682febe9"
+}

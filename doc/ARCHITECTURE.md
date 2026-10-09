@@ -35,17 +35,21 @@ Optional later adapters: Microsoft Graph (mail, calendar, SharePoint), Nextcloud
 
 ## Building blocks
 
-| Block            | Responsibility                                                                                                                       | Decision                                                                                                                               |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `domain` crate   | Types, rules and state machines. No I/O.                                                                                             | [0002](adr/0002-monorepo-and-services.md), [0003](adr/0003-runtime-and-tooling.md)                                                     |
-| `app` crate      | Domain commands, queries and ports. The only way to change accepted state.                                                           | [0002](adr/0002-monorepo-and-services.md)                                                                                              |
-| `store-pg` crate | Repositories, SQL migrations, sessions and the job queue.                                                                            | [0006](adr/0006-persistence.md), [0007](adr/0007-jobs-and-schedules.md), [0008](adr/0008-authentication.md)                            |
-| `adapters` crate | Object storage, mail and model provider.                                                                                             | [0009](adr/0009-object-storage.md), [0010](adr/0010-model-provider.md)                                                                 |
-| `api` crate      | HTTP handlers, DTOs and the OpenAPI document.                                                                                        | [0017](adr/0017-api-contract-rust.md)                                                                                                  |
-| `telegram` crate | Telegram gateway.                                                                                                                    | [0011](adr/0011-telegram.md)                                                                                                           |
-| `tada` binary    | Composition root. Process roles: `serve`, `worker`, `telegram`. Commands: `migrate`, `bootstrap`, `settings`, `openapi`, `problems`. | [0025](adr/0025-platform-contract.md)                                                                                                  |
-| `apps/web`       | React web client, German UI, design system.                                                                                          | [0005](adr/0005-web-client.md), [0018](adr/0018-design-system-foundation.md)–[0024](adr/0024-frontend-quality-gates.md)                |
-| Runtime          | One image that follows the platform contract. Each operator deploys it from a separate repository.                                   | [0025](adr/0025-platform-contract.md), [0028](adr/0028-images-and-registry.md), [0033](adr/0033-deployment-outside-this-repository.md) |
+| Block            | Responsibility                                                                                                                                 | Decision                                                                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain` crate   | Types, rules and state machines. No I/O.                                                                                                       | [0002](adr/0002-monorepo-and-services.md), [0003](adr/0003-runtime-and-tooling.md)                                                     |
+| `app` crate      | Domain commands, queries and ports. The only way to change accepted state.                                                                     | [0002](adr/0002-monorepo-and-services.md)                                                                                              |
+| `store-pg` crate | Repositories, SQL migrations, sessions and the job queue.                                                                                      | [0006](adr/0006-persistence.md), [0007](adr/0007-jobs-and-schedules.md), [0008](adr/0008-authentication.md)                            |
+| `adapters` crate | Object storage, mail and model provider.                                                                                                       | [0009](adr/0009-object-storage.md), [0010](adr/0010-model-provider.md)                                                                 |
+| `api` crate      | HTTP handlers, DTOs and the OpenAPI document.                                                                                                  | [0017](adr/0017-api-contract-rust.md)                                                                                                  |
+| `telegram` crate | Telegram gateway.                                                                                                                              | [0011](adr/0011-telegram.md)                                                                                                           |
+| `mcp` crate      | MCP server at `/mcp` for the AI clients of members: read tools and one proposal tool, with personal API tokens.                                | [0040](adr/0040-ai-intake-through-mcp.md), [0039](adr/0039-actors-and-identities.md)                                                   |
+| `tada` binary    | Composition root. Process roles: `serve`, `worker`, `telegram`. Commands: `migrate`, `bootstrap`, `export`, `settings`, `openapi`, `problems`. | [0025](adr/0025-platform-contract.md), [0059](adr/0059-structured-export.md)                                                           |
+| `apps/web`       | React web client, German UI, design system.                                                                                                    | [0005](adr/0005-web-client.md), [0018](adr/0018-design-system-foundation.md)–[0024](adr/0024-frontend-quality-gates.md)                |
+| Runtime          | One image that follows the platform contract. Each operator deploys it from a separate repository.                                             | [0025](adr/0025-platform-contract.md), [0028](adr/0028-images-and-registry.md), [0033](adr/0033-deployment-outside-this-repository.md) |
+
+An MCP tool answers a refusal of `app`, also invalid arguments, as a tool result with `isError`, the problem code and the JSON pointers of the invalid values; only `internal` and `unavailable` are JSON-RPC errors.
+Each refusal and each JSON-RPC error of a tool also contains the request ID.
 
 Search uses PostgreSQL full-text search first.
 pgvector comes only if an evaluation shows a benefit.
@@ -54,7 +58,7 @@ pgvector comes only if an evaluation shows a benefit.
 
 ### A domain command
 
-1. A driving adapter (`api`, `telegram` or `worker`) receives a request and identifies the caller.
+1. A driving adapter (`api`, `mcp`, `telegram` or `worker`) receives a request and identifies the caller.
 2. The adapter calls one `app` command with the caller's capability.
 3. The command checks the permissions, the allowed transition and the record version.
 4. The command commits the change, the audit event and any outbound job in one transaction.
@@ -102,7 +106,15 @@ tada does not copy every tool into PostgreSQL.
 - Source items, source versions, evidence links, proposals and accepted records are separate tables.
 - A link to a source is not evidence, because documents change and messages disappear.
   Evidence is the exact source version or a snapshot, with its hash, capture time and a locator such as a page or a passage.
+- One domain type holds evidence: `domain::sources::Evidence`, a passage with the ID of its source version.
+  Proposals, fact versions and the source links of drafts use it ([ADR 0050](adr/0050-proposals-and-review.md), [ADR 0051](adr/0051-document-drafts-and-provenance.md)).
+  A passage of a proposal cites the source text of its changeset by default.
+  It can also cite another source version with a text, for example an uploaded text file, if the source version is readable in the event of the proposal (`app::access::event_source_reach`).
+  Otherwise the passage could show a text of another event to the members of the event.
+  The source links of a draft follow the same rule: they cite only source versions that are readable in the event of the draft.
+  A draft version has no source version, so a passage cannot cite a draft.
 - Audit messages contain no raw personal data.
+- [doc/data-inventory.md](data-inventory.md) lists each category of personal data that tada stores.
 - Retention and deletion rules cover originals, snapshots, extracted facts, embeddings and backups.
 
 ### Permissions and isolation
@@ -111,6 +123,11 @@ tada does not copy every tool into PostgreSQL.
   [ADR 0006](adr/0006-persistence.md) defines how the database enforces it.
 - Event permissions apply inside the organization boundary.
 - Permission filtering happens before retrieval, so AI answers and citations never contain data the caller cannot see.
+- Owners and admins read each source version of their organization.
+  Another member reads the source versions of the events in which the member has an event role, and the source versions that the facts and proposals of these events cite as evidence.
+  For example, the text of an organization changeset has no event, and the members of the event that it creates read it through the evidence.
+  `app::access::source_reach` holds this rule. Search and the reads of citations use it.
+  A new citation in a proposal or a draft uses the reach of its own event (`app::access::event_source_reach`).
 - A document copied into an event does not widen access. Both the source access and the event membership must allow disclosure.
 - Unknown event attribution goes to a triage queue. AI can suggest an event, but it never shows a message to more than one event team on its own.
 
@@ -158,6 +175,37 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 - tada shows unsupported pages and formats explicitly. OCR text alone cannot check traffic capacity, evacuation geometry or aviation safety.
 - The first formats: Markdown concepts, PDF preview and export, text PDFs and selected office files. Specialist formats stay downloadable originals.
 - A move to another storage provider keeps document IDs, version IDs, hashes and approvals, with a tested mapping manifest.
+- In Slice 1, each document belongs to exactly one event, and access follows the event role ([ADR 0052](adr/0052-event-roles-and-ownership.md)).
+  The `DOC` numbers stay unique in the organization ([ADR 0038](adr/0038-ids-and-time.md)).
+  Documents of the whole organization need a later ADR, because no access rule for them exists yet.
+- Each organization has a storage quota: the column `organization.storage_quota_bytes`, 5 GiB by default ([ADR 0043](adr/0043-upload-policy.md)).
+  It is a value in the database, not an environment setting. An operator changes it for one organization with SQL.
+- The text of an uploaded plain text, Markdown or CSV file is the text of its source version: members can search and cite it ([ADR 0050](adr/0050-proposals-and-review.md)).
+  A proposal can cite a passage of such a file as its evidence.
+  PDF and office files have no extracted text yet. An agent cites its own source text for facts from such files.
+- tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. tada stores a larger text file without its text: members cannot search or cite it, and the file stays downloadable.
+  The PostgreSQL search index of one text is limited to 1 MB, and the index of a text with many unique words can be larger than the text.
+  If the index of a text under the cap is too large, tada stores the version without searchable text.
+- The source text of a changeset has at most 100,000 characters after the normalization, else the request fails with `validation-failed`.
+  The cap keeps the search index of the text under its limit, and it limits the cost of the passage checks, which read the text.
+  A changeset has at most 200 proposals, and each proposal has at most 10 passages of evidence; else the request fails with `validation-failed`.
+  These limits also bound the cost of the passage checks of one request.
+- An upload is a raw request body with the media type `application/octet-stream`, not a multipart form.
+  The header `X-File-Name` holds the file name, percent-encoded as UTF-8.
+  The server then streams the body to the object storage without a form parser.
+- The upload routes read the body as a stream, so the default body limit of `axum` does not apply to them.
+  They apply `TADA_UPLOAD_MAX_BYTES` instead ([ADR 0043](adr/0043-upload-policy.md)): a larger `Content-Length` fails at once, and the upload counts the bytes of the stream.
+  All other routes keep the default limit of `axum`.
+  Each running upload holds at most about 9 MiB in memory: one part of 8 MiB for the object storage and the 1 MiB of the inspection.
+  Slice 1 does not limit the number of uploads that run at the same time.
+- An upload checks the access of the member before the stream starts.
+  The publish after the stream does not check it again.
+  Thus an owner or admin can remove a member during a long upload, and tada still publishes the version of that upload.
+  This is a known limit of Slice 1: a removed member loses access with the next request, and one upload is one long request.
+- A download sends `Content-Disposition` with the RFC 6266 file name, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'self'; sandbox`, `Cross-Origin-Resource-Policy: same-origin` and `Cache-Control: private, no-store` ([ADR 0009](adr/0009-object-storage.md)).
+  Only PDF and plain text can be inline. Each other type is an attachment, also if the client asks for inline.
+- A draft has at most 200,000 characters of Markdown ([ADR 0051](adr/0051-document-drafts-and-provenance.md)).
+  A concept of an event has some ten thousand characters. The limit bounds the size of one proposal.
 
 ### Safe evolution
 

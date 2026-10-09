@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO rate_limit_counter (key, window_start, count) VALUES ($1, $2, 1)\n                 ON CONFLICT (key, window_start) DO UPDATE SET count = rate_limit_counter.count + 1\n                 RETURNING count",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "rate_limit_counter",
+            "name": "count"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "60586a76354708cf9a20aaa2ecf200416ace82a619b52784cc9180b80c980474"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE outbound_intent SET status = 'unknown', finished_at = now()\n             WHERE id = $1 AND status = 'pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9176a6781f2d0ca3f71bc3e133c3488dd317cd466e7e8a37fb8c1c3f86ff1535"
+}

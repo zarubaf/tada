@@ -1,0 +1,424 @@
+//! Sign-in end to end: the magic-link request, the mail, the session cookie and sign-out (ADR 0008, ADR 0056).
+
+// The helpers of this test file are not `#[test]` functions, so clippy.toml does not cover them.
+#![allow(clippy::unwrap_used)]
+
+mod support;
+
+use std::net::IpAddr;
+use std::ops::Deref;
+
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Method, Request, Response, StatusCode, header};
+use jiff::SignedDuration;
+use serde_json::{Value, json};
+use support::{MailApp, SESSION_COOKIE, session_cookie};
+use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
+use tada_app::domain::ids::OrganizationId;
+
+const LINK: &str = "https://tada.example.org/sign-in/link#token=";
+const SECOND: SignedDuration = SignedDuration::from_secs(1);
+
+/// The shared test application with the steps of a sign-in.
+struct App(MailApp);
+
+impl Deref for App {
+    type Target = MailApp;
+
+    fn deref(&self) -> &MailApp {
+        &self.0
+    }
+}
+
+impl App {
+    async fn start() -> Self {
+        Self(MailApp::start().await)
+    }
+
+    /// Creates a user with a membership in each of `organizations`.
+    async fn user(&self, email: &str, organizations: &[OrganizationId]) {
+        let user = self
+            .test
+            .create_user(
+                &DisplayName::parse("Anna Muster").unwrap(),
+                &Email::parse(email).unwrap(),
+            )
+            .await;
+        for organization in organizations {
+            self.test
+                .add_membership(*organization, user, OrganizationRole::Member)
+                .await;
+        }
+    }
+
+    async fn post(
+        &self,
+        path: &str,
+        body: &Value,
+        cookie: Option<&str>,
+    ) -> (Response<Body>, Value) {
+        let mut request = support::request(Method::POST, path)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::USER_AGENT, "Firefox");
+        if let Some(cookie) = cookie {
+            request = request.header(header::COOKIE, format!("{SESSION_COOKIE}={cookie}"));
+        }
+        self.send(request.body(Body::from(body.to_string())).unwrap())
+            .await
+    }
+
+    async fn get(&self, path: &str, cookie: Option<&str>) -> (Response<Body>, Value) {
+        let mut request = Request::get(path);
+        if let Some(cookie) = cookie {
+            request = request.header(header::COOKIE, format!("{SESSION_COOKIE}={cookie}"));
+        }
+        self.send(request.body(Body::empty()).unwrap()).await
+    }
+
+    async fn request_link(&self, email: &str) -> (Response<Body>, Value) {
+        self.post("/api/v1/sign-in/requests", &json!({"email": email}), None)
+            .await
+    }
+
+    /// Requests a magic link for `email`, sends it and reads the token from the link fragment.
+    async fn magic_link(&self, email: &str) -> String {
+        let (response, _) = self.request_link(email).await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        self.mailed_token(LINK).await
+    }
+
+    async fn redeem(&self, token: &str) -> (Response<Body>, Value) {
+        self.post("/api/v1/sign-in/magic-link", &json!({"token": token}), None)
+            .await
+    }
+
+    /// Signs `email` in and returns the value of the session cookie.
+    async fn sign_in(&self, email: &str) -> String {
+        let token = self.magic_link(email).await;
+        let (response, _) = self.redeem(&token).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        session_cookie(&response).unwrap()
+    }
+}
+
+/// A sign-in request for `email` from the client `peer`.
+async fn request_link_from(router: &Router, peer: IpAddr, email: &str) -> (Response<Body>, Value) {
+    let request = support::request_from(peer, Method::POST, "/api/v1/sign-in/requests")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(json!({"email": email}).to_string()))
+        .unwrap();
+    support::send(router, request).await
+}
+
+#[tokio::test]
+async fn a_sign_in_request_gets_the_same_answer_for_each_address_and_only_a_member_gets_mail() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    app.user("ben@example.org", &[]).await;
+
+    let mut answers = Vec::new();
+    for email in [
+        "nobody@example.org",
+        "ben@example.org",
+        "Anna@Example.org",
+        "no address",
+    ] {
+        let (response, body) = app.request_link(email).await;
+        answers.push((response.status(), body));
+    }
+    assert_eq!(answers, vec![(StatusCode::ACCEPTED, Value::Null); 4]);
+
+    app.run_jobs().await;
+    let sent = app.mailer.sent();
+    assert_eq!(sent.len(), 1, "only the member gets a mail");
+    assert_eq!(sent[0].to, Email::parse("anna@example.org").unwrap());
+
+    support::logs::assert_clean(&[
+        "nobody@example.org",
+        "ben@example.org",
+        "anna@example.org",
+        "Anna@Example.org",
+        "Anna Muster",
+    ]);
+}
+
+#[tokio::test]
+async fn a_member_signs_in_with_the_magic_link_in_the_organization() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+
+    let token = app.magic_link("anna@example.org").await;
+    let (response, session) = app.redeem(&token).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+    let set_cookie = response.headers()[header::SET_COOKIE].to_str().unwrap();
+    let cookie = session_cookie(&response).unwrap();
+    assert_eq!(
+        set_cookie,
+        format!(
+            "{SESSION_COOKIE}={cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000"
+        )
+    );
+    app.test.assert_no_plaintext(&cookie).await;
+    app.test.assert_no_plaintext(&token).await;
+
+    let organization = json!({
+        "organization_id": testwil.as_uuid(),
+        "name": "testwil",
+        "role": "member",
+    });
+    assert_eq!(session["display_name"], "Anna Muster");
+    assert_eq!(session["organization"], organization);
+    assert_eq!(session["memberships"], json!([organization]));
+
+    let (response, read) = app.get("/api/v1/session", Some(&cookie)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(read, session);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+    let (response, _) = app.get("/api/v1/events", Some(&cookie)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    support::logs::assert_clean(&[
+        &token,
+        &cookie,
+        "anna@example.org",
+        "Anna Muster",
+        "Firefox",
+    ]);
+    support::logs::assert_route_logged("/api/v1/sign-in/magic-link");
+}
+
+#[tokio::test]
+async fn a_member_of_two_organizations_chooses_one() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    let musterhausen = app.test.create_organization("musterhausen").await;
+    let other = app.test.create_organization("andere").await;
+    app.user("anna@example.org", &[testwil, musterhausen]).await;
+    let cookie = app.sign_in("anna@example.org").await;
+
+    let (response, problem) = app.get("/api/v1/events", Some(&cookie)).await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(problem["code"], "organization-required");
+    let (response, session) = app.get("/api/v1/session", Some(&cookie)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(session.get("organization").is_none(), "{session}");
+    assert_eq!(session["memberships"].as_array().unwrap().len(), 2);
+
+    let (response, problem) = app
+        .post(
+            "/api/v1/session/organization",
+            &json!({"organization_id": other.as_uuid()}),
+            Some(&cookie),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(problem["code"], "not-found");
+
+    let (response, session) = app
+        .post(
+            "/api/v1/session/organization",
+            &json!({"organization_id": musterhausen.as_uuid()}),
+            Some(&cookie),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+    assert_eq!(
+        session["organization"]["organization_id"],
+        json!(musterhausen.as_uuid())
+    );
+    let (response, _) = app.get("/api/v1/events", Some(&cookie)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_magic_link_works_once() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+
+    let token = app.magic_link("anna@example.org").await;
+    let (first, _) = app.redeem(&token).await;
+    assert_eq!(first.status(), StatusCode::OK);
+    let (second, problem) = app.redeem(&token).await;
+    assert_eq!(second.status(), StatusCode::UNAUTHORIZED);
+    assert!(session_cookie(&second).is_none());
+
+    let (_, unknown) = app.redeem("unknown").await;
+    assert_eq!(
+        without_request_id(problem),
+        without_request_id(unknown),
+        "no detail difference"
+    );
+
+    // The failed redemptions are the error path of the sign-in.
+    support::logs::assert_clean(&[&token, "unknown", "anna@example.org"]);
+}
+
+/// A problem without the fields that differ for each request.
+fn without_request_id(mut problem: Value) -> Value {
+    problem.as_object_mut().unwrap().remove("request_id");
+    problem.as_object_mut().unwrap().remove("instance");
+    problem
+}
+
+#[tokio::test]
+async fn a_magic_link_expires_after_15_minutes() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+
+    let token = app.magic_link("anna@example.org").await;
+    app.clock.advance(SignedDuration::from_mins(15) - SECOND);
+    let (response, _) = app.redeem(&token).await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let token = app.magic_link("anna@example.org").await;
+    app.clock.advance(SignedDuration::from_mins(15));
+    let (response, problem) = app.redeem(&token).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(problem["code"], "unauthenticated");
+}
+
+#[tokio::test]
+async fn a_get_request_on_the_link_does_not_sign_in() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let token = app.magic_link("anna@example.org").await;
+
+    for path in [
+        format!("/sign-in/link?token={token}"),
+        format!("/api/v1/sign-in/magic-link?token={token}"),
+    ] {
+        let (response, _) = app.get(&path, None).await;
+        assert_ne!(response.status(), StatusCode::OK, "{path}");
+        assert!(session_cookie(&response).is_none(), "{path}");
+    }
+
+    let (response, _) = app.redeem(&token).await;
+    assert_eq!(response.status(), StatusCode::OK, "the token is unused");
+}
+
+#[tokio::test]
+async fn a_session_ends_after_14_idle_days() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let cookie = app.sign_in("anna@example.org").await;
+
+    app.clock
+        .advance(SignedDuration::from_hours(14 * 24) - SECOND);
+    let (response, _) = app.get("/api/v1/events", Some(&cookie)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    app.clock.advance(SignedDuration::from_hours(14 * 24));
+    let (response, problem) = app.get("/api/v1/events", Some(&cookie)).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(problem["code"], "unauthenticated");
+}
+
+#[tokio::test]
+async fn after_sign_out_the_old_cookie_is_unauthenticated() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let cookie = app.sign_in("anna@example.org").await;
+
+    let (response, body) = app
+        .post("/api/v1/sign-out", &json!({}), Some(&cookie))
+        .await;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert_eq!(body, Value::Null);
+    assert_eq!(
+        response.headers()[header::SET_COOKIE],
+        format!("{SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0")
+    );
+
+    for path in ["/api/v1/session", "/api/v1/events"] {
+        let (response, _) = app.get(path, Some(&cookie)).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{path}");
+    }
+
+    let (response, _) = app.post("/api/v1/sign-out", &json!({}), None).await;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn each_response_forbids_the_referrer() {
+    let app = App::start().await;
+    // `App::send` checks the header of each response, also of problems and of the web routes.
+    for path in [
+        "/api/v1/session",
+        "/api/v1/nothing",
+        "/sign-in/link",
+        "/healthz",
+    ] {
+        app.get(path, None).await;
+    }
+    app.request_link("nobody@example.org").await;
+    app.redeem("unknown").await;
+}
+
+#[tokio::test]
+async fn the_sixth_request_for_one_address_is_rate_limited_also_with_two_processes() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let other_process = support::session_router(&app.test, app.clock.clone());
+    let processes = [&app.router, &other_process];
+
+    for n in 0..5 {
+        let (response, _) =
+            request_link_from(processes[n % 2], support::PEER, "anna@example.org").await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED, "request {}", n + 1);
+    }
+    let (response, problem) =
+        request_link_from(processes[1], support::PEER, "Anna@Example.org").await;
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(problem["code"], "rate-limited");
+    // The window started at the time of the test clock and lasts one hour.
+    assert_eq!(response.headers()[header::RETRY_AFTER], "3600");
+
+    let other_ip: IpAddr = "198.51.100.1".parse().unwrap();
+    let (response, _) = request_link_from(processes[0], other_ip, "ben@example.org").await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+    app.run_jobs().await;
+    assert_eq!(
+        app.mailer.sent().len(),
+        5,
+        "the limited request sends no mail"
+    );
+
+    app.clock.advance(SignedDuration::from_hours(1));
+    let (response, _) = request_link_from(processes[0], support::PEER, "anna@example.org").await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED, "a new window");
+
+    support::logs::assert_clean(&["anna@example.org", "ben@example.org", "198.51.100.1"]);
+}
+
+#[tokio::test]
+async fn the_31st_request_from_one_ip_address_is_rate_limited() {
+    let app = App::start().await;
+    for n in 0..30 {
+        let (response, _) = request_link_from(
+            &app.router,
+            support::PEER,
+            &format!("person{n}@example.org"),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED, "request {}", n + 1);
+    }
+    let (response, problem) =
+        request_link_from(&app.router, support::PEER, "person30@example.org").await;
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(problem["code"], "rate-limited");
+    assert!(response.headers().contains_key(header::RETRY_AFTER));
+
+    support::logs::assert_clean(&["person0@example.org", "person30@example.org"]);
+}

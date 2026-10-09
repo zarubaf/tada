@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO document_manifest_source\n             (organization_id, document_version_id, source_version_id, start_offset, end_offset)\n         SELECT $1, $2, t.source_version_id, t.start_offset, t.end_offset\n         FROM unnest($3::uuid[], $4::int[], $5::int[]) AS t (source_version_id, start_offset, end_offset)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray",
+        "Int4Array",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5d3c1cf1502963318ecae3a97c828ec82511098c646558c04dc82d5213e1da60"
+}

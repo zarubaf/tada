@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.proposal_id, r.result, r.created_at AS \"created_at: jiff_sqlx::Timestamp\"\n               FROM review_result r\n               JOIN proposal p ON p.organization_id = r.organization_id AND p.id = r.proposal_id\n               WHERE r.organization_id = $1 AND p.changeset_id = $2\n               ORDER BY r.created_at, r.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "proposal_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "review_result",
+            "name": "proposal_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "result",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "review_result",
+            "name": "result"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "review_result",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ed565c717110dc14109e27975c5b849a55c32076f17eb85326f82006d9e3c7e1"
+}

@@ -5,6 +5,7 @@ use jiff::tz::TimeZone;
 
 use crate::RecordVersion;
 use crate::ids::{EventId, OrganizationId};
+use crate::name::{self, NameError};
 
 /// An event. All fields hold checked values.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +33,10 @@ pub enum EventKeyError {
 }
 
 impl EventKey {
+    /// The rule of `parse` as a regular expression, for the JSON Schema of an input.
+    /// Change it together with `parse`.
+    pub const PATTERN: &str = "^[A-Z0-9]{2,8}$";
+
     pub fn parse(value: &str) -> Result<Self, EventKeyError> {
         if !(2..=8).contains(&value.len()) {
             return Err(EventKeyError::Length);
@@ -50,40 +55,25 @@ impl EventKey {
     }
 }
 
-/// The name of an event: 1 to 200 characters, without control characters and without spaces at the ends.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The name of an event, with the rules of `crate::name`.
+#[derive(Clone, PartialEq, Eq)]
 pub struct EventName(String);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-pub enum EventNameError {
-    #[error("an event name is not empty")]
-    Empty,
-    #[error("an event name has at most 200 characters")]
-    TooLong,
-    #[error("an event name has no control characters")]
-    ControlCharacter,
-}
-
 impl EventName {
-    pub const MAX_CHARS: usize = 200;
-
     /// Removes the spaces at the ends, then checks the value.
-    pub fn parse(value: &str) -> Result<Self, EventNameError> {
-        let value = value.trim();
-        if value.is_empty() {
-            return Err(EventNameError::Empty);
-        }
-        if value.chars().count() > Self::MAX_CHARS {
-            return Err(EventNameError::TooLong);
-        }
-        if value.chars().any(char::is_control) {
-            return Err(EventNameError::ControlCharacter);
-        }
-        Ok(Self(value.to_owned()))
+    pub fn parse(value: &str) -> Result<Self, NameError> {
+        name::parse(value).map(Self)
     }
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// An event name can contain a name of a person, so `Debug` shows its length only (ADR 0035).
+impl std::fmt::Debug for EventName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EventName({} characters)", self.0.chars().count())
     }
 }
 
@@ -118,6 +108,12 @@ mod tests {
     use super::*;
 
     #[test]
+    fn debug_of_an_event_name_hides_the_name() {
+        let name = EventName::parse("Erika Muster Party").unwrap();
+        assert!(!format!("{name:?}").contains("Erika"));
+    }
+
+    #[test]
     fn accepts_keys_of_two_to_eight_capital_letters_and_digits() {
         for key in ["FL", "FLY28", "ABCDEFG8"] {
             assert_eq!(EventKey::parse(key).unwrap().as_str(), key);
@@ -134,21 +130,12 @@ mod tests {
     }
 
     #[test]
-    fn trims_and_checks_names() {
+    fn an_event_name_has_the_rules_of_a_name() {
         assert_eq!(
             EventName::parse("  Open Day Testwil ").unwrap().as_str(),
             "Open Day Testwil"
         );
-        assert_eq!(EventName::parse(" \t"), Err(EventNameError::Empty));
-        assert_eq!(
-            EventName::parse(&"ä".repeat(201)),
-            Err(EventNameError::TooLong)
-        );
-        assert!(EventName::parse(&"ä".repeat(200)).is_ok());
-        assert_eq!(
-            EventName::parse("Open\u{0}Day"),
-            Err(EventNameError::ControlCharacter)
-        );
+        assert_eq!(EventName::parse(" "), Err(NameError::Empty));
     }
 
     #[test]

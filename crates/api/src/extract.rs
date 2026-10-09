@@ -1,19 +1,44 @@
 //! Request extractors whose rejections are problem details (ADR 0037).
 
-use axum::extract::rejection::{JsonRejection, QueryRejection};
-use axum::extract::{FromRequest, FromRequestParts, Request};
-use axum::http::header;
+use std::convert::Infallible;
+use std::fmt;
+
+use axum::extract::rejection::{JsonRejection, PathRejection, QueryRejection};
+use axum::extract::{FromRequest, FromRequestParts, OptionalFromRequestParts, Request};
 use axum::http::request::Parts;
+use axum::http::{HeaderValue, header};
 use serde::de::DeserializeOwned;
-use tada_app::auth::AuthenticationError;
+use tada_app::auth::{Authenticated, AuthenticationError, Credential};
 use tada_app::caller::MemberCaller;
+use tada_app::domain::RecordVersion;
+use tada_app::paging::PageLimit;
 use tada_app::problem::ProblemCode;
+use tada_app::session::ABSOLUTE_TIMEOUT;
 
 use crate::ApiState;
 use crate::problem::ApiError;
+use crate::request_id;
 
-/// The session cookie (ADR 0008).
-const SESSION_COOKIE: &str = "__Host-tada-session";
+/// The `limit` query parameter of a list (ADR 0044). The default is 50.
+pub(crate) fn page_limit(limit: Option<u32>) -> Result<PageLimit, ApiError> {
+    match limit {
+        None => Ok(PageLimit::DEFAULT),
+        Some(limit) => PageLimit::new(limit).ok_or_else(|| {
+            ApiError::new(ProblemCode::MalformedRequest).with_detail("The limit must be 1 to 200.")
+        }),
+    }
+}
+
+/// The `expected_version` of a command on an existing record (ADR 0044).
+pub(crate) fn record_version(value: i64) -> Result<RecordVersion, ApiError> {
+    RecordVersion::new(value).ok_or_else(|| {
+        ApiError::new(ProblemCode::MalformedRequest)
+            .with_detail("The expected version must be 1 or more.")
+    })
+}
+
+/// The name of the session cookie (ADR 0008).
+pub const SESSION_COOKIE: &str = "__Host-tada-session";
 
 /// A JSON request body.
 #[derive(Debug)]
@@ -65,6 +90,28 @@ where
     }
 }
 
+/// The path parameters of a request.
+#[derive(Debug)]
+pub struct Path<T>(pub T);
+
+impl<S, T> FromRequestParts<S> for Path<T>
+where
+    S: Send + Sync,
+    T: DeserializeOwned + Send,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, ApiError> {
+        <axum::extract::Path<T> as FromRequestParts<S>>::from_request_parts(parts, state)
+            .await
+            .map(|axum::extract::Path(value)| Self(value))
+            .map_err(|_: PathRejection| {
+                ApiError::new(ProblemCode::MalformedRequest)
+                    .with_detail("The path parameters do not match the schema.")
+            })
+    }
+}
+
 /// The member who sends the request (ADR 0039).
 #[derive(Debug)]
 pub struct Caller(pub MemberCaller);
@@ -73,15 +120,74 @@ impl FromRequestParts<ApiState> for Caller {
     type Rejection = ApiError;
 
     async fn from_request_parts(parts: &mut Parts, state: &ApiState) -> Result<Self, ApiError> {
-        let token = session_token(parts);
-        match state.authenticator.authenticate(token).await {
-            Ok(caller) => Ok(Self(caller)),
-            Err(AuthenticationError::Unauthenticated) => {
-                Err(ApiError::new(ProblemCode::Unauthenticated))
-            }
-            Err(AuthenticationError::Store(error)) => Err(ApiError::store(&error)),
+        // The REST API accepts only the session cookie and only members (ADR 0039).
+        let credential = session_token(parts).map(Credential::Session);
+        match state.authenticator.authenticate(credential).await? {
+            Authenticated::Member(caller) => Ok(Self(caller.with_request(request_id()))),
+            Authenticated::Ai(_) => Err(AuthenticationError::Unauthenticated.into()),
         }
     }
+}
+
+/// The token of the session cookie of the request. `Debug` never shows it (ADR 0035).
+/// A request without the cookie is `unauthenticated`.
+pub struct SessionToken(String);
+
+impl SessionToken {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for SessionToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("SessionToken(redacted)")
+    }
+}
+
+impl<S: Send + Sync> FromRequestParts<S> for SessionToken {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, ApiError> {
+        session_token(parts)
+            .map(|token| Self(token.to_owned()))
+            .ok_or_else(|| ApiError::new(ProblemCode::Unauthenticated))
+    }
+}
+
+impl<S: Send + Sync> OptionalFromRequestParts<S> for SessionToken {
+    type Rejection = Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Option<Self>, Infallible> {
+        Ok(session_token(parts).map(|token| Self(token.to_owned())))
+    }
+}
+
+/// The `Set-Cookie` value that gives the browser the session token (ADR 0008).
+/// The cookie lives as long as a session can live.
+pub(crate) fn session_cookie(token: &str) -> Result<HeaderValue, ApiError> {
+    cookie(token, ABSOLUTE_TIMEOUT.as_secs())
+}
+
+/// The `Set-Cookie` value that removes the session cookie from the browser.
+pub(crate) fn expired_session_cookie() -> Result<HeaderValue, ApiError> {
+    cookie("", 0)
+}
+
+/// The one format of the session cookie. `Domain` is absent, as the `__Host-` prefix requires.
+fn cookie(value: &str, max_age: i64) -> Result<HeaderValue, ApiError> {
+    let mut header = HeaderValue::from_str(&format!(
+        "{SESSION_COOKIE}={value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={max_age}"
+    ))
+    .map_err(|_| ApiError::new(ProblemCode::Internal))?;
+    // HTTP/2 then keeps the token out of its header compression tables.
+    header.set_sensitive(true);
+    Ok(header)
+}
+
+/// The ID of the current request. Outside a request it is the nil UUID, which is no ID.
+pub(crate) fn request_id() -> Option<uuid::Uuid> {
+    Some(request_id::current()).filter(|id| !id.is_nil())
 }
 
 fn session_token(parts: &Parts) -> Option<&str> {

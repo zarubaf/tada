@@ -20,6 +20,7 @@ tada-store-pg = { path = "crates/store-pg" }
 tada-adapters = { path = "crates/adapters" }
 tada-api = { path = "crates/api" }
 tada-telegram = { path = "crates/telegram" }
+tada-mcp = { path = "crates/mcp" }
 
 anyhow = "1.0.104"
 async-trait = "0.1.92"
@@ -32,14 +33,25 @@ fluent-bundle = "0.16.0"
 frankenstein = { version = "0.52.1", default-features = false, features = ["client-reqwest", "trait-async"] }
 futures = { version = "0.3.34", default-features = false, features = ["std"] }
 getrandom = "0.4.3"
+# HMAC-SHA-256 for the keys of the rate-limit counters (ADR 0056), from the RustCrypto family of sha2.
+hmac = "0.13.0"
 ipnet = "2.12.2"
+infer = { version = "0.22.0", default-features = false, features = ["alloc"] }
 jiff = { version = "0.2.37", features = ["serde", "tzdb-bundle-always"] }
 jiff-sqlx = { version = "0.2.0", features = ["postgres"] }
 json-subscriber = "0.3.0"
+lettre = { version = "0.11.23", default-features = false, features = ["tokio1", "tokio1-rustls", "ring", "rustls-native-certs", "builder", "smtp-transport"] }
+pulldown-cmark = { version = "0.13.4", default-features = false }
+# The official MCP SDK: the tool macros and the Streamable HTTP transport of the MCP server (ADR 0040).
+rmcp = { version = "3.5.1", default-features = false, features = ["server", "macros", "transport-streamable-http-server"] }
+# JSON Schemas of the app input types for the MCP tools (ADR 0040).
+schemars = { version = "1.2.2", features = ["uuid1"] }
 secrecy = "0.10.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.11.0"
+# The text difference by line of two draft versions (ADR 0058).
+similar = { version = "2.7.0", default-features = false, features = ["text"] }
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-native-roots", "postgres", "migrate", "macros", "uuid"] }
 tempfile = "3.27.0"
 testcontainers-modules = { version = "0.15.0", features = ["postgres"] }
@@ -49,6 +61,7 @@ tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["fs"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt", "registry", "std"] }
+unicode-normalization = "0.1.25"
 url = "2.5.8"
 utoipa = { version = "6.0.0", features = ["jiff_0_2", "uuid", "preserve_order", "preserve_path_order"] }
 utoipa-axum = "0.3.0"

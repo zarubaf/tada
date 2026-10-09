@@ -23,7 +23,7 @@ The app shell has three layouts. The viewport width selects the layout.
 
 - The bottom bar has four items: „Meine Arbeit“, „Eingang“, „Anlässe“ and „Mehr“.
 - The bottom bar shows a count badge on „Eingang“ when proposals wait for the member.
-- The evidence panel and the filters open as full-screen sheets.
+- The evidence panel and the filters open as sheets from the bottom, up to 90 % of the screen height.
 - The page gutter is `--space-4`.
 
 ### Medium (40rem to 80rem)
@@ -75,6 +75,7 @@ Rules:
 ## Page templates
 
 Each screen uses one of these templates. A new template needs a change to this document.
+Each template uses the `Page` component for the `main` element, the page gutters and the `h1` style.
 
 | Template         | Structure                                                                                                   | Used by                                              |
 | ---------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
@@ -83,6 +84,9 @@ Each screen uses one of these templates. A new template needs a change to this d
 | Overview         | A header with the key facts, then sections in one column                                                    | Event overview                                       |
 | Portfolio        | A filter bar, then a table of events with readiness columns                                                 | Portfolio                                            |
 | Form             | One column, at most 40rem wide, the actions at the bottom                                                   | Create and edit pages                                |
+| Public page      | No shell. The app name, one heading and a form column of at most 40rem                                      | Sign-in, magic link, invitation, organization choice |
+| Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings             |
+| Event page       | The event header with the key and the name, the sub-navigation of the event, then the sub-page              | „Übersicht“, „Mitglieder“ of an event                |
 | Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                          |
 
 ## Widths

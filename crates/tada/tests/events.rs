@@ -3,40 +3,36 @@
 // The helpers of this test file are not `#[test]` functions, so clippy.toml does not cover them.
 #![allow(clippy::unwrap_used)]
 
+mod support;
+
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::http::{Request, Response, StatusCode, header};
+use axum::http::{Method, Request, Response, StatusCode, header};
 use serde_json::{Value, json};
 use tada_adapters::clock::SystemClock;
-use tada_api::ApiState;
-use tada_store_pg::dev::DevAuthenticator;
+use tada_app::caller::OrganizationRole;
+use tada_app::domain::ids::UserId;
 use tada_store_pg::testing::TestDatabase;
 use tower::ServiceExt;
 
 struct Api {
     router: axum::Router,
-    _database: TestDatabase,
+    test: TestDatabase,
+    user: UserId,
+    cookie: String,
 }
 
 impl Api {
     async fn start() -> Self {
         let test = TestDatabase::start().await;
-        test.database.ensure_dev_organization().await.unwrap();
-        let router = tada_api::router(
-            ApiState {
-                dependencies: vec![Arc::new(test.database.clone())],
-                authenticator: Arc::new(DevAuthenticator),
-                events: Arc::new(test.database.clone()),
-                telegram: Arc::new(test.database.clone()),
-                clock: Arc::new(SystemClock),
-                trusted_proxies: Vec::new(),
-            },
-            None,
-        );
+        let (_, user, cookie) = test.member("testwil", OrganizationRole::Owner).await;
+        let router = support::session_router(&test, Arc::new(SystemClock));
         Self {
             router,
-            _database: test,
+            test,
+            user,
+            cookie: format!("{}={cookie}", support::SESSION_COOKIE),
         }
     }
 
@@ -53,7 +49,8 @@ impl Api {
     }
 
     async fn post(&self, path: &str, body: &Value) -> (Response<Body>, Value) {
-        let request = Request::post(path)
+        let request = support::request(Method::POST, path)
+            .header(header::COOKIE, &self.cookie)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(body.to_string()))
             .unwrap();
@@ -61,8 +58,11 @@ impl Api {
     }
 
     async fn get(&self, path: &str) -> (Response<Body>, Value) {
-        self.send(Request::get(path).body(Body::empty()).unwrap())
-            .await
+        let request = Request::get(path)
+            .header(header::COOKIE, &self.cookie)
+            .body(Body::empty())
+            .unwrap();
+        self.send(request).await
     }
 }
 
@@ -87,6 +87,14 @@ async fn creates_an_event_and_lists_it() {
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(page["items"], json!([event]));
     assert!(page.get("next_cursor").is_none());
+
+    // The creator becomes the event manager of the new event (ADR 0052).
+    let (response, members) = api.get(&format!("/api/v1/events/{id}/memberships")).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let members = members["items"].as_array().unwrap();
+    assert_eq!(members.len(), 1);
+    assert_eq!(members[0]["user_id"], json!(api.user.as_uuid()));
+    assert_eq!(members[0]["event_role"], "event-manager");
 }
 
 #[tokio::test]
@@ -154,7 +162,8 @@ async fn a_taken_key_gives_a_problem() {
 #[tokio::test]
 async fn a_body_that_is_not_json_gives_a_problem_without_its_content() {
     let api = Api::start().await;
-    let request = Request::post("/api/v1/events")
+    let request = support::request(Method::POST, "/api/v1/events")
+        .header(header::COOKIE, &api.cookie)
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(r#"{"key": "secret-value""#))
         .unwrap();
@@ -163,7 +172,8 @@ async fn a_body_that_is_not_json_gives_a_problem_without_its_content() {
     assert_eq!(problem["code"], "malformed-request");
     assert!(!problem.to_string().contains("secret-value"));
 
-    let request = Request::post("/api/v1/events")
+    let request = support::request(Method::POST, "/api/v1/events")
+        .header(header::COOKIE, &api.cookie)
         .body(Body::from("{}"))
         .unwrap();
     let (response, problem) = api.send(request).await;
@@ -213,4 +223,55 @@ async fn an_unknown_route_gives_a_not_found_problem() {
     let (response, problem) = api.get("/api/v1/nothing").await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     assert_eq!(problem["code"], "not-found");
+}
+
+#[tokio::test]
+async fn a_state_change_from_another_origin_changes_nothing() {
+    let api = Api::start().await;
+    let body = json!({"key": "TEST30", "name": "Open Day Testwil"});
+    let foreign =
+        Request::post("/api/v1/events").header(header::ORIGIN, "https://evil.example.com");
+    let missing = Request::post("/api/v1/events");
+    // An origin differs also in the scheme or in the port.
+    let http = Request::post("/api/v1/events").header(header::ORIGIN, "http://tada.example.org");
+    for request in [foreign, missing, http] {
+        let request = request
+            .header(header::COOKIE, &api.cookie)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        let (response, problem) = api.send(request).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_eq!(problem["code"], "forbidden");
+    }
+    let events: i64 = api.test.scalar("SELECT count(*) FROM event").await;
+    assert_eq!(events, 0, "no handler ran");
+
+    let (response, _) = api.post("/api/v1/events", &body).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::CREATED,
+        "the origin of tada works"
+    );
+}
+
+#[tokio::test]
+async fn a_read_needs_no_origin() {
+    let api = Api::start().await;
+    let request = Request::get("/api/v1/events")
+        .header(header::COOKIE, &api.cookie)
+        .header(header::ORIGIN, "https://evil.example.com")
+        .body(Body::empty())
+        .unwrap();
+    let (response, _) = api.send(request).await;
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_request_without_a_session_gets_401() {
+    let api = Api::start().await;
+    let request = Request::get("/api/v1/events").body(Body::empty()).unwrap();
+    let (response, problem) = api.send(request).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(problem["code"], "unauthenticated");
 }

@@ -2,7 +2,7 @@
 
 tada is an event-planning workspace for clubs.
 [PRODUCT.md](doc/PRODUCT.md) describes what we build, and [ARCHITECTURE.md](doc/ARCHITECTURE.md) describes how.
-The [roadmap](doc/roadmap.md) shows what is done and what comes next.
+The [roadmap](doc/roadmap.md) shows what comes next.
 
 ## Run it locally
 
@@ -15,15 +15,8 @@ The mise tasks find `cargo` in `~/.cargo/bin`. To use `cargo` directly in your s
 4. Run `mise run dev:web` in a second terminal.
 5. Open `http://localhost:5173`.
 
-The page shows the events of the development organization.
-A debug build acts as the owner of this organization for each request ([ADR 0053](doc/adr/0053-development-authenticator.md)).
-The web client cannot create events yet. Create one through the API:
-
-```sh
-curl -X POST http://localhost:8080/api/v1/events \
-  -H 'Content-Type: application/json' \
-  -d '{"key": "TEST30", "name": "Tag der offenen Tür Testwil"}'
-```
+You must sign in to use tada.
+Create an organization and read the sign-in mail in Mailpit as the [contributing guide](doc/contributing.md#local-runtime) describes.
 
 Run `mise run dev:down` to stop the services. The data stays in the Docker volumes.
 

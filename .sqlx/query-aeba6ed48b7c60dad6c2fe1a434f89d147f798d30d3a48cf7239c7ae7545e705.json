@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)\n             VALUES ($1, $2, $3, 'Open Day Testwil', 'Europe/Zurich', 1, now())",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "aeba6ed48b7c60dad6c2fe1a434f89d147f798d30d3a48cf7239c7ae7545e705"
+}

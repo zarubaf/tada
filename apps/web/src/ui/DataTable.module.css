@@ -1,6 +1,11 @@
 @layer components {
+  /*
+   * The container clips the rounded corners but does not scroll, so the sticky header sticks to the
+   * page. It declares the container of the two-line rows (ADR 0019).
+   */
   .container {
-    overflow-x: auto;
+    container-type: inline-size;
+    overflow: clip;
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
     background: var(--color-bg-surface);
@@ -11,12 +16,26 @@
     border-collapse: collapse;
   }
 
+  /* The label of a cell shows only in a two-line row, where the column headers are hidden. */
+  .label {
+    display: none;
+  }
+
+  .caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .table th,
   .table td {
     height: var(--row-height);
     padding: 0 var(--space-3);
     text-align: start;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .table th {
@@ -35,9 +54,60 @@
   .table td[data-mono] {
     font-family: var(--font-family-mono);
     font-size: var(--font-size-sm);
+    white-space: nowrap;
   }
 
   .table td[data-numeric] {
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Below 28rem: two-line list rows (doc/design/layout-and-responsiveness.md, „Container queries“). */
+  @container (width < 28rem) {
+    .table,
+    .table tbody,
+    .table tr,
+    .table td {
+      display: block;
+    }
+
+    .table thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+
+    .table tbody tr {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2) var(--space-4);
+      padding: var(--space-3);
+    }
+
+    .table td {
+      height: auto;
+      padding: 0;
+    }
+
+    /* The first line: the first column, without its label. */
+    .table td:first-child {
+      flex-basis: 100%;
+      font-weight: var(--font-weight-medium);
+    }
+
+    .table td:not(:first-child) {
+      display: grid;
+      align-content: start;
+      gap: var(--space-0-5);
+    }
+
+    .table td:not(:first-child) > .label {
+      display: block;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+      font-family: var(--font-family-sans);
+    }
   }
 }

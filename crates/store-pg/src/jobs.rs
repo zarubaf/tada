@@ -15,8 +15,6 @@ use crate::Database;
 use crate::error::store_error;
 
 /// Adds a job inside the transaction of a command. A rollback removes the job with the change.
-// The first command with a job, the owner invitation of ADR 0036, calls this in Slice 1.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) async fn enqueue(conn: &mut PgConnection, job: &NewJob) -> Result<Uuid, sqlx::Error> {
     let id = Uuid::now_v7();
     sqlx::query!(
@@ -49,7 +47,7 @@ impl JobQueue for Database {
                    LIMIT 1
                )
                RETURNING id, kind, version, payload AS "payload: Json<serde_json::Value>", organization_id,
-                         request_id, attempts"#,
+                         request_id, attempts, max_attempts"#,
             worker_id,
             lease.as_secs_f64(),
         )
@@ -64,6 +62,7 @@ impl JobQueue for Database {
             organization_id: row.organization_id.map(OrganizationId::from_uuid),
             request_id: row.request_id,
             attempt: row.attempts,
+            max_attempts: row.max_attempts,
         }))
     }
 
@@ -108,7 +107,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use serde_json::json;
-    use tada_app::jobs::{Handlers, JobFailed, JobHandler, Ran, run_next};
+    use tada_app::jobs::{Handlers, JobFailed, JobHandler, JobWarning, Ran, run_next};
 
     use super::*;
     use crate::testing::TestDatabase;
@@ -191,18 +190,18 @@ mod tests {
         let id = add(&test, &job("ping")).await;
         let (first, second) = (Uuid::now_v7(), Uuid::now_v7());
 
-        let lost = test
-            .database
-            .claim(first, Duration::from_millis(200))
-            .await
-            .unwrap()
-            .unwrap();
+        let lost = test.database.claim(first, LEASE).await.unwrap().unwrap();
         assert_eq!(
             test.database.claim(second, LEASE).await.unwrap(),
             None,
             "the lease holds"
         );
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        // The lease ends now. A short real lease would end before the check above on a loaded machine.
+        sqlx::query("UPDATE job SET locked_until = now() - interval '1 second' WHERE id = $1")
+            .bind(id)
+            .execute(&test.database.pool)
+            .await
+            .unwrap();
         let again = test.database.claim(second, LEASE).await.unwrap().unwrap();
         assert_eq!((again.id, again.attempt), (id, 2));
 
@@ -224,6 +223,7 @@ mod tests {
         let worker = Uuid::now_v7();
 
         let first = test.database.claim(worker, LEASE).await.unwrap().unwrap();
+        assert!(!first.is_last_attempt());
         assert!(
             test.database
                 .fail(&first, worker, "the provider refused")
@@ -241,6 +241,7 @@ mod tests {
             .await
             .unwrap();
         let last = test.database.claim(worker, LEASE).await.unwrap().unwrap();
+        assert!(last.is_last_attempt());
         assert!(
             test.database
                 .fail(&last, worker, "the provider refused")
@@ -268,10 +269,10 @@ mod tests {
             "count"
         }
 
-        async fn run(&self, job: &Job) -> Result<(), JobFailed> {
+        async fn run(&self, job: &Job) -> Result<Option<JobWarning>, JobFailed> {
             assert_eq!(job.version, 1);
-            self.0.fetch_add(1, Ordering::SeqCst);
-            Ok(())
+            let count = self.0.fetch_add(1, Ordering::SeqCst);
+            Ok((count > 0).then(|| JobWarning("counted again".into())))
         }
     }
 
@@ -284,6 +285,7 @@ mod tests {
 
         let counted = add(&test, &job("count")).await;
         let unknown = add(&test, &job("unknown")).await;
+        let again = add(&test, &job("count")).await;
         assert_eq!(
             run_next(&test.database, &handlers, worker, LEASE)
                 .await
@@ -300,9 +302,15 @@ mod tests {
             run_next(&test.database, &handlers, worker, LEASE)
                 .await
                 .unwrap(),
+            Ran::CompletedWithWarning(again, JobWarning("counted again".into()))
+        );
+        assert_eq!(
+            run_next(&test.database, &handlers, worker, LEASE)
+                .await
+                .unwrap(),
             Ran::Idle
         );
-        assert_eq!(counter.0.load(Ordering::SeqCst), 1);
+        assert_eq!(counter.0.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]

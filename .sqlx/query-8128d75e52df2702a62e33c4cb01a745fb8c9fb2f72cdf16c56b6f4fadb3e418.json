@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE organization\n             SET privacy_notice = $2, privacy_notice_version = privacy_notice_version + 1\n             WHERE id = $1 AND privacy_notice_version = $3\n             RETURNING privacy_notice_version",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "privacy_notice_version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "organization",
+            "name": "privacy_notice_version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8128d75e52df2702a62e33c4cb01a745fb8c9fb2f72cdf16c56b6f4fadb3e418"
+}

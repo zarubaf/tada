@@ -20,6 +20,62 @@ export const events = [
   },
 ];
 
+const membership = {
+  organization_id: "0199b8e0-0000-7000-8000-0000000000a1",
+  name: "Fliegergruppe Testwil",
+  role: "member",
+};
+
+/** An invented signed-in member with one organization. */
+export const sessionInfo = {
+  user_id: "0199b8e0-0000-7000-8000-0000000000b1",
+  display_name: "Anna Muster",
+  organization: membership,
+  memberships: [membership],
+};
+
+/** A session whose organization role is `role`. */
+export function sessionWithRole(role: string) {
+  const own = { ...membership, role };
+  return { ...sessionInfo, organization: own, memberships: [own] };
+}
+
+/**
+ * The fake API of the event screens: the answer of `GET /api/v1/events/{id}`. The event has an
+ * empty profile and no fields; `fakeProfile` after it sets a profile.
+ */
+export async function fakeEvent(page: Page, body: unknown, status = 200): Promise<void> {
+  await fakeProfile(page, { facts: [], proposals: [], open_questions: [] }, []);
+  await page.route("**/api/v1/events/*", (route) =>
+    route.fulfill({
+      status,
+      contentType: status < 400 ? "application/json" : "application/problem+json",
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+/** The fake API of the event overview: the answers of `GET .../profile` and `GET .../fields`. */
+export async function fakeProfile(page: Page, profile: unknown, fields: unknown[]): Promise<void> {
+  await page.route("**/api/v1/events/*/profile", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(profile) }),
+  );
+  await page.route("**/api/v1/events/*/fields", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: fields }),
+    }),
+  );
+}
+
+/** The fake API of the browser checks: the answer of `GET /api/v1/session`. */
+export async function fakeSession(page: Page, info: unknown = sessionInfo): Promise<void> {
+  await page.route("**/api/v1/session", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(info) }),
+  );
+}
+
 /** The fake API of the browser checks: the answer of `GET /api/v1/events`. */
 export async function fakeEvents(page: Page, status: number, body: unknown): Promise<void> {
   await page.route("**/api/v1/events*", (route) =>
@@ -39,6 +95,42 @@ export const unavailable = {
   instance: "urn:uuid:01a1118e-3359-73dd-a500-feed65806a9d",
   request_id: "01a1118e-3359-73dd-a500-feed65806a9d",
 };
+
+/** A problem body for the fake API. */
+export function problemBody(code: string, status: number) {
+  return { ...unavailable, code, status };
+}
+
+// The fake API of the sign-in pages.
+
+/** A client without a session: the answer of `GET /api/v1/session`. */
+export async function fakeSignedOut(page: Page): Promise<void> {
+  await page.route("**/api/v1/session", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/problem+json",
+      body: JSON.stringify(problemBody("unauthenticated", 401)),
+    }),
+  );
+}
+
+/** Answers a POST to `path` with the given status and JSON body. */
+export async function fakePost(
+  page: Page,
+  path: string,
+  status: number,
+  body?: unknown,
+): Promise<void> {
+  await page.route(`**${path}`, (route) =>
+    route.fulfill({
+      status,
+      contentType: status < 400 ? "application/json" : "application/problem+json",
+      body: body === undefined ? "" : JSON.stringify(body),
+    }),
+  );
+}
+
+export const invitationPreview = { organization_name: "Fliegergruppe Testwil", role: "member" };
 
 export const viewports = [
   { name: "375", width: 375, height: 812 },
@@ -65,5 +157,37 @@ export async function fontsLoaded(page: Page): Promise<void> {
       document.fonts.load('400 1rem "JetBrains Mono Variable"', "Aä"),
     ]);
     await document.fonts.ready;
+  });
+}
+
+/**
+ * The elements whose text overflows its box, for the pseudo-locale check (ADR 0024). A scroll
+ * container is not an overflow, but the page itself must not scroll sideways.
+ */
+export async function textOverflows(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const found: string[] = [];
+    for (const element of document.querySelectorAll<HTMLElement>("body *")) {
+      const style = getComputedStyle(element);
+      const scrolls = ["auto", "scroll"].includes(style.overflowX);
+      // Visually hidden text, for example a table caption, has no box to overflow.
+      const visuallyHidden = style.clipPath !== "none";
+      if (
+        scrolls ||
+        visuallyHidden ||
+        element.title ||
+        element.childElementCount > 0 ||
+        !element.textContent?.trim()
+      ) {
+        continue;
+      }
+      if (element.scrollWidth > element.clientWidth + 1 && element.clientWidth > 0) {
+        found.push(`${element.tagName}: ${element.textContent.trim().slice(0, 40)}`);
+      }
+    }
+    if (document.documentElement.scrollWidth > window.innerWidth) {
+      found.push("the page scrolls horizontally");
+    }
+    return found;
   });
 }

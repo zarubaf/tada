@@ -23,12 +23,14 @@ Entra
 Deno
 ESLint
 Garage
+Svix
 Graphile
 grammY
 Hono
 Keycloak
 Kysely
 lefthook
+Mailgun
 Mailpit
 markdownlint
 mdformat
@@ -159,3 +161,4 @@ Testwil
 trixie
 (?i)redactions?
 (?i)participations?
+worktree

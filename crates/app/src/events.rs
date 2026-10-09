@@ -1,33 +1,60 @@
-//! The `CreateEvent` command and the `ListEvents` query.
+//! The `CreateEvent` command and the `ListEvents` and `GetEvent` queries.
 
 use std::fmt::Debug;
 
 use async_trait::async_trait;
 use tada_domain::RecordVersion;
-use tada_domain::events::{
-    Event, EventKey, EventKeyError, EventName, EventNameError, EventTimeZone,
-};
-use tada_domain::ids::{self, EventId};
+use tada_domain::events::{Event, EventKey, EventKeyError, EventName, EventTimeZone};
+use tada_domain::identity::EventRole;
+use tada_domain::ids::{self, EventId, UserId};
+use tada_domain::name::NameError;
 use uuid::Uuid;
 
+use crate::access::{self, AccessError, Principal};
+use crate::audit::{AuditAction, AuditEvent, AuditRole};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
+use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
-use crate::problem::{FieldError, ProblemCode};
+use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
 
 /// The repository port for events. Each method stays inside `scope`.
 #[async_trait]
 pub trait EventStore: Debug + Send + Sync {
-    /// Inserts a new event. The store checks that its ID and its key are free.
-    async fn insert(&self, scope: OrgScope, event: &Event) -> Result<Inserted, StoreError>;
+    /// Inserts a new event with `manager` as its event manager, and records `audit` in order, all in
+    /// one transaction (ADR 0052). The store checks that the ID and the key are free; if one is
+    /// taken, it changes nothing.
+    async fn insert(
+        &self,
+        scope: OrgScope,
+        event: &Event,
+        manager: UserId,
+        audit: &[AuditEvent],
+    ) -> Result<Inserted, StoreError>;
 
     async fn get(&self, scope: OrgScope, id: EventId) -> Result<Option<Event>, StoreError>;
+
+    /// The event with the key `key`, unique in the organization (ADR 0038).
+    async fn find_by_key(
+        &self,
+        scope: OrgScope,
+        key: &EventKey,
+    ) -> Result<Option<Event>, StoreError>;
 
     /// Returns at most `limit` events in the order of their keys, after `after` if it is given.
     async fn list(
         &self,
         scope: OrgScope,
+        after: Option<&EventCursor>,
+        limit: u32,
+    ) -> Result<Vec<Event>, StoreError>;
+
+    /// Like `list`, but only the events in which `member` has an event membership.
+    async fn list_of_member(
+        &self,
+        scope: OrgScope,
+        member: UserId,
         after: Option<&EventCursor>,
         limit: u32,
     ) -> Result<Vec<Event>, StoreError>;
@@ -80,32 +107,57 @@ impl CreateEventError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for CreateEventError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::Forbidden => ProblemCode::Forbidden,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
+        }
+    }
+
+    fn field_errors(&self) -> &[FieldError] {
+        match self {
+            Self::Invalid(errors) => errors,
+            _ => &[],
         }
     }
 }
 
 /// Creates an event in the caller's organization.
 ///
-/// Only owners and admins create events. They can act as event manager in each event (ADR 0052).
+/// Only owners and admins create events. They can act as event manager in each event, and the
+/// creator also becomes the event manager of the new event (ADR 0052).
 pub async fn create_event(
     caller: &MemberCaller,
     input: NewEvent,
     store: &dyn EventStore,
     clock: &dyn Clock,
 ) -> Result<Created, CreateEventError> {
-    if !caller.is_owner_or_admin() {
+    if !access::sees_all_events(caller) {
         return Err(CreateEventError::Forbidden);
     }
     let scope = caller.scope();
     let event = validate(scope, input, clock)?;
 
-    match store.insert(scope, &event).await? {
+    match store
+        .insert(
+            scope,
+            &event,
+            caller.user_id(),
+            &creation_audit(caller, event.id),
+        )
+        .await?
+    {
         Inserted::Inserted => Ok(Created::New(event)),
         Inserted::KeyTaken => Err(invalid("key", "taken")),
         Inserted::IdTaken => match store.get(scope, event.id).await? {
@@ -113,6 +165,27 @@ pub async fn create_event(
             _ => Err(invalid("id", "taken")),
         },
     }
+}
+
+/// The audit events of a new event: its creation and its first event manager, the caller (ADR 0052, ADR 0061).
+pub(crate) fn creation_audit(caller: &MemberCaller, event: EventId) -> [AuditEvent; 2] {
+    let scope = Some(caller.scope());
+    [
+        AuditEvent::new(
+            caller.actor(),
+            AuditAction::EventCreate,
+            Some(event.as_uuid()),
+            scope,
+        ),
+        AuditEvent::new(
+            caller.actor(),
+            AuditAction::EventMembershipAdd,
+            Some(event.as_uuid()),
+            scope,
+        )
+        .about(caller.user_id())
+        .with_roles(None, Some(AuditRole::Event(EventRole::EventManager))),
+    ]
 }
 
 fn validate(
@@ -123,10 +196,7 @@ fn validate(
     let mut errors = Vec::new();
     let id = match input.id {
         Some(id) if !ids::is_record_id(id) => {
-            errors.push(FieldError {
-                field: "id",
-                code: "not-uuid-v7",
-            });
+            errors.push(FieldError::new("id", "not-uuid-v7"));
             None
         }
         Some(id) => Some(EventId::from_uuid(id)),
@@ -134,35 +204,19 @@ fn validate(
     };
     let key = EventKey::parse(&input.key)
         .map_err(|error| {
-            errors.push(FieldError {
-                field: "key",
-                code: match error {
-                    EventKeyError::Length => "length",
-                    EventKeyError::Characters => "characters",
-                },
-            });
+            errors.push(FieldError::new("key", key_error_code(error)));
         })
         .ok();
     let name = EventName::parse(&input.name)
         .map_err(|error| {
-            errors.push(FieldError {
-                field: "name",
-                code: match error {
-                    EventNameError::Empty => "empty",
-                    EventNameError::TooLong => "too-long",
-                    EventNameError::ControlCharacter => "control-character",
-                },
-            });
+            errors.push(FieldError::new("name", name_error_code(error)));
         })
         .ok();
     let time_zone = match input.time_zone {
         None => Some(EventTimeZone::default_zone()),
         Some(name) => EventTimeZone::parse(&name)
             .map_err(|_| {
-                errors.push(FieldError {
-                    field: "time_zone",
-                    code: "unknown",
-                });
+                errors.push(FieldError::new("time_zone", "unknown"));
             })
             .ok(),
     };
@@ -185,8 +239,25 @@ fn same_content(existing: &Event, new: &Event) -> bool {
     existing.key == new.key && existing.name == new.name && existing.time_zone == new.time_zone
 }
 
+/// The entry code of an invalid event key.
+pub fn key_error_code(error: EventKeyError) -> &'static str {
+    match error {
+        EventKeyError::Length => "length",
+        EventKeyError::Characters => "characters",
+    }
+}
+
+/// The entry code of an invalid name.
+pub(crate) fn name_error_code(error: NameError) -> &'static str {
+    match error {
+        NameError::Empty => "empty",
+        NameError::TooLong => "too-long",
+        NameError::ControlCharacter => "control-character",
+    }
+}
+
 fn invalid(field: &'static str, code: &'static str) -> CreateEventError {
-    CreateEventError::Invalid(vec![FieldError { field, code }])
+    CreateEventError::Invalid(vec![FieldError::new(field, code)])
 }
 
 /// The position after the last event of a page: the sort key and the ID (ADR 0044).
@@ -205,34 +276,41 @@ pub enum ListEventsError {
 impl ListEventsError {
     /// All codes that this query can return, for the API contract (ADR 0037).
     pub const CODES: &[ProblemCode] = &[ProblemCode::Unavailable, ProblemCode::Internal];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for ListEventsError {
+    fn code(&self) -> ProblemCode {
         match self {
-            Self::Store(error) => store_code(error),
+            Self::Store(error) => error.code(),
         }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        let Self::Store(error) = self;
+        Some(error)
     }
 }
 
 /// Lists the events that the caller can see, in the order of their keys.
 ///
-/// Owners and admins see all events of the organization. Other members see only the events in which
-/// they have an event role (ADR 0052). Event roles do not exist yet, so they see none.
+/// Owners and admins see all events of the organization.
+/// Other members see only the events in which they have an event role (ADR 0052).
 pub async fn list_events(
-    caller: &MemberCaller,
+    caller: &impl Principal,
     after: Option<EventCursor>,
     limit: PageLimit,
     store: &dyn EventStore,
 ) -> Result<Page<Event, EventCursor>, ListEventsError> {
-    if !caller.is_owner_or_admin() {
-        return Ok(Page {
-            items: Vec::new(),
-            next: None,
-        });
-    }
+    let scope = caller.scope();
     // One more than the limit shows if a next page exists.
-    let mut items = store
-        .list(caller.scope(), after.as_ref(), limit.get() + 1)
-        .await?;
+    let fetch = limit.get() + 1;
+    let mut items = if access::sees_all_events(caller) {
+        store.list(scope, after.as_ref(), fetch).await?
+    } else {
+        store
+            .list_of_member(scope, caller.user_id(), after.as_ref(), fetch)
+            .await?
+    };
     let more = items.len() > limit.get() as usize;
     items.truncate(limit.get() as usize);
     let next = more
@@ -245,11 +323,41 @@ pub async fn list_events(
     Ok(Page { items, next })
 }
 
-fn store_code(error: &StoreError) -> ProblemCode {
-    match error {
-        StoreError::Unavailable(_) => ProblemCode::Unavailable,
-        StoreError::Internal(_) => ProblemCode::Internal,
+/// The event `id`, if the caller can read it (ADR 0052).
+pub async fn get_event(
+    caller: &impl Principal,
+    id: EventId,
+    store: &dyn EventStore,
+    identity: &dyn IdentityStore,
+) -> Result<Event, AccessError> {
+    if !access::event_access(caller, id, identity).await?.can_read() {
+        return Err(AccessError::NotFound);
     }
+    store
+        .get(caller.scope(), id)
+        .await?
+        .ok_or(AccessError::NotFound)
+}
+
+/// The event with the key `key`, if the caller can read it (ADR 0052).
+/// An event that the caller cannot read is not found, like an event that does not exist.
+pub async fn find_event(
+    caller: &impl Principal,
+    key: &EventKey,
+    store: &dyn EventStore,
+    identity: &dyn IdentityStore,
+) -> Result<Event, AccessError> {
+    let event = store
+        .find_by_key(caller.scope(), key)
+        .await?
+        .ok_or(AccessError::NotFound)?;
+    if !access::event_access(caller, event.id, identity)
+        .await?
+        .can_read()
+    {
+        return Err(AccessError::NotFound);
+    }
+    Ok(event)
 }
 
 #[cfg(test)]
@@ -257,17 +365,29 @@ mod tests {
     use std::sync::Mutex;
 
     use jiff::Timestamp;
-    use tada_domain::ids::{OrganizationId, UserId};
+    use tada_domain::ids::OrganizationId;
 
     use super::*;
+    use crate::audit::RoleChange;
     use crate::caller::OrganizationRole;
 
+    /// The events, the event memberships (event, user) and the audit events of the inserts.
     #[derive(Debug, Default)]
-    struct MemoryStore(Mutex<Vec<Event>>);
+    struct MemoryStore(
+        Mutex<Vec<Event>>,
+        Mutex<Vec<(EventId, UserId)>>,
+        Mutex<Vec<AuditEvent>>,
+    );
 
     #[async_trait]
     impl EventStore for MemoryStore {
-        async fn insert(&self, scope: OrgScope, event: &Event) -> Result<Inserted, StoreError> {
+        async fn insert(
+            &self,
+            scope: OrgScope,
+            event: &Event,
+            manager: UserId,
+            audit: &[AuditEvent],
+        ) -> Result<Inserted, StoreError> {
             assert_eq!(scope.organization_id(), event.organization_id);
             let mut events = self.0.lock().unwrap();
             if events.iter().any(|known| known.id == event.id) {
@@ -279,6 +399,8 @@ mod tests {
                 return Ok(Inserted::KeyTaken);
             }
             events.push(event.clone());
+            self.1.lock().unwrap().push((event.id, manager));
+            self.2.lock().unwrap().extend_from_slice(audit);
             Ok(Inserted::Inserted)
         }
 
@@ -287,6 +409,18 @@ mod tests {
             Ok(events
                 .iter()
                 .find(|event| event.id == id && event.organization_id == scope.organization_id())
+                .cloned())
+        }
+
+        async fn find_by_key(
+            &self,
+            scope: OrgScope,
+            key: &EventKey,
+        ) -> Result<Option<Event>, StoreError> {
+            let events = self.0.lock().unwrap();
+            Ok(events
+                .iter()
+                .find(|event| &event.key == key && event.organization_id == scope.organization_id())
                 .cloned())
         }
 
@@ -308,6 +442,20 @@ mod tests {
                 .cloned()
                 .collect();
             events.sort_by(|a, b| (&a.key, a.id).cmp(&(&b.key, b.id)));
+            events.truncate(limit as usize);
+            Ok(events)
+        }
+
+        async fn list_of_member(
+            &self,
+            scope: OrgScope,
+            member: UserId,
+            after: Option<&EventCursor>,
+            limit: u32,
+        ) -> Result<Vec<Event>, StoreError> {
+            let memberships = self.1.lock().unwrap().clone();
+            let mut events = self.list(scope, after, u32::MAX).await?;
+            events.retain(|event| memberships.contains(&(event.id, member)));
             events.truncate(limit as usize);
             Ok(events)
         }
@@ -360,6 +508,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_creator_becomes_the_event_manager_with_an_audit_event_for_each() {
+        let store = MemoryStore::default();
+        let Created::New(event) = create_event(&owner(), new_event("TEST30"), &store, &FixedClock)
+            .await
+            .unwrap()
+        else {
+            panic!("not a new event");
+        };
+        let creator = owner().user_id();
+        assert_eq!(*store.1.lock().unwrap(), [(event.id, creator)]);
+        let audit = store.2.lock().unwrap();
+        let actions: Vec<_> = audit.iter().map(AuditEvent::action).collect();
+        assert_eq!(
+            actions,
+            [AuditAction::EventCreate, AuditAction::EventMembershipAdd]
+        );
+        assert!(
+            audit
+                .iter()
+                .all(|audit| audit.record_id() == Some(event.id.as_uuid()))
+        );
+        assert_eq!(audit[0].subject(), None);
+        assert_eq!(audit[1].subject(), Some(creator));
+        assert_eq!(
+            audit[1].roles(),
+            Some(RoleChange {
+                old: None,
+                new: Some(AuditRole::Event(EventRole::EventManager)),
+            })
+        );
+    }
+
+    #[tokio::test]
     async fn reports_all_invalid_fields_together() {
         let store = MemoryStore::default();
         let input = NewEvent {
@@ -375,7 +556,7 @@ mod tests {
         };
         let fields: Vec<_> = errors
             .iter()
-            .map(|error| (error.field, error.code))
+            .map(|error| (error.field.as_ref(), error.code))
             .collect();
         assert_eq!(
             fields,
@@ -415,13 +596,7 @@ mod tests {
         else {
             panic!("not invalid");
         };
-        assert_eq!(
-            errors,
-            [FieldError {
-                field: "id",
-                code: "taken"
-            }]
-        );
+        assert_eq!(errors, [FieldError::new("id", "taken")]);
     }
 
     #[tokio::test]
@@ -435,13 +610,7 @@ mod tests {
         else {
             panic!("not invalid");
         };
-        assert_eq!(
-            errors,
-            [FieldError {
-                field: "key",
-                code: "taken"
-            }]
-        );
+        assert_eq!(errors, [FieldError::new("key", "taken")]);
 
         let other = caller(200, OrganizationRole::Admin);
         assert!(
@@ -501,6 +670,45 @@ mod tests {
             .map(|event| event.key.as_str())
             .collect();
         assert_eq!(keys, ["CC"]);
+        assert_eq!(second.next, None);
+    }
+
+    #[tokio::test]
+    async fn a_member_lists_only_the_events_with_an_event_membership() {
+        let store = MemoryStore::default();
+        for key in ["AA", "BB", "CC"] {
+            create_event(&owner(), new_event(key), &store, &FixedClock)
+                .await
+                .unwrap();
+        }
+        // Another user than the owner, who is the event manager of each event as its creator.
+        let member = MemberCaller::new(
+            UserId::from_uuid(Uuid::from_u128(2)),
+            owner().scope().organization_id(),
+            OrganizationRole::Member,
+        );
+        let page = list_events(&member, None, PageLimit::DEFAULT, &store)
+            .await
+            .unwrap();
+        assert!(page.items.is_empty(), "no event role, no event");
+
+        for event in store.0.lock().unwrap().iter() {
+            if event.key.as_str() != "BB" {
+                store.1.lock().unwrap().push((event.id, member.user_id()));
+            }
+        }
+        let limit = PageLimit::new(1).unwrap();
+        let first = list_events(&member, None, limit, &store).await.unwrap();
+        let second = list_events(&member, first.next, limit, &store)
+            .await
+            .unwrap();
+        let keys: Vec<_> = first
+            .items
+            .iter()
+            .chain(&second.items)
+            .map(|event| event.key.as_str())
+            .collect();
+        assert_eq!(keys, ["AA", "CC"]);
         assert_eq!(second.next, None);
     }
 

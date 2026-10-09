@@ -1,0 +1,25 @@
+@layer components {
+  .brand {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .form {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  /* The submit button keeps its own width. */
+  .form > button {
+    justify-self: start;
+  }
+
+  .text {
+    color: var(--color-text-muted);
+    text-wrap: pretty;
+  }
+
+  .link {
+    color: var(--color-accent-text);
+    text-decoration: underline;
+  }
+}

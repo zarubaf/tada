@@ -1,0 +1,111 @@
+@layer components {
+  /*
+   * Narrow: a top bar and a fixed bottom bar. The content clears the bar, and a focused element
+   * never hides under it (WCAG 2.4.11). The bar grows by the safe area of the home indicator.
+   */
+  :global(html):has(.shell) {
+    --bottom-bar-height: calc(
+      var(--control-height-lg) +
+      var(--space-4) +
+      1px +
+      env(safe-area-inset-bottom)
+    );
+
+    /* Room for the focus ring: 2 px outline with a 2 px offset. */
+    scroll-padding-block-end: calc(var(--bottom-bar-height) + var(--space-1));
+  }
+
+  .shell {
+    display: grid;
+    padding-block-end: var(--bottom-bar-height);
+  }
+
+  .side {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-surface);
+  }
+
+  .brand {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .switcher {
+    min-width: 0;
+  }
+
+  .nav {
+    --safe-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+
+    position: fixed;
+    inset: auto 0 0;
+    z-index: var(--z-shell);
+    display: flex;
+    padding: var(--space-2) var(--space-4);
+    padding-block-end: var(--safe-bottom);
+    border-top: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-surface);
+  }
+
+  .member {
+    display: grid;
+    grid-column: 3;
+  }
+
+  .failure {
+    grid-column: 1 / -1;
+  }
+
+  /* On narrow layouts the link is in the member menu. */
+  .footer {
+    display: none;
+  }
+
+  /* Medium and wide (--bp-medium): a sidebar of 15rem (240 px). */
+  @media (width >= 40rem) {
+    :global(html):has(.shell) {
+      scroll-padding-block-end: 0;
+    }
+
+    .shell {
+      grid-template-columns: 15rem 1fr;
+      align-items: start;
+      padding-block-end: 0;
+    }
+
+    .side {
+      position: sticky;
+      top: 0;
+      grid-template-columns: 1fr;
+      grid-auto-rows: max-content;
+      align-content: start;
+      align-items: stretch;
+      height: 100dvh;
+      padding: var(--space-4);
+      border-right: 1px solid var(--color-border-subtle);
+      border-bottom: 0;
+    }
+
+    .nav {
+      position: static;
+      flex-direction: column;
+      padding: 0;
+      border-top: 0;
+      background: none;
+    }
+
+    .footer {
+      display: grid;
+    }
+
+    .member {
+      position: absolute;
+      inset: auto var(--space-4) var(--space-4);
+      gap: var(--space-2);
+    }
+  }
+}

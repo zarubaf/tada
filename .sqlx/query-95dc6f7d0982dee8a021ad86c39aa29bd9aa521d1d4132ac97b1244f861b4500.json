@@ -1,0 +1,125 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, event_id, key, label_text, label_message, value_type, description, module, status\n               FROM field_definition\n               WHERE event_id IS NULL OR (organization_id = $1 AND event_id = $2)\n               ORDER BY key COLLATE \"C\", id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "label_text",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "label_text"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "label_message",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "label_message"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "value_type",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "value_type"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "module",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "module"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "field_definition",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "95dc6f7d0982dee8a021ad86c39aa29bd9aa521d1d4132ac97b1244f861b4500"
+}

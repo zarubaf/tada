@@ -1,10 +1,16 @@
 // The component gallery (ADR 0024): each token and each component in each state.
 // Only builds that are not production builds contain this page.
 import { Button } from "../ui/Button";
+import { Checkbox } from "../ui/Checkbox";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
+import { FileButton } from "../ui/FileButton";
+import { FileLink } from "../ui/FileLink";
 import { InlineError } from "../ui/InlineError";
+import { KnowledgeState } from "../ui/KnowledgeState";
+import { Markdown } from "../ui/Markdown";
 import { Skeleton } from "../ui/Skeleton";
+import { Switch } from "../ui/Switch";
 import styles from "./Gallery.module.css";
 
 const colors = [
@@ -47,6 +53,19 @@ const rows: Row[] = [
     created: "01.03.2028, 14:12",
   },
 ];
+const markdownSample = `## Datenschutz der Fliegergruppe Testwil
+
+Die Fliegergruppe Testwil verarbeitet **Daten** für den Anlass „Tag der offenen Tür“.
+
+- Verantwortlich ist der Vorstand.
+- Fragen an [vorstand@example.org](mailto:vorstand@example.org).
+
+| Kategorie | Zweck |
+| --- | --- |
+| Anzeigename | Zeigt die Mitglieder |
+| Veranstaltungsbewilligungsverfahren | Plant den Anlass |
+
+Ein Bild erscheint als Text: ![Lageplan des Flugplatzes](https://example.org/plan.png)`;
 const columns: Column<Row>[] = [
   { id: "key", header: "Kürzel", cell: (row) => row.key, mono: true },
   { id: "name", header: "Name", cell: (row) => row.name },
@@ -113,6 +132,37 @@ export function Gallery() {
       </section>
 
       <section className={styles.section}>
+        <h2 className={styles.heading}>Auswahl und Schalter</h2>
+        <div className={styles.row}>
+          <Checkbox label="Hinweis gelesen" isSelected={false} onChange={() => {}} />
+          <Checkbox label="Hinweis gelesen" isSelected onChange={() => {}} />
+          <Checkbox label="Hinweis gelesen" isSelected isDisabled onChange={() => {}} />
+        </div>
+        <div className={styles.row}>
+          <Switch label="MCP-Token erlauben" isSelected={false} onChange={() => {}} />
+          <Switch label="MCP-Token erlauben" isSelected onChange={() => {}} />
+          <Switch label="MCP-Token erlauben" isSelected isDisabled onChange={() => {}} />
+          <Switch label="MCP-Token erlauben" isSelected isPending onChange={() => {}} />
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Dateien</h2>
+        <div className={styles.row}>
+          <FileButton onSelect={() => {}}>Datei hochladen</FileButton>
+          <FileButton isPending onSelect={() => {}}>
+            Datei hochladen
+          </FileButton>
+          <FileLink download href="/beispiel.pdf">
+            Herunterladen
+          </FileLink>
+          <FileLink newTab href="/beispiel.pdf">
+            Vorschau in neuem Tab öffnen
+          </FileLink>
+        </div>
+      </section>
+
+      <section className={styles.section}>
         <h2 className={styles.heading}>Zustände</h2>
         <Skeleton />
         <EmptyState
@@ -124,6 +174,25 @@ export function Gallery() {
           requestId="01a1118e-3359-73dd-a500-feed65806a9d"
           onRetry={() => {}}
         />
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Markdown</h2>
+        <Markdown>{markdownSample}</Markdown>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Stand des Wissens</h2>
+        <div className={styles.row}>
+          <KnowledgeState state="accepted" showLabel>
+            Flugplatz Musterhausen
+          </KnowledgeState>
+          <KnowledgeState state="accepted">Flugplatz Musterhausen</KnowledgeState>
+          <KnowledgeState state="proposed">CHF 15.00</KnowledgeState>
+          <KnowledgeState state="assumption">ca. 20’000 Personen pro Tag</KnowledgeState>
+          <KnowledgeState state="conflict">CHF 12.00</KnowledgeState>
+          <KnowledgeState state="unknown" />
+        </div>
       </section>
 
       <section className={styles.section}>

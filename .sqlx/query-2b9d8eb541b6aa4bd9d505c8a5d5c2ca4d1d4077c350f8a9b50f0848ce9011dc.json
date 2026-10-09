@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT blob_key AS \"blob_key!\", sha256 FROM document_version\n             WHERE organization_id = $1 AND blob_key IS NOT NULL\n             ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "blob_key!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "blob_key"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sha256",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "document_version",
+            "name": "sha256"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "2b9d8eb541b6aa4bd9d505c8a5d5c2ca4d1d4077c350f8a9b50f0848ce9011dc"
+}

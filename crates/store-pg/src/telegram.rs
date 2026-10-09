@@ -1,11 +1,9 @@
 //! The `TelegramLinks` adapter (ADR 0011). Codes are 256 random bits; the table holds their SHA-256 hash (ADR 0008).
 
 use async_trait::async_trait;
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
-use sha2::{Digest, Sha256};
+use secrecy::ExposeSecret;
 use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
 use tada_app::domain::ids::UserId;
@@ -14,10 +12,7 @@ use tada_app::telegram::{Confirmed, LinkRequest, TelegramLinks, TelegramName, Te
 
 use crate::Database;
 use crate::error::store_error;
-
-fn hash(code: &str) -> Vec<u8> {
-    Sha256::digest(code.as_bytes()).to_vec()
-}
+use crate::token::{hash_token, new_token};
 
 #[async_trait]
 impl TelegramLinks for Database {
@@ -27,25 +22,21 @@ impl TelegramLinks for Database {
         user_id: UserId,
         expires_at: Timestamp,
     ) -> Result<String, StoreError> {
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).map_err(|error| {
-            StoreError::Internal(Box::new(std::io::Error::other(error.to_string())))
-        })?;
         // Telegram accepts this alphabet and length in a `/start` parameter of a deep link.
-        let code = URL_SAFE_NO_PAD.encode(bytes);
+        let token = new_token("")?;
         sqlx::query!(
             "INSERT INTO telegram_link_code (id, organization_id, user_id, code_hash, expires_at, created_at)
              VALUES ($1, $2, $3, $4, $5, now())",
             Uuid::now_v7(),
             scope.organization_id().as_uuid(),
             user_id.as_uuid(),
-            hash(&code),
+            token.hash,
             expires_at.to_sqlx() as _,
         )
         .execute(&self.pool)
         .await
         .map_err(store_error)?;
-        Ok(code)
+        Ok(token.secret.expose_secret().to_owned())
     }
 
     async fn claim(
@@ -59,7 +50,7 @@ impl TelegramLinks for Database {
             "UPDATE telegram_link_code
              SET claimed_by = $2, claimed_name = $3, claimed_at = $4
              WHERE code_hash = $1 AND claimed_by IS NULL AND expires_at > $4",
-            hash(code),
+            hash_token(code),
             account.0,
             name.0,
             now.to_sqlx() as _,
@@ -143,6 +134,17 @@ impl TelegramLinks for Database {
         Ok(Confirmed::Linked(TelegramUserId(account)))
     }
 
+    async fn user_of(&self, account: TelegramUserId) -> Result<Option<UserId>, StoreError> {
+        let user = sqlx::query_scalar!(
+            "SELECT user_id FROM telegram_identity WHERE telegram_user_id = $1",
+            account.0,
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(user.map(UserId::from_uuid))
+    }
+
     async fn record_update(&self, update_id: i64) -> Result<bool, StoreError> {
         let result = sqlx::query!(
             "INSERT INTO telegram_update (update_id, received_at) VALUES ($1, now()) ON CONFLICT DO NOTHING",
@@ -160,12 +162,21 @@ mod tests {
     use jiff::SignedDuration;
     use tada_app::caller::MemberCaller;
     use tada_app::caller::OrganizationRole::Member;
+    use tada_app::domain::identity::{DisplayName, Email};
 
     use super::*;
     use crate::testing::TestDatabase;
 
-    fn member(test_org: tada_app::domain::ids::OrganizationId) -> MemberCaller {
-        MemberCaller::new(UserId::from_uuid(Uuid::now_v7()), test_org, Member)
+    /// A member with a user row, because the Telegram tables refer to the user.
+    async fn member(
+        test: &TestDatabase,
+        organization: tada_app::domain::ids::OrganizationId,
+    ) -> MemberCaller {
+        let name = DisplayName::parse("Anna Muster").unwrap();
+        let email = Email::parse(&format!("{}@example.org", Uuid::now_v7())).unwrap();
+        let user = test.create_user(&name, &email).await;
+        test.add_membership(organization, user, Member).await;
+        MemberCaller::new(user, organization, Member)
     }
 
     fn name(text: &str) -> TelegramName {
@@ -175,7 +186,8 @@ mod tests {
     #[tokio::test]
     async fn links_an_account_after_the_claim_and_the_confirmation() {
         let test = TestDatabase::start().await;
-        let alice = member(test.create_organization("testwil").await);
+        let organization = test.create_organization("testwil").await;
+        let alice = member(&test, organization).await;
         let db = &test.database;
         let now = Timestamp::now();
         let code = db
@@ -215,6 +227,11 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(confirmed, Confirmed::Linked(TelegramUserId(42)));
+        assert_eq!(
+            db.user_of(TelegramUserId(42)).await.unwrap(),
+            Some(alice.user_id())
+        );
+        assert_eq!(db.user_of(TelegramUserId(43)).await.unwrap(), None);
         assert!(
             db.requests(alice.scope(), alice.user_id(), now)
                 .await
@@ -233,7 +250,10 @@ mod tests {
     async fn another_member_cannot_see_or_confirm_a_request() {
         let test = TestDatabase::start().await;
         let organization = test.create_organization("testwil").await;
-        let (alice, bob) = (member(organization), member(organization));
+        let (alice, bob) = (
+            member(&test, organization).await,
+            member(&test, organization).await,
+        );
         let db = &test.database;
         let now = Timestamp::now();
         let code = db
@@ -270,7 +290,8 @@ mod tests {
     #[tokio::test]
     async fn an_expired_code_cannot_be_claimed_or_confirmed() {
         let test = TestDatabase::start().await;
-        let alice = member(test.create_organization("testwil").await);
+        let organization = test.create_organization("testwil").await;
+        let alice = member(&test, organization).await;
         let db = &test.database;
         let now = Timestamp::now();
         let code = db
@@ -322,7 +343,10 @@ mod tests {
     async fn an_account_links_to_one_user_only() {
         let test = TestDatabase::start().await;
         let organization = test.create_organization("testwil").await;
-        let (alice, bob) = (member(organization), member(organization));
+        let (alice, bob) = (
+            member(&test, organization).await,
+            member(&test, organization).await,
+        );
         let db = &test.database;
         let now = Timestamp::now();
         for caller in [&alice, &bob] {

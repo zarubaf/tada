@@ -2,32 +2,18 @@
 
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use jiff::SignedDuration;
 use serde::Serialize;
-use tada_app::problem::{FieldError, ProblemCode};
-use tada_app::store::StoreError;
+use tada_app::problem::{CommandError, ProblemCode};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::request_id;
 
-/// The base of the `type` URL: the public catalog of problem codes.
-const CATALOG: &str = "https://github.com/zarubaf/tada/blob/main/doc/problems.md";
-
-/// The HTTP status of each code. A new code without a status does not compile.
-pub const fn status(code: ProblemCode) -> StatusCode {
-    match code {
-        ProblemCode::MalformedRequest => StatusCode::BAD_REQUEST,
-        ProblemCode::Unauthenticated => StatusCode::UNAUTHORIZED,
-        ProblemCode::Forbidden => StatusCode::FORBIDDEN,
-        ProblemCode::NotFound => StatusCode::NOT_FOUND,
-        ProblemCode::RecordVersionConflict | ProblemCode::InvalidTransition => StatusCode::CONFLICT,
-        ProblemCode::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
-        ProblemCode::UnsupportedMediaType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
-        ProblemCode::ValidationFailed => StatusCode::UNPROCESSABLE_ENTITY,
-        ProblemCode::RateLimited => StatusCode::TOO_MANY_REQUESTS,
-        ProblemCode::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
-        ProblemCode::Internal => StatusCode::INTERNAL_SERVER_ERROR,
-    }
+/// The HTTP status of each code (ADR 0066).
+fn status(code: ProblemCode) -> StatusCode {
+    // Each status of `ProblemCode` is valid; a test checks it.
+    StatusCode::from_u16(code.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 /// An error response. `detail` never repeats input values.
@@ -67,6 +53,8 @@ pub struct ApiError {
     code: ProblemCode,
     detail: Option<&'static str>,
     errors: Vec<ProblemError>,
+    /// The seconds of the `Retry-After` header.
+    retry_after: Option<i64>,
 }
 
 impl ApiError {
@@ -75,6 +63,7 @@ impl ApiError {
             code,
             detail: None,
             errors: Vec::new(),
+            retry_after: None,
         }
     }
 
@@ -82,31 +71,35 @@ impl ApiError {
         self.detail = Some(detail);
         self
     }
+}
 
-    /// A `validation-failed` problem. Each field of the command input is a member of the request body.
-    pub fn invalid(errors: Vec<FieldError>) -> Self {
+/// Each error of a command or query becomes a problem with the code of the error (ADR 0037).
+/// A store failure goes to the log with its cause; the response does not show the cause.
+impl<E: CommandError> From<E> for ApiError {
+    fn from(error: E) -> Self {
+        if let Some(store_error) = error.store_error() {
+            tracing::error!(error = %error_chain(store_error), "the store failed");
+        }
         Self {
-            code: ProblemCode::ValidationFailed,
+            code: error.code(),
             detail: None,
-            errors: errors
-                .into_iter()
+            errors: error
+                .field_errors()
+                .iter()
                 .map(|error| ProblemError {
-                    pointer: format!("/{}", error.field),
+                    pointer: error.pointer(),
                     code: error.code.to_owned(),
                 })
                 .collect(),
+            retry_after: error.retry_after().map(retry_after_seconds),
         }
     }
+}
 
-    /// A store failure. The log gets the cause; the response does not.
-    pub fn store(error: &StoreError) -> Self {
-        let code = match error {
-            StoreError::Unavailable(_) => ProblemCode::Unavailable,
-            StoreError::Internal(_) => ProblemCode::Internal,
-        };
-        tracing::error!(error = %error_chain(error), "the store failed");
-        Self::new(code)
-    }
+/// The wait in whole seconds for `Retry-After`, rounded up, and at least one second.
+fn retry_after_seconds(wait: SignedDuration) -> i64 {
+    let seconds = wait.as_secs() + i64::from(wait.subsec_nanos() > 0);
+    seconds.max(1)
 }
 
 /// The error and all its sources in one line, for logs.
@@ -126,7 +119,7 @@ impl IntoResponse for ApiError {
         let status = status(self.code);
         let request_id = request_id::current();
         let problem = Problem {
-            type_url: format!("{CATALOG}#{}", self.code.as_str()),
+            type_url: self.code.type_url(),
             code: self.code.as_str().to_owned(),
             title: self.code.meaning().to_owned(),
             status: status.as_u16(),
@@ -140,6 +133,23 @@ impl IntoResponse for ApiError {
             header::CONTENT_TYPE,
             HeaderValue::from_static("application/problem+json"),
         );
+        if let Some(seconds) = self.retry_after {
+            response
+                .headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from(seconds));
+        }
         response
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_problem_code_has_a_valid_http_status() {
+        for code in ProblemCode::ALL {
+            assert_eq!(status(code).as_u16(), code.http_status(), "{code:?}");
+        }
     }
 }

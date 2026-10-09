@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH member AS (\n             SELECT e.user_id FROM email_identity e\n             WHERE e.email = $1\n               AND EXISTS (SELECT 1 FROM organization_membership m WHERE m.user_id = e.user_id)\n         ), intent AS (\n             INSERT INTO outbound_intent (id, user_id, purpose, message_id, request_id, created_at)\n             SELECT $2, user_id, 'magic-link', $3, $4, now() FROM member\n             RETURNING id\n         )\n         INSERT INTO job (id, kind, version, payload, request_id, run_at, created_at)\n         SELECT $5, $6, 1, $7, $4, now(), now() FROM intent",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0281da7c3346264ac7cf44d42aacdd6f8e121f14c05399ef20e98cc45ec707bd"
+}

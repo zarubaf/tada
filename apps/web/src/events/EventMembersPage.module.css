@@ -1,0 +1,36 @@
+@layer components {
+  .members {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .add {
+    container-type: inline-size;
+    display: grid;
+    gap: var(--space-3);
+    max-width: 40rem;
+  }
+
+  /* A narrow container: one column with a full-width button. A wider one: one row (ADR 0019). */
+  .addForm {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  @container (width >= 28rem) {
+    .addForm {
+      grid-template-columns: 1fr 1fr auto;
+      align-items: end;
+    }
+  }
+}

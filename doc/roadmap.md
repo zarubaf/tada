@@ -4,42 +4,116 @@ This roadmap divides the work into slices.
 Each slice ends with a demonstration, tests, updated documents and a clean commit series.
 A slice starts only after the previous slice meets its acceptance criteria.
 The numbers in parentheses identify the acceptance criteria; they do not change when criteria move between slices.
+The roadmap shows only the open slices.
+The Git history keeps the done slices.
 
-## Slice 0: Foundation and walking skeleton
+## Slice 1: Sign-in and the preliminary event concept
 
-Goal: a repository and a runtime that later slices can build on without rework.
+Goal: invited members sign in and enter the known facts of a large event.
+They upload source documents and get a German preliminary concept and an enquiry draft with provenance.
+tada sends no correspondence to suppliers or the public in this slice.
+It sends only invitations and magic links.
 
-1. Foundation: tools, documentation checks, secret scanning, ADRs and CI. (Done.)
-2. Walking skeleton: Docker Compose with PostgreSQL, Garage and Mailpit; the `tada` binary with `serve`, `worker` and the web client; `CreateEvent` from the API to the web client, with tests; the first migration, the OpenAPI snapshot check and the crate boundary check. (Done.)
-3. Spikes:
-   - The job queue (ADR 0007). (Done. The result is [ADR 0054](adr/0054-job-queue-implementation.md). The queue exists; its schedules come with the scheduled checks of Slice 2.)
-   - Upload, download and versions in object storage (ADR 0009). (Done. The `BlobStore` adapter streams uploads to Garage, also as multipart uploads, and keeps nothing of a failed upload. The type detection of ADR 0043 needs [ADR 0055](adr/0055-office-format-detection.md). Document versions come with the documents of Slice 1.)
-   - Telegram identity linking (ADR 0011). (Done. `tada telegram` claims link codes through long polling, and the member confirms the link through the API. The webhook mode, the health endpoints of the telegram role and the web page for the confirmation come with the Telegram work of Slice 2.)
-4. A first deployment of the walking skeleton, from the operator's deployment repository (ADR 0033). (Done. The demo environment runs the image of CI with invented data only. A release build answers each API call with `unauthenticated` until sign-in exists ([ADR 0053](adr/0053-development-authenticator.md)).)
-5. ADRs for the decisions that the first code needs: observability ([0035](adr/0035-observability.md)), configuration ([0036](adr/0036-configuration.md)), the error model ([0037](adr/0037-error-model.md)), IDs and time ([0038](adr/0038-ids-and-time.md)) and actors ([0039](adr/0039-actors-and-identities.md)). (Done.)
-6. ADRs for Slice 0 and Slice 1: CI build and dependencies ([0041](adr/0041-ci-build-and-dependencies.md)), transactional email ([0042](adr/0042-transactional-email.md)), upload policy ([0043](adr/0043-upload-policy.md)) and API conventions ([0044](adr/0044-api-conventions.md)). (Done.)
-7. ADRs for the core of Slice 1: entities and the fact model ([0049](adr/0049-entities-and-fact-model.md)), proposals and review ([0050](adr/0050-proposals-and-review.md)), document drafts with provenance ([0051](adr/0051-document-drafts-and-provenance.md)), and event roles ([0052](adr/0052-event-roles-and-ownership.md)). (Done.)
-8. ADRs for Slice 2, accepted before Slice 2 starts: data protection ([0045](adr/0045-data-protection.md)), inbound email ([0046](adr/0046-inbound-email.md)), the model adapter ([0047](adr/0047-model-adapter.md)) and the AI evaluation set ([0048](adr/0048-ai-evaluation-set.md)). (Done.) No real personal data goes to a model provider before ADR 0045 is accepted.
+Slice 1 runs with invented data and public facts only.
+Real personal data needs the external review of the authentication code (ADR 0008) and the person features of ADR 0045 in Slice 2.
 
-## Slice 1: Preliminary event concept
+Scope:
 
-Goal: the team enters the known facts of a large event, uploads source documents and gets a German preliminary concept and an enquiry draft with provenance.
-tada sends no correspondence in this slice.
-Real personal data enters tada only after ADR 0045 is accepted, also in this slice. Before that, Slice 1 runs with invented data and public facts.
+- Sign-in with magic links, invitations and sessions ([ADR 0008](adr/0008-authentication.md)), and the first owner through `tada bootstrap` ([ADR 0036](adr/0036-configuration.md)).
+- Organization memberships, event memberships and event roles ([ADR 0052](adr/0052-event-roles-and-ownership.md)).
+- Transactional email through the worker ([ADR 0042](adr/0042-transactional-email.md)).
+- The fact model and the field catalog ([ADR 0049](adr/0049-entities-and-fact-model.md)), proposals and the Review Inbox ([ADR 0050](adr/0050-proposals-and-review.md)).
+- API tokens and the MCP server ([ADR 0039](adr/0039-actors-and-identities.md), [ADR 0040](adr/0040-ai-intake-through-mcp.md)).
+- Source documents with versions ([ADR 0009](adr/0009-object-storage.md), [ADR 0043](adr/0043-upload-policy.md)), and document drafts with provenance ([ADR 0051](adr/0051-document-drafts-and-provenance.md)).
+- The Telegram link confirmation in the web client and one Telegram command that creates a proposal ([ADR 0011](adr/0011-telegram.md)).
+- The privacy notice, the API token notice and the data inventory ([ADR 0045](adr/0045-data-protection.md)).
+
+Out of scope:
+
+- Passkeys (ADR 0008), OAuth for MCP clients (ADR 0040) and API tokens with a `write` scope (ADR 0039).
+- Self sign-up.
+  Sign-up stays invite-only (ADR 0008).
+- AI intake inside tada and the model adapter (Slice 2).
+- Workstreams, review routing to owners, and scheduled checks (Slice 2).
+- The Telegram webhook mode and the health endpoints of the `telegram` process role (Slice 2).
+- The person features of ADR 0045: the export of one person, correction, legal redaction and retention jobs (Slice 2).
+- The sweep of orphan objects in the object storage (Slice 2).
+  Until the sweep exists, orphan files and the parts of incomplete multipart uploads can stay in the object storage.
+- Mail to suppliers or the public (Slice 3), and the processing of bounces (ADR 0042).
+
+Work items, in this order:
+
+1. Identity and mail:
+   - Users, email identities, organization memberships and event memberships in the `identity` code module and in `store-pg`.
+   - The data inventory of ADR 0045 starts with these tables.
+   - The Telegram tables get a foreign key to the user.
+   - The `Mailer` port, the SMTP adapter, outbound intents and the send job of the worker (ADR 0042).
+2. Invitations and sign-in in the API:
+   - `tada bootstrap` creates the organization and the owner invitation (ADR 0036).
+   - Owners and admins invite members, revoke invitations and remove memberships ([ADR 0056](adr/0056-sign-in-details.md)).
+   - Magic links, sessions, sign-out, the `Origin` check and the rate limits (ADR 0008, ADR 0056).
+   - The new secret `TADA_RATE_LIMIT_KEY_FILE` of `serve` (ADR 0056).
+     `mise run gen` adds it to [doc/settings.md](settings.md), and `scripts/dev_secrets.py` generates it for development.
+   - The session authenticator replaces the development authenticator and the rejecting authenticator (ADR 0053).
+3. Sign-in in the web client:
+   - The sign-in page, the confirmation pages for magic links and invitations, the choice of the organization and sign-out.
+   - The member list and the invitation form for owners and admins.
+   - The event memberships page, where an event manager gives event roles (ADR 0052).
+   - The Telegram link confirmation (ADR 0011).
+     The gateway keeps long polling in this slice.
+4. Facts and review: the field catalog, the event profile, facts, fact versions, changesets, conflicts and the Review Inbox (ADR 0049, ADR 0050).
+   The event managers review all proposals (ADR 0052).
+   Open gap: the evidence of a proposal has no capture time of its source version.
+   The Review Inbox shows the time of the changeset instead.
+   The design asks for the capture time ([components](design/components.md)), so the evidence of a proposal must get it.
+5. API tokens and MCP: the token notice, and token creation and revocation (ADR 0039, ADR 0045).
+   The `/mcp` endpoint gives the read and proposal tools (ADR 0040).
+6. Documents:
+   - Upload with type detection, document versions and the document list in the web client ([ADR 0043](adr/0043-upload-policy.md), [ADR 0055](adr/0055-office-format-detection.md)).
+   - Document drafts with a provenance manifest, approval, and the differences between two versions (ADR 0051).
+7. Telegram command: a linked member proposes a change of a fact (ADR 0011).
+8. Gates before the demonstration:
+   - Isolation tests with two organizations, the structured export, and a backup restoration in the operator's deployment repository (ADR 0033).
+   - The privacy notice in the web client, from the template of ADR 0045.
+   - The external review of the authentication code (ADR 0008).
 
 Demonstration:
 
-1. A member describes the event in free text to their own AI agent (Claude or Codex). The agent proposes facts, assumptions, unknowns and open questions through MCP ([ADR 0040](adr/0040-ai-intake-through-mcp.md)).
-2. The member accepts or corrects the proposals in the Review Inbox.
-3. A member uploads source documents and browses them in the web client.
-4. A member asks the agent: "What are we planning and what remains unknown?" The agent answers from the read tools.
-5. The agent writes a German concept and an enquiry draft from accepted facts and labeled assumptions, and proposes both as document drafts.
-6. tada saves both drafts as document versions with fact and source-version provenance.
-7. A member proposes a change of the date window through a Telegram command. The owner reviews it. The agent writes a new draft version, and tada shows the differences.
-8. An operator restarts the services. All records and files stay available.
+1. An operator runs `tada bootstrap` for a new organization.
+   The owner accepts the invitation mail and invites a second member.
+   The member signs in with a magic link, and the owner makes the member an event manager of a new event.
+2. The event manager describes the event in free text to their own AI agent (Claude or Codex).
+   The agent proposes facts, assumptions, unknowns and open questions through MCP ([ADR 0040](adr/0040-ai-intake-through-mcp.md)).
+3. The event manager accepts or corrects the proposals in the Review Inbox.
+4. A member uploads source documents and browses them in the web client.
+5. A member asks the agent: "What are we planning and what remains unknown?"
+   The agent answers from the read tools.
+6. The agent writes a German concept and an enquiry draft from accepted facts and labeled assumptions, and proposes both as document drafts.
+7. tada saves both drafts as document versions with fact and source-version provenance.
+8. A member links Telegram and proposes a change of the date window through a Telegram command.
+   An event manager reviews it.
+   The agent writes a new draft version, and tada shows the differences.
+9. An operator restarts the services.
+   All records, files and sessions stay available.
 
 Acceptance:
 
+- A person without an invitation cannot sign in.
+  The sign-in form gives the same answer for a known and an unknown address.
+- A magic link expires after 15 minutes and works once.
+  A GET request on the link does not sign in.
+- An invitation expires after 7 days and works once.
+- The database contains no token in plain text: no magic link, invitation, session, link code or API token.
+- A session after its idle timeout (14 days) or its absolute timeout (90 days) gets `unauthenticated`.
+- After sign-out, the old session cookie gets `unauthenticated`.
+- A state-changing request with a wrong `Origin` header changes nothing.
+- The sixth sign-in request for one address in one hour gets `rate-limited`, also when two `serve` processes run.
+- A release build contains no development authenticator.
+- An event viewer cannot create proposals or a `propose` token, also through MCP.
+- A removed member loses access with the next request.
+- No log line contains an email address, a token or an IP address (ADR 0035).
+- The tests cover the applicable requirements of OWASP ASVS 5.0 on authentication and sessions.
+- The team closes the findings of the external reviewer (ADR 0008).
 - Every asserted fact traces to an accepted field or an exact source version.
 - An unknown value stays unknown.
 - Members find files without the chat.
@@ -57,6 +131,14 @@ Acceptance:
 Goal: workstream leads own their work directly, and the AI PM follows up without the PM.
 
 Scope: AI intake inside tada (web and Telegram) through the model adapter, actions and commitments, distributed review, durable scheduled checks, internal Telegram reminders, decisions, risks, requirements, templates, portfolio and resource views, and inbound email.
+The Telegram work adds the webhook mode and the health endpoints of the `telegram` process role (ADR 0011).
+The person features of ADR 0045 come in this slice: the export of one person, correction, legal redaction and retention jobs.
+The sweep of orphan objects in the object storage comes in this slice too ([ADR 0009](adr/0009-object-storage.md), [ADR 0045](adr/0045-data-protection.md)).
+An orphan is an object that no document version refers to, for example after a crash or an unknown commit outcome.
+The sweep also removes the parts of multipart uploads that a canceled request left incomplete.
+A lifecycle rule of the bucket in the deployment repository can do the second part (ADR 0033).
+The scheduled checks use the job queue of [ADR 0054](adr/0054-job-queue-implementation.md).
+Inbound email uses the modular adapters and the webhook of [ADR 0057](adr/0057-modular-mail-and-inbound-webhook.md) (proposed).
 
 Acceptance:
 

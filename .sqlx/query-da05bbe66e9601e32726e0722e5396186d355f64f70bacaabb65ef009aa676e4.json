@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO document_version\n             (id, organization_id, document_id, number, kind, blob_key, media_type, size_bytes,\n              sha256, file_name, uploaded_by, source_version_id, created_at)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Bytea",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "da05bbe66e9601e32726e0722e5396186d355f64f70bacaabb65ef009aa676e4"
+}

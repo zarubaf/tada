@@ -1,0 +1,25 @@
+@layer components {
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .header {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .key {
+    color: var(--color-text-muted);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-sm);
+  }
+
+  .dates {
+    font-size: var(--font-size-base);
+  }
+
+  .datesLabel {
+    color: var(--color-text-muted);
+  }
+}

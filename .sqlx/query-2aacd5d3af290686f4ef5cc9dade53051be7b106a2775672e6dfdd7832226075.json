@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n                                   SELECT 1 FROM field_definition\n                                   WHERE id = $1 AND status = 'active'\n                                     AND (event_id IS NULL OR (organization_id = $2 AND event_id = $3))\n                               ) AS \"active!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "active!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2aacd5d3af290686f4ef5cc9dade53051be7b106a2775672e6dfdd7832226075"
+}

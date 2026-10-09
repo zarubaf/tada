@@ -2,8 +2,14 @@
 //!
 //! A constructor checks each value, so other code cannot create an invalid value (ADR 0003).
 
+pub mod documents;
 pub mod events;
+pub mod facts;
+pub mod identity;
 pub mod ids;
+pub mod name;
+pub mod proposals;
+pub mod sources;
 
 mod version;
 

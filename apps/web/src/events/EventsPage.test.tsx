@@ -2,6 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { createApi, type Event, type Problem } from "../api/client";
+import { Router } from "../router/Router";
+import { SessionProvider } from "../session/SessionProvider";
 import { EventsPage } from "./EventsPage";
 
 // Invented fixtures with long German names and umlauts (doc/design/principles.md).
@@ -79,6 +81,52 @@ describe("EventsPage", () => {
     expect(await screen.findByText("FLY28")).toBeInTheDocument();
   });
 
+  it("moves focus to the alert when a retry fails, and to the heading when it works", async () => {
+    const unavailable = () =>
+      json(
+        503,
+        { code: "unavailable", status: 503, request_id: "x", type: "", title: "", instance: "" },
+        "application/problem+json",
+      );
+    const { api } = fakeApi(
+      unavailable(),
+      unavailable(),
+      json(200, { items: [event("FLY28", "Fly-in 2028")] }),
+    );
+    render(<EventsPage api={api} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Erneut versuchen" }));
+    await vi.waitFor(() => expect(screen.getByRole("alert")).toHaveFocus());
+
+    await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
+    expect(await screen.findByText("FLY28")).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Anlässe" })).toHaveFocus());
+  });
+
+  it("keeps the rows and the focus when the next page fails", async () => {
+    const { api, urls } = fakeApi(
+      json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "c1" }),
+      json(
+        503,
+        { code: "unavailable", status: 503, request_id: "x", type: "", title: "", instance: "" },
+        "application/problem+json",
+      ),
+      json(200, { items: [event("BB", "Zweiter Anlass")] }),
+    );
+    render(<EventsPage api={api} />);
+
+    const more = await screen.findByRole("button", { name: "Weitere Anlässe laden" });
+    await userEvent.click(more);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("nicht erreichbar");
+    expect(screen.getByText("AA")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Weitere Anlässe laden" })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "Weitere Anlässe laden" }));
+    expect(await screen.findByText("BB")).toBeInTheDocument();
+    expect(urls[2]).toContain("cursor=c1");
+  });
+
   it("shows the general message of the status class for an unknown code", async () => {
     const { api } = fakeApi(
       json(
@@ -104,5 +152,66 @@ describe("EventsPage", () => {
     expect(screen.getByText("AA")).toBeInTheDocument();
     expect(urls[1]).toContain("cursor=QUEgMDE");
     expect(screen.queryByRole("button", { name: "Weitere Anlässe laden" })).not.toBeInTheDocument();
+  });
+
+  it("keeps focus on the button while more pages remain", async () => {
+    const { api } = fakeApi(
+      json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "c1" }),
+      json(200, { items: [event("BB", "Zweiter Anlass")], next_cursor: "c2" }),
+    );
+    render(<EventsPage api={api} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
+
+    expect(await screen.findByText("BB")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Weitere Anlässe laden" })).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("Weitere Anlässe geladen.");
+  });
+
+  it("moves focus to the heading when the last page arrives", async () => {
+    const { api } = fakeApi(
+      json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "c1" }),
+      json(200, { items: [event("BB", "Zweiter Anlass")] }),
+    );
+    render(<EventsPage api={api} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
+
+    expect(await screen.findByText("BB")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Anlässe" })).toHaveFocus();
+  });
+});
+
+describe("EventsPage toolbar", () => {
+  function signedIn(role: string) {
+    const membership = { organization_id: "o1", name: "Fliegergruppe Testwil", role };
+    const session = {
+      user_id: "u1",
+      display_name: "Anna Muster",
+      organization: membership,
+      memberships: [membership],
+    };
+    const fetch = async (request: Request) =>
+      json(200, new URL(request.url).pathname.endsWith("/session") ? session : { items: [] });
+    const api = createApi(fetch as unknown as typeof globalThis.fetch);
+    render(
+      <Router>
+        <SessionProvider api={api}>
+          <EventsPage api={api} />
+        </SessionProvider>
+      </Router>,
+    );
+  }
+
+  it.each(["owner", "admin"])("offers „Anlass erfassen“ to the role %s", async (role) => {
+    signedIn(role);
+    const link = await screen.findByRole("link", { name: "Anlass erfassen" });
+    expect(link).toHaveAttribute("href", "/events/new");
+  });
+
+  it("does not offer „Anlass erfassen“ to a member", async () => {
+    signedIn("member");
+    await screen.findByText("Noch keine Anlässe erfasst");
+    expect(screen.queryByRole("link", { name: "Anlass erfassen" })).not.toBeInTheDocument();
   });
 });

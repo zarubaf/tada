@@ -14,6 +14,7 @@ ignore = [
 [licenses]
 # Licenses that are compatible with Apache-2.0 for distribution (ADR 0014).
 allow = [
+  "0BSD",
   "Apache-2.0",
   "Apache-2.0 WITH LLVM-exception",
   "BSD-2-Clause",
@@ -50,15 +51,21 @@ allow-wildcard-paths = true
 # - The domain crate depends on no other tada crate.
 # - I/O crates are dependencies of adapter crates only.
 deny = [
-  { crate = "tada-app", wrappers = ["tada-store-pg", "tada-adapters", "tada-api", "tada-telegram", "tada"] },
-  { crate = "tada-store-pg", wrappers = ["tada"] },
+  { crate = "tada-app", wrappers = ["tada-store-pg", "tada-adapters", "tada-api", "tada-telegram", "tada-mcp", "tada"] },
+  # The integration tests of tada-store-pg use its own test database, through a dev-dependency on itself.
+  { crate = "tada-store-pg", wrappers = ["tada", "tada-store-pg"] },
   { crate = "tada-adapters", wrappers = ["tada"] },
   { crate = "tada-api", wrappers = ["tada"] },
   { crate = "tada-telegram", wrappers = ["tada"] },
+  { crate = "tada-mcp", wrappers = ["tada"] },
   { crate = "sqlx", wrappers = ["tada-store-pg", "jiff-sqlx"] },
   { crate = "aws-sdk-s3", wrappers = ["tada-adapters"] },
+  # lettre is the SMTP client of the mail adapter (ADR 0042).
+  { crate = "lettre", wrappers = ["tada-adapters"] },
   # frankenstein is the typed Bot API client of the telegram crate (ADR 0011).
   { crate = "reqwest", wrappers = ["tada-adapters", "frankenstein"] },
+  # rmcp is the MCP SDK of the mcp crate (ADR 0040).
+  { crate = "rmcp", wrappers = ["tada-mcp"] },
 ]
 
 [sources]

@@ -33,6 +33,14 @@
     line-height: var(--line-height-ui);
   }
 
+  /*
+   * The browser default for code is the generic monospace family. It has a smaller default size and
+   * resolves to a system font that can change in the middle of a page load. Use the token instead.
+   */
+  code {
+    font-family: var(--font-family-mono);
+  }
+
   h1,
   h2,
   h3 {
@@ -47,6 +55,18 @@
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
+  }
+
+  /*
+   * Forced colors (ADR 0022): the system replaces the colors, so focus rings use Highlight. An
+   * important declaration in the first layer wins over the later layers (see below).
+   */
+  @media (forced-colors: active) {
+    :focus-visible,
+    [data-focus-visible] {
+      /* biome-ignore lint/complexity/noImportantStyles: see the comment above */
+      outline-color: Highlight !important;
+    }
   }
 
   /*

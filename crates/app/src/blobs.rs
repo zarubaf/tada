@@ -25,6 +25,13 @@ impl BlobKey {
         Self(format!("{organization_id}/{}", Uuid::now_v7()))
     }
 
+    /// For store adapters only: restores the key of a stored document version.
+    /// Other code gets a key from `new`.
+    #[doc(hidden)]
+    pub fn restore(key: String) -> Self {
+        Self(key)
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -51,13 +58,17 @@ pub enum BlobError {
 #[async_trait]
 pub trait BlobStore: Debug + Send + Sync {
     /// Writes the stream to `key` and returns its size. Above `limit` bytes, it stops and keeps nothing.
+    /// Infrastructure query (ADR 0039): the key names the object, and the key starts with the organization ID.
     async fn put(&self, key: &BlobKey, body: ByteStream, limit: u64) -> Result<u64, BlobError>;
 
     /// Reads the object, or returns `None` if it does not exist.
+    /// Infrastructure query (ADR 0039): the key names the object, and the key starts with the organization ID.
     async fn get(&self, key: &BlobKey) -> Result<Option<ByteStream>, BlobError>;
 
     /// The size of the object, or `None` if it does not exist.
+    /// Infrastructure query (ADR 0039): the key names the object, and the key starts with the organization ID.
     async fn head(&self, key: &BlobKey) -> Result<Option<u64>, BlobError>;
 
+    /// Infrastructure query (ADR 0039): the key names the object, and the key starts with the organization ID.
     async fn delete(&self, key: &BlobKey) -> Result<(), BlobError>;
 }

@@ -17,13 +17,17 @@ tada-store-pg.workspace = true
 tada-adapters.workspace = true
 tada-api.workspace = true
 tada-telegram.workspace = true
+tada-mcp.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
+axum.workspace = true
 clap.workspace = true
+futures.workspace = true
 ipnet.workspace = true
+jiff.workspace = true
 json-subscriber.workspace = true
 secrecy.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["fs", "io-util"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
 serde_json.workspace = true
@@ -31,9 +35,14 @@ uuid.workspace = true
 url.workspace = true
 
 [dev-dependencies]
+tada-app = { workspace = true, features = ["testing"] }
 tada-store-pg = { workspace = true, features = ["testing"] }
-axum.workspace = true
+tada-adapters = { workspace = true, features = ["testing"] }
+async-trait.workspace = true
+bytes.workspace = true
+futures.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 tempfile.workspace = true
 tower.workspace = true
 tokio.workspace = true

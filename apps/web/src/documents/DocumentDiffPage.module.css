@@ -1,0 +1,68 @@
+@layer components {
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .header {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .key {
+    color: var(--color-text-muted);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-sm);
+  }
+
+  .title {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--letter-spacing-tight);
+    line-height: var(--line-height-2xl);
+    overflow-wrap: anywhere;
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .list {
+    display: grid;
+    gap: var(--space-1);
+    padding-inline-start: var(--space-6);
+    list-style: disc;
+  }
+
+  /* The words of a change are for assistive technology; the marker and the color support them. */
+  .words {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .text {
+    display: inline-block;
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .text[data-kind="added"] {
+    background: var(--color-success-subtle);
+  }
+
+  .text[data-kind="removed"] {
+    background: var(--color-danger-subtle);
+    text-decoration: line-through;
+  }
+}

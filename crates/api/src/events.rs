@@ -1,17 +1,15 @@
-//! `/api/v1/events`: the `CreateEvent` command and the `ListEvents` query.
+//! `/api/v1/events`: the `CreateEvent` command and the `ListEvents` and `GetEvent` queries.
 
 use axum::extract::State;
 use axum::http::StatusCode;
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
+use tada_app::access::AccessError;
 use tada_app::domain::events::{self as domain, EventKey};
 use tada_app::domain::ids::EventId;
 use tada_app::events::{
     self as app, CreateEventError, Created, EventCursor, ListEventsError, NewEvent,
 };
-use tada_app::paging::PageLimit;
 use tada_app::problem::ProblemCode;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -19,12 +17,15 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::ApiState;
-use crate::contract::{AUTHENTICATED, JSON_BODY, QUERY, codes};
-use crate::extract::{Caller, Json, Query};
+use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
+use crate::cursor;
+use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::problem::{ApiError, Problem};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
-    OpenApiRouter::new().routes(routes!(list_events, create_event))
+    OpenApiRouter::new()
+        .routes(routes!(list_events, create_event))
+        .routes(routes!(get_event))
 }
 
 /// The problem codes of each operation (ADR 0037). They come from the error types of the `app` crate
@@ -38,6 +39,10 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         (
             "list_events",
             codes(&[AUTHENTICATED, QUERY, ListEventsError::CODES]),
+        ),
+        (
+            "get_event",
+            codes(&[AUTHENTICATED, PATH, AccessError::CODES]),
         ),
     ]
 }
@@ -111,12 +116,9 @@ async fn create_event(
         name: request.name,
         time_zone: request.time_zone,
     };
-    match app::create_event(&caller, input, state.events.as_ref(), state.clock.as_ref()).await {
-        Ok(Created::New(event)) => Ok((StatusCode::CREATED, axum::Json(event.into()))),
-        Ok(Created::Existing(event)) => Ok((StatusCode::OK, axum::Json(event.into()))),
-        Err(CreateEventError::Invalid(errors)) => Err(ApiError::invalid(errors)),
-        Err(CreateEventError::Forbidden) => Err(ApiError::new(ProblemCode::Forbidden)),
-        Err(CreateEventError::Store(error)) => Err(ApiError::store(&error)),
+    match app::create_event(&caller, input, state.events.as_ref(), state.clock.as_ref()).await? {
+        Created::New(event) => Ok((StatusCode::CREATED, axum::Json(event.into()))),
+        Created::Existing(event) => Ok((StatusCode::OK, axum::Json(event.into()))),
     }
 }
 
@@ -157,37 +159,52 @@ async fn list_events(
     Caller(caller): Caller,
     Query(query): Query<ListEventsQuery>,
 ) -> Result<axum::Json<EventPage>, ApiError> {
-    let limit = match query.limit {
-        None => PageLimit::DEFAULT,
-        Some(limit) => PageLimit::new(limit).ok_or_else(|| {
-            ApiError::new(ProblemCode::MalformedRequest).with_detail("The limit must be 1 to 200.")
-        })?,
-    };
+    let limit = page_limit(query.limit)?;
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
-    let page = app::list_events(&caller, after, limit, state.events.as_ref())
-        .await
-        .map_err(|error| match error {
-            ListEventsError::Store(error) => ApiError::store(&error),
-        })?;
+    let page = app::list_events(&caller, after, limit, state.events.as_ref()).await?;
     Ok(axum::Json(EventPage {
         items: page.items.into_iter().map(Event::from).collect(),
         next_cursor: page.next.as_ref().map(encode_cursor),
     }))
 }
 
+/// Reads one event. The caller needs an event role in it, or the organization role owner or admin.
+#[utoipa::path(
+    get,
+    path = "/events/{event_id}",
+    operation_id = "get_event",
+    tag = "events",
+    params(("event_id" = Uuid, Path, description = "The ID of the event.")),
+    responses(
+        (status = OK, description = "The event.", body = Event),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn get_event(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+    Path(event_id): Path<Uuid>,
+) -> Result<axum::Json<Event>, ApiError> {
+    let event = app::get_event(
+        &caller,
+        EventId::from_uuid(event_id),
+        state.events.as_ref(),
+        state.identity.as_ref(),
+    )
+    .await?;
+    Ok(axum::Json(event.into()))
+}
+
 /// The cursor is opaque for clients (ADR 0044): the key and the ID, in Base64.
 fn encode_cursor(cursor: &EventCursor) -> String {
-    URL_SAFE_NO_PAD.encode(format!("{} {}", cursor.key.as_str(), cursor.id))
+    cursor::encode(format!("{} {}", cursor.key.as_str(), cursor.id))
 }
 
 fn decode_cursor(text: &str) -> Result<EventCursor, ApiError> {
-    let invalid =
-        || ApiError::new(ProblemCode::MalformedRequest).with_detail("The cursor is not valid.");
-    let bytes = URL_SAFE_NO_PAD.decode(text).map_err(|_| invalid())?;
-    let text = String::from_utf8(bytes).map_err(|_| invalid())?;
-    let (key, id) = text.split_once(' ').ok_or_else(invalid)?;
+    let text = cursor::decode_text(text)?;
+    let (key, id) = text.split_once(' ').ok_or_else(cursor::invalid)?;
     Ok(EventCursor {
-        key: EventKey::parse(key).map_err(|_| invalid())?,
-        id: EventId::from_uuid(id.parse().map_err(|_| invalid())?),
+        key: EventKey::parse(key).map_err(|_| cursor::invalid())?,
+        id: EventId::from_uuid(id.parse().map_err(|_| cursor::invalid())?),
     })
 }

@@ -14,7 +14,10 @@ use std::str::FromStr;
 use secrecy::SecretString;
 
 pub use reference::reference;
-pub use sections::{Logging, MigrateSettings, ServeSettings, TelegramSettings, WorkerSettings};
+pub use sections::{
+    BootstrapSettings, ExportSettings, Logging, MigrateSettings, ServeSettings, TelegramSettings,
+    WorkerSettings,
+};
 
 /// The description of one setting, for the loader and for the reference.
 #[derive(Debug)]
@@ -62,6 +65,8 @@ tuple_section!(A);
 tuple_section!(A, B);
 tuple_section!(A, B, C);
 tuple_section!(A, B, C, D);
+tuple_section!(A, B, C, D, E);
+tuple_section!(A, B, C, D, E, F);
 
 /// Reads the section `S` from the environment.
 pub fn load<S: Section>(
@@ -141,7 +146,20 @@ impl Source<'_> {
             self.error(setting, "is not set");
             return None;
         };
-        let content = match fs::read_to_string(&path) {
+        self.read_secret_file(setting, &path)
+    }
+
+    /// Reads a secret that can be absent. The outer `None` is an error; the inner one is "not set".
+    pub fn optional_secret(&mut self, setting: &Setting) -> Option<Option<SecretString>> {
+        debug_assert!(setting.secret, "{} is not a secret", setting.name);
+        match (self.lookup)(setting.name) {
+            None => Some(None),
+            Some(path) => self.read_secret_file(setting, &path).map(Some),
+        }
+    }
+
+    fn read_secret_file(&mut self, setting: &Setting, path: &str) -> Option<SecretString> {
+        let content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(error) => {
                 self.error(
@@ -152,7 +170,7 @@ impl Source<'_> {
             }
         };
         // Some runtimes mount secrets readable by all users, so this is a warning only (ADR 0036).
-        if fs::metadata(&path).is_ok_and(|metadata| metadata.permissions().mode() & 0o004 != 0) {
+        if fs::metadata(path).is_ok_and(|metadata| metadata.permissions().mode() & 0o004 != 0) {
             self.warnings.push(format!(
                 "{} names a file that all users can read",
                 setting.name
@@ -189,7 +207,9 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use super::*;
-    use crate::settings::sections::Database;
+    use tada_adapters::mail::SmtpTls;
+
+    use crate::settings::sections::{Database, Uploads};
 
     fn secret_file(content: &str) -> NamedTempFile {
         let mut file = NamedTempFile::new().unwrap();
@@ -224,6 +244,8 @@ mod tests {
                 "TADA_S3_BUCKET",
                 "TADA_S3_ACCESS_KEY_ID_FILE",
                 "TADA_S3_SECRET_ACCESS_KEY_FILE",
+                "TADA_PUBLIC_URL",
+                "TADA_RATE_LIMIT_KEY_FILE",
             ]
         );
     }
@@ -285,8 +307,146 @@ mod tests {
     }
 
     #[test]
+    fn the_upload_limit_is_100_mb_by_default_and_never_zero() {
+        let loaded = load_from::<(Uploads,)>(&[]).unwrap();
+        assert_eq!(loaded.settings.0.max_bytes.get(), 100_000_000);
+        let errors = load_from::<(Uploads,)>(&[("TADA_UPLOAD_MAX_BYTES", "0")]).unwrap_err();
+        assert_eq!(
+            errors.0,
+            [
+                "TADA_UPLOAD_MAX_BYTES is not a valid byte count: number would be zero for non-zero type"
+            ]
+        );
+    }
+
+    #[test]
     fn rejects_an_invalid_log_filter() {
         let errors = load_from::<(Logging,)>(&[("TADA_LOG", "info,[")]).unwrap_err();
         assert!(errors.0[0].starts_with("TADA_LOG is not a valid log filter"));
+    }
+
+    const MAIL: [(&str, &str); 3] = [
+        ("TADA_PUBLIC_URL", "https://tada.example.org"),
+        ("TADA_MAIL_FROM", "tada@example.org"),
+        ("TADA_MAIL_SMTP_HOST", "mail.example.org"),
+    ];
+
+    fn worker_with(extra: &[(&str, &str)]) -> Result<Loaded<WorkerSettings>, SettingsErrors> {
+        let password = secret_file("s3cr3t");
+        let path = password.path().to_str().unwrap().to_owned();
+        let mut variables = vec![
+            ("TADA_DATABASE_URL", "postgres://tada@localhost/tada"),
+            ("TADA_DATABASE_PASSWORD_FILE", path.as_str()),
+        ];
+        variables.extend(MAIL);
+        variables.extend_from_slice(extra);
+        load_from::<WorkerSettings>(&variables)
+    }
+
+    #[test]
+    fn the_worker_reads_the_mail_settings_with_the_smtp_defaults() {
+        let (_, public_url, mail, smtp) = worker_with(&[]).unwrap().settings;
+        assert_eq!(public_url.origin(), "https://tada.example.org");
+        assert_eq!(mail.from.as_str(), "tada@example.org");
+        assert_eq!(smtp.host, "mail.example.org");
+        assert_eq!(smtp.port, 465);
+        assert_eq!(smtp.tls, SmtpTls::Implicit);
+        assert!(smtp.credentials.is_none());
+    }
+
+    #[test]
+    fn a_missing_mail_setting_is_reported_with_the_other_errors() {
+        let errors =
+            load_from::<WorkerSettings>(&[("TADA_PUBLIC_URL", "https://tada.example.org")])
+                .unwrap_err();
+        let names: Vec<&str> = errors
+            .0
+            .iter()
+            .map(|error| error.split(' ').next().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "TADA_DATABASE_URL",
+                "TADA_DATABASE_PASSWORD_FILE",
+                "TADA_MAIL_FROM",
+                "TADA_MAIL_SMTP_HOST",
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_a_public_url_with_a_path_or_a_query() {
+        for bad in [
+            "https://tada.example.org/app",
+            "https://tada.example.org/?a=1",
+            "https://tada.example.org/#x",
+            "ftp://tada.example.org",
+        ] {
+            let errors = worker_with(&[("TADA_PUBLIC_URL", bad)]).unwrap_err();
+            assert_eq!(errors.0.len(), 1, "{bad}: {errors}");
+            assert!(errors.0[0].starts_with("TADA_PUBLIC_URL "), "{bad}");
+        }
+    }
+
+    #[test]
+    fn rejects_an_invalid_sender_address_without_repeating_it() {
+        let errors = worker_with(&[("TADA_MAIL_FROM", "not-an-address")]).unwrap_err();
+        assert_eq!(errors.0.len(), 1);
+        assert!(errors.0[0].starts_with("TADA_MAIL_FROM "));
+        assert!(!errors.0[0].contains("not-an-address"), "{errors}");
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn accepts_smtp_without_tls_in_a_debug_build() {
+        let (.., smtp) = worker_with(&[("TADA_MAIL_SMTP_TLS", "none")])
+            .unwrap()
+            .settings;
+        assert_eq!(smtp.tls, SmtpTls::None);
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn rejects_smtp_without_tls_in_a_release_build() {
+        let errors = worker_with(&[("TADA_MAIL_SMTP_TLS", "none")]).unwrap_err();
+        assert!(errors.0[0].starts_with("TADA_MAIL_SMTP_TLS "), "{errors}");
+    }
+
+    #[test]
+    fn accepts_starttls_and_rejects_an_unknown_tls_mode() {
+        let (.., smtp) = worker_with(&[("TADA_MAIL_SMTP_TLS", "starttls")])
+            .unwrap()
+            .settings;
+        assert_eq!(smtp.tls, SmtpTls::StartTls);
+        let errors = worker_with(&[("TADA_MAIL_SMTP_TLS", "maybe")]).unwrap_err();
+        assert!(errors.0[0].starts_with("TADA_MAIL_SMTP_TLS "));
+        assert!(!errors.0[0].contains("maybe"));
+    }
+
+    #[test]
+    fn reads_the_smtp_user_and_password_as_a_pair() {
+        let password = secret_file("smtp-s3cr3t\n");
+        let path = password.path().to_str().unwrap();
+        let (.., smtp) = worker_with(&[
+            ("TADA_MAIL_SMTP_USERNAME", "tada"),
+            ("TADA_MAIL_SMTP_PASSWORD_FILE", path),
+        ])
+        .unwrap()
+        .settings;
+        let (username, secret) = smtp.credentials.unwrap();
+        assert_eq!(username, "tada");
+        assert_eq!(secret.expose_secret(), "smtp-s3cr3t");
+
+        let errors = worker_with(&[("TADA_MAIL_SMTP_USERNAME", "tada")]).unwrap_err();
+        assert_eq!(
+            errors.0,
+            ["TADA_MAIL_SMTP_PASSWORD_FILE must be set together with TADA_MAIL_SMTP_USERNAME"]
+        );
+        let errors = worker_with(&[("TADA_MAIL_SMTP_PASSWORD_FILE", path)]).unwrap_err();
+        assert_eq!(
+            errors.0,
+            ["TADA_MAIL_SMTP_USERNAME must be set together with TADA_MAIL_SMTP_PASSWORD_FILE"]
+        );
     }
 }

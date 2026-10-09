@@ -1,0 +1,54 @@
+@layer components {
+  .select {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .label {
+    font-weight: var(--font-weight-medium);
+  }
+
+  .trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-height: var(--control-height-md);
+    min-width: 9rem;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .trigger[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .select[data-invalid] .trigger {
+    border-color: var(--color-danger);
+  }
+
+  .error {
+    color: var(--color-danger);
+    font-size: var(--font-size-sm);
+  }
+
+  .trigger[data-disabled] {
+    cursor: default;
+    opacity: 0.5;
+  }
+
+  @media (forced-colors: active) {
+    .trigger[data-disabled] {
+      border-color: GrayText;
+      color: GrayText;
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE field_definition SET status = 'deprecated'\n                 WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "32d19d476b309b5946514e951d5ee9d161043655a101f266b95b298a10ef78c5"
+}

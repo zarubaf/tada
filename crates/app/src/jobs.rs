@@ -1,7 +1,7 @@
 //! Durable jobs (ADRs 0007 and 0054): the port of the queue, the port of a job handler, and the step
 //! that runs one job.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
@@ -41,19 +41,31 @@ pub struct Job {
     pub request_id: Option<Uuid>,
     /// 1 for the first attempt.
     pub attempt: i32,
+    /// After a failed attempt with this number, the job fails for good.
+    pub max_attempts: i32,
+}
+
+impl Job {
+    /// True if a failure of this attempt fails the job for good.
+    pub fn is_last_attempt(&self) -> bool {
+        self.attempt >= self.max_attempts
+    }
 }
 
 /// The queue, as the worker sees it. The database clock gives due times and leases (ADR 0038).
 #[async_trait]
 pub trait JobQueue: Debug + Send + Sync {
     /// Claims the oldest due job for `lease`. Another worker can claim the job again after the lease.
+    /// Infrastructure query (ADR 0039): the worker serves the jobs of all organizations, and the job names its own.
     async fn claim(&self, worker_id: Uuid, lease: Duration) -> Result<Option<Job>, StoreError>;
 
     /// Removes a job that completed. Returns false if the worker no longer holds the job.
+    /// Infrastructure query (ADR 0039): the worker holds the job, and the job names its own organization.
     async fn complete(&self, job: &Job, worker_id: Uuid) -> Result<bool, StoreError>;
 
     /// Records a failed attempt. The job runs again after a backoff, or fails for good after its
     /// last attempt. Returns false if the worker no longer holds the job.
+    /// Infrastructure query (ADR 0039): the worker holds the job, and the job names its own organization.
     async fn fail(&self, job: &Job, worker_id: Uuid, reason: &str) -> Result<bool, StoreError>;
 }
 
@@ -62,8 +74,14 @@ pub trait JobQueue: Debug + Send + Sync {
 pub trait JobHandler: Debug + Send + Sync {
     fn kind(&self) -> &'static str;
 
-    async fn run(&self, job: &Job) -> Result<(), JobFailed>;
+    /// Runs the job. `Ok(Some(warning))` completes the job, and the worker logs the warning.
+    async fn run(&self, job: &Job) -> Result<Option<JobWarning>, JobFailed>;
 }
+
+/// A completed job that the operator must know about, for example a mail that the server rejected.
+/// The text goes into the log, so it contains no direct identifiers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobWarning(pub String);
 
 /// A failed attempt. The reason goes into the job row and the log, so it contains no direct identifiers.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -79,6 +97,11 @@ impl Handlers {
         self.0.insert(handler.kind(), handler);
         self
     }
+
+    /// The job kinds that have a handler.
+    pub fn kinds(&self) -> BTreeSet<&'static str> {
+        self.0.keys().copied().collect()
+    }
 }
 
 /// What `run_next` did.
@@ -87,6 +110,8 @@ pub enum Ran {
     /// No job was due.
     Idle,
     Completed(Uuid),
+    /// The job completed, and its handler reported a warning.
+    CompletedWithWarning(Uuid, JobWarning),
     Failed(Uuid),
     /// The lease expired and another worker holds the job now. The result of this attempt is lost.
     LeaseLost(Uuid),
@@ -110,12 +135,13 @@ pub async fn run_next(
         ))),
     };
     let held = match &result {
-        Ok(()) => queue.complete(&job, worker_id).await?,
+        Ok(_) => queue.complete(&job, worker_id).await?,
         Err(failure) => queue.fail(&job, worker_id, &failure.0).await?,
     };
     Ok(match (held, result) {
         (false, _) => Ran::LeaseLost(job.id),
-        (true, Ok(())) => Ran::Completed(job.id),
+        (true, Ok(None)) => Ran::Completed(job.id),
+        (true, Ok(Some(warning))) => Ran::CompletedWithWarning(job.id, warning),
         (true, Err(_)) => Ran::Failed(job.id),
     })
 }

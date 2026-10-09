@@ -1,16 +1,17 @@
 //! The request ID and the request log (ADR 0035).
 
-use std::net::SocketAddr;
 use std::time::Instant;
 
-use axum::extract::{ConnectInfo, MatchedPath, Request, State};
+use axum::extract::{MatchedPath, Request, State};
 use axum::http::HeaderValue;
 use axum::middleware::Next;
 use axum::response::Response;
+use tada_app::caller::RequestId;
 use tracing::Instrument;
 use uuid::Uuid;
 
 use crate::ApiState;
+use crate::client_ip;
 
 pub const HEADER: &str = "x-request-id";
 
@@ -25,8 +26,10 @@ pub fn current() -> Uuid {
 }
 
 /// Gives each request an ID, a log span with this ID, one log line at the end and the response header.
-pub async fn track(State(state): State<ApiState>, request: Request, next: Next) -> Response {
+pub async fn track(State(state): State<ApiState>, mut request: Request, next: Next) -> Response {
     let request_id = forwarded_id(&state, &request).unwrap_or_else(Uuid::now_v7);
+    // The task-local does not reach a handler in another task; the extensions do.
+    request.extensions_mut().insert(RequestId::new(request_id));
     // The route template, never the raw path: a path can contain a token (ADR 0008).
     let route = request
         .extensions()
@@ -59,16 +62,8 @@ pub async fn track(State(state): State<ApiState>, request: Request, next: Next) 
 
 /// The `X-Request-Id` of a trusted proxy, if it is a UUID.
 fn forwarded_id(state: &ApiState, request: &Request) -> Option<Uuid> {
-    let peer = request
-        .extensions()
-        .get::<ConnectInfo<SocketAddr>>()?
-        .0
-        .ip();
-    if !state
-        .trusted_proxies
-        .iter()
-        .any(|range| range.contains(&peer))
-    {
+    let peer = client_ip::peer(request.extensions())?;
+    if !client_ip::is_trusted_proxy(&state.trusted_proxies, peer) {
         return None;
     }
     request.headers().get(HEADER)?.to_str().ok()?.parse().ok()

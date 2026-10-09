@@ -1,0 +1,78 @@
+@layer components {
+  .state {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-2);
+    max-width: 100%;
+  }
+
+  .value {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .mark {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-sm);
+  }
+
+  .icon {
+    flex: none;
+  }
+
+  .label {
+    color: var(--color-text-muted);
+  }
+
+  .hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .state[data-state="accepted"] .icon {
+    color: var(--color-success);
+  }
+
+  .state[data-state="proposed"] .value {
+    padding: 0 var(--space-1);
+    border: 1px dashed var(--color-accent);
+    border-radius: var(--radius-sm);
+    background: var(--color-accent-subtle);
+  }
+
+  .state[data-state="proposed"] .icon,
+  .state[data-state="proposed"] .label {
+    color: var(--color-accent-text);
+  }
+
+  .state[data-state="assumption"] .value {
+    text-decoration: underline dotted var(--color-text-muted);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+
+  .state[data-state="conflict"] .value {
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    background: var(--color-danger-subtle);
+  }
+
+  .state[data-state="conflict"] .icon,
+  .state[data-state="conflict"] .label {
+    color: var(--color-danger);
+  }
+
+  .state[data-state="unknown"] .mark {
+    color: var(--color-text-muted);
+    font-size: inherit;
+    line-height: inherit;
+  }
+}

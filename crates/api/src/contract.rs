@@ -2,29 +2,28 @@
 
 use std::collections::BTreeMap;
 
+use tada_app::auth::AuthenticationError;
 use tada_app::problem::ProblemCode;
 use utoipa::openapi::extensions::Extensions;
 use utoipa::openapi::{Info, License, OpenApi};
-
-use crate::problem;
 
 /// The extension that lists the problem codes of an operation (ADR 0037).
 pub const PROBLEM_CODES_EXTENSION: &str = "x-tada-problem-codes";
 
 /// The codes of each operation that needs a member caller.
-pub(crate) const AUTHENTICATED: &[ProblemCode] = &[
-    ProblemCode::Unauthenticated,
-    ProblemCode::Unavailable,
-    ProblemCode::Internal,
-];
+pub(crate) const AUTHENTICATED: &[ProblemCode] = AuthenticationError::CODES;
 /// The codes of each operation with a JSON body.
 pub(crate) const JSON_BODY: &[ProblemCode] = &[
     ProblemCode::MalformedRequest,
     ProblemCode::UnsupportedMediaType,
     ProblemCode::PayloadTooLarge,
 ];
+/// The codes of each state-changing operation: the `Origin` check (ADR 0008).
+const STATE_CHANGE: &[ProblemCode] = &[ProblemCode::Forbidden];
 /// The codes of each operation with query parameters.
 pub(crate) const QUERY: &[ProblemCode] = &[ProblemCode::MalformedRequest];
+/// The codes of each operation with path parameters.
+pub(crate) const PATH: &[ProblemCode] = &[ProblemCode::MalformedRequest];
 
 /// The sorted union of code lists.
 pub(crate) fn codes(lists: &[&[ProblemCode]]) -> Vec<ProblemCode> {
@@ -50,18 +49,23 @@ pub(crate) fn complete(
     document.info = info;
 
     for item in document.paths.paths.values_mut() {
+        // The `Origin` check rejects a state change before its handler runs (ADR 0008).
         let operations = [
-            &mut item.get,
-            &mut item.put,
-            &mut item.post,
-            &mut item.delete,
-            &mut item.patch,
+            (&mut item.get, &[][..]),
+            (&mut item.put, STATE_CHANGE),
+            (&mut item.post, STATE_CHANGE),
+            (&mut item.delete, STATE_CHANGE),
+            (&mut item.patch, STATE_CHANGE),
         ];
-        for operation in operations.into_iter().flatten() {
+        for (operation, method_codes) in operations {
+            let Some(operation) = operation else {
+                continue;
+            };
             let id = operation.operation_id.as_deref().unwrap_or_default();
-            let Some(codes) = problem_codes.get(id) else {
+            let Some(handler_codes) = problem_codes.get(id) else {
                 panic!("the operation {id} has no problem codes");
             };
+            let codes = codes(&[handler_codes, method_codes]);
             let names: Vec<&str> = codes.iter().map(|code| code.as_str()).collect();
             let extensions = operation.extensions.get_or_insert_with(Extensions::default);
             extensions.insert(PROBLEM_CODES_EXTENSION.to_owned(), names.into());
@@ -77,7 +81,7 @@ pub fn problem_catalog() -> String {
         let name = code.as_str();
         rows.push([
             format!("<a id=\"{name}\"></a>`{name}`"),
-            problem::status(code).as_u16().to_string(),
+            code.http_status().to_string(),
             code.meaning().to_owned(),
         ]);
     }
@@ -139,9 +143,91 @@ mod tests {
         }
         assert_eq!(
             operations,
-            crate::events::problem_codes().len() + crate::telegram::problem_codes().len(),
+            crate::problem_codes().len(),
             "a code list without an operation"
         );
+    }
+
+    #[test]
+    fn each_state_change_lists_the_origin_check() {
+        let document = crate::openapi();
+        let codes = |operation: &utoipa::openapi::path::Operation| {
+            operation.extensions.as_ref().unwrap()[PROBLEM_CODES_EXTENSION].clone()
+        };
+        for item in document.paths.paths.values() {
+            if let Some(post) = &item.post {
+                assert!(
+                    codes(post)
+                        .as_array()
+                        .unwrap()
+                        .contains(&"forbidden".into())
+                );
+            }
+        }
+        let events = &document.paths.paths["/api/v1/events"];
+        let list = codes(events.get.as_ref().unwrap());
+        assert!(!list.as_array().unwrap().contains(&"forbidden".into()));
+    }
+
+    /// The names of the types with `ToSchema` in one source file.
+    fn schema_types(source: &str) -> Vec<String> {
+        let name_of = |line: &str| {
+            let rest = line
+                .trim_start()
+                .trim_start_matches("pub ")
+                .trim_start_matches("pub(crate) ");
+            let rest = rest
+                .strip_prefix("struct ")
+                .or_else(|| rest.strip_prefix("enum "))?;
+            Some(
+                rest.split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()?
+                    .to_owned(),
+            )
+        };
+        let mut names = Vec::new();
+        let mut derived = false;
+        for line in source.lines() {
+            let trimmed = line.trim_start();
+            if let Some(rest) = trimmed.strip_prefix("impl ToSchema for ") {
+                names.extend(name_of(&format!("struct {rest}")));
+            } else if trimmed.starts_with("#[derive(") && trimmed.contains("ToSchema") {
+                derived = true;
+            } else if derived && let Some(name) = name_of(trimmed) {
+                names.push(name);
+                derived = false;
+            }
+        }
+        names
+    }
+
+    /// utoipa keys the component schemas by type name and keeps one of two types with the same name,
+    /// so the contract would describe the wrong type without an error.
+    #[test]
+    fn each_schema_type_has_its_own_name() {
+        let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut seen: BTreeMap<String, String> = BTreeMap::new();
+        let mut duplicates = Vec::new();
+        for entry in std::fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            let source = std::fs::read_to_string(&path).unwrap();
+            let file = path.file_name().unwrap().to_string_lossy().into_owned();
+            for name in schema_types(&source) {
+                if let Some(other) = seen.insert(name.clone(), file.clone()) {
+                    duplicates.push(format!("{name} in {other} and {file}"));
+                }
+            }
+        }
+        assert!(
+            seen.contains_key("Problem"),
+            "the scan finds the schema types"
+        );
+        assert!(duplicates.is_empty(), "{duplicates:?}");
+        let document = serde_json::to_value(crate::openapi()).unwrap();
+        let components = document["components"]["schemas"].as_object().unwrap();
+        for name in components.keys() {
+            assert!(seen.contains_key(name), "the scan misses the schema {name}");
+        }
     }
 
     #[test]

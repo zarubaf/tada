@@ -15,5 +15,6 @@ workspace = true
 tada-app.workspace = true
 fluent-bundle.workspace = true
 frankenstein.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true

@@ -1,7 +1,9 @@
 //! The composition root: it connects the adapters to the `app` crate and runs the process roles (ADR 0025).
 //! `main.rs` only parses the command line.
 
-mod logging;
+pub mod bootstrap;
+pub mod export;
+pub mod logging;
 pub mod serve;
 pub mod settings;
 mod shutdown;
@@ -13,6 +15,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use anyhow::Context;
+use tada_app::domain::facts::{CORE_CATALOG_VERSION, core_catalog};
 use tada_store_pg::Database;
 
 use crate::settings::{Loaded, Logging, MigrateSettings, Section};
@@ -59,7 +62,11 @@ pub async fn migrate((database,): MigrateSettings) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
     db.migrate().await?;
-    tracing::info!("the migrations are applied");
+    // The Rust catalog is the one authority for the shipped fields (ADR 0049).
+    db.sync_catalog(&core_catalog(), CORE_CATALOG_VERSION)
+        .await
+        .context("cannot sync the shipped field catalog")?;
+    tracing::info!("the migrations are applied and the shipped field catalog is in sync");
     db.close().await;
     Ok(())
 }

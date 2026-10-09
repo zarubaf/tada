@@ -1,0 +1,262 @@
+//! Source texts and passages (ADR 0050): the exact locations that evidence points to.
+
+use unicode_normalization::UnicodeNormalization;
+
+use crate::ids::SourceVersionId;
+
+/// The normalized text of a source version: Unicode NFC with `\n` line ends.
+/// The character offsets of a passage count in this text.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SourceText(String);
+
+impl SourceText {
+    /// Converts `\r\n` and `\r` to `\n`, then applies Unicode NFC.
+    pub fn normalize(input: &str) -> Self {
+        let lines = input.replace("\r\n", "\n").replace('\r', "\n");
+        Self(lines.nfc().collect())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// The text can contain personal data, so `Debug` shows its length only (ADR 0035).
+impl std::fmt::Debug for SourceText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SourceText({} characters)", self.0.chars().count())
+    }
+}
+
+/// A passage of a source version: a range of characters, its exact quote, and the page of a PDF.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Passage {
+    /// The offset of the first character, in characters of the normalized text.
+    pub start: u32,
+    /// The offset after the last character.
+    pub end: u32,
+    pub quote: String,
+    /// The page of a PDF, from 1.
+    pub page: Option<u32>,
+}
+
+/// The quote can contain personal data, so `Debug` shows the range only (ADR 0035).
+impl std::fmt::Debug for Passage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Passage")
+            .field("start", &self.start)
+            .field("end", &self.end)
+            .field("page", &self.page)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Evidence (ADR 0050): a passage of one source version.
+///
+/// The one shape of evidence in tada. A proposal, a fact version and a draft cite their evidence with it.
+/// The source version can be the intake text of a changeset, an uploaded document version or a review edit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Evidence {
+    pub source_version_id: SourceVersionId,
+    pub passage: Passage,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum PassageError {
+    #[error("a passage has at least one character")]
+    Empty,
+    #[error("the passage ends after the end of the text")]
+    OutOfRange,
+    #[error("the quote is not the text of the range")]
+    QuoteMismatch,
+    #[error("the page of a passage starts at 1")]
+    Page,
+}
+
+impl Passage {
+    /// The passage from `start` to `end` of `text`, the normalized text of a source version, with its quote.
+    pub fn of_range(text: &str, start: u32, end: u32) -> Result<Self, PassageError> {
+        Ok(Self {
+            start,
+            end,
+            quote: quote(text, start, end)?.to_owned(),
+            page: None,
+        })
+    }
+
+    /// Returns `Ok` if `quote` is the text from `start` to `end` of `text`, the normalized text of the source version.
+    pub fn check(&self, text: &str) -> Result<(), PassageError> {
+        if self.page == Some(0) {
+            return Err(PassageError::Page);
+        }
+        if quote(text, self.start, self.end)? == self.quote {
+            Ok(())
+        } else {
+            Err(PassageError::QuoteMismatch)
+        }
+    }
+}
+
+/// A passage with the text around it, so that a reader sees the passage in its context.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Excerpt {
+    /// The text before the passage. It starts at most the given context before the passage.
+    pub before: String,
+    /// The text of the passage.
+    pub quote: String,
+    /// The text after the passage. It ends at most the given context after the passage.
+    pub after: String,
+}
+
+/// The excerpt can contain personal data, so `Debug` shows the lengths only (ADR 0035).
+impl std::fmt::Debug for Excerpt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let length = |text: &str| text.chars().count();
+        write!(
+            f,
+            "Excerpt({} + {} + {} characters)",
+            length(&self.before),
+            length(&self.quote),
+            length(&self.after)
+        )
+    }
+}
+
+impl Passage {
+    /// The passage in `text` with at most `context` characters before and after it.
+    /// `None` if the range of the passage is not in `text`.
+    pub fn excerpt(&self, text: &str, context: u32) -> Option<Excerpt> {
+        let offset = |chars: u32| byte_offset(text, chars);
+        let start = offset(self.start)?;
+        let end = offset(self.end)?;
+        if start > end {
+            return None;
+        }
+        let first = offset(self.start.saturating_sub(context)).unwrap_or(0);
+        let last = offset(self.end.saturating_add(context)).unwrap_or(text.len());
+        Some(Excerpt {
+            before: text[first..start].to_owned(),
+            quote: text[start..end].to_owned(),
+            after: text[end..last].to_owned(),
+        })
+    }
+}
+
+/// The text from the character offset `start` to `end` of `text`, the normalized text of a source version.
+pub fn quote(text: &str, start: u32, end: u32) -> Result<&str, PassageError> {
+    if start >= end {
+        return Err(PassageError::Empty);
+    }
+    let start = byte_offset(text, start).ok_or(PassageError::OutOfRange)?;
+    let end = byte_offset(text, end).ok_or(PassageError::OutOfRange)?;
+    Ok(&text[start..end])
+}
+
+/// The byte offset of the character offset `chars` in `text`, or `None` after the end of the text.
+fn byte_offset(text: &str, chars: u32) -> Option<usize> {
+    let chars = usize::try_from(chars).ok()?;
+    text.char_indices()
+        .map(|(offset, _)| offset)
+        .chain(std::iter::once(text.len()))
+        .nth(chars)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn passage(start: u32, end: u32, quote: &str) -> Passage {
+        Passage {
+            start,
+            end,
+            quote: quote.to_owned(),
+            page: None,
+        }
+    }
+
+    const TEXT: &str = "Das Flugfeld öffnet im Mai.\nDer Eintritt ist gratis.";
+
+    #[test]
+    fn accepts_a_quote_that_matches_its_range() {
+        assert_eq!(passage(4, 12, "Flugfeld").check(TEXT), Ok(()));
+        // "ö" is one character, so the offsets count characters, not bytes.
+        assert_eq!(passage(13, 19, "öffnet").check(TEXT), Ok(()));
+        assert_eq!(
+            passage(28, 52, "Der Eintritt ist gratis.").check(TEXT),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn quotes_a_range_of_characters() {
+        assert_eq!(quote(TEXT, 13, 19), Ok("öffnet"));
+        assert_eq!(quote(TEXT, 28, 52), Ok("Der Eintritt ist gratis."));
+        assert_eq!(quote(TEXT, 4, 4), Err(PassageError::Empty));
+        assert_eq!(quote(TEXT, 50, 53), Err(PassageError::OutOfRange));
+    }
+
+    #[test]
+    fn rejects_a_quote_that_does_not_match_its_range() {
+        assert_eq!(
+            passage(4, 12, "Flugplatz").check(TEXT),
+            Err(PassageError::QuoteMismatch)
+        );
+        assert_eq!(
+            passage(5, 13, "Flugfeld").check(TEXT),
+            Err(PassageError::QuoteMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_an_empty_range_a_range_after_the_text_and_page_zero() {
+        assert_eq!(passage(4, 4, "").check(TEXT), Err(PassageError::Empty));
+        assert_eq!(passage(5, 4, "").check(TEXT), Err(PassageError::Empty));
+        assert_eq!(
+            passage(50, 53, "is.").check(TEXT),
+            Err(PassageError::OutOfRange)
+        );
+        let mut on_page_zero = passage(4, 12, "Flugfeld");
+        on_page_zero.page = Some(0);
+        assert_eq!(on_page_zero.check(TEXT), Err(PassageError::Page));
+    }
+
+    #[test]
+    fn a_range_gives_the_passage_with_its_quote() {
+        let passage = Passage::of_range(TEXT, 13, 19).unwrap();
+        assert_eq!(passage.quote, "öffnet");
+        assert_eq!(passage.check(TEXT), Ok(()));
+        assert_eq!(Passage::of_range(TEXT, 4, 4), Err(PassageError::Empty));
+        assert_eq!(
+            Passage::of_range(TEXT, 50, 53),
+            Err(PassageError::OutOfRange)
+        );
+    }
+
+    #[test]
+    fn normalizes_line_ends_and_unicode() {
+        // "o" with a combining diaeresis becomes the one character "ö".
+        let text = SourceText::normalize("Flugfeld o\u{308}ffnet\r\nim Mai\rund Juni\n");
+        assert_eq!(text.as_str(), "Flugfeld öffnet\nim Mai\nund Juni\n");
+        assert_eq!(SourceText::normalize(text.as_str()), text);
+    }
+
+    #[test]
+    fn debug_hides_the_text_and_the_quote() {
+        let text = SourceText::normalize("Anna Muster");
+        assert!(!format!("{text:?}").contains("Anna"));
+        assert!(!format!("{:?}", passage(0, 4, "Anna")).contains("Anna"));
+    }
+
+    #[test]
+    fn an_excerpt_shows_the_passage_with_the_text_around_it() {
+        let excerpt = passage(13, 19, "öffnet").excerpt(TEXT, 5).unwrap();
+        assert_eq!(excerpt.before, "feld ");
+        assert_eq!(excerpt.quote, "öffnet");
+        assert_eq!(excerpt.after, " im M");
+        let whole = passage(4, 12, "Flugfeld").excerpt(TEXT, 100).unwrap();
+        assert_eq!(whole.before, "Das ");
+        assert_eq!(whole.after, " öffnet im Mai.\nDer Eintritt ist gratis.");
+        assert_eq!(passage(50, 53, "is.").excerpt(TEXT, 5), None);
+        assert!(!format!("{excerpt:?}").contains("öffnet"));
+    }
+}

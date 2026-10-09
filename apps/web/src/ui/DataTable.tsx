@@ -12,20 +12,23 @@ export interface Column<T> {
 }
 
 export interface DataTableProps<T> {
-  /** The accessible name of the table. */
+  /** The name of the table: its caption, for assistive technology only. */
   label: string;
   columns: Column<T>[];
   rows: T[];
   rowKey: (row: T) => string;
 }
 
-/** A read-only table with a sticky header (doc/design/components.md, „Registers and tables“). */
+/**
+ * A read-only table with a sticky header (doc/design/components.md, „Registers and tables“).
+ * In a container below 28rem, each row is a two-line list row: the first column, then the other
+ * columns with their names as visible labels. The table never scrolls sideways (ADR 0023).
+ */
 export function DataTable<T>({ label, columns, rows, rowKey }: DataTableProps<T>) {
   return (
-    // A narrow screen scrolls the table sideways. The keyboard reaches the scroll area through tabIndex.
-    // biome-ignore lint/a11y/noNoninteractiveTabindex: WCAG 2.1.1 needs a focusable scroll area
-    <section className={styles.container} aria-label={label} tabIndex={0}>
-      <table className={styles.table} aria-label={label}>
+    <div className={styles.container}>
+      <table className={styles.table}>
+        <caption className={styles.caption}>{label}</caption>
         <thead>
           <tr>
             {columns.map((column) => (
@@ -44,6 +47,8 @@ export function DataTable<T>({ label, columns, rows, rowKey }: DataTableProps<T>
                   data-mono={column.mono || undefined}
                   data-numeric={column.numeric || undefined}
                 >
+                  {/* Shown only in a two-line row, where the column headers are not visible. */}
+                  <span className={styles.label}>{column.header}</span>
                   {column.cell(row)}
                 </td>
               ))}
@@ -51,6 +56,6 @@ export function DataTable<T>({ label, columns, rows, rowKey }: DataTableProps<T>
           ))}
         </tbody>
       </table>
-    </section>
+    </div>
   );
 }

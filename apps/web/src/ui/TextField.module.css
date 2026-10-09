@@ -1,0 +1,56 @@
+@layer components {
+  .field {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .label {
+    font-weight: var(--font-weight-medium);
+  }
+
+  .input {
+    min-height: var(--control-height-md);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+    color: var(--color-text);
+    font: inherit;
+  }
+
+  .area {
+    padding: var(--space-2);
+    line-height: var(--line-height-base);
+    resize: vertical;
+  }
+
+  .input[data-mono] {
+    font-family: var(--font-family-mono);
+  }
+
+  .input[data-invalid] {
+    border-color: var(--color-danger);
+  }
+
+  .help {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .error {
+    color: var(--color-danger);
+    font-size: var(--font-size-sm);
+  }
+
+  /* 16 px on touch devices, so that iOS does not zoom (doc/design/layout-and-responsiveness.md) */
+  @media (pointer: coarse) {
+    .input {
+      font-size: var(--font-size-base);
+    }
+  }
+
+  .input[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}

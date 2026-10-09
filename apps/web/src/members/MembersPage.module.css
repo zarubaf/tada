@@ -1,0 +1,46 @@
+@layer components {
+  .page {
+    display: grid;
+    align-content: start;
+    gap: var(--space-6);
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .invite {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  /* One column, at most 40rem wide (doc/design/components.md, „Forms“). */
+  .form {
+    container-type: inline-size;
+    display: grid;
+    gap: var(--space-4);
+    max-width: 40rem;
+  }
+
+  /* The primary action is full width in a narrow form and on the right in a wide one (ADR 0019). */
+  .actions {
+    display: grid;
+  }
+
+  @container (width >= 28rem) {
+    .actions {
+      justify-items: end;
+    }
+  }
+}

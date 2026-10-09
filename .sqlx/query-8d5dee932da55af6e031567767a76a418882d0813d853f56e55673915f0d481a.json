@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO invitation_token (token_hash, organization_id, invitation_id, expires_at)\n             SELECT $1, organization_id, id, $4 FROM invitation\n             WHERE organization_id = $2 AND id = $3 AND status = 'pending'\n             FOR SHARE",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8d5dee932da55af6e031567767a76a418882d0813d853f56e55673915f0d481a"
+}

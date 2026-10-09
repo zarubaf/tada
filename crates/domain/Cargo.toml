@@ -14,4 +14,5 @@ workspace = true
 [dependencies]
 jiff.workspace = true
 thiserror.workspace = true
+unicode-normalization.workspace = true
 uuid.workspace = true

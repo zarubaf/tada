@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT manifest AS \"manifest!\" FROM proposal\n           WHERE organization_id = $1 AND id = $2 AND manifest IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "manifest!",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "proposal",
+            "name": "manifest"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "e1d3905db36dd2439ae0f6e62a58ab5ae9df20c4b06e4c167a52ecca6793f1e3"
+}

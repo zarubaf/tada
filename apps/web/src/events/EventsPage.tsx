@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
 import { LOCALE, t } from "../i18n";
+import { useOptionalSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
+import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { LinkButton } from "../ui/LinkButton";
+import { LiveRegion } from "../ui/LiveRegion";
+import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventsPage.module.css";
 
@@ -32,45 +37,81 @@ type State =
 /** „Anlässe“: the events that the member can see, in the order of their keys. */
 export function EventsPage({ api }: { api: Api }) {
   const [state, setState] = useState<State>({ kind: "loading" });
+  // The server decides; the button only hides an action that would fail.
+  const role = useOptionalSession()?.organization?.role;
+  const canCreate = role === "owner" || role === "admin";
+  const heading = useRef<HTMLHeadingElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
+  const { retried, retry } = useRetry(() => heading.current);
+  // The failure of „Weitere laden“: the button stays and keeps focus, so the region announces it.
+  const [failure, setFailure] = useState<string>();
+  const [confirmation, setConfirmation] = useState<string>();
 
-  const load = useCallback(
-    async (cursor: string | undefined, previous: Event[]) => {
-      const query = cursor === undefined ? {} : { cursor };
-      try {
-        const { data, error } = await api.GET("/api/v1/events", { params: { query } });
-        if (data) {
-          setState({
-            kind: "loaded",
-            events: [...previous, ...data.items],
-            nextCursor: data.next_cursor ?? undefined,
-            loadingMore: false,
-          });
-        } else {
-          setState({
-            kind: "failed",
-            message: problemMessage(error),
-            requestId: error?.request_id,
-          });
-        }
-      } catch {
-        setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+  /** The first page. Resolves to true when it loaded. */
+  const load = useCallback(async () => {
+    try {
+      const { data, error } = await api.GET("/api/v1/events", { params: { query: {} } });
+      if (data) {
+        setState({
+          kind: "loaded",
+          events: data.items,
+          nextCursor: data.next_cursor ?? undefined,
+          loadingMore: false,
+        });
+        return true;
       }
-    },
-    [api],
-  );
+      setState({ kind: "failed", message: problemMessage(error), requestId: error?.request_id });
+    } catch {
+      setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+    }
+    return false;
+  }, [api]);
 
   useEffect(() => {
-    void load(undefined, []);
+    void load();
   }, [load]);
 
-  const retry = () => {
-    setState({ kind: "loading" });
-    void load(undefined, []);
+  /** The next page: the loaded rows stay, and a failure keeps the cursor for the next press. */
+  const loadMore = async (events: Event[], cursor: string) => {
+    setFailure(undefined);
+    setConfirmation(undefined);
+    setState({ kind: "loaded", events, nextCursor: cursor, loadingMore: true });
+    let message: string;
+    try {
+      const { data, error } = await api.GET("/api/v1/events", { params: { query: { cursor } } });
+      if (data) {
+        const nextCursor = data.next_cursor ?? undefined;
+        setState({
+          kind: "loaded",
+          events: [...events, ...data.items],
+          nextCursor,
+          loadingMore: false,
+        });
+        setConfirmation(t("events-loaded-more"));
+        if (nextCursor === undefined) {
+          // The last page arrived and the button leaves: focus goes to the heading.
+          focusAfterCommit(() => heading.current);
+        }
+        return;
+      }
+      message = problemMessage(error);
+    } catch {
+      message = problemMessage(undefined);
+    }
+    setState({ kind: "loaded", events, nextCursor: cursor, loadingMore: false });
+    setFailure(message);
   };
 
   return (
-    <main className={styles.page}>
-      <h1 className={styles.title}>{t("events-title")}</h1>
+    <Page>
+      <div className={styles.toolbar}>
+        <PageTitle ref={heading}>{t("events-title")}</PageTitle>
+        {canCreate && (
+          <LinkButton to="/events/new" primary>
+            {t("events-create")}
+          </LinkButton>
+        )}
+      </div>
       {state.kind === "loading" && (
         <div className={styles.skeleton} role="status" aria-label={t("events-loading")}>
           <Skeleton />
@@ -79,7 +120,17 @@ export function EventsPage({ api }: { api: Api }) {
         </div>
       )}
       {state.kind === "failed" && (
-        <InlineError message={state.message} requestId={state.requestId} onRetry={retry} />
+        <InlineError
+          message={state.message}
+          requestId={state.requestId}
+          onRetry={() =>
+            retry(() => {
+              setState({ kind: "loading" });
+              return load();
+            })
+          }
+          announce={retried ? "focus" : "alert"}
+        />
       )}
       {state.kind === "loaded" && state.events.length === 0 && (
         <EmptyState title={t("events-empty-title")} text={t("events-empty-text")} />
@@ -92,19 +143,25 @@ export function EventsPage({ api }: { api: Api }) {
             rows={state.events}
             rowKey={(event) => event.id}
           />
+          <LiveRegion kind="alert">{failure}</LiveRegion>
+          <LiveRegion kind="status">{confirmation}</LiveRegion>
           {state.nextCursor !== undefined && (
-            <Button
-              isDisabled={state.loadingMore}
-              onPress={() => {
-                setState({ ...state, loadingMore: true });
-                void load(state.nextCursor, state.events);
-              }}
-            >
-              {t("events-load-more")}
-            </Button>
+            <div>
+              <Button
+                isPending={state.loadingMore}
+                onPress={() => {
+                  const { events, nextCursor } = state;
+                  if (!state.loadingMore && nextCursor !== undefined) {
+                    void loadMore(events, nextCursor);
+                  }
+                }}
+              >
+                {t("events-load-more")}
+              </Button>
+            </div>
           )}
         </>
       )}
-    </main>
+    </Page>
   );
 }

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO magic_link (token_hash, user_id, expires_at, created_at)\n             VALUES ($1, $2, $3, now())",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ad63e7dfdaf63f18994bd28b189f55a3d1e2134ffe783ab5001cb863485f21d1"
+}

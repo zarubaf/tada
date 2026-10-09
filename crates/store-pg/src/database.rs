@@ -26,11 +26,20 @@ impl Database {
     ///
     /// The URL must not contain the password (ADR 0036).
     pub fn connect_lazy(url: &str, password: &SecretString) -> Result<Self, sqlx::Error> {
+        Self::connect_lazy_with_timeout(url, password, Duration::from_secs(5))
+    }
+
+    /// Like [`Self::connect_lazy`] with another acquire timeout. Only tests use it.
+    pub(crate) fn connect_lazy_with_timeout(
+        url: &str,
+        password: &SecretString,
+        acquire_timeout: Duration,
+    ) -> Result<Self, sqlx::Error> {
         let options = PgConnectOptions::from_str(url)?
             .password(password.expose_secret())
             .application_name("tada");
         let pool = PgPoolOptions::new()
-            .acquire_timeout(Duration::from_secs(5))
+            .acquire_timeout(acquire_timeout)
             .connect_lazy_with(options);
         Ok(Self { pool })
     }
@@ -63,5 +72,27 @@ impl DependencyCheck for Database {
             .await
             .map(|_| ())
             .map_err(|error| DependencyUnavailable(Box::new(error)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// The versions of the committed migrations, in order.
+    /// The numbers 16 and 18 stay unused: an existing database would apply a migration with such a number
+    /// after the newer migrations, and a new database before them (see `migrations/README.md`).
+    const VERSIONS: [i64; 21] = [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 19, 20, 21, 22, 23,
+    ];
+
+    #[test]
+    fn a_new_migration_takes_the_next_number_after_the_highest() {
+        let versions: Vec<i64> = sqlx::migrate!()
+            .iter()
+            .map(|migration| migration.version)
+            .collect();
+        assert_eq!(
+            versions, VERSIONS,
+            "add a new migration with the next number after the highest, then add the number here"
+        );
     }
 }

@@ -7,15 +7,26 @@
 //! A phishing link alone cannot bind an account, because only the member's own session can confirm.
 
 use std::fmt::{self, Debug};
+use std::ops::Range;
 
 use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
-use tada_domain::ids::UserId;
+use tada_domain::events::{Event, EventKey};
+use tada_domain::facts::{FactValue, FieldKey, FieldStatus, ValueError};
+use tada_domain::ids::{ChangesetId, UserId};
+use tada_domain::sources::SourceText;
 use uuid::Uuid;
 
+use crate::access::{self, AccessError};
 use crate::caller::{MemberCaller, OrgScope, ServiceCaller, TelegramGateway};
 use crate::clock::Clock;
-use crate::problem::ProblemCode;
+use crate::events::EventStore;
+use crate::identity::IdentityStore;
+use crate::problem::{CommandError, FieldError, ProblemCode};
+use crate::proposals::{
+    Created, FactStateInput, NewChangeset, NewProposal, OperationInput, PassageInput, ProposeError,
+    ProposeStores, ValueInput, create_changeset,
+};
 use crate::store::StoreError;
 
 /// A link code expires after 10 minutes (ADR 0011).
@@ -77,7 +88,7 @@ pub trait TelegramLinks: Debug + Send + Sync {
     ) -> Result<String, StoreError>;
 
     /// Marks an unexpired, unclaimed code as claimed by the account. Returns false for any other code.
-    /// An infrastructure query (ADR 0039): the code finds its organization.
+    /// Infrastructure query (ADR 0039): the code finds its organization.
     async fn claim(
         &self,
         code: &str,
@@ -103,7 +114,12 @@ pub trait TelegramLinks: Debug + Send + Sync {
         now: Timestamp,
     ) -> Result<Confirmed, StoreError>;
 
+    /// The user that the Telegram account is linked to.
+    /// Infrastructure query (ADR 0039): a Telegram account has no organization before it names a user.
+    async fn user_of(&self, account: TelegramUserId) -> Result<Option<UserId>, StoreError>;
+
     /// Records an update ID. Returns false if the gateway saw it before.
+    /// Infrastructure query (ADR 0039): a Telegram update ID has no organization.
     async fn record_update(&self, update_id: i64) -> Result<bool, StoreError>;
 }
 
@@ -134,13 +150,21 @@ impl LinkError {
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
+}
 
-    pub fn code(&self) -> ProblemCode {
+impl CommandError for LinkError {
+    fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
             Self::AlreadyLinked => ProblemCode::InvalidTransition,
-            Self::Store(StoreError::Unavailable(_)) => ProblemCode::Unavailable,
-            Self::Store(StoreError::Internal(_)) => ProblemCode::Internal,
+            Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
         }
     }
 }
@@ -196,4 +220,180 @@ pub async fn confirm_link(
         Confirmed::NotFound => Err(LinkError::NotFound),
         Confirmed::AlreadyLinked => Err(LinkError::AlreadyLinked),
     }
+}
+
+/// The event of a Telegram command, with the linked member who acts in it.
+#[derive(Debug)]
+pub struct MemberEvent {
+    pub caller: MemberCaller,
+    pub event: Event,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum TelegramActError {
+    #[error("the Telegram account is not linked to a user")]
+    NotLinked,
+    /// No event with this key, or the member has no event role in it.
+    #[error("the event does not exist or the member cannot see it")]
+    NotFound,
+    /// The member has events with this key in more than one organization.
+    #[error("more than one event of the member has this key")]
+    Ambiguous,
+    #[error("the event has no open field with this key")]
+    UnknownField,
+    #[error("the value does not fit the field")]
+    Value(#[from] ValueError),
+    #[error(transparent)]
+    Propose(#[from] ProposeError),
+    #[error(transparent)]
+    Store(#[from] StoreError),
+}
+
+impl From<AccessError> for TelegramActError {
+    fn from(error: AccessError) -> Self {
+        match error {
+            AccessError::NotFound => Self::NotFound,
+            AccessError::Store(error) => Self::Store(error),
+        }
+    }
+}
+
+impl CommandError for TelegramActError {
+    fn code(&self) -> ProblemCode {
+        match self {
+            Self::NotLinked | Self::NotFound => ProblemCode::NotFound,
+            Self::Ambiguous | Self::UnknownField | Self::Value(_) => ProblemCode::ValidationFailed,
+            Self::Propose(error) => error.code(),
+            Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            Self::Propose(error) => error.store_error(),
+            _ => None,
+        }
+    }
+}
+
+/// The member for whom the gateway acts in the event `event_key` (ADR 0038, ADR 0039):
+/// the event of the linked user among the events with this key in the organizations of the user.
+/// The user needs an event role in the event, or an owner or admin role in its organization.
+/// It reads the memberships at the time of the call, so a removed member finds nothing.
+pub async fn member_for(
+    gateway: &ServiceCaller<TelegramGateway>,
+    account: TelegramUserId,
+    event_key: &str,
+    links: &dyn TelegramLinks,
+    identity: &dyn IdentityStore,
+    events: &dyn EventStore,
+) -> Result<MemberEvent, TelegramActError> {
+    let user = links
+        .user_of(account)
+        .await?
+        .ok_or(TelegramActError::NotLinked)?;
+    let key = EventKey::parse(&event_key.to_uppercase()).map_err(|_| TelegramActError::NotFound)?;
+    let mut found = Vec::new();
+    for membership in identity.memberships_of(user).await? {
+        let caller = gateway.member(user, membership.organization_id, membership.role);
+        let Some(event) = events.find_by_key(caller.scope(), &key).await? else {
+            continue;
+        };
+        match access::event_access(&caller, event.id, identity).await {
+            Ok(_) => found.push(MemberEvent { caller, event }),
+            Err(AccessError::NotFound) => {}
+            Err(AccessError::Store(error)) => return Err(error.into()),
+        }
+    }
+    match (found.pop(), found.is_empty()) {
+        (Some(only), true) => Ok(only),
+        (Some(_), false) => Err(TelegramActError::Ambiguous),
+        (None, _) => Err(TelegramActError::NotFound),
+    }
+}
+
+/// A message that proposes a new value for a field.
+#[derive(Debug)]
+pub struct FactMessage<'a> {
+    /// The whole message. The changeset keeps it as its source text.
+    pub source: &'a SourceText,
+    /// The key of the field, for example `date_window`.
+    pub field_key: &'a str,
+    /// The value part of the message, in characters of `source`. It is the passage of the evidence.
+    pub value: Range<usize>,
+}
+
+/// Proposes the value of one field of the event: one changeset with one `SetFact` proposal,
+/// against the current version of the fact. `reason` is the short text for the reviewer. An event manager reviews it in the web client (ADR 0050).
+pub async fn propose_fact(
+    caller: &MemberCaller,
+    event: &Event,
+    message: FactMessage<'_>,
+    reason: &str,
+    stores: ProposeStores<'_>,
+    clock: &dyn Clock,
+) -> Result<ChangesetId, TelegramActError> {
+    // Fail fast: a viewer gets the refusal before any hint about the field or the value.
+    if !access::event_access(caller, event.id, stores.identity)
+        .await?
+        .can_propose()
+    {
+        return Err(ProposeError::Forbidden.into());
+    }
+    let key = FieldKey::parse(message.field_key).map_err(|_| TelegramActError::UnknownField)?;
+    let scope = caller.scope();
+    let field = stores
+        .facts
+        .catalog(scope, event.id)
+        .await?
+        .into_iter()
+        .find(|field| field.key == key && field.status == FieldStatus::Active)
+        .ok_or(TelegramActError::UnknownField)?;
+    let quote: String = message
+        .source
+        .as_str()
+        .chars()
+        .skip(message.value.start)
+        .take(message.value.len())
+        .collect();
+    let valued = FactValue::parse_text(&quote, &field.value_type)?;
+    let expected_version = stores
+        .facts
+        .current_version(scope, event.id, field.id)
+        .await?
+        .map(|current| current.number.get());
+    let offset = |offset: usize| {
+        u32::try_from(offset)
+            .map_err(|_| ProposeError::Invalid(vec![FieldError::new("source_text", "length")]))
+    };
+    let input = NewChangeset {
+        id: None,
+        event_id: Some(event.id.as_uuid()),
+        source_text: message.source.as_str().to_owned(),
+        proposals: vec![NewProposal {
+            id: Uuid::now_v7(),
+            operation: OperationInput::SetFact {
+                event_id: event.id.as_uuid(),
+                field_id: field.id.as_uuid(),
+                state: FactStateInput::Accepted {
+                    value: ValueInput::from(&valued.value),
+                    approximate: valued.approximate,
+                },
+                expected_version,
+            },
+            depends_on: Vec::new(),
+            evidence: vec![PassageInput {
+                source_version_id: None,
+                start: offset(message.value.start)?,
+                end: offset(message.value.end)?,
+                quote,
+                page: None,
+            }],
+            reason: reason.to_owned(),
+        }],
+    };
+    let (Created::New(changeset) | Created::Existing(changeset)) =
+        create_changeset(caller, input, stores, clock).await?;
+    Ok(changeset.id)
 }

@@ -1,0 +1,102 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.organization_id, i.user_id, i.invitation_id, i.message_id,\n                      coalesce(e.email, inv.email) AS \"email!\",\n                      coalesce(u.locale, invited.locale, 'de-CH') AS \"locale!\",\n                      o.name AS \"organization_name?\", inv.status AS \"invitation_status?\"\n               FROM outbound_intent i\n               LEFT JOIN email_identity e ON e.user_id = i.user_id\n               LEFT JOIN app_user u ON u.id = i.user_id\n               LEFT JOIN invitation inv\n                   ON inv.organization_id = i.organization_id AND inv.id = i.invitation_id\n               LEFT JOIN organization o ON o.id = inv.organization_id\n               LEFT JOIN email_identity invited_email ON invited_email.email = inv.email\n               LEFT JOIN app_user invited ON invited.id = invited_email.user_id\n               WHERE i.id = $1 AND i.status = 'pending'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "organization_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "outbound_intent",
+            "name": "organization_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "outbound_intent",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "invitation_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "outbound_intent",
+            "name": "invitation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outbound_intent",
+            "name": "message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "email!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "locale!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "organization_name?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "organization",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "invitation_status?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "invitation",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      false,
+      null,
+      null,
+      true,
+      true
+    ]
+  },
+  "hash": "5ff5ae172bcb1dfb5b5d6ea48a85aac80007b5c85d9629d8b673f4fc0f44eecc"
+}
