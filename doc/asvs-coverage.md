@@ -164,6 +164,7 @@ The caller of a token is always an AI caller.
 | A trusted peer gives the rightmost untrusted address, and an entry that is no address stops the walk.          | `crates/api/src/client_ip.rs::a_trusted_peer_gives_the_rightmost_untrusted_address` and `crates/api/src/client_ip.rs::an_entry_that_is_not_an_address_stops_the_walk`                  |
 | A trusted peer without `X-Forwarded-For` is the client.                                                        | `crates/api/src/client_ip.rs::a_trusted_peer_without_x_forwarded_for_is_the_client`                                                                                                    |
 | A request with `X-Forwarded-For` from a peer that is not a trusted proxy writes one warning without addresses. | `sign_in.rs::x_forwarded_for_without_a_trusted_proxy_gives_one_warning` and `crates/api/src/client_ip.rs::x_forwarded_for_from_an_untrusted_peer_is_a_sign_of_a_missing_proxy_setting` |
+| The server makes each request ID. It never takes the ID from `X-Request-Id`, also not from a trusted proxy.    | `crates/api/src/lib.rs::the_request_id_never_comes_from_a_header_also_behind_a_trusted_proxy`                                                                                          |
 | The debug text of the client IP address holds no address.                                                      | `crates/api/src/client_ip.rs::the_debug_text_holds_no_address`                                                                                                                         |
 
 ## Log redaction

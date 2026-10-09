@@ -26,8 +26,13 @@ pub fn current() -> Uuid {
 }
 
 /// Gives each request an ID, a log span with this ID, one log line at the end and the response header.
+///
+/// The server always makes the ID. A proxy can pass the header of the client on, so a client could
+/// otherwise give its request the ID of another request. The ID of a trusted proxy goes into the
+/// log line only, as `proxy_request_id`, to join the log of the proxy.
 pub async fn track(State(state): State<ApiState>, mut request: Request, next: Next) -> Response {
-    let request_id = forwarded_id(&state, &request).unwrap_or_else(Uuid::now_v7);
+    let request_id = Uuid::now_v7();
+    let proxy_request_id = forwarded_id(&state, &request);
     // The task-local does not reach a handler in another task; the extensions do.
     request.extensions_mut().insert(RequestId::new(request_id));
     // The route template, never the raw path: a path can contain a token (ADR 0008).
@@ -51,6 +56,7 @@ pub async fn track(State(state): State<ApiState>, mut request: Request, next: Ne
             route,
             status = response.status().as_u16(),
             duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+            proxy_request_id = proxy_request_id.as_ref().map(tracing::field::display),
             "request completed"
         );
     });
