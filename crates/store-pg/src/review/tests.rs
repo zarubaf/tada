@@ -740,7 +740,7 @@ async fn inbox(test: &TestDatabase, caller: &MemberCaller) -> Vec<ChangesetId> {
     .unwrap()
     .items
     .into_iter()
-    .map(|changeset| changeset.id)
+    .map(|changeset| changeset.changeset.id)
     .collect()
 }
 
@@ -791,9 +791,9 @@ async fn the_review_inbox_shows_organization_changesets_to_owners_and_admins_onl
     .unwrap()
     .items;
     assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].open_proposals(), 1);
-    assert_eq!(listed[0].event_id, Some(event));
-    assert_eq!(listed[0].author, open_day.contributor.actor());
+    assert_eq!(listed[0].in_inbox, 1);
+    assert_eq!(listed[0].changeset.event_id, Some(event));
+    assert_eq!(listed[0].changeset.author, open_day.contributor.actor());
 
     // A changeset without open proposals leaves the inbox.
     apply(&test, &open_day.manager, &of_event, select(&[id]))

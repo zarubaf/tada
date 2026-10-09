@@ -14,8 +14,9 @@ use tada_domain::proposals::Operation;
 use super::selection::closure;
 use crate::access::EventAccess;
 use crate::caller::OrgScope;
+use crate::identity::IdentityStore;
 use crate::store::StoreError;
-use crate::work::WorkStore;
+use crate::work::{WorkStore, is_possible_owner};
 use crate::workstreams::WorkstreamStore;
 
 /// The reviewers of one proposal by rules 1 to 4 of ADR 0067.
@@ -214,13 +215,14 @@ pub(crate) struct RoutingFacts {
 
 impl RoutingFacts {
     /// Reads the owners of the records that `operations` change and, if a new record names a workstream,
-    /// the leads of the workstreams of `event`: at most two queries.
+    /// the leads of the workstreams of `event`: at most two queries, and the access of each owner and lead.
+    /// An owner or a lead without the contributor or manager role in the event now is no reviewer (rule 8),
+    /// so the proposal goes to the event managers at once.
     pub(crate) async fn load<'a>(
         scope: OrgScope,
         event: EventId,
         operations: impl IntoIterator<Item = &'a Operation>,
-        work: &dyn WorkStore,
-        workstreams: &dyn WorkstreamStore,
+        ports: RoutingPorts<'_>,
     ) -> Result<Self, StoreError> {
         let mut actions = Vec::new();
         let mut commitments = Vec::new();
@@ -241,20 +243,61 @@ impl RoutingFacts {
         }
         let mut facts = Self::default();
         if !actions.is_empty() || !commitments.is_empty() {
-            let owners = work.owners(scope, event, &actions, &commitments).await?;
+            let owners = ports
+                .work
+                .owners(scope, event, &actions, &commitments)
+                .await?;
             facts.action_owners = owners.actions.into_iter().collect();
             facts.commitment_owners = owners.commitments.into_iter().collect();
         }
         if needs_leads {
-            facts.leads = workstreams
+            facts.leads = ports
+                .workstreams
                 .list(scope, event)
                 .await?
                 .into_iter()
                 .map(|workstream| (workstream.id, workstream.lead))
                 .collect();
         }
+        facts.keep_reviewers(scope, event, ports.identity).await?;
         Ok(facts)
     }
+
+    /// Drops each owner and lead who cannot review in the event now: one access check for each user.
+    async fn keep_reviewers(
+        &mut self,
+        scope: OrgScope,
+        event: EventId,
+        identity: &dyn IdentityStore,
+    ) -> Result<(), StoreError> {
+        let users: BTreeSet<UserId> = self
+            .action_owners
+            .values()
+            .chain(self.commitment_owners.values())
+            .chain(self.leads.values())
+            .copied()
+            .collect();
+        let mut reviewers = HashSet::new();
+        for user in users {
+            if is_possible_owner(scope, event, user, identity).await? {
+                reviewers.insert(user);
+            }
+        }
+        self.action_owners
+            .retain(|_, user| reviewers.contains(user));
+        self.commitment_owners
+            .retain(|_, user| reviewers.contains(user));
+        self.leads.retain(|_, user| reviewers.contains(user));
+        Ok(())
+    }
+}
+
+/// The ports that `RoutingFacts::load` reads.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RoutingPorts<'a> {
+    pub(crate) identity: &'a dyn IdentityStore,
+    pub(crate) work: &'a dyn WorkStore,
+    pub(crate) workstreams: &'a dyn WorkstreamStore,
 }
 
 impl RoutingLookup for RoutingFacts {

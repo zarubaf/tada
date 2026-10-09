@@ -44,7 +44,7 @@ use crate::work::WorkStore;
 use crate::workstreams::WorkstreamStore;
 
 use self::checks::{check_edits, parse_edits, stale_owners};
-use self::routing::{ChangesetRoutes, RoutedProposal, RoutingFacts};
+use self::routing::{ChangesetRoutes, RoutedProposal, RoutingFacts, RoutingPorts};
 use self::selection::{apply_order, proposal_status, selection, to_apply, with_dependents};
 use self::steps::{audit_of, step, step_status};
 
@@ -162,11 +162,6 @@ pub struct OpenChangeset {
 }
 
 impl OpenChangeset {
-    /// The number of its open proposals.
-    pub fn open_proposals(&self) -> u32 {
-        u32::try_from(self.proposals.len()).unwrap_or(u32::MAX)
-    }
-
     /// True if its open proposals are stale. All proposals of a changeset have its creation time.
     pub fn is_stale(&self, now: Timestamp) -> bool {
         ProposalStatus::Open.is_stale(self.created_at, now)
@@ -733,7 +728,7 @@ pub async fn list_open_changesets(
     limit: PageLimit,
     stores: ReviewStores<'_>,
     clock: &dyn Clock,
-) -> Result<Page<OpenChangeset, ChangesetCursor>, ReviewQueryError> {
+) -> Result<Page<InboxChangeset, ChangesetCursor>, ReviewQueryError> {
     if let Some(event) = event_id
         && !access::event_access(caller, event, stores.identity)
             .await?
@@ -742,8 +737,16 @@ pub async fn list_open_changesets(
         return Err(ReviewQueryError::Forbidden);
     }
     let inbox = inbox(caller, event_id, stores.into(), clock.now()).await?;
-    let changesets = inbox.into_iter().map(|(changeset, _)| changeset).collect();
-    Ok(page(changesets, after, limit))
+    Ok(page(inbox, after, limit))
+}
+
+/// A changeset of the Review Inbox of the caller.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InboxChangeset {
+    pub changeset: OpenChangeset,
+    /// The number of its open proposals in the Review Inbox of the caller, at least one.
+    /// "My Work" counts the same proposals.
+    pub in_inbox: u32,
 }
 
 /// The ports that the Review Inbox reads.
@@ -753,6 +756,16 @@ pub struct InboxPorts<'a> {
     pub review: &'a dyn ReviewStore,
     pub work: &'a dyn WorkStore,
     pub workstreams: &'a dyn WorkstreamStore,
+}
+
+impl<'a> InboxPorts<'a> {
+    fn routing(self) -> RoutingPorts<'a> {
+        RoutingPorts {
+            identity: self.identity,
+            work: self.work,
+            workstreams: self.workstreams,
+        }
+    }
 }
 
 impl<'a> From<ReviewStores<'a>> for InboxPorts<'a> {
@@ -775,7 +788,7 @@ pub async fn review_count(
     Ok(inbox(caller, None, ports, now)
         .await?
         .into_iter()
-        .map(|(_, count)| count)
+        .map(|item| item.in_inbox)
         .sum())
 }
 
@@ -787,7 +800,7 @@ async fn inbox(
     event: Option<EventId>,
     ports: InboxPorts<'_>,
     now: Timestamp,
-) -> Result<Vec<(OpenChangeset, u32)>, StoreError> {
+) -> Result<Vec<InboxChangeset>, StoreError> {
     let scope = caller.scope();
     let changesets = ports.review.open_changesets(scope, event).await?;
     let mut events: Vec<Option<EventId>> = changesets.iter().map(|c| c.event_id).collect();
@@ -807,7 +820,7 @@ async fn inbox(
                     .filter(|changeset| changeset.event_id == Some(event))
                     .flat_map(|changeset| &changeset.proposals)
                     .map(|proposal| &proposal.operation);
-                RoutingFacts::load(scope, event, operations, ports.work, ports.workstreams).await?
+                RoutingFacts::load(scope, event, operations, ports.routing()).await?
             }
             None => RoutingFacts::default(),
         };
@@ -825,8 +838,11 @@ async fn inbox(
                 .iter()
                 .filter(|proposal| routes.in_inbox_of(user, *access, proposal.id, overdue))
                 .count();
-            let count = u32::try_from(count).unwrap_or(u32::MAX);
-            (count > 0).then_some((changeset, count))
+            let in_inbox = u32::try_from(count).unwrap_or(u32::MAX);
+            (in_inbox > 0).then_some(InboxChangeset {
+                changeset,
+                in_inbox,
+            })
         })
         .collect())
 }
@@ -835,14 +851,15 @@ async fn inbox(
 /// The access of the caller filters the changesets, so the page comes after the filter.
 /// The open changesets of an organization are few, so the store gives them all.
 fn page(
-    changesets: Vec<OpenChangeset>,
+    changesets: Vec<InboxChangeset>,
     after: Option<ChangesetCursor>,
     limit: PageLimit,
-) -> Page<OpenChangeset, ChangesetCursor> {
+) -> Page<InboxChangeset, ChangesetCursor> {
     let limit = limit.get() as usize;
-    let mut items: Vec<OpenChangeset> = changesets
+    let mut items: Vec<InboxChangeset> = changesets
         .into_iter()
-        .filter(|changeset| {
+        .filter(|item| {
+            let changeset = &item.changeset;
             after.is_none_or(|after| {
                 (changeset.created_at, changeset.id) > (after.created_at, after.id)
             })
@@ -855,8 +872,8 @@ fn page(
         .then(|| items.last())
         .flatten()
         .map(|last| ChangesetCursor {
-            created_at: last.created_at,
-            id: last.id,
+            created_at: last.changeset.created_at,
+            id: last.changeset.id,
         });
     Page { items, next }
 }
@@ -925,7 +942,8 @@ async fn reviewable(
     let facts = match changeset.event_id {
         Some(event) => {
             let operations = changeset.proposals.iter().map(|p| &p.operation);
-            RoutingFacts::load(scope, event, operations, stores.work, stores.workstreams).await?
+            let ports = InboxPorts::from(stores).routing();
+            RoutingFacts::load(scope, event, operations, ports).await?
         }
         None => RoutingFacts::default(),
     };

@@ -19,7 +19,7 @@ use tada_app::proposals::{
 };
 use tada_app::review::{
     self as app, Applied, ApplyError, ApplyInput, ChangesetCursor, ChangesetReview,
-    ConflictReason as AppConflictReason, Edit, LocalRecord, OpenChangeset as AppOpenChangeset,
+    ConflictReason as AppConflictReason, Edit, InboxChangeset, LocalRecord,
     ProposalReview as AppProposalReview, ProposalStatus as AppProposalStatus, RecordEditInput,
     ReviewQueryError, ReviewStores,
 };
@@ -173,7 +173,7 @@ pub struct OpenChangeset {
     pub event_id: Option<Uuid>,
     pub author: Author,
     pub created_at: Timestamp,
-    /// The number of its open proposals.
+    /// The number of its open proposals in the Review Inbox of the caller (ADR 0067). "My Work" counts the same proposals.
     pub open_proposals: u32,
     /// True if its open proposals are older than 14 days (ADR 0050). A stale proposal does not change.
     pub stale: bool,
@@ -1065,13 +1065,17 @@ async fn list(
     }))
 }
 
-fn open_changeset(changeset: AppOpenChangeset, now: Timestamp) -> OpenChangeset {
+fn open_changeset(item: InboxChangeset, now: Timestamp) -> OpenChangeset {
+    let InboxChangeset {
+        changeset,
+        in_inbox,
+    } = item;
     OpenChangeset {
         id: changeset.id.as_uuid(),
         event_id: changeset.event_id.map(EventId::as_uuid),
         author: changeset.author.into(),
         created_at: changeset.created_at,
-        open_proposals: changeset.open_proposals(),
+        open_proposals: in_inbox,
         stale: changeset.is_stale(now),
     }
 }
