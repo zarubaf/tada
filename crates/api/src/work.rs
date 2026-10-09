@@ -27,6 +27,7 @@ use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::cursor;
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
+use crate::parties::{PartyKind, PartyRef};
 use crate::problem::{ApiError, Problem};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
@@ -190,24 +191,6 @@ impl From<Shown<ActionView>> for Action {
     }
 }
 
-/// The kind of a promisor.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum PromisorKind {
-    Person,
-    Institution,
-}
-
-/// The person or institution that makes a commitment.
-#[derive(Debug, Serialize, ToSchema)]
-pub struct Promisor {
-    pub kind: PromisorKind,
-    pub id: Uuid,
-    /// The readable ID, for example `INS-001`.
-    pub local_id: String,
-    pub name: String,
-}
-
 /// A passage that supports one version of a record.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct RecordEvidence {
@@ -248,7 +231,8 @@ pub struct Commitment {
     pub text: String,
     /// The condition. It never changes, and it stays after the commitment becomes firm.
     pub condition: Option<String>,
-    pub promisor: Promisor,
+    /// The person or institution that makes the commitment.
+    pub promisor: PartyRef,
     /// The member who follows the commitment up: a contributor or manager of the event.
     pub owner_user_id: Uuid,
     pub workstream_id: Option<Uuid>,
@@ -281,22 +265,13 @@ impl From<Shown<CommitmentView>> for Commitment {
         } = shown;
         let local_id = commitment.local_id();
         let fields = commitment.fields;
-        let (kind, id) = match commitment.promisor.party {
-            Party::Person(id) => (PromisorKind::Person, id.as_uuid()),
-            Party::Institution(id) => (PromisorKind::Institution, id.as_uuid()),
-        };
         Self {
             id: commitment.id.as_uuid(),
             local_id,
             event_id: commitment.event_id.as_uuid(),
             text: fields.text.as_str().to_owned(),
             condition: commitment.condition.map(|text| text.as_str().to_owned()),
-            promisor: Promisor {
-                kind,
-                id,
-                local_id: commitment.promisor.local_id,
-                name: commitment.promisor.name.as_str().to_owned(),
-            },
+            promisor: commitment.promisor.into(),
             owner_user_id: fields.owner.as_uuid(),
             workstream_id: fields.workstream_id.map(WorkstreamId::as_uuid),
             due_date: fields.due_date,
@@ -409,7 +384,7 @@ pub struct ChangeActionRequest {
 /// The promisor of a new commitment: a person or an institution of the organization.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct PromisorInput {
-    pub kind: PromisorKind,
+    pub kind: PartyKind,
     pub id: Uuid,
 }
 
@@ -487,8 +462,8 @@ fn owner_filter(caller: &MemberCaller, owner: Option<&str>) -> Result<Option<Use
 
 fn promisor(input: &PromisorInput) -> Party {
     match input.kind {
-        PromisorKind::Person => Party::Person(PersonId::from_uuid(input.id)),
-        PromisorKind::Institution => Party::Institution(InstitutionId::from_uuid(input.id)),
+        PartyKind::Person => Party::Person(PersonId::from_uuid(input.id)),
+        PartyKind::Institution => Party::Institution(InstitutionId::from_uuid(input.id)),
     }
 }
 

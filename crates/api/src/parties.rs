@@ -4,9 +4,10 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use serde::{Deserialize, Deserializer, Serialize};
 use tada_app::domain::ids::{InstitutionId, PersonId, UserId};
+use tada_app::domain::parties::Party;
 use tada_app::parties::{
     self as app, InstitutionChange, InstitutionView, NewInstitution, NewPerson, PartyError,
-    PartyReadError, PersonChange, PersonView,
+    PartyReadError, PartyRef as AppPartyRef, PersonChange, PersonView,
 };
 use tada_app::problem::ProblemCode;
 use tada_app::records::{NumberCursor, Shown};
@@ -66,6 +67,39 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
             codes(&[AUTHENTICATED, PATH, JSON_BODY, PartyError::CODES]),
         ),
     ]
+}
+
+/// The kind of a party: a person or an institution.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum PartyKind {
+    Person,
+    Institution,
+}
+
+/// A person or an institution of the organization, with its readable ID and its name.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PartyRef {
+    pub kind: PartyKind,
+    pub id: Uuid,
+    /// The readable ID, for example `INS-001`.
+    pub local_id: String,
+    pub name: String,
+}
+
+impl From<AppPartyRef> for PartyRef {
+    fn from(party: AppPartyRef) -> Self {
+        let (kind, id) = match party.party {
+            Party::Person(id) => (PartyKind::Person, id.as_uuid()),
+            Party::Institution(id) => (PartyKind::Institution, id.as_uuid()),
+        };
+        Self {
+            kind,
+            id,
+            local_id: party.local_id,
+            name: party.name.as_str().to_owned(),
+        }
+    }
 }
 
 /// A person of the organization.

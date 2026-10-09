@@ -5420,7 +5420,8 @@
             "description": "The condition. It never changes, and it stays after the commitment becomes firm."
           },
           "promisor": {
-            "$ref": "#/components/schemas/Promisor"
+            "$ref": "#/components/schemas/PartyRef",
+            "description": "The person or institution that makes the commitment."
           },
           "owner_user_id": {
             "type": "string",
@@ -9344,6 +9345,40 @@
           "member"
         ]
       },
+      "PartyKind": {
+        "type": "string",
+        "description": "The kind of a party: a person or an institution.",
+        "enum": [
+          "person",
+          "institution"
+        ]
+      },
+      "PartyRef": {
+        "type": "object",
+        "description": "A person or an institution of the organization, with its readable ID and its name.",
+        "required": [
+          "kind",
+          "id",
+          "local_id",
+          "name"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/PartyKind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_id": {
+            "type": "string",
+            "description": "The readable ID, for example `INS-001`."
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "Passage": {
         "type": "object",
         "description": "A passage of a source version: a range of characters in its normalized text and the exact quote.",
@@ -9555,32 +9590,6 @@
           }
         }
       },
-      "Promisor": {
-        "type": "object",
-        "description": "The person or institution that makes a commitment.",
-        "required": [
-          "kind",
-          "id",
-          "local_id",
-          "name"
-        ],
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/PromisorKind"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "local_id": {
-            "type": "string",
-            "description": "The readable ID, for example `INS-001`."
-          },
-          "name": {
-            "type": "string"
-          }
-        }
-      },
       "PromisorInput": {
         "type": "object",
         "description": "The promisor of a new commitment: a person or an institution of the organization.",
@@ -9590,21 +9599,13 @@
         ],
         "properties": {
           "kind": {
-            "$ref": "#/components/schemas/PromisorKind"
+            "$ref": "#/components/schemas/PartyKind"
           },
           "id": {
             "type": "string",
             "format": "uuid"
           }
         }
-      },
-      "PromisorKind": {
-        "type": "string",
-        "description": "The kind of a promisor.",
-        "enum": [
-          "person",
-          "institution"
-        ]
       },
       "Proposal": {
         "type": "object",
