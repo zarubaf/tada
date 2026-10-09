@@ -574,7 +574,7 @@
         "tags": [
           "sign-in"
         ],
-        "summary": "Accepts an invitation. The token works once. The response sets the cookie of a new session\nin the organization of the invitation. The new session ends the session that the request sends.",
+        "summary": "Accepts an invitation. The token works once. For a user without a membership in another\norganization, the response sets the cookie of a new session in the organization of the\ninvitation, and the new session ends the session that the request sends. A member of another\norganization gets `202` without a session and signs in with a magic link.",
         "operationId": "accept_invitation",
         "requestBody": {
           "content": {
@@ -596,6 +596,9 @@
                 }
               }
             }
+          },
+          "202": {
+            "description": "The membership is added. The user is a member of another organization and signs in with a magic link. The body is empty."
           },
           "default": {
             "description": "A problem (ADR 0037).",

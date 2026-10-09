@@ -143,6 +143,7 @@ invitation-title = Einladung
 invitation-text = Sie sind eingeladen: Organisation { $organization }, Rolle { $role }.
 invitation-accept = Einladung annehmen
 invitation-invalid = Diese Einladung ist ungültig oder abgelaufen.
+invitation-accepted-sign-in = Die Einladung ist angenommen. Sie sind schon Mitglied einer anderen Organisation in tada. Melden Sie sich jetzt mit Ihrer E-Mail-Adresse an.
 invitation-loading = Einladung wird geladen
 invitation-privacy-title = Datenschutz
 role-owner = Organisationsleitung

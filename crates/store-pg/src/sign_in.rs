@@ -17,7 +17,8 @@ use tada_app::domain::ids::{InvitationId, OrganizationId, UserId};
 use tada_app::outbound::SEND_JOB;
 use tada_app::rate_limit::{RateDecision, SignInLimits};
 use tada_app::sign_in::{
-    InvitationPreview, SignInRequestStore, SignInStore, accepted_role, initial_organization,
+    Accepted, InvitationPreview, SignInRequestStore, SignInStore, accepted_role,
+    initial_organization,
 };
 use tada_app::store::StoreError;
 
@@ -198,7 +199,7 @@ impl SignInStore for Database {
         user_agent: Option<&str>,
         request_id: Option<Uuid>,
         now: Timestamp,
-    ) -> Result<Option<SecretString>, StoreError> {
+    ) -> Result<Option<Accepted>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         // The lock on the invitation serializes two acceptances, also with two different tokens of
         // one invitation. The second one then sees the status `accepted` and finds nothing.
@@ -260,6 +261,23 @@ impl SignInStore for Database {
         );
         record(&mut tx, &event).await.map_err(store_error)?;
 
+        // A session of a member of another organization could switch to it, so the member signs
+        // in with a magic link instead.
+        let elsewhere = sqlx::query_scalar!(
+            r#"SELECT EXISTS (
+                   SELECT 1 FROM organization_membership
+                   WHERE user_id = $1 AND organization_id <> $2
+               ) AS "exists!""#,
+            user_id.as_uuid(),
+            organization_id.as_uuid(),
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        if elsewhere {
+            tx.commit().await.map_err(store_error)?;
+            return Ok(Some(Accepted::SignInRequired));
+        }
         // The session starts in the organization of the invitation (ADR 0056).
         let session =
             insert_session(&mut tx, user_id, Some(organization_id), user_agent, now).await?;
@@ -267,7 +285,7 @@ impl SignInStore for Database {
             delete_session(&mut tx, replaced).await?;
         }
         tx.commit().await.map_err(store_error)?;
-        Ok(Some(session))
+        Ok(Some(Accepted::Session(session)))
     }
 }
 
@@ -750,12 +768,14 @@ mod tests {
         let printed = invitation_token(&test, testwil, id, expires_at).await;
 
         let request = Uuid::now_v7();
-        let session = test
+        let Some(Accepted::Session(session)) = test
             .database
             .accept_invitation(&mailed, None, Some("Firefox"), Some(request), now())
             .await
             .unwrap()
-            .unwrap();
+        else {
+            panic!("no session");
+        };
         assert_eq!(count(&test, "invitation_token").await, 0);
         let row = test
             .database

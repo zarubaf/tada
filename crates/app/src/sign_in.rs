@@ -51,10 +51,10 @@ pub trait SignInStore: Debug + Send + Sync {
 
     /// Accepts the pending invitation of `token` if the token is valid at `now`, in one transaction:
     /// it finds or creates the user of the address, gives the membership the role of
-    /// `accepted_role`, marks the invitation accepted, deletes all its tokens, records the audit
-    /// event and starts a session in the organization of the invitation. A new session ends the
-    /// session of `replaced` (ASVS 7.2.4).
-    /// It returns the session token, or `None` for an unknown, used or expired token.
+    /// `accepted_role`, marks the invitation accepted, deletes all its tokens and records the audit
+    /// event. If the user has no membership in another organization, it also starts a session in the
+    /// organization of the invitation, which ends the session of `replaced` (ASVS 7.2.4).
+    /// It returns `None` for an unknown, used or expired token.
     /// Infrastructure query (ADR 0039): the token names the invitation, and the invitation names its organization.
     async fn accept_invitation(
         &self,
@@ -63,7 +63,18 @@ pub trait SignInStore: Debug + Send + Sync {
         user_agent: Option<&str>,
         request_id: Option<Uuid>,
         now: Timestamp,
-    ) -> Result<Option<SecretString>, StoreError>;
+    ) -> Result<Option<Accepted>, StoreError>;
+}
+
+/// The result of an accepted invitation.
+#[derive(Debug)]
+pub enum Accepted {
+    /// A new session in the organization of the invitation.
+    Session(SecretString),
+    /// The user has a membership in another organization. The acceptance added the membership and
+    /// started no session: the member signs in with a magic link. An invitation link lives 7 days and
+    /// can reach other people, so it never gives a session that reaches another organization.
+    SignInRequired,
 }
 
 /// What an invitation is for, before the invitee accepts it.
@@ -244,8 +255,9 @@ pub async fn preview_invitation(
         .ok_or(SignInError::Unauthenticated)
 }
 
-/// Accepts the invitation of `token` once and returns the token of the new session.
-/// The new session replaces the session `replaced` that the request sends, if any (ASVS 7.2.4).
+/// Accepts the invitation of `token` once. A user without a membership in another organization
+/// gets a new session, which replaces the session `replaced` that the request sends, if any
+/// (ASVS 7.2.4). Another user signs in with a magic link (`Accepted::SignInRequired`).
 pub async fn accept_invitation(
     token: &str,
     replaced: Option<&str>,
@@ -253,7 +265,7 @@ pub async fn accept_invitation(
     request_id: Option<Uuid>,
     store: &dyn SignInStore,
     clock: &dyn Clock,
-) -> Result<SecretString, SignInError> {
+) -> Result<Accepted, SignInError> {
     store
         .accept_invitation(token, replaced, user_agent, request_id, clock.now())
         .await?
@@ -362,9 +374,9 @@ mod tests {
             _: Option<&str>,
             request_id: Option<Uuid>,
             now: Timestamp,
-        ) -> Result<Option<SecretString>, StoreError> {
+        ) -> Result<Option<Accepted>, StoreError> {
             self.accepted.lock().unwrap().push((request_id, now));
-            Ok((token == "valid").then(|| SecretString::from("session")))
+            Ok((token == "valid").then(|| Accepted::Session(SecretString::from("session"))))
         }
     }
 
@@ -488,9 +500,13 @@ mod tests {
     async fn an_acceptance_uses_the_time_of_the_clock_and_the_request() {
         let store = MemoryStore::default();
         let request = Uuid::from_u128(7);
-        let session = accept_invitation("valid", None, None, Some(request), &store, &FixedClock)
-            .await
-            .unwrap();
+        let Accepted::Session(session) =
+            accept_invitation("valid", None, None, Some(request), &store, &FixedClock)
+                .await
+                .unwrap()
+        else {
+            panic!("no session");
+        };
         assert_eq!(session.expose_secret(), "session");
         assert_eq!(*store.accepted.lock().unwrap(), [(Some(request), NOW)]);
         let result = accept_invitation("used", None, None, None, &store, &FixedClock).await;

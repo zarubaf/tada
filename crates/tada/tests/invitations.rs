@@ -266,15 +266,51 @@ async fn an_invitation_expires_after_7_days() {
     );
 }
 
+/// The attack: whoever gets the invitation link of a member of another organization, for example
+/// from a forwarded mail, would sign in as that member and switch to the other organization. The
+/// acceptance adds the membership only; the member signs in with a magic link.
 #[tokio::test]
-async fn acceptance_creates_a_missing_user_and_reuses_an_existing_one() {
+async fn an_invitation_of_a_member_of_another_organization_starts_no_session() {
     let app = App::start().await;
     let testwil = app.test.create_organization("testwil").await;
     let musterhausen = app.test.create_organization("musterhausen").await;
     let anna = app.user("anna@example.org").await;
     app.test
-        .add_membership(musterhausen, anna, OrganizationRole::Member)
+        .add_membership(musterhausen, anna, OrganizationRole::Owner)
         .await;
+
+    let token = app
+        .invite(testwil, "anna@example.org", OrganizationRole::Member)
+        .await;
+    let (response, body) = app.accept(&token).await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    assert_eq!(body, Value::Null);
+    assert!(response.headers().get(header::SET_COOKIE).is_none());
+    assert_eq!(app.count("SELECT count(*) FROM session").await, 0);
+    assert_eq!(
+        app.count(&format!(
+            "SELECT count(*) FROM organization_membership WHERE user_id = '{}'",
+            anna.as_uuid()
+        ))
+        .await,
+        2,
+        "the acceptance adds the membership"
+    );
+    let (response, _) = app.accept(&token).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "the token works once"
+    );
+}
+
+/// An invitation reuses the user of its address. The session of the acceptance can reach the
+/// organization of the invitation only, so a user without another membership gets one.
+#[tokio::test]
+async fn acceptance_creates_a_missing_user_and_reuses_an_existing_one() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    let anna = app.user("anna@example.org").await;
 
     let token = app
         .invite(testwil, "anna@example.org", OrganizationRole::Member)
@@ -291,7 +327,7 @@ async fn acceptance_creates_a_missing_user_and_reuses_an_existing_one() {
         json!(testwil.as_uuid()),
         "the session is in the organization of the invitation"
     );
-    assert_eq!(session["memberships"].as_array().unwrap().len(), 2);
+    assert_eq!(session["memberships"].as_array().unwrap().len(), 1);
 
     let token = app
         .invite(testwil, "ben@example.org", OrganizationRole::Member)
