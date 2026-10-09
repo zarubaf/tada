@@ -340,6 +340,37 @@ describe("the detail", () => {
     expect(within(card).queryByText(/KI-Client/)).not.toBeInTheDocument();
   });
 
+  it("disables „Bearbeiten und annehmen“ for a value type that this client does not know", async () => {
+    const CS_UNKNOWN = "0199b8e0-0000-7000-8000-000000000c09";
+    CHANGESETS.set(CS_UNKNOWN, {
+      ...oldChangeset,
+      id: CS_UNKNOWN,
+      proposals: [
+        proposal("0199b8e0-0000-7000-8000-0000000001c1", {
+          operation: {
+            kind: "set-fact",
+            event_id: EVENT.id,
+            field_id: VENUE,
+            state: "accepted",
+            value: { type: "text", text: "Flugplatz Testwil" },
+            expected_version: null,
+          },
+        }),
+      ],
+    });
+    renderAt(
+      `/inbox/${CS_UNKNOWN}`,
+      fakeServer({
+        "GET /api/v1/events/:id/fields": () =>
+          json(200, { items: [{ ...venueField, value_type: { type: "duration" } }] }),
+      }),
+    );
+
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    expect(within(card).getByRole("button", { name: /^Bearbeiten und annehmen/ })).toBeDisabled();
+    expect(within(card).getByText("Diesen Wert können Sie hier nicht bearbeiten.")).toBeVisible();
+  });
+
   it("shows the failure of the detail with a retry", async () => {
     renderAt(
       `/inbox/${CS_NEW}`,
