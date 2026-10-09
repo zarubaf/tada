@@ -10,25 +10,10 @@ use uuid::Uuid;
 
 use crate::request_id;
 
-/// The base of the `type` URL: the public catalog of problem codes.
-const CATALOG: &str = "https://github.com/zarubaf/tada/blob/main/doc/problems.md";
-
-/// The HTTP status of each code. A new code without a status does not compile.
-pub const fn status(code: ProblemCode) -> StatusCode {
-    match code {
-        ProblemCode::MalformedRequest => StatusCode::BAD_REQUEST,
-        ProblemCode::Unauthenticated => StatusCode::UNAUTHORIZED,
-        // The member is signed in but must choose an organization first.
-        ProblemCode::Forbidden | ProblemCode::OrganizationRequired => StatusCode::FORBIDDEN,
-        ProblemCode::NotFound => StatusCode::NOT_FOUND,
-        ProblemCode::RecordVersionConflict | ProblemCode::InvalidTransition => StatusCode::CONFLICT,
-        ProblemCode::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
-        ProblemCode::UnsupportedMediaType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
-        ProblemCode::ValidationFailed => StatusCode::UNPROCESSABLE_ENTITY,
-        ProblemCode::RateLimited => StatusCode::TOO_MANY_REQUESTS,
-        ProblemCode::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
-        ProblemCode::Internal => StatusCode::INTERNAL_SERVER_ERROR,
-    }
+/// The HTTP status of each code (ADR 0066).
+fn status(code: ProblemCode) -> StatusCode {
+    // Each status of `ProblemCode` is valid; a test checks it.
+    StatusCode::from_u16(code.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 /// An error response. `detail` never repeats input values.
@@ -134,7 +119,7 @@ impl IntoResponse for ApiError {
         let status = status(self.code);
         let request_id = request_id::current();
         let problem = Problem {
-            type_url: format!("{CATALOG}#{}", self.code.as_str()),
+            type_url: self.code.type_url(),
             code: self.code.as_str().to_owned(),
             title: self.code.meaning().to_owned(),
             status: status.as_u16(),
@@ -154,5 +139,17 @@ impl IntoResponse for ApiError {
                 .insert(header::RETRY_AFTER, HeaderValue::from(seconds));
         }
         response
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_problem_code_has_a_valid_http_status() {
+        for code in ProblemCode::ALL {
+            assert_eq!(status(code).as_u16(), code.http_status(), "{code:?}");
+        }
     }
 }

@@ -81,6 +81,7 @@ The ADRs are the authority for the decisions in this project.
 | [0063](0063-ownership-after-removal.md)                  | Ownership after removal                                  | Proposed                  |
 | [0064](0064-one-proposal-input-for-http-and-mcp.md)      | One proposal input for HTTP and MCP                      | Proposed                  |
 | [0065](0065-worker-deletes-ended-rate-limit-counters.md) | The worker deletes ended rate-limit counters             | Proposed                  |
+| [0066](0066-problem-status-in-app.md)                    | The HTTP status of a problem code lives in `app`         | Proposed                  |
 
 ## New ADR
 

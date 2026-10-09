@@ -16,6 +16,8 @@ An export of `tada export` holds all personal data of one organization in files 
 It holds the rows of the tables below and the uploaded files, without tokens, token hashes and other secrets.
 The operator stores, transfers and deletes it like a backup.
 tada does not keep a record of exports.
+The CSV files of an export hold the text of members and AI clients unchanged, and tada does not neutralize spreadsheet formulas in them.
+Import a CSV file as text, and do not open it directly in a spreadsheet program (ADR 0059).
 
 | Category                 | Table and columns                                                                                                                                            | Purpose                                                                                                                                                                                                                     | Retention                                                                                                                                                                                    |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -375,6 +375,11 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
     let (status, body) = mcp.rpc(None, None, &list).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert_eq!(body["code"], "unauthenticated");
+    assert_eq!(
+        body["type"],
+        "https://github.com/zarubaf/tada/blob/main/doc/problems.md#unauthenticated"
+    );
+    assert_eq!(body["status"], 401);
     let (status, _) = mcp.rpc(Some("tada_pat_unknown"), None, &list).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 
@@ -383,6 +388,10 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert_eq!(body["code"], "forbidden");
+    assert_eq!(
+        body["type"],
+        "https://github.com/zarubaf/tada/blob/main/doc/problems.md#forbidden"
+    );
 
     let (status, body) = mcp
         .rpc(Some(&mcp.token), Some(support::PUBLIC_URL), &list)

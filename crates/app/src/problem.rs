@@ -6,6 +6,9 @@ use jiff::SignedDuration;
 
 use crate::store::StoreError;
 
+/// The base of the `type` URL of a problem: the public catalog of problem codes (ADR 0037).
+const CATALOG: &str = "https://github.com/zarubaf/tada/blob/main/doc/problems.md";
+
 /// A stable problem code. A code never changes its meaning; a code that is no longer used stays reserved.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ProblemCode {
@@ -56,6 +59,30 @@ impl ProblemCode {
             Self::RateLimited => "rate-limited",
             Self::Unavailable => "unavailable",
             Self::Internal => "internal",
+        }
+    }
+
+    /// The URL of the code in the public catalog: the `type` of a problem (ADR 0037).
+    pub fn type_url(self) -> String {
+        format!("{CATALOG}#{}", self.as_str())
+    }
+
+    /// The HTTP status of the code (ADR 0037, ADR 0066). Each adapter that answers over HTTP uses it.
+    /// A new code without a status does not compile.
+    pub const fn http_status(self) -> u16 {
+        match self {
+            Self::MalformedRequest => 400,
+            Self::Unauthenticated => 401,
+            // The member is signed in but must choose an organization first.
+            Self::Forbidden | Self::OrganizationRequired => 403,
+            Self::NotFound => 404,
+            Self::RecordVersionConflict | Self::InvalidTransition => 409,
+            Self::PayloadTooLarge => 413,
+            Self::UnsupportedMediaType => 415,
+            Self::ValidationFailed => 422,
+            Self::RateLimited => 429,
+            Self::Unavailable => 503,
+            Self::Internal => 500,
         }
     }
 
