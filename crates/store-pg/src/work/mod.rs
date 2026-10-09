@@ -238,7 +238,7 @@ async fn select_actions(
     conn: &mut PgConnection,
     scope: OrgScope,
     select: &Select,
-) -> Result<Vec<ActionView>, StoreError> {
+) -> Result<Vec<ActionView>, sqlx::Error> {
     let rows = sqlx::query_as!(
         ActionRow,
         r#"SELECT id, event_id, local_number, title, description, owner_user_id, workstream_id,
@@ -265,8 +265,7 @@ async fn select_actions(
         select.limit,
     )
     .fetch_all(&mut *conn)
-    .await
-    .map_err(store_error)?;
+    .await?;
     Ok(rows
         .into_iter()
         .map(ActionView::try_from)
@@ -278,7 +277,7 @@ async fn select_commitments(
     conn: &mut PgConnection,
     scope: OrgScope,
     select: &Select,
-) -> Result<Vec<CommitmentView>, StoreError> {
+) -> Result<Vec<CommitmentView>, sqlx::Error> {
     let organization = scope.organization_id().as_uuid();
     let rows = sqlx::query_as!(
         CommitmentRow,
@@ -312,8 +311,7 @@ async fn select_commitments(
         select.limit,
     )
     .fetch_all(&mut *conn)
-    .await
-    .map_err(store_error)?;
+    .await?;
     let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
     let evidence = sqlx::query_as!(
         EvidenceRow,
@@ -329,8 +327,7 @@ async fn select_commitments(
         &ids,
     )
     .fetch_all(&mut *conn)
-    .await
-    .map_err(store_error)?;
+    .await?;
     let mut by_commitment: HashMap<Uuid, Vec<RecordEvidenceView>> = HashMap::new();
     for row in evidence {
         let id = row.commitment_id;
@@ -348,55 +345,183 @@ async fn select_commitments(
         .collect::<Result<_, _>>()?)
 }
 
-/// Locks the row of a record and checks its version. The row lock serializes two changes:
-/// the second one sees the new version and conflicts.
-async fn lock_version(
+/// The action `id` of the event, read inside the transaction of the caller.
+pub(crate) async fn action_in(
     conn: &mut PgConnection,
     scope: OrgScope,
-    table: Table,
     event: EventId,
-    id: Uuid,
-    expected: RecordVersion,
-) -> Result<Option<WorkChanged<()>>, StoreError> {
-    let (organization, event) = (scope.organization_id().as_uuid(), event.as_uuid());
-    let current = match table {
-        Table::Action => {
-            sqlx::query_scalar!(
-                "SELECT version FROM action
-             WHERE organization_id = $1 AND event_id = $2 AND id = $3
-             FOR UPDATE",
-                organization,
-                event,
-                id,
-            )
-            .fetch_optional(&mut *conn)
-            .await
-        }
-        Table::Commitment => {
-            sqlx::query_scalar!(
-                "SELECT version FROM commitment
-             WHERE organization_id = $1 AND event_id = $2 AND id = $3
-             FOR UPDATE",
-                organization,
-                event,
-                id,
-            )
-            .fetch_optional(&mut *conn)
-            .await
-        }
-    }
-    .map_err(store_error)?;
-    Ok(match current {
-        None => Some(WorkChanged::NotFound),
-        Some(version) if version != expected.get() => Some(WorkChanged::VersionConflict),
-        Some(_) => None,
-    })
+    id: ActionId,
+) -> Result<Option<ActionView>, sqlx::Error> {
+    Ok(
+        select_actions(conn, scope, &Select::one(event, id.as_uuid()))
+            .await?
+            .pop(),
+    )
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Table {
-    Action,
-    Commitment,
+/// The commitment `id` of the event, read inside the transaction of the caller.
+pub(crate) async fn commitment_in(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    event: EventId,
+    id: CommitmentId,
+) -> Result<Option<CommitmentView>, sqlx::Error> {
+    Ok(
+        select_commitments(conn, scope, &Select::one(event, id.as_uuid()))
+            .await?
+            .pop(),
+    )
+}
+
+/// Inserts an action with the version 1 and the next number of its event, and returns the number.
+/// The direct command and the apply of a proposal both write a new action here (ADR 0068).
+pub(crate) async fn insert_action(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    action: &NewActionRecord,
+    at: Timestamp,
+) -> Result<i64, sqlx::Error> {
+    let number = next_local_number(
+        conn,
+        scope,
+        action.event_id.as_uuid(),
+        LocalIdKind::Action.prefix(),
+    )
+    .await?;
+    let fields = &action.fields;
+    sqlx::query!(
+        "INSERT INTO action
+             (id, organization_id, event_id, local_number, title, description, owner_user_id,
+              workstream_id, due_date, status, version, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, $11, $11)",
+        action.id.as_uuid(),
+        scope.organization_id().as_uuid(),
+        action.event_id.as_uuid(),
+        number,
+        fields.title.as_str(),
+        fields.description.as_ref().map(ActionDescription::as_str),
+        fields.owner.as_uuid(),
+        fields.workstream_id.map(WorkstreamId::as_uuid),
+        fields.due_date.map(|date| date.to_sqlx()) as _,
+        fields.status.as_str(),
+        at.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(number)
+}
+
+/// Replaces the values of an action if its version is `expected`, and returns the new version.
+/// `None` means that the event has no such action with this version. The row lock of the update
+/// serializes two changes: the second one sees the new version and changes nothing.
+/// The direct command and the apply of a proposal both change an action here (ADR 0068).
+pub(crate) async fn update_action(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    event: EventId,
+    id: ActionId,
+    fields: &ActionFields,
+    expected: RecordVersion,
+    at: Timestamp,
+) -> Result<Option<i64>, sqlx::Error> {
+    sqlx::query_scalar!(
+        "UPDATE action
+         SET title = $5, description = $6, owner_user_id = $7, workstream_id = $8,
+             due_date = $9, status = $10, version = version + 1, updated_at = $11
+         WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4
+         RETURNING version",
+        scope.organization_id().as_uuid(),
+        event.as_uuid(),
+        id.as_uuid(),
+        expected.get(),
+        fields.title.as_str(),
+        fields.description.as_ref().map(ActionDescription::as_str),
+        fields.owner.as_uuid(),
+        fields.workstream_id.map(WorkstreamId::as_uuid),
+        fields.due_date.map(|date| date.to_sqlx()) as _,
+        fields.status.as_str(),
+        at.to_sqlx() as _,
+    )
+    .fetch_optional(&mut *conn)
+    .await
+}
+
+/// Inserts a commitment with the version 1 and the next number of its event, and returns the number.
+/// The direct command and the apply of a proposal both write a new commitment here (ADR 0068).
+pub(crate) async fn insert_commitment(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    commitment: &NewCommitmentRecord,
+    at: Timestamp,
+) -> Result<i64, sqlx::Error> {
+    let number = next_local_number(
+        conn,
+        scope,
+        commitment.event_id.as_uuid(),
+        LocalIdKind::Commitment.prefix(),
+    )
+    .await?;
+    let (person, institution) = match commitment.promisor {
+        Party::Person(id) => (Some(id.as_uuid()), None),
+        Party::Institution(id) => (None, Some(id.as_uuid())),
+    };
+    let fields = &commitment.fields;
+    sqlx::query!(
+        "INSERT INTO commitment
+             (id, organization_id, event_id, local_number, text, condition, person_id,
+              institution_id, owner_user_id, workstream_id, due_date, status, firm_reason,
+              version, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 1, $14, $14)",
+        commitment.id.as_uuid(),
+        scope.organization_id().as_uuid(),
+        commitment.event_id.as_uuid(),
+        number,
+        fields.text.as_str(),
+        commitment.condition.as_ref().map(ConditionText::as_str),
+        person,
+        institution,
+        fields.owner.as_uuid(),
+        fields.workstream_id.map(WorkstreamId::as_uuid),
+        fields.due_date.map(|date| date.to_sqlx()) as _,
+        fields.status.as_str(),
+        fields.firm_reason.as_ref().map(FirmReason::as_str),
+        at.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(number)
+}
+
+/// Like `update_action`, for a commitment. The condition and the promisor never change.
+pub(crate) async fn update_commitment(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    event: EventId,
+    id: CommitmentId,
+    fields: &CommitmentFields,
+    expected: RecordVersion,
+    at: Timestamp,
+) -> Result<Option<i64>, sqlx::Error> {
+    sqlx::query_scalar!(
+        "UPDATE commitment
+         SET text = $5, owner_user_id = $6, workstream_id = $7, due_date = $8, status = $9,
+             firm_reason = $10, version = version + 1, updated_at = $11
+         WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4
+         RETURNING version",
+        scope.organization_id().as_uuid(),
+        event.as_uuid(),
+        id.as_uuid(),
+        expected.get(),
+        fields.text.as_str(),
+        fields.owner.as_uuid(),
+        fields.workstream_id.map(WorkstreamId::as_uuid),
+        fields.due_date.map(|date| date.to_sqlx()) as _,
+        fields.status.as_str(),
+        fields.firm_reason.as_ref().map(FirmReason::as_str),
+        at.to_sqlx() as _,
+    )
+    .fetch_optional(&mut *conn)
+    .await
 }
 
 /// The keys of the events that `user` can read now: the events with an event role of the user,
@@ -465,48 +590,16 @@ impl WorkStore for Database {
         audit: &AuditEvent,
     ) -> Result<WorkCreated<ActionView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let number = next_local_number(
-            &mut tx,
-            scope,
-            action.event_id.as_uuid(),
-            LocalIdKind::Action.prefix(),
-        )
-        .await
-        .map_err(store_error)?;
-        let fields = &action.fields;
-        let inserted = sqlx::query!(
-            "INSERT INTO action
-                 (id, organization_id, event_id, local_number, title, description, owner_user_id,
-                  workstream_id, due_date, status, version, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, $11, $11)",
-            action.id.as_uuid(),
-            scope.organization_id().as_uuid(),
-            action.event_id.as_uuid(),
-            number,
-            fields.title.as_str(),
-            fields.description.as_ref().map(ActionDescription::as_str),
-            fields.owner.as_uuid(),
-            fields.workstream_id.map(WorkstreamId::as_uuid),
-            fields.due_date.map(|date| date.to_sqlx()) as _,
-            fields.status.as_str(),
-            at.to_sqlx() as _,
-        )
-        .execute(&mut *tx)
-        .await;
-        match inserted {
+        match insert_action(&mut tx, scope, action, at).await {
             Ok(_) => {}
             Err(error) if violates(&error, "action_pkey") => return Ok(WorkCreated::IdTaken),
             Err(error) => return Err(store_error(error)),
         }
         audit::record(&mut tx, audit).await.map_err(store_error)?;
-        let view = select_actions(
-            &mut tx,
-            scope,
-            &Select::one(action.event_id, action.id.as_uuid()),
-        )
-        .await?
-        .pop()
-        .ok_or(InvalidRow("action"))?;
+        let view = action_in(&mut tx, scope, action.event_id, action.id)
+            .await
+            .map_err(store_error)?
+            .ok_or(InvalidRow("action"))?;
         tx.commit().await.map_err(store_error)?;
         Ok(WorkCreated::Created(view))
     }
@@ -518,38 +611,23 @@ impl WorkStore for Database {
         id: ActionId,
         fields: &ActionFields,
         expected: RecordVersion,
+        at: Timestamp,
         audit: &AuditEvent,
     ) -> Result<WorkChanged<ActionView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let id = id.as_uuid();
-        match lock_version(&mut tx, scope, Table::Action, event, id, expected).await? {
-            Some(WorkChanged::NotFound) => return Ok(WorkChanged::NotFound),
-            Some(_) => return Ok(WorkChanged::VersionConflict),
-            None => {}
+        let updated = update_action(&mut tx, scope, event, id, fields, expected, at)
+            .await
+            .map_err(store_error)?;
+        let current = action_in(&mut tx, scope, event, id)
+            .await
+            .map_err(store_error)?;
+        let Some(view) = current else {
+            return Ok(WorkChanged::NotFound);
+        };
+        if updated.is_none() {
+            return Ok(WorkChanged::VersionConflict);
         }
-        sqlx::query!(
-            "UPDATE action
-             SET title = $4, description = $5, owner_user_id = $6, workstream_id = $7,
-                 due_date = $8, status = $9, version = version + 1, updated_at = now()
-             WHERE organization_id = $1 AND event_id = $2 AND id = $3",
-            scope.organization_id().as_uuid(),
-            event.as_uuid(),
-            id,
-            fields.title.as_str(),
-            fields.description.as_ref().map(ActionDescription::as_str),
-            fields.owner.as_uuid(),
-            fields.workstream_id.map(WorkstreamId::as_uuid),
-            fields.due_date.map(|date| date.to_sqlx()) as _,
-            fields.status.as_str(),
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(store_error)?;
         audit::record(&mut tx, audit).await.map_err(store_error)?;
-        let view = select_actions(&mut tx, scope, &Select::one(event, id))
-            .await?
-            .pop()
-            .ok_or(InvalidRow("action"))?;
         tx.commit().await.map_err(store_error)?;
         Ok(WorkChanged::Changed(view))
     }
@@ -561,11 +639,9 @@ impl WorkStore for Database {
         id: ActionId,
     ) -> Result<Option<ActionView>, StoreError> {
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        Ok(
-            select_actions(&mut conn, scope, &Select::one(event, id.as_uuid()))
-                .await?
-                .pop(),
-        )
+        action_in(&mut conn, scope, event, id)
+            .await
+            .map_err(store_error)
     }
 
     async fn actions(
@@ -576,7 +652,9 @@ impl WorkStore for Database {
     ) -> Result<Vec<ActionView>, StoreError> {
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
         let status = filter.status.map(ActionStatus::as_str);
-        select_actions(&mut conn, scope, &Select::filter(event, filter, status)).await
+        select_actions(&mut conn, scope, &Select::filter(event, filter, status))
+            .await
+            .map_err(store_error)
     }
 
     async fn create_commitment(
@@ -587,56 +665,16 @@ impl WorkStore for Database {
         audit: &AuditEvent,
     ) -> Result<WorkCreated<CommitmentView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let number = next_local_number(
-            &mut tx,
-            scope,
-            commitment.event_id.as_uuid(),
-            LocalIdKind::Commitment.prefix(),
-        )
-        .await
-        .map_err(store_error)?;
-        let (person, institution) = match commitment.promisor {
-            Party::Person(id) => (Some(id.as_uuid()), None),
-            Party::Institution(id) => (None, Some(id.as_uuid())),
-        };
-        let fields = &commitment.fields;
-        let inserted = sqlx::query!(
-            "INSERT INTO commitment
-                 (id, organization_id, event_id, local_number, text, condition, person_id,
-                  institution_id, owner_user_id, workstream_id, due_date, status, firm_reason,
-                  version, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 1, $14, $14)",
-            commitment.id.as_uuid(),
-            scope.organization_id().as_uuid(),
-            commitment.event_id.as_uuid(),
-            number,
-            fields.text.as_str(),
-            commitment.condition.as_ref().map(ConditionText::as_str),
-            person,
-            institution,
-            fields.owner.as_uuid(),
-            fields.workstream_id.map(WorkstreamId::as_uuid),
-            fields.due_date.map(|date| date.to_sqlx()) as _,
-            fields.status.as_str(),
-            fields.firm_reason.as_ref().map(FirmReason::as_str),
-            at.to_sqlx() as _,
-        )
-        .execute(&mut *tx)
-        .await;
-        match inserted {
+        match insert_commitment(&mut tx, scope, commitment, at).await {
             Ok(_) => {}
             Err(error) if violates(&error, "commitment_pkey") => return Ok(WorkCreated::IdTaken),
             Err(error) => return Err(store_error(error)),
         }
         audit::record(&mut tx, audit).await.map_err(store_error)?;
-        let view = select_commitments(
-            &mut tx,
-            scope,
-            &Select::one(commitment.event_id, commitment.id.as_uuid()),
-        )
-        .await?
-        .pop()
-        .ok_or(InvalidRow("commitment"))?;
+        let view = commitment_in(&mut tx, scope, commitment.event_id, commitment.id)
+            .await
+            .map_err(store_error)?
+            .ok_or(InvalidRow("commitment"))?;
         tx.commit().await.map_err(store_error)?;
         Ok(WorkCreated::Created(view))
     }
@@ -648,38 +686,23 @@ impl WorkStore for Database {
         id: CommitmentId,
         fields: &CommitmentFields,
         expected: RecordVersion,
+        at: Timestamp,
         audit: &AuditEvent,
     ) -> Result<WorkChanged<CommitmentView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let id = id.as_uuid();
-        match lock_version(&mut tx, scope, Table::Commitment, event, id, expected).await? {
-            Some(WorkChanged::NotFound) => return Ok(WorkChanged::NotFound),
-            Some(_) => return Ok(WorkChanged::VersionConflict),
-            None => {}
+        let updated = update_commitment(&mut tx, scope, event, id, fields, expected, at)
+            .await
+            .map_err(store_error)?;
+        let current = commitment_in(&mut tx, scope, event, id)
+            .await
+            .map_err(store_error)?;
+        let Some(view) = current else {
+            return Ok(WorkChanged::NotFound);
+        };
+        if updated.is_none() {
+            return Ok(WorkChanged::VersionConflict);
         }
-        sqlx::query!(
-            "UPDATE commitment
-             SET text = $4, owner_user_id = $5, workstream_id = $6, due_date = $7, status = $8,
-                 firm_reason = $9, version = version + 1, updated_at = now()
-             WHERE organization_id = $1 AND event_id = $2 AND id = $3",
-            scope.organization_id().as_uuid(),
-            event.as_uuid(),
-            id,
-            fields.text.as_str(),
-            fields.owner.as_uuid(),
-            fields.workstream_id.map(WorkstreamId::as_uuid),
-            fields.due_date.map(|date| date.to_sqlx()) as _,
-            fields.status.as_str(),
-            fields.firm_reason.as_ref().map(FirmReason::as_str),
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(store_error)?;
         audit::record(&mut tx, audit).await.map_err(store_error)?;
-        let view = select_commitments(&mut tx, scope, &Select::one(event, id))
-            .await?
-            .pop()
-            .ok_or(InvalidRow("commitment"))?;
         tx.commit().await.map_err(store_error)?;
         Ok(WorkChanged::Changed(view))
     }
@@ -691,11 +714,9 @@ impl WorkStore for Database {
         id: CommitmentId,
     ) -> Result<Option<CommitmentView>, StoreError> {
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        Ok(
-            select_commitments(&mut conn, scope, &Select::one(event, id.as_uuid()))
-                .await?
-                .pop(),
-        )
+        commitment_in(&mut conn, scope, event, id)
+            .await
+            .map_err(store_error)
     }
 
     async fn commitments(
@@ -706,7 +727,9 @@ impl WorkStore for Database {
     ) -> Result<Vec<CommitmentView>, StoreError> {
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
         let status = filter.status.map(CommitmentStatus::as_str);
-        select_commitments(&mut conn, scope, &Select::filter(event, filter, status)).await
+        select_commitments(&mut conn, scope, &Select::filter(event, filter, status))
+            .await
+            .map_err(store_error)
     }
 
     async fn my_open_work(
@@ -717,8 +740,12 @@ impl WorkStore for Database {
     ) -> Result<MyWork, StoreError> {
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
         let keys = event_keys_of(&mut conn, scope, user, all_events).await?;
-        let actions = select_actions(&mut conn, scope, &Select::open_of(user)).await?;
-        let commitments = select_commitments(&mut conn, scope, &Select::open_of(user)).await?;
+        let actions = select_actions(&mut conn, scope, &Select::open_of(user))
+            .await
+            .map_err(store_error)?;
+        let commitments = select_commitments(&mut conn, scope, &Select::open_of(user))
+            .await
+            .map_err(store_error)?;
         Ok(MyWork {
             actions: in_events(actions, &keys, |a| {
                 (a.fields.due_date, a.event_id, a.local_number)

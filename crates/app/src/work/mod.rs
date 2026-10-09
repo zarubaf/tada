@@ -205,7 +205,10 @@ pub trait WorkStore: Debug + Send + Sync {
     ) -> Result<WorkCreated<ActionView>, StoreError>;
 
     /// Replaces the values of an action if its version is `expected`, and counts the version up.
-    /// The store stamps the change time.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "a write port takes the scope, the record, the values, the version, the time and the audit event"
+    )]
     async fn change_action(
         &self,
         scope: OrgScope,
@@ -213,6 +216,7 @@ pub trait WorkStore: Debug + Send + Sync {
         id: ActionId,
         fields: &ActionFields,
         expected: RecordVersion,
+        at: Timestamp,
         audit: &AuditEvent,
     ) -> Result<WorkChanged<ActionView>, StoreError>;
 
@@ -241,7 +245,10 @@ pub trait WorkStore: Debug + Send + Sync {
     ) -> Result<WorkCreated<CommitmentView>, StoreError>;
 
     /// Replaces the values of a commitment if its version is `expected`, and counts the version up.
-    /// The store stamps the change time.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "a write port takes the scope, the record, the values, the version, the time and the audit event"
+    )]
     async fn change_commitment(
         &self,
         scope: OrgScope,
@@ -249,6 +256,7 @@ pub trait WorkStore: Debug + Send + Sync {
         id: CommitmentId,
         fields: &CommitmentFields,
         expected: RecordVersion,
+        at: Timestamp,
         audit: &AuditEvent,
     ) -> Result<WorkChanged<CommitmentView>, StoreError>;
 

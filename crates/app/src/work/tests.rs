@@ -358,6 +358,7 @@ impl WorkStore for Memory {
         id: ActionId,
         fields: &ActionFields,
         expected: RecordVersion,
+        _: Timestamp,
         audit: &AuditEvent,
     ) -> Result<WorkChanged<ActionView>, StoreError> {
         let mut all = self.actions.lock().unwrap();
@@ -448,6 +449,7 @@ impl WorkStore for Memory {
         id: CommitmentId,
         fields: &CommitmentFields,
         expected: RecordVersion,
+        _: Timestamp,
         audit: &AuditEvent,
     ) -> Result<WorkChanged<CommitmentView>, StoreError> {
         let mut all = self.commitments.lock().unwrap();

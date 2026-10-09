@@ -3,23 +3,24 @@
 //! Each write copies the passages of the proposal into `record_evidence` with the record version that it produced.
 //! A new record takes the next readable number of its scope: `ACT` and `COM` in the event, `PER` and `INS` in the organization.
 
-use jiff_sqlx::ToSqlx;
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
-use tada_app::domain::identity::Email;
 use tada_app::domain::ids::{EventId, LocalIdKind, ProposalId, SourceVersionId, WorkstreamId};
-use tada_app::domain::parties::{Party, PhoneNumber};
+use tada_app::domain::parties::Party;
 use tada_app::domain::proposals::Operation;
 use tada_app::domain::sources::Evidence;
-use tada_app::domain::work::{
-    ActionDescription, ActionStatus, CommitmentStatus, ConditionText, FirmReason,
-};
+use tada_app::domain::work::{ActionStatus, CommitmentStatus};
+use tada_app::parties::{InstitutionFields, PersonFields};
 use tada_app::review::{ApplyPlan, ApplyStep, LocalRecord, NewLocalId, StepEvidence};
+use tada_app::work::{ActionFields, CommitmentFields, NewActionRecord, NewCommitmentRecord};
 
 use super::insert_review_text;
-use crate::local_ids::next_local_number;
+use crate::parties::{insert_institution, insert_person};
 use crate::proposals::operation_to_json;
+use crate::work::{
+    action_in, commitment_in, insert_action, insert_commitment, update_action, update_commitment,
+};
 
 /// The record that a passage of `record_evidence` supports.
 #[derive(Debug, Clone, Copy)]
@@ -73,21 +74,12 @@ pub(super) async fn write_record(
             email,
             phone,
         } => {
-            let number = organization_number(conn, scope, LocalIdKind::Person).await?;
-            sqlx::query!(
-                "INSERT INTO person
-                     (id, organization_id, local_number, name, email, phone, version, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $7)",
-                id.as_uuid(),
-                scope.organization_id().as_uuid(),
-                number,
-                name.as_str(),
-                email.as_ref().map(Email::as_str),
-                phone.as_ref().map(PhoneNumber::as_str),
-                plan.now.to_sqlx() as _,
-            )
-            .execute(&mut *conn)
-            .await?;
+            let fields = PersonFields {
+                name: name.clone(),
+                email: email.clone(),
+                phone: phone.clone(),
+            };
+            let number = insert_person(conn, scope, *id, &fields, None, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Person(*id), number)?);
             (RecordRef::Person(id.as_uuid()), 1)
         }
@@ -98,22 +90,13 @@ pub(super) async fn write_record(
             email,
             phone,
         } => {
-            let number = organization_number(conn, scope, LocalIdKind::Institution).await?;
-            sqlx::query!(
-                "INSERT INTO institution
-                     (id, organization_id, local_number, name, kind, email, phone, version, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8)",
-                id.as_uuid(),
-                scope.organization_id().as_uuid(),
-                number,
-                name.as_str(),
-                kind.as_str(),
-                email.as_ref().map(Email::as_str),
-                phone.as_ref().map(PhoneNumber::as_str),
-                plan.now.to_sqlx() as _,
-            )
-            .execute(&mut *conn)
-            .await?;
+            let fields = InstitutionFields {
+                name: name.clone(),
+                kind: *kind,
+                email: email.clone(),
+                phone: phone.clone(),
+            };
+            let number = insert_institution(conn, scope, *id, &fields, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Institution(*id), number)?);
             (RecordRef::Institution(id.as_uuid()), 1)
         }
@@ -126,26 +109,19 @@ pub(super) async fn write_record(
             workstream,
             due_date,
         } => {
-            let number = event_number(conn, scope, *event_id, LocalIdKind::Action).await?;
-            sqlx::query!(
-                "INSERT INTO action
-                     (id, organization_id, event_id, local_number, title, description, owner_user_id,
-                      workstream_id, due_date, status, version, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, $11, $11)",
-                id.as_uuid(),
-                scope.organization_id().as_uuid(),
-                event_id.as_uuid(),
-                number,
-                title.as_str(),
-                description.as_ref().map(ActionDescription::as_str),
-                owner.as_uuid(),
-                workstream.map(WorkstreamId::as_uuid),
-                due_date.map(|date| date.to_sqlx()) as _,
-                ActionStatus::Open.as_str(),
-                plan.now.to_sqlx() as _,
-            )
-            .execute(&mut *conn)
-            .await?;
+            let action = NewActionRecord {
+                id: *id,
+                event_id: *event_id,
+                fields: ActionFields {
+                    title: title.clone(),
+                    description: description.clone(),
+                    owner: *owner,
+                    workstream_id: *workstream,
+                    due_date: *due_date,
+                    status: ActionStatus::Open,
+                },
+            };
+            let number = insert_action(conn, scope, &action, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Action(*id), number)?);
             (RecordRef::Action(id.as_uuid()), 1)
         }
@@ -159,33 +135,21 @@ pub(super) async fn write_record(
             due_date,
             condition,
         } => {
-            let number = event_number(conn, scope, *event_id, LocalIdKind::Commitment).await?;
-            let (person, institution) = match promisor {
-                Party::Person(id) => (Some(id.as_uuid()), None),
-                Party::Institution(id) => (None, Some(id.as_uuid())),
+            let commitment = NewCommitmentRecord {
+                id: *id,
+                event_id: *event_id,
+                condition: condition.clone(),
+                promisor: *promisor,
+                fields: CommitmentFields {
+                    text: text.clone(),
+                    owner: *owner,
+                    workstream_id: *workstream,
+                    due_date: *due_date,
+                    status: CommitmentStatus::initial(condition.as_ref()),
+                    firm_reason: None,
+                },
             };
-            sqlx::query!(
-                "INSERT INTO commitment
-                     (id, organization_id, event_id, local_number, text, condition, person_id,
-                      institution_id, owner_user_id, workstream_id, due_date, status,
-                      version, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 1, $13, $13)",
-                id.as_uuid(),
-                scope.organization_id().as_uuid(),
-                event_id.as_uuid(),
-                number,
-                text.as_str(),
-                condition.as_ref().map(ConditionText::as_str),
-                person,
-                institution,
-                owner.as_uuid(),
-                workstream.map(WorkstreamId::as_uuid),
-                due_date.map(|date| date.to_sqlx()) as _,
-                CommitmentStatus::initial(condition.as_ref()).as_str(),
-                plan.now.to_sqlx() as _,
-            )
-            .execute(&mut *conn)
-            .await?;
+            let number = insert_commitment(conn, scope, &commitment, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Commitment(*id), number)?);
             (RecordRef::Commitment(id.as_uuid()), 1)
         }
@@ -195,18 +159,22 @@ pub(super) async fn write_record(
             status,
             expected_version,
         } => {
-            let version = sqlx::query_scalar!(
-                "UPDATE action SET status = $5, version = version + 1, updated_at = $6
-                 WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4
-                 RETURNING version",
-                scope.organization_id().as_uuid(),
-                event_id.as_uuid(),
-                action_id.as_uuid(),
-                expected_version.get(),
-                status.as_str(),
-                plan.now.to_sqlx() as _,
+            let current = action_in(conn, scope, *event_id, *action_id)
+                .await?
+                .ok_or(sqlx::Error::RowNotFound)?;
+            let fields = ActionFields {
+                status: *status,
+                ..current.fields
+            };
+            let version = update_action(
+                conn,
+                scope,
+                *event_id,
+                *action_id,
+                &fields,
+                *expected_version,
+                plan.now,
             )
-            .fetch_optional(&mut *conn)
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
             (RecordRef::Action(action_id.as_uuid()), version)
@@ -217,18 +185,22 @@ pub(super) async fn write_record(
             due_date,
             expected_version,
         } => {
-            let version = sqlx::query_scalar!(
-                "UPDATE action SET due_date = $5, version = version + 1, updated_at = $6
-                 WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4
-                 RETURNING version",
-                scope.organization_id().as_uuid(),
-                event_id.as_uuid(),
-                action_id.as_uuid(),
-                expected_version.get(),
-                due_date.map(|date| date.to_sqlx()) as _,
-                plan.now.to_sqlx() as _,
+            let current = action_in(conn, scope, *event_id, *action_id)
+                .await?
+                .ok_or(sqlx::Error::RowNotFound)?;
+            let fields = ActionFields {
+                due_date: *due_date,
+                ..current.fields
+            };
+            let version = update_action(
+                conn,
+                scope,
+                *event_id,
+                *action_id,
+                &fields,
+                *expected_version,
+                plan.now,
             )
-            .fetch_optional(&mut *conn)
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
             (RecordRef::Action(action_id.as_uuid()), version)
@@ -245,20 +217,23 @@ pub(super) async fn write_record(
                     "a change to firm needs a reason".into(),
                 ));
             }
-            let version = sqlx::query_scalar!(
-                "UPDATE commitment
-                 SET status = $5, firm_reason = coalesce($6, firm_reason), version = version + 1, updated_at = $7
-                 WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4
-                 RETURNING version",
-                scope.organization_id().as_uuid(),
-                event_id.as_uuid(),
-                commitment_id.as_uuid(),
-                expected_version.get(),
-                status.as_str(),
-                step.firm_reason.as_ref().map(FirmReason::as_str),
-                plan.now.to_sqlx() as _,
+            let current = commitment_in(conn, scope, *event_id, *commitment_id)
+                .await?
+                .ok_or(sqlx::Error::RowNotFound)?;
+            let fields = CommitmentFields {
+                status: *status,
+                firm_reason: step.firm_reason.clone().or(current.fields.firm_reason),
+                ..current.fields
+            };
+            let version = update_commitment(
+                conn,
+                scope,
+                *event_id,
+                *commitment_id,
+                &fields,
+                *expected_version,
+                plan.now,
             )
-            .fetch_optional(&mut *conn)
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
             (RecordRef::Commitment(commitment_id.as_uuid()), version)
@@ -271,29 +246,6 @@ pub(super) async fn write_record(
     };
     insert_evidence(conn, scope, record, version, step.proposal_id, &evidence).await?;
     Ok(written)
-}
-
-async fn organization_number(
-    conn: &mut PgConnection,
-    scope: OrgScope,
-    kind: LocalIdKind,
-) -> Result<i64, sqlx::Error> {
-    next_local_number(
-        conn,
-        scope,
-        scope.organization_id().as_uuid(),
-        kind.prefix(),
-    )
-    .await
-}
-
-async fn event_number(
-    conn: &mut PgConnection,
-    scope: OrgScope,
-    event: EventId,
-    kind: LocalIdKind,
-) -> Result<i64, sqlx::Error> {
-    next_local_number(conn, scope, event.as_uuid(), kind.prefix()).await
 }
 
 fn local_id(record: LocalRecord, number: i64) -> Result<NewLocalId, sqlx::Error> {

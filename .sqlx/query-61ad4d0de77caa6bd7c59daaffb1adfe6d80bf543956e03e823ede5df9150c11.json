@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE commitment\n                 SET status = $5, firm_reason = coalesce($6, firm_reason), version = version + 1, updated_at = $7\n                 WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4\n                 RETURNING version",
+  "query": "UPDATE commitment\n         SET text = $5, owner_user_id = $6, workstream_id = $7, due_date = $8, status = $9,\n             firm_reason = $10, version = version + 1, updated_at = $11\n         WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4\n         RETURNING version",
   "describe": {
     "columns": [
       {
@@ -22,6 +22,10 @@
         "Uuid",
         "Int8",
         "Text",
+        "Uuid",
+        "Uuid",
+        "Date",
+        "Text",
         "Text",
         "Timestamptz"
       ]
@@ -30,5 +34,5 @@
       false
     ]
   },
-  "hash": "4be7b01c85cb4a97e2d856766eaf3dfd198442fb90ab52b0627c3665b1a0470e"
+  "hash": "61ad4d0de77caa6bd7c59daaffb1adfe6d80bf543956e03e823ede5df9150c11"
 }

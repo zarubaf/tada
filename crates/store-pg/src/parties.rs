@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
+use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
@@ -109,6 +110,68 @@ fn after_number(after: Option<PartyCursor>) -> i64 {
     after.map_or(0, |cursor| i64::try_from(cursor.0).unwrap_or(i64::MAX))
 }
 
+/// Inserts a person with the version 1 and the next number of the organization, and returns the number.
+/// The direct command and the apply of a proposal both write a new person here (ADR 0069).
+pub(crate) async fn insert_person(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    id: PersonId,
+    fields: &PersonFields,
+    user_id: Option<UserId>,
+    at: Timestamp,
+) -> Result<i64, sqlx::Error> {
+    let organization = scope.organization_id().as_uuid();
+    let number = next_local_number(conn, scope, organization, LocalIdKind::Person.prefix()).await?;
+    sqlx::query!(
+        "INSERT INTO person
+             (id, organization_id, local_number, name, email, phone, user_id, version,
+              created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8)",
+        id.as_uuid(),
+        organization,
+        number,
+        fields.name.as_str(),
+        fields.email.as_ref().map(Email::as_str),
+        fields.phone.as_ref().map(PhoneNumber::as_str),
+        user_id.map(UserId::as_uuid),
+        at.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(number)
+}
+
+/// Inserts an institution with the version 1 and the next number of the organization, and returns the number.
+/// The direct command and the apply of a proposal both write a new institution here (ADR 0069).
+pub(crate) async fn insert_institution(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    id: InstitutionId,
+    fields: &InstitutionFields,
+    at: Timestamp,
+) -> Result<i64, sqlx::Error> {
+    let organization = scope.organization_id().as_uuid();
+    let number =
+        next_local_number(conn, scope, organization, LocalIdKind::Institution.prefix()).await?;
+    sqlx::query!(
+        "INSERT INTO institution
+             (id, organization_id, local_number, name, kind, email, phone, version,
+              created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8)",
+        id.as_uuid(),
+        organization,
+        number,
+        fields.name.as_str(),
+        fields.kind.as_str(),
+        fields.email.as_ref().map(Email::as_str),
+        fields.phone.as_ref().map(PhoneNumber::as_str),
+        at.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(number)
+}
+
 #[async_trait]
 impl PartyStore for Database {
     async fn create_person(
@@ -120,33 +183,21 @@ impl PartyStore for Database {
         at: Timestamp,
         audit: &AuditEvent,
     ) -> Result<PersonView, StoreError> {
-        let organization = scope.organization_id().as_uuid();
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let number = next_local_number(&mut tx, scope, organization, LocalIdKind::Person.prefix())
+        let number = insert_person(&mut tx, scope, id, fields, user_id, at)
             .await
             .map_err(store_error)?;
-        let row = sqlx::query_as!(
-            PersonRow,
-            "INSERT INTO person
-                 (id, organization_id, local_number, name, email, phone, user_id, version,
-                  created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8)
-             RETURNING id, local_number, name, email, phone, user_id, version",
-            id.as_uuid(),
-            organization,
-            number,
-            fields.name.as_str(),
-            fields.email.as_ref().map(Email::as_str),
-            fields.phone.as_ref().map(PhoneNumber::as_str),
-            user_id.map(UserId::as_uuid),
-            at.to_sqlx() as _,
-        )
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(store_error)?;
         audit::record(&mut tx, audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
-        Ok(row.try_into()?)
+        Ok(PersonView {
+            id,
+            local_number: u64::try_from(number).map_err(|_| InvalidRow("person.local_number"))?,
+            name: fields.name.clone(),
+            email: fields.email.clone(),
+            phone: fields.phone.clone(),
+            user_id,
+            version: RecordVersion::FIRST,
+        })
     }
 
     async fn change_person(
@@ -248,38 +299,22 @@ impl PartyStore for Database {
         at: Timestamp,
         audit: &AuditEvent,
     ) -> Result<InstitutionView, StoreError> {
-        let organization = scope.organization_id().as_uuid();
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let number = next_local_number(
-            &mut tx,
-            scope,
-            organization,
-            LocalIdKind::Institution.prefix(),
-        )
-        .await
-        .map_err(store_error)?;
-        let row = sqlx::query_as!(
-            InstitutionRow,
-            "INSERT INTO institution
-                 (id, organization_id, local_number, name, kind, email, phone, version,
-                  created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8)
-             RETURNING id, local_number, name, kind, email, phone, version",
-            id.as_uuid(),
-            organization,
-            number,
-            fields.name.as_str(),
-            fields.kind.as_str(),
-            fields.email.as_ref().map(Email::as_str),
-            fields.phone.as_ref().map(PhoneNumber::as_str),
-            at.to_sqlx() as _,
-        )
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(store_error)?;
+        let number = insert_institution(&mut tx, scope, id, fields, at)
+            .await
+            .map_err(store_error)?;
         audit::record(&mut tx, audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
-        Ok(row.try_into()?)
+        Ok(InstitutionView {
+            id,
+            local_number: u64::try_from(number)
+                .map_err(|_| InvalidRow("institution.local_number"))?,
+            name: fields.name.clone(),
+            kind: fields.kind,
+            email: fields.email.clone(),
+            phone: fields.phone.clone(),
+            version: RecordVersion::FIRST,
+        })
     }
 
     async fn change_institution(

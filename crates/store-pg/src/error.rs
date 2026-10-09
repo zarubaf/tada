@@ -33,6 +33,14 @@ impl From<InvalidRow> for StoreError {
     }
 }
 
+/// A row helper that runs inside a larger transaction, such as an apply, returns `sqlx::Error`.
+/// `store_error` maps this decode error to `internal`, as `InvalidRow` itself.
+impl From<InvalidRow> for sqlx::Error {
+    fn from(error: InvalidRow) -> Self {
+        sqlx::Error::Decode(Box::new(error))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

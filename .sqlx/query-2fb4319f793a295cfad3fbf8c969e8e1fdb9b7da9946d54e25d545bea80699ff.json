@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE action SET status = $5, version = version + 1, updated_at = $6\n                 WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4\n                 RETURNING version",
+  "query": "UPDATE action\n         SET title = $5, description = $6, owner_user_id = $7, workstream_id = $8,\n             due_date = $9, status = $10, version = version + 1, updated_at = $11\n         WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4\n         RETURNING version",
   "describe": {
     "columns": [
       {
@@ -22,6 +22,11 @@
         "Uuid",
         "Int8",
         "Text",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Date",
+        "Text",
         "Timestamptz"
       ]
     },
@@ -29,5 +34,5 @@
       false
     ]
   },
-  "hash": "75599bf48c5d67d7d01d7e0c39c813282d654880b7d19dcc79e540233e81d3b2"
+  "hash": "2fb4319f793a295cfad3fbf8c969e8e1fdb9b7da9946d54e25d545bea80699ff"
 }
