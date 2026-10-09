@@ -811,6 +811,56 @@ async fn an_invalid_status_change_is_refused() {
     assert!(matches!(back, Err(WorkError::InvalidTransition)));
 }
 
+/// A change to the current status is no transition (ADR 0068), as for a proposal: it changes nothing.
+#[tokio::test]
+async fn a_change_to_the_same_status_is_refused() {
+    let memory = Memory::default();
+    let action = action_by(&memory, OWNER, new_action(OWNER, None))
+        .await
+        .unwrap();
+    let same = change_action_by(
+        &memory,
+        OWNER,
+        action.id,
+        ActionChange {
+            status: Some(ActionStatus::Open),
+            ..no_change(action.version)
+        },
+    )
+    .await;
+    assert!(
+        matches!(same, Err(WorkError::InvalidTransition)),
+        "{same:?}"
+    );
+
+    let commitment = create_commitment(
+        &caller(OWNER),
+        open_day(),
+        new_commitment(Some("subject to signed order")),
+        memory.ports(),
+    )
+    .await
+    .unwrap();
+    let same = change_commitment_by(
+        &memory,
+        OWNER,
+        commitment.id,
+        CommitmentChange {
+            status: Some(CommitmentStatus::Conditional),
+            ..commitment_change(commitment.version)
+        },
+    )
+    .await;
+    assert!(
+        matches!(same, Err(WorkError::InvalidTransition)),
+        "{same:?}"
+    );
+    assert_eq!(
+        memory.audit(),
+        [AuditAction::ActionCreate, AuditAction::CommitmentCreate]
+    );
+}
+
 #[tokio::test]
 async fn a_conditional_commitment_stays_conditional_after_a_change() {
     let memory = Memory::default();

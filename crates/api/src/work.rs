@@ -567,7 +567,7 @@ async fn get_action(
 }
 
 /// Changes an action. Its owner, the lead of its workstream or an event manager can do it.
-/// A status that the current status cannot change to gives `invalid-transition`.
+/// A status that the current status cannot change to gives `invalid-transition`; so does the current status itself.
 #[utoipa::path(
     patch,
     path = "/events/{event_id}/actions/{id}",
@@ -717,6 +717,7 @@ async fn get_commitment(
 
 /// Changes a commitment. Its owner, the lead of its workstream or an event manager can do it.
 /// The status `firm` gives `invalid-transition`: only "make firm" makes a commitment firm.
+/// The current status and any status that it cannot change to give `invalid-transition` too.
 #[utoipa::path(
     patch,
     path = "/events/{event_id}/commitments/{id}",
