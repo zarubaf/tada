@@ -65,6 +65,7 @@ Operations in proposals (`domain::proposals::Operation`):
   An edit cannot remove the condition of a proposed commitment. An edit that adds a condition makes the commitment start `conditional`.
   The record keeps the passages of the proposal and the edited values as a source version of the kind `review`.
 - A proposal that names a workstream conflicts if the workstream closes before the apply.
+  A proposal of a new action or commitment conflicts if its owner is no longer a contributor or a manager of the event at the apply.
 - The operations listed here cover the proposals of 2a.
 
 Not in 2a:

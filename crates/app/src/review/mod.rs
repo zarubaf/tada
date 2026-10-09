@@ -34,8 +34,8 @@ use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::{
-    Changeset, FactStateInput, ProposalStore, owner_refusal, state_from_input, value_error_code,
-    workstream_refusal,
+    Changeset, FactStateInput, ProposalStore, owner_refusal, state_from_input, text_error_code,
+    value_error_code, workstream_refusal,
 };
 use crate::sources::SourceStore;
 use crate::store::StoreError;
@@ -207,6 +207,9 @@ impl Debug for ApplyStep {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApplyPlan {
     pub changeset_id: ChangesetId,
+    /// The event of the changeset, `None` for a changeset of the organization.
+    /// The review text of an edited person or institution belongs to it, so the members of the event read it.
+    pub event_id: Option<EventId>,
     /// The reviewer: the author of the review results, the fact versions and the review source versions.
     pub reviewer: Actor,
     /// The member who becomes the event manager of each new event (ADR 0052),
@@ -492,13 +495,19 @@ pub async fn apply_changeset(
     let steps: Vec<ApplyStep> = apply_order(&changeset.proposals, &selected)
         .into_iter()
         .map(|proposal| step(proposal, &edits))
-        .collect();
+        .collect::<Result<_, _>>()?;
+    // The owner of a new work record can lose the event role after the proposal (ADR 0068).
+    let stale = stale_owners(scope, &steps, stores.identity).await?;
+    if !stale.is_empty() {
+        return Err(conflict(caller, changeset_id, stale, now, stores).await);
+    }
     let audit = steps
         .iter()
         .flat_map(|step| audit_of(caller, step))
         .collect();
     let plan = ApplyPlan {
         changeset_id,
+        event_id: changeset.event_id,
         reviewer: caller.actor(),
         manager: caller.user_id(),
         now,
@@ -517,21 +526,57 @@ pub async fn apply_changeset(
         ApplyOutcome::NotOpen => Err(ApplyError::InvalidTransition),
         ApplyOutcome::KeyTaken => Err(invalid("key", "taken")),
         ApplyOutcome::Conflict(proposals) => {
-            // The conflict stays visible: a separate transaction records it (ADR 0050).
-            let batch = review_batch(
-                caller,
-                changeset_id,
-                &proposals,
-                BatchOutcome::Conflict,
-                now,
-            );
-            // A concurrent review may have closed a proposal first. Then its status stays as it is.
-            // If the record fails, the caller still learns of the conflict: the proposals stay open,
-            // and the next apply finds the same conflict and records it then.
-            let _recorded = stores.review.record(scope, &batch).await;
-            Err(ApplyError::Conflict(proposals))
+            Err(conflict(caller, changeset_id, proposals, now, stores).await)
         }
     }
+}
+
+/// Records the conflict of `proposals` and returns the error of the apply.
+/// The conflict stays visible: a separate transaction records it (ADR 0050).
+async fn conflict(
+    caller: &MemberCaller,
+    changeset_id: ChangesetId,
+    proposals: Vec<ProposalId>,
+    now: Timestamp,
+    stores: ReviewStores<'_>,
+) -> ApplyError {
+    let batch = review_batch(
+        caller,
+        changeset_id,
+        &proposals,
+        BatchOutcome::Conflict,
+        now,
+    );
+    // A concurrent review may have closed a proposal first. Then its status stays as it is.
+    // If the record fails, the caller still learns of the conflict: the proposals stay open,
+    // and the next apply finds the same conflict and records it then.
+    let _recorded = stores.review.record(caller.scope(), &batch).await;
+    ApplyError::Conflict(proposals)
+}
+
+/// The steps that create an action or a commitment whose owner is no longer a contributor or a manager of the event.
+/// An edited owner passed `check_edits`, so only an owner who changed role after the proposal shows here.
+async fn stale_owners(
+    scope: OrgScope,
+    steps: &[ApplyStep],
+    identity: &dyn IdentityStore,
+) -> Result<Vec<ProposalId>, StoreError> {
+    let mut stale = Vec::new();
+    for step in steps {
+        if let Operation::CreateAction {
+            event_id, owner, ..
+        }
+        | Operation::CreateCommitment {
+            event_id, owner, ..
+        } = &step.operation
+            && owner_refusal(scope, *event_id, *owner, identity)
+                .await?
+                .is_some()
+        {
+            stale.push(step.proposal_id);
+        }
+    }
+    Ok(stale)
 }
 
 /// The result of a successful rejection.
@@ -1123,12 +1168,20 @@ async fn edited_work_refusals(
     Ok(refusals)
 }
 
-fn step(proposal: &Proposal, edits: &Edits) -> ApplyStep {
+/// The step of one proposal. A change to firm needs a valid reason: the commitment keeps it (ADR 0068).
+fn step(proposal: &Proposal, edits: &Edits) -> Result<ApplyStep, ApplyError> {
     let firm_reason = match proposal.operation {
         Operation::ChangeCommitmentStatus {
             status: CommitmentStatus::Firm,
             ..
-        } => FirmReason::parse(proposal.reason.as_str()).ok(),
+        } => Some(
+            FirmReason::parse(proposal.reason.as_str()).map_err(|error| {
+                ApplyError::Invalid(vec![FieldError::new(
+                    format!("proposals/{}/reason", proposal.id),
+                    text_error_code(error),
+                )])
+            })?,
+        ),
         _ => None,
     };
     let (operation, evidence) = match (&proposal.operation, edits.get(&proposal.id)) {
@@ -1158,12 +1211,12 @@ fn step(proposal: &Proposal, edits: &Edits) -> ApplyStep {
             StepEvidence::Proposal(proposal.evidence.clone()),
         ),
     };
-    ApplyStep {
+    Ok(ApplyStep {
         proposal_id: proposal.id,
         operation,
         evidence,
         firm_reason,
-    }
+    })
 }
 
 fn step_status(step: &ApplyStep) -> ProposalStatus {
@@ -1366,6 +1419,28 @@ mod tests {
         let debug = format!("{step:?}");
         assert!(debug.contains("SetFact"), "{debug}");
         assert!(!debug.contains("Anna"), "{debug}");
+    }
+
+    #[test]
+    fn a_change_to_firm_without_a_valid_reason_does_not_apply() {
+        let mut firm = proposal(1, &[]);
+        firm.operation = Operation::ChangeCommitmentStatus {
+            event_id: EventId::from_uuid(Uuid::from_u128(20)),
+            commitment_id: tada_domain::ids::CommitmentId::from_uuid(Uuid::from_u128(40)),
+            status: CommitmentStatus::Firm,
+            expected_version: tada_domain::RecordVersion::FIRST,
+        };
+        firm.reason = Reason::parse(&"a".repeat(FirmReason::MAX_CHARS + 1)).unwrap();
+        let result = step(&firm, &Edits::new());
+        assert!(matches!(result, Err(ApplyError::Invalid(_))), "{result:?}");
+        firm.reason = Reason::parse("Der Auftrag ist unterschrieben.").unwrap();
+        let step = step(&firm, &Edits::new()).unwrap();
+        assert_eq!(
+            step.firm_reason
+                .map(|reason| reason.as_str().to_owned())
+                .as_deref(),
+            Some("Der Auftrag ist unterschrieben.")
+        );
     }
 
     fn open(n: u128, time: &str) -> OpenChangeset {

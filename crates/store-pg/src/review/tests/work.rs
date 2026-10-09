@@ -534,6 +534,16 @@ async fn an_edit_that_adds_a_condition_makes_a_commitment_conditional() {
         (name.as_str(), email.as_deref()),
         ("Moritz Beispiel", Some("moritz@example.org"))
     );
+    // The review text of each edit belongs to the event of the changeset, also the one of the person,
+    // so the members of the event can read the evidence.
+    let events: Vec<Option<Uuid>> = sqlx::query_scalar(
+        "SELECT i.event_id FROM source_version v JOIN source_item i ON i.id = v.source_item_id
+         WHERE v.kind = 'review'",
+    )
+    .fetch_all(&test.database.pool)
+    .await
+    .unwrap();
+    assert_eq!(events, [Some(open_day.event.as_uuid()); 2]);
 }
 
 #[tokio::test]
@@ -660,5 +670,211 @@ async fn a_workstream_that_closes_after_the_proposal_makes_the_apply_conflict() 
     assert_eq!(
         status_of(&test, &open_day, changeset.id, id).await,
         ProposalStatus::Conflict
+    );
+}
+
+#[tokio::test]
+async fn an_owner_who_lost_the_event_role_makes_the_apply_conflict() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let anna = open_day.contributor.user_id();
+    let (first, second) = (Uuid::now_v7(), Uuid::now_v7());
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![
+            proposal(
+                first,
+                action(open_day.event, Uuid::now_v7(), anna, None),
+                &[],
+                "im Mai 2030",
+            ),
+            proposal(
+                second,
+                action(
+                    open_day.event,
+                    Uuid::now_v7(),
+                    open_day.manager.user_id(),
+                    None,
+                ),
+                &[],
+                "im Mai 2030",
+            ),
+        ],
+    )
+    .await;
+    sqlx::query("DELETE FROM event_membership WHERE event_id = $1 AND user_id = $2")
+        .bind(open_day.event.as_uuid())
+        .bind(anna.as_uuid())
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
+    let result = apply(
+        &test,
+        &open_day.manager,
+        &changeset,
+        select(&[first, second]),
+    )
+    .await;
+    assert!(
+        matches!(result, Err(ApplyError::Conflict(ref ids)) if ids == &[ProposalId::from_uuid(first)]),
+        "{result:?}"
+    );
+    assert_eq!(count(&test, "action").await, 0);
+    assert_eq!(
+        status_of(&test, &open_day, changeset.id, first).await,
+        ProposalStatus::Conflict
+    );
+    assert_eq!(
+        status_of(&test, &open_day, changeset.id, second).await,
+        ProposalStatus::Open
+    );
+}
+
+#[tokio::test]
+async fn a_promisor_of_another_organization_is_refused() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let other = test.create_organization("musterhausen").await;
+    let (person_id, institution_id) = (Uuid::now_v7(), Uuid::now_v7());
+    sqlx::query(
+        "INSERT INTO person (id, organization_id, local_number, name, version, created_at, updated_at)
+         VALUES ($1, $2, 1, 'Moritz Muster', 1, now(), now())",
+    )
+    .bind(person_id)
+    .bind(other.as_uuid())
+    .execute(&test.database.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO institution (id, organization_id, local_number, name, kind, version, created_at, updated_at)
+         VALUES ($1, $2, 1, 'Zeltbau AG', 'company', 1, now(), now())",
+    )
+    .bind(institution_id)
+    .bind(other.as_uuid())
+    .execute(&test.database.pool)
+    .await
+    .unwrap();
+    for promisor in [
+        json!({"person": person_id}),
+        json!({"institution": institution_id}),
+    ] {
+        let input: NewChangeset = serde_json::from_value(json!({
+            "event_id": open_day.event.as_uuid(),
+            "source_text": SOURCE,
+            "proposals": [proposal(
+                Uuid::now_v7(),
+                commitment(open_day.event, Uuid::now_v7(), promisor, open_day.contributor.user_id()),
+                &[],
+                "im Mai 2030",
+            )],
+        }))
+        .unwrap();
+        let result = create_changeset(
+            &open_day.contributor,
+            input,
+            propose_stores(&test),
+            &FixedClock,
+        )
+        .await;
+        let Err(tada_app::proposals::ProposeError::Invalid(errors)) = result else {
+            panic!("not invalid: {result:?}");
+        };
+        let fields: Vec<_> = errors
+            .iter()
+            .map(|error| (error.field.as_ref(), error.code))
+            .collect();
+        assert_eq!(
+            fields,
+            [("proposals/0/operation/promisor", "unknown-record")]
+        );
+    }
+    assert_eq!(count(&test, "changeset").await, 0);
+    assert_eq!(count(&test, "proposal").await, 0);
+}
+
+fn action_change(event: EventId, id: Uuid, change: Value) -> Value {
+    let mut operation =
+        json!({"event_id": event.as_uuid(), "action_id": id, "expected_version": 1});
+    for (key, value) in change.as_object().unwrap() {
+        operation[key] = value.clone();
+    }
+    operation
+}
+
+#[tokio::test]
+async fn applying_changes_of_an_action_counts_its_version_and_keeps_the_evidence() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let (action_id, created) = (Uuid::now_v7(), Uuid::now_v7());
+    let anna = open_day.contributor.user_id();
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            created,
+            action(open_day.event, action_id, anna, None),
+            &[],
+            "im Mai 2030",
+        )],
+    )
+    .await;
+    apply(&test, &open_day.manager, &changeset, select(&[created]))
+        .await
+        .unwrap();
+
+    let (status, due) = (Uuid::now_v7(), Uuid::now_v7());
+    let mut due_change = action_change(
+        open_day.event,
+        action_id,
+        json!({"kind": "change-action-due", "due_date": "2030-05-01"}),
+    );
+    due_change["expected_version"] = json!(2);
+    let changes = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![
+            proposal(
+                status,
+                action_change(
+                    open_day.event,
+                    action_id,
+                    json!({"kind": "change-action-status", "status": "in-progress"}),
+                ),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(due, due_change, &[status], "20000 Besuchern"),
+        ],
+    )
+    .await;
+    apply(&test, &open_day.manager, &changes, select(&[due]))
+        .await
+        .unwrap();
+    let (state, version, due_date): (String, i64, Option<jiff_sqlx::Date>) =
+        sqlx::query_as("SELECT status, version, due_date FROM action WHERE id = $1")
+            .bind(action_id)
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap();
+    assert_eq!((state.as_str(), version), ("in-progress", 3));
+    assert_eq!(
+        due_date.map(|date| date.to_jiff().to_string()).as_deref(),
+        Some("2030-05-01")
+    );
+    assert_eq!(
+        record_evidence(&test, "action_id", action_id).await,
+        [
+            (1, created, "im Mai 2030".to_owned()),
+            (2, status, "Das Open Day".to_owned()),
+            (3, due, "20000 Besuchern".to_owned()),
+        ]
+    );
+    assert_eq!(
+        audit_actions(&test, action_id).await,
+        ["action.create", "action.change", "action.change"]
     );
 }
