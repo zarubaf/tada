@@ -209,11 +209,9 @@ pub async fn change_commitment(
     }
     let text = check.finish(text).map_err(WorkError::Invalid)?;
     let status = match status {
-        Some(CommitmentStatus::Firm) => return Err(WorkError::InvalidTransition),
-        Some(next) if next != old.status && !old.status.can_change_to(next) => {
-            return Err(WorkError::InvalidTransition);
-        }
-        Some(next) => next,
+        // A change to the current status keeps it.
+        Some(next) if next == old.status && next != CommitmentStatus::Firm => next,
+        Some(next) => old.status.change_directly(next)?,
         None => old.status,
     };
     let fields = CommitmentFields {
@@ -252,11 +250,8 @@ pub async fn make_commitment_firm(
     if current.version != input.expected_version {
         return Err(WorkError::VersionConflict);
     }
-    if !current.fields.status.can_change_to(CommitmentStatus::Firm) {
-        return Err(WorkError::InvalidTransition);
-    }
     let fields = CommitmentFields {
-        status: CommitmentStatus::Firm,
+        status: current.fields.status.change_to(CommitmentStatus::Firm)?,
         firm_reason: Some(reason),
         ..current.fields
     };

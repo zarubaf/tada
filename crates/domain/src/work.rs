@@ -149,12 +149,26 @@ status_enum!(
     }
 );
 
+/// A status change that the transitions of ADR 0068 do not allow.
+/// A change to the same status is not a transition either.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("the status cannot change to this status")]
+pub struct InvalidTransition;
+
 impl ActionStatus {
-    /// Returns true if an action in this status can change to `next`.
-    /// A change to the same status is not a transition.
-    pub fn can_change_to(self, next: Self) -> bool {
+    pub const ALL: [Self; 5] = [
+        Self::Open,
+        Self::InProgress,
+        Self::Blocked,
+        Self::Done,
+        Self::Canceled,
+    ];
+
+    /// The one decision of a status change of an action (ADR 0068): the direct command, the check of a
+    /// proposal and the apply all ask it.
+    pub fn change_to(self, next: Self) -> Result<Self, InvalidTransition> {
         use ActionStatus::{Blocked, Canceled, Done, InProgress, Open};
-        matches!(
+        let allowed = matches!(
             (self, next),
             (Open, InProgress)
                 | (InProgress, Open)
@@ -162,11 +176,32 @@ impl ActionStatus {
                 | (Blocked, Open | InProgress)
                 | (Open | InProgress | Blocked, Done | Canceled)
                 | (Done, Open)
-        )
+        );
+        if allowed {
+            Ok(next)
+        } else {
+            Err(InvalidTransition)
+        }
+    }
+
+    /// The statuses that an action in this status can change to.
+    pub fn next_statuses(self) -> Vec<Self> {
+        Self::ALL
+            .into_iter()
+            .filter(|next| self.change_to(*next).is_ok())
+            .collect()
     }
 }
 
 impl CommitmentStatus {
+    pub const ALL: [Self; 5] = [
+        Self::Conditional,
+        Self::Firm,
+        Self::Fulfilled,
+        Self::Broken,
+        Self::Withdrawn,
+    ];
+
     /// The status of a new commitment: conditional with a condition, else firm.
     pub fn initial(condition: Option<&ConditionText>) -> Self {
         if condition.is_some() {
@@ -176,13 +211,35 @@ impl CommitmentStatus {
         }
     }
 
-    /// Returns true if a commitment in this status can change to `next`.
-    pub fn can_change_to(self, next: Self) -> bool {
+    /// The one decision of a status change of a commitment (ADR 0068). A change to `firm` needs a reason,
+    /// which "make firm" and a proposal give; `change_directly` refuses it.
+    pub fn change_to(self, next: Self) -> Result<Self, InvalidTransition> {
         use CommitmentStatus::{Broken, Conditional, Firm, Fulfilled, Withdrawn};
-        matches!(
+        let allowed = matches!(
             (self, next),
             (Conditional, Firm) | (Conditional | Firm, Fulfilled | Broken | Withdrawn)
-        )
+        );
+        if allowed {
+            Ok(next)
+        } else {
+            Err(InvalidTransition)
+        }
+    }
+
+    /// A status change of the direct change command: any transition but to `firm`.
+    pub fn change_directly(self, next: Self) -> Result<Self, InvalidTransition> {
+        if next == Self::Firm {
+            return Err(InvalidTransition);
+        }
+        self.change_to(next)
+    }
+
+    /// The statuses that the direct change command can set on a commitment in this status.
+    pub fn direct_next_statuses(self) -> Vec<Self> {
+        Self::ALL
+            .into_iter()
+            .filter(|next| self.change_directly(*next).is_ok())
+            .collect()
     }
 }
 
@@ -190,26 +247,18 @@ impl CommitmentStatus {
 mod tests {
     use super::*;
 
-    const ACTION: [ActionStatus; 5] = [
-        ActionStatus::Open,
-        ActionStatus::InProgress,
-        ActionStatus::Blocked,
-        ActionStatus::Done,
-        ActionStatus::Canceled,
-    ];
-    const COMMITMENT: [CommitmentStatus; 5] = [
-        CommitmentStatus::Conditional,
-        CommitmentStatus::Firm,
-        CommitmentStatus::Fulfilled,
-        CommitmentStatus::Broken,
-        CommitmentStatus::Withdrawn,
-    ];
+    const ACTION: [ActionStatus; 5] = ActionStatus::ALL;
+    const COMMITMENT: [CommitmentStatus; 5] = CommitmentStatus::ALL;
 
     #[test]
     fn an_action_can_be_reopened_after_done() {
-        assert!(ActionStatus::Done.can_change_to(ActionStatus::Open));
-        assert!(!ActionStatus::Done.can_change_to(ActionStatus::InProgress));
-        assert!(!ActionStatus::Done.can_change_to(ActionStatus::Canceled));
+        assert!(ActionStatus::Done.change_to(ActionStatus::Open).is_ok());
+        assert!(
+            !ActionStatus::Done
+                .change_to(ActionStatus::InProgress)
+                .is_ok()
+        );
+        assert!(!ActionStatus::Done.change_to(ActionStatus::Canceled).is_ok());
     }
 
     #[test]
@@ -217,21 +266,29 @@ mod tests {
         assert!(
             ACTION
                 .iter()
-                .all(|next| !ActionStatus::Canceled.can_change_to(*next))
+                .all(|next| !ActionStatus::Canceled.change_to(*next).is_ok())
         );
     }
 
     #[test]
     fn a_blocked_action_returns_to_open_or_in_progress() {
-        assert!(ActionStatus::Blocked.can_change_to(ActionStatus::Open));
-        assert!(ActionStatus::Blocked.can_change_to(ActionStatus::InProgress));
-        assert!(ActionStatus::Open.can_change_to(ActionStatus::Blocked));
-        assert!(ActionStatus::InProgress.can_change_to(ActionStatus::Blocked));
+        assert!(ActionStatus::Blocked.change_to(ActionStatus::Open).is_ok());
+        assert!(
+            ActionStatus::Blocked
+                .change_to(ActionStatus::InProgress)
+                .is_ok()
+        );
+        assert!(ActionStatus::Open.change_to(ActionStatus::Blocked).is_ok());
+        assert!(
+            ActionStatus::InProgress
+                .change_to(ActionStatus::Blocked)
+                .is_ok()
+        );
     }
 
     #[test]
     fn an_action_never_changes_to_its_own_status() {
-        assert!(ACTION.iter().all(|s| !s.can_change_to(*s)));
+        assert!(ACTION.iter().all(|s| !s.change_to(*s).is_ok()));
     }
 
     #[test]
@@ -253,10 +310,18 @@ mod tests {
         assert!(
             COMMITMENT
                 .iter()
-                .all(|s| !s.can_change_to(CommitmentStatus::Conditional))
+                .all(|s| !s.change_to(CommitmentStatus::Conditional).is_ok())
         );
-        assert!(CommitmentStatus::Conditional.can_change_to(CommitmentStatus::Firm));
-        assert!(!CommitmentStatus::Firm.can_change_to(CommitmentStatus::Firm));
+        assert!(
+            CommitmentStatus::Conditional
+                .change_to(CommitmentStatus::Firm)
+                .is_ok()
+        );
+        assert!(
+            !CommitmentStatus::Firm
+                .change_to(CommitmentStatus::Firm)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -266,13 +331,53 @@ mod tests {
             CommitmentStatus::Broken,
             CommitmentStatus::Withdrawn,
         ] {
-            assert!(COMMITMENT.iter().all(|next| !done.can_change_to(*next)));
+            assert!(COMMITMENT.iter().all(|next| !done.change_to(*next).is_ok()));
         }
         for open in [CommitmentStatus::Conditional, CommitmentStatus::Firm] {
-            assert!(open.can_change_to(CommitmentStatus::Fulfilled));
-            assert!(open.can_change_to(CommitmentStatus::Broken));
-            assert!(open.can_change_to(CommitmentStatus::Withdrawn));
+            assert!(open.change_to(CommitmentStatus::Fulfilled).is_ok());
+            assert!(open.change_to(CommitmentStatus::Broken).is_ok());
+            assert!(open.change_to(CommitmentStatus::Withdrawn).is_ok());
         }
+    }
+
+    #[test]
+    fn a_direct_change_never_makes_a_commitment_firm() {
+        assert_eq!(
+            CommitmentStatus::Conditional.change_directly(CommitmentStatus::Firm),
+            Err(InvalidTransition)
+        );
+        assert_eq!(
+            CommitmentStatus::Conditional.change_directly(CommitmentStatus::Fulfilled),
+            Ok(CommitmentStatus::Fulfilled)
+        );
+        assert_eq!(
+            CommitmentStatus::Conditional.direct_next_statuses(),
+            [
+                CommitmentStatus::Fulfilled,
+                CommitmentStatus::Broken,
+                CommitmentStatus::Withdrawn
+            ]
+        );
+        assert!(
+            CommitmentStatus::Fulfilled
+                .direct_next_statuses()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn next_statuses_follow_the_transitions() {
+        assert_eq!(
+            ActionStatus::Open.next_statuses(),
+            [
+                ActionStatus::InProgress,
+                ActionStatus::Blocked,
+                ActionStatus::Done,
+                ActionStatus::Canceled
+            ]
+        );
+        assert_eq!(ActionStatus::Done.next_statuses(), [ActionStatus::Open]);
+        assert!(ActionStatus::Canceled.next_statuses().is_empty());
     }
 
     #[test]
