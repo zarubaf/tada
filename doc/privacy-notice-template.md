@@ -30,6 +30,9 @@ This file does not repeat it.
 - The categories of data, as in [the data inventory](data-inventory.md).
   They include the counters of sign-in attempts: keyed hashes of the email address and the IP address, kept for two hours at most.
 - Telegram, as an optional channel.
+  A message with the command `/vorschlag` becomes a source text that tada keeps with the event.
+  Each reader of the event sees it, also through the AI clients of members.
+  The message and the reply of the bot pass through Telegram.
 - The AI clients of members.
   They read the data of the member through the read tools of MCP.
 - Quotes as evidence.

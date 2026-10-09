@@ -48,6 +48,11 @@ privacy-template =
     Dann speichert tada die Telegram-Kennung und den Namen des Kontos.
     Ohne diese Verknüpfung nutzt tada Telegram nicht.
 
+    Ein verknüpftes Mitglied kann mit dem Befehl /vorschlag einen Wert für einen Anlass vorschlagen.
+    tada speichert die ganze Nachricht als Quellentext beim Anlass.
+    Alle, die den Anlass lesen dürfen, sehen diesen Text, auch über die KI-Clients der Mitglieder.
+    Die Nachricht und die Antwort des Bots, zum Beispiel mit dem Namen des Anlasses, gehen über Telegram.
+
     # KI-Clients der Mitglieder
 
     Ein Mitglied kann ein API-Token erstellen und damit den eigenen KI-Client verbinden.
