@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT e.action_id, e.commitment_id, e.person_id, e.institution_id, e.record_version,\n                      e.proposal_id, e.source_version_id,\n                      v.captured_at AS \"captured_at: jiff_sqlx::Timestamp\",\n                      e.start_offset, e.end_offset, e.quote, e.page\n               FROM record_evidence e\n               JOIN source_version v\n                   ON v.organization_id = e.organization_id AND v.id = e.source_version_id\n               WHERE e.organization_id = $1\n                 AND (e.action_id = ANY($2) OR e.commitment_id = ANY($3)\n                      OR e.person_id = ANY($4) OR e.institution_id = ANY($5))\n               ORDER BY e.record_version, e.start_offset, e.id",
+  "query": "SELECT e.action_id, e.commitment_id, e.person_id, e.institution_id, e.record_version,\n                      e.proposal_id, e.source_version_id,\n                      v.captured_at AS \"captured_at: jiff_sqlx::Timestamp\",\n                      e.start_offset, e.end_offset, e.quote, e.page\n               FROM record_evidence e\n               JOIN source_version v\n                   ON v.organization_id = e.organization_id AND v.id = e.source_version_id\n               WHERE e.organization_id = $1\n                 AND (e.action_id = ANY($2) OR e.commitment_id = ANY($3)\n                      OR e.person_id = ANY($4) OR e.institution_id = ANY($5))\n                 AND e.source_version_id = ANY($6)\n               ORDER BY e.record_version, e.start_offset, e.id",
   "describe": {
     "columns": [
       {
@@ -142,6 +142,7 @@
         "UuidArray",
         "UuidArray",
         "UuidArray",
+        "UuidArray",
         "UuidArray"
       ]
     },
@@ -160,5 +161,5 @@
       true
     ]
   },
-  "hash": "b868bd7f848e00ecba7461f95e02407d99a70ebade59f39868a14465acb46eb2"
+  "hash": "c0cd1b9735656cf2825cdb31b679d01441f45fd703bd43159396cec51289993b"
 }

@@ -98,6 +98,31 @@ impl EvidenceStore for Database {
             RecordRef::Institution(id) => Some(id.as_uuid()),
             _ => None,
         });
+        let organization = scope.organization_id().as_uuid();
+        // A person or an institution belongs to the organization, but the source of its evidence belongs to an event:
+        // the caller sees only the passages of the sources that it can read (ADR 0050). The filter comes before the
+        // read of the quotes: first the cited source versions, then the readable ones of them, then the passages.
+        let cited = sqlx::query_scalar!(
+            "SELECT DISTINCT source_version_id FROM record_evidence
+             WHERE organization_id = $1
+               AND (action_id = ANY($2) OR commitment_id = ANY($3)
+                    OR person_id = ANY($4) OR institution_id = ANY($5))",
+            organization,
+            &actions,
+            &commitments,
+            &persons,
+            &institutions,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        if cited.is_empty() {
+            return Ok(Vec::new());
+        }
+        let readable: Vec<Uuid> = readable_source_ids(&self.pool, scope, reach, &cited)
+            .await?
+            .into_iter()
+            .collect();
         let rows = sqlx::query_as!(
             EvidenceRow,
             r#"SELECT e.action_id, e.commitment_id, e.person_id, e.institution_id, e.record_version,
@@ -110,24 +135,19 @@ impl EvidenceStore for Database {
                WHERE e.organization_id = $1
                  AND (e.action_id = ANY($2) OR e.commitment_id = ANY($3)
                       OR e.person_id = ANY($4) OR e.institution_id = ANY($5))
+                 AND e.source_version_id = ANY($6)
                ORDER BY e.record_version, e.start_offset, e.id"#,
-            scope.organization_id().as_uuid(),
+            organization,
             &actions,
             &commitments,
             &persons,
             &institutions,
+            &readable,
         )
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
-        // A person or an institution belongs to the organization, but the source of its evidence belongs to an event:
-        // the caller sees only the passages of the sources that it can read (ADR 0050).
-        let mut sources: Vec<Uuid> = rows.iter().map(|row| row.source_version_id).collect();
-        sources.sort_unstable();
-        sources.dedup();
-        let readable = readable_source_ids(&self.pool, scope, reach, &sources).await?;
         rows.into_iter()
-            .filter(|row| readable.contains(&row.source_version_id))
             .map(|row| Ok((row.record()?, RecordEvidenceView::try_from(row)?)))
             .collect()
     }
