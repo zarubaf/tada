@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-06
+- Amended by: [0070](0070-ai-security-review-replaces-the-external-review.md)
 
 ## Context
 
