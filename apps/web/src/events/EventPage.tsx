@@ -103,6 +103,9 @@ export function EventPage({
             <NavLink to={`${base}/documents`} within="/documents">
               {t("event-nav-documents")}
             </NavLink>
+            <NavLink to={`${base}/actions`}>{t("event-nav-actions")}</NavLink>
+            <NavLink to={`${base}/commitments`}>{t("event-nav-commitments")}</NavLink>
+            <NavLink to={`${base}/workstreams`}>{t("event-nav-workstreams")}</NavLink>
           </SubNav>
           {children}
         </EventContext>

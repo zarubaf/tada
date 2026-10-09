@@ -97,6 +97,21 @@ function renderAt(path: string, api: ReturnType<typeof createApi>) {
             <p>Mitgliederliste</p>
           </EventPage>
         </Route>
+        <Route path="/events/:eventId/actions">
+          <EventPage api={api}>
+            <p>Aufgabenliste</p>
+          </EventPage>
+        </Route>
+        <Route path="/events/:eventId/commitments">
+          <EventPage api={api}>
+            <p>Zusagenliste</p>
+          </EventPage>
+        </Route>
+        <Route path="/events/:eventId/workstreams">
+          <EventPage api={api}>
+            <p>Arbeitsbereichsliste</p>
+          </EventPage>
+        </Route>
       </Routes>
     </Router>,
   );
@@ -188,6 +203,37 @@ describe("EventPage", () => {
     expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
       "aria-current",
     );
+  });
+
+  it.each([
+    ["Aufgaben", "actions", "Aufgabenliste"],
+    ["Zusagen", "commitments", "Zusagenliste"],
+    ["Arbeitsbereiche", "workstreams", "Arbeitsbereichsliste"],
+  ])("marks only %s as current on its path", async (name, segment, content) => {
+    const { api } = fakeApi(json(200, event));
+    renderAt(`/events/${event.id}/${segment}`, api);
+
+    await screen.findByText(content);
+    const nav = screen.getByRole("navigation", { name: "Anlass" });
+    const current = within(nav)
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("aria-current") === "page");
+    expect(current.map((link) => link.textContent)).toEqual([name]);
+  });
+
+  it.each([
+    ["Aufgaben", "actions", "Aufgabenliste"],
+    ["Zusagen", "commitments", "Zusagenliste"],
+    ["Arbeitsbereiche", "workstreams", "Arbeitsbereichsliste"],
+  ])("opens %s from the sub-navigation", async (name, segment, content) => {
+    const { api, urls } = fakeApi(json(200, event));
+    renderAt(`/events/${event.id}`, api);
+
+    await userEvent.click(await screen.findByRole("link", { name }));
+    expect(window.location.pathname).toBe(`/events/${event.id}/${segment}`);
+    expect(await screen.findByText(content)).toBeInTheDocument();
+    // The page stays mounted: the event is not loaded a second time.
+    expect(urls).toHaveLength(1);
   });
 
   it("opens the members page from the sub-navigation", async () => {

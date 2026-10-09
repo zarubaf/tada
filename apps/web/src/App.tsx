@@ -26,6 +26,9 @@ import { SignInPage } from "./sign-in/SignInPage";
 import { TelegramPage } from "./telegram/TelegramPage";
 import { TokensPage } from "./tokens/TokensPage";
 import { SkipLink } from "./ui/SkipLink";
+import { ActionsPage } from "./work/ActionsPage";
+import { CommitmentsPage } from "./work/CommitmentsPage";
+import { WorkstreamsPage } from "./work/WorkstreamsPage";
 
 const defaultApi = createApi();
 
@@ -88,6 +91,21 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   <Route path="/events/:eventId/documents">
                     <EventPage api={api}>
                       <DocumentsPage api={api} />
+                    </EventPage>
+                  </Route>
+                  <Route path="/events/:eventId/actions">
+                    <EventPage api={api}>
+                      <ActionsPage api={api} />
+                    </EventPage>
+                  </Route>
+                  <Route path="/events/:eventId/commitments">
+                    <EventPage api={api}>
+                      <CommitmentsPage api={api} />
+                    </EventPage>
+                  </Route>
+                  <Route path="/events/:eventId/workstreams">
+                    <EventPage api={api}>
+                      <WorkstreamsPage api={api} />
                     </EventPage>
                   </Route>
                   <Route path="/documents/:documentId">

@@ -53,7 +53,7 @@ function civilDate(date: string): Date {
 }
 
 /** A civil date (`2030-05-18`) as 18.05.2030. */
-function formatDate(date: string): string {
+export function formatDate(date: string): string {
   return dayFormat.format(civilDate(date));
 }
 

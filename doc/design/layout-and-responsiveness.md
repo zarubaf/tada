@@ -86,7 +86,7 @@ Each template uses the `Page` component for the `main` element, the page gutters
 | Form             | One column, at most 40rem wide, the actions at the bottom                                                   | Create and edit pages                                |
 | Public page      | No shell. The app name, one heading and a form column of at most 40rem                                      | Sign-in, magic link, invitation, organization choice |
 | Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings             |
-| Event page       | The event header with the key and the name, the sub-navigation of the event, then the sub-page              | „Übersicht“, „Mitglieder“ of an event                |
+| Event page       | The event header with the key and the name, the sub-navigation of the event, then the sub-page              | „Übersicht“, „Mitglieder“, „Aufgaben“ of an event    |
 | Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                          |
 
 ## Widths
