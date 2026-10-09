@@ -353,6 +353,40 @@ async fn a_stolen_session_does_not_come_back_with_a_new_invitation() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
+/// The attack: an admin who expects the removal invites an own second address as admin. The
+/// removal revokes the pending invitations of the admin, so the link does not bring the admin back.
+#[tokio::test]
+async fn a_removal_revokes_the_pending_invitations_of_the_member() {
+    let app = App::start().await;
+    let owner = app.member("Olga Owner", OrganizationRole::Owner).await;
+    let admin = app.member("Adam Admin", OrganizationRole::Admin).await;
+    let (status, own) = app.invite(&admin, "adam.alt@example.org", "admin").await;
+    assert_eq!(status, StatusCode::CREATED);
+    let token = app.mailed_token(LINK).await;
+    let (status, other) = app.invite(&owner, "berta@example.org", "member").await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, _) = app.remove(&owner, admin.id).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let (status, problem) = app.accept(&token).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "{problem}");
+    let (_, page) = app.get(&owner, "/api/v1/invitations").await;
+    assert_eq!(
+        page["items"],
+        json!([other]),
+        "the invitation of the owner stays"
+    );
+    assert_eq!(
+        app.count(&format!(
+            "SELECT count(*) FROM audit_event WHERE action = 'invitation.revoke' AND record_id = '{}'",
+            own["id"].as_str().unwrap()
+        ))
+        .await,
+        1
+    );
+}
+
 #[tokio::test]
 async fn the_last_owner_cannot_leave_and_an_admin_cannot_remove_an_owner() {
     let app = App::start().await;

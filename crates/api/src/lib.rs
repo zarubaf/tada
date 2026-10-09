@@ -648,6 +648,7 @@ mod tests {
             _: tada_app::members::Remover,
             _: tada_app::domain::ids::UserId,
             _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<Option<tada_app::members::Refusal>, tada_app::store::StoreError> {
             unreachable!()

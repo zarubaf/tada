@@ -238,6 +238,7 @@ async fn remove_member(
         UserId::from_uuid(user_id),
         record_version(request.expected_version)?,
         state.members.as_ref(),
+        state.clock.as_ref(),
     )
     .await?;
     Ok(StatusCode::NO_CONTENT)

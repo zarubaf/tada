@@ -391,6 +391,7 @@ impl MemberStore for Database {
         remover: Remover,
         member: UserId,
         expected_version: RecordVersion,
+        now: Timestamp,
         audit: &AuditEvent,
     ) -> Result<Option<Refusal>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
@@ -416,6 +417,24 @@ impl MemberStore for Database {
             .execute(&mut *tx)
             .await
             .map_err(store_error)?;
+        // The pending invitations of the member go too: a member who expects the removal could
+        // invite a second address of their own and come back with it.
+        let pending = sqlx::query_scalar!(
+            "SELECT id FROM invitation
+             WHERE organization_id = $1 AND invited_by = $2 AND status = 'pending'",
+            scope.organization_id().as_uuid(),
+            member.as_uuid(),
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        let revoked = revoke_invitations(&mut tx, scope.organization_id(), &pending, now)
+            .await
+            .map_err(store_error)?;
+        for id in revoked {
+            let event = audit.for_record(AuditAction::InvitationRevoke, id);
+            audit::record(&mut tx, &event).await.map_err(store_error)?;
+        }
         // The log of each event shows that the member left it (ADR 0061).
         for (event, role) in locked.event_roles {
             let left = audit
@@ -539,6 +558,7 @@ mod tests {
                     Remover::of(remover),
                     member,
                     RecordVersion::FIRST,
+                    NOW.parse().unwrap(),
                     &audit,
                 )
                 .await
@@ -976,6 +996,7 @@ mod tests {
                 Remover::of(&other),
                 anna,
                 RecordVersion::FIRST,
+                NOW.parse().unwrap(),
                 &audit,
             )
             .await

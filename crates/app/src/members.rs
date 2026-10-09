@@ -217,7 +217,8 @@ pub trait MemberStore: Debug + Send + Sync {
 
     /// Removes the organization membership of `member` with its event memberships and its API tokens, if
     /// `remover` allows it for the locked rows. The same transaction ends all sessions of `member`, in
-    /// each organization. The store adds the old role to `audit`.
+    /// each organization, and revokes the pending invitations that `member` created, at `now`, with an
+    /// `InvitationRevoke` event of the actor of `audit` for each one. The store adds the old role to `audit`.
     /// The audit event `organization_membership.remove` implies the deletion of the tokens; no event names them.
     async fn remove(
         &self,
@@ -225,6 +226,7 @@ pub trait MemberStore: Debug + Send + Sync {
         remover: Remover,
         member: UserId,
         expected_version: RecordVersion,
+        now: Timestamp,
         audit: &AuditEvent,
     ) -> Result<Option<Refusal>, StoreError>;
 }
@@ -585,11 +587,14 @@ pub async fn revoke_invitation(
 /// the membership. tada cannot tell a stolen session from the member's own one, so a removal is
 /// the remedy for a stolen session: a kept session could choose the organization again after a new
 /// invitation. The member signs in again with a magic link.
+/// The pending invitations that the member created stop working too: a member who expects the
+/// removal could otherwise invite a second address of their own.
 pub async fn remove_member(
     caller: &MemberCaller,
     member: UserId,
     expected_version: RecordVersion,
     store: &dyn MemberStore,
+    clock: &dyn Clock,
 ) -> Result<(), RemoveMemberError> {
     let scope = caller.scope();
     // An organization membership has no ID of its own: the record ID is its organization.
@@ -601,7 +606,14 @@ pub async fn remove_member(
     )
     .about(member);
     match store
-        .remove(scope, Remover::of(caller), member, expected_version, &audit)
+        .remove(
+            scope,
+            Remover::of(caller),
+            member,
+            expected_version,
+            clock.now(),
+            &audit,
+        )
         .await?
     {
         None => Ok(()),
@@ -840,6 +852,7 @@ mod tests {
             _: Remover,
             _: UserId,
             _: RecordVersion,
+            _: Timestamp,
             _: &AuditEvent,
         ) -> Result<Option<Refusal>, StoreError> {
             unreachable!()
