@@ -348,8 +348,8 @@ async fn after_sign_out_the_old_cookie_is_unauthenticated() {
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
 }
 
-/// A sign-in ends the session token that the request already sends (ASVS 7.2.4), also a token of
-/// another user. Only the new token works afterwards.
+/// A sign-in ends the session token that the request already sends (ASVS 7.2.4). Only the new
+/// token works afterwards.
 #[tokio::test]
 async fn a_sign_in_ends_the_session_that_the_request_sends() {
     let app = App::start().await;
