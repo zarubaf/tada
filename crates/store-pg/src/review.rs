@@ -23,8 +23,8 @@ use tada_app::domain::ids::{
 use tada_app::domain::proposals::{DraftDocument, Operation};
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::review::{
-    ApplyOutcome, ApplyPlan, ApplyStep, LocalRecord, NewLocalId, OpenChangeset, Recorded,
-    ReviewBatch, ReviewOutcome, ReviewRecord, ReviewStore, StepEvidence,
+    ApplyOutcome, ApplyPlan, ApplyStep, LocalRecord, NewLocalId, OpenChangeset, OpenProposal,
+    Recorded, ReviewBatch, ReviewOutcome, ReviewRecord, ReviewStore, StepEvidence,
 };
 use tada_app::store::StoreError;
 
@@ -32,6 +32,7 @@ use crate::Database;
 use crate::documents::{DOCUMENT_COUNTER, DRAFT};
 use crate::error::{InvalidRow, store_error};
 use crate::local_ids::next_local_number;
+use crate::proposals::operation_from_json;
 use crate::sources::{TextItem, TextKind};
 use crate::{actor, audit, drafts, events, sources, values};
 
@@ -165,33 +166,76 @@ impl ReviewStore for Database {
         scope: OrgScope,
         event: Option<EventId>,
     ) -> Result<Vec<OpenChangeset>, StoreError> {
-        let rows = sqlx::query!(
-            r#"SELECT c.id, c.event_id, c.author, c.created_at AS "created_at: jiff_sqlx::Timestamp",
-                      count(*) AS "open_proposals!"
-               FROM changeset c
-               JOIN proposal p ON p.organization_id = c.organization_id AND p.changeset_id = c.id
-               WHERE c.organization_id = $1 AND ($2::uuid IS NULL OR c.event_id = $2)
+        let organization = scope.organization_id().as_uuid();
+        let event = event.map(EventId::as_uuid);
+        let proposals = sqlx::query!(
+            r#"SELECT p.changeset_id, p.id, p.operation, p.operation_version
+               FROM proposal p
+               JOIN changeset c ON c.organization_id = p.organization_id AND c.id = p.changeset_id
+               WHERE p.organization_id = $1 AND ($2::uuid IS NULL OR c.event_id = $2)
                  AND NOT EXISTS (
                      SELECT 1 FROM review_result r
                      WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id
                  )
-               GROUP BY c.id
-               ORDER BY c.created_at, c.id"#,
-            scope.organization_id().as_uuid(),
-            event.map(EventId::as_uuid) as Option<Uuid>,
+               ORDER BY p.id"#,
+            organization,
+            event as Option<Uuid>,
         )
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
-        rows.into_iter()
+        if proposals.is_empty() {
+            return Ok(Vec::new());
+        }
+        let changeset_ids: Vec<Uuid> = proposals.iter().map(|row| row.changeset_id).collect();
+        let changesets = sqlx::query!(
+            r#"SELECT id, event_id, author, created_at AS "created_at: jiff_sqlx::Timestamp"
+               FROM changeset
+               WHERE organization_id = $1 AND id = ANY($2)
+               ORDER BY created_at, id"#,
+            organization,
+            &changeset_ids,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        let dependencies = sqlx::query!(
+            "SELECT proposal_id, depends_on
+             FROM proposal_dependency
+             WHERE organization_id = $1 AND changeset_id = ANY($2)
+             ORDER BY proposal_id, depends_on",
+            organization,
+            &changeset_ids,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        let mut depends_on: HashMap<Uuid, Vec<ProposalId>> = HashMap::new();
+        for dependency in dependencies {
+            depends_on
+                .entry(dependency.proposal_id)
+                .or_default()
+                .push(ProposalId::from_uuid(dependency.depends_on));
+        }
+        let mut open: HashMap<Uuid, Vec<OpenProposal>> = HashMap::new();
+        for row in proposals {
+            open.entry(row.changeset_id)
+                .or_default()
+                .push(OpenProposal {
+                    id: ProposalId::from_uuid(row.id),
+                    operation: operation_from_json(row.operation_version, &row.operation)?,
+                    depends_on: depends_on.remove(&row.id).unwrap_or_default(),
+                });
+        }
+        changesets
+            .into_iter()
             .map(|row| {
                 Ok(OpenChangeset {
                     id: ChangesetId::from_uuid(row.id),
                     event_id: row.event_id.map(EventId::from_uuid),
                     author: actor::from_json(&row.author)?,
                     created_at: row.created_at.to_jiff(),
-                    open_proposals: u32::try_from(row.open_proposals)
-                        .map_err(|_| InvalidRow("proposal"))?,
+                    proposals: open.remove(&row.id).unwrap_or_default(),
                 })
             })
             .collect()

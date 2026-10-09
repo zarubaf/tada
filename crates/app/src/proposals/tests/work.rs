@@ -17,6 +17,7 @@ use crate::records::{Changed, Created, NumberCursor};
 use crate::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 use crate::work::{
     ActionFields, CommitmentFields, MyWork, NewActionRecord, NewCommitmentRecord, WorkFilter,
+    WorkOwners,
 };
 use crate::workstreams::{
     Changed as WorkstreamChanged, Created as WorkstreamCreated, WorkstreamUpdate,
@@ -275,6 +276,16 @@ impl WorkStore for Memory {
         _: EventId,
         _: &WorkFilter<CommitmentStatus>,
     ) -> Result<Vec<CommitmentView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn owners(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: &[ActionId],
+        _: &[CommitmentId],
+    ) -> Result<WorkOwners, StoreError> {
         unreachable!()
     }
 

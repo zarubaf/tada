@@ -262,6 +262,7 @@ impl Mcp {
             review: &self.test.database,
             sources: &self.test.database,
             workstreams: &self.test.database,
+            work: &self.test.database,
         };
         let input = ApplyInput {
             selected: selected

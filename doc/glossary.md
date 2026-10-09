@@ -93,7 +93,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | apply               | The command that accepts selected proposals of a changeset and their dependencies, all or nothing (ADR 0050).                        | merge (of proposals)     |
 | stale               | The mark of an open proposal that is older than 14 days. A stale proposal does not change.                                           | expired                  |
 | overdue proposal    | An open proposal that is older than 3 days. The event managers see it in their inbox even if another member reviews it (ADR 0067).   | stale                    |
-| Review Inbox        | The list of changesets with open proposals that a member can review.                                                                 | approval queue           |
+| Review Inbox        | The list of changesets with open proposals that the review routing gives a member, and the overdue proposals for event managers.     | approval queue           |
 | provenance manifest | The list of fact versions and source passages that one document version uses, extracted from its `tada:` links.                      | citations list           |
 | legal redaction     | The audited replacement of personal data with a tombstone, the only exception to immutability (ADR 0045).                            | deletion (for evidence)  |
 

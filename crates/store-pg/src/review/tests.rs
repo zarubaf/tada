@@ -12,8 +12,8 @@ use tada_app::proposals::{
     Changeset, Created, FactStateInput, NewChangeset, ProposeStores, ValueInput, create_changeset,
 };
 use tada_app::review::{
-    Applied, ApplyError, ApplyInput, Edit, ProposalStatus, ReviewQueryError, ReviewStore,
-    ReviewStores, apply_changeset, list_open_changesets, reject_proposals, status,
+    Applied, ApplyError, ApplyInput, Edit, ProposalStatus, ReviewStore, ReviewStores,
+    apply_changeset, list_open_changesets, reject_proposals, status,
 };
 
 use crate::actor;
@@ -70,6 +70,7 @@ fn stores(test: &TestDatabase) -> ReviewStores<'_> {
         review: &test.database,
         sources: &test.database,
         workstreams: &test.database,
+        work: &test.database,
     }
 }
 
@@ -571,21 +572,20 @@ async fn a_contributor_cannot_review() {
         Some(event),
         None,
         PageLimit::DEFAULT,
-        &test.database,
-        &test.database,
+        stores(&test),
+        &FixedClock,
     )
-    .await;
-    assert!(
-        matches!(listed, Err(ReviewQueryError::Forbidden)),
-        "{listed:?}"
-    );
+    .await
+    .unwrap();
+    // The routing gives the contributor no proposal of the event (ADR 0067).
+    assert!(listed.items.is_empty());
     let inbox = list_open_changesets(
         contributor,
         None,
         None,
         PageLimit::DEFAULT,
-        &test.database,
-        &test.database,
+        stores(&test),
+        &FixedClock,
     )
     .await
     .unwrap();
@@ -733,8 +733,8 @@ async fn inbox(test: &TestDatabase, caller: &MemberCaller) -> Vec<ChangesetId> {
         None,
         None,
         PageLimit::DEFAULT,
-        &test.database,
-        &test.database,
+        stores(test),
+        &FixedClock,
     )
     .await
     .unwrap()
@@ -784,14 +784,14 @@ async fn the_review_inbox_shows_organization_changesets_to_owners_and_admins_onl
         Some(event),
         None,
         PageLimit::DEFAULT,
-        &test.database,
-        &test.database,
+        stores(&test),
+        &FixedClock,
     )
     .await
     .unwrap()
     .items;
     assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].open_proposals, 1);
+    assert_eq!(listed[0].open_proposals(), 1);
     assert_eq!(listed[0].event_id, Some(event));
     assert_eq!(listed[0].author, open_day.contributor.actor());
 
@@ -949,8 +949,8 @@ async fn the_rejection_of_a_new_event_rejects_its_facts() {
             None,
             None,
             PageLimit::DEFAULT,
-            &test.database,
-            &test.database,
+            stores(&test),
+            &FixedClock,
         )
         .await
         .unwrap()

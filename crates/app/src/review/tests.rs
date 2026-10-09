@@ -156,7 +156,7 @@ fn open(n: u128, time: &str) -> OpenChangeset {
             None,
         ),
         created_at: at(time),
-        open_proposals: 1,
+        proposals: Vec::new(),
     }
 }
 

@@ -18,6 +18,8 @@ function setFact(
     evidence: [],
     status: "open",
     stale: false,
+    overdue: false,
+    routed_to_me: true,
     operation: {
       kind: "set-fact",
       event_id: EVENT,

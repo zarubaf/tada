@@ -2050,7 +2050,7 @@
         "tags": [
           "review"
         ],
-        "summary": "Lists the changesets of an event with open proposals, oldest first. Only its event managers see them.",
+        "summary": "Lists the changesets of an event with open proposals in the Review Inbox of the caller, oldest first (ADR 0067).\nA viewer of the event gets `forbidden`.",
         "operationId": "list_event_changesets",
         "parameters": [
           {
@@ -2210,7 +2210,7 @@
         "tags": [
           "review"
         ],
-        "summary": "The Review Inbox: the changesets with open proposals that the caller can review, oldest first.\nThey are the changesets of each event that the caller manages and, for owners and admins,\nthe changesets of the organization, for example one that creates an event.",
+        "summary": "The Review Inbox: the changesets with open proposals that the review routing gives the caller, oldest first (ADR 0067).\nA proposal goes to the owner of the record that it changes, to the lead of the workstream of a new record,\nor to the event managers. An event manager also sees the overdue proposals of the event.\nOwners and admins also see the changesets of the organization, for example one that creates an event.",
         "operationId": "list_changesets",
         "parameters": [
           {
@@ -2286,7 +2286,7 @@
         "tags": [
           "review"
         ],
-        "summary": "Reads a changeset with each proposal, its evidence, its status and the current value of its target.\nOnly the reviewers of the changeset can read it.",
+        "summary": "Reads a changeset with each proposal, its evidence, its status and the current value of its target.\nOnly a reviewer of at least one of its proposals can read it (ADR 0067).",
         "operationId": "get_changeset",
         "parameters": [
           {
@@ -8592,7 +8592,7 @@
           "review_count": {
             "type": "integer",
             "format": "int32",
-            "description": "The number of proposals that the caller reviews.",
+            "description": "The number of open proposals in the Review Inbox of the caller: the proposals that the review routing gives\nthe caller, and for an event manager also the overdue proposals of the event.",
             "minimum": 0
           }
         }
@@ -9616,7 +9616,9 @@
           "reason",
           "evidence",
           "status",
-          "stale"
+          "stale",
+          "overdue",
+          "routed_to_me"
         ],
         "properties": {
           "id": {
@@ -9651,6 +9653,14 @@
           "stale": {
             "type": "boolean",
             "description": "True if the proposal is open and older than 14 days (ADR 0050)."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "True if the proposal is open and older than 3 days. The Review Inbox of an event manager shows an overdue\nproposal also when it goes to another reviewer (ADR 0067)."
+          },
+          "routed_to_me": {
+            "type": "boolean",
+            "description": "True if the review routing gives the proposal to the caller: as the owner of the record, as the lead of the\nworkstream, or as an event manager when it goes to no other reviewer (ADR 0067).\nAn event manager can review each proposal of the event, also when this is false."
           },
           "conflict_reason": {
             "oneOf": [

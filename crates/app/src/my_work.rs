@@ -7,6 +7,7 @@ use tada_domain::ids::EventId;
 
 use crate::access::{self, Principal};
 use crate::records::{Shown, shown};
+use crate::review::{InboxPorts, ReviewStore, review_count};
 use crate::work::{
     ActionView, ChangeRights, CommitmentView, InEvent, WorkError, WorkPorts, WorkRecord,
 };
@@ -19,14 +20,16 @@ pub struct MyWorkView {
     pub actions: Vec<InEvent<Shown<ActionView>>>,
     /// The commitments with the status `conditional` or `firm`, in the same order.
     pub commitments: Vec<InEvent<Shown<CommitmentView>>>,
-    /// The proposals that the caller reviews. Zero until the review routing feeds it.
+    /// The open proposals in the Review Inbox of the caller (ADR 0067).
     pub review_count: u32,
 }
 
-/// The open records of the caller in the events that the caller can read (spec 2a, section 4).
+/// The open records of the caller in the events that the caller can read, and the number of proposals in the Review
+/// Inbox of the caller (spec 2a, section 4).
 pub async fn my_work(
     caller: &impl Principal,
     ports: WorkPorts<'_>,
+    review: &dyn ReviewStore,
 ) -> Result<MyWorkView, WorkError> {
     let events = access::readable_events(caller, ports.identity).await?;
     let work = ports
@@ -68,10 +71,16 @@ pub async fn my_work(
         ports.work,
     )
     .await?;
+    let inbox = InboxPorts {
+        identity: ports.identity,
+        review,
+        work: ports.work,
+        workstreams: ports.workstreams,
+    };
     Ok(MyWorkView {
         actions: in_events(actions),
         commitments: in_events(commitments),
-        review_count: 0,
+        review_count: review_count(caller, inbox, ports.clock.now()).await?,
     })
 }
 

@@ -1346,6 +1346,16 @@ mod tests {
             unreachable!()
         }
 
+        async fn owners(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: &[tada_app::domain::ids::ActionId],
+            _: &[tada_app::domain::ids::CommitmentId],
+        ) -> Result<tada_app::work::WorkOwners, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
         async fn my_open_work(
             &self,
             _: tada_app::caller::OrgScope,

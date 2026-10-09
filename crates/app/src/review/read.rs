@@ -7,7 +7,9 @@ use tada_domain::ids::{ChangesetId, EventId, SourceVersionId};
 use tada_domain::proposals::{Operation, Proposal};
 use tada_domain::sources::{Excerpt, SourceText};
 
-use super::{ProposalStatus, ReviewQueryError, ReviewStores, proposal_status, reviewable};
+use super::{
+    ProposalStatus, ReviewQueryError, ReviewStores, Reviewable, proposal_status, reviewable,
+};
 use crate::access;
 use crate::caller::{Actor, MemberCaller};
 use crate::clock::Clock;
@@ -41,6 +43,11 @@ pub struct ProposalReview {
     pub status: ProposalStatus,
     /// True if the proposal is open and older than `STALE_AFTER`.
     pub stale: bool,
+    /// True if the proposal is open and older than `OVERDUE_AFTER` (ADR 0067).
+    pub overdue: bool,
+    /// True if the review routing gives the proposal to the caller (ADR 0067). An event manager can review each
+    /// proposal of the event, also one that is not routed to the manager.
+    pub routed_to_me: bool,
     /// Why the proposal conflicts. `None` unless the status is `Conflict`.
     pub conflict: Option<ConflictReason>,
     /// The current version of the fact that a `SetFact` proposal sets, or `None`.
@@ -70,7 +77,7 @@ struct MissingProvenance;
 struct PassageOutsideText;
 
 /// The changeset with each proposal, its evidence, its status and the current value of its target,
-/// for a caller who can review the changeset.
+/// for a caller who reviews at least one of its proposals (ADR 0067).
 pub async fn get_changeset(
     caller: &MemberCaller,
     id: ChangesetId,
@@ -78,12 +85,23 @@ pub async fn get_changeset(
     clock: &dyn Clock,
 ) -> Result<ChangesetReview, ReviewQueryError> {
     let scope = caller.scope();
-    let (changeset, source) = reviewable(caller, id, stores).await?;
+    let reviewable = reviewable(caller, id, stores).await?;
+    let routed: Vec<bool> = reviewable
+        .changeset
+        .proposals
+        .iter()
+        .map(|proposal| reviewable.routed_to(caller, proposal.id))
+        .collect();
+    let Reviewable {
+        changeset,
+        source,
+        results,
+        ..
+    } = reviewable;
     let texts = evidence_texts(caller, &changeset, source, stores).await?;
-    let results = stores.review.results(scope, id).await?;
     let now = clock.now();
     let mut proposals = Vec::new();
-    for proposal in changeset.proposals {
+    for (proposal, routed_to_me) in changeset.proposals.into_iter().zip(routed) {
         let status = proposal_status(&results, proposal.id);
         let current = match proposal.operation {
             Operation::SetFact {
@@ -135,6 +153,8 @@ pub async fn get_changeset(
             conflict: (status == ProposalStatus::Conflict)
                 .then(|| conflict_reason(&proposal.operation, current.as_ref())),
             stale: status.is_stale(changeset.created_at, now),
+            overdue: status.is_overdue(changeset.created_at, now),
+            routed_to_me,
             status,
             excerpts,
             current,

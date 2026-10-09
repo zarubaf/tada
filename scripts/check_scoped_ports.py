@@ -45,6 +45,7 @@ NON_PORTS = {
     "Mailer": "sends a mail, no data access",
     "MayPropose": "a marker on a caller type, no data access",
     "Principal": "describes a caller type, no data access",
+    "RoutingLookup": "reads owners and leads that a port loaded before, no data access",
     "ServiceIdentity": "describes a service caller type, no data access",
     "WorkRecord": "reads the owner and the workstream of a work record view, no data access",
 }

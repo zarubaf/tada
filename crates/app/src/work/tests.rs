@@ -514,6 +514,16 @@ impl WorkStore for Memory {
         unreachable!()
     }
 
+    async fn owners(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: &[ActionId],
+        _: &[CommitmentId],
+    ) -> Result<WorkOwners, StoreError> {
+        unreachable!()
+    }
+
     async fn my_open_work(
         &self,
         _: OrgScope,
