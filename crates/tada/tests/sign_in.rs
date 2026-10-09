@@ -365,44 +365,6 @@ async fn each_response_forbids_the_referrer() {
 }
 
 #[tokio::test]
-async fn the_sixth_request_for_one_address_is_rate_limited_also_with_two_processes() {
-    let app = App::start().await;
-    let testwil = app.test.create_organization("testwil").await;
-    app.user("anna@example.org", &[testwil]).await;
-    let other_process = support::session_router(&app.test, app.clock.clone());
-    let processes = [&app.router, &other_process];
-
-    for n in 0..5 {
-        let (response, _) =
-            request_link_from(processes[n % 2], support::PEER, "anna@example.org").await;
-        assert_eq!(response.status(), StatusCode::ACCEPTED, "request {}", n + 1);
-    }
-    let (response, problem) =
-        request_link_from(processes[1], support::PEER, "Anna@Example.org").await;
-    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
-    assert_eq!(problem["code"], "rate-limited");
-    // The window started at the time of the test clock and lasts one hour.
-    assert_eq!(response.headers()[header::RETRY_AFTER], "3600");
-
-    let other_ip: IpAddr = "198.51.100.1".parse().unwrap();
-    let (response, _) = request_link_from(processes[0], other_ip, "ben@example.org").await;
-    assert_eq!(response.status(), StatusCode::ACCEPTED);
-
-    app.run_jobs().await;
-    assert_eq!(
-        app.mailer.sent().len(),
-        5,
-        "the limited request sends no mail"
-    );
-
-    app.clock.advance(SignedDuration::from_hours(1));
-    let (response, _) = request_link_from(processes[0], support::PEER, "anna@example.org").await;
-    assert_eq!(response.status(), StatusCode::ACCEPTED, "a new window");
-
-    support::logs::assert_clean(&["anna@example.org", "ben@example.org", "198.51.100.1"]);
-}
-
-#[tokio::test]
 async fn the_31st_request_from_one_ip_address_is_rate_limited() {
     let app = App::start().await;
     for n in 0..30 {
@@ -441,4 +403,60 @@ async fn the_31st_request_from_one_ipv6_network_is_rate_limited() {
     let other_network = IpAddr::from([0x2001, 0xdb8, 0, 0x65, 0, 0, 0, 1]);
     let (response, _) = request_link_from(&app.router, other_network, "person31@example.org").await;
     assert_eq!(response.status(), StatusCode::ACCEPTED, "another /64");
+}
+/// An attacker who knows the address of a member asks for links again and again. The member
+/// still gets the answer of each request and finds a valid link in the inbox (ADR 0056).
+#[tokio::test]
+async fn requests_of_another_client_do_not_lock_a_member_out() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let attacker: IpAddr = "198.51.100.66".parse().unwrap();
+
+    for n in 0..10 {
+        let (response, _) = request_link_from(&app.router, attacker, "anna@example.org").await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED, "request {}", n + 1);
+    }
+    app.clock.advance(SignedDuration::from_mins(4));
+    let (response, _) = request_link_from(&app.router, support::PEER, "anna@example.org").await;
+    assert_eq!(
+        response.status(),
+        StatusCode::ACCEPTED,
+        "the request of the member"
+    );
+
+    let token = app.mailed_token(LINK).await;
+    let (response, _) = app.redeem(&token).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "the link in the inbox works"
+    );
+}
+
+/// The cooldown bounds the mails to one address, also with many clients and two processes.
+#[tokio::test]
+async fn one_address_gets_at_most_one_mail_in_each_cooldown_also_with_two_processes() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+    let other_process = support::session_router(&app.test, app.clock.clone());
+    let processes = [&app.router, &other_process];
+
+    // One request each minute for one hour, each from another client.
+    for minute in 0..60u8 {
+        let client = IpAddr::from([198, 51, 100, minute]);
+        let (response, _) = request_link_from(
+            processes[usize::from(minute) % 2],
+            client,
+            "Anna@Example.org",
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED, "minute {minute}");
+        app.clock.advance(SignedDuration::from_mins(1));
+    }
+    app.run_jobs().await;
+    assert_eq!(app.mailer.sent().len(), 12, "one mail in each 5 minutes");
+
+    support::logs::assert_clean(&["anna@example.org", "198.51.100.1"]);
 }

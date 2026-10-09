@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use crate::clock::Clock;
 use crate::problem::{CommandError, ProblemCode};
-use crate::rate_limit::{RateDecision, RateLimit, sign_in_limits};
+use crate::rate_limit::{RateDecision, SignInLimits, sign_in_limits};
 use crate::store::StoreError;
 
 /// The repository port of sign-in. Each method takes a token as the holder sends it.
@@ -84,15 +84,18 @@ pub fn accepted_role(
 /// The repository port of sign-in requests (ADR 0056).
 #[async_trait]
 pub trait SignInRequestStore: Debug + Send + Sync {
-    /// Counts the request against each of `limits` in the window of `now`. If each limit allows
-    /// it, the same transaction queues a magic-link intent for the user of `email` if that user has
-    /// a membership. A known and an unknown address both write the counters in one commit, so that
-    /// the time of the request does not show if the address is known (ADR 0008).
+    /// Counts the request against `limits.client` in the window of `now` and returns its decision.
+    /// If the client limit allows the request, the same transaction counts it against
+    /// `limits.mail`, and, if the mail limit allows it too, queues a magic-link intent for the user
+    /// of `email` if that user has a membership. The mail limit never changes the answer, so
+    /// requests of another client cannot lock a member out (ADR 0056).
+    /// A known and an unknown address both write the counters in one commit, so that the time of
+    /// the request does not show if the address is known (ADR 0008).
     /// Infrastructure query (ADR 0039): sign-in has no organization yet, and the address names the user.
     async fn queue_magic_link(
         &self,
         email: &Email,
-        limits: &[RateLimit<'_>],
+        limits: &SignInLimits<'_>,
         request_id: Option<Uuid>,
         now: Timestamp,
     ) -> Result<RateDecision, StoreError>;
@@ -110,7 +113,7 @@ pub fn initial_organization(memberships: &[OrganizationId]) -> Option<Organizati
 /// An error of `request_magic_link`.
 #[derive(Debug, thiserror::Error)]
 pub enum RequestSignInError {
-    /// The address or the client sent too many requests in the current window (ADR 0056).
+    /// The client sent too many requests in the current window (ADR 0056).
     #[error("too many sign-in requests")]
     RateLimited { retry_after: SignedDuration },
     #[error(transparent)]
@@ -151,7 +154,8 @@ impl CommandError for RequestSignInError {
 
 /// Asks for a magic link from the client `client_ip`. An invalid or unknown address, or an address
 /// without a membership, gets no mail, and the caller gets no information about it (ADR 0056).
-/// Each valid address counts against the limits of the address and of the client.
+/// Each valid address counts against the limit of the client and, if that allows it, against the
+/// mail cooldown of the address. Only the client limit refuses a request.
 pub async fn request_magic_link(
     email: &str,
     client_ip: IpAddr,
@@ -255,7 +259,7 @@ mod tests {
     use secrecy::ExposeSecret;
 
     use super::*;
-    use crate::rate_limit::{RateSubject, SIGN_IN_PER_EMAIL, SIGN_IN_PER_IP};
+    use crate::rate_limit::{MAIL_COOLDOWN, RateSubject, SIGN_IN_PER_IP, WINDOW};
 
     const NOW: Timestamp = Timestamp::constant(1_900_000_000, 0);
 
@@ -270,8 +274,14 @@ mod tests {
 
     const CLIENT: IpAddr = IpAddr::V4(std::net::Ipv4Addr::new(203, 0, 113, 7));
 
-    /// A queued request: the address, the subjects and limits, the request ID and the time.
-    type Queued = (Email, Vec<(String, u32)>, Option<Uuid>, Timestamp);
+    /// A queued request: the address, the subject, count and window of the client limit and of the
+    /// mail limit, the request ID and the time.
+    type Queued = (
+        Email,
+        [(String, u32, SignedDuration); 2],
+        Option<Uuid>,
+        Timestamp,
+    );
 
     /// Records the calls. A redeem, a preview and an acceptance succeed for the token `valid` only.
     /// A request is limited if `limited` is set.
@@ -288,20 +298,18 @@ mod tests {
         async fn queue_magic_link(
             &self,
             email: &Email,
-            limits: &[RateLimit<'_>],
+            limits: &SignInLimits<'_>,
             request_id: Option<Uuid>,
             now: Timestamp,
         ) -> Result<RateDecision, StoreError> {
-            let limits = limits
-                .iter()
-                .map(|limit| {
-                    let subject = match limit.subject {
-                        RateSubject::Email(email) => email.as_str().to_owned(),
-                        RateSubject::Ip(network) => network.address().to_string(),
-                    };
-                    (subject, limit.limit)
-                })
-                .collect();
+            let describe = |limit: &crate::rate_limit::RateLimit<'_>| {
+                let subject = match limit.subject {
+                    RateSubject::Email(email) => email.as_str().to_owned(),
+                    RateSubject::Ip(network) => network.address().to_string(),
+                };
+                (subject, limit.limit, limit.window)
+            };
+            let limits = [describe(&limits.client), describe(&limits.mail)];
             self.queued
                 .lock()
                 .unwrap()
@@ -384,9 +392,9 @@ mod tests {
             *store.queued.lock().unwrap(),
             [(
                 Email::parse("anna@example.org").unwrap(),
-                vec![
-                    ("anna@example.org".to_owned(), SIGN_IN_PER_EMAIL),
-                    ("203.0.113.7".to_owned(), SIGN_IN_PER_IP),
+                [
+                    ("203.0.113.7".to_owned(), SIGN_IN_PER_IP, WINDOW),
+                    ("anna@example.org".to_owned(), 1, MAIL_COOLDOWN),
                 ],
                 Some(request),
                 NOW

@@ -12,7 +12,7 @@ use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::mail::{MailTexts, Mailer};
 use tada_app::outbound::SendOutbound;
 use tada_app::public_url::PublicUrl;
-use tada_app::rate_limit::RateWindow;
+use tada_app::rate_limit::{RateWindow, WINDOW};
 use tada_store_pg::Database;
 use uuid::Uuid;
 
@@ -49,7 +49,7 @@ struct CounterSweep {
 impl CounterSweep {
     /// The start of the window of `now`, if no sweep in this window succeeded.
     fn due(&self, now: Timestamp) -> Option<Timestamp> {
-        let start = RateWindow::containing(now).start;
+        let start = RateWindow::containing(now, WINDOW).start;
         (self.swept != Some(start)).then_some(start)
     }
 

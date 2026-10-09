@@ -15,7 +15,7 @@ use tada_app::audit::AuditEvent;
 use tada_app::domain::identity::{Email, OrganizationRole};
 use tada_app::domain::ids::{InvitationId, OrganizationId, UserId};
 use tada_app::outbound::SEND_JOB;
-use tada_app::rate_limit::{RateDecision, RateLimit};
+use tada_app::rate_limit::{RateDecision, SignInLimits};
 use tada_app::sign_in::{
     InvitationPreview, SignInRequestStore, SignInStore, accepted_role, initial_organization,
 };
@@ -25,7 +25,7 @@ use crate::Database;
 use crate::audit::record;
 use crate::error::store_error;
 use crate::identity::organization_role;
-use crate::rate_limit::PgRateLimiter;
+use crate::rate_limit::{PgRateLimiter, delete_ended_counters};
 use crate::session::insert_session;
 use crate::token::hash_token;
 
@@ -67,6 +67,8 @@ async fn queue_magic_link_intent(
 }
 
 /// The `SignInRequestStore` adapter: the rate limits and the magic-link intent in one transaction.
+/// A request that the client limit refuses does not count against the mail limit, so it cannot
+/// take the one mail of a cooldown without a mail.
 #[derive(Debug)]
 pub struct PgSignInRequestStore {
     database: Database,
@@ -87,13 +89,16 @@ impl SignInRequestStore for PgSignInRequestStore {
     async fn queue_magic_link(
         &self,
         email: &Email,
-        limits: &[RateLimit<'_>],
+        limits: &SignInLimits<'_>,
         request_id: Option<Uuid>,
         now: Timestamp,
     ) -> Result<RateDecision, StoreError> {
         let mut tx = self.database.pool.begin().await.map_err(store_error)?;
-        let decision = self.rate_limiter.hit(&mut tx, limits, now).await?;
-        if decision == RateDecision::Allowed {
+        delete_ended_counters(&mut tx, now).await?;
+        let decision = self.rate_limiter.hit(&mut tx, &limits.client, now).await?;
+        if decision == RateDecision::Allowed
+            && self.rate_limiter.hit(&mut tx, &limits.mail, now).await? == RateDecision::Allowed
+        {
             queue_magic_link_intent(&mut *tx, email, request_id).await?;
         }
         // The counters are written in each case, so each request ends with one write commit.
@@ -365,7 +370,7 @@ mod tests {
     use tada_app::caller::MemberCaller;
     use tada_app::domain::identity::{DisplayName, OrganizationRole};
     use tada_app::outbound::{OutboundStore, Purpose};
-    use tada_app::rate_limit::{SIGN_IN_PER_EMAIL, sign_in_limits};
+    use tada_app::rate_limit::{MAIL_COOLDOWN, SIGN_IN_PER_IP, sign_in_limits};
     use tada_app::session::SessionStore;
 
     use super::*;
@@ -463,7 +468,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_limited_request_queues_nothing() {
+    async fn the_mail_limit_stops_the_mail_but_not_the_request() {
         let test = TestDatabase::start().await;
         let testwil = test.create_organization("testwil").await;
         let anna = user(&test, "anna@example.org").await;
@@ -471,23 +476,62 @@ mod tests {
             .await;
         let store = request_store(&test);
         let anna = email("anna@example.org");
-        let limits = sign_in_limits(&anna, "203.0.113.7".parse().unwrap());
 
-        for _ in 0..SIGN_IN_PER_EMAIL {
-            store
+        for client in ["203.0.113.7", "198.51.100.1", "198.51.100.2"] {
+            let limits = sign_in_limits(&anna, client.parse().unwrap());
+            let decision = store
                 .queue_magic_link(&anna, &limits, None, now())
+                .await
+                .unwrap();
+            assert_eq!(decision, RateDecision::Allowed, "{client}");
+        }
+        assert_eq!(count(&test, "outbound_intent").await, 1);
+
+        let limits = sign_in_limits(&anna, "203.0.113.7".parse().unwrap());
+        store
+            .queue_magic_link(&anna, &limits, None, now() + MAIL_COOLDOWN)
+            .await
+            .unwrap();
+        assert_eq!(
+            count(&test, "outbound_intent").await,
+            2,
+            "the next cooldown"
+        );
+    }
+
+    /// A refused request does not take the one mail of the cooldown, so a flood from one client
+    /// cannot stop the mail of a request from another client.
+    #[tokio::test]
+    async fn a_request_that_the_client_limit_refuses_queues_nothing_and_leaves_the_mail() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let anna = user(&test, "anna@example.org").await;
+        test.add_membership(testwil, anna, OrganizationRole::Member)
+            .await;
+        let store = request_store(&test);
+        let anna = email("anna@example.org");
+        let flooding = "198.51.100.66".parse().unwrap();
+        for n in 0..SIGN_IN_PER_IP {
+            let other = email(&format!("person{n}@example.org"));
+            store
+                .queue_magic_link(&other, &sign_in_limits(&other, flooding), None, now())
                 .await
                 .unwrap();
         }
         let decision = store
-            .queue_magic_link(&anna, &limits, None, now())
+            .queue_magic_link(&anna, &sign_in_limits(&anna, flooding), None, now())
             .await
             .unwrap();
         assert!(matches!(decision, RateDecision::Limited { .. }));
-        assert_eq!(
-            count(&test, "outbound_intent").await,
-            i64::from(SIGN_IN_PER_EMAIL)
-        );
+        assert_eq!(count(&test, "outbound_intent").await, 0);
+
+        let limits = sign_in_limits(&anna, "203.0.113.7".parse().unwrap());
+        let decision = store
+            .queue_magic_link(&anna, &limits, None, now())
+            .await
+            .unwrap();
+        assert_eq!(decision, RateDecision::Allowed);
+        assert_eq!(count(&test, "outbound_intent").await, 1);
     }
 
     async fn magic_link(test: &TestDatabase, user: UserId, expires_at: Timestamp) -> String {
