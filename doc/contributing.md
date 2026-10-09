@@ -38,6 +38,7 @@ Do not remove `.dev/secrets/` while the volumes exist. The database and the stor
 | Decisions and their reasons | [doc/adr/](adr/README.md)                  |
 | Terms                       | [doc/glossary.md](glossary.md)             |
 | Personal data we store      | [doc/data-inventory.md](data-inventory.md) |
+| Checks before a release     | [doc/release-gates.md](release-gates.md)   |
 | Slices and acceptance       | [doc/roadmap.md](roadmap.md)               |
 | Design system and UI rules  | [doc/design/](design/README.md)            |
 | Tool versions and tasks     | [mise.toml](../mise.toml)                  |

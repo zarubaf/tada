@@ -32,9 +32,9 @@ use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::outbound::SendOutbound;
 use tada_app::public_url::PublicUrl;
 use tada_app::session::SessionAuthenticator;
-use tada_store_pg::PgSignInRequestStore;
 use tada_store_pg::rate_limit::PgRateLimiter;
 use tada_store_pg::testing::TestDatabase;
+use tada_store_pg::{Database, PgSignInRequestStore};
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -59,7 +59,16 @@ pub fn api_state(
     authenticator: Arc<dyn Authenticator>,
     clock: Arc<dyn Clock>,
 ) -> ApiState {
-    let database = Arc::new(test.database.clone());
+    api_state_on(&test.database, authenticator, clock)
+}
+
+/// The state of the API on one pool of the test database, for example the pool of one process of a restart test.
+pub fn api_state_on(
+    pool: &Database,
+    authenticator: Arc<dyn Authenticator>,
+    clock: Arc<dyn Clock>,
+) -> ApiState {
+    let database = Arc::new(pool.clone());
     ApiState {
         dependencies: vec![database.clone()],
         authenticator,
@@ -68,10 +77,7 @@ pub fn api_state(
         identity: database.clone(),
         sessions: database.clone(),
         sign_in: database.clone(),
-        sign_in_requests: Arc::new(PgSignInRequestStore::new(
-            test.database.clone(),
-            rate_limiter(),
-        )),
+        sign_in_requests: Arc::new(PgSignInRequestStore::new(pool.clone(), rate_limiter())),
         clock,
         trusted_proxies: Vec::new(),
         event_members: database.clone(),

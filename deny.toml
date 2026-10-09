@@ -52,7 +52,8 @@ allow-wildcard-paths = true
 # - I/O crates are dependencies of adapter crates only.
 deny = [
   { crate = "tada-app", wrappers = ["tada-store-pg", "tada-adapters", "tada-api", "tada-telegram", "tada-mcp", "tada"] },
-  { crate = "tada-store-pg", wrappers = ["tada"] },
+  # The integration tests of tada-store-pg use its own test database, through a dev-dependency on itself.
+  { crate = "tada-store-pg", wrappers = ["tada", "tada-store-pg"] },
   { crate = "tada-adapters", wrappers = ["tada"] },
   { crate = "tada-api", wrappers = ["tada"] },
   { crate = "tada-telegram", wrappers = ["tada"] },
