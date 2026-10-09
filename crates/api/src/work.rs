@@ -404,6 +404,7 @@ pub struct CreateCommitmentRequest {
 }
 
 /// The input of `ChangeCommitment`. An absent field stays as it is. `null` clears an optional field.
+/// A request needs at least one field to change.
 /// The condition never changes. The status `firm` needs "make firm".
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ChangeCommitmentRequest {

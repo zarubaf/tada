@@ -5083,7 +5083,7 @@
       },
       "ChangeCommitmentRequest": {
         "type": "object",
-        "description": "The input of `ChangeCommitment`. An absent field stays as it is. `null` clears an optional field.\nThe condition never changes. The status `firm` needs \"make firm\".",
+        "description": "The input of `ChangeCommitment`. An absent field stays as it is. `null` clears an optional field.\nA request needs at least one field to change.\nThe condition never changes. The status `firm` needs \"make firm\".",
         "required": [
           "expected_version"
         ],
@@ -5152,7 +5152,7 @@
       },
       "ChangeInstitutionRequest": {
         "type": "object",
-        "description": "The input of `ChangeInstitution`. An absent field stays as it is. `null` clears email or phone.",
+        "description": "The input of `ChangeInstitution`. An absent field stays as it is. `null` clears email or phone.\nA request needs at least one field to change.",
         "required": [
           "expected_version"
         ],
@@ -5190,7 +5190,7 @@
       },
       "ChangePersonRequest": {
         "type": "object",
-        "description": "The input of `ChangePerson`. An absent field stays as it is. `null` clears email or phone.",
+        "description": "The input of `ChangePerson`. An absent field stays as it is. `null` clears email or phone.\nA request needs at least one field to change.",
         "required": [
           "expected_version"
         ],
@@ -5222,7 +5222,7 @@
       },
       "ChangeWorkstreamRequest": {
         "type": "object",
-        "description": "The input of `ChangeWorkstream`. A field that is absent stays as it is.",
+        "description": "The input of `ChangeWorkstream`. A field that is absent stays as it is.\nA request needs at least one field to change.",
         "required": [
           "expected_version"
         ],

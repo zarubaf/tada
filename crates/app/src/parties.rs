@@ -235,6 +235,7 @@ pub enum PartyError {
     NotFound,
     #[error("the record changed after the caller read it")]
     VersionConflict,
+    /// Invalid values. A change without a field has no field errors.
     #[error("invalid values")]
     Invalid(Vec<FieldError>),
     #[error(transparent)]
@@ -444,6 +445,9 @@ pub async fn change_person(
     require_change(caller)?;
     let scope = caller.scope();
     let current = store.person(scope, id).await?.ok_or(PartyError::NotFound)?;
+    if change.name.is_none() && change.email.is_none() && change.phone.is_none() {
+        return Err(PartyError::Invalid(Vec::new()));
+    }
     if current.version != change.expected_version {
         return Err(PartyError::VersionConflict);
     }
@@ -554,6 +558,13 @@ pub async fn change_institution(
         .institution(scope, id)
         .await?
         .ok_or(PartyError::NotFound)?;
+    if change.name.is_none()
+        && change.kind.is_none()
+        && change.email.is_none()
+        && change.phone.is_none()
+    {
+        return Err(PartyError::Invalid(Vec::new()));
+    }
     if current.version != change.expected_version {
         return Err(PartyError::VersionConflict);
     }
