@@ -430,7 +430,7 @@ pub enum Operation {
         #[serde(skip_serializing_if = "Option::is_none")]
         workstream: Option<Uuid>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        due: Option<jiff::civil::Date>,
+        due_date: Option<jiff::civil::Date>,
     },
     /// A new commitment of the event. With a condition it starts `conditional`, else `firm`.
     CreateCommitment {
@@ -443,7 +443,7 @@ pub enum Operation {
         #[serde(skip_serializing_if = "Option::is_none")]
         workstream: Option<Uuid>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        due: Option<jiff::civil::Date>,
+        due_date: Option<jiff::civil::Date>,
         #[serde(skip_serializing_if = "Option::is_none")]
         condition: Option<String>,
     },
@@ -460,7 +460,7 @@ pub enum Operation {
         action_id: Uuid,
         /// The new due date. It is absent if the proposal clears the due date.
         #[serde(skip_serializing_if = "Option::is_none")]
-        due: Option<jiff::civil::Date>,
+        due_date: Option<jiff::civil::Date>,
         /// The version of the action that the proposal expects.
         expected_version: i64,
     },
@@ -640,7 +640,7 @@ impl From<&DomainOperation> for Operation {
                 description,
                 owner,
                 workstream,
-                due,
+                due_date,
             } => Self::CreateAction {
                 id: id.as_uuid(),
                 event_id: event_id.as_uuid(),
@@ -648,7 +648,7 @@ impl From<&DomainOperation> for Operation {
                 description: description.as_ref().map(|text| text.as_str().to_owned()),
                 owner: owner.as_uuid(),
                 workstream: workstream.map(|id| id.as_uuid()),
-                due: *due,
+                due_date: *due_date,
             },
             DomainOperation::CreateCommitment {
                 id,
@@ -657,7 +657,7 @@ impl From<&DomainOperation> for Operation {
                 promisor,
                 owner,
                 workstream,
-                due,
+                due_date,
                 condition,
             } => Self::CreateCommitment {
                 id: id.as_uuid(),
@@ -666,7 +666,7 @@ impl From<&DomainOperation> for Operation {
                 promisor: (*promisor).into(),
                 owner: owner.as_uuid(),
                 workstream: workstream.map(|id| id.as_uuid()),
-                due: *due,
+                due_date: *due_date,
                 condition: condition.as_ref().map(|text| text.as_str().to_owned()),
             },
             DomainOperation::ChangeActionStatus {
@@ -683,12 +683,12 @@ impl From<&DomainOperation> for Operation {
             DomainOperation::ChangeActionDue {
                 event_id,
                 action_id,
-                due,
+                due_date,
                 expected_version,
             } => Self::ChangeActionDue {
                 event_id: event_id.as_uuid(),
                 action_id: action_id.as_uuid(),
-                due: *due,
+                due_date: *due_date,
                 expected_version: expected_version.get(),
             },
             DomainOperation::ChangeCommitmentStatus {

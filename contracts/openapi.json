@@ -6389,7 +6389,7 @@
                                 "null"
                               ]
                             },
-                            "due": {
+                            "due_date": {
                               "description": "The due date as `YYYY-MM-DD`.",
                               "type": [
                                 "string",
@@ -6447,7 +6447,7 @@
                                 "null"
                               ]
                             },
-                            "due": {
+                            "due_date": {
                               "description": "The due date as `YYYY-MM-DD`.",
                               "type": [
                                 "string",
@@ -6575,7 +6575,7 @@
                               "format": "uuid",
                               "type": "string"
                             },
-                            "due": {
+                            "due_date": {
                               "description": "The new due date as `YYYY-MM-DD`. Leave it out to clear the due date.",
                               "type": [
                                 "string",
@@ -8801,7 +8801,7 @@
                 ],
                 "format": "uuid"
               },
-              "due": {
+              "due_date": {
                 "type": [
                   "string",
                   "null"
@@ -8854,7 +8854,7 @@
                 ],
                 "format": "uuid"
               },
-              "due": {
+              "due_date": {
                 "type": [
                   "string",
                   "null"
@@ -8927,7 +8927,7 @@
                 "type": "string",
                 "format": "uuid"
               },
-              "due": {
+              "due_date": {
                 "type": [
                   "string",
                   "null"

@@ -271,7 +271,7 @@ fn action(id: Uuid, workstream: Option<WorkstreamId>) -> Value {
     json!({
         "kind": "create-action", "id": id, "event_id": open_day().as_uuid(),
         "title": "Bewilligung klären", "owner": anna().as_uuid(),
-        "workstream": workstream.map(WorkstreamId::as_uuid), "due": "2030-04-30",
+        "workstream": workstream.map(WorkstreamId::as_uuid), "due_date": "2030-04-30",
     })
 }
 
@@ -440,12 +440,14 @@ async fn a_proposal_cannot_set_a_closed_workstream() {
     let result = create_changeset(&anna, intake(active), stores(&memory), &FixedClock).await;
     let stored = changeset_of(result.unwrap());
     let Operation::CreateAction {
-        due, workstream, ..
+        due_date,
+        workstream,
+        ..
     } = &stored.proposals[0].operation
     else {
         panic!("not an action");
     };
-    assert_eq!(*due, Some(Date::constant(2030, 4, 30)));
+    assert_eq!(*due_date, Some(Date::constant(2030, 4, 30)));
     assert_eq!(*workstream, Some(active));
 }
 

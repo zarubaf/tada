@@ -124,7 +124,7 @@ pub(super) async fn write_record(
             description,
             owner,
             workstream,
-            due,
+            due_date,
         } => {
             let number = event_number(conn, scope, *event_id, LocalIdKind::Action).await?;
             sqlx::query!(
@@ -140,7 +140,7 @@ pub(super) async fn write_record(
                 description.as_ref().map(ActionDescription::as_str),
                 owner.as_uuid(),
                 workstream.map(WorkstreamId::as_uuid),
-                due.map(|date| date.to_sqlx()) as _,
+                due_date.map(|date| date.to_sqlx()) as _,
                 ActionStatus::Open.as_str(),
                 plan.now.to_sqlx() as _,
             )
@@ -156,7 +156,7 @@ pub(super) async fn write_record(
             promisor,
             owner,
             workstream,
-            due,
+            due_date,
             condition,
         } => {
             let number = event_number(conn, scope, *event_id, LocalIdKind::Commitment).await?;
@@ -180,7 +180,7 @@ pub(super) async fn write_record(
                 institution,
                 owner.as_uuid(),
                 workstream.map(WorkstreamId::as_uuid),
-                due.map(|date| date.to_sqlx()) as _,
+                due_date.map(|date| date.to_sqlx()) as _,
                 CommitmentStatus::initial(condition.as_ref()).as_str(),
                 plan.now.to_sqlx() as _,
             )
@@ -214,7 +214,7 @@ pub(super) async fn write_record(
         Operation::ChangeActionDue {
             event_id,
             action_id,
-            due,
+            due_date,
             expected_version,
         } => {
             let version = sqlx::query_scalar!(
@@ -225,7 +225,7 @@ pub(super) async fn write_record(
                 event_id.as_uuid(),
                 action_id.as_uuid(),
                 expected_version.get(),
-                due.map(|date| date.to_sqlx()) as _,
+                due_date.map(|date| date.to_sqlx()) as _,
                 plan.now.to_sqlx() as _,
             )
             .fetch_optional(&mut *conn)

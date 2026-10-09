@@ -107,7 +107,7 @@ enum OperationRecord {
         description: Option<String>,
         owner: Uuid,
         workstream: Option<Uuid>,
-        due: Option<String>,
+        due_date: Option<String>,
     },
     CreateCommitment {
         id: Uuid,
@@ -116,7 +116,7 @@ enum OperationRecord {
         promisor: PartyRecord,
         owner: Uuid,
         workstream: Option<Uuid>,
-        due: Option<String>,
+        due_date: Option<String>,
         condition: Option<String>,
     },
     ChangeActionStatus {
@@ -128,7 +128,7 @@ enum OperationRecord {
     ChangeActionDue {
         event_id: Uuid,
         action_id: Uuid,
-        due: Option<String>,
+        due_date: Option<String>,
         expected_version: i64,
     },
     ChangeCommitmentStatus {
@@ -283,7 +283,7 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             description,
             owner,
             workstream,
-            due,
+            due_date,
         } => OperationRecord::CreateAction {
             id: id.as_uuid(),
             event_id: event_id.as_uuid(),
@@ -291,7 +291,7 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             description: description.as_ref().map(|text| text.as_str().to_owned()),
             owner: owner.as_uuid(),
             workstream: workstream.map(WorkstreamId::as_uuid),
-            due: due.map(|date| date.to_string()),
+            due_date: due_date.map(|date| date.to_string()),
         },
         Operation::CreateCommitment {
             id,
@@ -300,7 +300,7 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             promisor,
             owner,
             workstream,
-            due,
+            due_date,
             condition,
         } => OperationRecord::CreateCommitment {
             id: id.as_uuid(),
@@ -312,7 +312,7 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             },
             owner: owner.as_uuid(),
             workstream: workstream.map(WorkstreamId::as_uuid),
-            due: due.map(|date| date.to_string()),
+            due_date: due_date.map(|date| date.to_string()),
             condition: condition.as_ref().map(|text| text.as_str().to_owned()),
         },
         Operation::ChangeActionStatus {
@@ -329,12 +329,12 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
         Operation::ChangeActionDue {
             event_id,
             action_id,
-            due,
+            due_date,
             expected_version,
         } => OperationRecord::ChangeActionDue {
             event_id: event_id.as_uuid(),
             action_id: action_id.as_uuid(),
-            due: due.map(|date| date.to_string()),
+            due_date: due_date.map(|date| date.to_string()),
             expected_version: expected_version.get(),
         },
         Operation::ChangeCommitmentStatus {
@@ -484,7 +484,7 @@ pub(crate) fn operation_from_json(
             description,
             owner,
             workstream,
-            due,
+            due_date,
         } => Operation::CreateAction {
             id: ActionId::from_uuid(id),
             event_id: EventId::from_uuid(event_id),
@@ -492,7 +492,7 @@ pub(crate) fn operation_from_json(
             description: parsed(description, ActionDescription::parse)?,
             owner: UserId::from_uuid(owner),
             workstream: workstream.map(WorkstreamId::from_uuid),
-            due: parsed(due, |text| text.parse())?,
+            due_date: parsed(due_date, |text| text.parse())?,
         },
         OperationRecord::CreateCommitment {
             id,
@@ -501,7 +501,7 @@ pub(crate) fn operation_from_json(
             promisor,
             owner,
             workstream,
-            due,
+            due_date,
             condition,
         } => Operation::CreateCommitment {
             id: CommitmentId::from_uuid(id),
@@ -513,7 +513,7 @@ pub(crate) fn operation_from_json(
             },
             owner: UserId::from_uuid(owner),
             workstream: workstream.map(WorkstreamId::from_uuid),
-            due: parsed(due, |text| text.parse())?,
+            due_date: parsed(due_date, |text| text.parse())?,
             condition: parsed(condition, ConditionText::parse)?,
         },
         OperationRecord::ChangeActionStatus {
@@ -530,12 +530,12 @@ pub(crate) fn operation_from_json(
         OperationRecord::ChangeActionDue {
             event_id,
             action_id,
-            due,
+            due_date,
             expected_version,
         } => Operation::ChangeActionDue {
             event_id: EventId::from_uuid(event_id),
             action_id: ActionId::from_uuid(action_id),
-            due: parsed(due, |text| text.parse())?,
+            due_date: parsed(due_date, |text| text.parse())?,
             expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
         },
         OperationRecord::ChangeCommitmentStatus {
@@ -1648,7 +1648,7 @@ mod tests {
                 description: Some(ActionDescription::parse("Mit der Gemeinde.\nBald.").unwrap()),
                 owner: UserId::from_uuid(Uuid::now_v7()),
                 workstream: Some(WorkstreamId::from_uuid(Uuid::now_v7())),
-                due: Some(jiff::civil::date(2030, 4, 30)),
+                due_date: Some(jiff::civil::date(2030, 4, 30)),
             },
             Operation::CreateCommitment {
                 id: CommitmentId::from_uuid(Uuid::now_v7()),
@@ -1657,7 +1657,7 @@ mod tests {
                 promisor: Party::Institution(InstitutionId::from_uuid(Uuid::now_v7())),
                 owner: UserId::from_uuid(Uuid::now_v7()),
                 workstream: None,
-                due: None,
+                due_date: None,
                 condition: Some(ConditionText::parse("wenn unterschrieben").unwrap()),
             },
             Operation::ChangeActionStatus {
@@ -1669,7 +1669,7 @@ mod tests {
             Operation::ChangeActionDue {
                 event_id: event,
                 action_id: ActionId::from_uuid(Uuid::now_v7()),
-                due: None,
+                due_date: None,
                 expected_version: RecordVersion::FIRST,
             },
             Operation::ChangeCommitmentStatus {
