@@ -18,9 +18,11 @@ use tada_app::clock::Clock;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::facts::core_catalog;
 use tada_app::domain::identity::{DisplayName, Email, EventRole};
-use tada_app::domain::ids::{EventId, OrganizationId, ProposalId, UserId};
+use tada_app::domain::ids::{EventId, InstitutionId, OrganizationId, ProposalId, UserId};
+use tada_app::domain::parties::Party;
 use tada_app::domain::sources::SourceText;
 use tada_app::event_members::{add_event_member, change_event_role};
+use tada_app::parties::{NewInstitution, NewPerson, create_institution, create_person};
 use tada_app::proposals::{Changeset, Created, NewChangeset, ProposeStores, create_changeset};
 use tada_app::review::{ApplyInput, ReviewStores, apply_changeset};
 use tada_app::search::{SearchRequest, search_sources};
@@ -28,6 +30,8 @@ use tada_app::sources::SourceStore;
 use tada_app::tokens::{
     NOTICE_VERSION, TokenAuthenticator, TokenError, TokenRequest, TokenScope, create_token,
 };
+use tada_app::work::{NewAction, NewCommitment, WorkPorts, create_action, create_commitment};
+use tada_app::workstreams::{NewWorkstream, create_workstream};
 use tada_mcp::McpState;
 use tada_store_pg::testing::TestDatabase;
 use tower::ServiceExt;
@@ -411,7 +415,7 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 8, "{names:?}");
+    assert_eq!(names.len(), 12, "{names:?}");
     for name in [
         "list_events",
         "get_event_schema",
@@ -420,6 +424,10 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         "get_source_passage",
         "list_documents",
         "get_document_version",
+        "list_workstreams",
+        "list_actions",
+        "list_commitments",
+        "search_parties",
         "propose_changeset",
     ] {
         assert!(names.contains(&name), "{names:?}");
@@ -741,6 +749,9 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
             .unwrap()
             .contains("Never fill in")
     );
+    let instructions = result["instructions"].as_str().unwrap();
+    assert!(instructions.contains("search_parties"), "{instructions}");
+    assert!(instructions.contains("condition"), "{instructions}");
 
     let initialized = json!({"jsonrpc": "2.0", "method": "notifications/initialized"});
     let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &initialized).await;
@@ -750,7 +761,7 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
     let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &list).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     let tools = body["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 8);
+    assert_eq!(tools.len(), 12);
     for tool in tools {
         assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
         assert_eq!(tool["outputSchema"]["type"], "object", "{tool}");
@@ -1255,4 +1266,250 @@ async fn an_agent_proposes_a_document_draft_and_reads_it_back() {
         .call("list_documents", json!({"event_key": "FLY31"}))
         .await;
     assert_eq!(problem(&body)["code"], "not-found", "{body}");
+}
+
+impl Mcp {
+    /// The owner creates the institution "Gemeinde Testwil" and returns it.
+    async fn institution(&self) -> InstitutionId {
+        let database = &self.test.database;
+        let input = NewInstitution {
+            id: None,
+            name: "Gemeinde Testwil".to_owned(),
+            kind: "authority".to_owned(),
+            email: Some("bauamt@example.org".to_owned()),
+            phone: None,
+        };
+        let shown = create_institution(&self.owner, input, database, database, &*self.clock)
+            .await
+            .unwrap();
+        shown.record.id
+    }
+
+    /// The owner creates a commitment of `promisor` in `event`. A `condition` makes it conditional.
+    async fn commitment(
+        &self,
+        event: EventId,
+        promisor: Party,
+        text: &str,
+        condition: Option<&str>,
+    ) {
+        let database = &self.test.database;
+        let ports = WorkPorts {
+            identity: database,
+            work: database,
+            workstreams: database,
+            parties: database,
+            clock: &*self.clock,
+        };
+        let input = NewCommitment {
+            id: None,
+            text: text.to_owned(),
+            condition: condition.map(str::to_owned),
+            promisor,
+            owner: self.owner.user_id(),
+            workstream: None,
+            due_date: None,
+        };
+        create_commitment(&self.owner, event, input, ports)
+            .await
+            .unwrap();
+    }
+}
+
+/// The member reads the commitments of an event through MCP, and the status filter and the event role count.
+#[tokio::test]
+async fn mcp_lists_the_commitments_of_an_event() {
+    let mcp = Mcp::start().await;
+    let institution = Party::Institution(mcp.institution().await);
+    mcp.commitment(
+        mcp.open_day,
+        institution,
+        "Sperrt die Zufahrt",
+        Some("wenn der Ort feststeht"),
+    )
+    .await;
+    mcp.commitment(mcp.open_day, institution, "Stellt Tische", None)
+        .await;
+    mcp.commitment(mcp.secret, institution, "Geheim", None)
+        .await;
+
+    // Anna is a viewer of OPEN30: a `read` token reads.
+    let all = mcp
+        .result("list_commitments", json!({"event_key": "OPEN30"}))
+        .await;
+    let items = all["commitments"].as_array().unwrap();
+    assert_eq!(items.len(), 2, "{all}");
+    assert_eq!(all["more"], false);
+    assert_eq!(items[0]["local_id"], "COM-001", "{all}");
+    assert_eq!(items[0]["status"], "conditional");
+    assert_eq!(items[0]["condition"], "wenn der Ort feststeht");
+    assert_eq!(items[0]["promisor"]["local_id"], "INS-001");
+    assert_eq!(items[0]["promisor"]["name"], "Gemeinde Testwil");
+    assert_eq!(items[1]["status"], "firm");
+    assert!(items[1]["condition"].is_null());
+    // The rights of the member are not for the agent: it cannot change a record directly.
+    assert!(items[0].get("can_change").is_none(), "{all}");
+
+    let firm = mcp
+        .result(
+            "list_commitments",
+            json!({"event_key": "OPEN30", "status": "firm"}),
+        )
+        .await;
+    assert_eq!(firm["commitments"].as_array().unwrap().len(), 1, "{firm}");
+    assert_eq!(firm["commitments"][0]["text"], "Stellt Tische");
+
+    // Anna has no role in SECRET30.
+    let body = mcp
+        .call("list_commitments", json!({"event_key": "SECRET30"}))
+        .await;
+    assert_eq!(problem(&body)["code"], "not-found", "{body}");
+}
+
+#[tokio::test]
+async fn mcp_lists_workstreams_and_actions() {
+    let mcp = Mcp::start().await;
+    let database = &mcp.test.database;
+    let workstream = create_workstream(
+        &mcp.owner,
+        mcp.open_day,
+        NewWorkstream {
+            id: None,
+            name: "Aufbau".to_owned(),
+            lead: mcp.owner.user_id(),
+        },
+        database,
+        database,
+        &*mcp.clock,
+    )
+    .await
+    .unwrap();
+    let ports = WorkPorts {
+        identity: database,
+        work: database,
+        workstreams: database,
+        parties: database,
+        clock: &*mcp.clock,
+    };
+    let action = NewAction {
+        id: None,
+        title: "Zelt bestellen".to_owned(),
+        description: None,
+        owner: mcp.owner.user_id(),
+        workstream: Some(workstream.id),
+        due_date: None,
+    };
+    create_action(&mcp.owner, mcp.open_day, action, ports)
+        .await
+        .unwrap();
+
+    let streams = mcp
+        .result("list_workstreams", json!({"event_key": "OPEN30"}))
+        .await;
+    assert_eq!(streams["workstreams"][0]["name"], "Aufbau", "{streams}");
+    assert_eq!(streams["workstreams"][0]["status"], "active");
+    let actions = mcp
+        .result("list_actions", json!({"event_key": "OPEN30"}))
+        .await;
+    assert_eq!(actions["actions"][0]["local_id"], "ACT-001", "{actions}");
+    assert_eq!(
+        actions["actions"][0]["workstream_id"],
+        json!(workstream.id.as_uuid())
+    );
+    let done = mcp
+        .result(
+            "list_actions",
+            json!({"event_key": "OPEN30", "status": "done"}),
+        )
+        .await;
+    assert!(done["actions"].as_array().unwrap().is_empty(), "{done}");
+    let body = mcp
+        .call(
+            "list_actions",
+            json!({"event_key": "OPEN30", "status": "later"}),
+        )
+        .await;
+    assert_eq!(body["result"]["isError"], true, "{body}");
+}
+
+#[tokio::test]
+async fn mcp_search_parties_finds_an_institution() {
+    let mcp = Mcp::start().await;
+    mcp.institution().await;
+    let database = &mcp.test.database;
+    let person = NewPerson {
+        id: None,
+        name: "Gerda Gemeinde".to_owned(),
+        email: None,
+        phone: None,
+        user_id: None,
+    };
+    create_person(&mcp.owner, person, database, database, &*mcp.clock)
+        .await
+        .unwrap();
+
+    let found = mcp
+        .result("search_parties", json!({"q": "gemeinde testwil"}))
+        .await;
+    assert_eq!(
+        found["institutions"].as_array().unwrap().len(),
+        1,
+        "{found}"
+    );
+    assert_eq!(found["institutions"][0]["local_id"], "INS-001");
+    assert_eq!(found["institutions"][0]["kind"], "authority");
+    assert_eq!(found["institutions"][0]["email"], "bauamt@example.org");
+    assert!(found["persons"].as_array().unwrap().is_empty(), "{found}");
+
+    let both = mcp.result("search_parties", json!({"q": "gemeinde"})).await;
+    assert_eq!(both["persons"][0]["local_id"], "PER-001", "{both}");
+    assert_eq!(both["institutions"].as_array().unwrap().len(), 1);
+    assert_eq!(both["more"], false);
+
+    // Another organization sees none of them.
+    let none = mcp.result("search_parties", json!({"q": "zzz"})).await;
+    assert!(none["persons"].as_array().unwrap().is_empty());
+}
+
+/// A viewer reads work through a `read` token; only a `propose` token proposes a commitment (ADR 0052).
+#[tokio::test]
+async fn a_viewer_token_reads_but_a_read_token_cannot_propose_a_commitment() {
+    let mcp = Mcp::start().await;
+    let institution = mcp.institution().await;
+    mcp.commitment(
+        mcp.open_day,
+        Party::Institution(institution),
+        "Stellt Tische",
+        None,
+    )
+    .await;
+    let listed = mcp
+        .result("list_commitments", json!({"event_key": "OPEN30"}))
+        .await;
+    assert_eq!(
+        listed["commitments"].as_array().unwrap().len(),
+        1,
+        "{listed}"
+    );
+
+    let (_, propose) = mcp.contributor_token().await;
+    let arguments = changeset(
+        mcp.secret,
+        SOURCE,
+        json!([proposal(
+            Uuid::now_v7(),
+            json!({
+                "kind": "create-commitment", "id": Uuid::now_v7(), "event_id": mcp.secret.as_uuid(),
+                "text": "Klärt die Bewilligung", "promisor": {"institution": institution.as_uuid()},
+                "owner": mcp.anna.as_uuid(), "condition": "wenn der Ort feststeht",
+            }),
+            &[],
+            SOURCE,
+            "Der Ort ist noch offen"
+        )]),
+    );
+    let body = mcp.propose_with(&mcp.token, arguments.clone()).await;
+    assert_eq!(problem(&body)["code"], "forbidden", "{body}");
+    let body = mcp.propose_with(&propose, arguments).await;
+    assert_eq!(body["result"]["isError"], false, "{body}");
 }

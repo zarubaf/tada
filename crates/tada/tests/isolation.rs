@@ -1259,6 +1259,43 @@ fn tool_attempts(t: &Targets) -> Vec<(&'static str, Value, ToolExpect)> {
             ToolExpect::Refused,
         ),
         (
+            "list_workstreams",
+            json!({"event_key": "OPEN30"}),
+            ToolExpect::Answers,
+        ),
+        (
+            "list_workstreams",
+            json!({"event_key": "ONLYB31"}),
+            ToolExpect::Refused,
+        ),
+        (
+            "list_actions",
+            json!({"event_key": "OPEN30"}),
+            ToolExpect::Answers,
+        ),
+        (
+            "list_actions",
+            json!({"event_key": "ONLYB31"}),
+            ToolExpect::Refused,
+        ),
+        (
+            "list_commitments",
+            json!({"event_key": "OPEN30"}),
+            ToolExpect::Answers,
+        ),
+        (
+            "list_commitments",
+            json!({"event_key": "ONLYB31"}),
+            ToolExpect::Refused,
+        ),
+        // Only B holds persons and institutions with the marker.
+        (
+            "search_parties",
+            json!({"q": B_MARKER}),
+            ToolExpect::Answers,
+        ),
+        ("search_parties", json!({"q": "Beat"}), ToolExpect::Answers),
+        (
             "propose_changeset",
             json!({"id": Uuid::now_v7(), "event_id": t.b_second, "source_text": SOURCE,
                    "proposals": [proposal(date(&t.b_second, &t.date_field), None)]}),

@@ -8,6 +8,7 @@ mod errors;
 mod guard;
 mod propose;
 mod tools;
+mod work;
 
 use std::sync::Arc;
 
