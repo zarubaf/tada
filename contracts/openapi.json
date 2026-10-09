@@ -4597,7 +4597,7 @@
           "uploaded_by": {
             "type": "string",
             "format": "uuid",
-            "description": "The user ID of the member who added the version."
+            "description": "The user ID of the member who added the version: the member who uploaded the file, or for a draft,\nthe member who accepted its proposal."
           },
           "source_version_id": {
             "type": [
@@ -4615,7 +4615,7 @@
       },
       "DocumentVersionKind": {
         "type": "string",
-        "description": "The kind of a document version (ADR 0051).",
+        "description": "The kind of a document version (ADR 0051).\nThe list of kinds is closed: the kind decides which fields a version has, so a client cannot show a version of a kind\nthat it does not know. A new kind needs a new ADR and a new version of the API (ADR 0017).",
         "enum": [
           "upload",
           "draft"
@@ -4742,7 +4742,7 @@
       },
       "DraftVersionStatus": {
         "type": "string",
-        "description": "The status of a draft version (ADR 0051).",
+        "description": "The status of a draft version (ADR 0051).\nThe list of statuses is closed: they are the document states of the approval, and a client must know if a version\nis approved. A new status needs a new ADR and a new version of the API (ADR 0017).",
         "enum": [
           "draft",
           "review",
