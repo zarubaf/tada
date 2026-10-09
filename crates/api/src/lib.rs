@@ -3,6 +3,7 @@
 mod actors;
 mod client_ip;
 mod contract;
+mod cursor;
 mod documents;
 mod event_members;
 mod events;

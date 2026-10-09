@@ -964,9 +964,7 @@ async fn a_retry_with_the_same_content_returns_the_stored_changeset() {
         panic!("not new");
     };
     // The retry comes through another request.
-    let retry_caller = anna
-        .clone()
-        .with_request(crate::caller::Channel::Web, Some(Uuid::now_v7()));
+    let retry_caller = anna.clone().with_request(Some(Uuid::now_v7()));
     let retry = create_changeset(&retry_caller, input.clone(), stores(&memory), &FixedClock)
         .await
         .unwrap();

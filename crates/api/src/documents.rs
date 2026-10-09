@@ -11,8 +11,6 @@ use axum::body::Body;
 use axum::extract::{FromRequest, Request, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use futures::TryStreamExt;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -32,6 +30,7 @@ use uuid::Uuid;
 
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
+use crate::cursor;
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
 use crate::values::{FactState, Passage, Value, state_parts};
@@ -145,6 +144,8 @@ impl From<DocumentView> for Document {
 }
 
 /// The kind of a document version (ADR 0051).
+/// The list of kinds is closed: the kind decides which fields a version has, so a client cannot show a version of a kind
+/// that it does not know. A new kind needs a new ADR and a new version of the API (ADR 0017).
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum DocumentVersionKind {
@@ -155,6 +156,8 @@ pub enum DocumentVersionKind {
 }
 
 /// The status of a draft version (ADR 0051).
+/// The list of statuses is closed: they are the document states of the approval, and a client must know if a version
+/// is approved. A new status needs a new ADR and a new version of the API (ADR 0017).
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum DraftVersionStatus {
@@ -199,7 +202,8 @@ pub struct DocumentVersion {
     pub size_bytes: Option<u64>,
     /// The SHA-256 hash of the content, as lowercase hexadecimal digits.
     pub sha256: String,
-    /// The user ID of the member who added the version.
+    /// The user ID of the member who added the version: the member who uploaded the file, or for a draft,
+    /// the member who accepted its proposal.
     pub uploaded_by: Uuid,
     /// The source version that holds the same file (ADR 0050). It is absent for a draft.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -532,6 +536,7 @@ pub struct DownloadQuery {
 /// The response has the media type that tada detected, `X-Content-Type-Options: nosniff`, a
 /// `Content-Security-Policy` that allows nothing, and the file name in `Content-Disposition`
 /// (RFC 6266). `disposition=inline` applies only to PDF and plain text (ADR 0009, ADR 0043).
+/// A draft version has no file, so it is not found here; `RenderDocumentVersion` reads it.
 #[utoipa::path(
     get,
     path = "/document-versions/{version_id}/content",
@@ -962,15 +967,12 @@ fn content_disposition(kind: &'static str, file_name: &str) -> Result<HeaderValu
 
 /// The cursor is opaque for clients (ADR 0044): the number of the readable ID, in Base64.
 fn encode_cursor(cursor: DocumentCursor) -> String {
-    URL_SAFE_NO_PAD.encode(cursor.0.to_string())
+    cursor::encode(cursor.0.to_string())
 }
 
 fn decode_cursor(text: &str) -> Result<DocumentCursor, ApiError> {
-    let invalid =
-        || ApiError::new(ProblemCode::MalformedRequest).with_detail("The cursor is not valid.");
-    let bytes = URL_SAFE_NO_PAD.decode(text).map_err(|_| invalid())?;
-    let text = String::from_utf8(bytes).map_err(|_| invalid())?;
-    Ok(DocumentCursor(text.parse().map_err(|_| invalid())?))
+    let text = cursor::decode_text(text)?;
+    Ok(DocumentCursor(text.parse().map_err(|_| cursor::invalid())?))
 }
 
 impl ApiState {

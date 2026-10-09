@@ -409,7 +409,7 @@ telegram-confirm-cancel = Abbrechen
 telegram-linked = Telegram-Konto verknüpft.
 telegram-requests-refreshed = Anfragen aktualisiert.
 
-# The notice of ADR 0045. A changed text gets a new NOTICE_VERSION in crates/app/src/tokens/mod.rs.
+# The notice of ADR 0045. A changed text gets a new NOTICE_VERSION and a new line in NOTICE_TEXTS in crates/app/src/tokens/mod.rs; a test checks it.
 token-notice-title = Hinweis zum API-Token
 token-notice-access = Mit dem Token erhält Ihr eigener KI-Client Zugriff auf die Personendaten, die Sie in tada sehen können.
 token-notice-policy = Die Richtlinie des Vereins verlangt einen KI-Tarif, der die eingegebenen Daten nicht zum Training verwendet.
@@ -433,7 +433,7 @@ tokens-expiry-180 = 180 Tage
 tokens-expiry-364 = Ein Jahr
 tokens-create = Token erstellen
 tokens-error-name = Geben Sie dem Token einen Namen.
-tokens-error-name-too-long = Der Name darf höchstens 100 Zeichen lang sein.
+tokens-error-name-too-long = Der Name ist zu lang. Kürzen Sie ihn.
 tokens-error-notice = Der Hinweis hat sich geändert. Laden Sie die Seite neu und lesen Sie ihn erneut.
 tokens-propose-forbidden = Das Recht, Vorschläge zu machen, fehlt Ihnen in allen Veranstaltungen. Wählen Sie „Lesen“.
 tokens-created = Token erstellt.

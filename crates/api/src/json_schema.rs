@@ -1,4 +1,5 @@
 //! OpenAPI schemas from JSON Schemas: the input types of the `app` crate keep one shape for the API and MCP (ADR 0040).
+//! Only the proposal input types are an exception to the DTO rule of ADR 0017 (ADR 0064).
 
 use schemars::JsonSchema;
 use schemars::generate::SchemaSettings;

@@ -79,6 +79,7 @@ The ADRs are the authority for the decisions in this project.
 | [0061](0061-audit-subject-and-role-detail.md)         | Audit subject and role detail                            | Proposed                  |
 | [0062](0062-authenticators-in-app.md)                 | Authenticators in `app`                                  | Proposed                  |
 | [0063](0063-ownership-after-removal.md)               | Ownership after removal                                  | Proposed                  |
+| [0064](0064-one-proposal-input-for-http-and-mcp.md)   | One proposal input for HTTP and MCP                      | Proposed                  |
 
 ## New ADR
 

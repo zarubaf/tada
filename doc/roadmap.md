@@ -61,6 +61,9 @@ Work items, in this order:
      The gateway keeps long polling in this slice.
 4. Facts and review: the field catalog, the event profile, facts, fact versions, changesets, conflicts and the Review Inbox (ADR 0049, ADR 0050).
    The event managers review all proposals (ADR 0052).
+   Open gap: the evidence of a proposal has no capture time of its source version.
+   The Review Inbox shows the time of the changeset instead.
+   The design asks for the capture time ([components](design/components.md)), so the evidence of a proposal must get it.
 5. API tokens and MCP: the token notice, and token creation and revocation (ADR 0039, ADR 0045).
    The `/mcp` endpoint gives the read and proposal tools (ADR 0040).
 6. Documents:

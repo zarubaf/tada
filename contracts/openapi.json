@@ -1490,7 +1490,7 @@
           "documents"
         ],
         "summary": "Downloads the file of a document version.",
-        "description": "The response has the media type that tada detected, `X-Content-Type-Options: nosniff`, a\n`Content-Security-Policy` that allows nothing, and the file name in `Content-Disposition`\n(RFC 6266). `disposition=inline` applies only to PDF and plain text (ADR 0009, ADR 0043).",
+        "description": "The response has the media type that tada detected, `X-Content-Type-Options: nosniff`, a\n`Content-Security-Policy` that allows nothing, and the file name in `Content-Disposition`\n(RFC 6266). `disposition=inline` applies only to PDF and plain text (ADR 0009, ADR 0043).\nA draft version has no file, so it is not found here; `RenderDocumentVersion` reads it.",
         "operationId": "download_document_version",
         "parameters": [
           {
@@ -4425,8 +4425,12 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "A name that helps the member to find the token again: 1 to 100 characters.",
-            "example": "Claude Code"
+            "description": "A name that helps the member to find the token again. tada removes the spaces at the ends and counts the characters (Unicode scalar values).",
+            "examples": [
+              "Claude Code"
+            ],
+            "maxLength": 200,
+            "minLength": 1
           },
           "scope": {
             "$ref": "#/components/schemas/ApiTokenScope"
@@ -4686,7 +4690,7 @@
           "uploaded_by": {
             "type": "string",
             "format": "uuid",
-            "description": "The user ID of the member who added the version."
+            "description": "The user ID of the member who added the version: the member who uploaded the file, or for a draft,\nthe member who accepted its proposal."
           },
           "source_version_id": {
             "type": [
@@ -4704,7 +4708,7 @@
       },
       "DocumentVersionKind": {
         "type": "string",
-        "description": "The kind of a document version (ADR 0051).",
+        "description": "The kind of a document version (ADR 0051).\nThe list of kinds is closed: the kind decides which fields a version has, so a client cannot show a version of a kind\nthat it does not know. A new kind needs a new ADR and a new version of the API (ADR 0017).",
         "enum": [
           "upload",
           "draft"
@@ -4831,7 +4835,7 @@
       },
       "DraftVersionStatus": {
         "type": "string",
-        "description": "The status of a draft version (ADR 0051).",
+        "description": "The status of a draft version (ADR 0051).\nThe list of statuses is closed: they are the document states of the approval, and a client must know if a version\nis approved. A new status needs a new ADR and a new version of the API (ADR 0017).",
         "enum": [
           "draft",
           "review",
@@ -6099,7 +6103,7 @@
       },
       "OrganizationFeatureName": {
         "type": "string",
-        "description": "A switch of the organization.",
+        "description": "A switch of the organization. The list of features is open: a client ignores a feature that it does not know.",
         "enum": [
           "mcp-tokens"
         ]

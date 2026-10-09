@@ -10,7 +10,30 @@ use crate::store::StoreError;
 
 /// A caller that acts for a member: the member itself, or an AI client of the member.
 /// An AI caller never has more rights than its principal (ADR 0052), so access uses the member.
-pub trait Principal {
+///
+/// The trait is sealed: only `MemberCaller` and `AiCaller` implement it (ADR 0039).
+/// Another crate cannot wrap a caller and give it other rights:
+///
+/// ```compile_fail,E0277
+/// use tada_app::access::Principal;
+/// use tada_app::caller::{AiCaller, OrgScope, OrganizationRole};
+/// use tada_app::domain::ids::UserId;
+///
+/// struct Wrapper(AiCaller);
+///
+/// impl Principal for Wrapper {
+///     fn user_id(&self) -> UserId {
+///         self.0.user_id()
+///     }
+///     fn scope(&self) -> OrgScope {
+///         self.0.scope()
+///     }
+///     fn organization_role(&self) -> OrganizationRole {
+///         OrganizationRole::Owner
+///     }
+/// }
+/// ```
+pub trait Principal: crate::caller::sealed::Sealed {
     /// The member for whom the caller acts.
     fn user_id(&self) -> UserId;
     /// The organization that all reads and writes of the caller stay in.

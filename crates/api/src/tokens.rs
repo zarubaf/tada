@@ -10,12 +10,14 @@ use jiff::Timestamp;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use tada_app::domain::ids::ApiTokenId;
+use tada_app::domain::name::NAME_MAX_CHARS;
 use tada_app::problem::ProblemCode;
 use tada_app::tokens::{
     self as app, ApiToken as AppApiToken, Feature, FeatureState, NOTICE_VERSION, TokenError,
     TokenRequest, TokenScope,
 };
 use utoipa::ToSchema;
+use utoipa::openapi::schema::{Object, ObjectBuilder, Type};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
@@ -79,7 +81,7 @@ impl From<ApiTokenScope> for TokenScope {
     }
 }
 
-/// A switch of the organization.
+/// A switch of the organization. The list of features is open: a client ignores a feature that it does not know.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum OrganizationFeatureName {
@@ -162,8 +164,7 @@ impl std::fmt::Debug for CreatedApiToken {
 /// The input of `CreateToken`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateTokenRequest {
-    /// A name that helps the member to find the token again: 1 to 100 characters.
-    #[schema(example = "Claude Code")]
+    #[schema(schema_with = token_name_schema)]
     pub name: String,
     pub scope: ApiTokenScope,
     /// The expiry. It is in the future and at most one year away.
@@ -171,6 +172,20 @@ pub struct CreateTokenRequest {
     /// The version of the notice that the member confirmed: `GetTokenNotice` gives it.
     /// Any other version than the current one, also a missing one, gives `validation-failed` with the code `not-confirmed`.
     pub notice_version_confirmed: Option<u32>,
+}
+
+/// The schema of a token name. The length limit is the one of each record name (`tada_domain::name`).
+fn token_name_schema() -> Object {
+    ObjectBuilder::new()
+        .schema_type(Type::String)
+        .description(Some(
+            "A name that helps the member to find the token again. \
+             tada removes the spaces at the ends and counts the characters (Unicode scalar values).",
+        ))
+        .min_length(Some(1))
+        .max_length(Some(NAME_MAX_CHARS))
+        .examples(["Claude Code"])
+        .build()
 }
 
 /// The version of the token notice. The text of the notice is part of the web client.
@@ -403,5 +418,14 @@ mod tests {
             secret: "tada_pat_secret".to_owned(),
         };
         assert!(!format!("{created:?}").contains("tada_pat_secret"));
+    }
+
+    #[test]
+    fn the_contract_takes_the_name_limit_from_the_domain() {
+        use utoipa::PartialSchema;
+        let schema = serde_json::to_value(CreateTokenRequest::schema()).unwrap();
+        let name = &schema["properties"]["name"];
+        assert_eq!(name["minLength"], 1);
+        assert_eq!(name["maxLength"], NAME_MAX_CHARS);
     }
 }

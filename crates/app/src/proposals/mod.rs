@@ -43,7 +43,40 @@ use crate::tokens::TokenScope;
 
 /// A caller that can create proposals (ADR 0039): a member, or an AI client of a member.
 /// A service identity cannot propose. The Telegram gateway proposes through a `MemberCaller` with the channel Telegram.
-pub trait MayPropose: Principal {
+///
+/// The trait is sealed: only `MemberCaller` and `AiCaller` implement it (ADR 0039).
+/// Another crate cannot make a caller whose credential allows proposals:
+///
+/// ```compile_fail,E0277
+/// use tada_app::access::Principal;
+/// use tada_app::caller::{Actor, AiCaller, OrgScope, OrganizationRole};
+/// use tada_app::domain::ids::UserId;
+/// use tada_app::proposals::MayPropose;
+///
+/// struct Wrapper(AiCaller);
+///
+/// impl Principal for Wrapper {
+///     fn user_id(&self) -> UserId {
+///         self.0.user_id()
+///     }
+///     fn scope(&self) -> OrgScope {
+///         self.0.scope()
+///     }
+///     fn organization_role(&self) -> OrganizationRole {
+///         self.0.organization_role()
+///     }
+/// }
+///
+/// impl MayPropose for Wrapper {
+///     fn actor(&self) -> Actor {
+///         self.0.actor()
+///     }
+///     fn credential_allows_proposals(&self) -> bool {
+///         true
+///     }
+/// }
+/// ```
+pub trait MayPropose: Principal + crate::caller::sealed::Sealed {
     /// The author of the changeset and of its audit event.
     fn actor(&self) -> Actor;
 

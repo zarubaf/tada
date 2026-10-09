@@ -192,14 +192,18 @@ impl MemberCaller {
         }
     }
 
-    /// Names the channel and the request of this caller, for the actor of audit records.
+    /// Names the request of this caller, for the actor of audit records.
+    /// The channel stays the one of the authenticator, so an adapter cannot change it (ADR 0039).
     #[must_use]
-    pub fn with_request(self, channel: Channel, request_id: Option<Uuid>) -> Self {
-        Self {
-            channel,
-            request_id,
-            ..self
-        }
+    pub fn with_request(self, request_id: Option<Uuid>) -> Self {
+        Self { request_id, ..self }
+    }
+
+    /// For tests of other crates only: a member of another channel, for example `telegram`.
+    #[cfg(any(test, feature = "testing"))]
+    #[must_use]
+    pub fn with_channel(self, channel: Channel) -> Self {
+        Self { channel, ..self }
     }
 
     pub fn channel(&self) -> Channel {
@@ -219,6 +223,16 @@ impl MemberCaller {
         OrgScope(self.organization_id)
     }
 }
+
+/// Seals the caller traits `Principal` and `MayPropose` (ADR 0039).
+/// Only the callers of this module implement `Sealed`, so no other crate can implement the traits.
+pub(crate) mod sealed {
+    pub trait Sealed {}
+}
+
+impl sealed::Sealed for MemberCaller {}
+
+impl sealed::Sealed for AiCaller {}
 
 impl crate::access::Principal for MemberCaller {
     fn user_id(&self) -> UserId {
@@ -288,7 +302,7 @@ impl AiCaller {
     #[must_use]
     pub fn with_request(self, request_id: Option<Uuid>) -> Self {
         Self {
-            principal: self.principal.with_request(Channel::ApiToken, request_id),
+            principal: self.principal.with_request(request_id),
             ..self
         }
     }
@@ -485,14 +499,26 @@ mod tests {
     #[test]
     fn a_member_actor_names_the_member_the_channel_and_the_request() {
         let request = Uuid::from_u128(3);
-        let actor = member()
-            .with_request(Channel::Telegram, Some(request))
-            .actor();
+        let actor = member().with_request(Some(request)).actor();
         assert_eq!(actor.kind(), ActorKind::Member);
         assert_eq!(actor.id(), Uuid::from_u128(1));
         assert_eq!(actor.principal(), None);
-        assert_eq!(actor.channel(), Channel::Telegram);
+        assert_eq!(actor.channel(), Channel::Web);
         assert_eq!(actor.request_id(), Some(request));
+    }
+
+    #[test]
+    fn the_request_keeps_the_channel_of_the_authenticator() {
+        let request = Uuid::from_u128(3);
+        let linked = ServiceCaller::<TelegramGateway>::new()
+            .member(
+                UserId::from_uuid(Uuid::from_u128(1)),
+                OrganizationId::from_uuid(Uuid::from_u128(2)),
+                OrganizationRole::Member,
+            )
+            .with_request(Some(request));
+        assert_eq!(linked.actor().channel(), Channel::Telegram);
+        assert_eq!(linked.actor().request_id(), Some(request));
     }
 
     fn ai(scope: TokenScope) -> AiCaller {

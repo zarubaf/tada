@@ -714,3 +714,44 @@ fn each_error_has_a_code_in_its_list() {
         assert!(TokenError::CODES.contains(&error.code()), "{error:?}");
     }
 }
+
+/// The `token-notice-*` messages of the web client, with their continuation lines.
+fn notice_text() -> String {
+    let messages = include_str!("../../../../locales/de-CH/web.ftl");
+    let mut text = String::new();
+    let mut inside = false;
+    for line in messages.lines() {
+        if line.starts_with("token-notice-") {
+            inside = true;
+        } else if !line.starts_with(' ') {
+            inside = false;
+        }
+        if inside {
+            text.push_str(line);
+            text.push('\n');
+        }
+    }
+    text
+}
+
+#[test]
+fn a_changed_notice_text_needs_a_new_notice_version() {
+    use sha2::{Digest, Sha256};
+    let hash: String = Sha256::digest(notice_text().as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let (newest_version, newest_hash) = *NOTICE_TEXTS.last().unwrap();
+    assert_eq!(
+        newest_version, NOTICE_VERSION,
+        "the newest notice text has the current version"
+    );
+    assert_eq!(
+        hash, newest_hash,
+        "the notice text changed: add a line to NOTICE_TEXTS and change NOTICE_VERSION"
+    );
+    for pair in NOTICE_TEXTS.windows(2) {
+        assert_eq!(pair[1].0, pair[0].0 + 1, "the versions count up by one");
+        assert_ne!(pair[1].1, pair[0].1, "each version has its own text");
+    }
+}

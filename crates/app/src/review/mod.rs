@@ -633,12 +633,7 @@ async fn visible_open_changesets(
 ) -> Result<Vec<OpenChangeset>, ReviewQueryError> {
     let scope = caller.scope();
     if let Some(event) = event_id {
-        if !access::event_access(caller, event, identity)
-            .await?
-            .can_review()
-        {
-            return Err(ReviewQueryError::Forbidden);
-        }
+        review_access(caller, Some(event), identity).await?;
         return Ok(store.open_changesets(scope, Some(event)).await?);
     }
     let mut reviews: HashMap<Option<EventId>, bool> = HashMap::new();
@@ -689,19 +684,43 @@ fn page(
     Page { items, next }
 }
 
+/// The one review rule (ADR 0052): the caller reviews the changesets of an event in which it is event manager,
+/// and, for `None`, the changesets of the organization only as owner or admin.
+///
+/// `Forbidden` means that the caller sees the event but does not review it.
+/// `NotFound` means that the caller cannot see the event, or that it cannot see the changesets of the organization.
+async fn review_access(
+    caller: &MemberCaller,
+    event: Option<EventId>,
+    identity: &dyn IdentityStore,
+) -> Result<(), ReviewQueryError> {
+    match event {
+        Some(event) => {
+            if access::event_access(caller, event, identity)
+                .await?
+                .can_review()
+            {
+                Ok(())
+            } else {
+                Err(ReviewQueryError::Forbidden)
+            }
+        }
+        None if access::sees_all_events(caller) => Ok(()),
+        None => Err(ReviewQueryError::NotFound),
+    }
+}
+
 /// True if the caller reviews the event, or for `None`, the changesets of the organization.
+/// A list hides what the caller cannot review, so a refusal is `false` here, not an error.
 async fn can_review(
     caller: &MemberCaller,
     event: Option<EventId>,
     identity: &dyn IdentityStore,
 ) -> Result<bool, StoreError> {
-    let Some(event) = event else {
-        return Ok(access::sees_all_events(caller));
-    };
-    match access::event_access(caller, event, identity).await {
-        Ok(access) => Ok(access.can_review()),
-        Err(AccessError::NotFound) => Ok(false),
-        Err(AccessError::Store(error)) => Err(error),
+    match review_access(caller, event, identity).await {
+        Ok(()) => Ok(true),
+        Err(ReviewQueryError::NotFound | ReviewQueryError::Forbidden) => Ok(false),
+        Err(ReviewQueryError::Store(error)) => Err(error),
     }
 }
 
@@ -714,19 +733,7 @@ async fn reviewable(
     let Some((changeset, source)) = stores.proposals.get(caller.scope(), id).await? else {
         return Err(ReviewQueryError::NotFound);
     };
-    match changeset.event_id {
-        Some(event) => {
-            if !access::event_access(caller, event, stores.identity)
-                .await?
-                .can_review()
-            {
-                return Err(ReviewQueryError::Forbidden);
-            }
-        }
-        // Only owners and admins see the changesets of the organization.
-        None if !access::sees_all_events(caller) => return Err(ReviewQueryError::NotFound),
-        None => {}
-    }
+    review_access(caller, changeset.event_id, stores.identity).await?;
     Ok((changeset, source))
 }
 
