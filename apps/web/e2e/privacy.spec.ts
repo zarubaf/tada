@@ -2,8 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
   fakeEvents,
+  fakePost,
   fakeSession,
+  fakeSignedOut,
   fontsLoaded,
+  invitationPreview,
   sessionWithRole,
   setTheme,
   textOverflows,
@@ -98,3 +101,29 @@ test("the footer and the member menu lead to the privacy notice", async ({ page 
   await page.getByRole("menuitem", { name: "Datenschutz" }).click();
   await expect(page).toHaveURL(/\/privacy$/);
 });
+
+// The invitee reads the privacy notice before the click that accepts (ADR 0045).
+for (const state of states) {
+  test(`the invitation page shows the ${state.name} of the privacy notice before the accept button`, async ({
+    page,
+  }) => {
+    await fakeSignedOut(page);
+    await fakePost(page, "/api/v1/invitations/preview", 200, {
+      ...invitationPreview,
+      privacy_notice: state.markdown,
+    });
+    await page.goto("/invitation#token=invented-token");
+    const notice = page.getByRole("region", { name: "Datenschutz" });
+    await expect(notice.getByRole("heading", { name: state.heading })).toBeVisible();
+    await expect(notice.locator("img")).toHaveCount(0);
+
+    const accept = page.getByRole("button", { name: "Einladung annehmen" });
+    await expect(accept).toBeVisible();
+    const acceptFollowsNotice = await notice.evaluate(
+      (section, button) =>
+        (section.compareDocumentPosition(button as Node) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      await accept.elementHandle(),
+    );
+    expect(acceptFollowsNotice).toBe(true);
+  });
+}
