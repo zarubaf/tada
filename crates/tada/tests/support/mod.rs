@@ -94,6 +94,7 @@ pub fn api_state_on(
         privacy: database.clone(),
         parties: database.clone(),
         workstreams: database.clone(),
+        work: database.clone(),
     }
 }
 

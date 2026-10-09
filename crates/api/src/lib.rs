@@ -23,6 +23,7 @@ mod sign_in;
 mod telegram;
 mod tokens;
 mod values;
+mod work;
 mod workstreams;
 
 use std::net::SocketAddr;
@@ -57,6 +58,7 @@ use tada_app::sign_in::{SignInRequestStore, SignInStore};
 use tada_app::sources::SourceStore;
 use tada_app::telegram::TelegramLinks;
 use tada_app::tokens::TokenStore;
+use tada_app::work::WorkStore;
 use tada_app::workstreams::WorkstreamStore;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa::openapi::OpenApi;
@@ -105,6 +107,8 @@ pub struct ApiState {
     pub parties: Arc<dyn PartyStore>,
     /// The workstreams of events (ADR 0067).
     pub workstreams: Arc<dyn WorkstreamStore>,
+    /// The actions and commitments of events (ADR 0068).
+    pub work: Arc<dyn WorkStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -126,7 +130,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(tokens::routes())
                 .merge(privacy::routes())
                 .merge(parties::routes())
-                .merge(workstreams::routes()),
+                .merge(workstreams::routes())
+                .merge(work::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -148,6 +153,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(privacy::problem_codes())
         .chain(parties::problem_codes())
         .chain(workstreams::problem_codes())
+        .chain(work::problem_codes())
         .collect()
 }
 
@@ -1148,6 +1154,112 @@ mod tests {
     }
 
     #[derive(Debug)]
+    struct NoWork;
+
+    #[async_trait::async_trait]
+    impl WorkStore for NoWork {
+        async fn create_action(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::work::NewActionRecord,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::work::WorkCreated<tada_app::work::ActionView>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn change_action(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::ActionId,
+            _: &tada_app::work::ActionFields,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::work::WorkChanged<tada_app::work::ActionView>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn action(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::ActionId,
+        ) -> Result<Option<tada_app::work::ActionView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn actions(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: &tada_app::work::WorkFilter<tada_app::domain::work::ActionStatus>,
+        ) -> Result<Vec<tada_app::work::ActionView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn create_commitment(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::work::NewCommitmentRecord,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::work::WorkCreated<tada_app::work::CommitmentView>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn change_commitment(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::CommitmentId,
+            _: &tada_app::work::CommitmentFields,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::work::WorkChanged<tada_app::work::CommitmentView>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn commitment(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::CommitmentId,
+        ) -> Result<Option<tada_app::work::CommitmentView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn commitments(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: &tada_app::work::WorkFilter<tada_app::domain::work::CommitmentStatus>,
+        ) -> Result<Vec<tada_app::work::CommitmentView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn my_open_work(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<tada_app::work::MyWork, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[derive(Debug)]
     struct NoPrivacy;
 
     #[async_trait::async_trait]
@@ -1196,6 +1308,7 @@ mod tests {
             privacy: Arc::new(NoPrivacy),
             parties: Arc::new(NoParties),
             workstreams: Arc::new(NoWorkstreams),
+            work: Arc::new(NoWork),
         }
     }
 

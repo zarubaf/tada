@@ -49,6 +49,16 @@ pub enum AuditAction {
     WorkstreamCreate,
     /// An event manager renamed a workstream, changed its lead or opened or closed it (ADR 0067).
     WorkstreamChange,
+    /// A contributor or manager created an action (ADR 0068).
+    ActionCreate,
+    /// The owner, the workstream lead or a manager changed an action (ADR 0068).
+    ActionChange,
+    /// A contributor or manager created a commitment (ADR 0068).
+    CommitmentCreate,
+    /// The owner, the workstream lead or a manager changed a commitment (ADR 0068).
+    CommitmentChange,
+    /// A conditional commitment became firm. The commitment keeps the reason; the event holds no text (ADR 0068).
+    CommitmentFirm,
 }
 
 impl AuditAction {
@@ -82,6 +92,11 @@ impl AuditAction {
             Self::InstitutionChange => "institution.change",
             Self::WorkstreamCreate => "workstream.create",
             Self::WorkstreamChange => "workstream.change",
+            Self::ActionCreate => "action.create",
+            Self::ActionChange => "action.change",
+            Self::CommitmentCreate => "commitment.create",
+            Self::CommitmentChange => "commitment.change",
+            Self::CommitmentFirm => "commitment.firm",
         }
     }
 
@@ -114,6 +129,8 @@ impl AuditAction {
             Self::PersonCreate | Self::PersonChange => "person",
             Self::InstitutionCreate | Self::InstitutionChange => "institution",
             Self::WorkstreamCreate | Self::WorkstreamChange => "workstream",
+            Self::ActionCreate | Self::ActionChange => "action",
+            Self::CommitmentCreate | Self::CommitmentChange | Self::CommitmentFirm => "commitment",
         }
     }
 }
