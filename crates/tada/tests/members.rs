@@ -435,6 +435,107 @@ async fn an_admin_cannot_replace_an_owner_invitation() {
     assert_eq!(status, StatusCode::CREATED);
 }
 
+/// The remedy for a stolen session without a removal: the member signs out everywhere, also the
+/// last owner, whom a removal refuses. The current session ends too.
+#[tokio::test]
+async fn a_member_signs_out_everywhere() {
+    let app = App::start().await;
+    let olga = app.member("Olga Owner", OrganizationRole::Owner).await;
+    let musterhausen = app.test.create_organization("musterhausen").await;
+    app.test
+        .add_membership(musterhausen, olga.id, OrganizationRole::Member)
+        .await;
+    let stolen = app
+        .test
+        .sign_in(olga.id, Some(musterhausen), app.clock.now())
+        .await;
+
+    let (status, _) = app
+        .call(
+            Some(&olga.cookie),
+            Method::POST,
+            "/api/v1/session/sign-out-everywhere",
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    for cookie in [&olga.cookie, &stolen] {
+        let (status, _) = app
+            .call(Some(cookie), Method::GET, "/api/v1/session", None)
+            .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+    assert_eq!(
+        app.count("SELECT count(*) FROM organization_membership WHERE role = 'owner'")
+            .await,
+        1,
+        "the membership stays"
+    );
+    assert_eq!(
+        app.count(&format!(
+            "SELECT count(*) FROM audit_event WHERE action = 'organization_membership.end_sessions' AND subject_user_id = '{}'",
+            olga.id.as_uuid()
+        ))
+        .await,
+        1
+    );
+}
+
+/// An owner or an admin ends the sessions of another member without a removal, up to the own role:
+/// only an owner ends the sessions of an owner. A member cannot end the sessions of others.
+#[tokio::test]
+async fn an_owner_or_admin_ends_the_sessions_of_a_member() {
+    let app = App::start().await;
+    let olga = app.member("Olga Owner", OrganizationRole::Owner).await;
+    let otto = app.member("Otto Owner", OrganizationRole::Owner).await;
+    let adam = app.member("Adam Admin", OrganizationRole::Admin).await;
+    let anna = app.member("Anna Muster", OrganizationRole::Member).await;
+    let end = |member: UserId| format!("/api/v1/members/{}/sessions/end", member.as_uuid());
+
+    let (status, problem) = app
+        .call(Some(&anna.cookie), Method::POST, &end(adam.id), None)
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    let (status, _) = app
+        .call(Some(&adam.cookie), Method::POST, &end(otto.id), None)
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = app
+        .call(Some(&otto.cookie), Method::GET, "/api/v1/session", None)
+        .await;
+    assert_eq!(status, StatusCode::OK, "a refusal changes nothing");
+
+    let (status, _) = app
+        .call(Some(&adam.cookie), Method::POST, &end(anna.id), None)
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = app
+        .call(Some(&anna.cookie), Method::GET, "/api/v1/session", None)
+        .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    let (status, _) = app
+        .call(Some(&olga.cookie), Method::POST, &end(otto.id), None)
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = app
+        .call(Some(&otto.cookie), Method::GET, "/api/v1/session", None)
+        .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        app.count("SELECT count(*) FROM organization_membership")
+            .await,
+        4,
+        "no membership ends"
+    );
+
+    let stranger = UserId::from_uuid(uuid::Uuid::now_v7());
+    let (status, _) = app
+        .call(Some(&olga.cookie), Method::POST, &end(stranger), None)
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
 #[tokio::test]
 async fn the_last_owner_cannot_leave_and_an_admin_cannot_remove_an_owner() {
     let app = App::start().await;

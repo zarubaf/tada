@@ -44,6 +44,10 @@ use uuid::Uuid;
 /// Each other operation of the OpenAPI document needs a case in `attempts`.
 const NOT_ORGANIZATION_SCOPED: &[(&str, &str)] = &[
     (
+        "sign_out_everywhere",
+        "It ends the own sessions of the caller in each organization and names no record.",
+    ),
+    (
         "get_telegram_link",
         "A Telegram link belongs to the user, not to an organization, and shows only the own link.",
     ),
@@ -458,6 +462,10 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
         "remove_member" => vec![post(
             api(format!("/members/{}/remove", t.b_member)),
             json!({"expected_version": 1}),
+            Expect::NotFound,
+        )],
+        "end_member_sessions" => vec![command(
+            api(format!("/members/{}/sessions/end", t.b_member)),
             Expect::NotFound,
         )],
         "list_invitations" => vec![get(api("/invitations".into()), READS)],

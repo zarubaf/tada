@@ -17,6 +17,7 @@ import { ReviewInbox } from "./review/ReviewInbox";
 import { Route, Router, Routes } from "./router/Router";
 import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
 import { SessionProvider } from "./session/SessionProvider";
+import { AccountPage } from "./settings/AccountPage";
 import { OrganizationPage } from "./settings/OrganizationPage";
 import { SettingsLayout } from "./settings/SettingsLayout";
 import { Shell } from "./shell/Shell";
@@ -151,6 +152,11 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   <Route path="/settings/organization">
                     <SettingsLayout>
                       <OrganizationPage api={api} />
+                    </SettingsLayout>
+                  </Route>
+                  <Route path="/settings/account">
+                    <SettingsLayout>
+                      <AccountPage api={api} />
                     </SettingsLayout>
                   </Route>
                   <Route path="*">

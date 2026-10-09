@@ -392,6 +392,46 @@ impl MemberStore for Database {
         Ok(true)
     }
 
+    async fn end_sessions(
+        &self,
+        scope: OrgScope,
+        member: UserId,
+        audit: &AuditEvent,
+    ) -> Result<bool, StoreError> {
+        let mut tx = self.pool.begin().await.map_err(store_error)?;
+        // The share lock keeps the membership while the sessions end, so a member that a removal
+        // takes at the same moment gets no event of a membership that no longer exists.
+        let is_member = sqlx::query_scalar!(
+            "SELECT user_id FROM organization_membership
+             WHERE organization_id = $1 AND user_id = $2
+             FOR SHARE",
+            scope.organization_id().as_uuid(),
+            member.as_uuid(),
+        )
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(store_error)?
+        .is_some();
+        if !is_member {
+            return Ok(false);
+        }
+        sqlx::query!("DELETE FROM session WHERE user_id = $1", member.as_uuid())
+            .execute(&mut *tx)
+            .await
+            .map_err(store_error)?;
+        // An open magic link would start a new session at once.
+        sqlx::query!(
+            "DELETE FROM magic_link WHERE user_id = $1",
+            member.as_uuid()
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        audit::record(&mut tx, audit).await.map_err(store_error)?;
+        tx.commit().await.map_err(store_error)?;
+        Ok(true)
+    }
+
     async fn remove(
         &self,
         scope: OrgScope,
