@@ -209,8 +209,6 @@ pub async fn change_commitment(
     }
     let text = check.finish(text).map_err(WorkError::Invalid)?;
     let status = match status {
-        // A change to the current status keeps it.
-        Some(next) if next == old.status && next != CommitmentStatus::Firm => next,
         Some(next) => old.status.change_directly(next)?,
         None => old.status,
     };

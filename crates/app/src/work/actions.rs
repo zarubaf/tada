@@ -155,8 +155,6 @@ pub async fn change_action(
         .finish(title.zip(description))
         .map_err(WorkError::Invalid)?;
     let status = match status {
-        // A change to the current status keeps it.
-        Some(next) if next == old.status => next,
         Some(next) => old.status.change_to(next)?,
         None => old.status,
     };

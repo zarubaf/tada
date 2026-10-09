@@ -3756,7 +3756,7 @@
         "tags": [
           "work"
         ],
-        "summary": "Changes an action. Its owner, the lead of its workstream or an event manager can do it.\nA status that the current status cannot change to gives `invalid-transition`.",
+        "summary": "Changes an action. Its owner, the lead of its workstream or an event manager can do it.\nA status that the current status cannot change to gives `invalid-transition`; so does the current status itself.",
         "operationId": "change_action",
         "parameters": [
           {
@@ -4056,7 +4056,7 @@
         "tags": [
           "work"
         ],
-        "summary": "Changes a commitment. Its owner, the lead of its workstream or an event manager can do it.\nThe status `firm` gives `invalid-transition`: only \"make firm\" makes a commitment firm.",
+        "summary": "Changes a commitment. Its owner, the lead of its workstream or an event manager can do it.\nThe status `firm` gives `invalid-transition`: only \"make firm\" makes a commitment firm.\nThe current status and any status that it cannot change to give `invalid-transition` too.",
         "operationId": "change_commitment",
         "parameters": [
           {
