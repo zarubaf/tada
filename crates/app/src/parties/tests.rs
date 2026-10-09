@@ -688,6 +688,11 @@ async fn the_list_filters_by_name_and_pages_by_number() {
 #[test]
 fn names_match_on_equal_contained_and_shared_words() {
     assert!(names_match("muller ag", "muller ag"));
+    // The main case of ADR 0050: a hyphen does not hide a duplicate.
+    assert!(names_match(
+        &normalized_name("Müller-Bau AG"),
+        &normalized_name("Müller Bau AG")
+    ));
     assert!(names_match("muller ag", "muller"));
     assert!(names_match("muller", "muller ag"));
     assert!(names_match("generatoren ag", "testwil generatoren"));
