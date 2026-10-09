@@ -400,8 +400,13 @@ async fn require_create(
     }
 }
 
+/// True if `caller` can change persons and institutions: an owner or an admin (ADR 0069).
+pub fn may_change_parties(caller: &impl Principal) -> bool {
+    access::sees_all_events(caller)
+}
+
 fn require_change(caller: &MemberCaller) -> Result<(), PartyError> {
-    if access::sees_all_events(caller) {
+    if may_change_parties(caller) {
         Ok(())
     } else {
         Err(PartyError::Forbidden)
@@ -454,7 +459,7 @@ pub async fn create_person(
             )
             .await?,
     )?;
-    Ok(Shown::created(person))
+    Ok(Shown::created(person, may_change_parties(caller)))
 }
 
 /// Changes a person. Only an owner or an admin can do it.
@@ -507,7 +512,15 @@ pub async fn change_person(
             )
             .await?,
     )?;
-    Ok(shown_one(caller, person, RecordRef::Person(id), identity, store).await?)
+    Ok(shown_one(
+        caller,
+        person,
+        RecordRef::Person(id),
+        may_change_parties(caller),
+        identity,
+        store,
+    )
+    .await?)
 }
 
 /// The persons whose name contains `query`, in the order of their numbers.
@@ -526,10 +539,12 @@ pub async fn list_persons(
         .persons(caller.scope(), query.as_deref(), after, limit.get() + 1)
         .await?;
     let Page { items, next } = page(items, limit, |person| person.local_number);
+    let may_change = may_change_parties(caller);
     let items = shown(
         caller,
         items,
         |person| RecordRef::Person(person.id),
+        |_| may_change,
         identity,
         store,
     )
@@ -548,7 +563,15 @@ pub async fn get_person(
         .person(caller.scope(), id)
         .await?
         .ok_or(PartyReadError::NotFound)?;
-    Ok(shown_one(caller, person, RecordRef::Person(id), identity, store).await?)
+    Ok(shown_one(
+        caller,
+        person,
+        RecordRef::Person(id),
+        may_change_parties(caller),
+        identity,
+        store,
+    )
+    .await?)
 }
 
 /// Creates an institution. The permission is the one of `create_person`.
@@ -579,7 +602,7 @@ pub async fn create_institution(
             .create_institution(caller.scope(), id, &fields, clock.now(), &audit)
             .await?,
     )?;
-    Ok(Shown::created(institution))
+    Ok(Shown::created(institution, may_change_parties(caller)))
 }
 
 /// Changes an institution. Only an owner or an admin can do it.
@@ -652,6 +675,7 @@ pub async fn change_institution(
         caller,
         institution,
         RecordRef::Institution(id),
+        may_change_parties(caller),
         identity,
         store,
     )
@@ -673,10 +697,12 @@ pub async fn list_institutions(
         .institutions(caller.scope(), query.as_deref(), after, limit.get() + 1)
         .await?;
     let Page { items, next } = page(items, limit, |institution| institution.local_number);
+    let may_change = may_change_parties(caller);
     let items = shown(
         caller,
         items,
         |institution| RecordRef::Institution(institution.id),
+        |_| may_change,
         identity,
         store,
     )
@@ -699,6 +725,7 @@ pub async fn get_institution(
         caller,
         institution,
         RecordRef::Institution(id),
+        may_change_parties(caller),
         identity,
         store,
     )

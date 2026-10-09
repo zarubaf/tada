@@ -22,7 +22,7 @@ use tada_domain::work::{
 pub use self::actions::{
     ActionChange, NewAction, change_action, create_action, get_action, list_actions,
 };
-pub(crate) use self::checks::is_possible_owner;
+pub(crate) use self::checks::{ChangeRights, WorkRecord, is_possible_owner};
 pub use self::commitments::{
     CommitmentChange, FirmInput, NewCommitment, change_commitment, create_commitment,
     get_commitment, list_commitments, make_commitment_firm,
@@ -35,7 +35,7 @@ use crate::identity::IdentityStore;
 use crate::paging::PageLimit;
 use crate::parties::{PartyRef, PartyStore};
 use crate::problem::{CommandError, FieldError, ProblemCode};
-use crate::records::{Changed, Created, EvidenceStore, NumberCursor};
+use crate::records::{Changed, Created, EvidenceStore, NumberCursor, Shown};
 use crate::store::StoreError;
 use crate::workstreams::WorkstreamStore;
 
@@ -103,6 +103,29 @@ pub struct CommitmentFields {
     pub status: CommitmentStatus,
     /// The reason that made the commitment firm. A conditional commitment has none.
     pub firm_reason: Option<FirmReason>,
+}
+
+impl Shown<ActionView> {
+    /// The statuses that the caller can set with a change now (ADR 0068): none without the right to change the action.
+    pub fn next_statuses(&self) -> Vec<ActionStatus> {
+        if self.can_change {
+            self.record.fields.status.next_statuses()
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+impl Shown<CommitmentView> {
+    /// The statuses that the caller can set with a change now (ADR 0068): none without the right to change the
+    /// commitment. `firm` is never one of them: only "make firm" sets it.
+    pub fn next_statuses(&self) -> Vec<CommitmentStatus> {
+        if self.can_change {
+            self.record.fields.status.direct_next_statuses()
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 /// A new action, checked, before the store gives it its number.

@@ -215,8 +215,13 @@ impl WorkstreamStore for Memory {
             .cloned())
     }
 
-    async fn list(&self, _: OrgScope, _: EventId) -> Result<Vec<Workstream>, StoreError> {
-        unreachable!()
+    async fn list(&self, _: OrgScope, event: EventId) -> Result<Vec<Workstream>, StoreError> {
+        let all = self.workstreams.lock().unwrap();
+        Ok(all
+            .iter()
+            .filter(|known| known.event_id == event)
+            .cloned()
+            .collect())
     }
 }
 
@@ -710,6 +715,68 @@ async fn the_owner_the_lead_and_a_manager_change_an_action_and_nobody_else() {
     };
     let lead = change_action_by(&memory, LEAD, free.id, change).await;
     assert!(matches!(lead, Err(WorkError::Forbidden)));
+}
+
+/// The view tells each reader whether it can change the record and to which statuses (ADR 0067, ADR 0068),
+/// so that a client does not repeat the rules.
+#[tokio::test]
+async fn the_view_tells_the_reader_its_right_and_the_next_statuses() {
+    let memory = Memory::default();
+    let action = action_by(&memory, OWNER, new_action(OWNER, Some(ground())))
+        .await
+        .unwrap();
+    for (reader, can_change) in [
+        (OWNER, true),
+        (LEAD, true),
+        (MANAGER, true),
+        (OTHER, false),
+        (VIEWER, false),
+    ] {
+        let shown = get_action(&caller(reader), open_day(), action.id, memory.ports())
+            .await
+            .unwrap();
+        assert_eq!(shown.can_change, can_change, "{reader}");
+        let next = if can_change {
+            vec![
+                ActionStatus::InProgress,
+                ActionStatus::Blocked,
+                ActionStatus::Done,
+                ActionStatus::Canceled,
+            ]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(shown.next_statuses(), next, "{reader}");
+    }
+
+    let commitment = create_commitment(
+        &caller(OWNER),
+        open_day(),
+        new_commitment(Some("subject to signed order")),
+        memory.ports(),
+    )
+    .await
+    .unwrap();
+    assert!(commitment.can_change);
+    // "Make firm" sets `firm`, so a change does not offer it.
+    assert_eq!(
+        commitment.next_statuses(),
+        [
+            CommitmentStatus::Fulfilled,
+            CommitmentStatus::Broken,
+            CommitmentStatus::Withdrawn
+        ]
+    );
+    let by_viewer = get_commitment(
+        &caller(VIEWER),
+        open_day(),
+        commitment.record.id,
+        memory.ports(),
+    )
+    .await
+    .unwrap();
+    assert!(!by_viewer.can_change);
+    assert!(by_viewer.next_statuses().is_empty());
 }
 
 #[test]

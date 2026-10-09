@@ -156,13 +156,19 @@ pub struct Action {
     pub version: i64,
     /// The evidence of the accepted proposals that created or changed the action.
     pub evidence: Vec<RecordEvidence>,
+    /// True if the caller can change the action now: its owner, the lead of its workstream or an event manager.
+    pub can_change: bool,
+    /// The statuses that the caller can set with a change now. Empty without `can_change`.
+    pub next_statuses: Vec<ActionStatus>,
 }
 
 impl From<Shown<ActionView>> for Action {
     fn from(shown: Shown<ActionView>) -> Self {
+        let next_statuses = shown.next_statuses().into_iter().map(Into::into).collect();
         let Shown {
             record: action,
             evidence,
+            can_change,
         } = shown;
         let local_id = action.local_id();
         let fields = action.fields;
@@ -178,6 +184,8 @@ impl From<Shown<ActionView>> for Action {
             status: fields.status.into(),
             version: action.version.get(),
             evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
+            can_change,
+            next_statuses,
         }
     }
 }
@@ -252,13 +260,21 @@ pub struct Commitment {
     pub version: i64,
     /// The evidence of the accepted proposals that created or changed the commitment.
     pub evidence: Vec<RecordEvidence>,
+    /// True if the caller can change the commitment now, and make it firm:
+    /// its owner, the lead of its workstream or an event manager.
+    pub can_change: bool,
+    /// The statuses that the caller can set with a change now. Empty without `can_change`.
+    /// It never holds `firm`: only "make firm" sets it.
+    pub next_statuses: Vec<CommitmentStatus>,
 }
 
 impl From<Shown<CommitmentView>> for Commitment {
     fn from(shown: Shown<CommitmentView>) -> Self {
+        let next_statuses = shown.next_statuses().into_iter().map(Into::into).collect();
         let Shown {
             record: commitment,
             evidence,
+            can_change,
         } = shown;
         let local_id = commitment.local_id();
         let fields = commitment.fields;
@@ -285,6 +301,8 @@ impl From<Shown<CommitmentView>> for Commitment {
             firm_reason: fields.firm_reason.map(|text| text.as_str().to_owned()),
             version: commitment.version.get(),
             evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
+            can_change,
+            next_statuses,
         }
     }
 }

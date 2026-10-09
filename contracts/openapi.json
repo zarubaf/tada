@@ -4257,7 +4257,9 @@
           "owner_user_id",
           "status",
           "version",
-          "evidence"
+          "evidence",
+          "can_change",
+          "next_statuses"
         ],
         "properties": {
           "id": {
@@ -4314,6 +4316,17 @@
               "$ref": "#/components/schemas/RecordEvidence"
             },
             "description": "The evidence of the accepted proposals that created or changed the action."
+          },
+          "can_change": {
+            "type": "boolean",
+            "description": "True if the caller can change the action now: its owner, the lead of its workstream or an event manager."
+          },
+          "next_statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActionStatus"
+            },
+            "description": "The statuses that the caller can set with a change now. Empty without `can_change`."
           }
         }
       },
@@ -5378,7 +5391,9 @@
           "owner_user_id",
           "status",
           "version",
-          "evidence"
+          "evidence",
+          "can_change",
+          "next_statuses"
         ],
         "properties": {
           "id": {
@@ -5446,6 +5461,17 @@
               "$ref": "#/components/schemas/RecordEvidence"
             },
             "description": "The evidence of the accepted proposals that created or changed the commitment."
+          },
+          "can_change": {
+            "type": "boolean",
+            "description": "True if the caller can change the commitment now, and make it firm:\nits owner, the lead of its workstream or an event manager."
+          },
+          "next_statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommitmentStatus"
+            },
+            "description": "The statuses that the caller can set with a change now. Empty without `can_change`.\nIt never holds `firm`: only \"make firm\" sets it."
           }
         }
       },
@@ -7983,7 +8009,8 @@
           "name",
           "kind",
           "version",
-          "evidence"
+          "evidence",
+          "can_change"
         ],
         "properties": {
           "id": {
@@ -8024,6 +8051,10 @@
               "$ref": "#/components/schemas/RecordEvidence"
             },
             "description": "The evidence of the accepted proposals that created or changed the institution,\nfrom the sources that the caller can read."
+          },
+          "can_change": {
+            "type": "boolean",
+            "description": "True if the caller can change the institution: an owner or an admin."
           }
         }
       },
@@ -9351,7 +9382,8 @@
           "local_id",
           "name",
           "version",
-          "evidence"
+          "evidence",
+          "can_change"
         ],
         "properties": {
           "id": {
@@ -9396,6 +9428,10 @@
               "$ref": "#/components/schemas/RecordEvidence"
             },
             "description": "The evidence of the accepted proposals that created or changed the person,\nfrom the sources that the caller can read."
+          },
+          "can_change": {
+            "type": "boolean",
+            "description": "True if the caller can change the person: an owner or an admin."
           }
         }
       },

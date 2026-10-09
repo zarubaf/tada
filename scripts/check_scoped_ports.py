@@ -46,6 +46,7 @@ NON_PORTS = {
     "MayPropose": "a marker on a caller type, no data access",
     "Principal": "describes a caller type, no data access",
     "ServiceIdentity": "describes a service caller type, no data access",
+    "WorkRecord": "reads the owner and the workstream of a work record view, no data access",
 }
 TRAIT = re.compile(r"\bpub(?:\([^)]*\))?\s+trait\s+(\w+)[^{;]*\{")
 FUNCTION = re.compile(r"\bfn\b")

@@ -1,17 +1,19 @@
 //! The checks that the commands of actions and commitments share.
 
+use std::collections::HashMap;
+
 use tada_domain::ids::{EventId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::work::{ActionDescription, ActionTitle, CommitmentText};
 
-use super::{WorkError, may_change_work};
-use crate::access::{self, EventAccess};
+use super::{ActionView, CommitmentView, WorkError, WorkPorts, may_change_work};
+use crate::access::{self, EventAccess, Principal};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::identity::IdentityStore;
 use crate::parties::PartyStore;
 use crate::problem::FieldError;
 use crate::proposals::text_error_code;
-use crate::records::{Changed, Checker, Created};
+use crate::records::{Changed, Checker, Created, RecordRef, Shown, shown, shown_one};
 use crate::store::StoreError;
 use crate::workstreams::{ActiveWorkstreamError, WorkstreamStore, active_workstream};
 
@@ -101,17 +103,15 @@ pub(super) async fn check_promisor(
     Ok(())
 }
 
-/// The caller must be a contributor or a manager of the event.
+/// The caller must be a contributor or a manager of the event. Returns the access of the caller.
 pub(super) async fn require_create(
     caller: &MemberCaller,
     event: EventId,
     identity: &dyn IdentityStore,
-) -> Result<(), WorkError> {
-    if access::event_access(caller, event, identity)
-        .await?
-        .can_propose()
-    {
-        Ok(())
+) -> Result<EventAccess, WorkError> {
+    let access = access::event_access(caller, event, identity).await?;
+    if access.can_propose() {
+        Ok(access)
     } else {
         Err(WorkError::Forbidden)
     }
@@ -126,18 +126,145 @@ pub(super) async fn require_change(
     workstream: Option<WorkstreamId>,
     workstreams: &dyn WorkstreamStore,
 ) -> Result<(), WorkError> {
-    let lead = match workstream {
-        Some(id) => workstreams
-            .get(caller.scope(), event, id)
-            .await?
-            .map(|workstream| workstream.lead),
-        None => None,
-    };
-    if may_change_work(access, caller.user_id(), owner, lead) {
+    if may_change(caller, access, event, owner, workstream, workstreams).await? {
         Ok(())
     } else {
         Err(WorkError::Forbidden)
     }
+}
+
+/// True if the caller can change a record with the owner `owner` in the workstream `workstream` (`may_change_work`).
+pub(super) async fn may_change(
+    caller: &impl Principal,
+    access: EventAccess,
+    event: EventId,
+    owner: UserId,
+    workstream: Option<WorkstreamId>,
+    workstreams: &dyn WorkstreamStore,
+) -> Result<bool, StoreError> {
+    Ok(ChangeRights::of_event(caller, access, event, workstreams)
+        .await?
+        .allow(owner, workstream))
+}
+
+/// What a caller can change in one event: the input of `may_change_work` for each record of the event.
+#[derive(Debug)]
+pub(crate) struct ChangeRights {
+    caller: UserId,
+    access: EventAccess,
+    /// The lead of each workstream of the event.
+    leads: HashMap<WorkstreamId, UserId>,
+}
+
+impl ChangeRights {
+    pub(crate) async fn of_event(
+        caller: &impl Principal,
+        access: EventAccess,
+        event: EventId,
+        workstreams: &dyn WorkstreamStore,
+    ) -> Result<Self, StoreError> {
+        let leads = workstreams
+            .list(caller.scope(), event)
+            .await?
+            .into_iter()
+            .map(|workstream| (workstream.id, workstream.lead))
+            .collect();
+        Ok(Self {
+            caller: caller.user_id(),
+            access,
+            leads,
+        })
+    }
+
+    /// True if the caller can change a record with the owner `owner` in the workstream `workstream`.
+    pub(crate) fn allow(&self, owner: UserId, workstream: Option<WorkstreamId>) -> bool {
+        let lead = workstream.and_then(|id| self.leads.get(&id).copied());
+        may_change_work(self.access, self.caller, owner, lead)
+    }
+}
+
+/// The parts of an action or a commitment that its view for a caller needs.
+pub(crate) trait WorkRecord {
+    fn record_ref(&self) -> RecordRef;
+    fn owner(&self) -> UserId;
+    fn workstream(&self) -> Option<WorkstreamId>;
+}
+
+impl WorkRecord for ActionView {
+    fn record_ref(&self) -> RecordRef {
+        RecordRef::Action(self.id)
+    }
+
+    fn owner(&self) -> UserId {
+        self.fields.owner
+    }
+
+    fn workstream(&self) -> Option<WorkstreamId> {
+        self.fields.workstream_id
+    }
+}
+
+impl WorkRecord for CommitmentView {
+    fn record_ref(&self) -> RecordRef {
+        RecordRef::Commitment(self.id)
+    }
+
+    fn owner(&self) -> UserId {
+        self.fields.owner
+    }
+
+    fn workstream(&self) -> Option<WorkstreamId> {
+        self.fields.workstream_id
+    }
+}
+
+/// The records of one event as the caller reads them: with their evidence and the right to change each.
+pub(super) async fn show<T: WorkRecord>(
+    caller: &impl Principal,
+    access: EventAccess,
+    event: EventId,
+    records: Vec<T>,
+    ports: WorkPorts<'_>,
+) -> Result<Vec<Shown<T>>, StoreError> {
+    let rights = ChangeRights::of_event(caller, access, event, ports.workstreams).await?;
+    shown(
+        caller,
+        records,
+        WorkRecord::record_ref,
+        |record| rights.allow(record.owner(), record.workstream()),
+        ports.identity,
+        ports.work,
+    )
+    .await
+}
+
+/// One record of an event as the caller reads it (`show`).
+pub(super) async fn show_one<T: WorkRecord>(
+    caller: &impl Principal,
+    access: EventAccess,
+    event: EventId,
+    record: T,
+    ports: WorkPorts<'_>,
+) -> Result<Shown<T>, StoreError> {
+    let can_change = may_change(
+        caller,
+        access,
+        event,
+        record.owner(),
+        record.workstream(),
+        ports.workstreams,
+    )
+    .await?;
+    let record_ref = record.record_ref();
+    shown_one(
+        caller,
+        record,
+        record_ref,
+        can_change,
+        ports.identity,
+        ports.work,
+    )
+    .await
 }
 
 /// The record of a create, or `taken` for its ID.

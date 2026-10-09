@@ -525,6 +525,27 @@ async fn a_change_without_a_field_is_invalid() {
     assert_eq!(memory.audit.lock().unwrap().len(), 2);
 }
 
+/// Only an owner or an admin changes a person, and the view tells each reader so (ADR 0069).
+#[tokio::test]
+async fn the_view_tells_the_reader_whether_it_can_change_the_person() {
+    let memory = Memory::default();
+    let created = create_person(
+        &anna(),
+        new_person("Beat Muster"),
+        &memory,
+        &memory,
+        &FixedClock,
+    )
+    .await
+    .unwrap();
+    assert!(!created.can_change);
+    let id = created.record.id;
+    let by_admin = get_person(&carla(), id, &memory, &memory).await.unwrap();
+    assert!(by_admin.can_change);
+    let by_member = get_person(&anna(), id, &memory, &memory).await.unwrap();
+    assert!(!by_member.can_change);
+}
+
 #[tokio::test]
 async fn a_stale_version_conflicts() {
     let memory = Memory::default();
