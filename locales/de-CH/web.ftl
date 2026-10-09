@@ -398,6 +398,7 @@ settings-nav-telegram = Telegram
 settings-nav-tokens = API-Token
 settings-nav-organization = Organisation
 settings-nav-account = Konto
+settings-loading = Einstellungen werden geladen
 account-title = Konto
 account-sessions-title = Sitzungen
 account-sessions-text = Haben Sie ein Gerät verloren, oder meldet sich jemand anderes mit Ihrem Konto an? Melden Sie sich überall ab. Danach melden Sie sich mit einem neuen Link an.

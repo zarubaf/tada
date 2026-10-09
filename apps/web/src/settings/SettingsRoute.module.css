@@ -1,0 +1,6 @@
+@layer components {
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+}
