@@ -60,18 +60,18 @@ impl TestDatabase {
             .expect("cannot start PostgreSQL; is Docker running?");
         let port = container.get_host_port_ipv4(5432).await.unwrap();
         let url = format!("postgres://postgres@127.0.0.1:{port}/postgres");
-        // Production fails fast after 5 s; test containers need longer under heavy machine load.
-        let database = Database::connect_lazy_with_timeout(
-            &url,
-            &SecretString::from("postgres"),
-            Duration::from_secs(60),
-        )
-        .unwrap();
         Self {
-            database,
+            database: connect(&url),
             url,
             _container: container,
         }
+    }
+
+    /// A new pool on this database, as a new process opens it.
+    /// A restart test closes it and opens another one, while the database stays.
+    #[must_use]
+    pub fn connect(&self) -> Database {
+        connect(&self.url)
     }
 
     /// The connection pool, for tests that run SQL of their own, for example old migrations and fixtures.
@@ -416,6 +416,18 @@ impl TestDatabase {
         .await
         .unwrap();
     }
+}
+
+/// A pool on the database at `url`, with the password of the container.
+#[allow(clippy::unwrap_used)]
+fn connect(url: &str) -> Database {
+    // Production fails fast after 5 s; test containers need longer under heavy machine load.
+    Database::connect_lazy_with_timeout(
+        url,
+        &SecretString::from("postgres"),
+        Duration::from_secs(60),
+    )
+    .unwrap()
 }
 
 /// The SQLSTATE of a database error, for example `23514` for a violated CHECK.
