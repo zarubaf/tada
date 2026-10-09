@@ -10,7 +10,8 @@ Slice 2a adds the work records that members and the AI PM follow: actions and co
 The glossary says that a conditional commitment stays conditional, and that no signature or approval is invented.
 A commitment comes from a person or an institution (ADR 0069).
 The audit log keeps the history of changes, but a reader of a record also needs the evidence of each accepted change.
-ADR 0038 defines the prefixes `ACT` and `COM`. ADR 0052 defines the owner of a work record.
+ADR 0038 defines the prefixes `ACT` and `COM`.
+ADR 0052 defines the owner of a work record.
 
 ## Decision
 
@@ -36,46 +37,58 @@ Action (`ACT`, event scope):
 - Statuses: `open`, `in-progress`, `blocked`, `done`, `canceled`.
 - Transitions:
   - `open` and `in-progress` change into each other.
-  - `open` and `in-progress` change to `blocked`. `blocked` changes to `open` or `in-progress`.
+  - `open` and `in-progress` change to `blocked`.
+    `blocked` changes to `open` or `in-progress`.
   - `open`, `in-progress` and `blocked` change to `done` or `canceled`.
   - `done` changes to `open` (reopen).
   - `canceled` is final.
-- A change to the current status is not a transition. It returns `invalid-transition`.
+- A change to the current status is not a transition.
+  It returns `invalid-transition`.
 
 Commitment (`COM`, event scope):
 
 - Fields: text (at most 500 characters), promisor, owner, optional workstream, optional due date (`due_date`) and optional condition text (at most 500).
 - The promisor is exactly one person or one institution of the organization.
-- The owner is the member of the event who follows the commitment up. The owner has the contributor or manager role.
+- The owner is the member of the event who follows the commitment up.
+  The owner has the contributor or manager role.
 - The initial status is `conditional` if the condition text is set, else `firm`.
 - Transitions:
-  - `conditional` changes to `firm`. This needs a reason (at most 500 characters). The condition text stays as history.
+  - `conditional` changes to `firm`.
+    This needs a reason (at most 500 characters).
+    The condition text stays as history.
   - `conditional` and `firm` change to `fulfilled`, `broken` or `withdrawn`.
   - `fulfilled`, `broken` and `withdrawn` are final.
   - A change to the current status returns `invalid-transition`.
 - A command cannot remove the condition text of a conditional commitment.
   The only way to `firm` is the explicit "make firm" command, or an accepted proposal of that change.
   The command to change a commitment refuses the status `firm`.
-- The "make firm" command needs a reason. The reason is stored on the commitment as `firm_reason`.
-  The audit log records who made it firm and when. It holds no free text (ADR 0039).
+- The "make firm" command needs a reason.
+  The reason is stored on the commitment as `firm_reason`.
+  The audit log records who made it firm and when.
+  It holds no free text (ADR 0039).
 - Who may change a record: its owner, the lead of its workstream and an event manager (ADR 0067).
-  The same rule covers "make firm". A viewer changes nothing.
+  The same rule covers "make firm".
+  A viewer changes nothing.
 
 Operations in proposals (`domain::proposals::Operation`):
 
 - `CreateAction`, `CreateCommitment`, `ChangeActionStatus`, `ChangeActionDue` and `ChangeCommitmentStatus`.
-  The create operations carry the UUID of the new record, as in ADR 0050. The change operations carry `expected_version`.
+  The create operations carry the UUID of the new record, as in ADR 0050.
+  The change operations carry `expected_version`.
 - A `CreateCommitment` names its promisor as a person or an institution.
 - A change to `firm` through a proposal is the AI path for "condition met".
-  The owner reviews it. The evidence is the passage, for example the signed order.
+  The owner reviews it.
+  The evidence is the passage, for example the signed order.
   The reason of the proposal becomes `firm_reason` of the commitment, so it has at most 500 characters.
   The accepted change writes its evidence with the new record version.
 - The JSON name of the due date is `due_date` in the operations and in the direct API.
   The operation `CreateInstitution` names the institution kind `institution_kind`, because `kind` is the tag of the operation.
   The direct API of institutions uses `kind` (ADR 0069).
 - The review edit supports the text fields, the due date and the condition text of the create operations.
-  An edit of the owner or the workstream is a field edit too. The same rules as for a direct command apply.
-  An edit cannot remove the condition of a proposed commitment. An edit that adds a condition makes the commitment start `conditional`.
+  An edit of the owner or the workstream is a field edit too.
+  The same rules as for a direct command apply.
+  An edit cannot remove the condition of a proposed commitment.
+  An edit that adds a condition makes the commitment start `conditional`.
   An edited owner who is not a contributor or a manager of the event is refused with `validation-failed` on `edits/i/fields/owner`.
   The record keeps the passages of the proposal and the edited values as a source version of the kind `review`.
 - A proposal that names a workstream conflicts if the workstream closes before the apply.
@@ -86,12 +99,15 @@ Operations in proposals (`domain::proposals::Operation`):
 
 Not in 2a:
 
-- Proposals that change the owner of a record. The AI PM never reassigns owners.
+- Proposals that change the owner of a record.
+  The AI PM never reassigns owners.
 - Proposals that create workstreams.
 
 Concurrency and errors:
 
-- A change carries `expected_version`. If it does not match, the command returns `record-version-conflict`. Of two changes with the same version, one wins.
+- A change carries `expected_version`.
+  If it does not match, the command returns `record-version-conflict`.
+  Of two changes with the same version, one wins.
 - A forbidden transition, or a change to the current status, returns `invalid-transition`.
 - A text over its limit, or an unknown promisor, owner or workstream, returns `validation-failed` with a field code (ADR 0037).
   The field code for a promisor or a workstream of another organization or event is `unknown-record`.
@@ -100,15 +116,20 @@ Concurrency and errors:
 
 Conventions of the five record kinds (workstreams, actions, commitments, persons and institutions):
 
-- Client ID: a create takes an optional ID that must be a UUIDv7. Without it, the server chooses one.
+- Client ID: a create takes an optional ID that must be a UUIDv7.
+  Without it, the server chooses one.
   An ID that is not a UUIDv7 returns the field code `not-uuid-v7` on `id`.
-  An ID that any record of the kind holds, in any organization, returns the field code `taken`. A retry with the same ID returns `taken` too, because a create is not idempotent.
+  An ID that any record of the kind holds, in any organization, returns the field code `taken`.
+  A retry with the same ID returns `taken` too, because a create is not idempotent.
 - Empty change: a PATCH with no field to change returns `validation-failed` with no field error and writes nothing.
 - Order of checks in a change: access, record found, empty change, version, values (all field errors at once), then the transition.
-- Time source: the app clock gives `created_at` and `updated_at` of each write. The store never uses the database clock for these tables.
+- Time source: the app clock gives `created_at` and `updated_at` of each write.
+  The store never uses the database clock for these tables.
 - One write path: the direct command and the apply of a proposal call the same insert and update of a table.
-- Paging: a list pages by the local number of the record, with a cursor (ADR 0044). `next_cursor` is absent on the last page.
-- Reads: a read works for a member and for the AI client of that member, with the rights of the member. A command needs a member.
+- Paging: a list pages by the local number of the record, with a cursor (ADR 0044).
+  `next_cursor` is absent on the last page.
+- Reads: a read works for a member and for the AI client of that member, with the rights of the member.
+  A command needs a member.
 - Views: each action and commitment view carries `can_change` and `next_statuses`, and each commitment view also carries `can_make_firm`.
   Each person and institution view carries `can_change`.
   They come from the one permission rule and the one transition rule, so a client does not repeat them.
@@ -119,9 +140,11 @@ Conventions of the five record kinds (workstreams, actions, commitments, persons
 
 ## Consequences
 
-- A conditional commitment cannot become firm by accident. The acceptance criterion (5) has a testable rule.
+- A conditional commitment cannot become firm by accident.
+  The acceptance criterion (5) has a testable rule.
 - Each accepted change of the four kinds has evidence that a reader can open.
-- The current row is easy to query. The history needs the audit log and `record_evidence` together.
+- The current row is easy to query.
+  The history needs the audit log and `record_evidence` together.
 - Each new table joins the structured export and the data inventory in the same commit.
 
 ## Alternatives
