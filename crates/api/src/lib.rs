@@ -13,6 +13,7 @@ mod health;
 mod json_schema;
 mod members;
 mod origin;
+mod parties;
 mod privacy;
 mod problem;
 mod request_id;
@@ -44,6 +45,7 @@ use tada_app::facts::FactStore;
 use tada_app::health::DependencyCheck;
 use tada_app::identity::IdentityStore;
 use tada_app::members::MemberStore;
+use tada_app::parties::PartyStore;
 use tada_app::privacy::PrivacyStore;
 use tada_app::problem::ProblemCode;
 use tada_app::proposals::ProposalStore;
@@ -97,6 +99,8 @@ pub struct ApiState {
     pub tokens: Arc<dyn TokenStore>,
     /// The privacy notice of the organization (ADR 0045).
     pub privacy: Arc<dyn PrivacyStore>,
+    /// Persons and institutions (ADR 0069).
+    pub parties: Arc<dyn PartyStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -116,7 +120,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(facts::routes())
                 .merge(review::routes())
                 .merge(tokens::routes())
-                .merge(privacy::routes()),
+                .merge(privacy::routes())
+                .merge(parties::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -136,6 +141,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(review::problem_codes())
         .chain(tokens::problem_codes())
         .chain(privacy::problem_codes())
+        .chain(parties::problem_codes())
         .collect()
 }
 
@@ -986,6 +992,110 @@ mod tests {
     }
 
     #[derive(Debug)]
+    struct NoParties;
+
+    #[async_trait::async_trait]
+    impl tada_app::parties::PartyStore for NoParties {
+        async fn create_person(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::PersonId,
+            _: &tada_app::parties::PersonFields,
+            _: Option<tada_app::domain::ids::UserId>,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::parties::PersonView, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn change_person(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::PersonId,
+            _: &tada_app::parties::PersonFields,
+            _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::parties::PartyChanged<tada_app::parties::PersonView>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn person(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::PersonId,
+        ) -> Result<Option<tada_app::parties::PersonView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn persons(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: Option<&str>,
+            _: Option<tada_app::parties::PartyCursor>,
+            _: u32,
+        ) -> Result<Vec<tada_app::parties::PersonView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn create_institution(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::InstitutionId,
+            _: &tada_app::parties::InstitutionFields,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::parties::InstitutionView, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn change_institution(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::InstitutionId,
+            _: &tada_app::parties::InstitutionFields,
+            _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::parties::PartyChanged<tada_app::parties::InstitutionView>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn institution(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::InstitutionId,
+        ) -> Result<Option<tada_app::parties::InstitutionView>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn institutions(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: Option<&str>,
+            _: Option<tada_app::parties::PartyCursor>,
+            _: u32,
+        ) -> Result<Vec<tada_app::parties::InstitutionView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn named_like(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &str,
+        ) -> Result<Vec<tada_app::parties::PartyRef>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[derive(Debug)]
     struct NoPrivacy;
 
     #[async_trait::async_trait]
@@ -1032,6 +1142,7 @@ mod tests {
             sources: Arc::new(NoReview),
             tokens: Arc::new(NoTokens),
             privacy: Arc::new(NoPrivacy),
+            parties: Arc::new(NoParties),
         }
     }
 

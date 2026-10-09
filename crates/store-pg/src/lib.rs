@@ -44,6 +44,7 @@ mod jobs;
 mod local_ids;
 mod members;
 mod outbound;
+mod parties;
 mod privacy;
 mod proposals;
 pub mod rate_limit;

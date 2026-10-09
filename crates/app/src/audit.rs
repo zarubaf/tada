@@ -37,6 +37,14 @@ pub enum AuditAction {
     DocumentVersionUpload,
     /// An event manager approved a draft version (ADR 0051, ADR 0052).
     DocumentVersionApprove,
+    /// A member created a person (ADR 0069).
+    PersonCreate,
+    /// An owner or admin changed a person (ADR 0069).
+    PersonChange,
+    /// A member created an institution (ADR 0069).
+    InstitutionCreate,
+    /// An owner or admin changed an institution (ADR 0069).
+    InstitutionChange,
 }
 
 impl AuditAction {
@@ -64,6 +72,10 @@ impl AuditAction {
             Self::OrganizationSetPrivacyNotice => "organization.set_privacy_notice",
             Self::DocumentVersionUpload => "document_version.upload",
             Self::DocumentVersionApprove => "document_version.approve",
+            Self::PersonCreate => "person.create",
+            Self::PersonChange => "person.change",
+            Self::InstitutionCreate => "institution.create",
+            Self::InstitutionChange => "institution.change",
         }
     }
 
@@ -93,6 +105,8 @@ impl AuditAction {
                 "organization_feature"
             }
             Self::DocumentVersionUpload | Self::DocumentVersionApprove => "document_version",
+            Self::PersonCreate | Self::PersonChange => "person",
+            Self::InstitutionCreate | Self::InstitutionChange => "institution",
         }
     }
 }

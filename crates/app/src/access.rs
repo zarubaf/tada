@@ -186,6 +186,22 @@ pub async fn proposes_in_some_event(
         .any(|(_, role)| EventAccess::from(role).can_propose()))
 }
 
+/// True if the caller can read in some event: any event role, or the organization role owner or admin.
+/// Persons and institutions belong to the organization, so they follow this rule (ADR 0069).
+pub async fn reads_in_some_event(
+    caller: &impl Principal,
+    identity: &dyn IdentityStore,
+) -> Result<bool, StoreError> {
+    if sees_all_events(caller) {
+        return Ok(true);
+    }
+    Ok(identity
+        .event_roles_of(caller.scope(), caller.user_id())
+        .await?
+        .into_iter()
+        .any(|(_, role)| EventAccess::from(role).can_read()))
+}
+
 /// The source versions that a caller can read (ADR 0050, ADR 0052). Search and citations use this one rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SourceReach {
