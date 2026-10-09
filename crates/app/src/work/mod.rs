@@ -185,6 +185,13 @@ pub struct MyWork {
     pub commitments: Vec<InEvent<CommitmentView>>,
 }
 
+/// The current owner of each found action and commitment (`WorkStore::owners`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct WorkOwners {
+    pub actions: Vec<(ActionId, UserId)>,
+    pub commitments: Vec<(CommitmentId, UserId)>,
+}
+
 /// The repository port for actions and commitments. Each method stays inside `scope`.
 /// A create or a change records its audit event in the same transaction.
 #[async_trait]
@@ -268,6 +275,16 @@ pub trait WorkStore: EvidenceStore + Debug + Send + Sync {
         event: EventId,
         filter: &WorkFilter<CommitmentStatus>,
     ) -> Result<Vec<CommitmentView>, StoreError>;
+
+    /// The current owners of the actions `actions` and the commitments `commitments` of the event, for the review
+    /// routing (ADR 0067). A record that the event does not have is missing in the result.
+    async fn owners(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+        actions: &[ActionId],
+        commitments: &[CommitmentId],
+    ) -> Result<WorkOwners, StoreError>;
 
     /// The open records that `user` owns in the events of `events` (`access::readable_events`).
     async fn my_open_work(

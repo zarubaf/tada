@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT c.id, c.event_id, c.author, c.created_at AS \"created_at: jiff_sqlx::Timestamp\",\n                      count(*) AS \"open_proposals!\"\n               FROM changeset c\n               JOIN proposal p ON p.organization_id = c.organization_id AND p.changeset_id = c.id\n               WHERE c.organization_id = $1 AND ($2::uuid IS NULL OR c.event_id = $2)\n                 AND NOT EXISTS (\n                     SELECT 1 FROM review_result r\n                     WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id\n                 )\n               GROUP BY c.id\n               ORDER BY c.created_at, c.id",
+  "query": "SELECT id, event_id, author, created_at AS \"created_at: jiff_sqlx::Timestamp\"\n               FROM changeset\n               WHERE organization_id = $1 AND id = ANY($2)\n               ORDER BY created_at, id",
   "describe": {
     "columns": [
       {
@@ -46,27 +46,20 @@
             "name": "created_at"
           }
         }
-      },
-      {
-        "ordinal": 4,
-        "name": "open_proposals!",
-        "type_info": "Int8",
-        "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid"
+        "UuidArray"
       ]
     },
     "nullable": [
       false,
       true,
       false,
-      false,
-      null
+      false
     ]
   },
-  "hash": "a0b3967613f0c7ce0e5e5b2b83b3b10299ac42546715f39eef02808d8c1aec30"
+  "hash": "35a19bb59e3885bb4bbadb04f886b43b152333ad2b99446260c7afba68c278d8"
 }

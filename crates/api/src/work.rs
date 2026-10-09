@@ -840,7 +840,8 @@ pub struct MyWork {
     pub actions: Vec<MyAction>,
     /// The commitments with the status `conditional` or `firm`, in the same order.
     pub commitments: Vec<MyCommitment>,
-    /// The number of proposals that the caller reviews.
+    /// The number of open proposals in the Review Inbox of the caller: the proposals that the review routing gives
+    /// the caller, and for an event manager also the overdue proposals of the event.
     pub review_count: u32,
 }
 
@@ -860,7 +861,7 @@ async fn my_work(
     State(state): State<ApiState>,
     Caller(caller): Caller,
 ) -> Result<axum::Json<MyWork>, ApiError> {
-    let view = tada_app::my_work::my_work(&caller, ports(&state)).await?;
+    let view = tada_app::my_work::my_work(&caller, ports(&state), state.review.as_ref()).await?;
     Ok(axum::Json(MyWork {
         actions: view
             .actions

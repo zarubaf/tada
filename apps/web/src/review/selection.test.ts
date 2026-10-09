@@ -8,6 +8,8 @@ function proposal(id: string, dependsOn: string[] = [], status: Proposal["status
     depends_on: dependsOn,
     status,
     stale: false,
+    overdue: false,
+    routed_to_me: true,
     reason: "",
     evidence: [],
     operation: { kind: "deprecate-field", event_id: "e", field_id: "f" },

@@ -494,13 +494,15 @@ mod review {
             .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(inbox["items"], json!([]));
-        let (status, _) = api
+        // The list of the event shows only what the routing gives the contributor (ADR 0067): nothing here.
+        let (status, page) = api
             .get(
                 &contributor.cookie,
                 &format!("/api/v1/events/{event}/changesets?status=open"),
             )
             .await;
-        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(page["items"], json!([]));
         let (status, problem) = api
             .post(
                 &contributor.cookie,
@@ -755,5 +757,434 @@ mod work {
         let (_, read) = api.get(&contributor.cookie, &path).await;
         assert_eq!(read["status"], "conditional");
         assert_eq!(read["version"], 1);
+    }
+}
+
+/// Review routing (ADR 0067): a proposal goes to the person who owns the work.
+mod routing {
+    use super::*;
+
+    /// An event with an event manager, a workstream lead, the author of the proposals and another contributor.
+    struct Routed {
+        api: Api,
+        event: String,
+        workstream: String,
+        /// An event manager without an organization role that manages each event.
+        manager: Member,
+        lead: Member,
+        author: Member,
+        other: Member,
+    }
+
+    impl Routed {
+        async fn start() -> Self {
+            let api = Api::start().await;
+            let owner = api.member("testwil", OrganizationRole::Owner).await;
+            let event = api.create_event(&owner.cookie, "TEST30").await;
+            let manager = api.member("testwil", OrganizationRole::Member).await;
+            let lead = api.member("testwil", OrganizationRole::Member).await;
+            let author = api.member("testwil", OrganizationRole::Member).await;
+            let other = api.member("testwil", OrganizationRole::Member).await;
+            api.add_to_event(&owner.cookie, &event, &manager, "event-manager")
+                .await;
+            for member in [&lead, &author, &other] {
+                api.add_to_event(&owner.cookie, &event, member, "event-contributor")
+                    .await;
+            }
+            let (status, workstream) = api
+                .post(
+                    &manager.cookie,
+                    &format!("/api/v1/events/{event}/workstreams"),
+                    &json!({"name": "Bodenbetrieb", "lead_user_id": lead.user.as_uuid()}),
+                )
+                .await;
+            assert_eq!(status, StatusCode::CREATED, "{workstream}");
+            let workstream = workstream["id"].as_str().unwrap().to_owned();
+            Self {
+                api,
+                event,
+                workstream,
+                manager,
+                lead,
+                author,
+                other,
+            }
+        }
+
+        /// The author proposes `proposals`. Returns the ID of the changeset.
+        async fn propose(&self, proposals: Vec<Value>) -> String {
+            let (status, changeset) = self
+                .api
+                .post(
+                    &self.author.cookie,
+                    &format!("/api/v1/events/{}/changesets", self.event),
+                    &json!({"source_text": SOURCE, "proposals": proposals}),
+                )
+                .await;
+            assert_eq!(status, StatusCode::CREATED, "{changeset}");
+            changeset["id"].as_str().unwrap().to_owned()
+        }
+
+        /// A proposal of a new commitment of the author from the new person `person`, in `workstream`.
+        fn commitment(&self, person: Uuid, workstream: Option<&str>) -> Value {
+            proposal(
+                json!({
+                    "kind": "create-commitment", "id": Uuid::now_v7(), "event_id": self.event,
+                    "text": "Liefert den Generator", "promisor": {"person": person},
+                    "owner": self.author.user.as_uuid(), "workstream": workstream,
+                }),
+                "Der Ort ist noch offen.",
+            )
+        }
+
+        fn new_person(person: Uuid) -> Value {
+            proposal(
+                json!({"kind": "create-person", "id": person, "name": "Moritz Muster"}),
+                "Wer klärt die Bewilligung?",
+            )
+        }
+
+        /// A changeset with a new supplier and a commitment from it in the workstream.
+        async fn supplier_changeset(&self) -> (String, Value, Value) {
+            let person = Uuid::now_v7();
+            let supplier = Self::new_person(person);
+            let mut promise = self.commitment(person, Some(&self.workstream));
+            promise["depends_on"] = json!([supplier["id"]]);
+            let changeset = self.propose(vec![supplier.clone(), promise.clone()]).await;
+            (changeset, supplier, promise)
+        }
+
+        async fn inbox(&self, member: &Member) -> Vec<String> {
+            let (status, inbox) = self
+                .api
+                .get(&member.cookie, "/api/v1/changesets?status=open")
+                .await;
+            assert_eq!(status, StatusCode::OK, "{inbox}");
+            ids(&inbox)
+        }
+
+        async fn detail(&self, member: &Member, changeset: &str) -> (StatusCode, Value) {
+            self.api
+                .get(&member.cookie, &format!("/api/v1/changesets/{changeset}"))
+                .await
+        }
+
+        async fn apply(
+            &self,
+            member: &Member,
+            changeset: &str,
+            selected: &[&Value],
+        ) -> (StatusCode, Value) {
+            let ids: Vec<&Value> = selected.iter().map(|proposal| &proposal["id"]).collect();
+            self.api
+                .post(
+                    &member.cookie,
+                    &format!("/api/v1/changesets/{changeset}/apply"),
+                    &json!({"selected": ids}),
+                )
+                .await
+        }
+
+        /// An action of the event that `owner` owns, created by the manager.
+        async fn action(&self, owner: &Member) -> String {
+            let (status, action) = self
+                .api
+                .post(
+                    &self.manager.cookie,
+                    &format!("/api/v1/events/{}/actions", self.event),
+                    &json!({"title": "Generator bestellen", "owner_user_id": owner.user.as_uuid()}),
+                )
+                .await;
+            assert_eq!(status, StatusCode::CREATED, "{action}");
+            action["id"].as_str().unwrap().to_owned()
+        }
+
+        fn action_status(&self, action: &str) -> Value {
+            proposal(
+                json!({
+                    "kind": "change-action-status", "event_id": self.event, "action_id": action,
+                    "status": "in-progress", "expected_version": 1,
+                }),
+                "Wer klärt die Bewilligung?",
+            )
+        }
+
+        async fn remove_from_event(&self, member: &Member) {
+            let (status, problem) = self
+                .api
+                .post(
+                    &self.manager.cookie,
+                    &format!(
+                        "/api/v1/events/{}/memberships/{}/remove",
+                        self.event,
+                        member.user.as_uuid()
+                    ),
+                    &json!({"expected_version": 1}),
+                )
+                .await;
+            assert_eq!(status, StatusCode::NO_CONTENT, "{problem}");
+        }
+    }
+
+    fn proposal_of<'a>(changeset: &'a Value, id: &Value) -> &'a Value {
+        changeset["proposals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|proposal| proposal["id"] == *id)
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_change_of_an_action_goes_to_its_owner() {
+        let r = Routed::start().await;
+        let action = r.action(&r.other).await;
+        let change = r.action_status(&action);
+        let changeset = r.propose(vec![change.clone()]).await;
+
+        assert_eq!(r.inbox(&r.other).await, [changeset.as_str()]);
+        assert_eq!(r.inbox(&r.lead).await, Vec::<String>::new());
+        assert_eq!(r.inbox(&r.manager).await, Vec::<String>::new());
+        let (status, review) = r.detail(&r.other, &changeset).await;
+        assert_eq!(status, StatusCode::OK, "{review}");
+        let shown = proposal_of(&review, &change["id"]);
+        assert_eq!(shown["routed_to_me"], true);
+        assert_eq!(shown["overdue"], false);
+        let (status, _) = r.detail(&r.lead, &changeset).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+
+        let (status, applied) = r.apply(&r.other, &changeset, &[&change]).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let (_, read) = r
+            .api
+            .get(
+                &r.other.cookie,
+                &format!("/api/v1/events/{}/actions/{action}", r.event),
+            )
+            .await;
+        assert_eq!(read["status"], "in-progress");
+    }
+
+    #[tokio::test]
+    async fn a_new_commitment_in_a_workstream_goes_to_the_lead() {
+        let r = Routed::start().await;
+        let (changeset, _, promise) = r.supplier_changeset().await;
+
+        assert_eq!(r.inbox(&r.lead).await, [changeset.as_str()]);
+        assert_eq!(r.inbox(&r.manager).await, Vec::<String>::new());
+        assert_eq!(r.inbox(&r.author).await, Vec::<String>::new());
+        let (_, review) = r.detail(&r.lead, &changeset).await;
+        assert_eq!(proposal_of(&review, &promise["id"])["routed_to_me"], true);
+        let (_, review) = r.detail(&r.manager, &changeset).await;
+        assert_eq!(proposal_of(&review, &promise["id"])["routed_to_me"], false);
+    }
+
+    #[tokio::test]
+    async fn a_new_action_without_a_workstream_goes_to_the_managers() {
+        let r = Routed::start().await;
+        let action = proposal(
+            json!({
+                "kind": "create-action", "id": Uuid::now_v7(), "event_id": r.event,
+                "title": "Bewilligung klären", "owner": r.lead.user.as_uuid(),
+            }),
+            "Wer klärt die Bewilligung?",
+        );
+        let changeset = r.propose(vec![action.clone()]).await;
+
+        assert_eq!(r.inbox(&r.manager).await, [changeset.as_str()]);
+        assert_eq!(r.inbox(&r.lead).await, Vec::<String>::new());
+        let (_, review) = r.detail(&r.manager, &changeset).await;
+        assert_eq!(proposal_of(&review, &action["id"])["routed_to_me"], true);
+        let (status, _) = r.apply(&r.lead, &changeset, &[&action]).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn a_new_supplier_goes_to_the_lead_of_the_commitment_that_needs_it() {
+        let r = Routed::start().await;
+        let (changeset, supplier, promise) = r.supplier_changeset().await;
+
+        let (_, review) = r.detail(&r.lead, &changeset).await;
+        assert_eq!(proposal_of(&review, &supplier["id"])["routed_to_me"], true);
+        let (status, applied) = r.apply(&r.lead, &changeset, &[&promise]).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(applied["persons"][0]["local_id"], "PER-001");
+        assert_eq!(applied["commitments"][0]["local_id"], "COM-001");
+        assert_eq!(r.inbox(&r.lead).await, Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn the_manager_inbox_hides_routed_proposals_until_they_are_overdue() {
+        let r = Routed::start().await;
+        let (changeset, _, promise) = r.supplier_changeset().await;
+        assert_eq!(r.inbox(&r.manager).await, Vec::<String>::new());
+
+        r.api.clock.advance(SignedDuration::from_hours(3 * 24));
+        let manager = Member {
+            cookie: r.api.sign_in(r.manager.user, r.manager.organization).await,
+            ..r.manager
+        };
+        assert_eq!(r.inbox(&manager).await, Vec::<String>::new(), "day 3");
+        let (_, review) = r.detail(&manager, &changeset).await;
+        assert_eq!(proposal_of(&review, &promise["id"])["overdue"], false);
+
+        r.api.clock.advance(SignedDuration::from_hours(24));
+        let manager = Member {
+            cookie: r.api.sign_in(manager.user, manager.organization).await,
+            ..manager
+        };
+        assert_eq!(r.inbox(&manager).await, [changeset.as_str()], "day 4");
+        let (_, review) = r.detail(&manager, &changeset).await;
+        let shown = proposal_of(&review, &promise["id"]);
+        assert_eq!(shown["overdue"], true);
+        assert_eq!(shown["routed_to_me"], false);
+    }
+
+    #[tokio::test]
+    async fn a_manager_can_still_apply_a_routed_proposal() {
+        let r = Routed::start().await;
+        let (changeset, _, promise) = r.supplier_changeset().await;
+        let (status, applied) = r.apply(&r.manager, &changeset, &[&promise]).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(applied["commitments"][0]["local_id"], "COM-001");
+    }
+
+    #[tokio::test]
+    async fn a_replaced_lead_loses_the_proposal_at_once() {
+        let r = Routed::start().await;
+        let (changeset, _, promise) = r.supplier_changeset().await;
+        assert_eq!(r.inbox(&r.lead).await, [changeset.as_str()]);
+
+        let (status, changed) = r
+            .api
+            .send(
+                &r.manager.cookie,
+                Method::PATCH,
+                &format!("/api/v1/events/{}/workstreams/{}", r.event, r.workstream),
+                Some(&json!({"lead_user_id": r.other.user.as_uuid(), "expected_version": 1})),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{changed}");
+
+        assert_eq!(r.inbox(&r.lead).await, Vec::<String>::new());
+        let (status, _) = r.detail(&r.lead, &changeset).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let (status, problem) = r.apply(&r.lead, &changeset, &[&promise]).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(problem["code"], "forbidden");
+        assert_eq!(r.inbox(&r.other).await, [changeset.as_str()]);
+        let (status, applied) = r.apply(&r.other, &changeset, &[&promise]).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+    }
+
+    #[tokio::test]
+    async fn a_member_who_loses_the_role_loses_the_proposal_at_once() {
+        let r = Routed::start().await;
+        let action = r.action(&r.other).await;
+        let change = r.action_status(&action);
+        let changeset = r.propose(vec![change.clone()]).await;
+        assert_eq!(r.inbox(&r.other).await, [changeset.as_str()]);
+
+        r.remove_from_event(&r.other).await;
+
+        assert_eq!(r.inbox(&r.other).await, Vec::<String>::new());
+        let (status, _) = r.detail(&r.other, &changeset).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let (status, _) = r.apply(&r.other, &changeset, &[&change]).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let (_, work) = r.api.get(&r.other.cookie, "/api/v1/me/work").await;
+        assert_eq!(work["review_count"], 0);
+    }
+
+    #[tokio::test]
+    async fn a_lead_cannot_apply_a_selection_with_a_fact_proposal() {
+        let r = Routed::start().await;
+        let venue = r.api.field(&r.manager.cookie, &r.event, "venue").await;
+        let fact = venue_body(&r.event, &venue, "Flugfeld")["proposals"][0].clone();
+        let person = Uuid::now_v7();
+        let supplier = Routed::new_person(person);
+        let mut promise = r.commitment(person, Some(&r.workstream));
+        promise["depends_on"] = json!([supplier["id"]]);
+        let changeset = r
+            .propose(vec![fact.clone(), supplier, promise.clone()])
+            .await;
+
+        let (status, problem) = r.apply(&r.lead, &changeset, &[&promise, &fact]).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["code"], "forbidden");
+        let (status, problem) = r
+            .api
+            .post(
+                &r.lead.cookie,
+                &format!("/api/v1/changesets/{changeset}/reject"),
+                &json!({"proposal_ids": [fact["id"]]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        let (_, review) = r.detail(&r.manager, &changeset).await;
+        for proposal in review["proposals"].as_array().unwrap() {
+            assert_eq!(proposal["status"], "open");
+        }
+        let (_, commitments) = r
+            .api
+            .get(
+                &r.lead.cookie,
+                &format!("/api/v1/events/{}/commitments", r.event),
+            )
+            .await;
+        assert_eq!(commitments["items"], json!([]));
+    }
+
+    #[tokio::test]
+    async fn the_lead_sees_the_changeset_and_a_contributor_does_not() {
+        let r = Routed::start().await;
+        let (changeset, _, _) = r.supplier_changeset().await;
+
+        let (status, review) = r.detail(&r.lead, &changeset).await;
+        assert_eq!(status, StatusCode::OK, "{review}");
+        assert_eq!(review["proposals"].as_array().unwrap().len(), 2);
+        let (status, problem) = r.detail(&r.other, &changeset).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(problem["code"], "forbidden");
+        let (status, page) = r
+            .api
+            .get(
+                &r.lead.cookie,
+                &format!("/api/v1/events/{}/changesets?status=open", r.event),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{page}");
+        assert_eq!(ids(&page), [changeset.as_str()]);
+        let (status, page) = r
+            .api
+            .get(
+                &r.other.cookie,
+                &format!("/api/v1/events/{}/changesets?status=open", r.event),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{page}");
+        assert_eq!(page["items"], json!([]));
+    }
+
+    #[tokio::test]
+    async fn my_work_counts_my_reviews() {
+        let r = Routed::start().await;
+        r.supplier_changeset().await;
+        let action = r.action(&r.lead).await;
+        r.propose(vec![r.action_status(&action)]).await;
+
+        let count = |member: &Member| {
+            let cookie = member.cookie.clone();
+            let api = &r.api;
+            async move {
+                let (status, work) = api.get(&cookie, "/api/v1/me/work").await;
+                assert_eq!(status, StatusCode::OK, "{work}");
+                work["review_count"].clone()
+            }
+        };
+        // Two proposals of the supplier changeset and the change of the action of the lead.
+        assert_eq!(count(&r.lead).await, 3);
+        assert_eq!(count(&r.manager).await, 0);
+        assert_eq!(count(&r.other).await, 0);
     }
 }

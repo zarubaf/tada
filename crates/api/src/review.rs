@@ -217,6 +217,13 @@ pub struct Proposal {
     pub status: ProposalStatus,
     /// True if the proposal is open and older than 14 days (ADR 0050).
     pub stale: bool,
+    /// True if the proposal is open and older than 3 days. The Review Inbox of an event manager shows an overdue
+    /// proposal also when it goes to another reviewer (ADR 0067).
+    pub overdue: bool,
+    /// True if the review routing gives the proposal to the caller: as the owner of the record, as the lead of the
+    /// workstream, or as an event manager when it goes to no other reviewer (ADR 0067).
+    /// An event manager can review each proposal of the event, also when this is false.
+    pub routed_to_me: bool,
     /// Why the proposal conflicts, at the time of the read. It is present only if the status is `conflict`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conflict_reason: Option<ConflictReason>,
@@ -739,6 +746,8 @@ impl From<AppProposalReview> for Proposal {
                 .collect(),
             status: review.status.into(),
             stale: review.stale,
+            overdue: review.overdue,
+            routed_to_me: review.routed_to_me,
             conflict_reason: review.conflict.map(ConflictReason::from),
             current: review.current.map(CurrentFact::from),
             draft: review.draft.map(DraftRendering::from),
@@ -932,6 +941,7 @@ fn review_stores(state: &ApiState) -> ReviewStores<'_> {
         review: state.review.as_ref(),
         sources: state.sources.as_ref(),
         workstreams: state.workstreams.as_ref(),
+        work: state.work.as_ref(),
     }
 }
 
@@ -981,7 +991,8 @@ async fn create_changeset(
     }
 }
 
-/// Lists the changesets of an event with open proposals, oldest first. Only its event managers see them.
+/// Lists the changesets of an event with open proposals in the Review Inbox of the caller, oldest first (ADR 0067).
+/// A viewer of the event gets `forbidden`.
 #[utoipa::path(
     get,
     path = "/events/{event_id}/changesets",
@@ -1002,9 +1013,10 @@ async fn list_event_changesets(
     list(&state, &caller, Some(EventId::from_uuid(event_id)), query).await
 }
 
-/// The Review Inbox: the changesets with open proposals that the caller can review, oldest first.
-/// They are the changesets of each event that the caller manages and, for owners and admins,
-/// the changesets of the organization, for example one that creates an event.
+/// The Review Inbox: the changesets with open proposals that the review routing gives the caller, oldest first (ADR 0067).
+/// A proposal goes to the owner of the record that it changes, to the lead of the workstream of a new record,
+/// or to the event managers. An event manager also sees the overdue proposals of the event.
+/// Owners and admins also see the changesets of the organization, for example one that creates an event.
 #[utoipa::path(
     get,
     path = "/changesets",
@@ -1038,8 +1050,8 @@ async fn list(
         event_id,
         after,
         limit,
-        state.identity.as_ref(),
-        state.review.as_ref(),
+        review_stores(state),
+        state.clock.as_ref(),
     )
     .await?;
     let now = state.clock.now();
@@ -1059,13 +1071,13 @@ fn open_changeset(changeset: AppOpenChangeset, now: Timestamp) -> OpenChangeset 
         event_id: changeset.event_id.map(EventId::as_uuid),
         author: changeset.author.into(),
         created_at: changeset.created_at,
-        open_proposals: changeset.open_proposals,
+        open_proposals: changeset.open_proposals(),
         stale: changeset.is_stale(now),
     }
 }
 
 /// Reads a changeset with each proposal, its evidence, its status and the current value of its target.
-/// Only the reviewers of the changeset can read it.
+/// Only a reviewer of at least one of its proposals can read it (ADR 0067).
 #[utoipa::path(
     get,
     path = "/changesets/{changeset_id}",

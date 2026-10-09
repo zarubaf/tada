@@ -25,7 +25,7 @@ use tada_app::records::{Changed, Created, NumberCursor};
 use tada_app::store::StoreError;
 use tada_app::work::{
     ActionFields, ActionView, CommitmentFields, CommitmentView, InEvent, MyWork, NewActionRecord,
-    NewCommitmentRecord, WorkFilter, WorkStore,
+    NewCommitmentRecord, WorkFilter, WorkOwners, WorkStore,
 };
 
 use crate::Database;
@@ -667,6 +667,43 @@ impl WorkStore for Database {
         select_commitments(&mut conn, scope, &Select::filter(event, filter, status))
             .await
             .map_err(store_error)
+    }
+
+    async fn owners(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+        actions: &[ActionId],
+        commitments: &[CommitmentId],
+    ) -> Result<WorkOwners, StoreError> {
+        let actions: Vec<Uuid> = actions.iter().map(|id| id.as_uuid()).collect();
+        let commitments: Vec<Uuid> = commitments.iter().map(|id| id.as_uuid()).collect();
+        let rows = sqlx::query!(
+            r#"SELECT 'action' AS "kind!", id AS "id!", owner_user_id AS "owner_user_id!" FROM action
+               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($3)
+               UNION ALL
+               SELECT 'commitment', id, owner_user_id FROM commitment
+               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($4)"#,
+            scope.organization_id().as_uuid(),
+            event.as_uuid(),
+            &actions,
+            &commitments,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        let mut owners = WorkOwners::default();
+        for row in rows {
+            let owner = UserId::from_uuid(row.owner_user_id);
+            if row.kind == "action" {
+                owners.actions.push((ActionId::from_uuid(row.id), owner));
+            } else {
+                owners
+                    .commitments
+                    .push((CommitmentId::from_uuid(row.id), owner));
+            }
+        }
+        Ok(owners)
     }
 
     async fn my_open_work(

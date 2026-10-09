@@ -1,5 +1,6 @@
-//! Review and apply (ADR 0050): event managers apply a selection of a changeset all or nothing,
+//! Review and apply (ADR 0050): reviewers apply a selection of a changeset all or nothing,
 //! edit values with their own evidence, and reject proposals.
+//! The review routing decides who reviews each proposal (ADR 0067).
 //!
 //! Review results are append-only. The status of a proposal comes from its latest review result.
 //! Only a `MemberCaller` reviews: an AI client cannot accept proposals (ADR 0010, ADR 0039).
@@ -7,6 +8,7 @@
 mod checks;
 mod edits;
 mod read;
+pub mod routing;
 mod selection;
 mod steps;
 
@@ -27,7 +29,7 @@ pub use self::edits::RecordEditInput;
 pub use self::read::{
     ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, get_changeset,
 };
-use crate::access::{self, AccessError};
+use crate::access::{self, AccessError, EventAccess, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -38,14 +40,20 @@ use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::{Changeset, FactStateInput, ProposalStore};
 use crate::sources::SourceStore;
 use crate::store::StoreError;
+use crate::work::WorkStore;
 use crate::workstreams::WorkstreamStore;
 
 use self::checks::{check_edits, parse_edits, stale_owners};
+use self::routing::{ChangesetRoutes, RoutedProposal, RoutingFacts};
 use self::selection::{apply_order, proposal_status, selection, to_apply, with_dependents};
 use self::steps::{audit_of, step, step_status};
 
 /// An open proposal older than this shows as stale (ADR 0050). It does not change.
 pub const STALE_AFTER: SignedDuration = SignedDuration::from_hours(14 * 24);
+
+/// An open proposal older than this is overdue: the Review Inbox of the event managers shows it, even if it goes
+/// to another reviewer (ADR 0067). The value is provisional, like `STALE_AFTER`.
+pub const OVERDUE_AFTER: SignedDuration = SignedDuration::from_hours(3 * 24);
 
 /// The result of one review of one proposal (ADR 0050).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +112,11 @@ impl ProposalStatus {
     pub fn is_stale(self, created_at: Timestamp, now: Timestamp) -> bool {
         self == Self::Open && created_at < now - STALE_AFTER
     }
+
+    /// True if the proposal is open and older than `OVERDUE_AFTER` (ADR 0067).
+    pub fn is_overdue(self, created_at: Timestamp, now: Timestamp) -> bool {
+        self == Self::Open && created_at < now - OVERDUE_AFTER
+    }
 }
 
 impl From<ReviewOutcome> for ProposalStatus {
@@ -144,14 +157,56 @@ pub struct OpenChangeset {
     pub event_id: Option<EventId>,
     pub author: Actor,
     pub created_at: Timestamp,
-    /// The number of its open proposals.
-    pub open_proposals: u32,
+    /// Its open proposals, in the order of their IDs.
+    pub proposals: Vec<OpenProposal>,
 }
 
 impl OpenChangeset {
+    /// The number of its open proposals.
+    pub fn open_proposals(&self) -> u32 {
+        u32::try_from(self.proposals.len()).unwrap_or(u32::MAX)
+    }
+
     /// True if its open proposals are stale. All proposals of a changeset have its creation time.
     pub fn is_stale(&self, now: Timestamp) -> bool {
         ProposalStatus::Open.is_stale(self.created_at, now)
+    }
+
+    /// True if its open proposals are overdue (`OVERDUE_AFTER`).
+    pub fn is_overdue(&self, now: Timestamp) -> bool {
+        ProposalStatus::Open.is_overdue(self.created_at, now)
+    }
+
+    /// The reviewers of its open proposals.
+    fn routes(&self, lookup: &RoutingFacts) -> ChangesetRoutes {
+        ChangesetRoutes::new(
+            self.proposals.iter().map(|proposal| RoutedProposal {
+                id: proposal.id,
+                operation: &proposal.operation,
+                depends_on: &proposal.depends_on,
+                open: true,
+            }),
+            self.event_id,
+            lookup,
+        )
+    }
+}
+
+/// An open proposal of an open changeset: what the review routing needs of it.
+#[derive(Clone, PartialEq, Eq)]
+pub struct OpenProposal {
+    pub id: ProposalId,
+    pub operation: Operation,
+    pub depends_on: Vec<ProposalId>,
+}
+
+/// An operation can hold personal data, so `Debug` shows the IDs only (ADR 0035).
+impl Debug for OpenProposal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenProposal")
+            .field("id", &self.id)
+            .field("depends_on", &self.depends_on)
+            .finish_non_exhaustive()
     }
 }
 
@@ -323,7 +378,7 @@ pub trait ReviewStore: Debug + Send + Sync {
     /// Appends the review results and the audit events of `batch` in one transaction, if each proposal is open.
     async fn record(&self, scope: OrgScope, batch: &ReviewBatch) -> Result<Recorded, StoreError>;
 
-    /// The changesets with at least one open proposal, oldest first.
+    /// The changesets with at least one open proposal, oldest first, each with its open proposals.
     /// `Some(event)` gives the changesets of the event only; `None` gives all changesets of the organization.
     async fn open_changesets(
         &self,
@@ -341,8 +396,10 @@ pub struct ReviewStores<'a> {
     pub review: &'a dyn ReviewStore,
     /// The source versions that the evidence of a proposal cites besides the source text of its changeset.
     pub sources: &'a dyn SourceStore,
-    /// The workstreams that an edit gives a new record.
+    /// The workstreams that an edit gives a new record, and the leads that the routing reads.
     pub workstreams: &'a dyn WorkstreamStore,
+    /// The owners of actions and commitments that the routing reads (ADR 0067).
+    pub work: &'a dyn WorkStore,
 }
 
 /// The input of an apply: the selected proposals and the edited values.
@@ -384,7 +441,7 @@ pub enum ApplyError {
     /// The changeset is not in the caller's organization, or the caller cannot see its event.
     #[error("the changeset does not exist or the caller cannot see it")]
     NotFound,
-    /// Only event managers review (ADR 0052).
+    /// The caller does not review the changeset, or not each proposal of the selection (ADR 0067).
     #[error("the caller cannot review this changeset")]
     Forbidden,
     #[error("invalid values")]
@@ -454,6 +511,7 @@ impl CommandError for ApplyError {
 /// 1. The caller reviews the event of the changeset; owners and admins review a changeset of the organization.
 /// 2. The selection includes the dependencies of each selected proposal, except those that an earlier apply accepted.
 /// 3. Each proposal of the selection is open, else `invalid-transition`.
+///    The caller may review each of them (ADR 0067), else `forbidden`.
 /// 4. Each target has the expected version. Else nothing changes, a separate transaction appends
 ///    `conflict` for the proposals concerned, and the result is `record-version-conflict`.
 /// 5. A successful apply writes the records, the fact versions with their evidence, the draft versions with their
@@ -486,11 +544,11 @@ pub async fn apply_changeset(
     clock: &dyn Clock,
 ) -> Result<Applied, ApplyError> {
     let scope = caller.scope();
-    let (changeset, _) = reviewable(caller, changeset_id, stores).await?;
-    let results = stores.review.results(scope, changeset_id).await?;
-
-    let given = selection(&changeset, &input.selected, "selected")?;
-    let selected = to_apply(&changeset.proposals, &given, &results)?;
+    let reviewable = reviewable(caller, changeset_id, stores).await?;
+    let given = selection(&reviewable.changeset, &input.selected, "selected")?;
+    let selected = to_apply(&reviewable.changeset.proposals, &given, &reviewable.results)?;
+    reviewable.require(caller, &selected)?;
+    let changeset = reviewable.changeset;
     let edits = parse_edits(&changeset, &selected, input.edits)?;
     check_edits(scope, &changeset, &selected, &edits, stores).await?;
 
@@ -568,6 +626,7 @@ pub struct Rejected {
 /// these can never apply: an apply selects the dependencies of each proposal (ADR 0050).
 /// For example, the rejection of a new event rejects the facts of that event.
 /// Each given proposal must be open, else `invalid-transition`.
+/// The caller may review each rejected proposal (ADR 0067), else `forbidden`.
 ///
 /// A conflict does not close the dependents of a proposal in the same way: the conflict is a fact about the
 /// target record, not a decision of the reviewer. The dependents stay open until a reviewer rejects them.
@@ -579,18 +638,17 @@ pub async fn reject_proposals(
     clock: &dyn Clock,
 ) -> Result<Rejected, ApplyError> {
     let scope = caller.scope();
-    let (changeset, _) = reviewable(caller, changeset_id, stores).await?;
-    let results = stores.review.results(scope, changeset_id).await?;
-
-    let given = selection(&changeset, &ids, "proposal_ids")?;
-    let is_open = |id: ProposalId| proposal_status(&results, id) == ProposalStatus::Open;
+    let reviewable = reviewable(caller, changeset_id, stores).await?;
+    let given = selection(&reviewable.changeset, &ids, "proposal_ids")?;
+    let is_open = |id: ProposalId| proposal_status(&reviewable.results, id) == ProposalStatus::Open;
     if !given.iter().all(|id| is_open(*id)) {
         return Err(ApplyError::InvalidTransition);
     }
-    let rejected: Vec<ProposalId> = with_dependents(&changeset.proposals, &given)
+    let rejected: Vec<ProposalId> = with_dependents(&reviewable.changeset.proposals, &given)
         .into_iter()
         .filter(|id| is_open(*id))
         .collect();
+    reviewable.require(caller, &rejected)?;
     let batch = review_batch(
         caller,
         changeset_id,
@@ -612,7 +670,7 @@ pub enum ReviewQueryError {
     /// The event or the changeset is not in the caller's organization, or the caller cannot see it.
     #[error("the event or the changeset does not exist or the caller cannot see it")]
     NotFound,
-    /// Only event managers review (ADR 0052).
+    /// The caller sees the event, but reviews none of the proposals (ADR 0067).
     #[error("the caller cannot review this event")]
     Forbidden,
     #[error(transparent)]
@@ -662,50 +720,115 @@ pub struct ChangesetCursor {
     pub id: ChangesetId,
 }
 
-/// One page of the changesets with open proposals that the caller can review, oldest first.
+/// One page of the changesets of the Review Inbox of the caller, oldest first: the changesets with at least one open
+/// proposal that the review routing shows the caller (ADR 0067).
 ///
-/// `Some(event)` lists the changesets of one event and needs the right to review it.
-/// `None` is the Review Inbox: the changesets of each event that the caller reviews and, for owners and admins,
+/// `Some(event)` lists the changesets of one event; a viewer of the event gets `forbidden`.
+/// `None` lists the changesets of each event of the caller and, for owners and admins,
 /// the changesets of the organization, for example a new event.
 pub async fn list_open_changesets(
     caller: &MemberCaller,
     event_id: Option<EventId>,
     after: Option<ChangesetCursor>,
     limit: PageLimit,
-    identity: &dyn IdentityStore,
-    store: &dyn ReviewStore,
+    stores: ReviewStores<'_>,
+    clock: &dyn Clock,
 ) -> Result<Page<OpenChangeset, ChangesetCursor>, ReviewQueryError> {
-    let visible = visible_open_changesets(caller, event_id, identity, store).await?;
-    Ok(page(visible, after, limit))
+    if let Some(event) = event_id
+        && !access::event_access(caller, event, stores.identity)
+            .await?
+            .can_propose()
+    {
+        return Err(ReviewQueryError::Forbidden);
+    }
+    let inbox = inbox(caller, event_id, stores.into(), clock.now()).await?;
+    let changesets = inbox.into_iter().map(|(changeset, _)| changeset).collect();
+    Ok(page(changesets, after, limit))
 }
 
-async fn visible_open_changesets(
-    caller: &MemberCaller,
-    event_id: Option<EventId>,
-    identity: &dyn IdentityStore,
-    store: &dyn ReviewStore,
-) -> Result<Vec<OpenChangeset>, ReviewQueryError> {
-    let scope = caller.scope();
-    if let Some(event) = event_id {
-        review_access(caller, Some(event), identity).await?;
-        return Ok(store.open_changesets(scope, Some(event)).await?);
-    }
-    let mut reviews: HashMap<Option<EventId>, bool> = HashMap::new();
-    let mut visible = Vec::new();
-    for changeset in store.open_changesets(scope, None).await? {
-        let allowed = match reviews.get(&changeset.event_id) {
-            Some(allowed) => *allowed,
-            None => {
-                let allowed = can_review(caller, changeset.event_id, identity).await?;
-                reviews.insert(changeset.event_id, allowed);
-                allowed
-            }
-        };
-        if allowed {
-            visible.push(changeset);
+/// The ports that the Review Inbox reads.
+#[derive(Debug, Clone, Copy)]
+pub struct InboxPorts<'a> {
+    pub identity: &'a dyn IdentityStore,
+    pub review: &'a dyn ReviewStore,
+    pub work: &'a dyn WorkStore,
+    pub workstreams: &'a dyn WorkstreamStore,
+}
+
+impl<'a> From<ReviewStores<'a>> for InboxPorts<'a> {
+    fn from(stores: ReviewStores<'a>) -> Self {
+        Self {
+            identity: stores.identity,
+            review: stores.review,
+            work: stores.work,
+            workstreams: stores.workstreams,
         }
     }
-    Ok(visible)
+}
+
+/// The number of open proposals in the Review Inbox of the caller, for "My Work".
+pub async fn review_count(
+    caller: &impl Principal,
+    ports: InboxPorts<'_>,
+    now: Timestamp,
+) -> Result<u32, StoreError> {
+    Ok(inbox(caller, None, ports, now)
+        .await?
+        .into_iter()
+        .map(|(_, count)| count)
+        .sum())
+}
+
+/// The open changesets of `event`, or of the organization for `None`, that have open proposals in the Review Inbox
+/// of the caller, each with the number of these proposals. It reads the access of the caller and the current owners
+/// and leads once for each event.
+async fn inbox(
+    caller: &impl Principal,
+    event: Option<EventId>,
+    ports: InboxPorts<'_>,
+    now: Timestamp,
+) -> Result<Vec<(OpenChangeset, u32)>, StoreError> {
+    let scope = caller.scope();
+    let changesets = ports.review.open_changesets(scope, event).await?;
+    let mut events: Vec<Option<EventId>> = changesets.iter().map(|c| c.event_id).collect();
+    events.sort();
+    events.dedup();
+    let mut routing: HashMap<Option<EventId>, (EventAccess, RoutingFacts)> = HashMap::new();
+    for event in events {
+        let access = match changeset_access(caller, event, ports.identity).await {
+            Ok(access) if access.can_propose() => access,
+            Ok(_) | Err(ReviewQueryError::NotFound | ReviewQueryError::Forbidden) => continue,
+            Err(ReviewQueryError::Store(error)) => return Err(error),
+        };
+        let facts = match event {
+            Some(event) => {
+                let operations = changesets
+                    .iter()
+                    .filter(|changeset| changeset.event_id == Some(event))
+                    .flat_map(|changeset| &changeset.proposals)
+                    .map(|proposal| &proposal.operation);
+                RoutingFacts::load(scope, event, operations, ports.work, ports.workstreams).await?
+            }
+            None => RoutingFacts::default(),
+        };
+        routing.insert(event, (access, facts));
+    }
+    let user = caller.user_id();
+    Ok(changesets
+        .into_iter()
+        .filter_map(|changeset| {
+            let (access, facts) = routing.get(&changeset.event_id)?;
+            let routes = changeset.routes(facts);
+            let overdue = changeset.is_overdue(now);
+            let count = changeset
+                .proposals
+                .iter()
+                .filter(|proposal| routes.in_inbox_of(user, *access, proposal.id, overdue))
+                .count();
+            let count = u32::try_from(count).unwrap_or(u32::MAX);
+            (count > 0).then_some((changeset, count))
+        })
+        .collect())
 }
 
 /// The page after `after` of `changesets`, which are oldest first.
@@ -738,57 +861,101 @@ fn page(
     Page { items, next }
 }
 
-/// The one review rule (ADR 0052): the caller reviews the changesets of an event in which it is event manager,
-/// and, for `None`, the changesets of the organization only as owner or admin.
-///
-/// `Forbidden` means that the caller sees the event but does not review it.
-/// `NotFound` means that the caller cannot see the event, or that it cannot see the changesets of the organization.
-async fn review_access(
-    caller: &MemberCaller,
+/// The access of the caller to the changesets of `event`, or for `None`, to the changesets of the organization:
+/// owners and admins act as event managers there (ADR 0052). Other members cannot see them.
+async fn changeset_access(
+    caller: &impl Principal,
     event: Option<EventId>,
     identity: &dyn IdentityStore,
-) -> Result<(), ReviewQueryError> {
+) -> Result<EventAccess, ReviewQueryError> {
     match event {
-        Some(event) => {
-            if access::event_access(caller, event, identity)
-                .await?
-                .can_review()
-            {
-                Ok(())
-            } else {
-                Err(ReviewQueryError::Forbidden)
-            }
-        }
-        None if access::sees_all_events(caller) => Ok(()),
+        Some(event) => Ok(access::event_access(caller, event, identity).await?),
+        None if access::sees_all_events(caller) => Ok(EventAccess::Manager),
         None => Err(ReviewQueryError::NotFound),
     }
 }
 
-/// True if the caller reviews the event, or for `None`, the changesets of the organization.
-/// A list hides what the caller cannot review, so a refusal is `false` here, not an error.
-async fn can_review(
-    caller: &MemberCaller,
-    event: Option<EventId>,
-    identity: &dyn IdentityStore,
-) -> Result<bool, StoreError> {
-    match review_access(caller, event, identity).await {
-        Ok(()) => Ok(true),
-        Err(ReviewQueryError::NotFound | ReviewQueryError::Forbidden) => Ok(false),
-        Err(ReviewQueryError::Store(error)) => Err(error),
+/// A changeset that the caller reviews at least in part, with its review results and the reviewers of each proposal.
+struct Reviewable {
+    changeset: Changeset,
+    source: SourceText,
+    results: Vec<ReviewRecord>,
+    access: EventAccess,
+    routes: ChangesetRoutes,
+}
+
+impl Reviewable {
+    fn may_review(&self, caller: &MemberCaller, id: ProposalId) -> bool {
+        self.routes.may_review(caller.user_id(), self.access, id)
+    }
+
+    fn routed_to(&self, caller: &MemberCaller, id: ProposalId) -> bool {
+        self.routes.routed_to(caller.user_id(), self.access, id)
+    }
+
+    /// The caller must review each of `ids` (ADR 0067, rule 7). Else the review changes nothing.
+    fn require<'a>(
+        &self,
+        caller: &MemberCaller,
+        ids: impl IntoIterator<Item = &'a ProposalId>,
+    ) -> Result<(), ApplyError> {
+        if ids.into_iter().all(|id| self.may_review(caller, *id)) {
+            Ok(())
+        } else {
+            Err(ApplyError::Forbidden)
+        }
     }
 }
 
-/// The changeset with the text of its source version, if the caller can review it.
+/// The changeset with the text of its source version, if the caller reviews at least one of its proposals.
+///
+/// `NotFound` means that the caller cannot see the changeset. `Forbidden` means that the caller sees its event,
+/// but reviews none of its proposals.
 async fn reviewable(
     caller: &MemberCaller,
     id: ChangesetId,
     stores: ReviewStores<'_>,
-) -> Result<(Changeset, SourceText), ReviewQueryError> {
-    let Some((changeset, source)) = stores.proposals.get(caller.scope(), id).await? else {
+) -> Result<Reviewable, ReviewQueryError> {
+    let scope = caller.scope();
+    let Some((changeset, source)) = stores.proposals.get(scope, id).await? else {
         return Err(ReviewQueryError::NotFound);
     };
-    review_access(caller, changeset.event_id, stores.identity).await?;
-    Ok((changeset, source))
+    let access = changeset_access(caller, changeset.event_id, stores.identity).await?;
+    let results = stores.review.results(scope, id).await?;
+    let facts = match changeset.event_id {
+        Some(event) => {
+            let operations = changeset.proposals.iter().map(|p| &p.operation);
+            RoutingFacts::load(scope, event, operations, stores.work, stores.workstreams).await?
+        }
+        None => RoutingFacts::default(),
+    };
+    let routes = ChangesetRoutes::new(
+        changeset.proposals.iter().map(|proposal| RoutedProposal {
+            id: proposal.id,
+            operation: &proposal.operation,
+            depends_on: &proposal.depends_on,
+            open: proposal_status(&results, proposal.id) == ProposalStatus::Open,
+        }),
+        changeset.event_id,
+        &facts,
+    );
+    let reviewable = Reviewable {
+        changeset,
+        source,
+        results,
+        access,
+        routes,
+    };
+    let reviews_some = reviewable
+        .changeset
+        .proposals
+        .iter()
+        .any(|proposal| reviewable.may_review(caller, proposal.id));
+    if reviews_some {
+        Ok(reviewable)
+    } else {
+        Err(ReviewQueryError::Forbidden)
+    }
 }
 
 fn invalid(field: &'static str, code: &'static str) -> ApplyError {
