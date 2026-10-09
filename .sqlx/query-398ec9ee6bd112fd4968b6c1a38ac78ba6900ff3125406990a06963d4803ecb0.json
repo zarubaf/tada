@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH ended AS (DELETE FROM session WHERE token_hash = $1 RETURNING user_id)\n             DELETE FROM magic_link WHERE user_id IN (SELECT user_id FROM ended)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "398ec9ee6bd112fd4968b6c1a38ac78ba6900ff3125406990a06963d4803ecb0"
+}

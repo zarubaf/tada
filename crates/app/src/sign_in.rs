@@ -27,7 +27,8 @@ use crate::store::StoreError;
 #[async_trait]
 pub trait SignInStore: Debug + Send + Sync {
     /// Deletes the magic link of `token`. If the link existed and was valid at `now`, the same
-    /// transaction starts a session for its user and returns the session token.
+    /// transaction starts a session for its user, deletes the other magic links of the user, and
+    /// returns the session token.
     /// The organization of the session is `initial_organization` of the user's memberships.
     /// A user without a membership gets no session, and the link is used up all the same.
     /// A new session ends the session of `replaced` in the same transaction (ASVS 7.2.4).

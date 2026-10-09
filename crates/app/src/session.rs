@@ -77,9 +77,10 @@ pub trait SessionStore: Debug + Send + Sync {
         organization_id: Option<OrganizationId>,
     ) -> Result<(), StoreError>;
 
-    /// Ends the session, for example at sign-out.
+    /// Ends the session at sign-out, and deletes the open magic links of its user in the same
+    /// transaction: a link in the mailbox must not sign in again after the sign-out.
     /// Infrastructure query (ADR 0039): the token names the session, and a session belongs to a user.
-    async fn delete(&self, token: &str) -> Result<(), StoreError>;
+    async fn sign_out(&self, token: &str) -> Result<(), StoreError>;
 }
 
 /// The session of `token` at `now`, after it counts as used.
@@ -231,9 +232,10 @@ pub async fn choose_organization(
     Ok(())
 }
 
-/// Ends the session of `token`: the sign-out of ADR 0008. An unknown token changes nothing.
+/// Ends the session of `token`: the sign-out of ADR 0008. The open magic links of its user stop
+/// working too. An unknown token changes nothing.
 pub async fn sign_out(token: &str, sessions: &dyn SessionStore) -> Result<(), StoreError> {
-    sessions.delete(token).await
+    sessions.sign_out(token).await
 }
 
 /// The `Authenticator` of sessions (ADR 0008, ADR 0056). It lives in `app` because it only
@@ -402,7 +404,7 @@ mod tests {
             Ok(())
         }
 
-        async fn delete(&self, token: &str) -> Result<(), StoreError> {
+        async fn sign_out(&self, token: &str) -> Result<(), StoreError> {
             self.rows.lock().unwrap().remove(token);
             Ok(())
         }

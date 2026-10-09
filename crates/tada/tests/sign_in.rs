@@ -395,6 +395,45 @@ async fn a_failed_sign_in_keeps_the_session_that_the_request_sends() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
+/// The attack: a member asks for several links, signs in with one and signs out on a shared
+/// computer. The other links in the mailbox must not work any more.
+#[tokio::test]
+async fn a_sign_in_and_a_sign_out_end_the_other_magic_links() {
+    let app = App::start().await;
+    let testwil = app.test.create_organization("testwil").await;
+    app.user("anna@example.org", &[testwil]).await;
+
+    let first = app.magic_link("anna@example.org").await;
+    let second = app.magic_link("anna@example.org").await;
+    let (response, _) = app.redeem(&second).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let cookie = session_cookie(&response).unwrap();
+    let (response, _) = app.redeem(&first).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "the sign-in ends the other links"
+    );
+
+    let third = app.magic_link("anna@example.org").await;
+    let (response, _) = app
+        .post("/api/v1/sign-out", &json!({}), Some(&cookie))
+        .await;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    let (response, _) = app.redeem(&third).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "the sign-out ends the open links"
+    );
+    assert_eq!(
+        app.test
+            .scalar::<i64>("SELECT count(*) FROM magic_link")
+            .await,
+        0
+    );
+}
+
 #[tokio::test]
 async fn each_response_forbids_the_referrer() {
     let app = App::start().await;
