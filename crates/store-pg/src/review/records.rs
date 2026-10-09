@@ -53,7 +53,7 @@ pub(super) async fn write_record(
                 conn,
                 scope,
                 plan,
-                step.operation.event_id(),
+                step.operation.event_id().or(plan.event_id),
                 &operation_to_json(&step.operation),
             )
             .await?;
@@ -240,6 +240,11 @@ pub(super) async fn write_record(
             expected_version,
         } => {
             // A proposal that makes the commitment firm gives its reason (ADR 0068). The condition stays as history.
+            if *status == CommitmentStatus::Firm && step.firm_reason.is_none() {
+                return Err(sqlx::Error::Protocol(
+                    "a change to firm needs a reason".into(),
+                ));
+            }
             let version = sqlx::query_scalar!(
                 "UPDATE commitment
                  SET status = $5, firm_reason = coalesce($6, firm_reason), version = version + 1, updated_at = $7
