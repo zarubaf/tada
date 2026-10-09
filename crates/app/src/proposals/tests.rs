@@ -569,6 +569,65 @@ async fn a_proposal_without_evidence_is_rejected() {
 }
 
 #[tokio::test]
+async fn a_changeset_with_too_many_proposals_is_rejected() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let mut input = one_fact();
+    let first = input.proposals[0].clone();
+    input.proposals = (0..=MAX_PROPOSALS)
+        .map(|_| NewProposal {
+            id: Uuid::now_v7(),
+            ..first.clone()
+        })
+        .collect();
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals".to_owned(), "too-many")]
+    );
+    assert!(memory.inserted.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_proposal_with_too_many_passages_is_rejected() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let mut input = one_fact();
+    let passage = input.proposals[0].evidence[0].clone();
+    input.proposals[0].evidence = vec![passage; MAX_PASSAGES + 1];
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/0/evidence".to_owned(), "too-many")]
+    );
+    assert!(memory.inserted.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_changeset_at_the_limits_is_accepted() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let mut input = one_fact();
+    let passage = input.proposals[0].evidence[0].clone();
+    input.proposals[0].evidence = vec![passage; MAX_PASSAGES];
+    assert!(
+        create_changeset(&anna, input, stores(&memory), &FixedClock)
+            .await
+            .is_ok()
+    );
+}
+
+#[test]
+fn the_json_schema_of_a_new_changeset_names_the_limits() {
+    let schema = serde_json::to_value(schemars::schema_for!(NewChangeset)).unwrap();
+    assert_eq!(schema["properties"]["proposals"]["maxItems"], MAX_PROPOSALS);
+    assert_eq!(
+        schema["$defs"]["NewProposal"]["properties"]["evidence"]["maxItems"],
+        MAX_PASSAGES
+    );
+}
+
+#[tokio::test]
 async fn a_quote_that_does_not_match_its_range_is_rejected() {
     let memory = Memory::default();
     let anna = contributor(&memory);

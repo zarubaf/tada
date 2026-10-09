@@ -90,6 +90,7 @@ pub struct CreateChangesetRequest {
     /// The member's own words. tada stores them as a source version.
     /// The passages count characters (Unicode scalar values) of this text after normalization: Unicode NFC with `\n` line ends.
     pub source_text: String,
+    #[schemars(length(max = proposals::MAX_PROPOSALS))]
     pub proposals: Vec<NewProposal>,
 }
 

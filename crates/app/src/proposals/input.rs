@@ -21,6 +21,7 @@ use tada_domain::ids::{DocumentId, EventId, FieldDefinitionId, OpenQuestionId, U
 use tada_domain::proposals::{DraftDocument, Operation, QuestionText};
 use uuid::Uuid;
 
+use super::{MAX_PASSAGES, MAX_PROPOSALS};
 use crate::events::{key_error_code, name_error_code};
 use crate::problem::FieldError;
 
@@ -40,6 +41,7 @@ pub struct NewChangeset {
     /// The passages count characters (Unicode scalar values) of this text after normalization: Unicode NFC with `\n` line ends.
     /// At most 100,000 characters after the normalization.
     pub source_text: String,
+    #[schemars(length(max = MAX_PROPOSALS))]
     pub proposals: Vec<NewProposal>,
 }
 
@@ -56,6 +58,7 @@ pub struct NewProposal {
     pub depends_on: Vec<Uuid>,
     /// The passages of the source text that support the proposal. Each proposal has at least one.
     #[serde(default)]
+    #[schemars(length(max = MAX_PASSAGES))]
     pub evidence: Vec<PassageInput>,
     /// A short reason for the proposal.
     pub reason: String,
