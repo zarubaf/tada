@@ -12,7 +12,7 @@ use tada_app::domain::ids::OrganizationId;
 use tada_app::identity::Membership;
 use tada_app::problem::ProblemCode;
 use tada_app::session::{self, ChooseOrganizationError, SessionError};
-use tada_app::sign_in::{self as app, RequestSignInError, SignInError};
+use tada_app::sign_in::{self as app, Accepted, RequestSignInError, SignInError};
 use tada_app::store::StoreError;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -386,8 +386,10 @@ async fn preview_invitation(
     Ok(uncached(InvitationPreview::from(preview)))
 }
 
-/// Accepts an invitation. The token works once. The response sets the cookie of a new session
-/// in the organization of the invitation. The new session ends the session that the request sends.
+/// Accepts an invitation. The token works once. For a user without a membership in another
+/// organization, the response sets the cookie of a new session in the organization of the
+/// invitation, and the new session ends the session that the request sends. A member of another
+/// organization gets `202` without a session and signs in with a magic link.
 #[utoipa::path(
     post,
     path = "/invitations/accept",
@@ -396,6 +398,7 @@ async fn preview_invitation(
     request_body = InvitationTokenRequest,
     responses(
         (status = OK, description = "The new session. The `Set-Cookie` header holds its token.", body = SessionInfo),
+        (status = ACCEPTED, description = "The membership is added. The user is a member of another organization and signs in with a magic link. The body is empty."),
         (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
     ),
 )]
@@ -405,7 +408,7 @@ async fn accept_invitation(
     headers: HeaderMap,
     Json(body): Json<InvitationTokenRequest>,
 ) -> Result<Response, ApiError> {
-    let result = app::accept_invitation(
+    let accepted = app::accept_invitation(
         &body.token,
         replaced.as_ref().map(SessionToken::as_str),
         user_agent(&headers),
@@ -413,6 +416,9 @@ async fn accept_invitation(
         state.sign_in.as_ref(),
         state.clock.as_ref(),
     )
-    .await;
-    new_session(&state, result).await
+    .await?;
+    match accepted {
+        Accepted::Session(token) => new_session(&state, Ok(token)).await,
+        Accepted::SignInRequired => Ok(StatusCode::ACCEPTED.into_response()),
+    }
 }

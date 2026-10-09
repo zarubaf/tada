@@ -27,6 +27,8 @@ export function InvitationPage({ api }: { api: Api }) {
     token ? undefined : invalidFailure(t("invitation-invalid")),
   );
   const [busy, setBusy] = useState(false);
+  // The server added the membership but started no session: the member signs in with a magic link.
+  const [signInNext, setSignInNext] = useState(false);
   // The invitee reads the notice before the click that accepts (ADR 0045): the button waits for it.
   const [noticeShown, setNoticeShown] = useState(false);
   const waiting = useWaiting(failure);
@@ -78,6 +80,13 @@ export function InvitationPage({ api }: { api: Api }) {
     setBusy(true);
     try {
       const result = await api.POST("/api/v1/invitations/accept", { body: { token } });
+      if (result.response.status === 202) {
+        // A member of another organization gets no session from an invitation link.
+        setSignInNext(true);
+        setBusy(false);
+        heading.current?.focus();
+        return;
+      }
       if (!result.error) {
         await refresh();
         navigate("/", { replace: true });
@@ -98,7 +107,13 @@ export function InvitationPage({ api }: { api: Api }) {
       <LiveRegion kind="status">
         {preview.kind === "loading" && !failure ? t("invitation-loading") : ""}
       </LiveRegion>
-      {preview.kind === "ready" && !failure?.final && (
+      {signInNext && (
+        <>
+          <PublicText>{t("invitation-accepted-sign-in")}</PublicText>
+          <ToSignInLink />
+        </>
+      )}
+      {preview.kind === "ready" && !failure?.final && !signInNext && (
         <>
           <PublicText>
             {t("invitation-text", {

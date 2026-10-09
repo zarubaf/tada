@@ -102,6 +102,23 @@ describe("InvitationPage", () => {
     );
   });
 
+  it("sends a member of another organization to the sign-in after the acceptance", async () => {
+    const calls = renderAt(
+      "#token=invite-token",
+      json(200, { organization_name: "Fliegergruppe Testwil", role: "member" }),
+      new Response(null, { status: 202 }),
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Einladung annehmen" }));
+
+    expect(
+      await screen.findByText(/Melden Sie sich jetzt mit Ihrer E-Mail-Adresse an/),
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Einladung annehmen" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Anmeldung/ })).toHaveAttribute("href", "/sign-in");
+    expect(screen.getByTestId("where")).toHaveTextContent("/invitation");
+    expect(calls.filter((call) => call.path.endsWith("/session"))).toHaveLength(1);
+  });
+
   it("does not call a rate-limited accept invalid, and the button keeps focus", async () => {
     renderAt(
       "#token=invite-token",

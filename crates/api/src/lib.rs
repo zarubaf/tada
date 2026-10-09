@@ -534,7 +534,7 @@ mod tests {
             _: Option<&str>,
             _: Option<uuid::Uuid>,
             _: jiff::Timestamp,
-        ) -> Result<Option<secrecy::SecretString>, tada_app::store::StoreError> {
+        ) -> Result<Option<tada_app::sign_in::Accepted>, tada_app::store::StoreError> {
             unreachable!()
         }
     }
