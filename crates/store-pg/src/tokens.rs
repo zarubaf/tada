@@ -331,8 +331,9 @@ mod tests {
         scope: TokenScope,
         clock: &TestClock,
     ) -> Result<CreatedToken, TokenError> {
+        // The member signed in just now (`session::RECENT_SIGN_IN`).
         create_token(
-            caller,
+            &caller.clone().with_sign_in(clock.now()),
             request(scope),
             &test.database,
             &test.database,

@@ -23,6 +23,7 @@ telegram-value-web-only = Dieses Feld verweist auf einen anderen Eintrag. Änder
 problem-malformed-request = Die Anfrage ist ungültig.
 problem-unauthenticated = Sie sind nicht angemeldet.
 problem-organization-required = Wählen Sie zuerst eine Organisation in tada.
+problem-recent-sign-in-required = Melden Sie sich in tada neu an.
 problem-forbidden = Sie haben keine Berechtigung für diese Aktion.
 problem-not-found = Das gibt es nicht, oder Sie dürfen es nicht sehen.
 problem-record-version-conflict = Jemand hat diesen Eintrag inzwischen geändert. Versuchen Sie es erneut.

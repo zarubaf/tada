@@ -15,6 +15,7 @@ pub enum ProblemCode {
     MalformedRequest,
     Unauthenticated,
     OrganizationRequired,
+    RecentSignInRequired,
     Forbidden,
     NotFound,
     RecordVersionConflict,
@@ -28,10 +29,11 @@ pub enum ProblemCode {
 }
 
 impl ProblemCode {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::MalformedRequest,
         Self::Unauthenticated,
         Self::OrganizationRequired,
+        Self::RecentSignInRequired,
         Self::Forbidden,
         Self::NotFound,
         Self::RecordVersionConflict,
@@ -49,6 +51,7 @@ impl ProblemCode {
             Self::MalformedRequest => "malformed-request",
             Self::Unauthenticated => "unauthenticated",
             Self::OrganizationRequired => "organization-required",
+            Self::RecentSignInRequired => "recent-sign-in-required",
             Self::Forbidden => "forbidden",
             Self::NotFound => "not-found",
             Self::RecordVersionConflict => "record-version-conflict",
@@ -74,7 +77,8 @@ impl ProblemCode {
             Self::MalformedRequest => 400,
             Self::Unauthenticated => 401,
             // The member is signed in but must choose an organization first.
-            Self::Forbidden | Self::OrganizationRequired => 403,
+            // The member is signed in but must sign in again for this action.
+            Self::Forbidden | Self::OrganizationRequired | Self::RecentSignInRequired => 403,
             Self::NotFound => 404,
             Self::RecordVersionConflict | Self::InvalidTransition => 409,
             Self::PayloadTooLarge => 413,
@@ -93,6 +97,9 @@ impl ProblemCode {
             Self::Unauthenticated => "No valid session or token.",
             Self::OrganizationRequired => {
                 "The session has no organization. The client lets the member choose one."
+            }
+            Self::RecentSignInRequired => {
+                "The action needs a sign-in of at most 15 minutes ago. The client asks the member to sign in again."
             }
             Self::Forbidden => {
                 "The caller can see the record but lacks the permission for this action."

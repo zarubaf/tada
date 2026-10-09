@@ -108,7 +108,8 @@ impl Mcp {
         let owner = MemberCaller::new(olga, testwil, OrganizationRole::Owner);
         let otto = user(&test, musterhausen, "Otto", OrganizationRole::Owner).await;
         let other_owner = MemberCaller::new(otto, musterhausen, OrganizationRole::Owner);
-        let anna_caller = MemberCaller::new(anna, testwil, OrganizationRole::Member);
+        let anna_caller =
+            MemberCaller::new(anna, testwil, OrganizationRole::Member).with_sign_in(clock.now());
         let request = TokenRequest {
             name: "Claude Code".to_owned(),
             scope: TokenScope::Read,
@@ -873,8 +874,9 @@ impl Mcp {
             notice_version_confirmed: NOTICE_VERSION,
         };
         let database = &self.test.database;
-        let created =
-            create_token(&self.anna_caller, request, database, database, &*self.clock).await?;
+        // Anna signed in just now (`session::RECENT_SIGN_IN`).
+        let anna = self.anna_caller.clone().with_sign_in(self.clock.now());
+        let created = create_token(&anna, request, database, database, &*self.clock).await?;
         let secret = created.secret.expose_secret().to_owned();
         Ok((created.token.id.as_uuid(), secret))
     }

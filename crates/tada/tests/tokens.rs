@@ -121,6 +121,41 @@ async fn a_token_needs_the_confirmed_notice() {
     );
 }
 
+/// The attack: a stolen session mints a token that lives a year. A token needs a sign-in of at
+/// most 15 minutes ago, which the holder of a stolen session cannot do without the mailbox.
+#[tokio::test]
+async fn a_token_needs_a_recent_sign_in() {
+    let app = App::start().await;
+    let anna = app.member("Anna Muster", OrganizationRole::Member).await;
+    app.app.clock.advance(jiff::SignedDuration::from_mins(16));
+
+    let (status, problem) = app
+        .post(&anna, "/api/v1/tokens", &app.new_token("read"))
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    assert_eq!(problem["code"], "recent-sign-in-required");
+    assert_eq!(
+        app.app
+            .test
+            .scalar::<i64>("SELECT count(*) FROM api_token")
+            .await,
+        0
+    );
+
+    let fresh = Member {
+        id: anna.id,
+        cookie: app
+            .app
+            .test
+            .sign_in(anna.id, Some(app.testwil), app.app.clock.now())
+            .await,
+    };
+    let (status, _) = app
+        .post(&fresh, "/api/v1/tokens", &app.new_token("read"))
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+}
+
 #[tokio::test]
 async fn a_pure_event_viewer_cannot_create_a_propose_token() {
     let app = App::start().await;

@@ -2,10 +2,12 @@
 
 use std::marker::PhantomData;
 
+use jiff::Timestamp;
 pub use tada_domain::identity::OrganizationRole;
 use tada_domain::ids::{ApiTokenId, OrganizationId, UserId};
 use uuid::Uuid;
 
+use crate::session::RECENT_SIGN_IN;
 use crate::tokens::TokenScope;
 
 /// The ID of one request (ADR 0035). The HTTP server gives it to each driving adapter in the request
@@ -158,22 +160,48 @@ pub struct MemberCaller {
     role: OrganizationRole,
     channel: Channel,
     request_id: Option<Uuid>,
+    /// The start of the session of this caller: the time of the sign-in.
+    /// `None` for a caller without a session, for example a member who acts through Telegram.
+    signed_in_at: Option<Timestamp>,
 }
 
 impl MemberCaller {
     /// For tests of other crates only. Production code gets a caller from an authenticator.
+    /// The caller has no sign-in time; `with_sign_in` gives one.
     #[cfg(any(test, feature = "testing"))]
     pub fn new(user_id: UserId, organization_id: OrganizationId, role: OrganizationRole) -> Self {
-        Self::create(user_id, organization_id, role)
+        Self::build(user_id, organization_id, role, Channel::Web)
     }
 
-    /// For the authenticators of this crate (ADR 0062). Other code gets a caller from an authenticator.
+    /// For tests of other crates only: a caller whose session started at `signed_in_at`.
+    #[cfg(any(test, feature = "testing"))]
+    #[must_use]
+    pub fn with_sign_in(self, signed_in_at: Timestamp) -> Self {
+        Self {
+            signed_in_at: Some(signed_in_at),
+            ..self
+        }
+    }
+
+    /// For the session authenticator of this crate (ADR 0062): the member of a session that
+    /// started at `signed_in_at`. Other code gets a caller from an authenticator.
     pub(crate) fn create(
         user_id: UserId,
         organization_id: OrganizationId,
         role: OrganizationRole,
+        signed_in_at: Timestamp,
     ) -> Self {
-        Self::build(user_id, organization_id, role, Channel::Web)
+        Self {
+            signed_in_at: Some(signed_in_at),
+            ..Self::build(user_id, organization_id, role, Channel::Web)
+        }
+    }
+
+    /// True if the session of this caller started at most `RECENT_SIGN_IN` before `now`.
+    /// A caller without a session never counts as recently signed in.
+    pub fn signed_in_recently(&self, now: Timestamp) -> bool {
+        self.signed_in_at
+            .is_some_and(|signed_in_at| now.duration_since(signed_in_at) <= RECENT_SIGN_IN)
     }
 
     /// The one place that builds a member caller from its parts. Only this module can call it.
@@ -189,6 +217,7 @@ impl MemberCaller {
             role,
             channel,
             request_id: None,
+            signed_in_at: None,
         }
     }
 
@@ -291,6 +320,7 @@ impl AiCaller {
                 role,
                 channel: Channel::ApiToken,
                 request_id: None,
+                signed_in_at: None,
             },
             token_id,
             scope,

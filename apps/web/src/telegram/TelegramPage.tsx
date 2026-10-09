@@ -7,6 +7,7 @@ import {
 } from "../api/client";
 import { failureOf } from "../api/failure";
 import { LOCALE, t } from "../i18n";
+import { SignInAgain } from "../session/SignInAgain";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { DataTable } from "../ui/DataTable";
@@ -39,6 +40,8 @@ export function TelegramPage({ api }: { api: Api }) {
   const [confirming, setConfirming] = useState<TelegramLinkRequest>();
   // A request runs: a second press does nothing.
   const [busy, setBusy] = useState(false);
+  // The server asks for a new sign-in before it links an account.
+  const [signInAgain, setSignInAgain] = useState(false);
   // Both live regions are in the page from the start, so that a text set later is announced.
   const [failure, setFailure] = useState<string>();
   const [confirmation, setConfirmation] = useState<string>();
@@ -126,6 +129,9 @@ export function TelegramPage({ api }: { api: Api }) {
         );
       } else {
         showFailure(failureOf(result).message);
+        if (result.error?.code === "recent-sign-in-required") {
+          setSignInAgain(true);
+        }
         if (result.error?.code === "not-found") {
           // The request is gone or taken: the list shows the truth again.
           focusAfterCommit(() => requestsHeading.current);
@@ -274,6 +280,7 @@ export function TelegramPage({ api }: { api: Api }) {
             rowKey={(request) => request.id}
           />
         )}
+        {signInAgain && <SignInAgain />}
         {/* The button stays in the page while the list loads, so that it keeps focus. */}
         <div>
           <Button

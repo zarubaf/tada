@@ -285,6 +285,62 @@ async fn the_member_confirms_the_link_in_the_web_client() {
     support::logs::assert_route_logged("/api/v1/telegram/link-requests/{request_id}/confirm");
 }
 
+/// The attack: a stolen session links the Telegram account of the thief, which then acts as the
+/// member. The confirmation needs a sign-in of at most 15 minutes ago.
+#[tokio::test]
+async fn the_confirmation_needs_a_recent_sign_in() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+    let (organization, user, _) = test.member("testwil", OrganizationRole::Owner).await;
+    let old = jiff::Timestamp::now() - jiff::SignedDuration::from_mins(16);
+    let cookie = test.sign_in(user, Some(organization), old).await;
+    let router = support::session_router(&test, Arc::new(SystemClock));
+
+    let (status, _, code) = call(
+        &router,
+        &cookie,
+        Method::POST,
+        "/api/v1/telegram/link-codes",
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let code = code["code"].as_str().unwrap().to_owned();
+    let gateway = ServiceCaller::<TelegramGateway>::new();
+    let name = TelegramName("Testperson".to_owned());
+    assert!(
+        claim_link_code(
+            &gateway,
+            &code,
+            TelegramUserId(7130429),
+            &name,
+            &test.database,
+            &SystemClock
+        )
+        .await
+        .unwrap()
+    );
+    let (_, _, page) = call(
+        &router,
+        &cookie,
+        Method::GET,
+        "/api/v1/telegram/link-requests",
+    )
+    .await;
+    let path = format!(
+        "/api/v1/telegram/link-requests/{}/confirm",
+        page["items"][0]["id"].as_str().unwrap()
+    );
+
+    let (status, _, problem) = call(&router, &cookie, Method::POST, &path).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    assert_eq!(problem["code"], "recent-sign-in-required");
+    assert_eq!(
+        test.scalar::<i64>("SELECT count(*) FROM telegram_identity")
+            .await,
+        0
+    );
+}
+
 /// A club with the event TEST30, its manager and the web API.
 struct Club {
     test: TestDatabase,

@@ -228,8 +228,9 @@ impl TokenStore for Memory {
     }
 }
 
+/// Anna with the role `role`, signed in at the start of the test clock.
 fn anna_as(role: OrganizationRole) -> MemberCaller {
-    MemberCaller::new(anna(), testwil(), role)
+    MemberCaller::new(anna(), testwil(), role).with_sign_in(START)
 }
 
 fn request(scope: TokenScope) -> TokenRequest {
@@ -247,6 +248,30 @@ async fn create(
     request: TokenRequest,
 ) -> Result<CreatedToken, TokenError> {
     create_token(&anna_as(role), request, memory, memory, &TestClock::new()).await
+}
+
+#[tokio::test]
+async fn a_session_older_than_15_minutes_or_none_cannot_create_a_token() {
+    let memory = Memory::default();
+    for caller in [
+        MemberCaller::new(anna(), testwil(), Owner)
+            .with_sign_in(START - crate::session::RECENT_SIGN_IN - SignedDuration::from_secs(1)),
+        MemberCaller::new(anna(), testwil(), Owner),
+    ] {
+        let result = create_token(
+            &caller,
+            request(TokenScope::Read),
+            &memory,
+            &memory,
+            &TestClock::new(),
+        )
+        .await;
+        assert!(
+            matches!(result, Err(TokenError::RecentSignInRequired)),
+            "{result:?}"
+        );
+    }
+    assert!(memory.audit.lock().unwrap().is_empty());
 }
 
 fn invalid_fields(result: Result<CreatedToken, TokenError>) -> Vec<(String, &'static str)> {

@@ -22,6 +22,9 @@ use crate::store::StoreError;
 pub const IDLE_TIMEOUT: SignedDuration = SignedDuration::from_hours(14 * 24);
 /// A session ends at this age, also with regular use (ADR 0008).
 pub const ABSOLUTE_TIMEOUT: SignedDuration = SignedDuration::from_hours(90 * 24);
+/// The creation of a long-lived credential, an API token or a Telegram link, needs a session that
+/// started at most this long ago. A stolen session then cannot create one without the mailbox.
+pub const RECENT_SIGN_IN: SignedDuration = SignedDuration::from_mins(15);
 /// The last-use time of a session changes at most once in this interval, to limit the writes.
 pub const TOUCH_INTERVAL: SignedDuration = SignedDuration::from_mins(1);
 /// A session stores at most this many characters of the `User-Agent` header.
@@ -291,6 +294,7 @@ impl Authenticator for SessionAuthenticator {
             session.user_id,
             organization_id,
             role,
+            session.created_at,
         )))
     }
 }
@@ -559,7 +563,21 @@ mod tests {
         assert_eq!(
             caller,
             MemberCaller::new(anna(), testwil(), OrganizationRole::Admin)
+                .with_sign_in(fixture.clock.now())
         );
+    }
+
+    #[tokio::test]
+    async fn a_session_counts_as_a_recent_sign_in_for_15_minutes() {
+        let fixture = Fixture::new();
+        let token = fixture.sign_in(Some(testwil())).await;
+
+        fixture.clock.set(RECENT_SIGN_IN);
+        let caller = fixture.authenticate(&token).await.unwrap();
+        assert!(caller.signed_in_recently(fixture.clock.now()));
+        fixture.clock.set(RECENT_SIGN_IN + SECOND);
+        let caller = fixture.authenticate(&token).await.unwrap();
+        assert!(!caller.signed_in_recently(fixture.clock.now()));
     }
 
     #[tokio::test]
