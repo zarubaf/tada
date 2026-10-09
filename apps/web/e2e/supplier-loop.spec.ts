@@ -53,6 +53,7 @@ function proposal(id: string, extra: object) {
     stale: false,
     overdue: false,
     routed_to_me: true,
+    can_review: true,
     ...extra,
   };
 }

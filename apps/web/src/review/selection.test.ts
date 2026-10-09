@@ -10,6 +10,7 @@ function proposal(id: string, dependsOn: string[] = [], status: Proposal["status
     stale: false,
     overdue: false,
     routed_to_me: true,
+    can_review: true,
     reason: "",
     evidence: [],
     operation: { kind: "deprecate-field", event_id: "e", field_id: "f" },

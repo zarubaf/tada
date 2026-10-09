@@ -62,6 +62,7 @@ function proposal(id: string, extra: object) {
     stale: false,
     overdue: false,
     routed_to_me: true,
+    can_review: true,
     ...extra,
   };
 }
@@ -230,6 +231,7 @@ const workChangeset = {
     }),
     proposal(P_OTHER, {
       routed_to_me: false,
+      can_review: false,
       operation: {
         kind: "change-action-status",
         event_id: EVENT.id,
@@ -856,6 +858,26 @@ describe("work records", () => {
     expect(within(card).queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("an event manager acts on an overdue proposal of another reviewer", async () => {
+    const changeset = structuredClone(workChangeset);
+    changeset.proposals[2] = {
+      ...changeset.proposals[2],
+      overdue: true,
+      routed_to_me: false,
+      can_review: true,
+    } as never;
+    CHANGESETS.set(CS_WORK, changeset);
+    renderAt(`/inbox/${CS_WORK}`);
+
+    const card = await screen.findByRole("article", { name: "Status einer Aufgabe ändern" });
+    expect(within(card).queryByText("Andere Prüfung")).not.toBeInTheDocument();
+    expect(
+      within(card).getByRole("checkbox", { name: "Status einer Aufgabe ändern auswählen" }),
+    ).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Annehmen" })).toBeInTheDocument();
+    CHANGESETS.set(CS_WORK, workChangeset);
+  });
+
   it("lists the duplicate candidates with their readable ID", async () => {
     renderAt(`/inbox/${CS_WORK}`);
 
@@ -1178,7 +1200,11 @@ describe("edit of a work record", () => {
 describe("a link whose dependents go to another reviewer", () => {
   it("offers no link and says why", async () => {
     const changeset = structuredClone(workChangeset);
-    changeset.proposals[1] = { ...changeset.proposals[1], routed_to_me: false } as never;
+    changeset.proposals[1] = {
+      ...changeset.proposals[1],
+      routed_to_me: false,
+      can_review: false,
+    } as never;
     CHANGESETS.set(CS_WORK, changeset);
     renderAt(`/inbox/${CS_WORK}`);
 

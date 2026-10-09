@@ -109,9 +109,9 @@ export function ProposalCard(props: ProposalCardProps) {
   const conflictId = useId();
   const unavailableId = useId();
   const title = operationTitle(proposal.operation, fields);
-  // The member reviews an open proposal only when the routing gives it to them (ADR 0067).
-  const isOpen = proposal.status === "open" && proposal.routed_to_me;
-  const elsewhere = proposal.status === "open" && !proposal.routed_to_me;
+  // The member reviews an open proposal only when the server says so (ADR 0067): routed to them, or overdue.
+  const isOpen = proposal.status === "open" && proposal.can_review;
+  const elsewhere = proposal.status === "open" && !proposal.can_review;
   const field = editableField(proposal, fields);
   const isFact = proposal.operation.kind === "set-fact";
   const conflicting = isOpen && conflict !== undefined;
