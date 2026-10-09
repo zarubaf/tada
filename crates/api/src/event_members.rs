@@ -142,7 +142,8 @@ pub struct RemoveEventMembershipRequest {
     pub expected_version: i64,
 }
 
-/// Lists the event memberships of an event. Only its event managers see them.
+/// Lists the event memberships of an event, with names and roles only.
+/// Each member who can see the event reads them. Only event managers change them.
 #[utoipa::path(
     get,
     path = "/events/{event_id}/memberships",

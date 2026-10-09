@@ -89,8 +89,6 @@ pub trait EventMemberStore: Debug + Send + Sync {
 pub enum ListEventMembersError {
     #[error("the event does not exist or the caller cannot see it")]
     NotFound,
-    #[error("only event managers see the event memberships")]
-    Forbidden,
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -99,7 +97,6 @@ impl ListEventMembersError {
     /// All codes that this query can return, for the API contract (ADR 0037).
     pub const CODES: &[ProblemCode] = &[
         ProblemCode::NotFound,
-        ProblemCode::Forbidden,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -109,7 +106,6 @@ impl CommandError for ListEventMembersError {
     fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
-            Self::Forbidden => ProblemCode::Forbidden,
             Self::Store(error) => error.code(),
         }
     }
@@ -253,17 +249,18 @@ pub fn takes_last_manager(role: EventRole, new: Option<EventRole>, managers: usi
     role == EventRole::EventManager && new != Some(EventRole::EventManager) && managers == 1
 }
 
-/// The event memberships of an event. Only its event managers see them.
+/// The event memberships of an event: names and roles. Each member who can see the event reads
+/// them, so that a contributor can give work to another member. Only managers change them.
 pub async fn list_event_members(
     caller: &MemberCaller,
     event: EventId,
     identity: &dyn IdentityStore,
     store: &dyn EventMemberStore,
 ) -> Result<Vec<EventMember>, ListEventMembersError> {
-    match can_manage_members(caller, event, identity).await? {
-        None => Err(ListEventMembersError::NotFound),
-        Some(false) => Err(ListEventMembersError::Forbidden),
-        Some(true) => Ok(store.list(caller.scope(), event).await?),
+    match access::event_access(caller, event, identity).await {
+        Ok(_) => Ok(store.list(caller.scope(), event).await?),
+        Err(AccessError::NotFound) => Err(ListEventMembersError::NotFound),
+        Err(AccessError::Store(error)) => Err(error.into()),
     }
 }
 
@@ -377,12 +374,9 @@ mod tests {
                 StoreError::Unavailable("test".into()),
             ]
         };
-        let list = [
-            ListEventMembersError::NotFound,
-            ListEventMembersError::Forbidden,
-        ]
-        .into_iter()
-        .chain(stores().map(ListEventMembersError::Store));
+        let list = [ListEventMembersError::NotFound]
+            .into_iter()
+            .chain(stores().map(ListEventMembersError::Store));
         for error in list {
             assert!(
                 ListEventMembersError::CODES.contains(&error.code()),

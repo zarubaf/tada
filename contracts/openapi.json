@@ -623,7 +623,7 @@
         "tags": [
           "events"
         ],
-        "summary": "Lists the event memberships of an event. Only its event managers see them.",
+        "summary": "Lists the event memberships of an event, with names and roles only.\nEach member who can see the event reads them. Only event managers change them.",
         "operationId": "list_event_memberships",
         "parameters": [
           {
@@ -663,7 +663,6 @@
           "malformed-request",
           "unauthenticated",
           "organization-required",
-          "forbidden",
           "not-found",
           "unavailable",
           "internal"
