@@ -71,6 +71,7 @@ fn stores(test: &TestDatabase) -> ReviewStores<'_> {
         sources: &test.database,
         workstreams: &test.database,
         work: &test.database,
+        parties: &test.database,
     }
 }
 

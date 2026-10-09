@@ -36,6 +36,7 @@ use crate::clock::Clock;
 use crate::facts::FactStore;
 use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
+use crate::parties::PartyStore;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::{Changeset, FactStateInput, ProposalStore};
 use crate::sources::SourceStore;
@@ -395,6 +396,8 @@ pub struct ReviewStores<'a> {
     pub workstreams: &'a dyn WorkstreamStore,
     /// The owners of actions and commitments that the routing reads (ADR 0067).
     pub work: &'a dyn WorkStore,
+    /// The existing persons and institutions that a review shows as duplicates and links to (ADR 0069).
+    pub parties: &'a dyn PartyStore,
 }
 
 /// The input of an apply: the selected proposals and the edited values.

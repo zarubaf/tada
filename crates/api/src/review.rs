@@ -942,6 +942,7 @@ fn review_stores(state: &ApiState) -> ReviewStores<'_> {
         sources: state.sources.as_ref(),
         workstreams: state.workstreams.as_ref(),
         work: state.work.as_ref(),
+        parties: state.parties.as_ref(),
     }
 }
 
