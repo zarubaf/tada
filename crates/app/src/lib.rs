@@ -18,6 +18,7 @@ pub mod identity;
 pub mod jobs;
 pub mod mail;
 pub mod members;
+pub mod my_work;
 pub mod outbound;
 pub mod paging;
 pub mod parties;

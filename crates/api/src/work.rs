@@ -842,7 +842,7 @@ async fn my_work(
     State(state): State<ApiState>,
     Caller(caller): Caller,
 ) -> Result<axum::Json<MyWork>, ApiError> {
-    let view = app::my_work(&caller, state.work.as_ref()).await?;
+    let view = tada_app::my_work::my_work(&caller, state.work.as_ref()).await?;
     Ok(axum::Json(MyWork {
         actions: view
             .work
