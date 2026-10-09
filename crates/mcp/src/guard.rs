@@ -87,6 +87,9 @@ fn bearer_token(headers: &HeaderMap) -> Option<&str> {
 /// The body of an error response: the problem code, its meaning and the request ID (ADR 0037).
 #[derive(Serialize)]
 struct Problem {
+    /// The URL of the code in the public catalog.
+    #[serde(rename = "type")]
+    type_url: String,
     code: &'static str,
     title: &'static str,
     status: u16,
@@ -98,13 +101,11 @@ struct Problem {
 }
 
 fn problem(code: ProblemCode, request_id: Option<Uuid>) -> Response {
-    let status = match code {
-        ProblemCode::Unauthenticated => StatusCode::UNAUTHORIZED,
-        ProblemCode::Forbidden => StatusCode::FORBIDDEN,
-        ProblemCode::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
-        _ => StatusCode::INTERNAL_SERVER_ERROR,
-    };
+    // Each status of `ProblemCode` is valid; a test checks it.
+    let status =
+        StatusCode::from_u16(code.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     let body = Problem {
+        type_url: code.type_url(),
         code: code.as_str(),
         title: code.meaning(),
         status: status.as_u16(),
@@ -134,6 +135,16 @@ mod tests {
             headers.append(name.clone(), HeaderValue::from_str(value).unwrap());
         }
         headers
+    }
+
+    /// Each code gets the status of the catalog, so a code that the authenticator adds later
+    /// never becomes a silent 500 (ADR 0066).
+    #[test]
+    fn each_problem_code_gets_its_status_of_the_catalog() {
+        for code in ProblemCode::ALL {
+            let response = problem(code, None);
+            assert_eq!(response.status().as_u16(), code.http_status(), "{code:?}");
+        }
     }
 
     #[test]
