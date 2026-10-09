@@ -508,11 +508,22 @@ async fn check_owner(
     owner: UserId,
     identity: &dyn IdentityStore,
 ) -> Result<(), StoreError> {
-    match access::member_access(scope, event, owner, identity).await? {
-        Some(access) if access.can_propose() => {}
-        _ => check.push("owner", "unknown-member"),
+    if !is_possible_owner(scope, event, owner, identity).await? {
+        check.push("owner", "unknown-member");
     }
     Ok(())
+}
+
+/// True if `user` can own a work record of the event: a contributor or a manager of the event (ADR 0068).
+pub(crate) async fn is_possible_owner(
+    scope: OrgScope,
+    event: EventId,
+    user: UserId,
+    identity: &dyn IdentityStore,
+) -> Result<bool, StoreError> {
+    Ok(access::member_access(scope, event, user, identity)
+        .await?
+        .is_some_and(EventAccess::can_propose))
 }
 
 /// A new workstream of a record must be active and in the event. A store failure stops the command.
