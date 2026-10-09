@@ -878,3 +878,81 @@ async fn applying_changes_of_an_action_counts_its_version_and_keeps_the_evidence
         ["action.create", "action.change", "action.change"]
     );
 }
+
+/// Two status changes of one action in one changeset: the second step starts from the status that the first wrote.
+async fn status_chain(
+    test: &TestDatabase,
+    open_day: &OpenDay,
+    action_id: Uuid,
+    first: &str,
+    second: &str,
+) -> (Uuid, Uuid, Result<Applied, ApplyError>) {
+    let (one, two) = (Uuid::now_v7(), Uuid::now_v7());
+    let status = |status: &str, version: i64| {
+        let mut change = action_change(
+            open_day.event,
+            action_id,
+            json!({"kind": "change-action-status", "status": status}),
+        );
+        change["expected_version"] = json!(version);
+        change
+    };
+    let changes = propose(
+        test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![
+            proposal(one, status(first, 1), &[], "Das Open Day"),
+            proposal(two, status(second, 2), &[one], "20000 Besuchern"),
+        ],
+    )
+    .await;
+    let result = apply(test, &open_day.manager, &changes, select(&[two])).await;
+    (one, two, result)
+}
+
+async fn action_state(test: &TestDatabase, action_id: Uuid) -> (String, i64) {
+    sqlx::query_as("SELECT status, version FROM action WHERE id = $1")
+        .bind(action_id)
+        .fetch_one(&test.database.pool)
+        .await
+        .unwrap()
+}
+
+/// The apply checks each status step against the status of the row at that time (ADR 0068), not only its version.
+#[tokio::test]
+async fn a_status_chain_that_breaks_a_transition_conflicts_and_applies_nothing() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let (action_id, created) = (Uuid::now_v7(), Uuid::now_v7());
+    let anna = open_day.contributor.user_id();
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            created,
+            action(open_day.event, action_id, anna, None),
+            &[],
+            "im Mai 2030",
+        )],
+    )
+    .await;
+    apply(&test, &open_day.manager, &changeset, select(&[created]))
+        .await
+        .unwrap();
+
+    // "open → done", then "open → in-progress": the second step starts from done, which cannot go to in-progress.
+    let (_, second, result) =
+        status_chain(&test, &open_day, action_id, "done", "in-progress").await;
+    assert!(
+        matches!(&result, Err(ApplyError::Conflict(proposals)) if proposals == &[ProposalId::from_uuid(second)]),
+        "{result:?}"
+    );
+    assert_eq!(action_state(&test, action_id).await, ("open".to_owned(), 1));
+
+    // "open → in-progress", then "in-progress → done": both apply.
+    let (_, _, result) = status_chain(&test, &open_day, action_id, "in-progress", "done").await;
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(action_state(&test, action_id).await, ("done".to_owned(), 3));
+}

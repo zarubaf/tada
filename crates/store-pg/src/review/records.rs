@@ -162,8 +162,15 @@ pub(super) async fn write_record(
             let current = action_in(conn, scope, *event_id, *action_id)
                 .await?
                 .ok_or(sqlx::Error::RowNotFound)?;
+            // The status of the record decides the transition (ADR 0068). A record that changed after the check
+            // of the proposal has another version, so this refusal is a conflict like a version mismatch.
+            let status = current
+                .fields
+                .status
+                .change_to(*status)
+                .map_err(|_| sqlx::Error::RowNotFound)?;
             let fields = ActionFields {
-                status: *status,
+                status,
                 ..current.fields
             };
             let version = update_action(
@@ -220,8 +227,13 @@ pub(super) async fn write_record(
             let current = commitment_in(conn, scope, *event_id, *commitment_id)
                 .await?
                 .ok_or(sqlx::Error::RowNotFound)?;
+            let status = current
+                .fields
+                .status
+                .change_to(*status)
+                .map_err(|_| sqlx::Error::RowNotFound)?;
             let fields = CommitmentFields {
-                status: *status,
+                status,
                 firm_reason: step.firm_reason.clone().or(current.fields.firm_reason),
                 ..current.fields
             };
