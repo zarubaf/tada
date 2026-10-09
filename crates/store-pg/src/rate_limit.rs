@@ -73,10 +73,9 @@ impl PgRateLimiter {
                 mac.update(b"email\0");
                 mac.update(email.as_str().as_bytes());
             }
-            RateSubject::Ip(address) => {
-                // An IPv4 client of an IPv6 socket counts as the same IPv4 address.
+            RateSubject::Ip(network) => {
                 mac.update(b"ip\0");
-                mac.update(address.to_canonical().to_string().as_bytes());
+                mac.update(network.address().to_string().as_bytes());
             }
         }
         Ok(mac.finalize().into_bytes().into())

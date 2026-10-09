@@ -297,7 +297,7 @@ mod tests {
                 .map(|limit| {
                     let subject = match limit.subject {
                         RateSubject::Email(email) => email.as_str().to_owned(),
-                        RateSubject::Ip(address) => address.to_string(),
+                        RateSubject::Ip(network) => network.address().to_string(),
                     };
                     (subject, limit.limit)
                 })
