@@ -41,6 +41,7 @@ mod facts;
 mod heartbeat;
 mod identity;
 mod jobs;
+mod local_ids;
 mod members;
 mod outbound;
 mod privacy;
