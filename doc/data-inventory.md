@@ -11,6 +11,8 @@ Such an object can hold personal data.
 A canceled request, for example a client that disconnects during an upload, can leave the parts of an incomplete multipart upload in the object storage.
 These parts are not objects and can hold personal data too.
 Slice 1 has no job that finds and deletes these objects or parts.
+The sweep of orphan objects comes in Slice 2 ([roadmap](roadmap.md)).
+Until the sweep exists, these objects and parts can stay in the object storage, and nothing deletes them.
 
 An export of `tada export` holds all personal data of one organization in files outside the database (ADR 0059).
 It holds the rows of the tables below and the uploaded files, without tokens, token hashes and other secrets.
