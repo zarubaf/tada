@@ -417,6 +417,23 @@ impl MemberStore for Database {
             .execute(&mut *tx)
             .await
             .map_err(store_error)?;
+        // The Telegram link of the member ends for the same reason as the sessions: a link that a
+        // stolen session made would act again after a new invitation. Its open codes go with it.
+        sqlx::query!(
+            "DELETE FROM telegram_identity WHERE user_id = $1",
+            member.as_uuid()
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        sqlx::query!(
+            "DELETE FROM telegram_link_code WHERE organization_id = $1 AND user_id = $2",
+            scope.organization_id().as_uuid(),
+            member.as_uuid(),
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
         // The pending invitations of the member go too: a member who expects the removal could
         // invite a second address of their own and come back with it.
         let pending = sqlx::query_scalar!(
@@ -866,7 +883,8 @@ mod tests {
         );
     }
 
-    /// A removal ends each session of the member, in each organization; other sessions stay.
+    /// A removal ends each session and the Telegram link of the member, in each organization; other
+    /// sessions stay.
     #[tokio::test]
     async fn a_removal_ends_all_sessions_of_the_member() {
         let f = Fixture::start().await;
@@ -881,6 +899,13 @@ mod tests {
             .await;
         f.test.sign_in(anna, Some(musterhausen), now).await;
         f.test.sign_in(anna, None, now).await;
+        sqlx::query(
+            "INSERT INTO telegram_identity (telegram_user_id, user_id, linked_at) VALUES (42, $1, now())",
+        )
+        .bind(anna.as_uuid())
+        .execute(&f.db().pool)
+        .await
+        .unwrap();
         f.test
             .sign_in(f.owner.user_id(), Some(f.scope().organization_id()), now)
             .await;
@@ -891,6 +916,11 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(left, [f.owner.user_id().as_uuid()]);
+        assert_eq!(
+            f.count("SELECT count(*) FROM telegram_identity").await,
+            0,
+            "the Telegram link ends too"
+        );
     }
 
     #[tokio::test]

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM telegram_link_code WHERE claimed_by = $1 AND confirmed_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4964c962fcfae15cefbaff733bf29be5c9e41d27e4d9c9c0cb39e973ecb50612"
+}

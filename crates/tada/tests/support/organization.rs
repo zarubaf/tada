@@ -16,7 +16,7 @@ use tada_app::caller::{OrganizationRole, ServiceCaller, TelegramGateway};
 use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::session::SessionAuthenticator;
-use tada_app::telegram::{TelegramName, TelegramUserId, claim_link_code};
+use tada_app::telegram::{TelegramName, TelegramUserId, accept_link_claim, claim_link_code};
 use tada_app::tokens::TokenAuthenticator;
 use tada_mcp::McpState;
 use tada_store_pg::testing::TestDatabase;
@@ -243,7 +243,18 @@ pub async fn fill(
             TelegramUserId(telegram_user),
             &TelegramName("Testperson Testwil".to_owned()),
             &test.database,
-            &SystemClock,
+            &SystemClock
+        )
+        .await
+        .unwrap()
+        .is_some()
+    );
+    assert!(
+        accept_link_claim(
+            &ServiceCaller::<TelegramGateway>::new(),
+            TelegramUserId(telegram_user),
+            &test.database,
+            &SystemClock
         )
         .await
         .unwrap()

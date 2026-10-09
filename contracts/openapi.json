@@ -310,6 +310,74 @@
         ]
       }
     },
+    "/api/v1/telegram/link": {
+      "get": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Reads the Telegram link of the calling member. A link belongs to the user, in each organization.",
+        "operationId": "get_telegram_link",
+        "responses": {
+          "200": {
+            "description": "The link, or null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramLinkState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/telegram/link/remove": {
+      "post": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Removes the Telegram link of the calling member. Without a link, it changes nothing.",
+        "operationId": "remove_telegram_link",
+        "responses": {
+          "204": {
+            "description": "The member has no Telegram link."
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/sign-in/requests": {
       "post": {
         "tags": [
@@ -8105,6 +8173,24 @@
         ],
         "description": "The target of a `tada:` link for the reader. `kind` names it. The list of kinds is open."
       },
+      "LinkedTelegramAccount": {
+        "type": "object",
+        "description": "The Telegram account that is linked to the member.",
+        "required": [
+          "telegram_user_id",
+          "linked_at"
+        ],
+        "properties": {
+          "telegram_user_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "linked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "LintWarning": {
         "type": "object",
         "description": "A warning of the draft lint on one line, from 1.",
@@ -9803,6 +9889,25 @@
             "items": {
               "$ref": "#/components/schemas/TelegramLinkRequest"
             }
+          }
+        }
+      },
+      "TelegramLinkState": {
+        "type": "object",
+        "description": "The link of the member, or null if the member has none.",
+        "required": [
+          "link"
+        ],
+        "properties": {
+          "link": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LinkedTelegramAccount"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },

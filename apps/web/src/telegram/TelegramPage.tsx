@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type Api,
+  type LinkedTelegramAccount,
   problemMessage,
   type TelegramLinkCode,
   type TelegramLinkRequest,
@@ -29,8 +30,9 @@ type Requests =
 
 /**
  * „Telegram verknüpfen“ in the settings (ADR 0011): the member creates a link code, sends it to
- * the bot and confirms the claim of the Telegram account. The code shows once, right after its
- * creation, and the page never stores it.
+ * the bot, the Telegram account accepts it there, and the member confirms the claim here. The code
+ * shows once, right after its creation, and the page never stores it. The member also sees the
+ * linked account and can remove the link.
  */
 export function TelegramPage({ api }: { api: Api }) {
   const [requests, setRequests] = useState<Requests>({ kind: "loading" });
@@ -38,6 +40,9 @@ export function TelegramPage({ api }: { api: Api }) {
   const [refreshing, setRefreshing] = useState(false);
   const [code, setCode] = useState<TelegramLinkCode>();
   const [confirming, setConfirming] = useState<TelegramLinkRequest>();
+  // The linked account; `null` without a link, `undefined` while it is not known.
+  const [link, setLink] = useState<LinkedTelegramAccount | null>();
+  const [unlinking, setUnlinking] = useState(false);
   // A request runs: a second press does nothing.
   const [busy, setBusy] = useState(false);
   // The server asks for a new sign-in before it links an account.
@@ -72,9 +77,22 @@ export function TelegramPage({ api }: { api: Api }) {
     return failed.message;
   }, [api]);
 
+  /** Loads the linked account. A failure leaves it unknown, and the page shows no link section. */
+  const loadLink = useCallback(async () => {
+    try {
+      const { data } = await api.GET("/api/v1/telegram/link");
+      if (data) {
+        setLink(data.link);
+      }
+    } catch {
+      // The rest of the page works without it.
+    }
+  }, [api]);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadLink();
+  }, [load, loadLink]);
 
   const showFailure = (message: string) => {
     setFailure(message);
@@ -122,6 +140,7 @@ export function TelegramPage({ api }: { api: Api }) {
         setConfirmation(t("telegram-linked"));
         // The code has done its work, and a stale code would mislead.
         setCode(undefined);
+        void loadLink();
         setRequests((current) =>
           current.kind === "loaded"
             ? { ...current, items: current.items.filter((r) => r.id !== item.id) }
@@ -143,6 +162,30 @@ export function TelegramPage({ api }: { api: Api }) {
     }
     setBusy(false);
     setConfirming(undefined);
+  };
+
+  const unlink = async () => {
+    if (busy) {
+      return;
+    }
+    setFailure(undefined);
+    setConfirmation(undefined);
+    setBusy(true);
+    try {
+      const result = await api.POST("/api/v1/telegram/link/remove");
+      if (result.response.ok) {
+        // The pressed button leaves with the link: focus goes to the heading of the page.
+        focusAfterCommit(() => document.getElementById("telegram-title"));
+        setLink(null);
+        setConfirmation(t("telegram-unlinked"));
+      } else {
+        showFailure(failureOf(result).message);
+      }
+    } catch {
+      showFailure(failureOf({}).message);
+    }
+    setBusy(false);
+    setUnlinking(false);
   };
 
   /** „Aktualisieren“: the button stays and keeps focus, so the live regions announce the result. */
@@ -172,6 +215,21 @@ export function TelegramPage({ api }: { api: Api }) {
       <section className={styles.section} aria-labelledby="telegram-title">
         <PageTitle id="telegram-title">{t("telegram-title")}</PageTitle>
         <p>{t("telegram-intro")}</p>
+        {link && (
+          <div className={styles.linked}>
+            <p>
+              {t("telegram-linked-account", {
+                id: String(link.telegram_user_id),
+                time: claimedFormat.format(new Date(link.linked_at)),
+              })}
+            </p>
+            <div>
+              <Button variant="danger" onPress={() => setUnlinking(true)}>
+                {t("telegram-unlink")}
+              </Button>
+            </div>
+          </div>
+        )}
         <h2 className={styles.heading}>{t("telegram-steps-title")}</h2>
         <ol className={styles.steps}>
           <li>{t("telegram-step-create")}</li>
@@ -305,6 +363,16 @@ export function TelegramPage({ api }: { api: Api }) {
         isPending={busy}
         onConfirm={() => void confirm()}
         onCancel={() => !busy && setConfirming(undefined)}
+      />
+      <ConfirmDialog
+        isOpen={unlinking}
+        title={t("telegram-unlink-title")}
+        text={t("telegram-unlink-text")}
+        confirmLabel={t("telegram-unlink")}
+        cancelLabel={t("telegram-confirm-cancel")}
+        isPending={busy}
+        onConfirm={() => void unlink()}
+        onCancel={() => !busy && setUnlinking(false)}
       />
     </div>
   );

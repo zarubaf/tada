@@ -24,11 +24,12 @@ function problem(status: number, code: string) {
 
 interface Setup {
   requests?: unknown[][];
+  link?: unknown;
   answers?: Record<string, () => Response>;
 }
 
 /** A fake server. `requests` has one list per `GET`; the last one repeats. */
-function setup({ requests = [[request]], answers = {} }: Setup = {}) {
+function setup({ requests = [[request]], link = null, answers = {} }: Setup = {}) {
   const calls: string[] = [];
   let lists = 0;
   const own = { organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" };
@@ -53,6 +54,12 @@ function setup({ requests = [[request]], answers = {} }: Setup = {}) {
       const items = requests[Math.min(lists, requests.length - 1)];
       lists += 1;
       return json(200, { items });
+    }
+    if (key === "GET /api/v1/telegram/link") {
+      return json(200, { link });
+    }
+    if (key === "POST /api/v1/telegram/link/remove") {
+      return new Response(null, { status: 204 });
     }
     if (key === "POST /api/v1/telegram/link-codes") {
       return json(201, { code: "K7M3-QX92", expires_at: "2030-05-18T08:10:00Z" });
@@ -177,6 +184,30 @@ describe("TelegramPage", () => {
 
     await waitFor(() => expect(window.location.pathname).toBe("/sign-in"));
     expect(calls).toContain("POST /api/v1/sign-out");
+  });
+
+  it("shows the linked account and removes the link after a confirmation", async () => {
+    const { calls } = setup({
+      link: { telegram_user_id: 4711, linked_at: "2030-05-18T08:00:00Z" },
+    });
+
+    expect(await screen.findByText(/Telegram-Konto 4711 verknüpft/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Verknüpfung aufheben" }));
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "Telegram-Verknüpfung aufheben?",
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Verknüpfung aufheben" }));
+
+    expect(await screen.findByText("Telegram-Verknüpfung aufgehoben.")).toBeInTheDocument();
+    expect(screen.queryByText(/Telegram-Konto 4711 verknüpft/)).not.toBeInTheDocument();
+    expect(calls).toContain("POST /api/v1/telegram/link/remove");
+  });
+
+  it("shows no link section without a link", async () => {
+    setup();
+
+    await screen.findByText("Bernd Beispiel");
+    expect(screen.queryByRole("button", { name: "Verknüpfung aufheben" })).not.toBeInTheDocument();
   });
 
   it("loads the requests again on request", async () => {

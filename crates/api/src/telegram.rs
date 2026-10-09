@@ -22,6 +22,8 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
         .routes(routes!(create_link_code))
         .routes(routes!(list_link_requests))
         .routes(routes!(confirm_link))
+        .routes(routes!(get_link))
+        .routes(routes!(remove_link))
 }
 
 pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
@@ -32,6 +34,8 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
             "confirm_telegram_link",
             codes(&[AUTHENTICATED, LinkError::CODES]),
         ),
+        ("get_telegram_link", codes(&[AUTHENTICATED])),
+        ("remove_telegram_link", codes(&[AUTHENTICATED])),
     ]
 }
 
@@ -156,4 +160,61 @@ async fn confirm_link(
     Ok(axum::Json(TelegramLink {
         telegram_user_id: account.0,
     }))
+}
+
+/// The Telegram account that is linked to the member.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LinkedTelegramAccount {
+    pub telegram_user_id: i64,
+    pub linked_at: Timestamp,
+}
+
+/// The link of the member, or null if the member has none.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TelegramLinkState {
+    #[schema(required = true, nullable = true)]
+    pub link: Option<LinkedTelegramAccount>,
+}
+
+/// Reads the Telegram link of the calling member. A link belongs to the user, in each organization.
+#[utoipa::path(
+    get,
+    path = "/telegram/link",
+    operation_id = "get_telegram_link",
+    tag = "telegram",
+    responses(
+        (status = OK, description = "The link, or null.", body = TelegramLinkState),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn get_link(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+) -> Result<axum::Json<TelegramLinkState>, ApiError> {
+    let link = app::get_link(&caller, state.telegram.as_ref()).await?;
+    Ok(axum::Json(TelegramLinkState {
+        link: link.map(|link| LinkedTelegramAccount {
+            telegram_user_id: link.telegram_user_id.0,
+            linked_at: link.linked_at,
+        }),
+    }))
+}
+
+/// Removes the Telegram link of the calling member. Without a link, it changes nothing.
+#[utoipa::path(
+    post,
+    path = "/telegram/link/remove",
+    operation_id = "remove_telegram_link",
+    tag = "telegram",
+    responses(
+        (status = NO_CONTENT, description = "The member has no Telegram link."),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn remove_link(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+) -> Result<StatusCode, ApiError> {
+    app::unlink(&caller, state.telegram.as_ref()).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

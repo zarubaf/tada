@@ -378,7 +378,36 @@ mod tests {
             _: tada_app::telegram::TelegramUserId,
             _: &tada_app::telegram::TelegramName,
             _: jiff::Timestamp,
+        ) -> Result<Option<tada_app::telegram::LinkTarget>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn accept(
+            &self,
+            _: tada_app::telegram::TelegramUserId,
+            _: jiff::Timestamp,
         ) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn link_of(
+            &self,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<Option<tada_app::telegram::TelegramLink>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn unlink_user(
+            &self,
+            _: tada_app::domain::ids::UserId,
+        ) -> Result<(), tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn unlink_account(
+            &self,
+            _: tada_app::telegram::TelegramUserId,
+        ) -> Result<(), tada_app::store::StoreError> {
             unreachable!()
         }
 

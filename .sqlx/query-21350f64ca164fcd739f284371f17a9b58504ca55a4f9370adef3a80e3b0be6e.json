@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT telegram_user_id, linked_at AS \"linked_at: jiff_sqlx::Timestamp\"\n               FROM telegram_identity WHERE user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "telegram_user_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "telegram_identity",
+            "name": "telegram_user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "linked_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "telegram_identity",
+            "name": "linked_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "21350f64ca164fcd739f284371f17a9b58504ca55a4f9370adef3a80e3b0be6e"
+}

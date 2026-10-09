@@ -14,6 +14,7 @@ export type EventMembership = components["schemas"]["EventMembership"];
 export type Member = components["schemas"]["Member"];
 export type TelegramLinkCode = components["schemas"]["TelegramLinkCode"];
 export type TelegramLinkRequest = components["schemas"]["TelegramLinkRequest"];
+export type LinkedTelegramAccount = components["schemas"]["LinkedTelegramAccount"];
 export type ApiToken = components["schemas"]["ApiToken"];
 export type ApiTokenScope = components["schemas"]["ApiTokenScope"];
 export type OrganizationFeature = components["schemas"]["OrganizationFeature"];
