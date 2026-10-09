@@ -71,17 +71,20 @@ fn client_ip(peer: IpAddr, headers: &HeaderMap, trusted_proxies: &[IpNet]) -> Ip
     if !is_trusted_proxy(trusted_proxies, peer) {
         return peer;
     }
-    let forwarded: Vec<&str> = headers
+    // Split the bytes, not the text: a client entry that is not text then stops the walk only
+    // where it is, not before the entries that the proxies appended.
+    let forwarded: Vec<&[u8]> = headers
         .get_all(FORWARDED_FOR)
         .iter()
-        // A value that is not text cannot be parsed and stops the walk below.
-        .flat_map(|value| value.to_str().unwrap_or("").split(','))
-        .map(str::trim)
+        .flat_map(|value| value.as_bytes().split(|byte| *byte == b','))
         .collect();
     let mut client = peer;
     for entry in forwarded.iter().rev() {
         // An entry that is not an address stops the walk: the last trusted proxy is the client.
-        let Ok(address) = entry.parse::<IpAddr>() else {
+        let Some(address) = std::str::from_utf8(entry)
+            .ok()
+            .and_then(|entry| entry.trim().parse::<IpAddr>().ok())
+        else {
             break;
         };
         client = address;
@@ -161,6 +164,21 @@ mod tests {
     fn an_entry_that_is_not_an_address_stops_the_walk() {
         let headers = forwarded(&["203.0.113.7, unknown, 10.0.0.9"]);
         assert_eq!(client_ip(ip(PROXY), &headers, &trusted()), ip("10.0.0.9"));
+    }
+
+    /// The proxy appends the peer as text. A client entry that is not text must not hide it, or the
+    /// client gets the address of the proxy and a second rate limit.
+    #[test]
+    fn a_client_entry_that_is_not_text_does_not_hide_the_entry_of_the_proxy() {
+        let mut headers = HeaderMap::new();
+        headers.append(
+            FORWARDED_FOR,
+            HeaderValue::from_bytes(b"\xff, 203.0.113.7").unwrap(),
+        );
+        assert_eq!(
+            client_ip(ip(PROXY), &headers, &trusted()),
+            ip("203.0.113.7")
+        );
     }
 
     #[test]
