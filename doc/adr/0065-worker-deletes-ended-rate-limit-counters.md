@@ -1,4 +1,4 @@
-# 0064. The worker deletes ended rate-limit counters
+# 0065. The worker deletes ended rate-limit counters
 
 - Status: Proposed
 - Date: 2026-10-09

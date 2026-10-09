@@ -85,7 +85,7 @@ impl PgRateLimiter {
 
 impl Database {
     /// Deletes the counters of the windows that ended, as each sign-in request does. The worker calls it on
-    /// each loop, so a counter stays at most two windows also without a later sign-in (ADR 0064).
+    /// each loop, so a counter stays at most two windows also without a later sign-in (ADR 0065).
     /// Returns the number of deleted counters.
     pub async fn delete_ended_rate_limit_counters(
         &self,
@@ -243,7 +243,7 @@ mod tests {
     }
 
     /// The worker deletes the ended counters without a sign-in request, so no counter stays longer than
-    /// two windows (ADR 0064).
+    /// two windows (ADR 0065).
     #[tokio::test]
     async fn the_sweep_deletes_the_counters_of_windows_that_ended_one_window_ago() {
         let test = TestDatabase::start().await;

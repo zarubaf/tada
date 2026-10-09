@@ -70,7 +70,7 @@ pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::
         if let Err(error) = db.record_heartbeat(worker_id).await {
             tracing::warn!(%error, "the heartbeat failed");
         }
-        // Sign-in requests delete ended rate-limit counters too, but only if one comes (ADR 0064).
+        // Sign-in requests delete ended rate-limit counters too, but only if one comes (ADR 0065).
         if let Err(error) = db.delete_ended_rate_limit_counters(SystemClock.now()).await {
             tracing::warn!(%error, "cannot delete the ended rate-limit counters");
         }
