@@ -114,6 +114,7 @@ pub struct CreateWorkstreamRequest {
 }
 
 /// The input of `ChangeWorkstream`. A field that is absent stays as it is.
+/// A request needs at least one field to change.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ChangeWorkstreamRequest {
     pub name: Option<String>,

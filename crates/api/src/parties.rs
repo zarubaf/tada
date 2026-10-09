@@ -189,6 +189,7 @@ fn present<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Option<S
 }
 
 /// The input of `ChangePerson`. An absent field stays as it is. `null` clears email or phone.
+/// A request needs at least one field to change.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ChangePersonRequest {
     pub name: Option<String>,
@@ -203,6 +204,7 @@ pub struct ChangePersonRequest {
 }
 
 /// The input of `ChangeInstitution`. An absent field stays as it is. `null` clears email or phone.
+/// A request needs at least one field to change.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ChangeInstitutionRequest {
     pub name: Option<String>,

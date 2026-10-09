@@ -125,6 +125,7 @@ pub enum WorkstreamError {
     NotFound,
     #[error("only event managers manage workstreams")]
     Forbidden,
+    /// Invalid values. A change without a field has no field errors.
     #[error("invalid values")]
     Invalid(Vec<FieldError>),
     #[error("the workstream changed after the caller read it")]
@@ -258,6 +259,16 @@ pub async fn change_workstream(
     clock: &dyn Clock,
 ) -> Result<Workstream, WorkstreamError> {
     require_manager(caller, event, identity).await?;
+    let current = store
+        .get(caller.scope(), event, id)
+        .await?
+        .ok_or(WorkstreamError::NotFound)?;
+    if change.name.is_none() && change.lead.is_none() && change.status.is_none() {
+        return Err(WorkstreamError::Invalid(Vec::new()));
+    }
+    if current.version != change.expected_version {
+        return Err(WorkstreamError::VersionConflict);
+    }
     let name = change.name.as_deref().map(parse_name).transpose()?;
     if let Some(lead) = change.lead {
         check_lead(caller.scope(), event, lead, identity).await?;
@@ -568,6 +579,55 @@ mod tests {
         assert_eq!(created.status, WorkstreamStatus::Active);
         assert_eq!(created.version, RecordVersion::FIRST);
         assert_eq!(created.lead, user(CONTRIBUTOR));
+    }
+
+    /// A change without a field is `validation-failed` without field errors; a stale version conflicts before
+    /// the values are checked. Both write nothing.
+    #[tokio::test]
+    async fn an_empty_or_stale_change_is_refused() {
+        let memory = Memory::default();
+        let created = create(&memory, MANAGER, new("Gelände", MANAGER))
+            .await
+            .unwrap();
+        let change = |name: Option<&str>, expected_version| WorkstreamChange {
+            name: name.map(str::to_owned),
+            lead: None,
+            status: None,
+            expected_version,
+        };
+        let manager = caller(user(MANAGER));
+        let empty = change_workstream(
+            &manager,
+            open_day(),
+            created.id,
+            change(None, RecordVersion::FIRST),
+            &memory,
+            &memory,
+            &FixedClock,
+        )
+        .await;
+        assert!(
+            matches!(&empty, Err(WorkstreamError::Invalid(errors)) if errors.is_empty()),
+            "{empty:?}"
+        );
+        let stale = change_workstream(
+            &manager,
+            open_day(),
+            created.id,
+            change(Some(""), RecordVersion::new(2).unwrap()),
+            &memory,
+            &memory,
+            &FixedClock,
+        )
+        .await;
+        assert!(
+            matches!(stale, Err(WorkstreamError::VersionConflict)),
+            "{stale:?}"
+        );
+        assert_eq!(
+            memory.workstreams.lock().unwrap()[0].version,
+            RecordVersion::FIRST
+        );
     }
 
     #[tokio::test]

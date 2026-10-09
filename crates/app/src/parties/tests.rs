@@ -398,6 +398,56 @@ async fn a_change_keeps_what_it_does_not_name_and_clears_what_it_empties() {
     assert_eq!(changed.phone.unwrap().as_str(), "+41 00 000 00 00");
 }
 
+/// A change without a field is `validation-failed` without field errors, as for work records; it writes nothing.
+#[tokio::test]
+async fn a_change_without_a_field_is_invalid() {
+    let memory = Memory::default();
+    let created = person(&memory, "Beat Muster").await;
+    let empty = PersonChange {
+        name: None,
+        email: None,
+        phone: None,
+        expected_version: created.version,
+    };
+    let error = change_person(&carla(), created.id, empty, &memory, &FixedClock)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&error, PartyError::Invalid(errors) if errors.is_empty()),
+        "{error:?}"
+    );
+
+    let institution = create_institution(
+        &anna(),
+        NewInstitution {
+            name: "Testwil Generatoren AG".to_owned(),
+            kind: "company".to_owned(),
+            email: None,
+            phone: None,
+        },
+        &memory,
+        &memory,
+        &FixedClock,
+    )
+    .await
+    .unwrap();
+    let empty = InstitutionChange {
+        name: None,
+        kind: None,
+        email: None,
+        phone: None,
+        expected_version: institution.version,
+    };
+    let error = change_institution(&carla(), institution.id, empty, &memory, &FixedClock)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&error, PartyError::Invalid(errors) if errors.is_empty()),
+        "{error:?}"
+    );
+    assert_eq!(memory.audit.lock().unwrap().len(), 2);
+}
+
 #[tokio::test]
 async fn a_stale_version_conflicts() {
     let memory = Memory::default();
