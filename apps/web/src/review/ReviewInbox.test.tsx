@@ -1022,7 +1022,7 @@ async function openEdit(card: string, index = 0) {
   const article = (await screen.findAllByRole("article", { name: card }))[index] as HTMLElement;
   await userEvent.click(within(article).getByRole("button", { name: /^Bearbeiten und annehmen/ }));
   // The form loads on demand.
-  await within(article).findByRole("textbox", {}, { timeout: 4000 });
+  await within(article).findAllByRole("textbox", {}, { timeout: 4000 });
   return article;
 }
 
