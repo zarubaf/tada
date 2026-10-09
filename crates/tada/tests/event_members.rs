@@ -134,10 +134,32 @@ async fn an_owner_adds_a_manager_who_adds_a_contributor_who_cannot_add_anyone() 
     let (status, problem) = api.add(&ben_cookie, &event, carla, "event-viewer").await;
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert_eq!(problem["code"], "forbidden");
-    let (status, _) = api
+    // A contributor reads the list to give work to another member: names and roles, no contact data.
+    let (status, page) = api
         .get(&ben_cookie, &format!("/api/v1/events/{event}/memberships"))
         .await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(status, StatusCode::OK);
+    let items = page["items"].as_array().unwrap();
+    assert_eq!(items.len(), 3);
+    for item in items {
+        let mut keys: Vec<_> = item
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            [
+                "created_at",
+                "display_name",
+                "event_role",
+                "user_id",
+                "version"
+            ]
+        );
+    }
 
     let (status, page) = api
         .get(&anna_cookie, &format!("/api/v1/events/{event}/memberships"))
@@ -173,6 +195,10 @@ async fn a_member_without_an_event_role_does_not_find_the_event() {
     let (status, problem) = api.get(&anna, &format!("/api/v1/events/{event}")).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(problem["code"], "not-found");
+    let (status, _) = api
+        .get(&anna, &format!("/api/v1/events/{event}/memberships"))
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
     assert!(api.listed_keys(&anna).await.is_empty());
     assert_eq!(api.listed_keys(&owner).await, ["TEST30"]);
 }
