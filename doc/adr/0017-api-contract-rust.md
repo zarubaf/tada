@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-06
 - Supersedes: [0004](0004-http-api-contract.md)
+- See also: [0064](0064-one-proposal-input-for-http-and-mcp.md) (proposed): the proposal input types of `app` as request schemas.
 
 ## Context
 
