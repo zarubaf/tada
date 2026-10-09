@@ -238,7 +238,7 @@ async fn the_lead_reviews_a_supplier_promise_and_the_condition_stays_until_made_
     // 2. The contributor's AI client proposes the supplier and its conditional promise through MCP.
     let token = app.propose_token(&contributor).await;
     let (institution, commitment) = (Uuid::now_v7(), Uuid::now_v7());
-    let mut new_institution = proposal(
+    let new_institution = proposal(
         json!({"kind": "create-institution", "id": institution,
                "name": "Testwil Generatoren AG", "institution_kind": "company"}),
         SUPPLIER_QUOTE,
@@ -254,7 +254,6 @@ async fn the_lead_reviews_a_supplier_promise_and_the_condition_stays_until_made_
         PROMISE_QUOTE,
         "The supplier promises the delivery if the order is signed.",
     );
-    new_institution["id"] = json!(Uuid::now_v7());
     promise["depends_on"] = json!([new_institution["id"]]);
     let changeset = app
         .mcp_propose(
@@ -324,7 +323,7 @@ async fn the_lead_reviews_a_supplier_promise_and_the_condition_stays_until_made_
     assert_eq!(status, StatusCode::CONFLICT, "{problem}");
     assert_eq!(problem["code"], "invalid-transition");
 
-    // 6. A proposal of the AI client to make it firm changes nothing until the owner applies it.
+    // 6. A proposal of the AI client to make it firm changes nothing until the lead applies it.
     let to_firm = proposal(
         json!({
             "kind": "change-commitment-status", "event_id": event, "commitment_id": commitment,
@@ -351,6 +350,29 @@ async fn the_lead_reviews_a_supplier_promise_and_the_condition_stays_until_made_
     assert_eq!(made["status"], "firm");
     assert_eq!(made["firm_reason"], "The order is signed.");
     assert_eq!(made["condition"], "subject to signed order");
+
+    // The pending proposal expects version 2, so it conflicts now and changes nothing.
+    let review = app
+        .get(&lead, &format!("/api/v1/changesets/{pending}"))
+        .await;
+    let to_firm = &review["proposals"][0];
+    let (status, problem) = app
+        .post(
+            &lead,
+            &format!("/api/v1/changesets/{pending}/apply"),
+            &json!({"selected": [to_firm["id"]]}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+    assert_eq!(problem["code"], "record-version-conflict");
+    let review = app
+        .get(&lead, &format!("/api/v1/changesets/{pending}"))
+        .await;
+    assert_eq!(review["proposals"][0]["status"], "conflict");
+    assert_eq!(
+        app.get(&lead, &path).await["firm_reason"],
+        "The order is signed."
+    );
 
     // The audit log names the lead as the actor and holds no reason text (ADR 0068).
     let actors: Vec<Uuid> = firm_actors(&app).await;
