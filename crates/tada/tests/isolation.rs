@@ -104,6 +104,9 @@ struct Targets {
     b_token: String,
     b_invitation: String,
     b_link_request: String,
+    /// A person and an institution of B.
+    b_person: String,
+    b_institution: String,
     /// A member of B only, with a role in the first event of B.
     b_member: String,
 }
@@ -160,6 +163,16 @@ fn get(path: String, expect: Expect) -> Attempt {
 fn post(path: String, body: Value, expect: Expect) -> Attempt {
     Attempt {
         method: Method::POST,
+        path,
+        payload: Payload::Json(body),
+        expect,
+        actors: Actors::All,
+    }
+}
+
+fn patch(path: String, body: Value, expect: Expect) -> Attempt {
+    Attempt {
+        method: Method::PATCH,
         path,
         payload: Payload::Json(body),
         expect,
@@ -319,6 +332,37 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
         )],
         "revoke_invitation" => vec![command(
             api(format!("/invitations/{}/revoke", t.b_invitation)),
+            Expect::NotFound,
+        )],
+        // Persons and institutions.
+        "list_persons" => vec![get(api("/persons".into()), READS)],
+        "create_person" => vec![post(
+            api("/persons".into()),
+            json!({"name": "Beat Muster", "user_id": t.b_member}),
+            Expect::Refused,
+        )],
+        "get_person" => vec![get(
+            api(format!("/persons/{}", t.b_person)),
+            Expect::NotFound,
+        )],
+        "change_person" => vec![patch(
+            api(format!("/persons/{}", t.b_person)),
+            json!({"name": "Anna Beispiel", "expected_version": 1}),
+            Expect::NotFound,
+        )],
+        "list_institutions" => vec![get(api("/institutions".into()), READS)],
+        "create_institution" => vec![post(
+            api("/institutions".into()),
+            json!({"name": "Testwil Generatoren AG", "kind": "company"}),
+            Expect::Writes,
+        )],
+        "get_institution" => vec![get(
+            api(format!("/institutions/{}", t.b_institution)),
+            Expect::NotFound,
+        )],
+        "change_institution" => vec![patch(
+            api(format!("/institutions/{}", t.b_institution)),
+            json!({"name": "Testwil Generatoren AG", "expected_version": 1}),
             Expect::NotFound,
         )],
         // Documents and downloads.
@@ -736,6 +780,16 @@ impl World {
             .unwrap()
         );
 
+        let b_person = both_in_b
+            .post("/api/v1/persons", &json!({"name": "Beat Musterhausen"}))
+            .await;
+        let b_institution = both_in_b
+            .post(
+                "/api/v1/institutions",
+                &json!({"name": "Musterhausen Bau AG", "kind": "company"}),
+            )
+            .await;
+
         let b_profile = both_in_b
             .get(&format!("/api/v1/events/{}/profile", filled_b.event))
             .await;
@@ -779,6 +833,8 @@ impl World {
             b_invitation: first_id(&both_in_b.get("/api/v1/invitations").await),
             b_link_request: first_id(&both_in_b.get("/api/v1/telegram/link-requests").await),
             b_member: b_member.to_string(),
+            b_person: b_person["id"].as_str().unwrap().to_owned(),
+            b_institution: b_institution["id"].as_str().unwrap().to_owned(),
             ..Targets::default()
         };
         let b_ids = own_ids(&test, b, a).await;

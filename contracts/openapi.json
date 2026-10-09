@@ -2648,6 +2648,486 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/persons": {
+      "get": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Lists the persons of the organization in the order of their numbers.\nThe caller needs an event role in some event, or the organization role owner or admin.",
+        "operationId": "list_persons",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only records whose name contains this text. Case, accents and extra spaces do not matter.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of persons.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Creates a person. The caller needs the contributor or manager role in some event, or the\norganization role owner or admin.",
+        "operationId": "create_person",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePersonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/persons/{person_id}": {
+      "get": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Reads one person.",
+        "operationId": "get_person",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "path",
+            "description": "The ID of the person.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Changes a person. Only an owner or an admin can do it.\nA request with an old `expected_version` gets `record-version-conflict`.",
+        "operationId": "change_person",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "path",
+            "description": "The ID of the person.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePersonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/institutions": {
+      "get": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Lists the institutions of the organization in the order of their numbers.\nThe caller needs an event role in some event, or the organization role owner or admin.",
+        "operationId": "list_institutions",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only records whose name contains this text. Case, accents and extra spaces do not matter.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of institutions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstitutionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Creates an institution. The caller needs the contributor or manager role in some event, or the\norganization role owner or admin.",
+        "operationId": "create_institution",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInstitutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new institution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Institution"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/institutions/{institution_id}": {
+      "get": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Reads one institution.",
+        "operationId": "get_institution",
+        "parameters": [
+          {
+            "name": "institution_id",
+            "in": "path",
+            "description": "The ID of the institution.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The institution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Institution"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Changes an institution. Only an owner or an admin can do it.\nA request with an old `expected_version` gets `record-version-conflict`.",
+        "operationId": "change_institution",
+        "parameters": [
+          {
+            "name": "institution_id",
+            "in": "path",
+            "description": "The ID of the institution.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeInstitutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed institution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Institution"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
@@ -3269,6 +3749,76 @@
         "properties": {
           "event_role": {
             "$ref": "#/components/schemas/EventRole"
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "ChangeInstitutionRequest": {
+        "type": "object",
+        "description": "The input of `ChangeInstitution`. An absent field stays as it is. `null` clears email or phone.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "ChangePersonRequest": {
+        "type": "object",
+        "description": "The input of `ChangePerson`. An absent field stays as it is. `null` clears email or phone.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "expected_version": {
             "type": "integer",
@@ -4416,6 +4966,74 @@
           }
         }
       },
+      "CreateInstitutionRequest": {
+        "type": "object",
+        "description": "The input of `CreateInstitution`.",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "1 to 200 characters.",
+            "example": "Testwil Generatoren AG"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`authority`, `company`, `club` or `other`.",
+            "example": "company"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "1 to 50 characters, as written."
+          }
+        }
+      },
+      "CreatePersonRequest": {
+        "type": "object",
+        "description": "The input of `CreatePerson`.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "1 to 200 characters.",
+            "example": "Beat Muster"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "1 to 50 characters, as written."
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "A member of the caller's organization."
+          }
+        }
+      },
       "CreateTokenRequest": {
         "type": "object",
         "description": "The input of `CreateToken`.",
@@ -5299,6 +5917,73 @@
           "month"
         ]
       },
+      "Institution": {
+        "type": "object",
+        "description": "An institution of the organization.",
+        "required": [
+          "id",
+          "local_id",
+          "name",
+          "kind",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_id": {
+            "type": "string",
+            "description": "The readable ID, for example `INS-001`."
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`authority`, `company`, `club` or `other`."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. A change needs it."
+          }
+        }
+      },
+      "InstitutionPage": {
+        "type": "object",
+        "description": "One page of institutions.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Institution"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page. It is absent on the last page."
+          }
+        }
+      },
       "Invitation": {
         "type": "object",
         "description": "An invitation to the organization.",
@@ -6151,6 +6836,76 @@
             "format": "int32",
             "description": "The page of a PDF, from 1.",
             "minimum": 0
+          }
+        }
+      },
+      "Person": {
+        "type": "object",
+        "description": "A person of the organization.",
+        "required": [
+          "id",
+          "local_id",
+          "name",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_id": {
+            "type": "string",
+            "description": "The readable ID, for example `PER-001`."
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The account of the person, if the person is a member."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. A change needs it."
+          }
+        }
+      },
+      "PersonPage": {
+        "type": "object",
+        "description": "One page of persons.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Person"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page. It is absent on the last page."
           }
         }
       },

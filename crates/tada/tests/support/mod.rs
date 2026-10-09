@@ -92,6 +92,7 @@ pub fn api_state_on(
         sources: database.clone(),
         tokens: database.clone(),
         privacy: database.clone(),
+        parties: database.clone(),
     }
 }
 
