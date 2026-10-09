@@ -357,6 +357,7 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
                 READS,
             ),
         ],
+        "my_work" => vec![get(api("/me/work".to_owned()), READS)],
         "create_action" => vec![
             post(
                 api(format!("/events/{}/actions", t.b_event)),

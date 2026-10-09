@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use jiff::Timestamp;
 use jiff::civil::Date;
 use tada_domain::RecordVersion;
+use tada_domain::events::EventKey;
 use tada_domain::ids::{
     self, ActionId, CommitmentId, EventId, LocalIdKind, ProposalId, SourceVersionId, UserId,
     WorkstreamId,
@@ -163,13 +164,30 @@ pub struct WorkFilter<S> {
     pub limit: u32,
 }
 
-/// The open actions and commitments that a member owns, in all events of the organization.
+/// A work record with the key of its event: the full reference is the key and the readable ID,
+/// for example `FLY28/ACT-042` (ADR 0038).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InEvent<T> {
+    pub event_key: EventKey,
+    pub record: T,
+}
+
+/// The open actions and commitments that a member owns in the events where the member has a role.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MyWork {
-    /// The actions with the status `open`, `in-progress` or `blocked`, by due date.
-    pub actions: Vec<ActionView>,
-    /// The commitments with the status `conditional` or `firm`, by due date.
-    pub commitments: Vec<CommitmentView>,
+    /// The actions with the status `open`, `in-progress` or `blocked`.
+    /// Due date first, a record without a due date last, then event key and number.
+    pub actions: Vec<InEvent<ActionView>>,
+    /// The commitments with the status `conditional` or `firm`, in the same order.
+    pub commitments: Vec<InEvent<CommitmentView>>,
+}
+
+/// What "My Work" shows (spec 2a, section 4).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct MyWorkView {
+    pub work: MyWork,
+    /// The proposals that the caller reviews. Zero until the review routing feeds it.
+    pub review_count: u32,
 }
 
 /// The repository port for actions and commitments. Each method stays inside `scope`.
@@ -248,8 +266,15 @@ pub trait WorkStore: Debug + Send + Sync {
         filter: &WorkFilter<CommitmentStatus>,
     ) -> Result<Vec<CommitmentView>, StoreError>;
 
-    /// The open records that `user` owns, in each event of the organization.
-    async fn my_open_work(&self, scope: OrgScope, user: UserId) -> Result<MyWork, StoreError>;
+    /// The open records that `user` owns, in the events that `user` can read now: the events with
+    /// an event role of the user, or all events of the organization if `all_events` is set
+    /// (owners and admins, ADR 0052). A record of an event that the user left does not count.
+    async fn my_open_work(
+        &self,
+        scope: OrgScope,
+        user: UserId,
+        all_events: bool,
+    ) -> Result<MyWork, StoreError>;
 }
 
 /// The ports that the work commands need.
@@ -766,6 +791,18 @@ pub async fn list_actions(
     access::event_access(caller, event, identity).await?;
     let items = work.actions(caller.scope(), event, &query.filter()).await?;
     Ok(page(items, query.limit, |action| action.local_number))
+}
+
+/// The open records of the caller in the events where the caller has a role (spec 2a, section 4).
+pub async fn my_work(caller: &MemberCaller, work: &dyn WorkStore) -> Result<MyWorkView, WorkError> {
+    let all_events = access::sees_all_events(caller);
+    let work = work
+        .my_open_work(caller.scope(), caller.user_id(), all_events)
+        .await?;
+    Ok(MyWorkView {
+        work,
+        review_count: 0,
+    })
 }
 
 /// Creates a commitment. A contributor or a manager of the event can do it.

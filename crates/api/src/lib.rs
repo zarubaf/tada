@@ -1254,6 +1254,7 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: tada_app::domain::ids::UserId,
+            _: bool,
         ) -> Result<tada_app::work::MyWork, tada_app::store::StoreError> {
             unreachable!()
         }

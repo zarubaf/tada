@@ -491,3 +491,127 @@ async fn a_workstream_of_another_event_or_organization_is_unknown() {
         assert_eq!(page["items"][0]["workstream_id"], Value::Null);
     }
 }
+
+#[tokio::test]
+async fn my_work_lists_only_my_open_records_by_due_date() {
+    let api = Api::start().await;
+    let e = api.event().await;
+    let actions = format!("/api/v1/events/{}/actions", e.id);
+    let ben = e.ben.as_uuid();
+    for (title, due) in [
+        ("Spät", json!("2030-06-09")),
+        ("Ohne Datum", Value::Null),
+        ("Früh", json!("2030-06-01")),
+    ] {
+        api.created(
+            &e.ben_cookie,
+            &actions,
+            &json!({"title": title, "owner_user_id": ben, "due_date": due}),
+        )
+        .await;
+    }
+    let done = api
+        .created(
+            &e.ben_cookie,
+            &actions,
+            &json!({"title": "Erledigt", "owner_user_id": ben}),
+        )
+        .await;
+    let (status, _) = api
+        .patch(
+            &e.ben_cookie,
+            &record(&e, "actions", &done),
+            &json!({"status": "done", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    api.created(
+        &e.owner,
+        &actions,
+        &json!({"title": "Vom Chef", "owner_user_id": ben}),
+    )
+    .await;
+    let supplier = api.institution(&e.owner, "Testwil Generatoren AG").await;
+    api.created(
+        &e.ben_cookie,
+        &format!("/api/v1/events/{}/commitments", e.id),
+        &json!({
+            "text": "Generator delivery Friday 15:00",
+            "condition": "subject to signed order",
+            "promisor": {"kind": "institution", "id": supplier},
+            "owner_user_id": ben,
+        }),
+    )
+    .await;
+
+    let (status, work) = api.get(&e.ben_cookie, "/api/v1/me/work").await;
+    assert_eq!(status, StatusCode::OK, "{work}");
+    let titles: Vec<_> = work["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(titles, ["Früh", "Spät", "Ohne Datum", "Vom Chef"]);
+    assert_eq!(work["actions"][0]["event_key"], "TEST30");
+    assert_eq!(work["actions"][0]["local_id"], "ACT-003");
+    assert_eq!(work["commitments"].as_array().unwrap().len(), 1);
+    assert_eq!(work["commitments"][0]["event_key"], "TEST30");
+    assert_eq!(work["commitments"][0]["local_id"], "COM-001");
+    assert_eq!(work["review_count"], 0);
+
+    let (status, work) = api.get(&e.viewer, "/api/v1/me/work").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(work["actions"], json!([]));
+    assert_eq!(work["commitments"], json!([]));
+}
+
+#[tokio::test]
+async fn my_work_drops_events_where_i_lost_my_role() {
+    let api = Api::start().await;
+    let e = api.event().await;
+    api.created(
+        &e.owner,
+        &format!("/api/v1/events/{}/actions", e.id),
+        &json!({"title": "Generator bestellen", "owner_user_id": e.ben.as_uuid()}),
+    )
+    .await;
+    let (_, before) = api.get(&e.ben_cookie, "/api/v1/me/work").await;
+    assert_eq!(before["actions"].as_array().unwrap().len(), 1);
+
+    let (status, _) = api
+        .post(
+            &e.owner,
+            &format!(
+                "/api/v1/events/{}/memberships/{}/remove",
+                e.id,
+                e.ben.as_uuid()
+            ),
+            &json!({"expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let (status, after) = api.get(&e.ben_cookie, "/api/v1/me/work").await;
+    assert_eq!(status, StatusCode::OK, "{after}");
+    assert_eq!(after["actions"], json!([]));
+    assert_eq!(after["commitments"], json!([]));
+}
+
+#[tokio::test]
+async fn my_work_includes_events_without_membership_for_an_admin() {
+    let api = Api::start().await;
+    let e = api.event().await;
+    let (_, admin, admin_cookie) = api.test.member("testwil", OrganizationRole::Admin).await;
+    api.created(
+        &admin_cookie,
+        &format!("/api/v1/events/{}/actions", e.id),
+        &json!({"title": "Generator bestellen", "owner_user_id": admin.as_uuid()}),
+    )
+    .await;
+
+    let (status, work) = api.get(&admin_cookie, "/api/v1/me/work").await;
+    assert_eq!(status, StatusCode::OK, "{work}");
+    assert_eq!(work["actions"].as_array().unwrap().len(), 1);
+    assert_eq!(work["actions"][0]["event_key"], "TEST30");
+}

@@ -1,4 +1,4 @@
-//! `/api/v1/events/{event_id}/actions` and `/api/v1/events/{event_id}/commitments` (ADR 0068).
+//! `/api/v1/events/{event_id}/actions`, `/api/v1/events/{event_id}/commitments` and `/api/v1/me/work` (ADR 0068).
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -14,8 +14,8 @@ use tada_app::domain::work::{
 };
 use tada_app::problem::ProblemCode;
 use tada_app::work::{
-    self as app, ActionChange, ActionView, CommitmentChange, CommitmentView, FirmInput, NewAction,
-    NewCommitment, RecordEvidenceView, WorkCursor, WorkError, WorkPorts, WorkQuery,
+    self as app, ActionChange, ActionView, CommitmentChange, CommitmentView, FirmInput, InEvent,
+    NewAction, NewCommitment, RecordEvidenceView, WorkCursor, WorkError, WorkPorts, WorkQuery,
 };
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -35,6 +35,7 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
         .routes(routes!(list_commitments, create_commitment))
         .routes(routes!(get_commitment, change_commitment))
         .routes(routes!(make_commitment_firm))
+        .routes(routes!(my_work))
 }
 
 /// The problem codes of each operation (ADR 0037).
@@ -52,6 +53,7 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         ("get_commitment", read()),
         ("change_commitment", write()),
         ("make_commitment_firm", write()),
+        ("my_work", codes(&[AUTHENTICATED, WorkError::READ_CODES])),
     ]
 }
 
@@ -792,4 +794,74 @@ async fn make_commitment_firm(
     )
     .await?;
     Ok(axum::Json(commitment.into()))
+}
+
+/// An action in "My Work", with the key of its event.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MyAction {
+    /// The key of the event: with `local_id` it forms the full reference, for example `FLY28/ACT-042`.
+    pub event_key: String,
+    #[serde(flatten)]
+    pub action: Action,
+}
+
+/// A commitment in "My Work", with the key of its event.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MyCommitment {
+    /// The key of the event: with `local_id` it forms the full reference, for example `FLY28/COM-003`.
+    pub event_key: String,
+    #[serde(flatten)]
+    pub commitment: Commitment,
+}
+
+/// The open work of the caller.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MyWork {
+    /// The actions with the status `open`, `in-progress` or `blocked`.
+    /// Due date first, a record without a due date last, then event key and readable ID.
+    pub actions: Vec<MyAction>,
+    /// The commitments with the status `conditional` or `firm`, in the same order.
+    pub commitments: Vec<MyCommitment>,
+    /// The number of proposals that the caller reviews.
+    pub review_count: u32,
+}
+
+/// Lists the open actions and commitments that the caller owns.
+/// It leaves out the events where the caller has no event role.
+#[utoipa::path(
+    get,
+    path = "/me/work",
+    operation_id = "my_work",
+    tag = "work",
+    responses(
+        (status = OK, description = "The open work of the caller.", body = MyWork),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn my_work(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+) -> Result<axum::Json<MyWork>, ApiError> {
+    let view = app::my_work(&caller, state.work.as_ref()).await?;
+    Ok(axum::Json(MyWork {
+        actions: view
+            .work
+            .actions
+            .into_iter()
+            .map(|InEvent { event_key, record }| MyAction {
+                event_key: event_key.as_str().to_owned(),
+                action: record.into(),
+            })
+            .collect(),
+        commitments: view
+            .work
+            .commitments
+            .into_iter()
+            .map(|InEvent { event_key, record }| MyCommitment {
+                event_key: event_key.as_str().to_owned(),
+                commitment: record.into(),
+            })
+            .collect(),
+        review_count: view.review_count,
+    }))
 }
