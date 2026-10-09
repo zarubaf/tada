@@ -1290,6 +1290,37 @@ mod routing {
         assert_eq!(commitments["items"], json!([]));
     }
 
+    /// A dependency that the dependent does not need passes no reviewers on (ADR 0067, rule 5):
+    /// the owner of an action cannot apply a fact through a change of the action that names the fact.
+    #[tokio::test]
+    async fn an_unneeded_dependency_keeps_its_own_reviewers() {
+        let r = Routed::start().await;
+        let action = r.action(&r.author).await;
+        let venue = r.api.field(&r.manager.cookie, &r.event, "venue").await;
+        let fact = venue_body(&r.event, &venue, "Flugfeld")["proposals"][0].clone();
+        let mut change = r.action_status(&action);
+        change["depends_on"] = json!([fact["id"]]);
+        let changeset = r.propose(vec![fact.clone(), change.clone()]).await;
+
+        let (_, review) = r.detail(&r.author, &changeset).await;
+        assert_eq!(proposal_of(&review, &fact["id"])["routed_to_me"], false);
+        let (status, problem) = r.apply(&r.author, &changeset, &[&change]).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["code"], "forbidden");
+        let (_, profile) = r
+            .api
+            .get(
+                &r.manager.cookie,
+                &format!("/api/v1/events/{}/profile", r.event),
+            )
+            .await;
+        assert_eq!(profile["facts"], json!([]));
+        // The fact goes to the managers at once.
+        assert_eq!(r.inbox(&r.manager).await, [changeset.as_str()]);
+        let (_, review) = r.detail(&r.manager, &changeset).await;
+        assert_eq!(proposal_of(&review, &fact["id"])["routed_to_me"], true);
+    }
+
     #[tokio::test]
     async fn the_lead_sees_the_changeset_and_a_contributor_does_not() {
         let r = Routed::start().await;

@@ -9,7 +9,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use tada_domain::ids::{ActionId, CommitmentId, EventId, ProposalId, UserId, WorkstreamId};
-use tada_domain::proposals::Operation;
+use tada_domain::proposals::{NewRecord, Operation};
 
 use super::selection::closure;
 use crate::access::EventAccess;
@@ -80,8 +80,8 @@ pub fn reviewers(
     user.map_or(Reviewers::EventManagers, Reviewers::user)
 }
 
-/// True if the proposal goes to the caller: the caller is a member reviewer of the proposal or of a proposal that
-/// depends on it (rule 5), or the caller is an event manager and the proposal goes to no member.
+/// True if the proposal goes to the caller: the caller is a member reviewer of the proposal or of an open proposal
+/// that refers to the record that it creates (rule 5), or the caller is an event manager and the proposal goes to no member.
 /// A member reviewer must still have the contributor or manager role (rule 8).
 pub fn routed_to(
     caller: UserId,
@@ -119,21 +119,37 @@ pub fn in_inbox_of(
     routed_to(caller, access, own, dependents) || (access.can_review() && overdue)
 }
 
+/// True if `dependent` refers to the record that `dependency` creates (rule 5): in 2a, a new commitment whose
+/// promisor is a new person or a new institution of the changeset.
+/// Only then the reviewers of the dependent decide on the dependency too.
+/// Any other dependency keeps its own reviewers, so a `depends_on` entry cannot move a proposal to another reviewer.
+fn refers_to_new_record(dependent: &Operation, dependency: &Operation) -> bool {
+    let new_party = match dependency.new_record() {
+        Some(NewRecord::Person(id)) => id.as_uuid(),
+        Some(NewRecord::Institution(id)) => id.as_uuid(),
+        _ => return false,
+    };
+    dependent
+        .promisor()
+        .is_some_and(|promisor| promisor.as_uuid() == new_party)
+}
+
 /// One proposal of a changeset as the routing sees it.
 #[derive(Debug, Clone, Copy)]
 pub struct RoutedProposal<'a> {
     pub id: ProposalId,
     pub operation: &'a Operation,
     pub depends_on: &'a [ProposalId],
-    /// Only an open proposal can still be selected, so only an open proposal gives its reviewers to its dependencies.
+    /// Only an open proposal can still be selected, so only an open proposal gives its reviewers to the proposal of
+    /// the record that it refers to.
     pub open: bool,
 }
 
-/// The reviewers of each proposal of one changeset, and the open proposals that depend on each (rule 5).
+/// The reviewers of each proposal of one changeset, and the open proposals that refer to the record of each (rule 5).
 #[derive(Debug, Clone)]
 pub struct ChangesetRoutes {
     own: HashMap<ProposalId, Reviewers>,
-    /// The open proposals that depend on each proposal, directly or through other open proposals.
+    /// The open proposals that refer to the new record of each proposal, directly or through other open proposals.
     dependents: HashMap<ProposalId, Vec<ProposalId>>,
 }
 
@@ -148,9 +164,18 @@ impl ChangesetRoutes {
             .iter()
             .map(|proposal| (proposal.id, reviewers(proposal.operation, event, lookup)))
             .collect();
+        let operations: HashMap<ProposalId, &Operation> = proposals
+            .iter()
+            .map(|proposal| (proposal.id, proposal.operation))
+            .collect();
         let mut direct: HashMap<ProposalId, Vec<ProposalId>> = HashMap::new();
         for proposal in proposals.iter().filter(|proposal| proposal.open) {
-            for dependency in proposal.depends_on {
+            let needed = proposal.depends_on.iter().filter(|dependency| {
+                operations
+                    .get(dependency)
+                    .is_some_and(|operation| refers_to_new_record(proposal.operation, operation))
+            });
+            for dependency in needed {
                 direct.entry(*dependency).or_default().push(proposal.id);
             }
         }
@@ -170,7 +195,8 @@ impl ChangesetRoutes {
         Self { own, dependents }
     }
 
-    /// The reviewers of the proposal and of its open dependents. A proposal of another changeset has none.
+    /// The reviewers of the proposal and of the open proposals that refer to its new record.
+    /// A proposal of another changeset has none.
     fn of(&self, id: ProposalId) -> Option<(&Reviewers, Vec<&Reviewers>)> {
         let own = self.own.get(&id)?;
         let dependents = self
@@ -490,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn a_dependency_goes_to_the_reviewers_of_its_open_dependents() {
+    fn a_new_promisor_goes_to_the_reviewers_of_its_open_commitments() {
         let person = PersonId::from_uuid(Uuid::from_u128(60));
         let supplier = new_person(person);
         let promise = new_commitment(person, Some(workstream()));
@@ -540,5 +566,36 @@ mod tests {
         assert!(!closed.may_review(lead.0, lead.1, s));
         assert!(closed.in_inbox_of(user(MANAGER), EventAccess::Manager, s, false));
         assert!(!closed.may_review(lead.0, lead.1, proposal_id(9)));
+    }
+
+    #[test]
+    fn a_dependency_that_the_dependent_does_not_refer_to_keeps_its_own_reviewers() {
+        let deprecation = deprecation();
+        let change = change_action();
+        let (d, c) = (proposal_id(1), proposal_id(2));
+        let depends_on_deprecation = [d];
+        let routes = ChangesetRoutes::new(
+            [
+                RoutedProposal {
+                    id: d,
+                    operation: &deprecation,
+                    depends_on: &[],
+                    open: true,
+                },
+                RoutedProposal {
+                    id: c,
+                    operation: &change,
+                    depends_on: &depends_on_deprecation,
+                    open: true,
+                },
+            ],
+            Some(event()),
+            &facts(),
+        );
+        let owner = (user(OWNER), EventAccess::Contributor);
+        assert!(routes.may_review(owner.0, owner.1, c));
+        assert!(!routes.may_review(owner.0, owner.1, d));
+        assert!(!routes.routed_to(owner.0, owner.1, d));
+        assert!(routes.in_inbox_of(user(MANAGER), EventAccess::Manager, d, false));
     }
 }
