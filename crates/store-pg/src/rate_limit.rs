@@ -84,8 +84,8 @@ impl PgRateLimiter {
 }
 
 impl Database {
-    /// Deletes the counters of the windows that ended, as each sign-in request does. The worker calls it on
-    /// each loop, so a counter stays at most two windows also without a later sign-in (ADR 0065).
+    /// Deletes the counters of the windows that ended, as each sign-in request does. The worker calls it
+    /// once in each window, so a counter stays at most two windows also without a later sign-in (ADR 0065).
     /// Returns the number of deleted counters.
     pub async fn delete_ended_rate_limit_counters(
         &self,

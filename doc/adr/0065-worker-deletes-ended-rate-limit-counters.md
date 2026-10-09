@@ -16,13 +16,13 @@ The promise of two hours is then false.
 
 ## Decision
 
-- Each loop of the worker also deletes the counters whose window ended more than one window ago.
-  The worker loop starts every two seconds.
+- The first loop of the worker in each rate-limit window deletes the counters whose window ended more than one window ago.
+  The set of counters that the cleanup can delete changes only when a new window starts.
 - The worker uses the same cleanup as a sign-in request.
   It keeps the previous window and skips locked rows, as ADR 0056 requires.
 - Each sign-in request continues to delete ended counters.
 - A failed cleanup writes a warning to the log.
-  The next loop tries again.
+  The worker records only a successful cleanup, so the next loop tries again.
 
 The rest of ADR 0056 does not change.
 
@@ -30,7 +30,7 @@ The rest of ADR 0056 does not change.
 
 - No counter stays longer than two hours while a worker runs.
 - The data inventory and the privacy notice template state the true retention.
-- The worker runs one more small `DELETE` on each loop.
+- The worker runs one more small `DELETE` in each window.
 - If no worker runs, the cleanup again depends on the next sign-in request.
 
 ## Alternatives
