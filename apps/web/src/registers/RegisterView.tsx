@@ -4,8 +4,7 @@ import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
 import { InlineError } from "../ui/InlineError";
-import { Skeleton } from "../ui/Skeleton";
-import styles from "./RegisterView.module.css";
+import { SkeletonLines } from "../ui/Skeleton";
 import type { Register } from "./useRegister";
 import type { RegisterPaging } from "./useRegisterPage";
 
@@ -34,13 +33,7 @@ export function RegisterView<T extends { id: string }>({
   const [loadingMore, setLoadingMore] = useState(false);
 
   if (state.kind === "loading") {
-    return (
-      <div className={styles.skeleton} role="status" aria-label={loadingLabel}>
-        <Skeleton />
-        <Skeleton />
-        <Skeleton />
-      </div>
-    );
+    return <SkeletonLines label={loadingLabel} />;
   }
   if (state.kind === "failed") {
     return (

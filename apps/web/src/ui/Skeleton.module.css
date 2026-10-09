@@ -6,4 +6,9 @@
     border-radius: var(--radius-sm);
     background: var(--color-bg-hover);
   }
+
+  .lines {
+    display: grid;
+    gap: var(--space-2);
+  }
 }
