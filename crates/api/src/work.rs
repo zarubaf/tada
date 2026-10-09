@@ -266,11 +266,14 @@ pub struct Commitment {
     /// The statuses that the caller can set with a change now. Empty without `can_change`.
     /// It never holds `firm`: only "make firm" sets it.
     pub next_statuses: Vec<CommitmentStatus>,
+    /// True if the caller can make the commitment firm now: `can_change` and the status `conditional`.
+    pub can_make_firm: bool,
 }
 
 impl From<Shown<CommitmentView>> for Commitment {
     fn from(shown: Shown<CommitmentView>) -> Self {
         let next_statuses = shown.next_statuses().into_iter().map(Into::into).collect();
+        let can_make_firm = shown.can_make_firm();
         let Shown {
             record: commitment,
             evidence,
@@ -303,6 +306,7 @@ impl From<Shown<CommitmentView>> for Commitment {
             evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
             can_change,
             next_statuses,
+            can_make_firm,
         }
     }
 }

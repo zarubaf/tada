@@ -126,6 +126,17 @@ impl Shown<CommitmentView> {
             Vec::new()
         }
     }
+    /// True if the caller can make the commitment firm now (ADR 0068): the right to change it, and a status that can
+    /// change to `firm`, that is `conditional`.
+    pub fn can_make_firm(&self) -> bool {
+        self.can_change
+            && self
+                .record
+                .fields
+                .status
+                .change_to(CommitmentStatus::Firm)
+                .is_ok()
+    }
 }
 
 /// A new action, checked, before the store gives it its number.

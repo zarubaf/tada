@@ -777,6 +777,19 @@ async fn the_view_tells_the_reader_its_right_and_the_next_statuses() {
     .unwrap();
     assert!(!by_viewer.can_change);
     assert!(by_viewer.next_statuses().is_empty());
+    // Only a conditional commitment can become firm, and only for a caller who can change it.
+    assert!(commitment.can_make_firm());
+    assert!(!by_viewer.can_make_firm());
+    let firm = create_commitment(
+        &caller(OWNER),
+        open_day(),
+        new_commitment(None),
+        memory.ports(),
+    )
+    .await
+    .unwrap();
+    assert!(firm.can_change);
+    assert!(!firm.can_make_firm());
 }
 
 #[test]

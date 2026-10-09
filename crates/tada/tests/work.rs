@@ -250,6 +250,7 @@ async fn a_conditional_commitment_becomes_firm_only_with_a_reason() {
     assert_eq!(commitment["promisor"]["name"], "Testwil Generatoren AG");
     assert_eq!(commitment["firm_reason"], Value::Null);
     assert_eq!(commitment["evidence"], json!([]));
+    assert_eq!(commitment["can_make_firm"], true);
     let path = record(&e, "commitments", &commitment);
 
     let (status, problem) = api
