@@ -59,13 +59,13 @@ Passkeys come later with `webauthn-rs`.
 Assurance:
 
 - Tests cover the applicable requirements of OWASP ASVS 5.0, chapters on authentication and session management.
-- Before the first real event data goes live, an AI security review of the authentication code closes all its findings (ADR 0070).
+- Before the first real event data goes live, a person outside the core team reviews the authentication code.
 
 ## Consequences
 
 - One authority for memberships and roles.
 - We own about as much code for sessions as for magic links. It uses only maintained primitives.
-- The security review of ADR 0070 replaces the external reviewer.
+- We must find the external reviewer before go-live.
 
 ## Alternatives
 

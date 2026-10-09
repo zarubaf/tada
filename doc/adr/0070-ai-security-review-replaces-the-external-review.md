@@ -239,6 +239,7 @@ ADR 0039:
 
 ADR 0065:
 
+- ADR 0065 is still Proposed. This amends its proposed text, and the owner's acceptance of ADR 0065 includes this amendment.
 - This replaces the meaning of "rate-limit window" in ADR 0065 with the hour of the client limit.
   The cleanup deletes all counters whose window started before the previous hour, also the counters of the 10-minute mail cooldown.
   The retention of two hours stays.
@@ -259,6 +260,7 @@ The team accepts these risks for now.
 - `end_sessions` does not take the user lock.
   A redemption of a magic link that runs at the same time can keep its new session, or one of the two requests can fail with a database error.
   The removal has the same pattern.
+- An invitation that a removed admin sends at the same moment as the removal can commit after the revocation of the pending invitations.
 - The check of the admin role runs outside the lock of that transaction.
   An admin can end the sessions of a member that an owner promotes at the same moment.
   The effect is a sign-out only.
