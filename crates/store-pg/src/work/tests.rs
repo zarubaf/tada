@@ -5,6 +5,8 @@ use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::domain::parties::InstitutionKind;
 use tada_app::parties::{InstitutionFields, PartyStore};
 
+use tada_app::access::EventReach;
+
 use super::*;
 use crate::testing::TestDatabase;
 
@@ -303,7 +305,7 @@ async fn keeps_work_records_inside_their_event_and_organization() {
         Changed::NotFound
     );
     assert!(
-        db.my_open_work(stranger, f.owner, false)
+        db.my_open_work(stranger, f.owner, &EventReach::Organization)
             .await
             .unwrap()
             .actions
@@ -498,7 +500,7 @@ async fn my_open_work_orders_by_due_date_and_leaves_out_closed_records() {
     let work = f
         .test
         .database
-        .my_open_work(f.scope, f.owner, false)
+        .my_open_work(f.scope, f.owner, &EventReach::Events(vec![f.event]))
         .await
         .unwrap();
     let ids: Vec<_> = work.actions.iter().map(|a| a.record.id).collect();
@@ -507,20 +509,22 @@ async fn my_open_work_orders_by_due_date_and_leaves_out_closed_records() {
     assert_eq!(commitments, [&commitment]);
 }
 
+/// The store reads the events that the app gives (`access::readable_events`); it decides no access itself.
 #[tokio::test]
-async fn my_open_work_reads_all_events_for_a_member_who_acts_as_manager_everywhere() {
+async fn my_open_work_reads_only_the_given_events() {
     let f = Fixture::start().await;
-    f.action("Ohne Rolle", None).await;
-    sqlx::query("DELETE FROM event_membership WHERE user_id = $1")
-        .bind(f.owner.as_uuid())
-        .execute(&f.test.database.pool)
-        .await
-        .unwrap();
+    f.action("Im Anlass", None).await;
     let db = &f.test.database;
 
-    let by_role = db.my_open_work(f.scope, f.owner, false).await.unwrap();
-    assert!(by_role.actions.is_empty());
-    let everywhere = db.my_open_work(f.scope, f.owner, true).await.unwrap();
+    let none = db
+        .my_open_work(f.scope, f.owner, &EventReach::Events(Vec::new()))
+        .await
+        .unwrap();
+    assert!(none.actions.is_empty());
+    let everywhere = db
+        .my_open_work(f.scope, f.owner, &EventReach::Organization)
+        .await
+        .unwrap();
     assert_eq!(everywhere.actions.len(), 1);
     assert_eq!(everywhere.actions[0].event_key.as_str(), "TEST30");
 }

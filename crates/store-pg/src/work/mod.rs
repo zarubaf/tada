@@ -7,6 +7,7 @@ use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
+use tada_app::access::EventReach;
 use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
@@ -192,6 +193,8 @@ struct Select {
     after: i64,
     /// Only the records that are still open: for "my work".
     open_only: bool,
+    /// Only the records of these events. `None` reads each event of the organization.
+    events: Option<Vec<Uuid>>,
     limit: Option<i64>,
 }
 
@@ -216,10 +219,11 @@ impl Select {
         }
     }
 
-    fn open_of(user: UserId) -> Self {
+    fn open_of(user: UserId, events: Option<Vec<Uuid>>) -> Self {
         Self {
             owner: Some(user.as_uuid()),
             open_only: true,
+            events,
             ..Self::default()
         }
     }
@@ -252,6 +256,7 @@ async fn select_actions(
              AND ($6::uuid IS NULL OR workstream_id = $6)
              AND local_number > $7
              AND (NOT $8 OR status IN ('open', 'in-progress', 'blocked'))
+             AND ($10::uuid[] IS NULL OR event_id = ANY($10))
            ORDER BY event_id, local_number
            LIMIT $9"#,
         scope.organization_id().as_uuid(),
@@ -263,6 +268,7 @@ async fn select_actions(
         select.after,
         select.open_only,
         select.limit,
+        select.events.as_deref(),
     )
     .fetch_all(&mut *conn)
     .await?;
@@ -298,6 +304,7 @@ async fn select_commitments(
              AND ($6::uuid IS NULL OR c.workstream_id = $6)
              AND c.local_number > $7
              AND (NOT $8 OR c.status IN ('conditional', 'firm'))
+             AND ($10::uuid[] IS NULL OR c.event_id = ANY($10))
            ORDER BY c.event_id, c.local_number
            LIMIT $9"#,
         organization,
@@ -309,6 +316,7 @@ async fn select_commitments(
         select.after,
         select.open_only,
         select.limit,
+        select.events.as_deref(),
     )
     .fetch_all(&mut *conn)
     .await?;
@@ -524,24 +532,17 @@ pub(crate) async fn update_commitment(
     .await
 }
 
-/// The keys of the events that `user` can read now: the events with an event role of the user,
-/// or all events of the organization if `all_events` is set.
+/// The keys of the events in `events`, or of each event of the organization for `None`.
 async fn event_keys_of(
     conn: &mut PgConnection,
     scope: OrgScope,
-    user: UserId,
-    all_events: bool,
+    events: Option<&[Uuid]>,
 ) -> Result<HashMap<Uuid, EventKey>, StoreError> {
     let rows = sqlx::query!(
-        "SELECT e.id, e.key
-         FROM event e
-         WHERE e.organization_id = $1
-           AND ($3 OR EXISTS (SELECT 1 FROM event_membership m
-                              WHERE m.organization_id = e.organization_id
-                                AND m.event_id = e.id AND m.user_id = $2))",
+        "SELECT id, key FROM event
+         WHERE organization_id = $1 AND ($2::uuid[] IS NULL OR id = ANY($2))",
         scope.organization_id().as_uuid(),
-        user.as_uuid(),
-        all_events,
+        events,
     )
     .fetch_all(&mut *conn)
     .await
@@ -554,8 +555,8 @@ async fn event_keys_of(
         .collect()
 }
 
-/// Keeps the records of the events in `keys` and sorts them: due date first, none last,
-/// then event key and number.
+/// Adds the event key to each record and sorts them: due date first, none last, then event key and number.
+/// The select read only the records of the events in `keys`.
 fn in_events<T>(
     items: Vec<T>,
     keys: &HashMap<Uuid, EventKey>,
@@ -736,14 +737,19 @@ impl WorkStore for Database {
         &self,
         scope: OrgScope,
         user: UserId,
-        all_events: bool,
+        events: &EventReach,
     ) -> Result<MyWork, StoreError> {
+        let events = match events {
+            EventReach::Organization => None,
+            EventReach::Events(events) => Some(events.iter().map(|id| id.as_uuid()).collect()),
+        };
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        let keys = event_keys_of(&mut conn, scope, user, all_events).await?;
-        let actions = select_actions(&mut conn, scope, &Select::open_of(user))
+        let keys = event_keys_of(&mut conn, scope, events.as_deref()).await?;
+        let select = Select::open_of(user, events);
+        let actions = select_actions(&mut conn, scope, &select)
             .await
             .map_err(store_error)?;
-        let commitments = select_commitments(&mut conn, scope, &Select::open_of(user))
+        let commitments = select_commitments(&mut conn, scope, &select)
             .await
             .map_err(store_error)?;
         Ok(MyWork {

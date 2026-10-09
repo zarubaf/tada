@@ -192,14 +192,38 @@ pub async fn reads_in_some_event(
     caller: &impl Principal,
     identity: &dyn IdentityStore,
 ) -> Result<bool, StoreError> {
+    Ok(match readable_events(caller, identity).await? {
+        EventReach::Organization => true,
+        EventReach::Events(events) => !events.is_empty(),
+    })
+}
+
+/// The events that a caller can read (ADR 0052). A read across events, such as My Work, uses this one rule.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EventReach {
+    /// Each event of the organization: the reach of owners and admins.
+    Organization,
+    /// These events: the events in which the member has an event role.
+    Events(Vec<EventId>),
+}
+
+/// The events that `caller` can read now: owners and admins read each event of their organization,
+/// and other members read the events in which they have an event role.
+pub async fn readable_events(
+    caller: &impl Principal,
+    identity: &dyn IdentityStore,
+) -> Result<EventReach, StoreError> {
     if sees_all_events(caller) {
-        return Ok(true);
+        return Ok(EventReach::Organization);
     }
-    Ok(identity
+    let events = identity
         .event_roles_of(caller.scope(), caller.user_id())
         .await?
         .into_iter()
-        .any(|(_, role)| EventAccess::from(role).can_read()))
+        .filter(|(_, role)| EventAccess::from(*role).can_read())
+        .map(|(event, _)| event)
+        .collect();
+    Ok(EventReach::Events(events))
 }
 
 /// The source versions that a caller can read (ADR 0050, ADR 0052). Search and citations use this one rule.
@@ -219,18 +243,10 @@ pub async fn source_reach(
     caller: &impl Principal,
     identity: &dyn IdentityStore,
 ) -> Result<SourceReach, StoreError> {
-    if sees_all_events(caller) {
-        return Ok(SourceReach::Organization);
-    }
-    // Each event role can read (`EventAccess::can_read`).
-    let events = identity
-        .event_roles_of(caller.scope(), caller.user_id())
-        .await?
-        .into_iter()
-        .filter(|(_, role)| EventAccess::from(*role).can_read())
-        .map(|(event, _)| event)
-        .collect();
-    Ok(SourceReach::Events(events))
+    Ok(match readable_events(caller, identity).await? {
+        EventReach::Organization => SourceReach::Organization,
+        EventReach::Events(events) => SourceReach::Events(events),
+    })
 }
 
 /// The source versions of the event `event` that `caller` can read, for a search in one event.

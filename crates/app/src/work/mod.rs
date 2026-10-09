@@ -29,7 +29,7 @@ pub use self::commitments::{
     CommitmentChange, FirmInput, NewCommitment, change_commitment, create_commitment,
     get_commitment, list_commitments, make_commitment_firm,
 };
-use crate::access::{AccessError, EventAccess};
+use crate::access::{AccessError, EventAccess, EventReach};
 use crate::audit::AuditEvent;
 use crate::caller::OrgScope;
 use crate::clock::Clock;
@@ -254,14 +254,12 @@ pub trait WorkStore: Debug + Send + Sync {
         filter: &WorkFilter<CommitmentStatus>,
     ) -> Result<Vec<CommitmentView>, StoreError>;
 
-    /// The open records that `user` owns, in the events that `user` can read now: the events with
-    /// an event role of the user, or all events of the organization if `all_events` is set
-    /// (owners and admins, ADR 0052). A record of an event that the user left does not count.
+    /// The open records that `user` owns in the events of `events` (`access::readable_events`).
     async fn my_open_work(
         &self,
         scope: OrgScope,
         user: UserId,
-        all_events: bool,
+        events: &EventReach,
     ) -> Result<MyWork, StoreError>;
 }
 
