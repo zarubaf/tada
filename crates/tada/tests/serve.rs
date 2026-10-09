@@ -34,6 +34,40 @@ fn serve_without_the_rate_limit_key_stops_with_exit_code_2() {
     assert!(errors.contains("TADA_RATE_LIMIT_KEY_FILE"), "{errors}");
 }
 
+/// A short key lets a person with a copy of the counters find the key, and then each IPv4 address,
+/// by brute force.
+#[test]
+fn serve_with_a_short_rate_limit_key_stops_with_exit_code_2() {
+    let mut secret = NamedTempFile::new().unwrap();
+    secret.write_all(b"development only").unwrap();
+    let secret = secret.path().to_str().unwrap();
+    let mut short = NamedTempFile::new().unwrap();
+    short.write_all(&[b'k'; 31]).unwrap();
+    let short = short.path().to_str().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_tada"))
+        .arg("serve")
+        .env_clear()
+        .envs([
+            ("TADA_DATABASE_URL", "postgres://tada@127.0.0.1:1/tada"),
+            ("TADA_DATABASE_PASSWORD_FILE", secret),
+            ("TADA_S3_ENDPOINT", "http://127.0.0.1:1"),
+            ("TADA_S3_REGION", "garage"),
+            ("TADA_S3_BUCKET", "tada"),
+            ("TADA_S3_ACCESS_KEY_ID_FILE", secret),
+            ("TADA_S3_SECRET_ACCESS_KEY_FILE", secret),
+            ("TADA_PUBLIC_URL", "https://tada.example.org"),
+            ("TADA_RATE_LIMIT_KEY_FILE", short),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let errors = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        errors.contains("TADA_RATE_LIMIT_KEY_FILE must have at least 32 bytes"),
+        "{errors}"
+    );
+}
+
 /// Stops the process of the test, also when the test fails.
 struct Serve(Child);
 
@@ -68,8 +102,11 @@ async fn the_serve_process_rejects_a_request_without_a_session() {
     password.write_all(b"postgres").unwrap();
     let mut secret = NamedTempFile::new().unwrap();
     secret.write_all(b"development only").unwrap();
+    let mut rate_limit_key = NamedTempFile::new().unwrap();
+    rate_limit_key.write_all(&[b'k'; 32]).unwrap();
     let password = password.path().to_str().unwrap();
     let secret = secret.path().to_str().unwrap();
+    let rate_limit_key = rate_limit_key.path().to_str().unwrap();
     let port_text = port.to_string();
     let mut serve = Serve(
         Command::new(env!("CARGO_BIN_EXE_tada"))
@@ -85,7 +122,7 @@ async fn the_serve_process_rejects_a_request_without_a_session() {
                 ("TADA_S3_ACCESS_KEY_ID_FILE", secret),
                 ("TADA_S3_SECRET_ACCESS_KEY_FILE", secret),
                 ("TADA_PUBLIC_URL", "https://tada.example.org"),
-                ("TADA_RATE_LIMIT_KEY_FILE", secret),
+                ("TADA_RATE_LIMIT_KEY_FILE", rate_limit_key),
             ])
             .spawn()
             .unwrap(),
