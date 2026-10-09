@@ -8,8 +8,10 @@ pub mod facts;
 pub mod identity;
 pub mod ids;
 pub mod name;
+pub mod parties;
 pub mod proposals;
 pub mod sources;
+pub mod work;
 
 mod version;
 

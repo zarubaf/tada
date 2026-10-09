@@ -91,6 +91,27 @@ id_type!(
     ApiTokenId
 );
 
+id_type!(
+    /// The ID of a workstream.
+    WorkstreamId
+);
+id_type!(
+    /// The ID of an action.
+    ActionId
+);
+id_type!(
+    /// The ID of a commitment.
+    CommitmentId
+);
+id_type!(
+    /// The ID of a person.
+    PersonId
+);
+id_type!(
+    /// The ID of an institution.
+    InstitutionId
+);
+
 /// Returns true if `uuid` can be the ID of a new record: a UUIDv7 (ADR 0038).
 pub fn is_record_id(uuid: Uuid) -> bool {
     uuid.get_version_num() == 7
@@ -104,6 +125,14 @@ pub enum LocalIdKind {
     OpenQuestion,
     /// `DOC-<n>`, local to the organization.
     Document,
+    /// `ACT-<n>`, local to the event.
+    Action,
+    /// `COM-<n>`, local to the event.
+    Commitment,
+    /// `PER-<n>`, local to the organization.
+    Person,
+    /// `INS-<n>`, local to the organization.
+    Institution,
 }
 
 impl LocalIdKind {
@@ -111,6 +140,10 @@ impl LocalIdKind {
         match self {
             Self::OpenQuestion => "QST",
             Self::Document => "DOC",
+            Self::Action => "ACT",
+            Self::Commitment => "COM",
+            Self::Person => "PER",
+            Self::Institution => "INS",
         }
     }
 
@@ -129,5 +162,13 @@ mod local_id_tests {
         assert_eq!(LocalIdKind::OpenQuestion.readable_id(1), "QST-001");
         assert_eq!(LocalIdKind::Document.readable_id(42), "DOC-042");
         assert_eq!(LocalIdKind::OpenQuestion.readable_id(1234), "QST-1234");
+    }
+
+    #[test]
+    fn readable_ids_use_the_fixed_prefixes() {
+        assert_eq!(LocalIdKind::Action.readable_id(7), "ACT-007");
+        assert_eq!(LocalIdKind::Commitment.readable_id(42), "COM-042");
+        assert_eq!(LocalIdKind::Person.readable_id(1), "PER-001");
+        assert_eq!(LocalIdKind::Institution.readable_id(123), "INS-123");
     }
 }
