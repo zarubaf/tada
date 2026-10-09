@@ -466,17 +466,19 @@ impl MemberStore for Database {
             .map_err(store_error)?;
         // The Telegram link of the member ends for the same reason as the sessions: a link that a
         // stolen session made would act again after a new invitation. Its open codes go with it.
+        // The codes go first: a confirmation that runs at the same time holds its code row, so the
+        // delete waits for it, and the delete of the link then sees the new link.
         sqlx::query!(
-            "DELETE FROM telegram_identity WHERE user_id = $1",
-            member.as_uuid()
+            "DELETE FROM telegram_link_code WHERE organization_id = $1 AND user_id = $2",
+            scope.organization_id().as_uuid(),
+            member.as_uuid(),
         )
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
         sqlx::query!(
-            "DELETE FROM telegram_link_code WHERE organization_id = $1 AND user_id = $2",
-            scope.organization_id().as_uuid(),
-            member.as_uuid(),
+            "DELETE FROM telegram_identity WHERE user_id = $1",
+            member.as_uuid()
         )
         .execute(&mut *tx)
         .await
@@ -967,6 +969,55 @@ mod tests {
             f.count("SELECT count(*) FROM telegram_identity").await,
             0,
             "the Telegram link ends too"
+        );
+    }
+
+    /// A Telegram confirmation that runs at the same time as the removal cannot keep its link: the
+    /// removal waits for the code row, and then the delete of the link sees the new link.
+    #[tokio::test]
+    async fn a_removal_ends_a_telegram_link_that_a_confirmation_makes_at_the_same_time() {
+        let f = Fixture::start().await;
+        let anna = f.member("Anna Muster", OrganizationRole::Member).await;
+        let code = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO telegram_link_code
+                 (id, organization_id, user_id, code_hash, expires_at, claimed_by, claimed_name,
+                  claimed_at, accepted_at, created_at)
+             VALUES ($1, $2, $3, $4, now() + interval '10 minutes', 42, 'Anna', now(), now(), now())",
+        )
+        .bind(code)
+        .bind(f.scope().organization_id().as_uuid())
+        .bind(anna.as_uuid())
+        .bind(vec![7_u8; 32])
+        .execute(&f.db().pool)
+        .await
+        .unwrap();
+        // The confirmation of `TelegramLinks::confirm`, held open.
+        let mut confirmation = f.db().pool.begin().await.unwrap();
+        sqlx::query("UPDATE telegram_link_code SET confirmed_at = now() WHERE id = $1")
+            .bind(code)
+            .execute(&mut *confirmation)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO telegram_identity (telegram_user_id, user_id, linked_at) VALUES (42, $1, now())",
+        )
+        .bind(anna.as_uuid())
+        .execute(&mut *confirmation)
+        .await
+        .unwrap();
+
+        let removal = f.remove(anna);
+        let commit = async {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            confirmation.commit().await.unwrap();
+        };
+        let (removed, ()) = tokio::join!(removal, commit);
+        assert_eq!(removed, None);
+        assert_eq!(
+            f.count("SELECT count(*) FROM telegram_identity").await,
+            0,
+            "the link of the confirmation ends too"
         );
     }
 

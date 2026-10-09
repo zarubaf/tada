@@ -204,15 +204,17 @@ impl TelegramLinks for Database {
 
     async fn unlink_account(&self, account: TelegramUserId) -> Result<(), StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
+        // The claims go first: a confirmation that runs at the same time holds its code row, so the
+        // delete waits for it, and the delete of the link then sees the new link.
         sqlx::query!(
-            "DELETE FROM telegram_identity WHERE telegram_user_id = $1",
+            "DELETE FROM telegram_link_code WHERE claimed_by = $1 AND confirmed_at IS NULL",
             account.0
         )
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
         sqlx::query!(
-            "DELETE FROM telegram_link_code WHERE claimed_by = $1 AND confirmed_at IS NULL",
+            "DELETE FROM telegram_identity WHERE telegram_user_id = $1",
             account.0
         )
         .execute(&mut *tx)
@@ -552,6 +554,51 @@ mod tests {
             !db.accept(TelegramUserId(43), now).await.unwrap(),
             "the claim is gone"
         );
+    }
+
+    /// /trennen that runs at the same time as a confirmation of a claim of the account ends the
+    /// new link too.
+    #[tokio::test]
+    async fn an_unlink_ends_a_link_that_a_confirmation_makes_at_the_same_time() {
+        let test = TestDatabase::start().await;
+        let organization = test.create_organization("testwil").await;
+        let alice = member(&test, organization).await;
+        let db = &test.database;
+        let now = Timestamp::now();
+        let code = db
+            .create_code(
+                alice.scope(),
+                alice.user_id(),
+                now + SignedDuration::from_mins(10),
+            )
+            .await
+            .unwrap();
+        db.claim(&code, TelegramUserId(42), &name("Alice"), now)
+            .await
+            .unwrap();
+        db.accept(TelegramUserId(42), now).await.unwrap();
+        // The confirmation of `confirm`, held open.
+        let mut confirmation = db.pool.begin().await.unwrap();
+        sqlx::query("UPDATE telegram_link_code SET confirmed_at = now() WHERE claimed_by = 42")
+            .execute(&mut *confirmation)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO telegram_identity (telegram_user_id, user_id, linked_at) VALUES (42, $1, now())",
+        )
+        .bind(alice.user_id().as_uuid())
+        .execute(&mut *confirmation)
+        .await
+        .unwrap();
+
+        let unlink = db.unlink_account(TelegramUserId(42));
+        let commit = async {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            confirmation.commit().await.unwrap();
+        };
+        let (unlinked, ()) = tokio::join!(unlink, commit);
+        unlinked.unwrap();
+        assert_eq!(db.user_of(TelegramUserId(42)).await.unwrap(), None);
     }
 
     #[tokio::test]
