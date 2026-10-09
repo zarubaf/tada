@@ -584,10 +584,11 @@ async fn an_event_key_in_two_organizations_of_the_member_is_ambiguous() {
 }
 
 #[tokio::test]
-async fn an_update_that_does_not_decode_is_skipped_and_stays_out_of_the_log() {
+async fn an_update_that_does_not_decode_is_skipped_alone_and_stays_out_of_the_log() {
     support::logs::install();
     let test = TestDatabase::start().await;
     // The date is not a number, so the Bot API client cannot decode the batch.
+    // The update after it in the same batch decodes and gets its reply.
     let mut broken = update(5, "/vorschlag TEST30 venue Geheimnis im Hangar 3");
     broken["message"]["date"] = json!("gestern");
 
@@ -595,7 +596,7 @@ async fn an_update_that_does_not_decode_is_skipped_and_stays_out_of_the_log() {
     api.batches
         .lock()
         .unwrap()
-        .extend([vec![broken], vec![update(6, "not-a-code")]]);
+        .push_back(vec![broken, update(6, "not-a-code")]);
     let server = Router::new()
         .route("/{bot}/getUpdates", post(get_updates))
         .route("/{bot}/sendMessage", post(send_message))
@@ -609,24 +610,39 @@ async fn an_update_that_does_not_decode_is_skipped_and_stays_out_of_the_log() {
         Arc::new(test.database.clone()),
         Arc::new(SystemClock),
     );
-    let (replied, seen) = (api.replied.clone(), api.replies.clone());
+    let (replied, seen, asked) = (
+        api.replied.clone(),
+        api.replies.clone(),
+        api.offsets.clone(),
+    );
     let stop = async move {
         while seen.lock().unwrap().is_empty() {
             replied.notified().await;
+        }
+        // Wait for the next request, which shows the new offset.
+        while asked.lock().unwrap().len() < 2 {
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
     };
     tokio::time::timeout(Duration::from_secs(20), gateway.run(stop))
         .await
         .unwrap();
 
-    support::logs::assert_clean(&["Geheimnis", "Testperson", "Muster", "7130429", "test-token"]);
+    support::logs::assert_clean(&[
+        "Geheimnis",
+        "gestern",
+        "Testperson",
+        "Muster",
+        "7130429",
+        "test-token",
+    ]);
     let replies = api.replies.lock().unwrap().clone();
     assert_eq!(replies.len(), 1, "{replies:?}");
     assert!(replies[0].starts_with("Dieser Code ist ungültig"));
     let offsets = api.offsets.lock().unwrap().clone();
     assert_eq!(
         offsets[1],
-        json!(6),
-        "the next request must skip the update that does not decode: {offsets:?}"
+        json!(7),
+        "the next request must ask for the updates after the batch: {offsets:?}"
     );
 }

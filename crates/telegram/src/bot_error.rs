@@ -5,12 +5,14 @@
 //! the status code only.
 //!
 //! A batch of updates that does not decode does not decode on the next request either, so a retry stops
-//! the gateway forever. The gateway skips such a batch: it asks for the updates after the highest update
-//! ID in the answer. The senders get no reply, and the log shows the number of skipped updates.
+//! the gateway forever. The gateway then decodes each update of the answer on its own, handles the ones
+//! that decode and skips the others: it asks for the updates after the highest update ID in the answer.
+//! The senders of skipped updates get no reply, and the log shows only the number of skipped updates.
 
 use std::fmt;
 
 use frankenstein::Error;
+use frankenstein::updates::Update;
 use serde_json::Value;
 
 /// The kind and the status code of a failed Bot API request, never its body.
@@ -37,19 +39,40 @@ impl fmt::Display for BotFailure<'_> {
     }
 }
 
-/// The offset after the highest update ID of a `getUpdates` answer that does not decode, or `None` if the
-/// error is of another kind or the answer has no update ID. Also returns the number of updates in it.
-pub(crate) fn offset_past(error: &Error) -> Option<(i64, usize)> {
+/// The updates of a `getUpdates` answer that does not decode as a whole.
+#[derive(Debug)]
+pub(crate) struct Salvaged {
+    /// The updates that decode on their own, in the order of the answer.
+    pub(crate) updates: Vec<Update>,
+    /// The number of updates that do not decode.
+    pub(crate) skipped: usize,
+    /// The offset after the highest update ID in the answer.
+    pub(crate) next_offset: i64,
+}
+
+/// Decodes each update of a `getUpdates` answer that does not decode as a whole. Returns `None` if the
+/// error is of another kind or the answer has no valid update ID.
+pub(crate) fn salvage(error: &Error) -> Option<Salvaged> {
     let Error::JsonDecode { input, .. } = error else {
         return None;
     };
     let answer: Value = serde_json::from_str(input).ok()?;
-    let updates = answer.get("result")?.as_array()?;
-    let highest = updates
+    let results = answer.get("result")?.as_array()?;
+    // Telegram update IDs are `u32`; a larger number is not an update ID.
+    let highest = results
         .iter()
-        .filter_map(|update| update.get("update_id")?.as_i64())
+        .filter_map(|update| update.get("update_id")?.as_u64())
+        .filter_map(|id| u32::try_from(id).ok())
         .max()?;
-    Some((highest + 1, updates.len()))
+    let updates: Vec<Update> = results
+        .iter()
+        .filter_map(|update| serde_json::from_value(update.clone()).ok())
+        .collect();
+    Some(Salvaged {
+        skipped: results.len() - updates.len(),
+        updates,
+        next_offset: i64::from(highest) + 1,
+    })
 }
 
 #[cfg(test)]
@@ -63,19 +86,51 @@ mod tests {
         }
     }
 
+    /// A private message with the update ID `id`.
+    fn message(id: u64) -> String {
+        format!(
+            r#"{{"update_id":{id},"message":{{"message_id":1,"date":0,"text":"x","chat":{{"id":1,"type":"private"}}}}}}"#
+        )
+    }
+
     #[test]
-    fn skips_past_the_highest_update_id() {
-        let error = decode_error(r#"{"ok":true,"result":[{"update_id":7},{"update_id":9}]}"#);
-        assert_eq!(offset_past(&error), Some((10, 2)));
+    fn keeps_the_updates_that_decode_and_skips_past_the_highest_update_id() {
+        let bad = r#"{"update_id":7,"message":{"date":"gestern"}}"#;
+        let input = format!(
+            r#"{{"ok":true,"result":[{bad},{},{bad_late}]}}"#,
+            message(8),
+            bad_late = bad.replace('7', "9")
+        );
+        let salvaged = salvage(&decode_error(&input)).unwrap();
+        let ids: Vec<u32> = salvaged
+            .updates
+            .iter()
+            .map(|update| update.update_id)
+            .collect();
+        assert_eq!(ids, [8]);
+        assert_eq!(salvaged.skipped, 2);
+        assert_eq!(salvaged.next_offset, 10);
+    }
+
+    #[test]
+    fn an_update_id_above_u32_is_no_update_id() {
+        let input = format!(
+            r#"{{"ok":true,"result":[{{"update_id":{}}},{{"update_id":{}}}]}}"#,
+            u64::from(u32::MAX) + 1,
+            i64::MAX
+        );
+        assert!(salvage(&decode_error(&input)).is_none());
+        let input = format!(r#"{{"ok":true,"result":[{{"update_id":{}}}]}}"#, u32::MAX);
+        assert_eq!(
+            salvage(&decode_error(&input)).unwrap().next_offset,
+            i64::from(u32::MAX) + 1
+        );
     }
 
     #[test]
     fn retries_an_answer_without_an_update_id() {
-        assert_eq!(offset_past(&decode_error("<html>Bad Gateway</html>")), None);
-        assert_eq!(
-            offset_past(&decode_error(r#"{"ok":true,"result":[]}"#)),
-            None
-        );
+        assert!(salvage(&decode_error("<html>Bad Gateway</html>")).is_none());
+        assert!(salvage(&decode_error(r#"{"ok":true,"result":[]}"#)).is_none());
     }
 
     #[test]
