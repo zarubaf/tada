@@ -8,20 +8,21 @@ use tada_domain::work::{CommitmentStatus, ConditionText, FirmReason};
 use uuid::Uuid;
 
 use super::checks::{
-    Checker, audit, check_owner, check_promisor, check_workstream, page, parse_text, record_id,
-    require_change, require_create,
+    changed, check_owner, check_promisor, check_workstream, created, parse_text, require_change,
+    require_create,
 };
 use super::{
-    CommitmentFields, CommitmentView, NewCommitmentRecord, WorkChanged, WorkCreated, WorkCursor,
-    WorkError, WorkPorts, WorkQuery, WorkStore,
+    CommitmentFields, CommitmentView, NewCommitmentRecord, WorkError, WorkPorts, WorkQuery,
+    WorkStore,
 };
-use crate::access;
+use crate::access::{self, Principal};
 use crate::audit::AuditAction;
 use crate::caller::MemberCaller;
 use crate::identity::IdentityStore;
 use crate::paging::Page;
 use crate::problem::FieldError;
 use crate::proposals::text_error_code;
+use crate::records::{Checker, NumberCursor, audit, page, record_id};
 
 /// The input of `create_commitment`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,13 +67,15 @@ pub async fn create_commitment(
 ) -> Result<CommitmentView, WorkError> {
     require_create(caller, event, ports.identity).await?;
     let scope = caller.scope();
-    let id = CommitmentId::from_uuid(record_id(input.id)?);
+    let id = CommitmentId::from_uuid(
+        record_id(input.id).map_err(|error| WorkError::Invalid(vec![error]))?,
+    );
     let mut check = Checker::default();
     let text = parse_text(&mut check, &input.text);
     let condition = match input.condition.as_deref() {
         None => Some(None),
         Some(text) => check
-            .text("condition", text, ConditionText::parse, text_error_code)
+            .parse("condition", text, ConditionText::parse, text_error_code)
             .map(Some),
     };
     check_promisor(&mut check, scope, input.promisor, ports.parties).await?;
@@ -80,10 +83,9 @@ pub async fn create_commitment(
     if let Some(workstream) = input.workstream {
         check_workstream(&mut check, scope, event, workstream, ports.workstreams).await?;
     }
-    check.finish()?;
-    let (Some(text), Some(condition)) = (text, condition) else {
-        unreachable!("a checker without errors has all values")
-    };
+    let (text, condition) = check
+        .finish(text.zip(condition))
+        .map_err(WorkError::Invalid)?;
     let status = CommitmentStatus::initial(condition.as_ref());
     let commitment = NewCommitmentRecord {
         id,
@@ -100,14 +102,12 @@ pub async fn create_commitment(
         },
     };
     let audit = audit(caller, AuditAction::CommitmentCreate, id.as_uuid());
-    match ports
-        .work
-        .create_commitment(scope, &commitment, ports.clock.now(), &audit)
-        .await?
-    {
-        WorkCreated::Created(view) => Ok(view),
-        WorkCreated::IdTaken => Err(WorkError::Invalid(vec![FieldError::new("id", "taken")])),
-    }
+    created(
+        ports
+            .work
+            .create_commitment(scope, &commitment, ports.clock.now(), &audit)
+            .await?,
+    )
 }
 
 /// The current commitment, if the caller can change it.
@@ -145,23 +145,20 @@ async fn store_commitment_change(
     ports: WorkPorts<'_>,
 ) -> Result<CommitmentView, WorkError> {
     let audit = audit(caller, action, id.as_uuid());
-    match ports
-        .work
-        .change_commitment(
-            caller.scope(),
-            event,
-            id,
-            fields,
-            expected,
-            ports.clock.now(),
-            &audit,
-        )
-        .await?
-    {
-        WorkChanged::Changed(view) => Ok(view),
-        WorkChanged::NotFound => Err(WorkError::NotFound),
-        WorkChanged::VersionConflict => Err(WorkError::VersionConflict),
-    }
+    changed(
+        ports
+            .work
+            .change_commitment(
+                caller.scope(),
+                event,
+                id,
+                fields,
+                expected,
+                ports.clock.now(),
+                &audit,
+            )
+            .await?,
+    )
 }
 
 /// Changes a commitment: its owner, the lead of its workstream or an event manager can do it.
@@ -210,10 +207,7 @@ pub async fn change_commitment(
     {
         check_workstream(&mut check, scope, event, new, ports.workstreams).await?;
     }
-    check.finish()?;
-    let Some(text) = text else {
-        unreachable!("a checker without errors has all values")
-    };
+    let text = check.finish(text).map_err(WorkError::Invalid)?;
     let status = match status {
         Some(CommitmentStatus::Firm) => return Err(WorkError::InvalidTransition),
         Some(next) if next != old.status && !old.status.can_change_to(next) => {
@@ -280,7 +274,7 @@ pub async fn make_commitment_firm(
 
 /// One commitment of the event, with its evidence. Each reader of the event sees it.
 pub async fn get_commitment(
-    caller: &MemberCaller,
+    caller: &impl Principal,
     event: EventId,
     id: CommitmentId,
     identity: &dyn IdentityStore,
@@ -294,12 +288,12 @@ pub async fn get_commitment(
 
 /// The commitments of the event that match `query`, in the order of their numbers.
 pub async fn list_commitments(
-    caller: &MemberCaller,
+    caller: &impl Principal,
     event: EventId,
     query: WorkQuery<CommitmentStatus>,
     identity: &dyn IdentityStore,
     work: &dyn WorkStore,
-) -> Result<Page<CommitmentView, WorkCursor>, WorkError> {
+) -> Result<Page<CommitmentView, NumberCursor>, WorkError> {
     access::event_access(caller, event, identity).await?;
     let items = work
         .commitments(caller.scope(), event, &query.filter())

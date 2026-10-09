@@ -1,54 +1,22 @@
 //! The checks that the commands of actions and commitments share.
 
-use tada_domain::ids::{self, EventId, UserId, WorkstreamId};
+use tada_domain::ids::{EventId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::work::{ActionDescription, ActionTitle, CommitmentText};
-use uuid::Uuid;
 
-use super::{WorkCursor, WorkError, may_change_work};
+use super::{WorkError, may_change_work};
 use crate::access::{self, EventAccess};
-use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::identity::IdentityStore;
-use crate::paging::{Page, PageLimit};
 use crate::parties::PartyStore;
 use crate::problem::FieldError;
 use crate::proposals::text_error_code;
+use crate::records::{Changed, Checker, Created};
 use crate::store::StoreError;
 use crate::workstreams::{ActiveWorkstreamError, WorkstreamStore, active_workstream};
 
-/// Collects the field errors of one input, so that the caller sees all of them at once.
-#[derive(Debug, Default)]
-pub(super) struct Checker(Vec<FieldError>);
-
-impl Checker {
-    pub(super) fn text<T, E: Copy>(
-        &mut self,
-        field: &'static str,
-        input: &str,
-        parse: impl FnOnce(&str) -> Result<T, E>,
-        code: impl FnOnce(E) -> &'static str,
-    ) -> Option<T> {
-        parse(input)
-            .map_err(|error| self.0.push(FieldError::new(field, code(error))))
-            .ok()
-    }
-
-    pub(super) fn push(&mut self, field: &'static str, code: &'static str) {
-        self.0.push(FieldError::new(field, code));
-    }
-
-    pub(super) fn finish(self) -> Result<(), WorkError> {
-        if self.0.is_empty() {
-            Ok(())
-        } else {
-            Err(WorkError::Invalid(self.0))
-        }
-    }
-}
-
 pub(super) fn parse_title(check: &mut Checker, input: &str) -> Option<ActionTitle> {
-    check.text("title", input, ActionTitle::parse, text_error_code)
+    check.parse("title", input, ActionTitle::parse, text_error_code)
 }
 
 pub(super) fn parse_description(
@@ -58,7 +26,7 @@ pub(super) fn parse_description(
     match input {
         None => Some(None),
         Some(text) => check
-            .text(
+            .parse(
                 "description",
                 text,
                 ActionDescription::parse,
@@ -69,18 +37,7 @@ pub(super) fn parse_description(
 }
 
 pub(super) fn parse_text(check: &mut Checker, input: &str) -> Option<CommitmentText> {
-    check.text("text", input, CommitmentText::parse, text_error_code)
-}
-
-pub(super) fn record_id(id: Option<Uuid>) -> Result<Uuid, WorkError> {
-    match id {
-        Some(id) if !ids::is_record_id(id) => Err(WorkError::Invalid(vec![FieldError::new(
-            "id",
-            "not-uuid-v7",
-        )])),
-        Some(id) => Ok(id),
-        None => Ok(Uuid::now_v7()),
-    }
+    check.parse("text", input, CommitmentText::parse, text_error_code)
 }
 
 /// The owner of a work record must be a contributor or a manager of the event (ADR 0068).
@@ -120,7 +77,7 @@ pub(super) async fn check_workstream(
     match active_workstream(workstreams, scope, event, workstream).await {
         Ok(_) => Ok(()),
         Err(ActiveWorkstreamError::Refused(error)) => {
-            check.0.push(error);
+            check.add(error);
             Ok(())
         }
         Err(ActiveWorkstreamError::Store(error)) => Err(error),
@@ -183,20 +140,19 @@ pub(super) async fn require_change(
     }
 }
 
-pub(super) fn audit(caller: &MemberCaller, action: AuditAction, record: Uuid) -> AuditEvent {
-    AuditEvent::new(caller.actor(), action, Some(record), Some(caller.scope()))
+/// The record of a create, or `taken` for its ID.
+pub(super) fn created<T>(result: Created<T>) -> Result<T, WorkError> {
+    match result {
+        Created::Created(view) => Ok(view),
+        Created::IdTaken => Err(WorkError::Invalid(vec![FieldError::new("id", "taken")])),
+    }
 }
 
-pub(super) fn page<T>(
-    mut items: Vec<T>,
-    limit: PageLimit,
-    number: impl Fn(&T) -> u64,
-) -> Page<T, WorkCursor> {
-    let more = items.len() > limit.get() as usize;
-    items.truncate(limit.get() as usize);
-    let next = more
-        .then(|| items.last())
-        .flatten()
-        .map(|last| WorkCursor(number(last)));
-    Page { items, next }
+/// The record of a change, or why the store did not change it.
+pub(super) fn changed<T>(result: Changed<T>) -> Result<T, WorkError> {
+    match result {
+        Changed::Changed(view) => Ok(view),
+        Changed::NotFound => Err(WorkError::NotFound),
+        Changed::VersionConflict => Err(WorkError::VersionConflict),
+    }
 }

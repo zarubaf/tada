@@ -11,15 +11,14 @@ use tada_domain::work::{
 };
 
 use super::*;
-use crate::parties::{
-    InstitutionFields, InstitutionView, PartyChanged, PartyCursor, PartyRef, PersonFields,
-    PersonView,
-};
+use crate::parties::{InstitutionFields, InstitutionView, PartyRef, PersonFields, PersonView};
+use crate::records::{Changed, Created, NumberCursor};
 use crate::work::{
-    ActionFields, CommitmentFields, MyWork, NewActionRecord, NewCommitmentRecord, WorkChanged,
-    WorkCreated, WorkFilter,
+    ActionFields, CommitmentFields, MyWork, NewActionRecord, NewCommitmentRecord, WorkFilter,
 };
-use crate::workstreams::{Changed, Created as WorkstreamCreated, WorkstreamUpdate};
+use crate::workstreams::{
+    Changed as WorkstreamChanged, Created as WorkstreamCreated, WorkstreamUpdate,
+};
 
 #[async_trait]
 impl WorkstreamStore for Memory {
@@ -42,7 +41,7 @@ impl WorkstreamStore for Memory {
         _: RecordVersion,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<Changed, StoreError> {
+    ) -> Result<WorkstreamChanged, StoreError> {
         unreachable!()
     }
 
@@ -89,7 +88,7 @@ impl PartyStore for Memory {
         _: RecordVersion,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<PartyChanged<PersonView>, StoreError> {
+    ) -> Result<Changed<PersonView>, StoreError> {
         unreachable!()
     }
 
@@ -115,7 +114,7 @@ impl PartyStore for Memory {
         &self,
         _: OrgScope,
         _: Option<&str>,
-        _: Option<PartyCursor>,
+        _: Option<NumberCursor>,
         _: u32,
     ) -> Result<Vec<PersonView>, StoreError> {
         unreachable!()
@@ -140,7 +139,7 @@ impl PartyStore for Memory {
         _: RecordVersion,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<PartyChanged<InstitutionView>, StoreError> {
+    ) -> Result<Changed<InstitutionView>, StoreError> {
         unreachable!()
     }
 
@@ -156,7 +155,7 @@ impl PartyStore for Memory {
         &self,
         _: OrgScope,
         _: Option<&str>,
-        _: Option<PartyCursor>,
+        _: Option<NumberCursor>,
         _: u32,
     ) -> Result<Vec<InstitutionView>, StoreError> {
         unreachable!()
@@ -175,7 +174,7 @@ impl WorkStore for Memory {
         _: &NewActionRecord,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<WorkCreated<ActionView>, StoreError> {
+    ) -> Result<Created<ActionView>, StoreError> {
         unreachable!()
     }
 
@@ -188,7 +187,7 @@ impl WorkStore for Memory {
         _: RecordVersion,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<WorkChanged<ActionView>, StoreError> {
+    ) -> Result<Changed<ActionView>, StoreError> {
         unreachable!()
     }
 
@@ -223,7 +222,7 @@ impl WorkStore for Memory {
         _: &NewCommitmentRecord,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<WorkCreated<CommitmentView>, StoreError> {
+    ) -> Result<Created<CommitmentView>, StoreError> {
         unreachable!()
     }
 
@@ -236,7 +235,7 @@ impl WorkStore for Memory {
         _: RecordVersion,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<WorkChanged<CommitmentView>, StoreError> {
+    ) -> Result<Changed<CommitmentView>, StoreError> {
         unreachable!()
     }
 

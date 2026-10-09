@@ -37,6 +37,7 @@ use crate::identity::IdentityStore;
 use crate::paging::PageLimit;
 use crate::parties::{PartyRef, PartyStore};
 use crate::problem::{CommandError, FieldError, ProblemCode};
+use crate::records::{Changed, Created, NumberCursor};
 use crate::store::StoreError;
 use crate::workstreams::WorkstreamStore;
 
@@ -141,35 +142,13 @@ pub struct NewCommitmentRecord {
     pub fields: CommitmentFields,
 }
 
-/// The result of a create in the store.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum WorkCreated<T> {
-    Created(T),
-    /// A record with this ID exists, in this organization or in another one.
-    IdTaken,
-}
-
-/// The result of a change in the store.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum WorkChanged<T> {
-    Changed(T),
-    /// The event has no such record.
-    NotFound,
-    /// The record has another version.
-    VersionConflict,
-}
-
-/// The position after the last record of a page: its local number (ADR 0044).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WorkCursor(pub u64);
-
 /// The records of an event that a list shows, in the order of their numbers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WorkFilter<S> {
     pub owner: Option<UserId>,
     pub status: Option<S>,
     pub workstream: Option<WorkstreamId>,
-    pub after: Option<WorkCursor>,
+    pub after: Option<NumberCursor>,
     pub limit: u32,
 }
 
@@ -202,7 +181,7 @@ pub trait WorkStore: Debug + Send + Sync {
         action: &NewActionRecord,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkCreated<ActionView>, StoreError>;
+    ) -> Result<Created<ActionView>, StoreError>;
 
     /// Replaces the values of an action if its version is `expected`, and counts the version up.
     #[expect(
@@ -218,7 +197,7 @@ pub trait WorkStore: Debug + Send + Sync {
         expected: RecordVersion,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkChanged<ActionView>, StoreError>;
+    ) -> Result<Changed<ActionView>, StoreError>;
 
     async fn action(
         &self,
@@ -242,7 +221,7 @@ pub trait WorkStore: Debug + Send + Sync {
         commitment: &NewCommitmentRecord,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkCreated<CommitmentView>, StoreError>;
+    ) -> Result<Created<CommitmentView>, StoreError>;
 
     /// Replaces the values of a commitment if its version is `expected`, and counts the version up.
     #[expect(
@@ -258,7 +237,7 @@ pub trait WorkStore: Debug + Send + Sync {
         expected: RecordVersion,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkChanged<CommitmentView>, StoreError>;
+    ) -> Result<Changed<CommitmentView>, StoreError>;
 
     async fn commitment(
         &self,
@@ -391,7 +370,7 @@ pub struct WorkQuery<S> {
     pub owner: Option<UserId>,
     pub status: Option<S>,
     pub workstream: Option<WorkstreamId>,
-    pub after: Option<WorkCursor>,
+    pub after: Option<NumberCursor>,
     pub limit: PageLimit,
 }
 

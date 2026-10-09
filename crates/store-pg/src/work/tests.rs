@@ -103,8 +103,8 @@ impl Fixture {
             .await
             .unwrap()
         {
-            WorkCreated::Created(view) => view,
-            WorkCreated::IdTaken => panic!("id taken"),
+            Created::Created(view) => view,
+            Created::IdTaken => panic!("id taken"),
         }
     }
 
@@ -132,8 +132,8 @@ impl Fixture {
             .await
             .unwrap()
         {
-            WorkCreated::Created(view) => view,
-            WorkCreated::IdTaken => panic!("id taken"),
+            Created::Created(view) => view,
+            Created::IdTaken => panic!("id taken"),
         }
     }
 
@@ -144,7 +144,7 @@ impl Fixture {
         id: ActionId,
         fields: &ActionFields,
         expected: RecordVersion,
-    ) -> WorkChanged<ActionView> {
+    ) -> Changed<ActionView> {
         self.test
             .database
             .change_action(
@@ -195,7 +195,7 @@ async fn creates_and_changes_an_action_with_numbers_and_audit_events() {
         status: ActionStatus::Done,
         ..first.fields.clone()
     };
-    let WorkChanged::Changed(changed) = f
+    let Changed::Changed(changed) = f
         .change_action(f.scope, f.event, first.id, &fields, RecordVersion::FIRST)
         .await
     else {
@@ -213,7 +213,7 @@ async fn creates_and_changes_an_action_with_numbers_and_audit_events() {
     assert_eq!(
         f.change_action(f.scope, f.event, first.id, &fields, RecordVersion::FIRST)
             .await,
-        WorkChanged::VersionConflict
+        Changed::VersionConflict
     );
 
     let filter = WorkFilter {
@@ -268,7 +268,7 @@ async fn keeps_work_records_inside_their_event_and_organization() {
         event_id: other_event,
         fields: f.action_fields("Bar", None),
     };
-    let WorkCreated::Created(other) = db
+    let Created::Created(other) = db
         .create_action(
             f.scope,
             &other,
@@ -300,7 +300,7 @@ async fn keeps_work_records_inside_their_event_and_organization() {
             RecordVersion::FIRST
         )
         .await,
-        WorkChanged::NotFound
+        Changed::NotFound
     );
     assert!(
         db.my_open_work(stranger, f.owner, false)
@@ -324,10 +324,10 @@ async fn two_changes_with_one_version_leave_one_winner() {
     );
     let winners = [&a, &b]
         .iter()
-        .filter(|changed| matches!(changed, WorkChanged::Changed(_)))
+        .filter(|changed| matches!(changed, Changed::Changed(_)))
         .count();
     assert_eq!(winners, 1, "{a:?} {b:?}");
-    assert!([&a, &b].contains(&&WorkChanged::VersionConflict));
+    assert!([&a, &b].contains(&&Changed::VersionConflict));
 }
 
 #[tokio::test]
@@ -353,7 +353,7 @@ async fn a_commitment_keeps_its_condition_and_its_firm_reason() {
         firm_reason: Some(FirmReason::parse("The order is signed.").unwrap()),
         ..commitment.fields.clone()
     };
-    let WorkChanged::Changed(firm) = db
+    let Changed::Changed(firm) = db
         .change_commitment(
             f.scope,
             f.event,
