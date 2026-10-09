@@ -69,6 +69,8 @@ const actions = [
     due_date: "2030-05-18",
     status: "in-progress",
     version: 2,
+    can_change: true,
+    next_statuses: ["open", "done"],
   },
   {
     id: "0199b8e0-0000-7000-8000-0000000000d2",
@@ -78,6 +80,8 @@ const actions = [
     owner_user_id: BERND,
     status: "blocked",
     version: 1,
+    can_change: true,
+    next_statuses: ["open", "done"],
   },
   {
     id: "0199b8e0-0000-7000-8000-0000000000d3",
@@ -88,6 +92,8 @@ const actions = [
     due_date: "2030-04-02",
     status: "done",
     version: 4,
+    can_change: true,
+    next_statuses: ["open", "done"],
   },
 ];
 
@@ -109,6 +115,9 @@ const commitments = [
     due_date: "2030-05-17",
     status: "conditional",
     version: 3,
+    can_change: true,
+    can_make_firm: true,
+    next_statuses: ["fulfilled", "broken", "withdrawn"],
     evidence: [
       {
         record_version: 1,
@@ -137,6 +146,9 @@ const commitments = [
     status: "firm",
     firm_reason: "Bewilligung liegt vor.",
     version: 2,
+    can_change: true,
+    can_make_firm: false,
+    next_statuses: ["fulfilled", "broken", "withdrawn"],
     evidence: [],
   },
 ];

@@ -47,7 +47,8 @@ const institutions = [
   },
 ];
 
-async function fakeParties(page: Page): Promise<void> {
+/** The server marks each record that the caller can change; only an owner or admin can. */
+async function fakeParties(page: Page, canChange: boolean): Promise<void> {
   for (const [path, items] of [
     ["persons", persons],
     ["institutions", institutions],
@@ -56,7 +57,9 @@ async function fakeParties(page: Page): Promise<void> {
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({
+          items: items.map((item) => ({ ...item, can_change: canChange })),
+        }),
       }),
     );
   }
@@ -78,7 +81,7 @@ for (const viewport of viewports) {
         }) => {
           await page.setViewportSize(viewport);
           await fakeSession(page, sessionWithRole(role));
-          await fakeParties(page);
+          await fakeParties(page, role === "admin");
           await page.goto(shown.path);
           await setTheme(page, theme);
           await expect(page.getByRole("heading", { level: 1, name: shown.title })).toBeVisible();
@@ -107,7 +110,7 @@ for (const viewport of viewports) {
 test("at 320 px the register does not scroll sideways", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await fakeSession(page, sessionWithRole("admin"));
-  await fakeParties(page);
+  await fakeParties(page, true);
   await page.goto("/institutions");
   await expect(page.getByRole("table", { name: "Institutionen" })).toBeVisible();
 

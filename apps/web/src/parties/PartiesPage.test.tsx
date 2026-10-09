@@ -15,8 +15,15 @@ const beat = {
   email: "beat@example.org",
   phone: "+41 00 000 00 01",
   version: 2,
+  can_change: true,
 };
-const clara = { id: "p2", local_id: "PER-002", name: "Clara Probst", version: 1 };
+const clara = {
+  id: "p2",
+  local_id: "PER-002",
+  name: "Clara Probst",
+  version: 1,
+  can_change: true,
+};
 const generators = {
   id: "i1",
   local_id: "INS-001",
@@ -24,6 +31,7 @@ const generators = {
   kind: "company",
   email: "info@example.org",
   version: 4,
+  can_change: true,
 };
 
 function json(status: number, body: unknown, contentType = "application/json") {
@@ -37,22 +45,26 @@ function problem(status: number, code: string, errors?: unknown) {
 
 interface Setup {
   kind?: "person" | "institution";
-  role?: string;
+  /** The server says whether the caller can change the records. */
+  canChange?: boolean;
   /** Answers by `METHOD /path-suffix`. */
   answers?: Record<string, () => Response>;
 }
 
 /** A fake server that filters the list by `q`. It records `METHOD path?query` and the body. */
-function setup({ kind = "person", role = "member", answers = {} }: Setup = {}) {
+function setup({ kind = "person", canChange = true, answers = {} }: Setup = {}) {
   const calls: { call: string; body: unknown }[] = [];
-  const own = { organization_id: "o1", name: "Fliegergruppe Testwil", role };
+  const own = { organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" };
   const session = {
     user_id: ME,
     display_name: "Anna Muster",
     organization: own,
     memberships: [own],
   };
-  const records = kind === "person" ? [beat, clara] : [generators];
+  const records = (kind === "person" ? [beat, clara] : [generators]).map((r) => ({
+    ...r,
+    can_change: canChange,
+  }));
   const fetch = async (request: Request) => {
     const url = new URL(request.url);
     const text = request.method === "GET" ? "" : await request.clone().text();
@@ -159,15 +171,14 @@ describe("PartiesPage", () => {
     expect(await screen.findByText("PER-003")).toBeInTheDocument();
   });
 
-  it("offers editing to an admin only and sends the version", async () => {
-    setup({ role: "member" });
+  it("offers editing only where the server says the caller can change the record", async () => {
+    setup({ canChange: false });
     await screen.findByRole("table", { name: "Personen" });
     expect(screen.queryByRole("button", { name: /bearbeiten/i })).not.toBeInTheDocument();
   });
 
   it("changes a person with the version of the row", async () => {
     const { calls } = setup({
-      role: "admin",
       answers: {
         "PATCH /persons/p1": () => json(200, { ...beat, name: "Beat Muster-Neu", version: 3 }),
       },

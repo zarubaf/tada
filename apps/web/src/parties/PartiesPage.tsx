@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
-import { canManage } from "../members/roles";
-import { useOptionalSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
@@ -24,12 +22,11 @@ type State =
 /**
  * „Personen“ and „Institutionen“: the register of the organization, a search by name and the form
  * that creates a record. Owners and admins can change a record. The server decides each action;
- * the page hides only what the organization role forbids for a change.
+ * the page shows „Bearbeiten“ only where the record says `can_change`.
  */
 export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
   const party = useMemo(() => partyApi(api, kind), [api, kind]);
   const person = kind === "person";
-  const mayEdit = canManage(useOptionalSession()?.organization?.role);
   const [state, setState] = useState<State>({ kind: "loading" });
   const [query, setQuery] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
@@ -138,23 +135,24 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
         ]),
     { id: "email", header: t("parties-column-email"), cell: (row) => row.email ?? "" },
     { id: "phone", header: t("parties-column-phone"), cell: (row) => row.phone ?? "" },
-    ...(mayEdit
+    ...(state.kind === "loaded" && state.items.some((row) => row.can_change)
       ? [
           {
             id: "actions",
             header: t("parties-column-actions"),
-            cell: (row: Party) => (
-              <Button
-                aria-label={t("parties-edit-of", { name: row.name })}
-                onPress={() => {
-                  start();
-                  setEditing(row);
-                  focusAfterCommit(() => formHeading.current);
-                }}
-              >
-                {t("parties-edit")}
-              </Button>
-            ),
+            cell: (row: Party) =>
+              row.can_change && (
+                <Button
+                  aria-label={t("parties-edit-of", { name: row.name })}
+                  onPress={() => {
+                    start();
+                    setEditing(row);
+                    focusAfterCommit(() => formHeading.current);
+                  }}
+                >
+                  {t("parties-edit")}
+                </Button>
+              ),
           },
         ]
       : []),

@@ -18,7 +18,7 @@ import { ActionStatusLabel } from "./WorkStatus";
 
 /**
  * „Aufgaben“ of an event: the register of actions and the form that creates or changes one. The
- * owner, the lead of the workstream and an event manager can change an action; the server decides.
+ * server says per action whether the caller can change it (`can_change`).
  */
 export function ActionsPage({ api }: { api: Api }) {
   const { event } = useEventContext();
@@ -81,7 +81,7 @@ function Actions({ api, eventId, directory }: { api: Api; eventId: string; direc
       id: "actions",
       header: t("work-column-actions"),
       cell: (row) =>
-        directory.mayChange(row) && (
+        row.can_change && (
           <Button
             aria-label={t("work-edit-of", { id: row.local_id })}
             onPress={() => page.edit(row)}

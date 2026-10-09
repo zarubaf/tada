@@ -8,7 +8,6 @@ import { TextField } from "../ui/TextField";
 import type { Directory } from "./directory";
 import { blankToNull, fieldErrors, type SaveFailure, saveFailure } from "./fieldErrors";
 import { NO_WORKSTREAM, OwnerSelect, WorkstreamSelect } from "./fields";
-import { actionStatusChoices } from "./status";
 import styles from "./Work.module.css";
 
 const FIELDS = ["title", "description", "owner", "workstream", "due"] as const;
@@ -181,7 +180,7 @@ export function ActionForm({
       {record && (
         <Select
           label={t("work-field-status")}
-          options={actionStatusChoices(record.status).map((s) => ({
+          options={[record.status, ...record.next_statuses].map((s) => ({
             id: s,
             label: t(`action-status-${s}`),
           }))}

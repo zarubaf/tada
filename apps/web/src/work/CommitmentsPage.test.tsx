@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { BERND, EVENT, json, ME, problem, renderWork } from "../test/fakeWorkServer";
+import { EVENT, json, ME, problem, renderWork } from "../test/fakeWorkServer";
 import { CommitmentsPage } from "./CommitmentsPage";
 
 const user = userEvent.setup({ delay: null });
@@ -21,6 +21,9 @@ function commitment(over: Record<string, unknown> = {}) {
     due_date: "2030-05-17",
     status: "conditional",
     version: 3,
+    can_change: true,
+    can_make_firm: true,
+    next_statuses: ["fulfilled", "broken", "withdrawn"],
     evidence: [
       {
         record_version: 1,
@@ -80,7 +83,12 @@ describe("CommitmentsPage", () => {
         "POST /firm": () =>
           json(
             200,
-            commitment({ status: "firm", firm_reason: "Bestellung unterzeichnet", version: 4 }),
+            commitment({
+              status: "firm",
+              can_make_firm: false,
+              firm_reason: "Bestellung unterzeichnet",
+              version: 4,
+            }),
           ),
       },
       lists: { "/commitments": [commitment()] },
@@ -119,15 +127,21 @@ describe("CommitmentsPage", () => {
   });
 
   it("offers make firm only for a conditional commitment", async () => {
-    render({ lists: { "/commitments": [commitment({ status: "firm" })] } });
+    render({ lists: { "/commitments": [commitment({ status: "firm", can_make_firm: false })] } });
     await screen.findByRole("table", { name: "Zusagen" });
     expect(
       screen.queryByRole("button", { name: "COM-001 verbindlich machen" }),
     ).not.toBeInTheDocument();
   });
 
-  it("hides the change controls from a member who is neither owner nor lead nor manager", async () => {
-    render({ lists: { "/commitments": [commitment({ owner_user_id: BERND })] } });
+  it("hides the change controls where the server says the caller cannot change", async () => {
+    render({
+      lists: {
+        "/commitments": [
+          commitment({ can_change: false, can_make_firm: false, next_statuses: [] }),
+        ],
+      },
+    });
     await screen.findByRole("table", { name: "Zusagen" });
     expect(screen.queryByRole("button", { name: "COM-001 bearbeiten" })).not.toBeInTheDocument();
     expect(
