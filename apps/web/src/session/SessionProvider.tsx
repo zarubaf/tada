@@ -163,7 +163,7 @@ export function SessionProvider({ api, children }: { api: Api; children: ReactNo
       return <SessionContext value={null}>{children}</SessionContext>;
     }
     if (session && pathname === SIGN_IN_PATH) {
-      return <Redirect to="/events" />;
+      return <Redirect to="/" />;
     }
     // The loading and the failed state are in `main`, so that the skip link has a target.
     if (state.kind === "failed") {

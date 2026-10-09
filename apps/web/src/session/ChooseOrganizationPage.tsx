@@ -41,7 +41,7 @@ export function ChooseOrganizationPage({ api }: { api: Api }) {
       });
       if (!result.error) {
         await refresh();
-        navigate("/events", { replace: true });
+        navigate("/", { replace: true });
         return;
       }
       setFailure(failureOf(result));

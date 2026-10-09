@@ -15,7 +15,7 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page);
       await fakeEvents(page, state.status, state.body);
-      await page.goto("/?pseudo");
+      await page.goto("/events?pseudo");
       await expect(page.getByRole("heading", { name: /Áñlässé/ })).toBeVisible();
       // The skeleton is a labelled status; the live regions have no label.
       await expect(page.locator("[role=status][aria-label]")).toHaveCount(0);

@@ -55,14 +55,14 @@ describe("ChooseOrganizationPage", () => {
     expect(screen.getByRole("button", { name: /Segelflugclub Musterhausen/ })).toBeInTheDocument();
   });
 
-  it("chooses the organization, loads the session again and opens the events", async () => {
+  it("chooses the organization, loads the session again and opens My Work", async () => {
     const chosen = { ...withoutOrganization, organization: second };
     const calls = renderPage(json(200, chosen), json(200, chosen));
     await userEvent.click(
       await screen.findByRole("button", { name: /Segelflugclub Musterhausen/ }),
     );
 
-    expect(await screen.findByText("/events")).toBeInTheDocument();
+    expect(await screen.findByText("/")).toBeInTheDocument();
     expect(calls[1]).toEqual({
       method: "POST",
       path: "/api/v1/session/organization",
