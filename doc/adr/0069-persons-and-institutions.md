@@ -35,6 +35,10 @@ Permissions:
 
 - A member without an event role does not see persons and institutions (ADR 0052).
 - A record of another organization is invisible. A command that names one returns `validation-failed` with the field code `unknown-record`.
+- The member who creates a person can link it to the user account of any member of the organization.
+  No command changes the link later.
+  Each reader of the person sees the link.
+  Slice 2b decides if only owners and admins may set it.
 
 Proposals:
 
