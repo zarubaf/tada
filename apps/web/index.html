@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <title>tada</title>
+    <!--
+      The order of the CSS layers, before any style sheet: the build can put the styles of a chunk
+      that loads on demand first in the file, and the first mention of a layer fixes its rank.
+    -->
+    <style>
+      @layer reset, tokens, components;
+    </style>
   </head>
   <body>
     <div id="root"></div>

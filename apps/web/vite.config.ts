@@ -27,6 +27,9 @@ const developmentPolicy = widen(
 // An MCP client in development uses `http://localhost:5173/mcp`, the URL that the token page shows (ADR 0040).
 export default defineConfig({
   plugins: [react()],
+  // One CSS file for all chunks: the settings pages load on demand, and the order of the CSS layers
+  // must stay the same as without the split.
+  build: { cssCodeSplit: false },
   server: {
     proxy: { "/api": "http://127.0.0.1:8080", "/mcp": "http://127.0.0.1:8080" },
     headers: { "Content-Security-Policy": developmentPolicy },

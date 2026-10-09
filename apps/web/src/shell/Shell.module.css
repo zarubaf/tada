@@ -4,8 +4,14 @@
    * never hides under it (WCAG 2.4.11). The bar grows by the safe area of the home indicator.
    */
   :global(html):has(.shell) {
+    /*
+     * Each item of the bar has room for a label of two lines, so the height of the bar is the
+     * same for each label, also for a long one and for the pseudo-locale. The scroll padding below
+     * then always covers the real bar.
+     */
+    --bottom-bar-item-height: max(var(--control-height-lg), calc(2 * var(--line-height-ui)));
     --bottom-bar-height: calc(
-      var(--control-height-lg) +
+      var(--bottom-bar-item-height) +
       var(--space-4) +
       1px +
       env(safe-area-inset-bottom)
@@ -49,6 +55,13 @@
     padding-block-end: var(--safe-bottom);
     border-top: 1px solid var(--color-border-subtle);
     background: var(--color-bg-surface);
+  }
+
+  /* Narrow: each item of the bottom bar has the height of `--bottom-bar-item-height`. */
+  @media (width < 40rem) {
+    .nav > a {
+      min-height: var(--bottom-bar-item-height);
+    }
   }
 
   /* Hidden in the bottom bar; the member menu leads to the registers there. */

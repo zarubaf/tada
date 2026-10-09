@@ -8,7 +8,6 @@ import { EventMembersPage } from "./events/EventMembersPage";
 import { EventOverview } from "./events/EventOverview";
 import { EventPage } from "./events/EventPage";
 import { EventsPage } from "./events/EventsPage";
-import { MembersPage } from "./members/MembersPage";
 import { NotFoundPage } from "./NotFoundPage";
 import { PartiesPage } from "./parties/PartiesPage";
 import { PrivacyPage } from "./privacy/PrivacyPage";
@@ -17,15 +16,11 @@ import { ReviewInbox } from "./review/ReviewInbox";
 import { Route, Router, Routes } from "./router/Router";
 import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
 import { SessionProvider } from "./session/SessionProvider";
-import { AccountPage } from "./settings/AccountPage";
-import { OrganizationPage } from "./settings/OrganizationPage";
 import { SettingsLayout } from "./settings/SettingsLayout";
 import { Shell } from "./shell/Shell";
 import { InvitationPage } from "./sign-in/InvitationPage";
 import { MagicLinkPage } from "./sign-in/MagicLinkPage";
 import { SignInPage } from "./sign-in/SignInPage";
-import { TelegramPage } from "./telegram/TelegramPage";
-import { TokensPage } from "./tokens/TokensPage";
 import { SkipLink } from "./ui/SkipLink";
 import { ActionsPage } from "./work/ActionsPage";
 import { CommitmentsPage } from "./work/CommitmentsPage";
@@ -33,6 +28,24 @@ import { MyWorkPage } from "./work/MyWorkPage";
 import { WorkstreamsPage } from "./work/WorkstreamsPage";
 
 const defaultApi = createApi();
+
+// The settings pages load on demand: a member opens them seldom, and the first load stays inside
+// the bundle budget of ADR 0024.
+const MembersPage = lazy(() =>
+  import("./members/MembersPage").then((module) => ({ default: module.MembersPage })),
+);
+const TelegramPage = lazy(() =>
+  import("./telegram/TelegramPage").then((module) => ({ default: module.TelegramPage })),
+);
+const TokensPage = lazy(() =>
+  import("./tokens/TokensPage").then((module) => ({ default: module.TokensPage })),
+);
+const OrganizationPage = lazy(() =>
+  import("./settings/OrganizationPage").then((module) => ({ default: module.OrganizationPage })),
+);
+const AccountPage = lazy(() =>
+  import("./settings/AccountPage").then((module) => ({ default: module.AccountPage })),
+);
 
 // The component gallery exists only in builds that are not production builds (ADR 0024).
 const Gallery =
@@ -136,27 +149,37 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   {/* The settings */}
                   <Route path="/settings/members">
                     <SettingsLayout>
-                      <MembersPage api={api} />
+                      <Suspense>
+                        <MembersPage api={api} />
+                      </Suspense>
                     </SettingsLayout>
                   </Route>
                   <Route path="/settings/telegram">
                     <SettingsLayout>
-                      <TelegramPage api={api} />
+                      <Suspense>
+                        <TelegramPage api={api} />
+                      </Suspense>
                     </SettingsLayout>
                   </Route>
                   <Route path="/settings/tokens">
                     <SettingsLayout>
-                      <TokensPage api={api} />
+                      <Suspense>
+                        <TokensPage api={api} />
+                      </Suspense>
                     </SettingsLayout>
                   </Route>
                   <Route path="/settings/organization">
                     <SettingsLayout>
-                      <OrganizationPage api={api} />
+                      <Suspense>
+                        <OrganizationPage api={api} />
+                      </Suspense>
                     </SettingsLayout>
                   </Route>
                   <Route path="/settings/account">
                     <SettingsLayout>
-                      <AccountPage api={api} />
+                      <Suspense>
+                        <AccountPage api={api} />
+                      </Suspense>
                     </SettingsLayout>
                   </Route>
                   <Route path="*">
