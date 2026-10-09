@@ -59,7 +59,8 @@ mod tests {
             OrganizationId::from_uuid(Uuid::now_v7()),
             OrganizationRole::Member,
         )
-        .with_request(Channel::Telegram, Some(Uuid::now_v7()))
+        .with_channel(Channel::Telegram)
+        .with_request(Some(Uuid::now_v7()))
         .actor();
         let service = ServiceCaller::<JobRunner>::new().actor();
         let ai = Actor::restore(

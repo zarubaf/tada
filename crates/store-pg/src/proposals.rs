@@ -1167,7 +1167,7 @@ mod tests {
             organization,
             OrganizationRole::Owner,
         )
-        .with_request(tada_app::caller::Channel::Telegram, None);
+        .with_channel(tada_app::caller::Channel::Telegram);
         let event = Uuid::now_v7();
         let (input, ids) = new_event_intake(event);
         let changeset = new(create_changeset(&owner, input, stores(&test), &FixedClock).await);

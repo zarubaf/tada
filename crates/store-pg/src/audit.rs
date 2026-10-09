@@ -70,7 +70,8 @@ mod tests {
         let request = Uuid::now_v7();
         let record_id = Uuid::now_v7();
         let caller = MemberCaller::new(user, organization, OrganizationRole::Owner)
-            .with_request(tada_app::caller::Channel::Telegram, Some(request));
+            .with_channel(tada_app::caller::Channel::Telegram)
+            .with_request(Some(request));
         let event = AuditEvent::new(
             caller.actor(),
             AuditAction::EventCreate,

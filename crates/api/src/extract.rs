@@ -9,7 +9,7 @@ use axum::http::request::Parts;
 use axum::http::{HeaderValue, header};
 use serde::de::DeserializeOwned;
 use tada_app::auth::{Authenticated, AuthenticationError, Credential};
-use tada_app::caller::{Channel, MemberCaller};
+use tada_app::caller::MemberCaller;
 use tada_app::domain::RecordVersion;
 use tada_app::paging::PageLimit;
 use tada_app::problem::ProblemCode;
@@ -123,9 +123,7 @@ impl FromRequestParts<ApiState> for Caller {
         // The REST API accepts only the session cookie and only members (ADR 0039).
         let credential = session_token(parts).map(Credential::Session);
         match state.authenticator.authenticate(credential).await? {
-            Authenticated::Member(caller) => {
-                Ok(Self(caller.with_request(Channel::Web, request_id())))
-            }
+            Authenticated::Member(caller) => Ok(Self(caller.with_request(request_id()))),
             Authenticated::Ai(_) => Err(AuthenticationError::Unauthenticated.into()),
         }
     }
