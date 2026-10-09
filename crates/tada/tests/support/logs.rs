@@ -106,3 +106,17 @@ pub fn assert_route_logged(route: &str) {
         "no request line has the route {route}: {routes:?}"
     );
 }
+
+/// The number of captured lines at `level` whose message holds `text`.
+pub fn count_messages(level: &str, text: &str) -> usize {
+    lines()
+        .iter()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .filter(|line| line["level"] == level)
+        .filter(|line| {
+            line["message"]
+                .as_str()
+                .is_some_and(|message| message.contains(text))
+        })
+        .count()
+}

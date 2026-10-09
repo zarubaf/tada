@@ -460,3 +460,24 @@ async fn one_address_gets_at_most_one_mail_in_each_cooldown_also_with_two_proces
 
     support::logs::assert_clean(&["anna@example.org", "198.51.100.1"]);
 }
+
+/// An operator who forgets `TADA_TRUSTED_PROXIES` behind a reverse proxy gives all clients one
+/// rate limit. The server says so once, without the addresses.
+#[tokio::test]
+async fn x_forwarded_for_without_a_trusted_proxy_gives_one_warning() {
+    let app = App::start().await;
+    for _ in 0..2 {
+        let request = support::request(Method::POST, "/api/v1/sign-in/requests")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("x-forwarded-for", "198.51.100.23")
+            .body(Body::from(json!({"email": "anna@example.org"}).to_string()))
+            .unwrap();
+        let (response, _) = support::send(&app.router, request).await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+    }
+    assert_eq!(
+        support::logs::count_messages("WARN", "TADA_TRUSTED_PROXIES"),
+        1
+    );
+    support::logs::assert_clean(&["198.51.100.23", "anna@example.org"]);
+}

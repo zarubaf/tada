@@ -130,7 +130,7 @@ const TRUSTED_PROXIES: Setting = Setting {
     kind: "list of network ranges",
     default: Some(""),
     secret: false,
-    description: "The ranges of the reverse proxies, separated by commas, for example `10.0.0.0/8`. The server accepts `X-Request-Id` and `X-Forwarded-For` only from them.",
+    description: "The ranges of the reverse proxies, separated by commas, for example `10.0.0.0/8`. The server accepts `X-Request-Id` and `X-Forwarded-For` only from them. Set it if a reverse proxy is in front of tada: if it is empty, all clients have the address of the proxy and share one rate limit. The server writes a warning when a request from another peer has `X-Forwarded-For`.",
 };
 
 const WEB_ROOT: Setting = Setting {

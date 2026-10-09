@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use axum::extract::{ConnectInfo, FromRequestParts};
 use axum::http::request::Parts;
@@ -34,12 +35,36 @@ impl FromRequestParts<ApiState> for ClientIp {
     async fn from_request_parts(parts: &mut Parts, state: &ApiState) -> Result<Self, ApiError> {
         // `serve` gives each request its peer. Without it, the server cannot apply a rate limit.
         let peer = peer(&parts.extensions).ok_or_else(|| ApiError::new(ProblemCode::Internal))?;
+        if forwarded_by_an_untrusted_peer(peer, &parts.headers, &state.trusted_proxies)
+            && !WARNED.swap(true, Ordering::Relaxed)
+        {
+            // No address: the log never holds one (ADR 0035).
+            tracing::warn!(
+                "a request from a peer outside TADA_TRUSTED_PROXIES has X-Forwarded-For; \
+                 if a reverse proxy is in front of tada, set TADA_TRUSTED_PROXIES to its range, \
+                 or all clients share the rate limit of the proxy"
+            );
+        }
         Ok(Self(client_ip(
             peer,
             &parts.headers,
             &state.trusted_proxies,
         )))
     }
+}
+
+/// True after the first warning of `forwarded_by_an_untrusted_peer` in this process.
+static WARNED: AtomicBool = AtomicBool::new(false);
+
+/// True if a peer that is not a trusted proxy sends `X-Forwarded-For`. This is the sign of a
+/// reverse proxy that `TADA_TRUSTED_PROXIES` does not name: then each client behind it has the
+/// address of the proxy, and one client can use up the rate limit of all.
+fn forwarded_by_an_untrusted_peer(
+    peer: IpAddr,
+    headers: &HeaderMap,
+    trusted_proxies: &[IpNet],
+) -> bool {
+    headers.contains_key(FORWARDED_FOR) && !is_trusted_proxy(trusted_proxies, peer)
 }
 
 fn client_ip(peer: IpAddr, headers: &HeaderMap, trusted_proxies: &[IpNet]) -> IpAddr {
@@ -136,6 +161,27 @@ mod tests {
     fn an_entry_that_is_not_an_address_stops_the_walk() {
         let headers = forwarded(&["203.0.113.7, unknown, 10.0.0.9"]);
         assert_eq!(client_ip(ip(PROXY), &headers, &trusted()), ip("10.0.0.9"));
+    }
+
+    #[test]
+    fn x_forwarded_for_from_an_untrusted_peer_is_a_sign_of_a_missing_proxy_setting() {
+        let headers = forwarded(&["203.0.113.7"]);
+        assert!(forwarded_by_an_untrusted_peer(ip(PROXY), &headers, &[]));
+        assert!(forwarded_by_an_untrusted_peer(
+            ip("192.168.1.2"),
+            &headers,
+            &trusted()
+        ));
+        assert!(!forwarded_by_an_untrusted_peer(
+            ip(PROXY),
+            &headers,
+            &trusted()
+        ));
+        assert!(!forwarded_by_an_untrusted_peer(
+            ip(PROXY),
+            &HeaderMap::new(),
+            &[]
+        ));
     }
 
     #[test]
