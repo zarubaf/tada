@@ -512,6 +512,7 @@ fn validate(input: NewInvitation, clock: &dyn Clock) -> Result<Invitation, Invit
                     EmailError::Shape => "shape",
                     EmailError::TooLong => "too-long",
                     EmailError::ControlCharacter => "control-character",
+                    EmailError::Whitespace => "whitespace",
                 },
             );
         })

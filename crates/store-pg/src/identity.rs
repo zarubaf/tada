@@ -407,7 +407,13 @@ mod tests {
         .execute(&test.database.pool)
         .await
         .unwrap();
-        for address in ["Anna@Example.org", " anna@example.org", "anna@example.org "] {
+        for address in [
+            "Anna@Example.org",
+            " anna@example.org",
+            "anna@example.org ",
+            "an na@example.org",
+            "anna@example.org\tx",
+        ] {
             let rejected = sqlx::query(
                 "INSERT INTO email_identity (user_id, email, created_at) VALUES ($1, $2, now())",
             )
