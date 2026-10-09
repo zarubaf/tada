@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT c.id, c.event_id, c.local_number, c.text, c.condition, c.person_id, c.institution_id,\n                  COALESCE(p.local_number, i.local_number) AS \"promisor_number?\",\n                  COALESCE(p.name, i.name) AS \"promisor_name?\",\n                  c.owner_user_id, c.workstream_id, c.due_date AS \"due_date: jiff_sqlx::Date\",\n                  c.status, c.firm_reason, c.version\n           FROM commitment c\n           LEFT JOIN person p ON p.organization_id = c.organization_id AND p.id = c.person_id\n           LEFT JOIN institution i\n               ON i.organization_id = c.organization_id AND i.id = c.institution_id\n           WHERE c.organization_id = $1\n             AND ($2::uuid IS NULL OR c.event_id = $2)\n             AND ($3::uuid IS NULL OR c.id = $3)\n             AND ($4::uuid IS NULL OR c.owner_user_id = $4)\n             AND ($5::text IS NULL OR c.status = $5)\n             AND ($6::uuid IS NULL OR c.workstream_id = $6)\n             AND c.local_number > $7\n             AND (NOT $8 OR c.status IN ('conditional', 'firm'))\n           ORDER BY c.event_id, c.local_number\n           LIMIT $9",
+  "query": "SELECT c.id, c.event_id, c.local_number, c.text, c.condition, c.person_id, c.institution_id,\n                  COALESCE(p.local_number, i.local_number) AS \"promisor_number?\",\n                  COALESCE(p.name, i.name) AS \"promisor_name?\",\n                  c.owner_user_id, c.workstream_id, c.due_date AS \"due_date: jiff_sqlx::Date\",\n                  c.status, c.firm_reason, c.version\n           FROM commitment c\n           LEFT JOIN person p ON p.organization_id = c.organization_id AND p.id = c.person_id\n           LEFT JOIN institution i\n               ON i.organization_id = c.organization_id AND i.id = c.institution_id\n           WHERE c.organization_id = $1\n             AND ($2::uuid IS NULL OR c.event_id = $2)\n             AND ($3::uuid IS NULL OR c.id = $3)\n             AND ($4::uuid IS NULL OR c.owner_user_id = $4)\n             AND ($5::text IS NULL OR c.status = $5)\n             AND ($6::uuid IS NULL OR c.workstream_id = $6)\n             AND c.local_number > $7\n             AND (NOT $8 OR c.status IN ('conditional', 'firm'))\n             AND ($10::uuid[] IS NULL OR c.event_id = ANY($10))\n           ORDER BY c.event_id, c.local_number\n           LIMIT $9",
   "describe": {
     "columns": [
       {
@@ -169,7 +169,8 @@
         "Uuid",
         "Int8",
         "Bool",
-        "Int8"
+        "Int8",
+        "UuidArray"
       ]
     },
     "nullable": [
@@ -190,5 +191,5 @@
       false
     ]
   },
-  "hash": "00a20f1793d2b5e7e2a059f6fea3beb9265663e1273034f54c29362f950d01ea"
+  "hash": "b8992453047132efefdfbd017ea4758a4ee65fbf68c7b085c9b2c6685a3a7b4d"
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT e.id, e.key\n         FROM event e\n         WHERE e.organization_id = $1\n           AND ($3 OR EXISTS (SELECT 1 FROM event_membership m\n                              WHERE m.organization_id = e.organization_id\n                                AND m.event_id = e.id AND m.user_id = $2))",
+  "query": "SELECT id, key FROM event\n         WHERE organization_id = $1 AND ($2::uuid[] IS NULL OR id = ANY($2))",
   "describe": {
     "columns": [
       {
@@ -29,8 +29,7 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid",
-        "Bool"
+        "UuidArray"
       ]
     },
     "nullable": [
@@ -38,5 +37,5 @@
       false
     ]
   },
-  "hash": "e27bcd6180e453a5c77aa2b29294fa07fbb8ce1da90de2f7e2db743abe885bbf"
+  "hash": "b124ceab8541d99aa3d2df6ef8149784603f83c516200e81316c508536e482f2"
 }
