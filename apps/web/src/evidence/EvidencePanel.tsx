@@ -5,6 +5,7 @@ import { formatDateTime } from "../facts/formatValue";
 import { t } from "../i18n";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Sheet } from "../ui/Sheet";
+import { authorKindName } from "./authorKind";
 import styles from "./EvidencePanel.module.css";
 import { Excerpt } from "./Excerpt";
 
@@ -72,7 +73,7 @@ function authorName(author: Author, members: Map<string, string>): string {
   if (author.kind === "member") {
     return members.get(author.id) ?? t("evidence-author-unknown");
   }
-  return t(`evidence-author-${author.kind}`);
+  return authorKindName(author.kind);
 }
 
 function Source({

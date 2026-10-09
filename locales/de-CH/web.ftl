@@ -79,6 +79,7 @@ evidence-document-version = { $name }, Version { $number }
 evidence-author-unknown = Unbekanntes Mitglied
 evidence-author-ai = KI-Client
 evidence-author-service = Dienst
+evidence-author-other = Unbekannter Absender
 
 ## The state of knowledge of a value (doc/design/tokens.md).
 knowledge-accepted = Bestätigt
