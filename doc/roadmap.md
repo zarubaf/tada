@@ -16,7 +16,8 @@ Each sub-slice has its own design, plan, reviews and merge.
 The owner wants tada usable for a first real club event as soon as possible, so the sub-slices come in this order.
 
 tada runs with invented data and public facts only until two gates close.
-The first gate is the external review of the authentication code ([ADR 0008](adr/0008-authentication.md)).
+The first gate, the review of the authentication code, is closed.
+[ADR 0070](adr/0070-ai-security-review-replaces-the-external-review.md) records the AI security review and its fixes.
 The second gate is the person features of [ADR 0045](adr/0045-data-protection.md), which sub-slice 2b delivers.
 
 ### Slice 2a: Work records and distributed review
@@ -81,7 +82,7 @@ Acceptance:
 
 These items stay with the product owner and have no sub-slice.
 
-- The team closes the findings of the external reviewer (ADR 0008).
+- The findings of the security review of the authentication code are closed (ADR 0070).
 - (10) A backup restoration in the operator's deployment repository is demonstrated (ADR 0033, [release gates](release-gates.md)).
 
 ## Slice 3: Controlled outbound work

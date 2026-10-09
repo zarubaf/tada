@@ -3,6 +3,7 @@
 - Status: Proposed
 - Date: 2026-10-09
 - Amends: [0056](0056-sign-in-details.md)
+- Amended by: [0070](0070-ai-security-review-replaces-the-external-review.md)
 
 ## Context
 

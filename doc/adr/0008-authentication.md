@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-06
+- Amended by: [0070](0070-ai-security-review-replaces-the-external-review.md)
 
 ## Context
 
@@ -58,13 +59,13 @@ Passkeys come later with `webauthn-rs`.
 Assurance:
 
 - Tests cover the applicable requirements of OWASP ASVS 5.0, chapters on authentication and session management.
-- Before the first real event data goes live, a person outside the core team reviews the authentication code.
+- Before the first real event data goes live, an AI security review of the authentication code closes all its findings (ADR 0070).
 
 ## Consequences
 
 - One authority for memberships and roles.
 - We own about as much code for sessions as for magic links. It uses only maintained primitives.
-- We must find the external reviewer before go-live.
+- The security review of ADR 0070 replaces the external reviewer.
 
 ## Alternatives
 
