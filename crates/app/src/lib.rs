@@ -36,5 +36,6 @@ pub mod telegram;
 pub mod tokens;
 pub mod uploads;
 pub mod views;
+pub mod workstreams;
 
 pub use tada_domain as domain;

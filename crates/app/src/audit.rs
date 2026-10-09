@@ -45,6 +45,10 @@ pub enum AuditAction {
     InstitutionCreate,
     /// An owner or admin changed an institution (ADR 0069).
     InstitutionChange,
+    /// An event manager created a workstream (ADR 0067).
+    WorkstreamCreate,
+    /// An event manager renamed a workstream, changed its lead or opened or closed it (ADR 0067).
+    WorkstreamChange,
 }
 
 impl AuditAction {
@@ -76,6 +80,8 @@ impl AuditAction {
             Self::PersonChange => "person.change",
             Self::InstitutionCreate => "institution.create",
             Self::InstitutionChange => "institution.change",
+            Self::WorkstreamCreate => "workstream.create",
+            Self::WorkstreamChange => "workstream.change",
         }
     }
 
@@ -107,6 +113,7 @@ impl AuditAction {
             Self::DocumentVersionUpload | Self::DocumentVersionApprove => "document_version",
             Self::PersonCreate | Self::PersonChange => "person",
             Self::InstitutionCreate | Self::InstitutionChange => "institution",
+            Self::WorkstreamCreate | Self::WorkstreamChange => "workstream",
         }
     }
 }

@@ -23,6 +23,7 @@ mod sign_in;
 mod telegram;
 mod tokens;
 mod values;
+mod workstreams;
 
 use std::net::SocketAddr;
 use std::num::NonZeroU64;
@@ -56,6 +57,7 @@ use tada_app::sign_in::{SignInRequestStore, SignInStore};
 use tada_app::sources::SourceStore;
 use tada_app::telegram::TelegramLinks;
 use tada_app::tokens::TokenStore;
+use tada_app::workstreams::WorkstreamStore;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa::openapi::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
@@ -101,6 +103,8 @@ pub struct ApiState {
     pub privacy: Arc<dyn PrivacyStore>,
     /// Persons and institutions (ADR 0069).
     pub parties: Arc<dyn PartyStore>,
+    /// The workstreams of events (ADR 0067).
+    pub workstreams: Arc<dyn WorkstreamStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -121,7 +125,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(review::routes())
                 .merge(tokens::routes())
                 .merge(privacy::routes())
-                .merge(parties::routes()),
+                .merge(parties::routes())
+                .merge(workstreams::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -142,6 +147,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(tokens::problem_codes())
         .chain(privacy::problem_codes())
         .chain(parties::problem_codes())
+        .chain(workstreams::problem_codes())
         .collect()
 }
 
@@ -1096,6 +1102,52 @@ mod tests {
     }
 
     #[derive(Debug)]
+    struct NoWorkstreams;
+
+    #[async_trait::async_trait]
+    impl WorkstreamStore for NoWorkstreams {
+        async fn create(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::workstreams::Workstream,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::workstreams::Created, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn change(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::WorkstreamId,
+            _: &tada_app::workstreams::WorkstreamUpdate,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::workstreams::Changed, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn get(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::WorkstreamId,
+        ) -> Result<Option<tada_app::workstreams::Workstream>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn list(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+        ) -> Result<Vec<tada_app::workstreams::Workstream>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[derive(Debug)]
     struct NoPrivacy;
 
     #[async_trait::async_trait]
@@ -1143,6 +1195,7 @@ mod tests {
             tokens: Arc::new(NoTokens),
             privacy: Arc::new(NoPrivacy),
             parties: Arc::new(NoParties),
+            workstreams: Arc::new(NoWorkstreams),
         }
     }
 

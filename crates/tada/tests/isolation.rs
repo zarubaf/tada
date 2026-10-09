@@ -317,6 +317,35 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
             json!({"expected_version": 1}),
             Expect::NotFound,
         )],
+        // Workstreams. An unknown ID in B stands for a workstream of B: the lookup is by event.
+        "list_workstreams" => vec![
+            get(
+                api(format!("/events/{}/workstreams", t.b_event)),
+                Expect::NotFound,
+            ),
+            get(api(format!("/events/{}/workstreams", t.a_event)), READS),
+        ],
+        "create_workstream" => vec![
+            post(
+                api(format!("/events/{}/workstreams", t.b_event)),
+                json!({"name": "Gelände", "lead_user_id": t.a_member}),
+                Expect::NotFound,
+            ),
+            post(
+                api(format!("/events/{}/workstreams", t.a_event)),
+                json!({"name": "Gelände", "lead_user_id": t.b_member}),
+                Expect::Refused,
+            ),
+        ],
+        "change_workstream" => vec![patch(
+            api(format!(
+                "/events/{}/workstreams/{}",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            json!({"name": "Bar", "expected_version": 1}),
+            Expect::NotFound,
+        )],
         // Members and invitations.
         "list_members" => vec![get(api("/members".into()), reads(&t.a_member))],
         "remove_member" => vec![post(
