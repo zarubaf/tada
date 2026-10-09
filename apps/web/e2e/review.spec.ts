@@ -22,6 +22,10 @@ const NEW_FIELD = "0199b8e0-0000-7000-8000-0000000000f2";
 const P_FIELD = "0199b8e0-0000-7000-8000-0000000001a2";
 const P_FACT = "0199b8e0-0000-7000-8000-0000000001a3";
 const SOURCE = "0199b8e0-0000-7000-8000-0000000000e1";
+const CS_DRAFT = "0199b8e0-0000-7000-8000-000000000c04";
+const DRAFT_FACT = "0199b8e0-0000-7000-8000-0000000002a2";
+const draftFactLink = `tada:fact/${DRAFT_FACT}?v=2`;
+const draftHiddenLink = "tada:fact/0199b8e0-0000-7000-8000-0000000002a3?v=1";
 
 // Invented data with long German words and umlauts (doc/design/principles.md).
 const evidence = {
@@ -114,6 +118,49 @@ const changesets = {
       }),
     ],
   },
+  // A draft with a cited fact, a target that the reader cannot see and two lint warnings.
+  [CS_DRAFT]: {
+    id: CS_DRAFT,
+    event_id: event?.id,
+    author: ai,
+    source_version_id: SOURCE,
+    created_at: "2028-03-07T09:00:00Z",
+    proposals: [
+      proposal("0199b8e0-0000-7000-8000-0000000001c1", {
+        operation: {
+          kind: "create-document-draft",
+          event_id: event?.id,
+          markdown: "Entwurf",
+          document: {
+            kind: "new",
+            id: "0199b8e0-0000-7000-8000-0000000000d3",
+            name: "Konzept Flugtag Veranstaltungsbewilligungsverfahren",
+          },
+        },
+        draft: {
+          markdown: [
+            `Der Anlass findet auf dem Flugplatz [](${draftFactLink}) statt.`,
+            "Es kommen etwa 500 Gäste.",
+            `Das Konto lautet [](${draftHiddenLink}).`,
+          ].join("\n\n"),
+          lint_warnings: [
+            { line: 3, kind: "number" },
+            { line: 3, kind: "raw-html" },
+          ],
+          links: {
+            [draftFactLink]: {
+              kind: "fact",
+              fact_id: DRAFT_FACT,
+              version: 2,
+              state: "assumption",
+              value: { type: "text", text: "Testwil" },
+            },
+            [draftHiddenLink]: { kind: "hidden" },
+          },
+        },
+      }),
+    ],
+  },
   [CS_ORG]: {
     id: CS_ORG,
     event_id: null,
@@ -184,6 +231,9 @@ async function fakeInbox(page: Page): Promise<unknown[]> {
   await page.route("**/api/v1/events/*/fields", (route) =>
     route.fulfill(json({ items: [venueField] })),
   );
+  await page.route("**/api/v1/events/*/profile", (route) =>
+    route.fulfill(json({ facts: [], proposals: [], open_questions: [] })),
+  );
   await page.route(/\/api\/v1\/changesets\?/, (route) => route.fulfill(json({ items })));
   await page.route(/\/api\/v1\/changesets\/[^/]+$/, (route) => {
     const id = route.request().url().split("/").pop() as keyof typeof changesets;
@@ -202,6 +252,7 @@ const states = [
   { name: "list", path: "/inbox" },
   { name: "detail", path: `/inbox/${CS_NEW}` },
   { name: "conflict", path: `/inbox/${CS_OLD}` },
+  { name: "draft", path: `/inbox/${CS_DRAFT}` },
 ] as const;
 
 for (const viewport of viewports) {

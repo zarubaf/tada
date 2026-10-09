@@ -2,6 +2,8 @@
 // goes through `formatValue`, so that the inbox and the event overview read the same (ADR 0049).
 
 import type { Changeset, Field, Operation, Proposal, ValueType } from "../api/client";
+import { type DraftEnvironment, ProposalDraft } from "../documents/DraftView";
+import { LintWarnings } from "../documents/LintWarnings";
 import { formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { Link } from "../router/Router";
@@ -120,9 +122,12 @@ function FactComparison({
 export function OperationDetails({
   proposal,
   fields,
+  draftEnvironment,
 }: {
   proposal: Proposal;
   fields: Map<string, FieldInfo>;
+  /** Where a draft is read: its event. It is absent for a changeset of the organization. */
+  draftEnvironment: DraftEnvironment | undefined;
 }) {
   const { operation, draft } = proposal;
   switch (operation.kind) {
@@ -181,10 +186,9 @@ export function OperationDetails({
               </Link>
             </>
           )}
-          {draft && draft.lint_warnings.length > 0 && (
-            <p className={styles.note}>
-              {t("inbox-draft-warnings", { count: draft.lint_warnings.length })}
-            </p>
+          {draft && <LintWarnings warnings={draft.lint_warnings} />}
+          {draft && draftEnvironment && (
+            <ProposalDraft environment={draftEnvironment} draft={draft} />
           )}
         </div>
       );

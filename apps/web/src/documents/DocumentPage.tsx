@@ -1,17 +1,30 @@
+import { IconAlertTriangle } from "@tabler/icons-react";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Api, type Document, type DocumentVersion, problemMessage } from "../api/client";
+import {
+  type Api,
+  type Document,
+  type DocumentVersion,
+  type DraftRendering,
+  problemMessage,
+} from "../api/client";
 import { EventPage } from "../events/EventPage";
+import { useEventContext } from "../events/eventContext";
 import { loadOrganizationMembers } from "../events/eventMembers";
 import { LOCALE, t } from "../i18n";
 import { Link, useParams } from "../router/Router";
+import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { FileLink } from "../ui/FileLink";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { LiveRegion } from "../ui/LiveRegion";
 import { Page } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./DocumentPage.module.css";
+import { DraftView } from "./DraftView";
 import { formatSize, hashPrefix } from "./format";
+import { useCanApprove } from "./useCanApprove";
+import { diffPath, isApprovable, newestVersion, previousDraft } from "./versions";
 
 const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" });
 
@@ -153,7 +166,10 @@ export function DocumentPage({ api }: { api: Api }) {
           </FileLink>
         ) : (
           // A draft has no file: its download answers not-found.
-          <span className={styles.muted}>{t("document-draft-no-download")}</span>
+          <>
+            <span className={styles.muted}>{t("document-draft-no-download")}</span>
+            <DiffLink documentId={documentId} versions={versionsOf(state)} version={v} />
+          </>
         ),
     },
   ];
@@ -162,6 +178,8 @@ export function DocumentPage({ api }: { api: Api }) {
     return (
       <EventPage api={api} eventId={state.document.event_id}>
         <DocumentBody
+          api={api}
+          reload={load}
           document={state.document}
           versions={state.versions}
           columns={columns}
@@ -195,13 +213,88 @@ export function DocumentPage({ api }: { api: Api }) {
   );
 }
 
+/** The versions of a loaded page, or none. */
+function versionsOf(state: State): DocumentVersion[] {
+  return state.kind === "loaded" ? state.versions : [];
+}
+
+/** The link to the difference between a draft and the draft before it. */
+function DiffLink({
+  documentId,
+  versions,
+  version,
+}: {
+  documentId: string;
+  versions: DocumentVersion[];
+  version: DocumentVersion;
+}) {
+  const previous = previousDraft(versions, version);
+  return previous ? (
+    <Link
+      to={diffPath(documentId, previous, version)}
+      aria-label={t("document-diff-link-to", { number: previous.number })}
+    >
+      {t("document-diff-link")}
+    </Link>
+  ) : null;
+}
+
+type RenderingState =
+  | { kind: "loading" }
+  | { kind: "failed"; message: string; requestId: string | undefined }
+  | { kind: "loaded"; draft: DraftRendering };
+
+/** Loads the rendering of a draft version. Without a version, it loads nothing. */
+function useRendering(api: Api, versionId: string | undefined) {
+  const [state, setState] = useState<RenderingState>({ kind: "loading" });
+  const latest = useRef(0);
+
+  /** Resolves to true when the draft loaded. */
+  const load = useCallback(async () => {
+    if (!versionId) {
+      return true;
+    }
+    const request = ++latest.current;
+    const done = (next: RenderingState) => {
+      if (request === latest.current) {
+        setState(next);
+      }
+      return next.kind === "loaded";
+    };
+    try {
+      const { data, error } = await api.GET("/api/v1/document-versions/{version_id}/rendering", {
+        params: { path: { version_id: versionId } },
+      });
+      return done(
+        data
+          ? { kind: "loaded", draft: data.draft }
+          : { kind: "failed", message: problemMessage(error), requestId: error?.request_id },
+      );
+    } catch {
+      return done({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
+    }
+  }, [api, versionId]);
+
+  useEffect(() => {
+    setState({ kind: "loading" });
+    void load();
+  }, [load]);
+
+  return { state, load, loading: () => setState({ kind: "loading" }) };
+}
+
 /** The content of a loaded document. It sits in the layout of the event. */
 function DocumentBody({
+  api,
+  reload,
   document,
   versions,
   columns,
   heading,
 }: {
+  api: Api;
+  /** Loads the document and its versions again. Resolves to true when they loaded. */
+  reload: () => Promise<boolean>;
   document: Document;
   versions: DocumentVersion[];
   columns: Column<DocumentVersion>[];
@@ -210,8 +303,57 @@ function DocumentBody({
   const focusAfterCommit = useFocusAfterCommit();
   // The page arrived: focus goes to the heading of the document.
   useEffect(() => focusAfterCommit(() => heading.current), [focusAfterCommit, heading]);
-  const newest = useMemo(() => [...versions].sort((a, b) => b.number - a.number)[0], [versions]);
+  const { event, profile } = useEventContext();
+  const newest = useMemo(() => newestVersion(versions), [versions]);
   const preview = previewKind(newest);
+  const rendering = useRendering(api, newest?.kind === "draft" ? newest.id : undefined);
+  const previewHeading = useRef<HTMLHeadingElement>(null);
+  const { retried, retry } = useRetry(() => previewHeading.current);
+  const canApprove = useCanApprove(api, document.event_id);
+  const [approving, setApproving] = useState(false);
+  const [approved, setApproved] = useState<string>();
+  const [failed, setFailed] = useState<string>();
+
+  /** The button stays while it runs and when the call fails, so focus stays on it. */
+  const approve = async () => {
+    if (!newest || approving) {
+      return;
+    }
+    setApproving(true);
+    setApproved(undefined);
+    setFailed(undefined);
+    try {
+      const { data, error } = await api.POST("/api/v1/document-versions/{version_id}/approve", {
+        params: { path: { version_id: newest.id } },
+        body: { expected_version: document.version },
+      });
+      if (data) {
+        setApproved(t("document-approved", { number: data.number }));
+        await reload();
+        // The button left with the approval.
+        focusAfterCommit(() => heading.current);
+        return;
+      }
+      setFailed(
+        error?.code === "invalid-transition"
+          ? t("document-approve-invalid")
+          : problemMessage(error),
+      );
+      if (error?.code === "invalid-transition" || error?.code === "record-version-conflict") {
+        // Someone else changed the document: the page shows its current state. If the button
+        // left with it, focus would fall to the page: it moves to the heading instead.
+        await reload();
+        focusAfterCommit(() =>
+          window.document.activeElement === window.document.body ? heading.current : undefined,
+        );
+      }
+    } catch {
+      setFailed(problemMessage(undefined));
+    } finally {
+      setApproving(false);
+    }
+  };
+
   return (
     <>
       <Link to={`/events/${encodeURIComponent(document.event_id)}/documents`}>
@@ -223,6 +365,18 @@ function DocumentBody({
           {document.name}
         </h2>
       </header>
+      <LiveRegion kind="status">{approved}</LiveRegion>
+      <LiveRegion kind="alert">{failed}</LiveRegion>
+      {/* An absent value means that the server does not know: the page then says nothing. */}
+      {document.facts_changed === true && (
+        <section className={styles.changed} aria-labelledby="document-facts-changed-title">
+          <h3 id="document-facts-changed-title" className={styles.changedTitle}>
+            <IconAlertTriangle size={16} stroke={1.5} aria-hidden="true" />
+            {t("document-facts-changed-title")}
+          </h3>
+          <p>{t("document-facts-changed-text")}</p>
+        </section>
+      )}
       <section className={styles.section} aria-labelledby="document-versions-title">
         <h3 id="document-versions-title" className={styles.heading}>
           {t("document-versions-title")}
@@ -236,9 +390,44 @@ function DocumentBody({
         <p className={styles.help}>{t("documents-no-scan")}</p>
       </section>
       <section className={styles.section} aria-labelledby="document-preview-title">
-        <h3 id="document-preview-title" className={styles.heading}>
+        <h3
+          id="document-preview-title"
+          ref={previewHeading}
+          tabIndex={-1}
+          className={styles.heading}
+        >
           {t("document-preview-title")}
         </h3>
+        {newest && isApprovable(newest) && canApprove && (
+          <div>
+            <Button variant="primary" isPending={approving} onPress={() => void approve()}>
+              {t("document-approve")}
+            </Button>
+          </div>
+        )}
+        {newest?.kind === "draft" && rendering.state.kind === "loading" && <Skeleton />}
+        {newest?.kind === "draft" && rendering.state.kind === "failed" && (
+          <InlineError
+            message={rendering.state.message}
+            requestId={rendering.state.requestId}
+            announce={retried ? "focus" : "alert"}
+            onRetry={() =>
+              retry(() => {
+                rendering.loading();
+                return rendering.load();
+              })
+            }
+          />
+        )}
+        {newest?.kind === "draft" && rendering.state.kind === "loaded" && (
+          <DraftView
+            api={api}
+            eventId={document.event_id}
+            timeZone={event.time_zone}
+            draft={rendering.state.draft}
+            profile={profile}
+          />
+        )}
         {newest && preview === "text" && (
           <iframe
             className={styles.frame}
@@ -255,7 +444,6 @@ function DocumentBody({
             </FileLink>
           </div>
         )}
-        {newest?.kind === "draft" && <p>{t("document-preview-draft")}</p>}
         {newest?.kind === "upload" && !preview && <p>{t("document-preview-none")}</p>}
       </section>
     </>

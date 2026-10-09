@@ -47,7 +47,20 @@ const draft: DocumentVersion = {
 /** The number of requests for the document that fail before one succeeds. */
 const failures = { documents: 0 };
 
-function setup(versions: DocumentVersion[]) {
+const DRAFT_LINK = "tada:fact/0199b8e0-0000-7000-8000-0000000000a1?v=1";
+
+interface Options {
+  /** True when the document reports that its facts changed; absent when the server does not know. */
+  factsChanged?: boolean;
+  /** The caller is an event manager: the list of the event memberships answers. */
+  manager?: boolean;
+  /** The answer of the approval. */
+  approve?: () => Response;
+  /** The rendering of the draft fails. */
+  renderingFails?: boolean;
+}
+
+function setup(versions: DocumentVersion[], options: Options = {}) {
   const newest = versions[versions.length - 1] as DocumentVersion;
   const document = {
     id: DOCUMENT_ID,
@@ -58,6 +71,7 @@ function setup(versions: DocumentVersion[]) {
     created_at: "2030-05-18T08:00:00Z",
     version: versions.length,
     newest_version: newest,
+    ...(options.factsChanged !== undefined && { facts_changed: options.factsChanged }),
   };
   const session = {
     user_id: "u1",
@@ -65,10 +79,47 @@ function setup(versions: DocumentVersion[]) {
     organization: { organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" },
     memberships: [{ organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" }],
   };
+  const calls: { method: string; path: string; body: unknown }[] = [];
   const fetch = async (request: Request) => {
     const { pathname } = new URL(request.url);
+    const body = request.method === "POST" ? await request.clone().json() : undefined;
+    calls.push({ method: request.method, path: pathname, body });
     if (pathname.endsWith("/session")) {
       return json(200, session);
+    }
+    if (pathname.endsWith("/approve")) {
+      return (options.approve ?? (() => json(200, { ...newest, status: "approved" })))();
+    }
+    if (pathname.endsWith("/rendering")) {
+      return options.renderingFails
+        ? json(500, { type: "", code: "internal", title: "", status: 500, instance: "" })
+        : json(200, {
+            version: newest,
+            draft: {
+              markdown: `Der Ort ist [](${DRAFT_LINK}).\n\nEs gibt [Hinweise](https://example.org).`,
+              lint_warnings: [],
+              links: {
+                [DRAFT_LINK]: {
+                  kind: "fact",
+                  fact_id: "0199b8e0-0000-7000-8000-0000000000a1",
+                  version: 1,
+                  state: "accepted",
+                  value: { type: "text", text: "Flugplatz Testwil" },
+                },
+              },
+            },
+          });
+    }
+    if (pathname.endsWith(`/events/${EVENT_ID}/memberships`)) {
+      return options.manager
+        ? json(200, { items: [] })
+        : json(403, { type: "", code: "forbidden", title: "", status: 403, instance: "" });
+    }
+    if (pathname.endsWith("/profile")) {
+      return json(200, { facts: [], proposals: [], open_questions: [] });
+    }
+    if (pathname.endsWith("/fields")) {
+      return json(200, { items: [] });
     }
     if (pathname.endsWith("/versions")) {
       return json(200, { items: versions });
@@ -108,6 +159,7 @@ function setup(versions: DocumentVersion[]) {
       </Routes>
     </Router>,
   );
+  return { calls };
 }
 
 afterEach(() => {
@@ -181,8 +233,17 @@ describe("DocumentPage", () => {
     setup([version(1, "Programm.pdf", "application/pdf"), draft]);
 
     const preview = await screen.findByRole("region", { name: "Vorschau der neuesten Version" });
-    expect(within(preview).getByText(/neueste Version ist ein Entwurf/)).toBeInTheDocument();
-    expect(within(preview).queryByRole("link")).not.toBeInTheDocument();
+    expect(await within(preview).findByText("Flugplatz Testwil")).toBeInTheDocument();
+    expect(
+      within(preview).queryByRole("link", { name: "Vorschau in neuem Tab öffnen" }),
+    ).toBeNull();
+  });
+
+  it("shows the failure of the draft with a retry", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft], { renderingFails: true });
+
+    const preview = await screen.findByRole("region", { name: "Vorschau der neuesten Version" });
+    expect(await within(preview).findByRole("button", { name: "Erneut versuchen" })).toBeVisible();
   });
 
   it("opens a PDF preview in a new tab and shows a text preview in a frame", async () => {
@@ -215,5 +276,105 @@ describe("DocumentPage", () => {
     ]);
 
     expect(await screen.findByText(/keine Vorschau/)).toBeInTheDocument();
+  });
+
+  it("shows „Fakten geändert“ when the document says so", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft], { factsChanged: true });
+
+    expect(await screen.findByText("Fakten geändert")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["false", false],
+    ["absent", undefined],
+  ])("shows no „Fakten geändert“ when the value is %s", async (_name, factsChanged) => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft], {
+      ...(factsChanged !== undefined && { factsChanged }),
+    });
+
+    await screen.findByRole("table", { name: "Versionen" });
+    expect(screen.queryByText("Fakten geändert")).not.toBeInTheDocument();
+  });
+
+  it("offers „Version freigeben“ to an event manager for the newest draft", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft], { manager: true });
+
+    expect(await screen.findByRole("button", { name: "Version freigeben" })).toBeInTheDocument();
+  });
+
+  it("offers no approval to a member who is no event manager", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft]);
+
+    await screen.findByRole("table", { name: "Versionen" });
+    await within(
+      await screen.findByRole("region", { name: "Vorschau der neuesten Version" }),
+    ).findByText("Flugplatz Testwil");
+    expect(screen.queryByRole("button", { name: "Version freigeben" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["an upload", [version(1, "Programm.pdf", "application/pdf")]],
+    [
+      "an approved draft",
+      [version(1, "Programm.pdf", "application/pdf"), { ...draft, status: "approved" as const }],
+    ],
+  ])("offers no approval for the newest version when it is %s", async (_name, versions) => {
+    setup(versions, { manager: true });
+
+    await screen.findByRole("table", { name: "Versionen" });
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Version freigeben" })).toBeNull(),
+    );
+  });
+
+  it("approves with the record version of the document and announces the result", async () => {
+    const { calls } = setup([version(1, "Programm.pdf", "application/pdf"), draft], {
+      manager: true,
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Version freigeben" }));
+
+    expect(await screen.findByText("Version 3 ist freigegeben.")).toBeInTheDocument();
+    const approval = calls.find((call) => call.path.endsWith("/approve"));
+    expect(approval).toMatchObject({
+      method: "POST",
+      path: "/api/v1/document-versions/v3/approve",
+      body: { expected_version: 2 },
+    });
+    // The button left with the approval: focus goes to the heading of the document.
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2, name: "Programm Flugtag.pdf" })).toHaveFocus(),
+    );
+  });
+
+  it("keeps the button and its focus when the approval fails, and says why", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft], {
+      manager: true,
+      approve: () =>
+        json(409, {
+          type: "",
+          code: "invalid-transition",
+          title: "",
+          status: 409,
+          instance: "",
+        }),
+    });
+
+    const button = await screen.findByRole("button", { name: "Version freigeben" });
+    await userEvent.click(button);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nicht mehr freigegeben werden/);
+    expect(screen.getByRole("button", { name: "Version freigeben" })).toHaveFocus();
+  });
+
+  it("links the difference to the previous draft", async () => {
+    const earlier = { ...draft, id: "v2", number: 2, status: "superseded" as const };
+    setup([version(1, "Programm.pdf", "application/pdf"), earlier, { ...draft, number: 3 }]);
+
+    const table = await screen.findByRole("table", { name: "Versionen" });
+    expect(within(table).getByRole("link", { name: "Unterschiede zu Version 2" })).toHaveAttribute(
+      "href",
+      `/documents/${DOCUMENT_ID}/diff?from=v2&to=v3`,
+    );
   });
 });

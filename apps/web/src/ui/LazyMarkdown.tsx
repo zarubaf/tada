@@ -11,9 +11,10 @@ import {
 } from "react";
 import { problemMessage } from "../api/client";
 import { InlineError } from "./InlineError";
+import type { MarkdownProps } from "./Markdown";
 import { Skeleton } from "./Skeleton";
 
-type Loader = () => Promise<{ Markdown: ComponentType<{ children: string }> }>;
+type Loader = () => Promise<{ Markdown: ComponentType<MarkdownProps> }>;
 
 // The Markdown parser is large. It loads with the first text, so that it stays out of the
 // initial JavaScript (ADR 0024).
@@ -50,10 +51,13 @@ function Shown({ onShown }: { onShown: () => void }) {
  */
 export function LazyMarkdown({
   children,
+  renderLink,
   onShown,
   load = loadMarkdown,
 }: {
   children: string;
+  /** Renders a `tada:` link; see `Markdown`. */
+  renderLink?: MarkdownProps["renderLink"];
   /** Called when the text is in the page, for example to show an action only after it. */
   onShown?: () => void;
   /** For tests: the loader of the chunk. */
@@ -94,7 +98,7 @@ export function LazyMarkdown({
     <div ref={area} tabIndex={-1}>
       <ChunkBoundary key={failures} fallback={fallback}>
         <Suspense fallback={<Skeleton />}>
-          <Lazy>{children}</Lazy>
+          <Lazy renderLink={renderLink}>{children}</Lazy>
           <Shown onShown={shown} />
         </Suspense>
       </ChunkBoundary>
