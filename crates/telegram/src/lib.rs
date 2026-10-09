@@ -1,6 +1,7 @@
 //! The Telegram gateway (ADR 0011). It turns updates of the Bot API into `app` commands and contains
 //! no domain rules.
 
+mod bot_error;
 mod command;
 mod messages;
 
@@ -30,6 +31,7 @@ use tada_app::telegram::{
     member_for, propose_fact,
 };
 
+use crate::bot_error::BotFailure;
 use crate::command::{Incomplete, ProposeCommand, parse_propose};
 use crate::messages::Messages;
 
@@ -105,7 +107,7 @@ impl Gateway {
                     }
                 }
                 Err(error) => {
-                    tracing::warn!(%error, "the Bot API request failed");
+                    tracing::warn!(error = %BotFailure(&error), "the Bot API request failed");
                     tokio::select! {
                         () = &mut stop => return,
                         () = tokio::time::sleep(RETRY_DELAY) => {}
@@ -137,7 +139,7 @@ impl Gateway {
             .text(reply)
             .build();
         if let Err(error) = self.bot.send_message(&params).await {
-            tracing::warn!(%error, "cannot send the reply");
+            tracing::warn!(error = %BotFailure(&error), "cannot send the reply");
         }
     }
 
