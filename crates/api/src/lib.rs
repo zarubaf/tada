@@ -1180,6 +1180,7 @@ mod tests {
             _: tada_app::domain::ids::WorkstreamId,
             _: &tada_app::workstreams::WorkstreamUpdate,
             _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<tada_app::workstreams::Changed, tada_app::store::StoreError> {
             unreachable!()

@@ -87,6 +87,7 @@ impl WorkstreamStore for Database {
         id: WorkstreamId,
         update: &WorkstreamUpdate,
         expected: RecordVersion,
+        now: Timestamp,
         audit: &AuditEvent,
     ) -> Result<Changed, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
@@ -115,7 +116,7 @@ impl WorkstreamStore for Database {
                  lead_user_id = COALESCE($5, lead_user_id),
                  status = COALESCE($6, status),
                  version = version + 1,
-                 updated_at = now()
+                 updated_at = $7
              WHERE organization_id = $1 AND event_id = $2 AND id = $3
              RETURNING id, event_id, name, lead_user_id, status, version",
             scope.organization_id().as_uuid(),
@@ -124,6 +125,7 @@ impl WorkstreamStore for Database {
             update.name.as_ref().map(WorkstreamName::as_str),
             update.lead.map(UserId::as_uuid),
             update.status.map(WorkstreamStatus::as_str),
+            now.to_sqlx() as _,
         )
         .fetch_one(&mut *tx)
         .await;
@@ -262,6 +264,7 @@ mod tests {
                     id,
                     update,
                     expected,
+                    "2030-05-19T09:30:00Z".parse().unwrap(),
                     &self.audit(AuditAction::WorkstreamChange, id),
                 )
                 .await
@@ -319,6 +322,17 @@ mod tests {
         assert_eq!(changed.status, WorkstreamStatus::Closed);
         assert_eq!(changed.lead, f.lead);
         assert_eq!(changed.version.get(), 2);
+        // The app clock gives the change time, as for the other record kinds.
+        let updated_at: jiff_sqlx::Timestamp =
+            sqlx::query_scalar("SELECT updated_at FROM workstream WHERE id = $1")
+                .bind(ground.id.as_uuid())
+                .fetch_one(&f.test.database.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            updated_at.to_jiff(),
+            "2030-05-19T09:30:00Z".parse::<jiff::Timestamp>().unwrap()
+        );
         assert_eq!(
             f.audit_actions().await,
             [
@@ -397,6 +411,7 @@ mod tests {
                 ground.id,
                 &rename("Bar"),
                 RecordVersion::FIRST,
+                "2030-05-19T09:30:00Z".parse().unwrap(),
                 &f.audit(AuditAction::WorkstreamChange, ground.id),
             )
             .await

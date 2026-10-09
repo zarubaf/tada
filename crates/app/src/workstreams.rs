@@ -72,7 +72,11 @@ pub trait WorkstreamStore: Debug + Send + Sync {
         audit: &AuditEvent,
     ) -> Result<Created, StoreError>;
 
-    /// Applies `update` if the workstream has the version `expected`. The store stamps the change time.
+    /// Applies `update` if the workstream has the version `expected`.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "a write port takes the scope, the record, the values, the version, the time and the audit event"
+    )]
     async fn change(
         &self,
         scope: OrgScope,
@@ -80,6 +84,7 @@ pub trait WorkstreamStore: Debug + Send + Sync {
         id: WorkstreamId,
         update: &WorkstreamUpdate,
         expected: RecordVersion,
+        now: Timestamp,
         audit: &AuditEvent,
     ) -> Result<Changed, StoreError>;
 
@@ -260,6 +265,7 @@ pub async fn change_workstream(
     change: WorkstreamChange,
     identity: &dyn IdentityStore,
     store: &dyn WorkstreamStore,
+    clock: &dyn Clock,
 ) -> Result<Workstream, WorkstreamError> {
     require_manager(caller, event, identity).await?;
     let name = change.name.as_deref().map(parse_name).transpose()?;
@@ -279,6 +285,7 @@ pub async fn change_workstream(
             id,
             &update,
             change.expected_version,
+            clock.now(),
             &audit,
         )
         .await?
@@ -454,6 +461,7 @@ mod tests {
             id: WorkstreamId,
             update: &WorkstreamUpdate,
             expected: RecordVersion,
+            _: Timestamp,
             _: &AuditEvent,
         ) -> Result<Changed, StoreError> {
             let mut all = self.workstreams.lock().unwrap();
@@ -616,6 +624,7 @@ mod tests {
             change,
             &memory,
             &memory,
+            &FixedClock,
         )
         .await;
         assert_eq!(fields(result), [("lead".to_owned(), "unknown-member")]);
@@ -646,6 +655,7 @@ mod tests {
             rename,
             &memory,
             &memory,
+            &FixedClock,
         )
         .await;
         assert_eq!(fields(result), [("name".to_owned(), "taken")]);
@@ -664,8 +674,17 @@ mod tests {
             expected_version,
         };
         let manager = caller(user(MANAGER));
-        let run =
-            |change| change_workstream(&manager, open_day(), created.id, change, &memory, &memory);
+        let run = |change| {
+            change_workstream(
+                &manager,
+                open_day(),
+                created.id,
+                change,
+                &memory,
+                &memory,
+                &FixedClock,
+            )
+        };
         let changed = run(change(RecordVersion::FIRST)).await.unwrap();
         assert_eq!(changed.name.as_str(), "Aussengelände");
         assert_eq!(changed.version.get(), 2);
@@ -699,6 +718,7 @@ mod tests {
             close,
             &memory,
             &memory,
+            &FixedClock,
         )
         .await
         .unwrap();

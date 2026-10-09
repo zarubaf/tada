@@ -225,6 +225,7 @@ async fn change_workstream(
         change,
         state.identity.as_ref(),
         state.workstreams.as_ref(),
+        state.clock.as_ref(),
     )
     .await?;
     Ok(axum::Json(workstream.into()))
