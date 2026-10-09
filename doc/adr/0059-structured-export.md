@@ -56,6 +56,9 @@ The tables:
   For a table that the export leaves out, the list gives the reason.
   The export refuses to run if the schema has a table that the list does not name.
   So a new migration cannot add a table that escapes the export by accident.
+- For each exported table, the list also names the exported columns and the secret columns.
+  The export refuses to run if the table has a column that the list does not name, or if the list names a column that the table does not have.
+  So a new migration cannot add a secret column that goes into the export by accident.
 - The export contains the organization, its events, memberships, invitations, outbound intents, audit events, API tokens and switches.
   It also contains the local ID counters, event field definitions, sources, changesets, proposals and review results.
   It also contains the facts, fact versions, evidence links, open questions, documents, document versions and draft manifests.
@@ -88,7 +91,7 @@ The import:
 - An operator can give a club all of its data in open formats, with the files and their hashes.
 - An export holds all personal data of the organization.
   The operator stores, transfers and deletes it like a backup (ADR 0031, ADR 0045).
-- A new table needs a decision in the list of `store-pg`; the export fails until the table has one.
+- A new table or a new column needs a decision in the list of `store-pg`; the export fails until it has one.
 - The export holds all rows in memory. This is enough at club scale; a larger organization needs a streaming export.
 - An import into another installation must use the same schema version. A production import needs a new ADR.
 

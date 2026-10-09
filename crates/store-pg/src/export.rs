@@ -32,53 +32,384 @@ pub(crate) enum Rows {
 pub(crate) struct Exported {
     pub(crate) table: &'static str,
     pub(crate) rows: Rows,
+    /// The columns that the export holds, in the order of the table.
+    pub(crate) columns: &'static [&'static str],
     /// Columns with secrets, for example a token hash. The export leaves them out (ADR 0059).
     pub(crate) secret_columns: &'static [&'static str],
 }
 
-const fn exported(table: &'static str, rows: Rows) -> Exported {
+const fn exported(table: &'static str, rows: Rows, columns: &'static [&'static str]) -> Exported {
     Exported {
         table,
         rows,
+        columns,
         secret_columns: &[],
     }
 }
 
 /// The exported tables, each after the tables that it refers to. An import inserts them in this order.
+/// Each column of an exported table is in `columns` or in `secret_columns`.
+/// A new column stops the export until a migration author adds it to one of the two lists (ADR 0059).
 pub(crate) const EXPORTED: &[Exported] = &[
-    exported("organization", Rows::Organization),
-    exported("app_user", Rows::OfUsers("id")),
-    exported("email_identity", Rows::OfUsers("user_id")),
-    exported("telegram_identity", Rows::OfUsers("user_id")),
-    exported("organization_membership", Rows::OfOrganization),
-    exported("organization_feature", Rows::OfOrganization),
-    exported("event", Rows::OfOrganization),
-    exported("event_membership", Rows::OfOrganization),
-    exported("invitation", Rows::OfOrganization),
-    exported("outbound_intent", Rows::OfOrganization),
-    exported("audit_event", Rows::OfOrganization),
+    exported(
+        "organization",
+        Rows::Organization,
+        &[
+            "id",
+            "slug",
+            "name",
+            "created_at",
+            "storage_quota_bytes",
+            "privacy_notice",
+            "privacy_notice_version",
+        ],
+    ),
+    exported(
+        "app_user",
+        Rows::OfUsers("id"),
+        &["id", "display_name", "locale", "created_at"],
+    ),
+    exported(
+        "email_identity",
+        Rows::OfUsers("user_id"),
+        &["user_id", "email", "created_at"],
+    ),
+    exported(
+        "telegram_identity",
+        Rows::OfUsers("user_id"),
+        &["telegram_user_id", "user_id", "linked_at"],
+    ),
+    exported(
+        "organization_membership",
+        Rows::OfOrganization,
+        &[
+            "organization_id",
+            "user_id",
+            "role",
+            "version",
+            "created_at",
+        ],
+    ),
+    exported(
+        "organization_feature",
+        Rows::OfOrganization,
+        &["organization_id", "feature", "enabled", "version"],
+    ),
+    exported(
+        "event",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "key",
+            "name",
+            "time_zone",
+            "version",
+            "created_at",
+        ],
+    ),
+    exported(
+        "event_membership",
+        Rows::OfOrganization,
+        &[
+            "organization_id",
+            "event_id",
+            "user_id",
+            "event_role",
+            "version",
+            "created_at",
+        ],
+    ),
+    exported(
+        "invitation",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "email",
+            "display_name",
+            "role",
+            "invited_by",
+            "status",
+            "created_at",
+            "accepted_at",
+            "revoked_at",
+        ],
+    ),
+    exported(
+        "outbound_intent",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "user_id",
+            "invitation_id",
+            "purpose",
+            "status",
+            "message_id",
+            "request_id",
+            "created_at",
+            "finished_at",
+        ],
+    ),
+    exported(
+        "audit_event",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "occurred_at",
+            "actor_kind",
+            "actor_id",
+            "principal_id",
+            "channel",
+            "request_id",
+            "action",
+            "record_kind",
+            "record_id",
+            "subject_user_id",
+            "detail",
+        ],
+    ),
     Exported {
         table: "api_token",
         rows: Rows::OfOrganization,
+        columns: &[
+            "id",
+            "organization_id",
+            "user_id",
+            "name",
+            "scope",
+            "expires_at",
+            "notice_version",
+            "notice_confirmed_at",
+            "created_at",
+            "last_used_at",
+            "revoked_at",
+        ],
         secret_columns: &["token_hash"],
     },
-    exported("local_id_counter", Rows::OfOrganization),
-    exported("field_definition", Rows::OfOrganization),
-    exported("source_item", Rows::OfOrganization),
-    exported("source_version", Rows::OfOrganization),
-    exported("changeset", Rows::OfOrganization),
-    exported("proposal", Rows::OfOrganization),
-    exported("proposal_dependency", Rows::OfOrganization),
-    exported("proposal_evidence", Rows::OfOrganization),
-    exported("review_result", Rows::OfOrganization),
-    exported("fact", Rows::OfOrganization),
-    exported("fact_version", Rows::OfOrganization),
-    exported("evidence_link", Rows::OfOrganization),
-    exported("open_question", Rows::OfOrganization),
-    exported("document", Rows::OfOrganization),
-    exported("document_version", Rows::OfOrganization),
-    exported("document_manifest_fact", Rows::OfOrganization),
-    exported("document_manifest_source", Rows::OfOrganization),
+    exported(
+        "local_id_counter",
+        Rows::OfOrganization,
+        &["organization_id", "scope_id", "kind", "next"],
+    ),
+    exported(
+        "field_definition",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "event_id",
+            "key",
+            "label_text",
+            "label_message",
+            "value_type",
+            "description",
+            "module",
+            "status",
+            "catalog_version",
+            "created_at",
+        ],
+    ),
+    exported(
+        "source_item",
+        Rows::OfOrganization,
+        &["id", "organization_id", "event_id", "kind", "created_at"],
+    ),
+    exported(
+        "source_version",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "source_item_id",
+            "kind",
+            "channel",
+            "author_actor",
+            "text",
+            "sha256",
+            "url",
+            "retrieved_at",
+            "captured_at",
+        ],
+    ),
+    exported(
+        "changeset",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "event_id",
+            "author",
+            "source_version_id",
+            "created_at",
+        ],
+    ),
+    exported(
+        "proposal",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "changeset_id",
+            "event_id",
+            "operation",
+            "operation_version",
+            "target_kind",
+            "target_id",
+            "expected_version",
+            "reason",
+            "created_at",
+            "manifest",
+            "lint_warnings",
+        ],
+    ),
+    exported(
+        "proposal_dependency",
+        Rows::OfOrganization,
+        &[
+            "organization_id",
+            "changeset_id",
+            "proposal_id",
+            "depends_on",
+        ],
+    ),
+    exported(
+        "proposal_evidence",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "proposal_id",
+            "source_version_id",
+            "start_offset",
+            "end_offset",
+            "quote",
+            "page",
+        ],
+    ),
+    exported(
+        "review_result",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "proposal_id",
+            "result",
+            "reviewer",
+            "edit_source_version_id",
+            "created_at",
+        ],
+    ),
+    exported(
+        "fact",
+        Rows::OfOrganization,
+        &["id", "organization_id", "event_id", "field_id", "version"],
+    ),
+    exported(
+        "fact_version",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "fact_id",
+            "number",
+            "state",
+            "value",
+            "approximate",
+            "created_at",
+            "accepted_by",
+            "proposal_id",
+        ],
+    ),
+    exported(
+        "evidence_link",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "fact_version_id",
+            "source_version_id",
+            "start_offset",
+            "end_offset",
+            "quote",
+            "page",
+        ],
+    ),
+    exported(
+        "open_question",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "event_id",
+            "local_number",
+            "text",
+            "owner_user_id",
+            "status",
+            "version",
+            "created_at",
+        ],
+    ),
+    exported(
+        "document",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "event_id",
+            "local_number",
+            "name",
+            "owner_user_id",
+            "created_at",
+            "version",
+        ],
+    ),
+    exported(
+        "document_version",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "document_id",
+            "number",
+            "kind",
+            "blob_key",
+            "media_type",
+            "size_bytes",
+            "sha256",
+            "file_name",
+            "uploaded_by",
+            "source_version_id",
+            "status",
+            "created_at",
+            "approved_by",
+            "approved_at",
+            "markdown",
+        ],
+    ),
+    exported(
+        "document_manifest_fact",
+        Rows::OfOrganization,
+        &[
+            "organization_id",
+            "document_version_id",
+            "fact_id",
+            "fact_version_number",
+        ],
+    ),
+    exported(
+        "document_manifest_source",
+        Rows::OfOrganization,
+        &[
+            "organization_id",
+            "document_version_id",
+            "source_version_id",
+            "start_offset",
+            "end_offset",
+        ],
+    ),
 ];
 
 /// The tables that the export leaves out, with the reason (ADR 0059).
@@ -120,10 +451,18 @@ pub(crate) fn exported_table(table: &str) -> Option<&'static Exported> {
 #[error("the table {0} has no export decision; add it to EXPORTED or NOT_EXPORTED")]
 struct UndecidedTable(String);
 
-/// A secret column of the list that the table does not have, for example after a rename.
+/// A column of an exported table without an export decision. A new migration must add it to
+/// `columns` or to `secret_columns` of the table (ADR 0059).
 #[derive(Debug, thiserror::Error)]
-#[error("the secret column {0}.{1} does not exist")]
-struct UnknownSecretColumn(&'static str, &'static str);
+#[error(
+    "the column {0}.{1} has no export decision; add it to columns or secret_columns of the table"
+)]
+struct UndecidedColumn(&'static str, String);
+
+/// A column of the lists that the table does not have, for example after a rename.
+#[derive(Debug, thiserror::Error)]
+#[error("the column {0}.{1} does not exist")]
+struct UnknownColumn(&'static str, &'static str);
 
 /// An identifier in double quotes, for a name from the list or from the catalog.
 pub(crate) fn quoted(name: &str) -> String {
@@ -183,8 +522,18 @@ impl ExportSource for Database {
     }
 }
 
-/// Fails if a table of the schema is in neither list.
+/// Fails if a table of the schema is in neither list, or if the columns of an exported table
+/// differ from its `columns` and `secret_columns`.
 async fn check_decisions(conn: &mut PgConnection) -> Result<(), StoreError> {
+    check_tables(conn).await?;
+    for exported in EXPORTED {
+        check_columns(conn, exported).await?;
+    }
+    Ok(())
+}
+
+/// Fails if a table of the schema is in neither list.
+async fn check_tables(conn: &mut PgConnection) -> Result<(), StoreError> {
     let tables: Vec<String> = sqlx::query_scalar(
         "SELECT table_name::text FROM information_schema.tables
          WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'
@@ -203,6 +552,38 @@ async fn check_decisions(conn: &mut PgConnection) -> Result<(), StoreError> {
         .find(|table| !decided.contains(table.as_str()))
     {
         Some(table) => Err(StoreError::Internal(Box::new(UndecidedTable(table)))),
+        None => Ok(()),
+    }
+}
+
+/// Fails if a column of the table is in neither list, or if a listed column does not exist.
+/// A generated column holds only a value that the table computes from its other columns; the
+/// import computes it again, so it needs no decision.
+async fn check_columns(conn: &mut PgConnection, exported: &Exported) -> Result<(), StoreError> {
+    let columns: Vec<String> = sqlx::query_scalar(
+        "SELECT column_name::text FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = $1 AND is_generated = 'NEVER'
+         ORDER BY ordinal_position",
+    )
+    .bind(exported.table)
+    .fetch_all(&mut *conn)
+    .await
+    .map_err(store_error)?;
+    let decided = || exported.columns.iter().chain(exported.secret_columns);
+    if let Some(column) = columns
+        .iter()
+        .find(|column| !decided().any(|decided| decided == column))
+    {
+        return Err(StoreError::Internal(Box::new(UndecidedColumn(
+            exported.table,
+            column.clone(),
+        ))));
+    }
+    match decided().find(|decided| !columns.iter().any(|column| column == *decided)) {
+        Some(column) => Err(StoreError::Internal(Box::new(UnknownColumn(
+            exported.table,
+            column,
+        )))),
         None => Ok(()),
     }
 }
@@ -244,25 +625,6 @@ async fn table_rows(
     users: &str,
     organization: Uuid,
 ) -> Result<TableRows, StoreError> {
-    let mut columns: Vec<String> = sqlx::query_scalar(
-        "SELECT column_name::text FROM information_schema.columns
-         WHERE table_schema = current_schema() AND table_name = $1 AND is_generated = 'NEVER'
-         ORDER BY ordinal_position",
-    )
-    .bind(exported.table)
-    .fetch_all(&mut *conn)
-    .await
-    .map_err(store_error)?;
-    for secret in exported.secret_columns {
-        if !columns.iter().any(|column| column == secret) {
-            return Err(StoreError::Internal(Box::new(UnknownSecretColumn(
-                exported.table,
-                secret,
-            ))));
-        }
-    }
-    columns.retain(|column| !exported.secret_columns.contains(&column.as_str()));
-
     let foreign_keys: Vec<(Vec<String>, String, Vec<String>)> = sqlx::query_as(
         "SELECT
              array(SELECT a.attname::text FROM unnest(c.conkey) WITH ORDINALITY AS k(number, position)
@@ -281,7 +643,8 @@ async fn table_rows(
     .await
     .map_err(store_error)?;
 
-    let list = columns
+    let list = exported
+        .columns
         .iter()
         .map(|column| quoted(column))
         .collect::<Vec<_>>()
@@ -291,7 +654,7 @@ async fn table_rows(
         Rows::OfOrganization => "organization_id = $1".to_owned(),
         Rows::OfUsers(column) => format!("{} IN ({users})", quoted(column)),
     };
-    // The names come from the list and the catalog, quoted; the organization is a bind parameter.
+    // The names come from the list, quoted; the organization is a bind parameter.
     let rows: Vec<String> = sqlx::query_scalar(AssertSqlSafe(format!(
         "SELECT json_build_array({list})::text FROM (SELECT {list} FROM {table} WHERE {filter}) AS r ORDER BY r",
         table = quoted(exported.table),
@@ -310,7 +673,11 @@ async fn table_rows(
 
     Ok(TableRows {
         name: exported.table.to_owned(),
-        columns,
+        columns: exported
+            .columns
+            .iter()
+            .map(|&column| column.to_owned())
+            .collect(),
         foreign_keys: foreign_keys
             .into_iter()
             .map(|(columns, table, references)| ForeignKey {
@@ -373,6 +740,32 @@ mod tests {
         );
     }
 
+    /// Each column of an exported table is in `columns` or in `secret_columns`, and each listed
+    /// column is in the schema. A new column fails the export until it has a decision, so a new
+    /// secret column cannot go into the export files.
+    #[tokio::test]
+    async fn the_export_refuses_a_column_without_an_export_decision() {
+        let test = TestDatabase::start().await;
+        let organization = test.create_organization("testwil").await;
+        let mut conn = test.database.pool.acquire().await.unwrap();
+        check_decisions(&mut conn).await.unwrap();
+        drop(conn);
+
+        sqlx::query("ALTER TABLE organization ADD COLUMN webhook_secret text")
+            .execute(&test.database.pool)
+            .await
+            .unwrap();
+        let error = test
+            .database
+            .snapshot(scope(organization))
+            .await
+            .unwrap_err();
+        assert!(
+            format!("{error:?}").contains("UndecidedColumn(\"organization\", \"webhook_secret\")"),
+            "{error:?}"
+        );
+    }
+
     /// A secret column that the table no longer has stops the export, so a rename cannot export the secret.
     #[tokio::test]
     async fn the_export_refuses_a_renamed_secret_column() {
@@ -388,7 +781,27 @@ mod tests {
             .await
             .unwrap_err();
         assert!(
-            format!("{error:?}").contains("UnknownSecretColumn(\"api_token\", \"token_hash\")"),
+            format!("{error:?}").contains("UndecidedColumn(\"api_token\", \"secret_hash\")"),
+            "{error:?}"
+        );
+    }
+
+    /// A listed column that the table no longer has stops the export, so the lists stay true.
+    #[tokio::test]
+    async fn the_export_refuses_a_listed_column_that_does_not_exist() {
+        let test = TestDatabase::start().await;
+        let organization = test.create_organization("testwil").await;
+        sqlx::query("ALTER TABLE app_user DROP COLUMN locale")
+            .execute(&test.database.pool)
+            .await
+            .unwrap();
+        let error = test
+            .database
+            .snapshot(scope(organization))
+            .await
+            .unwrap_err();
+        assert!(
+            format!("{error:?}").contains("UnknownColumn(\"app_user\", \"locale\")"),
             "{error:?}"
         );
     }
