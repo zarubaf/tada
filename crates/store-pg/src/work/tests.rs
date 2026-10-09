@@ -18,6 +18,8 @@ struct Fixture {
 }
 
 const AT: &str = "2030-05-18T08:00:00Z";
+/// The app clock at a change. The store keeps it as the change time; the database clock plays no part.
+const CHANGED_AT: &str = "2030-05-19T09:30:00Z";
 
 impl Fixture {
     async fn start() -> Self {
@@ -151,6 +153,7 @@ impl Fixture {
                 id,
                 fields,
                 expected,
+                CHANGED_AT.parse().unwrap(),
                 &self.audit(AuditAction::ActionChange, id.as_uuid()),
             )
             .await
@@ -200,6 +203,13 @@ async fn creates_and_changes_an_action_with_numbers_and_audit_events() {
     };
     assert_eq!(changed.fields, fields);
     assert_eq!(changed.version.get(), 2);
+    let updated_at: jiff_sqlx::Timestamp =
+        sqlx::query_scalar("SELECT updated_at FROM action WHERE id = $1")
+            .bind(first.id.as_uuid())
+            .fetch_one(&f.test.database.pool)
+            .await
+            .unwrap();
+    assert_eq!(updated_at.to_jiff(), CHANGED_AT.parse().unwrap());
     assert_eq!(
         f.change_action(f.scope, f.event, first.id, &fields, RecordVersion::FIRST)
             .await,
@@ -350,6 +360,7 @@ async fn a_commitment_keeps_its_condition_and_its_firm_reason() {
             commitment.id,
             &fields,
             RecordVersion::FIRST,
+            CHANGED_AT.parse().unwrap(),
             &f.audit(AuditAction::CommitmentFirm, commitment.id.as_uuid()),
         )
         .await

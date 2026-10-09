@@ -185,6 +185,7 @@ impl WorkStore for Memory {
         _: ActionId,
         _: &ActionFields,
         _: RecordVersion,
+        _: Timestamp,
         _: &AuditEvent,
     ) -> Result<WorkChanged<ActionView>, StoreError> {
         unreachable!()
@@ -232,6 +233,7 @@ impl WorkStore for Memory {
         _: CommitmentId,
         _: &CommitmentFields,
         _: RecordVersion,
+        _: Timestamp,
         _: &AuditEvent,
     ) -> Result<WorkChanged<CommitmentView>, StoreError> {
         unreachable!()

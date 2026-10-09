@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO person\n             (id, organization_id, local_number, name, email, phone, user_id, version,\n              created_at, updated_at)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Text",
+        "Text",
+        "Text",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8075a50ae644a87b2beb742c6a9f73494fcf0904dff951a715c46b4011c6c5ae"
+}

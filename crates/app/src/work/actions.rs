@@ -176,7 +176,15 @@ pub async fn change_action(
     let audit = audit(caller, AuditAction::ActionChange, id.as_uuid());
     match ports
         .work
-        .change_action(scope, event, id, &fields, expected_version, &audit)
+        .change_action(
+            scope,
+            event,
+            id,
+            &fields,
+            expected_version,
+            ports.clock.now(),
+            &audit,
+        )
         .await?
     {
         WorkChanged::Changed(view) => Ok(view),

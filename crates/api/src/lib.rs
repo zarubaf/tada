@@ -1229,6 +1229,7 @@ mod tests {
             _: tada_app::domain::ids::ActionId,
             _: &tada_app::work::ActionFields,
             _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<
             tada_app::work::WorkChanged<tada_app::work::ActionView>,
@@ -1275,6 +1276,7 @@ mod tests {
             _: tada_app::domain::ids::CommitmentId,
             _: &tada_app::work::CommitmentFields,
             _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<
             tada_app::work::WorkChanged<tada_app::work::CommitmentView>,

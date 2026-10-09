@@ -147,7 +147,15 @@ async fn store_commitment_change(
     let audit = audit(caller, action, id.as_uuid());
     match ports
         .work
-        .change_commitment(caller.scope(), event, id, fields, expected, &audit)
+        .change_commitment(
+            caller.scope(),
+            event,
+            id,
+            fields,
+            expected,
+            ports.clock.now(),
+            &audit,
+        )
         .await?
     {
         WorkChanged::Changed(view) => Ok(view),
