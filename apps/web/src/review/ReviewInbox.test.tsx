@@ -920,3 +920,271 @@ describe("work records", () => {
     expect(await screen.findByText(/Dieser Eintrag passt nicht/)).toBeInTheDocument();
   });
 });
+
+const CS_EDIT = "0199b8e0-0000-7000-8000-000000000c05";
+const P_ACTION = "0199b8e0-0000-7000-8000-0000000001d1";
+const P_COND = "0199b8e0-0000-7000-8000-0000000001d2";
+const P_PLAIN = "0199b8e0-0000-7000-8000-0000000001d3";
+const P_INSTITUTION = "0199b8e0-0000-7000-8000-0000000001d4";
+const BERND = "0199b8e0-0000-7000-8000-0000000000b2";
+const STREAM = "0199b8e0-0000-7000-8000-0000000000d1";
+
+CHANGESETS.set(CS_EDIT, {
+  id: CS_EDIT,
+  event_id: EVENT.id,
+  author: AI,
+  source_version_id: evidence.source_version_id,
+  created_at: "2028-03-08T09:00:00Z",
+  proposals: [
+    proposal(P_ACTION, {
+      operation: {
+        kind: "create-action",
+        id: "0199b8e0-0000-7000-8000-0000000005d1",
+        event_id: EVENT.id,
+        title: "Generator bestellen",
+        description: null,
+        owner: SESSION.user_id,
+        workstream: null,
+        due_date: "2028-04-01",
+      },
+    }),
+    proposal(P_COND, {
+      operation: {
+        kind: "create-commitment",
+        id: "0199b8e0-0000-7000-8000-0000000005d2",
+        event_id: EVENT.id,
+        text: "Die Gemeinde sperrt die Strasse.",
+        promisor: { institution: "0199b8e0-0000-7000-8000-0000000005d9" },
+        owner: SESSION.user_id,
+        workstream: null,
+        due_date: null,
+        condition: "Wenn der Rat zustimmt",
+      },
+    }),
+    proposal(P_PLAIN, {
+      operation: {
+        kind: "create-commitment",
+        id: "0199b8e0-0000-7000-8000-0000000005d3",
+        event_id: EVENT.id,
+        text: "Der Verein stellt Zelte.",
+        promisor: { institution: "0199b8e0-0000-7000-8000-0000000005d9" },
+        owner: SESSION.user_id,
+        workstream: null,
+        due_date: null,
+        condition: null,
+      },
+    }),
+    proposal(P_INSTITUTION, {
+      operation: {
+        kind: "create-institution",
+        id: "0199b8e0-0000-7000-8000-0000000005d9",
+        name: "Gemeinde Testwil",
+        institution_kind: "authority",
+        email: null,
+        phone: null,
+      },
+    }),
+    proposal(P_PERSON, {
+      operation: {
+        kind: "create-person",
+        id: NEW_PERSON,
+        name: "Hans Beispiel",
+        email: null,
+        phone: null,
+      },
+    }),
+  ],
+});
+
+function editServer(extra: Record<string, Handler> = {}) {
+  return fakeServer({
+    "GET /api/v1/members": () =>
+      json(200, {
+        items: [
+          { user_id: SESSION.user_id, display_name: "Anna Muster" },
+          { user_id: BERND, display_name: "Bernd Beispiel" },
+        ],
+      }),
+    "GET /api/v1/events/:id/memberships": () =>
+      json(200, {
+        items: [
+          { user_id: SESSION.user_id, display_name: "Anna Muster", event_role: "event-manager" },
+          { user_id: BERND, display_name: "Bernd Beispiel", event_role: "event-contributor" },
+        ],
+      }),
+    "GET /api/v1/events/:id/workstreams": () =>
+      json(200, { items: [{ id: STREAM, name: "Bodenbetrieb", status: "active" }] }),
+    ...extra,
+  });
+}
+
+async function openEdit(card: string, index = 0) {
+  const article = (await screen.findAllByRole("article", { name: card }))[index] as HTMLElement;
+  await userEvent.click(within(article).getByRole("button", { name: /^Bearbeiten und annehmen/ }));
+  // The form loads on demand.
+  await within(article).findByRole("textbox", {}, { timeout: 4000 });
+  return article;
+}
+
+/** The submit button of the open form has the same name as the button that opened it. */
+async function submitEdit(card: HTMLElement) {
+  const buttons = within(card).getAllByRole("button", { name: "Bearbeiten und annehmen" });
+  await userEvent.click(buttons[0] as HTMLElement);
+}
+
+const lastEdits = (server: ReturnType<typeof fakeServer>) =>
+  (applyCalls(server)[0]?.body as { edits: unknown[] } | undefined)?.edits;
+
+describe("edit of a work record", () => {
+  it("sends the changed fields of an action: title, owner and workstream", async () => {
+    const server = renderAt(`/inbox/${CS_EDIT}`, editServer());
+
+    const card = await openEdit("Aufgabe „Generator bestellen“ anlegen");
+    const title = within(card).getByRole("textbox", { name: "Titel" });
+    await userEvent.clear(title);
+    await userEvent.type(title, "Notstrom bestellen");
+    await userEvent.click(within(card).getByRole("button", { name: /Verantwortlich/ }));
+    await userEvent.click(await screen.findByRole("option", { name: "Bernd Beispiel" }));
+    await userEvent.click(within(card).getByRole("button", { name: /Arbeitsbereich/ }));
+    await userEvent.click(await screen.findByRole("option", { name: "Bodenbetrieb" }));
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([
+      {
+        proposal_id: P_ACTION,
+        fields: { title: "Notstrom bestellen", owner: BERND, workstream: STREAM },
+      },
+    ]);
+  });
+
+  it("sends the new due date and clears a description", async () => {
+    const server = renderAt(`/inbox/${CS_EDIT}`, editServer());
+
+    const card = await openEdit("Aufgabe „Generator bestellen“ anlegen");
+    await userEvent.type(within(card).getByRole("textbox", { name: "Beschreibung" }), "Mit Tank");
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([
+      { proposal_id: P_ACTION, fields: { description: "Mit Tank" } },
+    ]);
+  });
+
+  it("edits the text and the condition of a conditional commitment", async () => {
+    const server = renderAt(`/inbox/${CS_EDIT}`, editServer());
+
+    const card = await openEdit("Zusage anlegen");
+    expect(within(card).getByRole("textbox", { name: "Bedingung" })).toHaveValue(
+      "Wenn der Rat zustimmt",
+    );
+    const condition = within(card).getByRole("textbox", { name: "Bedingung" });
+    await userEvent.clear(condition);
+    await userEvent.type(condition, "Wenn der Rat im Mai zustimmt");
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([
+      { proposal_id: P_COND, fields: { condition: "Wenn der Rat im Mai zustimmt" } },
+    ]);
+  });
+
+  it("does not remove the condition of a conditional commitment", async () => {
+    const server = renderAt(`/inbox/${CS_EDIT}`, editServer());
+
+    const card = await openEdit("Zusage anlegen");
+    await userEvent.clear(within(card).getByRole("textbox", { name: "Bedingung" }));
+    await submitEdit(card);
+
+    expect(await within(card).findByText(/Die Bedingung bleibt/)).toBeInTheDocument();
+    expect(applyCalls(server)).toHaveLength(0);
+  });
+
+  it("names the refusal of the server for a field", async () => {
+    const server = renderAt(
+      `/inbox/${CS_EDIT}`,
+      editServer({
+        "POST /api/v1/changesets/:id/apply": () =>
+          problemWith("validation-failed", 422, [
+            { pointer: "/edits/0/fields/condition", code: "condition-fixed" },
+          ]),
+      }),
+    );
+
+    const card = await openEdit("Zusage anlegen");
+    await userEvent.type(within(card).getByRole("textbox", { name: "Bedingung" }), "x");
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(await within(card).findByText(/Die Bedingung bleibt/)).toBeInTheDocument();
+  });
+
+  it("edits the text of a commitment without a condition and offers no condition field", async () => {
+    const server = renderAt(`/inbox/${CS_EDIT}`, editServer());
+
+    const card = await openEdit("Zusage anlegen", 1);
+    expect(within(card).queryByRole("textbox", { name: "Bedingung" })).not.toBeInTheDocument();
+    const text = within(card).getByRole("textbox", { name: "Zusage" });
+    await userEvent.clear(text);
+    await userEvent.type(text, "Der Verein stellt drei Zelte.");
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([
+      { proposal_id: P_PLAIN, fields: { text: "Der Verein stellt drei Zelte." } },
+    ]);
+  });
+
+  it("edits the name and the phone of an institution", async () => {
+    const server = renderAt(`/inbox/${CS_EDIT}`, editServer());
+
+    const card = await openEdit("Institution „Gemeinde Testwil“ anlegen");
+    const name = within(card).getByRole("textbox", { name: "Name" });
+    await userEvent.clear(name);
+    await userEvent.type(name, "Gemeinde Neutestwil");
+    await userEvent.type(within(card).getByRole("textbox", { name: "Telefon" }), "044 000 00 00");
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([
+      {
+        proposal_id: P_INSTITUTION,
+        fields: { name: "Gemeinde Neutestwil", phone: "044 000 00 00" },
+      },
+    ]);
+  });
+
+  it("edits the email of a person and shows the refusal of the address", async () => {
+    const server = renderAt(
+      `/inbox/${CS_EDIT}`,
+      editServer({
+        "POST /api/v1/changesets/:id/apply": () =>
+          problemWith("validation-failed", 422, [
+            { pointer: "/edits/0/fields/email", code: "email" },
+          ]),
+      }),
+    );
+
+    const card = await openEdit("Person „Hans Beispiel“ anlegen");
+    await userEvent.type(within(card).getByRole("textbox", { name: "E-Mail" }), "kein-at");
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([{ proposal_id: P_PERSON, fields: { email: "kein-at" } }]);
+    expect(await within(card).findByText(/E-Mail-Adresse ist ungültig/)).toBeInTheDocument();
+  });
+});
+
+describe("a link whose dependents go to another reviewer", () => {
+  it("offers no link and says why", async () => {
+    const changeset = structuredClone(workChangeset);
+    changeset.proposals[1] = { ...changeset.proposals[1], routed_to_me: false } as never;
+    CHANGESETS.set(CS_WORK, changeset);
+    renderAt(`/inbox/${CS_WORK}`);
+
+    const card = await screen.findByRole("article", { name: "Person „Hans Beispiel“ anlegen" });
+    expect(within(card).queryByRole("checkbox", { name: /Bestehenden Eintrag/ })).toBeNull();
+    expect(within(card).getByText(/anderer Prüfer/)).toBeInTheDocument();
+    CHANGESETS.set(CS_WORK, workChangeset);
+  });
+});

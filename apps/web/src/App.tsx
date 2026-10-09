@@ -22,10 +22,7 @@ import { InvitationPage } from "./sign-in/InvitationPage";
 import { MagicLinkPage } from "./sign-in/MagicLinkPage";
 import { SignInPage } from "./sign-in/SignInPage";
 import { SkipLink } from "./ui/SkipLink";
-import { ActionsPage } from "./work/ActionsPage";
-import { CommitmentsPage } from "./work/CommitmentsPage";
 import { MyWorkPage } from "./work/MyWorkPage";
-import { WorkstreamsPage } from "./work/WorkstreamsPage";
 
 const defaultApi = createApi();
 
@@ -42,6 +39,16 @@ const TokensPage = lazy(() =>
 );
 const OrganizationPage = lazy(() =>
   import("./settings/OrganizationPage").then((module) => ({ default: module.OrganizationPage })),
+);
+// The registers of an event load on demand too: they bring the pickers of the work forms.
+const ActionsPage = lazy(() =>
+  import("./work/ActionsPage").then((module) => ({ default: module.ActionsPage })),
+);
+const CommitmentsPage = lazy(() =>
+  import("./work/CommitmentsPage").then((module) => ({ default: module.CommitmentsPage })),
+);
+const WorkstreamsPage = lazy(() =>
+  import("./work/WorkstreamsPage").then((module) => ({ default: module.WorkstreamsPage })),
 );
 const AccountPage = lazy(() =>
   import("./settings/AccountPage").then((module) => ({ default: module.AccountPage })),
@@ -110,17 +117,23 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   <Route path="/events/:eventId/actions">
                     <EventPage api={api}>
-                      <ActionsPage api={api} />
+                      <Suspense>
+                        <ActionsPage api={api} />
+                      </Suspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/commitments">
                     <EventPage api={api}>
-                      <CommitmentsPage api={api} />
+                      <Suspense>
+                        <CommitmentsPage api={api} />
+                      </Suspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/workstreams">
                     <EventPage api={api}>
-                      <WorkstreamsPage api={api} />
+                      <Suspense>
+                        <WorkstreamsPage api={api} />
+                      </Suspense>
                     </EventPage>
                   </Route>
                   <Route path="/documents/:documentId">
