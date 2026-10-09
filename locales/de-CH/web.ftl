@@ -515,8 +515,8 @@ inbox-status-withdrawn = Zurückgezogen
 inbox-accept = Annehmen
 inbox-edit = Bearbeiten und annehmen
 inbox-reject = Ablehnen
-inbox-conflict-fact-changed = Jemand hat den Wert nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Der KI-Client kann einen neuen Vorschlag zum aktuellen Wert machen.
-inbox-conflict-target-changed = Der Eintrag hat sich nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Der KI-Client kann einen neuen Vorschlag machen.
+inbox-conflict-fact-changed = Jemand hat den Wert nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Wer ihn gemacht hat, kann einen neuen Vorschlag zum aktuellen Wert machen.
+inbox-conflict-target-changed = Der Eintrag hat sich nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Wer ihn gemacht hat, kann einen neuen Vorschlag machen.
 inbox-conflict-dependency = Ein Vorschlag, von dem dieser abhängt, hat einen Konflikt. Lehnen Sie beide ab.
 # $titles: the titles of the proposals, separated by commas.
 inbox-depends-on = Setzt voraus: { $titles }

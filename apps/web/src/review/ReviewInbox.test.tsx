@@ -333,6 +333,13 @@ describe("the detail", () => {
     expect(within(card).getByRole("button", { name: /^Ablehnen/ })).toBeEnabled();
   });
 
+  it("does not name an AI client in the conflict text, because a member can be the author", async () => {
+    renderAt(`/inbox/${CS_OLD}`);
+
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    expect(within(card).queryByText(/KI-Client/)).not.toBeInTheDocument();
+  });
+
   it("shows the failure of the detail with a retry", async () => {
     renderAt(
       `/inbox/${CS_NEW}`,
