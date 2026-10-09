@@ -47,7 +47,7 @@ pub(super) async fn write_record(
                 scope,
                 plan,
                 step.operation.event_id().or(plan.event_id),
-                &operation_to_json(&step.operation),
+                &operation_to_json(&step.operation).to_string(),
             )
             .await?;
             written.edit_source = Some(review.source_version_id);
@@ -57,6 +57,9 @@ pub(super) async fn write_record(
             return Err(sqlx::Error::Protocol(
                 "a work record has no edited fact state".into(),
             ));
+        }
+        StepEvidence::Link(_) => {
+            return Err(sqlx::Error::Protocol("a link writes no record".into()));
         }
     };
     let (record, version) = match &step.operation {
@@ -398,7 +401,7 @@ async fn takes_records(
     .await
 }
 
-async fn party_exists(
+pub(super) async fn party_exists(
     conn: &mut PgConnection,
     scope: OrgScope,
     party: Party,

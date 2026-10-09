@@ -760,6 +760,118 @@ mod work {
     }
 }
 
+mod links {
+    use super::*;
+
+    /// The reviewer sees an existing institution as a duplicate and links the proposed one to it (ADR 0069).
+    #[tokio::test]
+    async fn a_proposed_institution_links_to_an_existing_one_through_http() {
+        let api = Api::start().await;
+        let owner = api.member("testwil", OrganizationRole::Owner).await;
+        let event = api.create_event(&owner.cookie, "TEST30").await;
+        let (status, existing) = api
+            .post(
+                &owner.cookie,
+                "/api/v1/institutions",
+                &json!({"name": "Generatoren Testwil", "kind": "company"}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::CREATED, "{existing}");
+        let existing_id = existing["id"].as_str().unwrap().to_owned();
+        // An institution of another organization is invisible.
+        let stranger = api.member("musterhausen", OrganizationRole::Owner).await;
+        let (status, foreign) = api
+            .post(
+                &stranger.cookie,
+                "/api/v1/institutions",
+                &json!({"name": "Generatoren Testwil", "kind": "company"}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::CREATED, "{foreign}");
+
+        let (institution, commitment) = (Uuid::now_v7(), Uuid::now_v7());
+        let new_institution = proposal(
+            json!({"kind": "create-institution", "id": institution, "name": "Testwil Generatoren AG",
+                   "institution_kind": "company"}),
+            "Wer klärt die Bewilligung?",
+        );
+        let mut promise = proposal(
+            json!({
+                "kind": "create-commitment", "id": commitment, "event_id": event,
+                "text": "Liefert den Generator", "promisor": {"institution": institution},
+                "owner": owner.user.as_uuid(),
+            }),
+            "Der Ort ist noch offen.",
+        );
+        promise["depends_on"] = json!([new_institution["id"]]);
+        let (status, changeset) = api
+            .post(
+                &owner.cookie,
+                &format!("/api/v1/events/{event}/changesets"),
+                &json!({"source_text": SOURCE, "proposals": [new_institution, promise]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::CREATED, "{changeset}");
+        let changeset = changeset["id"].as_str().unwrap();
+
+        let (status, review) = api
+            .get(&owner.cookie, &format!("/api/v1/changesets/{changeset}"))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{review}");
+        let proposals = review["proposals"].as_array().unwrap();
+        let proposed = proposals
+            .iter()
+            .find(|proposal| proposal["id"] == new_institution["id"])
+            .unwrap();
+        assert_eq!(
+            proposed["duplicates"],
+            json!([{"kind": "institution", "id": existing_id, "local_id": "INS-001",
+                    "name": "Generatoren Testwil"}])
+        );
+        let promised = proposals
+            .iter()
+            .find(|proposal| proposal["id"] == promise["id"])
+            .unwrap();
+        assert!(promised.get("duplicates").is_none(), "{promised}");
+
+        let apply = format!("/api/v1/changesets/{changeset}/apply");
+        let (status, problem) = api
+            .post(
+                &owner.cookie,
+                &apply,
+                &json!({"selected": [promise["id"]],
+                        "links": [{"proposal_id": new_institution["id"], "record_id": foreign["id"]}]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["code"], "validation-failed");
+        assert_eq!(
+            problem["errors"],
+            json!([{"pointer": "/links/0", "code": "invalid-link"}])
+        );
+
+        let (status, result) = api
+            .post(
+                &owner.cookie,
+                &apply,
+                &json!({"selected": [promise["id"]],
+                        "links": [{"proposal_id": new_institution["id"], "record_id": existing_id}]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(result["institutions"], json!([]));
+        let (status, read) = api
+            .get(
+                &owner.cookie,
+                &format!("/api/v1/events/{event}/commitments/{commitment}"),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{read}");
+        assert_eq!(read["promisor"]["id"], json!(existing_id));
+        assert_eq!(read["promisor"]["local_id"], "INS-001");
+    }
+}
+
 /// Review routing (ADR 0067): a proposal goes to the person who owns the work.
 mod routing {
     use super::*;

@@ -7,6 +7,7 @@ use tada_domain::work::CommitmentStatus;
 use uuid::Uuid;
 
 use super::checks::Edits;
+use super::links::Links;
 use super::selection::with_dependencies;
 use super::*;
 
@@ -132,10 +133,10 @@ fn a_change_to_firm_without_a_valid_reason_does_not_apply() {
         expected_version: tada_domain::RecordVersion::FIRST,
     };
     firm.reason = Reason::parse(&"a".repeat(FirmReason::MAX_CHARS + 1)).unwrap();
-    let result = step(&firm, &Edits::new());
+    let result = step(&firm, &Edits::new(), &Links::default());
     assert!(matches!(result, Err(ApplyError::Invalid(_))), "{result:?}");
     firm.reason = Reason::parse("Der Auftrag ist unterschrieben.").unwrap();
-    let step = step(&firm, &Edits::new()).unwrap();
+    let step = step(&firm, &Edits::new(), &Links::default()).unwrap();
     assert_eq!(
         step.firm_reason
             .map(|reason| reason.as_str().to_owned())

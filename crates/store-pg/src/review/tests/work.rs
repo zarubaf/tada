@@ -402,6 +402,7 @@ async fn an_edit_cannot_remove_the_condition_of_a_commitment() {
     let (changeset, [person_id, commitment_id, first, second]) = supplier(&test, &open_day).await;
     let input = |fields: Value| ApplyInput {
         selected: vec![ProposalId::from_uuid(second)],
+        links: Vec::new(),
         edits: vec![edit(second, fields)],
     };
 
@@ -522,6 +523,7 @@ async fn an_edit_that_adds_a_condition_makes_a_commitment_conditional() {
     .await;
     let input = ApplyInput {
         selected: vec![ProposalId::from_uuid(second)],
+        links: Vec::new(),
         edits: vec![
             edit(second, json!({"condition": "wenn es nicht regnet"})),
             edit(
@@ -588,6 +590,7 @@ async fn an_edited_owner_must_be_a_contributor() {
     .await;
     let input = |owner: UserId| ApplyInput {
         selected: vec![ProposalId::from_uuid(id)],
+        links: Vec::new(),
         edits: vec![edit(
             id,
             json!({"owner": owner.as_uuid(), "due_date": "2030-04-30"}),
@@ -665,6 +668,7 @@ async fn a_workstream_that_closes_after_the_proposal_makes_the_apply_conflict() 
         &changeset,
         ApplyInput {
             selected: vec![ProposalId::from_uuid(id)],
+            links: Vec::new(),
             edits: vec![edit(id, json!({"workstream": other}))],
         },
     )

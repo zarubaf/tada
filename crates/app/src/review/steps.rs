@@ -4,6 +4,7 @@ use tada_domain::proposals::{Operation, Proposal};
 use tada_domain::work::{CommitmentStatus, FirmReason};
 
 use super::checks::{Edited, Edits};
+use super::links::Links;
 use super::{ApplyError, ApplyStep, ProposalStatus, StepEvidence};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::MemberCaller;
@@ -11,7 +12,20 @@ use crate::problem::FieldError;
 use crate::proposals::text_error_code;
 
 /// The step of one proposal. A change to firm needs a valid reason: the commitment keeps it (ADR 0068).
-pub(super) fn step(proposal: &Proposal, edits: &Edits) -> Result<ApplyStep, ApplyError> {
+/// A linked proposal creates no record; each other proposal uses the linked records (ADR 0069).
+pub(super) fn step(
+    proposal: &Proposal,
+    edits: &Edits,
+    links: &Links,
+) -> Result<ApplyStep, ApplyError> {
+    if let Some(linked) = links.get(proposal.id) {
+        return Ok(ApplyStep {
+            proposal_id: proposal.id,
+            operation: proposal.operation.clone(),
+            evidence: StepEvidence::Link(linked.clone()),
+            firm_reason: None,
+        });
+    }
     let firm_reason = match proposal.operation {
         Operation::ChangeCommitmentStatus {
             status: CommitmentStatus::Firm,
@@ -55,7 +69,7 @@ pub(super) fn step(proposal: &Proposal, edits: &Edits) -> Result<ApplyStep, Appl
     };
     Ok(ApplyStep {
         proposal_id: proposal.id,
-        operation,
+        operation: links.resolved(operation),
         evidence,
         firm_reason,
     })
@@ -63,13 +77,15 @@ pub(super) fn step(proposal: &Proposal, edits: &Edits) -> Result<ApplyStep, Appl
 
 pub(super) fn step_status(step: &ApplyStep) -> ProposalStatus {
     match step.evidence {
-        StepEvidence::Edit | StepEvidence::RecordEdit(_) => ProposalStatus::AcceptedWithEdit,
+        StepEvidence::Edit | StepEvidence::RecordEdit(_) | StepEvidence::Link(_) => {
+            ProposalStatus::AcceptedWithEdit
+        }
         StepEvidence::Proposal(_) => ProposalStatus::Accepted,
     }
 }
 
 /// The audit events of one step: the acceptance and, for a new event, the event and its first event manager,
-/// and for a work record or a party its creation or change.
+/// and for a work record or a party its creation or change. A link creates no record, so it has the acceptance only.
 pub(super) fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEvent> {
     let scope = Some(caller.scope());
     let mut events = vec![AuditEvent::new(
@@ -78,6 +94,9 @@ pub(super) fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEven
         Some(step.proposal_id.as_uuid()),
         scope,
     )];
+    if let StepEvidence::Link(_) = step.evidence {
+        return events;
+    }
     let record = match step.operation {
         Operation::CreateEvent { id, .. } => {
             events.extend(crate::events::creation_audit(caller, id));

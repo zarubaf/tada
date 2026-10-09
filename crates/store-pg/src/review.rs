@@ -295,7 +295,8 @@ async fn lock_targets(
     let mut documents = Vec::new();
     let mut work = records::WorkLocks::default();
     let organization = scope.organization_id().as_uuid();
-    for step in steps {
+    // A link creates no record, so it moves no counter. Records are never deleted, so it needs no lock.
+    for step in steps.iter().filter(|step| !is_link(step)) {
         if let Some((counter_scope, kind)) = work.add(scope, &step.operation) {
             counter_scopes.push(counter_scope);
             counter_kinds.push(kind);
@@ -394,6 +395,10 @@ async fn lock_targets(
     work.lock(conn, scope).await
 }
 
+fn is_link(step: &ApplyStep) -> bool {
+    matches!(step.evidence, StepEvidence::Link(_))
+}
+
 /// The proposals whose targets do not have the expected versions (ADR 0050).
 /// A record that an earlier step of the plan creates counts as new, and a fact that an earlier step sets
 /// counts with its new version, so the checks of all steps run before the first write.
@@ -409,6 +414,13 @@ async fn check_versions(
     let mut record_versions: HashMap<Uuid, i64> = HashMap::new();
     let mut conflicts = Vec::new();
     for step in steps {
+        // A linked record must exist in the organization; the proposed record never comes (ADR 0069).
+        if let StepEvidence::Link(linked) = &step.evidence {
+            if !records::party_exists(conn, scope, linked.party).await? {
+                conflicts.push(step.proposal_id);
+            }
+            continue;
+        }
         let matches = match &step.operation {
             Operation::CreateEvent { id, .. } => {
                 // An event ID is unique in the whole installation (ADR 0038).
@@ -595,6 +607,22 @@ async fn write_step(
     plan: &ApplyPlan,
     step: &ApplyStep,
 ) -> Result<Option<NewLocalId>, sqlx::Error> {
+    if let StepEvidence::Link(linked) = &step.evidence {
+        // A link creates no record. Its review text, in the event of the changeset, names the chosen record (ADR 0069).
+        let review =
+            insert_review_text(conn, scope, plan, plan.event_id, &linked.review_text()).await?;
+        insert_result(
+            conn,
+            scope,
+            step.proposal_id,
+            ReviewOutcome::AcceptedWithEdit,
+            Some(review.source_version_id),
+            &plan.reviewer,
+            plan.now,
+        )
+        .await?;
+        return Ok(None);
+    }
     let organization = scope.organization_id().as_uuid();
     let now = plan.now.to_sqlx();
     let mut local_id = None;
@@ -743,11 +771,15 @@ async fn write_step(
                 StepEvidence::Proposal(evidence) | StepEvidence::RecordEdit(evidence) => {
                     evidence.clone()
                 }
+                StepEvidence::Link(_) => {
+                    return Err(sqlx::Error::Protocol("a fact has no link".into()));
+                }
                 StepEvidence::Edit => {
                     let (state, value, approximate) = values::fact_state_to_columns(state);
                     let json = serde_json::json!({"state": state, "value": value, "approximate": approximate});
                     let evidence =
-                        insert_review_text(conn, scope, plan, Some(*event_id), &json).await?;
+                        insert_review_text(conn, scope, plan, Some(*event_id), &json.to_string())
+                            .await?;
                     edit_source = Some(evidence.source_version_id);
                     vec![evidence]
                 }
@@ -774,7 +806,9 @@ async fn write_step(
         }
     }
     let outcome = match step.evidence {
-        StepEvidence::Edit | StepEvidence::RecordEdit(_) => ReviewOutcome::AcceptedWithEdit,
+        StepEvidence::Edit | StepEvidence::RecordEdit(_) | StepEvidence::Link(_) => {
+            ReviewOutcome::AcceptedWithEdit
+        }
         StepEvidence::Proposal(_) => ReviewOutcome::Accepted,
     };
     insert_result(
@@ -944,15 +978,16 @@ async fn insert_draft(
 /// `values::fact_state_to_columns`. The text of an edited record is the edited operation in the format of
 /// `proposals::operation_to_json`. A source version never changes, so these formats are stable contracts:
 /// a change of a codec must keep them, or add a new format next to them that readers tell apart.
+/// The text of a link is `LinkedRecord::review_text`, for example `linked to PER-007` (ADR 0069).
 /// A person or an institution has no event, so the review text of its edit has none either.
 async fn insert_review_text(
     conn: &mut PgConnection,
     scope: OrgScope,
     plan: &ApplyPlan,
     event: Option<EventId>,
-    json: &serde_json::Value,
+    text: &str,
 ) -> Result<Evidence, sqlx::Error> {
-    let text = SourceText::normalize(&json.to_string());
+    let text = SourceText::normalize(text);
     let version = SourceVersionId::from_uuid(Uuid::now_v7());
     let item = TextItem {
         kind: TextKind::Review,

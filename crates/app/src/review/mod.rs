@@ -7,6 +7,7 @@
 
 mod checks;
 mod edits;
+mod links;
 mod read;
 pub mod routing;
 mod selection;
@@ -26,6 +27,7 @@ use tada_domain::sources::{Evidence, SourceText};
 use tada_domain::work::FirmReason;
 
 pub use self::edits::RecordEditInput;
+pub use self::links::{Link, LinkedRecord, MAX_DUPLICATES};
 pub use self::read::{
     ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, get_changeset,
 };
@@ -45,6 +47,7 @@ use crate::work::WorkStore;
 use crate::workstreams::WorkstreamStore;
 
 use self::checks::{check_edits, parse_edits, stale_owners};
+use self::links::check_links;
 use self::routing::{ChangesetRoutes, RoutedProposal, RoutingFacts, RoutingPorts};
 use self::selection::{apply_order, proposal_status, selection, to_apply, with_dependents};
 use self::steps::{audit_of, step, step_status};
@@ -217,6 +220,10 @@ pub enum StepEvidence {
     /// The reviewer edited fields of a new record. The store keeps the edited operation as a source version of the
     /// kind `review`, with the reviewer as author. The record keeps the evidence of the proposal and the review text.
     RecordEdit(Vec<Evidence>),
+    /// The reviewer linked a proposed person or institution to an existing record (ADR 0069).
+    /// The store creates no record. It keeps `LinkedRecord::review_text` as a source version of the kind `review`,
+    /// the evidence of the decision.
+    Link(LinkedRecord),
 }
 
 /// One proposal of an apply, with the operation to apply. An edit changes the state of a `SetFact`
@@ -400,11 +407,13 @@ pub struct ReviewStores<'a> {
     pub parties: &'a dyn PartyStore,
 }
 
-/// The input of an apply: the selected proposals and the edited values.
+/// The input of an apply: the selected proposals, the edited values and the links to existing records.
 #[derive(Debug, Clone)]
 pub struct ApplyInput {
     pub selected: Vec<ProposalId>,
     pub edits: Vec<Edit>,
+    /// Proposed persons and institutions that the reviewer replaces with existing records (ADR 0069).
+    pub links: Vec<Link>,
 }
 
 /// A change of the reviewer before the acceptance: the state of a proposal that sets a fact,
@@ -510,9 +519,11 @@ impl CommandError for ApplyError {
 /// 2. The selection includes the dependencies of each selected proposal, except those that an earlier apply accepted.
 /// 3. Each proposal of the selection is open, else `invalid-transition`.
 ///    The caller may review each of them (ADR 0067), else `forbidden`.
-/// 4. Each target has the expected version. Else nothing changes, a separate transaction appends
+/// 4. Each link names a selected proposal that creates a person or an institution, and an existing record of the same
+///    kind in the organization (ADR 0069). The other selected proposals use the linked record instead of the proposed one.
+/// 5. Each target has the expected version. Else nothing changes, a separate transaction appends
 ///    `conflict` for the proposals concerned, and the result is `record-version-conflict`.
-/// 5. A successful apply writes the records, the fact versions with their evidence, the draft versions with their
+/// 6. A successful apply writes the records, the fact versions with their evidence, the draft versions with their
 ///    provenance manifests, the local IDs, the review results and the audit events in one transaction.
 ///
 /// The caller is a `MemberCaller`, so an AI client cannot apply (ADR 0039).
@@ -549,11 +560,21 @@ pub async fn apply_changeset(
     let changeset = reviewable.changeset;
     let edits = parse_edits(&changeset, &selected, input.edits)?;
     check_edits(scope, &changeset, &selected, &edits, stores).await?;
+    let links = check_links(
+        scope,
+        &changeset,
+        &selected,
+        &reviewable.results,
+        &edits,
+        input.links,
+        stores.parties,
+    )
+    .await?;
 
     let now = clock.now();
     let steps: Vec<ApplyStep> = apply_order(&changeset.proposals, &selected)
         .into_iter()
-        .map(|proposal| step(proposal, &edits))
+        .map(|proposal| step(proposal, &edits, &links))
         .collect::<Result<_, _>>()?;
     // The owner of a new work record can lose the event role after the proposal (ADR 0068).
     let stale = stale_owners(scope, &steps, stores.identity).await?;

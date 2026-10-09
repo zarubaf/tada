@@ -4983,6 +4983,31 @@
                 },
                 "type": "array"
               },
+              "links": {
+                "description": "Proposed persons and institutions that use an existing record instead of a new one (ADR 0069).",
+                "items": {
+                  "additionalProperties": false,
+                  "description": "The reviewer links a proposal that creates a person or an institution to an existing record of the same kind.\ntada creates no record for it, and the other selected proposals use the existing record.\nAn invalid link gives `validation-failed` with the field code `invalid-link`; a link whose proposal has open\ndependents outside the selection gives `dependents-not-selected`.",
+                  "properties": {
+                    "proposal_id": {
+                      "description": "A selected `create-person` or `create-institution` proposal.",
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "record_id": {
+                      "description": "The existing person or institution of the organization.",
+                      "format": "uuid",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "proposal_id",
+                    "record_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
               "selected": {
                 "description": "The proposals to accept. tada adds the dependencies of each one that an earlier apply did not accept.",
                 "items": {
@@ -9695,6 +9720,16 @@
                 "type": "null"
               }
             ]
+          },
+          "duplicates": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PartyRef"
+            },
+            "description": "For an open `create-person` or `create-institution` proposal: at most 5 existing records of the same kind\nwith a similar name (ADR 0069). The reviewer can link the proposal to one of them. It is absent for each\nother proposal."
           }
         }
       },
