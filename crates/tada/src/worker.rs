@@ -6,8 +6,11 @@ use std::time::Duration;
 use anyhow::Context;
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
+use tada_app::clock::Clock;
 use tada_app::jobs::{Handlers, Ran, run_next};
+use tada_app::mail::{MailTexts, Mailer};
 use tada_app::outbound::SendOutbound;
+use tada_app::public_url::PublicUrl;
 use tada_store_pg::Database;
 use uuid::Uuid;
 
@@ -20,6 +23,18 @@ const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const LEASE: Duration = Duration::from_secs(300);
 /// The time limit of one SMTP send. A send that exceeds it has an unknown outcome (ADR 0042).
 const MAIL_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The handler of each job kind that the worker runs. Tests use the same registration.
+pub fn handlers(
+    db: &Database,
+    mailer: Arc<dyn Mailer>,
+    texts: Arc<dyn MailTexts>,
+    clock: Arc<dyn Clock>,
+    public_url: PublicUrl,
+) -> Handlers {
+    let send = SendOutbound::new(Arc::new(db.clone()), mailer, texts, clock, public_url);
+    Handlers::default().with(Arc::new(send))
+}
 
 pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
@@ -34,14 +49,13 @@ pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::
     })
     .context("invalid mail settings")?;
     let texts = FluentMailTexts::new().context("invalid mail texts")?;
-    let send = SendOutbound::new(
-        Arc::new(db.clone()),
+    let handlers = handlers(
+        &db,
         Arc::new(mailer),
         Arc::new(texts),
         Arc::new(SystemClock),
         public_url,
     );
-    let handlers = Handlers::default().with(Arc::new(send));
     let worker_id = Uuid::now_v7();
     tracing::info!(%worker_id, "worker started");
 

@@ -1,7 +1,7 @@
 //! Durable jobs (ADRs 0007 and 0054): the port of the queue, the port of a job handler, and the step
 //! that runs one job.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
@@ -96,6 +96,11 @@ impl Handlers {
     pub fn with(mut self, handler: Arc<dyn JobHandler>) -> Self {
         self.0.insert(handler.kind(), handler);
         self
+    }
+
+    /// The job kinds that have a handler.
+    pub fn kinds(&self) -> BTreeSet<&'static str> {
+        self.0.keys().copied().collect()
     }
 }
 

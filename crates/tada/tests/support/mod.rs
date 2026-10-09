@@ -5,8 +5,10 @@
 // The helpers are not `#[test]` functions, so clippy.toml does not cover them.
 #![allow(clippy::unwrap_used)]
 
+pub mod export;
 pub mod files;
 pub mod logs;
+pub mod organization;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::num::NonZeroU64;
