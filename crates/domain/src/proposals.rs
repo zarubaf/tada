@@ -103,7 +103,7 @@ pub enum Operation {
         description: Option<ActionDescription>,
         owner: UserId,
         workstream: Option<WorkstreamId>,
-        due: Option<Date>,
+        due_date: Option<Date>,
     },
     /// Create a commitment of an event (ADR 0068). It starts `conditional` with a condition, else `firm`.
     CreateCommitment {
@@ -113,7 +113,7 @@ pub enum Operation {
         promisor: Party,
         owner: UserId,
         workstream: Option<WorkstreamId>,
-        due: Option<Date>,
+        due_date: Option<Date>,
         condition: Option<ConditionText>,
     },
     /// Change the status of an action. `expected_version` is the current version of the action.
@@ -127,7 +127,7 @@ pub enum Operation {
     ChangeActionDue {
         event_id: EventId,
         action_id: ActionId,
-        due: Option<Date>,
+        due_date: Option<Date>,
         expected_version: RecordVersion,
     },
     /// Change the status of a commitment. A change to `firm` is the AI path for "condition met" (ADR 0068).

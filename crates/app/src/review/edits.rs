@@ -179,7 +179,7 @@ pub(super) fn edit_record(
             description: current_description,
             owner: current_owner,
             workstream: current_workstream,
-            due,
+            due_date: current_due_date,
         } => Operation::CreateAction {
             id,
             event_id,
@@ -199,7 +199,13 @@ pub(super) fn edit_record(
             ),
             owner: owner.map_or(current_owner, UserId::from_uuid),
             workstream: workstream.map_or(current_workstream, |id| id.map(WorkstreamId::from_uuid)),
-            due: errors.replace_optional("due_date", due, due_date, parse_date, |_| "date"),
+            due_date: errors.replace_optional(
+                "due_date",
+                current_due_date,
+                due_date,
+                parse_date,
+                |_| "date",
+            ),
         },
         Operation::CreateCommitment {
             id,
@@ -208,7 +214,7 @@ pub(super) fn edit_record(
             promisor,
             owner: current_owner,
             workstream: current_workstream,
-            due,
+            due_date: current_due_date,
             condition: current_condition,
         } => {
             // The condition of a proposed commitment stays: only "make firm" ends it (ADR 0068).
@@ -239,7 +245,13 @@ pub(super) fn edit_record(
                 owner: owner.map_or(current_owner, UserId::from_uuid),
                 workstream: workstream
                     .map_or(current_workstream, |id| id.map(WorkstreamId::from_uuid)),
-                due: errors.replace_optional("due_date", due, due_date, parse_date, |_| "date"),
+                due_date: errors.replace_optional(
+                    "due_date",
+                    current_due_date,
+                    due_date,
+                    parse_date,
+                    |_| "date",
+                ),
                 condition,
             }
         }

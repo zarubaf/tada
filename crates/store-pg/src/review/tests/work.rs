@@ -17,7 +17,7 @@ fn commitment(event: EventId, id: Uuid, promisor: Value, owner: UserId) -> Value
     json!({
         "kind": "create-commitment", "id": id, "event_id": event.as_uuid(),
         "text": "Liefert das Zelt", "promisor": promisor, "owner": owner.as_uuid(),
-        "due": "2030-05-10", "condition": "wenn der Auftrag unterschrieben ist",
+        "due_date": "2030-05-10", "condition": "wenn der Auftrag unterschrieben ist",
     })
 }
 

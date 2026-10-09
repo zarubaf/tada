@@ -663,7 +663,7 @@ mod work {
             json!({
                 "kind": "create-commitment", "id": commitment, "event_id": event,
                 "text": "Klärt die Bewilligung", "promisor": {"person": person},
-                "owner": contributor.user.as_uuid(), "due": "2030-04-30",
+                "owner": contributor.user.as_uuid(), "due_date": "2030-04-30",
                 "condition": "wenn der Ort feststeht",
             }),
             "Der Ort ist noch offen.",
@@ -692,7 +692,7 @@ mod work {
             .find(|operation| operation["kind"] == "create-commitment")
             .unwrap();
         assert_eq!(operation["promisor"], json!({"person": person}));
-        assert_eq!(operation["due"], "2030-04-30");
+        assert_eq!(operation["due_date"], "2030-04-30");
 
         let (status, result) = api
             .post(

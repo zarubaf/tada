@@ -214,7 +214,7 @@ pub enum OperationInput {
         workstream: Option<Uuid>,
         /// The due date as `YYYY-MM-DD`.
         #[serde(default)]
-        due: Option<String>,
+        due_date: Option<String>,
     },
     /// Create a commitment of the event. With a condition it starts `conditional`, else `firm`.
     /// Never invent a signature or an approval: a commitment with an open condition stays conditional.
@@ -234,7 +234,7 @@ pub enum OperationInput {
         workstream: Option<Uuid>,
         /// The due date as `YYYY-MM-DD`.
         #[serde(default)]
-        due: Option<String>,
+        due_date: Option<String>,
         /// The condition of the promise, 1 to 500 characters, for example "subject to a signed order".
         #[serde(default)]
         condition: Option<String>,
@@ -253,7 +253,7 @@ pub enum OperationInput {
         action_id: Uuid,
         /// The new due date as `YYYY-MM-DD`. Leave it out to clear the due date.
         #[serde(default)]
-        due: Option<String>,
+        due_date: Option<String>,
         /// The current version of the action.
         expected_version: i64,
     },
@@ -771,7 +771,7 @@ impl TryFrom<OperationInput> for Operation {
                 description,
                 owner,
                 workstream,
-                due,
+                due_date,
             } => {
                 let title = errors.take("title", ActionTitle::parse(&title), text_error_code);
                 let description = errors.optional(
@@ -780,7 +780,7 @@ impl TryFrom<OperationInput> for Operation {
                     ActionDescription::parse,
                     text_error_code,
                 );
-                let due = errors.optional("due", due, parse_date, |_| "date");
+                let due_date = errors.optional("due_date", due_date, parse_date, |_| "date");
                 (|| {
                     Some(Operation::CreateAction {
                         id: ActionId::from_uuid(id),
@@ -789,7 +789,7 @@ impl TryFrom<OperationInput> for Operation {
                         description: description?,
                         owner: UserId::from_uuid(owner),
                         workstream: workstream.map(WorkstreamId::from_uuid),
-                        due: due?,
+                        due_date: due_date?,
                     })
                 })()
             }
@@ -800,11 +800,11 @@ impl TryFrom<OperationInput> for Operation {
                 promisor,
                 owner,
                 workstream,
-                due,
+                due_date,
                 condition,
             } => {
                 let text = errors.take("text", CommitmentText::parse(&text), text_error_code);
-                let due = errors.optional("due", due, parse_date, |_| "date");
+                let due_date = errors.optional("due_date", due_date, parse_date, |_| "date");
                 let condition = errors.optional(
                     "condition",
                     condition,
@@ -819,7 +819,7 @@ impl TryFrom<OperationInput> for Operation {
                         promisor: promisor.into(),
                         owner: UserId::from_uuid(owner),
                         workstream: workstream.map(WorkstreamId::from_uuid),
-                        due: due?,
+                        due_date: due_date?,
                         condition: condition?,
                     })
                 })()
@@ -840,16 +840,16 @@ impl TryFrom<OperationInput> for Operation {
             OperationInput::ChangeActionDue {
                 event_id,
                 action_id,
-                due,
+                due_date,
                 expected_version,
             } => {
-                let due = errors.optional("due", due, parse_date, |_| "date");
+                let due_date = errors.optional("due_date", due_date, parse_date, |_| "date");
                 let expected_version = errors.version(expected_version);
                 (|| {
                     Some(Operation::ChangeActionDue {
                         event_id: EventId::from_uuid(event_id),
                         action_id: ActionId::from_uuid(action_id),
-                        due: due?,
+                        due_date: due_date?,
                         expected_version: expected_version?,
                     })
                 })()
