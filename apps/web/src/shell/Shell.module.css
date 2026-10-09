@@ -57,7 +57,11 @@
     background: var(--color-bg-surface);
   }
 
-  /* Narrow: each item of the bottom bar has the height of `--bottom-bar-item-height`. */
+  /*
+   * Narrow: each item of the bottom bar has the height of `--bottom-bar-item-height`. A media query
+   * cannot read a custom property, so the border of ADR 0023 is 40rem here and in the query for
+   * the medium layout below (the `--bp-medium` comments of the other style sheets).
+   */
   @media (width < 40rem) {
     .nav > a {
       min-height: var(--bottom-bar-item-height);

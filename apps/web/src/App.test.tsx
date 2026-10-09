@@ -46,6 +46,12 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Anlässe" })).toBeInTheDocument();
   });
 
+  it("loads a settings page on demand inside the settings template", async () => {
+    renderAt("/settings/account");
+    expect(await screen.findByRole("heading", { name: "Konto" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Einstellungen" })).toBeInTheDocument();
+  });
+
   it("shows the not-found page for an unknown path", async () => {
     renderAt("/nowhere");
     expect(await screen.findByText("Seite nicht gefunden")).toBeInTheDocument();

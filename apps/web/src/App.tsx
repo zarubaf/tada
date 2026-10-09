@@ -16,7 +16,7 @@ import { ReviewInbox } from "./review/ReviewInbox";
 import { Route, Router, Routes } from "./router/Router";
 import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
 import { SessionProvider } from "./session/SessionProvider";
-import { SettingsLayout } from "./settings/SettingsLayout";
+import { SettingsRoute } from "./settings/SettingsRoute";
 import { Shell } from "./shell/Shell";
 import { InvitationPage } from "./sign-in/InvitationPage";
 import { MagicLinkPage } from "./sign-in/MagicLinkPage";
@@ -148,39 +148,29 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   {/* The settings */}
                   <Route path="/settings/members">
-                    <SettingsLayout>
-                      <Suspense>
-                        <MembersPage api={api} />
-                      </Suspense>
-                    </SettingsLayout>
+                    <SettingsRoute>
+                      <MembersPage api={api} />
+                    </SettingsRoute>
                   </Route>
                   <Route path="/settings/telegram">
-                    <SettingsLayout>
-                      <Suspense>
-                        <TelegramPage api={api} />
-                      </Suspense>
-                    </SettingsLayout>
+                    <SettingsRoute>
+                      <TelegramPage api={api} />
+                    </SettingsRoute>
                   </Route>
                   <Route path="/settings/tokens">
-                    <SettingsLayout>
-                      <Suspense>
-                        <TokensPage api={api} />
-                      </Suspense>
-                    </SettingsLayout>
+                    <SettingsRoute>
+                      <TokensPage api={api} />
+                    </SettingsRoute>
                   </Route>
                   <Route path="/settings/organization">
-                    <SettingsLayout>
-                      <Suspense>
-                        <OrganizationPage api={api} />
-                      </Suspense>
-                    </SettingsLayout>
+                    <SettingsRoute>
+                      <OrganizationPage api={api} />
+                    </SettingsRoute>
                   </Route>
                   <Route path="/settings/account">
-                    <SettingsLayout>
-                      <Suspense>
-                        <AccountPage api={api} />
-                      </Suspense>
-                    </SettingsLayout>
+                    <SettingsRoute>
+                      <AccountPage api={api} />
+                    </SettingsRoute>
                   </Route>
                   <Route path="*">
                     <NotFoundPage />
