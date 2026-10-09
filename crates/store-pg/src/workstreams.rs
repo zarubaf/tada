@@ -14,7 +14,7 @@ use tada_app::workstreams::{Changed, Created, Workstream, WorkstreamStore, Works
 
 use crate::Database;
 use crate::audit;
-use crate::error::{InvalidRow, store_error};
+use crate::error::{InvalidRow, store_error, violates};
 
 struct WorkstreamRow {
     id: Uuid,
@@ -38,10 +38,6 @@ impl TryFrom<WorkstreamRow> for Workstream {
             version: RecordVersion::new(row.version).ok_or(InvalidRow("workstream.version"))?,
         })
     }
-}
-
-fn violates(error: &sqlx::Error, constraint: &str) -> bool {
-    matches!(error, sqlx::Error::Database(error) if error.constraint() == Some(constraint))
 }
 
 #[async_trait]

@@ -103,7 +103,7 @@ pub trait WorkstreamStore: Debug + Send + Sync {
 /// The input of `create_workstream`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewWorkstream {
-    /// The ID of the new workstream. A client that sends it can retry safely (ADR 0038).
+    /// The ID of the new workstream, a UUIDv7 (ADR 0038). Without it, the command chooses one. An ID that a record holds is `taken`, also on a retry.
     pub id: Option<Uuid>,
     pub name: String,
     pub lead: UserId,

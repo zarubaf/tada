@@ -1067,7 +1067,10 @@ mod tests {
             _: Option<tada_app::domain::ids::UserId>,
             _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
-        ) -> Result<tada_app::parties::PersonView, tada_app::store::StoreError> {
+        ) -> Result<
+            tada_app::records::Created<tada_app::parties::PersonView>,
+            tada_app::store::StoreError,
+        > {
             unreachable!()
         }
 
@@ -1111,7 +1114,10 @@ mod tests {
             _: &tada_app::parties::InstitutionFields,
             _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
-        ) -> Result<tada_app::parties::InstitutionView, tada_app::store::StoreError> {
+        ) -> Result<
+            tada_app::records::Created<tada_app::parties::InstitutionView>,
+            tada_app::store::StoreError,
+        > {
             unreachable!()
         }
 

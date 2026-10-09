@@ -76,7 +76,7 @@ impl PartyStore for Memory {
         _: Option<UserId>,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<PersonView, StoreError> {
+    ) -> Result<Created<PersonView>, StoreError> {
         unreachable!()
     }
 
@@ -127,7 +127,7 @@ impl PartyStore for Memory {
         _: &InstitutionFields,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<InstitutionView, StoreError> {
+    ) -> Result<Created<InstitutionView>, StoreError> {
         unreachable!()
     }
 

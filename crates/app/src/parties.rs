@@ -18,7 +18,7 @@ use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::text_error_code;
-use crate::records::{Changed, Checker, NumberCursor, audit, page};
+use crate::records::{Changed, Checker, Created, NumberCursor, audit, page, record_id};
 use crate::store::StoreError;
 
 /// A person of the organization, as the commands and queries show it.
@@ -100,7 +100,7 @@ pub trait PartyStore: Debug + Send + Sync {
         user_id: Option<UserId>,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<PersonView, StoreError>;
+    ) -> Result<Created<PersonView>, StoreError>;
 
     /// Replaces the values of a person if its version is `expected`, and counts the version up.
     async fn change_person(
@@ -134,7 +134,7 @@ pub trait PartyStore: Debug + Send + Sync {
         fields: &InstitutionFields,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<InstitutionView, StoreError>;
+    ) -> Result<Created<InstitutionView>, StoreError>;
 
     /// Replaces the values of an institution if its version is `expected`, and counts the version up.
     async fn change_institution(
@@ -191,6 +191,8 @@ pub fn names_match(a: &str, b: &str) -> bool {
 /// The input of `create_person`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewPerson {
+    /// The ID of the new person, a UUIDv7 (ADR 0038). Without it, the command chooses one. An ID that a record holds is `taken`, also on a retry.
+    pub id: Option<Uuid>,
     pub name: String,
     pub email: Option<String>,
     pub phone: Option<String>,
@@ -201,6 +203,8 @@ pub struct NewPerson {
 /// The input of `create_institution`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewInstitution {
+    /// The ID of the new institution, a UUIDv7 (ADR 0038). Without it, the command chooses one. An ID that a record holds is `taken`, also on a retry.
+    pub id: Option<Uuid>,
     pub name: String,
     pub kind: String,
     pub email: Option<String>,
@@ -338,6 +342,19 @@ fn parse_phone(check: &mut Checker, input: Option<&str>) -> Option<PhoneNumber> 
     check.parse("phone", input?, PhoneNumber::parse, text_error_code)
 }
 
+/// The ID of a new person or institution (`records::record_id`).
+fn new_id(id: Option<Uuid>) -> Result<Uuid, PartyError> {
+    record_id(id).map_err(|error| PartyError::Invalid(vec![error]))
+}
+
+/// The record of a create, or `taken` for its ID.
+fn created<T>(result: Created<T>) -> Result<T, PartyError> {
+    match result {
+        Created::Created(view) => Ok(view),
+        Created::IdTaken => Err(PartyError::Invalid(vec![FieldError::new("id", "taken")])),
+    }
+}
+
 /// The record of a change, or why the store did not change it.
 fn changed<T>(result: Changed<T>) -> Result<T, PartyError> {
     match result {
@@ -409,6 +426,7 @@ pub async fn create_person(
     clock: &dyn Clock,
 ) -> Result<PersonView, PartyError> {
     require_create(caller, identity).await?;
+    let id = PersonId::from_uuid(new_id(input.id)?);
     let mut check = Checker::default();
     let name = parse_name(&mut check, &input.name);
     let email = parse_email(&mut check, input.email.as_deref());
@@ -419,19 +437,20 @@ pub async fn create_person(
         check.push("user_id", "unknown-member");
     }
     let name = check.finish(name).map_err(PartyError::Invalid)?;
-    let id = PersonId::from_uuid(Uuid::now_v7());
     let audit = audit(caller, AuditAction::PersonCreate, id.as_uuid());
     let fields = PersonFields { name, email, phone };
-    Ok(store
-        .create_person(
-            caller.scope(),
-            id,
-            &fields,
-            input.user_id,
-            clock.now(),
-            &audit,
-        )
-        .await?)
+    created(
+        store
+            .create_person(
+                caller.scope(),
+                id,
+                &fields,
+                input.user_id,
+                clock.now(),
+                &audit,
+            )
+            .await?,
+    )
 }
 
 /// Changes a person. Only an owner or an admin can do it.
@@ -525,13 +544,13 @@ pub async fn create_institution(
     clock: &dyn Clock,
 ) -> Result<InstitutionView, PartyError> {
     require_create(caller, identity).await?;
+    let id = InstitutionId::from_uuid(new_id(input.id)?);
     let mut check = Checker::default();
     let name = parse_name(&mut check, &input.name);
     let kind = parse_kind(&mut check, &input.kind);
     let email = parse_email(&mut check, input.email.as_deref());
     let phone = parse_phone(&mut check, input.phone.as_deref());
     let (name, kind) = check.finish(name.zip(kind)).map_err(PartyError::Invalid)?;
-    let id = InstitutionId::from_uuid(Uuid::now_v7());
     let audit = audit(caller, AuditAction::InstitutionCreate, id.as_uuid());
     let fields = InstitutionFields {
         name,
@@ -539,9 +558,11 @@ pub async fn create_institution(
         email,
         phone,
     };
-    Ok(store
-        .create_institution(caller.scope(), id, &fields, clock.now(), &audit)
-        .await?)
+    created(
+        store
+            .create_institution(caller.scope(), id, &fields, clock.now(), &audit)
+            .await?,
+    )
 }
 
 /// Changes an institution. Only an owner or an admin can do it.

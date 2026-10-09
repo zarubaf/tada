@@ -5496,7 +5496,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "The UUIDv7 of the new action. A client that sends it can retry the request safely."
+            "description": "The UUIDv7 of the new action. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry."
           },
           "title": {
             "type": "string",
@@ -6896,7 +6896,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "The UUIDv7 of the new commitment. A client that sends it can retry the request safely."
+            "description": "The UUIDv7 of the new commitment. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry."
           },
           "text": {
             "type": "string",
@@ -6979,6 +6979,14 @@
           "kind"
         ],
         "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The UUIDv7 of the new institution. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry."
+          },
           "name": {
             "type": "string",
             "description": "1 to 200 characters.",
@@ -7011,6 +7019,14 @@
           "name"
         ],
         "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The UUIDv7 of the new person. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry."
+          },
           "name": {
             "type": "string",
             "description": "1 to 200 characters.",
@@ -7090,7 +7106,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "The UUIDv7 of the new workstream. A client that sends it can retry the request safely."
+            "description": "The UUIDv7 of the new workstream. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry."
           },
           "name": {
             "type": "string",

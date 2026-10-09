@@ -27,7 +27,7 @@ use crate::records::{Checker, NumberCursor, audit, page, record_id};
 /// The input of `create_commitment`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewCommitment {
-    /// The ID of the new commitment. A client that sends it can retry safely (ADR 0038).
+    /// The ID of the new commitment, a UUIDv7 (ADR 0038). Without it, the command chooses one. An ID that a record holds is `taken`, also on a retry.
     pub id: Option<Uuid>,
     pub text: String,
     /// The condition. A commitment with a condition starts `conditional`, else `firm`.

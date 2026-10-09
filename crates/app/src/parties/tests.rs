@@ -115,8 +115,11 @@ impl PartyStore for Memory {
         user_id: Option<UserId>,
         _: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<PersonView, StoreError> {
+    ) -> Result<Created<PersonView>, StoreError> {
         let mut persons = self.persons.lock().unwrap();
+        if persons.iter().any(|known| known.id == id) {
+            return Ok(Created::IdTaken);
+        }
         let person = PersonView {
             id,
             local_number: next_number(&persons),
@@ -128,7 +131,7 @@ impl PartyStore for Memory {
         };
         persons.push(person.clone());
         self.audit.lock().unwrap().push(audit.clone());
-        Ok(person)
+        Ok(Created::Created(person))
     }
 
     async fn change_person(
@@ -186,8 +189,11 @@ impl PartyStore for Memory {
         fields: &InstitutionFields,
         _: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<InstitutionView, StoreError> {
+    ) -> Result<Created<InstitutionView>, StoreError> {
         let mut institutions = self.institutions.lock().unwrap();
+        if institutions.iter().any(|known| known.id == id) {
+            return Ok(Created::IdTaken);
+        }
         let institution = InstitutionView {
             id,
             local_number: next_number(&institutions),
@@ -199,7 +205,7 @@ impl PartyStore for Memory {
         };
         institutions.push(institution.clone());
         self.audit.lock().unwrap().push(audit.clone());
-        Ok(institution)
+        Ok(Created::Created(institution))
     }
 
     async fn change_institution(
@@ -268,6 +274,7 @@ impl Clock for FixedClock {
 
 fn new_person(name: &str) -> NewPerson {
     NewPerson {
+        id: None,
         name: name.to_owned(),
         email: None,
         phone: None,
@@ -311,6 +318,38 @@ async fn a_contributor_creates_a_person() {
     assert_eq!(audit[0].action(), AuditAction::PersonCreate);
 }
 
+/// A client chooses the ID of a new person or institution as of a work record (ADR 0038): a UUIDv7 that is free.
+#[tokio::test]
+async fn a_client_chooses_the_id_of_a_new_party() {
+    let memory = Memory::default();
+    let id = Uuid::now_v7();
+    let input = NewPerson {
+        id: Some(id),
+        ..new_person("Beat Muster")
+    };
+    let created = create_person(&anna(), input.clone(), &memory, &memory, &FixedClock)
+        .await
+        .unwrap();
+    assert_eq!(created.id.as_uuid(), id);
+    let again = create_person(&anna(), input, &memory, &memory, &FixedClock)
+        .await
+        .unwrap_err();
+    assert_eq!(again.field_errors(), [FieldError::new("id", "taken")]);
+
+    let input = NewInstitution {
+        id: Some(Uuid::from_u128(7)),
+        name: "Testwil Generatoren AG".to_owned(),
+        kind: "company".to_owned(),
+        email: None,
+        phone: None,
+    };
+    let error = create_institution(&anna(), input, &memory, &memory, &FixedClock)
+        .await
+        .unwrap_err();
+    assert_eq!(error.field_errors(), [FieldError::new("id", "not-uuid-v7")]);
+    assert_eq!(memory.persons.lock().unwrap().len(), 1);
+}
+
 #[tokio::test]
 async fn a_viewer_cannot_create_a_person() {
     let memory = Memory::default();
@@ -337,6 +376,7 @@ async fn the_first_person_is_per_001() {
     let institution = create_institution(
         &carla(),
         NewInstitution {
+            id: None,
             name: "Testwil Generatoren AG".to_owned(),
             kind: "company".to_owned(),
             email: None,
@@ -420,6 +460,7 @@ async fn a_change_without_a_field_is_invalid() {
     let institution = create_institution(
         &anna(),
         NewInstitution {
+            id: None,
             name: "Testwil Generatoren AG".to_owned(),
             kind: "company".to_owned(),
             email: None,
@@ -506,6 +547,7 @@ async fn invalid_values_name_their_fields() {
 async fn an_institution_of_an_unknown_kind_is_refused() {
     let memory = Memory::default();
     let input = NewInstitution {
+        id: None,
         name: "Testwil Generatoren AG".to_owned(),
         kind: "bank".to_owned(),
         email: None,

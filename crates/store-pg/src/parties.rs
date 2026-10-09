@@ -14,12 +14,12 @@ use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber, 
 use tada_app::parties::{
     InstitutionFields, InstitutionView, PartyRef, PartyStore, PersonFields, PersonView, names_match,
 };
-use tada_app::records::{Changed, NumberCursor};
+use tada_app::records::{Changed, Created, NumberCursor};
 use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::audit;
-use crate::error::{InvalidRow, store_error};
+use crate::error::{InvalidRow, store_error, violates};
 use crate::local_ids::next_local_number;
 
 struct PersonRow {
@@ -182,14 +182,16 @@ impl PartyStore for Database {
         user_id: Option<UserId>,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<PersonView, StoreError> {
+    ) -> Result<Created<PersonView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let number = insert_person(&mut tx, scope, id, fields, user_id, at)
-            .await
-            .map_err(store_error)?;
+        let number = match insert_person(&mut tx, scope, id, fields, user_id, at).await {
+            Ok(number) => number,
+            Err(error) if violates(&error, "person_pkey") => return Ok(Created::IdTaken),
+            Err(error) => return Err(store_error(error)),
+        };
         audit::record(&mut tx, audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
-        Ok(PersonView {
+        Ok(Created::Created(PersonView {
             id,
             local_number: u64::try_from(number).map_err(|_| InvalidRow("person.local_number"))?,
             name: fields.name.clone(),
@@ -197,7 +199,7 @@ impl PartyStore for Database {
             phone: fields.phone.clone(),
             user_id,
             version: RecordVersion::FIRST,
-        })
+        }))
     }
 
     async fn change_person(
@@ -298,14 +300,16 @@ impl PartyStore for Database {
         fields: &InstitutionFields,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<InstitutionView, StoreError> {
+    ) -> Result<Created<InstitutionView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let number = insert_institution(&mut tx, scope, id, fields, at)
-            .await
-            .map_err(store_error)?;
+        let number = match insert_institution(&mut tx, scope, id, fields, at).await {
+            Ok(number) => number,
+            Err(error) if violates(&error, "institution_pkey") => return Ok(Created::IdTaken),
+            Err(error) => return Err(store_error(error)),
+        };
         audit::record(&mut tx, audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
-        Ok(InstitutionView {
+        Ok(Created::Created(InstitutionView {
             id,
             local_number: u64::try_from(number)
                 .map_err(|_| InvalidRow("institution.local_number"))?,
@@ -314,7 +318,7 @@ impl PartyStore for Database {
             email: fields.email.clone(),
             phone: fields.phone.clone(),
             version: RecordVersion::FIRST,
-        })
+        }))
     }
 
     async fn change_institution(

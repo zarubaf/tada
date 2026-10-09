@@ -23,7 +23,7 @@ use crate::records::{Checker, NumberCursor, audit, page, record_id};
 /// The input of `create_action`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewAction {
-    /// The ID of the new action. A client that sends it can retry safely (ADR 0038).
+    /// The ID of the new action, a UUIDv7 (ADR 0038). Without it, the command chooses one. An ID that a record holds is `taken`, also on a retry.
     pub id: Option<Uuid>,
     pub title: String,
     pub description: Option<String>,
