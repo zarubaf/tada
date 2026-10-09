@@ -24,6 +24,17 @@ pub const IDLE_TIMEOUT: SignedDuration = SignedDuration::from_hours(14 * 24);
 pub const ABSOLUTE_TIMEOUT: SignedDuration = SignedDuration::from_hours(90 * 24);
 /// The last-use time of a session changes at most once in this interval, to limit the writes.
 pub const TOUCH_INTERVAL: SignedDuration = SignedDuration::from_mins(1);
+/// A session stores at most this many characters of the `User-Agent` header.
+/// The limit keeps the personal data of each row small (ADR 0045).
+pub const USER_AGENT_MAX_CHARS: usize = 200;
+
+/// The part of a `User-Agent` value that a session stores: the first [`USER_AGENT_MAX_CHARS`] characters.
+pub fn stored_user_agent(value: &str) -> &str {
+    value
+        .char_indices()
+        .nth(USER_AGENT_MAX_CHARS)
+        .map_or(value, |(end, _)| &value[..end])
+}
 
 /// A stored session. The store never gives the token back.
 #[derive(Debug, Clone, PartialEq, Eq)]

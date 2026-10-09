@@ -74,3 +74,25 @@ impl DependencyCheck for Database {
             .map_err(|error| DependencyUnavailable(Box::new(error)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    /// The versions of the committed migrations, in order.
+    /// The numbers 16 and 18 stay unused: an existing database would apply a migration with such a number
+    /// after the newer migrations, and a new database before them (see `migrations/README.md`).
+    const VERSIONS: [i64; 21] = [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 19, 20, 21, 22, 23,
+    ];
+
+    #[test]
+    fn a_new_migration_takes_the_next_number_after_the_highest() {
+        let versions: Vec<i64> = sqlx::migrate!()
+            .iter()
+            .map(|migration| migration.version)
+            .collect();
+        assert_eq!(
+            versions, VERSIONS,
+            "add a new migration with the next number after the highest, then add the number here"
+        );
+    }
+}

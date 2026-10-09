@@ -3461,6 +3461,7 @@
                         ],
                         "type": "object"
                       },
+                      "maxItems": 10,
                       "type": "array"
                     },
                     "id": {
@@ -4364,6 +4365,7 @@
                   ],
                   "type": "object"
                 },
+                "maxItems": 200,
                 "type": "array"
               },
               "source_text": {

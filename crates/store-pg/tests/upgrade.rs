@@ -105,7 +105,7 @@ async fn an_upgrade_keeps_the_concept_the_sources_the_relationships_and_the_old_
     assert_eq!(applied, all.iter().map(|m| m.version).max().unwrap());
 
     // Each row of the fixture stays, with the values of the columns of the old schema.
-    // The upgrade can add rows: the catalog sync adds the shipped fields.
+    // The only new rows are the shipped fields that the catalog sync adds: field definitions without an event.
     let after = snapshot(pool, &old_columns).await;
     for (table, rows) in &before {
         for row in rows {
@@ -113,6 +113,12 @@ async fn an_upgrade_keeps_the_concept_the_sources_the_relationships_and_the_old_
                 after[table].contains(row),
                 "the upgrade changed or removed a row of {table}: {row}"
             );
+        }
+        for row in after[table].iter().filter(|row| !rows.contains(row)) {
+            let row_value: serde_json::Value = serde_json::from_str(row).unwrap();
+            let shipped_field = table == "field_definition"
+                && row_value.get("event_id") == Some(&serde_json::Value::Null);
+            assert!(shipped_field, "the upgrade added a row to {table}: {row}");
         }
     }
 

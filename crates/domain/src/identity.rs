@@ -163,10 +163,13 @@ pub enum EmailError {
     TooLong,
     #[error("the email address contains a control character")]
     ControlCharacter,
+    #[error("the email address contains a space")]
+    Whitespace,
 }
 
 /// A normalized email address. This is the only place that defines the normalization:
 /// it trims the address and lowercases all of it.
+/// The address has no whitespace inside it.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Email(String);
 
@@ -175,6 +178,9 @@ impl Email {
         let address = input.trim().to_lowercase();
         if address.chars().any(char::is_control) {
             return Err(EmailError::ControlCharacter);
+        }
+        if address.chars().any(char::is_whitespace) {
+            return Err(EmailError::Whitespace);
         }
         if address.chars().count() > EMAIL_MAX_CHARS {
             return Err(EmailError::TooLong);
@@ -305,6 +311,17 @@ mod tests {
             Email::parse("an\nna@example.org"),
             Err(EmailError::ControlCharacter)
         );
+        for input in [
+            "an na@example.org",
+            "anna@exam\u{a0}ple.org",
+            "anna@example.org\u{2003}x",
+        ] {
+            assert_eq!(
+                Email::parse(input),
+                Err(EmailError::Whitespace),
+                "{input:?}"
+            );
+        }
         let long = format!("{}@example.org", "a".repeat(243));
         assert_eq!(long.chars().count(), 255);
         assert_eq!(Email::parse(&long), Err(EmailError::TooLong));

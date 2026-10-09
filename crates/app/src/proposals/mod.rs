@@ -240,11 +240,19 @@ impl CommandError for ProposeError {
 /// The search index of one text is limited to 1 MB, and each passage check reads the text.
 pub const MAX_SOURCE_TEXT_CHARS: usize = 100_000;
 
+/// The most proposals of one changeset.
+/// Each passage check reads the source text, so the limits bound the work of one request.
+pub const MAX_PROPOSALS: usize = 200;
+
+/// The most passages of evidence of one proposal.
+pub const MAX_PASSAGES: usize = 10;
+
 /// Creates a changeset of proposals with their evidence (ADR 0050).
 ///
 /// 1. A changeset of an event needs the right to propose in the event (ADR 0052).
 ///    A changeset of the organization, for example a new event, needs an owner or admin as principal.
 /// 2. The source text has at most `MAX_SOURCE_TEXT_CHARS` characters.
+///    A changeset has at most `MAX_PROPOSALS` proposals, and a proposal at most `MAX_PASSAGES` passages.
 ///    Each proposal has at least one passage, and each passage matches the text of its source version (ADR 0040).
 ///    A passage names no source version for the source text of the changeset. A passage of another source version
 ///    must be readable in the event of the proposal (`access::event_source_reach`), for example a text file of the event.
@@ -428,6 +436,10 @@ fn parse(
     if input.proposals.is_empty() {
         errors.push(FieldError::new("proposals", "empty"));
     }
+    // Stop before the passage checks: they read the source text for each passage.
+    if input.proposals.len() > MAX_PROPOSALS {
+        return Err(invalid("proposals", "too-many"));
+    }
     let mut proposals = Vec::new();
     for (index, proposal) in input.proposals.into_iter().enumerate() {
         let path = |field: &str| format!("proposals/{index}/{field}");
@@ -436,6 +448,10 @@ fn parse(
         }
         if proposal.evidence.is_empty() {
             errors.push(FieldError::new(path("evidence"), "evidence-missing"));
+        }
+        if proposal.evidence.len() > MAX_PASSAGES {
+            errors.push(FieldError::new(path("evidence"), "too-many"));
+            continue;
         }
         let mut evidence = Vec::new();
         for (number, input) in proposal.evidence.into_iter().enumerate() {

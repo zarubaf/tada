@@ -23,7 +23,10 @@ INVENTORY = (
 
 
 def run(
-    migrations: dict[str, str], inventory: str = INVENTORY, allowed: dict[str, str] | None = None
+    migrations: dict[str, str],
+    inventory: str = INVENTORY,
+    allowed: dict[str, str] | None = None,
+    allowed_columns: dict[str, str] | None = None,
 ) -> tuple[int, str]:
     """Runs the check on temporary files. Returns the exit code and the text of standard error."""
     with tempfile.TemporaryDirectory() as folder:
@@ -34,7 +37,9 @@ def run(
         (root / "inventory.md").write_text(inventory)
         error = io.StringIO()
         with contextlib.redirect_stderr(error), contextlib.redirect_stdout(io.StringIO()):
-            code = check.main([str(root / "migrations"), str(root / "inventory.md")], allowed or {})
+            code = check.main(
+                [str(root / "migrations"), str(root / "inventory.md")], allowed or {}, allowed_columns or {}
+            )
         return code, error.getvalue()
 
 
@@ -98,6 +103,46 @@ class CheckDataInventory(unittest.TestCase):
         self.assertIn("gone_table", error)
         self.assertIn("no migration creates", error)
 
+    def test_fails_for_a_column_that_an_alter_table_adds_to_an_allowed_table(self) -> None:
+        migrations = {
+            "0001.sql": "CREATE TABLE job (id uuid);",
+            "0002.sql": "ALTER TABLE job ADD COLUMN requester_email text, ADD note text;",
+        }
+        code, error = run(migrations, allowed={"job": "A reason."})
+        self.assertEqual(code, 1)
+        self.assertIn("job.requester_email (0002.sql)", error)
+        self.assertIn("job.note (0002.sql)", error)
+
+    def test_an_allowed_column_with_a_reason_passes(self) -> None:
+        migrations = {
+            "0001.sql": "CREATE TABLE job (id uuid);",
+            "0002.sql": "ALTER TABLE ONLY public.job\n    ADD COLUMN IF NOT EXISTS attempts integer DEFAULT 0;",
+        }
+        code, error = run(migrations, allowed={"job": "A reason."}, allowed_columns={"job.attempts": "A reason."})
+        self.assertEqual(code, 0, error)
+
+    def test_a_constraint_that_an_alter_table_adds_is_not_a_column(self) -> None:
+        migrations = {
+            "0001.sql": "CREATE TABLE job (id uuid, other uuid);",
+            "0002.sql": (
+                "ALTER TABLE job ADD CONSTRAINT job_id CHECK (id IS NOT NULL), ADD FOREIGN KEY (other) "
+                "REFERENCES job (id), ADD PRIMARY KEY (id), ADD UNIQUE (other), ADD CHECK (true);\n"
+                "ALTER TABLE app_user ADD COLUMN email text;"
+            ),
+        }
+        code, error = run(migrations | {"0000.sql": "CREATE TABLE app_user (id uuid);"}, allowed={"job": "A reason."})
+        self.assertEqual(code, 0, error)
+
+    def test_fails_for_an_allowed_column_that_no_migration_adds(self) -> None:
+        code, error = run(
+            {"0001.sql": "CREATE TABLE job (id uuid);"},
+            allowed={"job": "A reason."},
+            allowed_columns={"job.gone": "A reason."},
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("job.gone", error)
+        self.assertIn("no migration adds", error)
+
     def test_fails_for_a_folder_without_tables(self) -> None:
         code, error = run({"0001.sql": "SELECT 1;"})
         self.assertEqual(code, 1)
@@ -108,6 +153,9 @@ class CheckDataInventory(unittest.TestCase):
             self.assertTrue(reason.endswith("."), table)
         for table in ("local_id_counter", "job", "worker_heartbeat", "telegram_update"):
             self.assertIn(table, check.ALLOWED)
+        for column, reason in check.ALLOWED_COLUMNS.items():
+            self.assertTrue(reason.endswith("."), column)
+            self.assertIn(column.split(".")[0], check.ALLOWED)
 
     def test_the_inventory_of_the_repository_covers_the_migrations(self) -> None:
         self.assertEqual(check.main([]), 0)
