@@ -4,24 +4,31 @@
 -- This trigger is the second line of defense, as for the content.
 -- An upload has no status and no approval, so no update of an upload passes a change of them.
 --
--- Allowed changes:
+-- Allowed status changes (ARCHITECTURE.md: an edit makes a new version, so no version goes back to draft or review):
+-- - `draft` to `review`.
 -- - `draft` or `review` to `approved`, with `approved_by` and `approved_at` set in the same update.
--- - `approved` to `superseded`, with the approval unchanged.
+--   This is the only change that sets the approval.
+-- - `approved` to `superseded`.
+-- - `draft`, `review`, `approved` or `superseded` to `archived`.
+-- Nothing leaves `archived`.
 -- Once `approved_at` is set, `approved_by` and `approved_at` never change.
--- A move into `review` or `archived` needs a new migration when the application gets one.
 CREATE FUNCTION document_version_approval_record() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
     approves boolean := coalesce(OLD.status IN ('draft', 'review') AND NEW.status = 'approved', false);
-    supersedes boolean := coalesce(OLD.status = 'approved' AND NEW.status = 'superseded', false);
+    allowed boolean := coalesce(
+        (OLD.status = 'draft' AND NEW.status = 'review')
+        OR (approves AND NEW.approved_at IS NOT NULL)
+        OR (OLD.status = 'approved' AND NEW.status = 'superseded')
+        OR (OLD.status IN ('draft', 'review', 'approved', 'superseded') AND NEW.status = 'archived'),
+        false);
     approval_changed boolean := (NEW.approved_by, NEW.approved_at) IS DISTINCT FROM (OLD.approved_by, OLD.approved_at);
 BEGIN
     IF approval_changed AND NOT (approves AND OLD.approved_at IS NULL) THEN
         RAISE EXCEPTION 'the approval of a document version never changes'
             USING ERRCODE = 'restrict_violation', CONSTRAINT = 'document_version_approval_record';
     END IF;
-    IF NEW.status IS DISTINCT FROM OLD.status
-       AND NOT ((approves AND NEW.approved_at IS NOT NULL) OR supersedes) THEN
+    IF NEW.status IS DISTINCT FROM OLD.status AND NOT allowed THEN
         RAISE EXCEPTION 'this status change of a document version is not allowed'
             USING ERRCODE = 'restrict_violation', CONSTRAINT = 'document_version_approval_record';
     END IF;
