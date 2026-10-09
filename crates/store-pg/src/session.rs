@@ -79,7 +79,8 @@ impl SessionStore for Database {
             last_used_at: row.last_used_at.to_jiff(),
         };
         if session.is_expired(now) {
-            self.delete(token).await?;
+            let mut conn = self.pool.acquire().await.map_err(store_error)?;
+            delete_session(&mut conn, token).await?;
             return Ok(None);
         }
         Ok(Some(session))
@@ -113,9 +114,16 @@ impl SessionStore for Database {
         Ok(())
     }
 
-    async fn delete(&self, token: &str) -> Result<(), StoreError> {
-        let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        delete_session(&mut conn, token).await
+    async fn sign_out(&self, token: &str) -> Result<(), StoreError> {
+        sqlx::query!(
+            "WITH ended AS (DELETE FROM session WHERE token_hash = $1 RETURNING user_id)
+             DELETE FROM magic_link WHERE user_id IN (SELECT user_id FROM ended)",
+            hash_token(token)
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(())
     }
 }
 
@@ -260,7 +268,7 @@ mod tests {
         let user = anna(&test).await;
         let token = create(&test, user, None, None, now()).await;
 
-        test.database.delete(token.expose_secret()).await.unwrap();
+        test.database.sign_out(token.expose_secret()).await.unwrap();
         assert_eq!(
             test.database
                 .find(token.expose_secret(), now())
@@ -291,7 +299,7 @@ mod tests {
             .unwrap();
         assert_eq!(session.organization_id, None);
 
-        test.database.delete(first.expose_secret()).await.unwrap();
+        test.database.sign_out(first.expose_secret()).await.unwrap();
         assert!(
             test.database
                 .find(second.expose_secret(), now())

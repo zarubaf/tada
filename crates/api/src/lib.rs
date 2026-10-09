@@ -501,7 +501,7 @@ mod tests {
             unreachable!()
         }
 
-        async fn delete(&self, _: &str) -> Result<(), tada_app::store::StoreError> {
+        async fn sign_out(&self, _: &str) -> Result<(), tada_app::store::StoreError> {
             unreachable!()
         }
     }

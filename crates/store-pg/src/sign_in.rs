@@ -161,6 +161,11 @@ impl SignInStore for Database {
         if let Some(replaced) = replaced {
             delete_session(&mut tx, replaced).await?;
         }
+        // The other links of the user stop working too, for example a second mail in the mailbox.
+        sqlx::query!("DELETE FROM magic_link WHERE user_id = $1", link.user_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
         Ok(Some(session))
     }
