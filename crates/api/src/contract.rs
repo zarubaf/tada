@@ -7,8 +7,6 @@ use tada_app::problem::ProblemCode;
 use utoipa::openapi::extensions::Extensions;
 use utoipa::openapi::{Info, License, OpenApi};
 
-use crate::problem;
-
 /// The extension that lists the problem codes of an operation (ADR 0037).
 pub const PROBLEM_CODES_EXTENSION: &str = "x-tada-problem-codes";
 
@@ -83,7 +81,7 @@ pub fn problem_catalog() -> String {
         let name = code.as_str();
         rows.push([
             format!("<a id=\"{name}\"></a>`{name}`"),
-            problem::status(code).as_u16().to_string(),
+            code.http_status().to_string(),
             code.meaning().to_owned(),
         ]);
     }
