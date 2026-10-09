@@ -8684,7 +8684,7 @@
           "open_proposals": {
             "type": "integer",
             "format": "int32",
-            "description": "The number of its open proposals.",
+            "description": "The number of its open proposals in the Review Inbox of the caller (ADR 0067). \"My Work\" counts the same proposals.",
             "minimum": 0
           },
           "stale": {

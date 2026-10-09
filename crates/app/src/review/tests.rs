@@ -144,8 +144,8 @@ fn a_change_to_firm_without_a_valid_reason_does_not_apply() {
     );
 }
 
-fn open(n: u128, time: &str) -> OpenChangeset {
-    OpenChangeset {
+fn open(n: u128, time: &str) -> InboxChangeset {
+    let changeset = OpenChangeset {
         id: ChangesetId::from_uuid(Uuid::from_u128(n)),
         event_id: None,
         author: Actor::restore(
@@ -157,6 +157,10 @@ fn open(n: u128, time: &str) -> OpenChangeset {
         ),
         created_at: at(time),
         proposals: Vec::new(),
+    };
+    InboxChangeset {
+        changeset,
+        in_inbox: 1,
     }
 }
 

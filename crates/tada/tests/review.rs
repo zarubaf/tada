@@ -1094,6 +1094,49 @@ mod routing {
         assert_eq!(status, StatusCode::NOT_FOUND);
         let (_, work) = r.api.get(&r.other.cookie, "/api/v1/me/work").await;
         assert_eq!(work["review_count"], 0);
+        // The proposal has no reviewer besides the managers now, so they see it at once.
+        assert_eq!(r.inbox(&r.manager).await, [changeset.as_str()]);
+        let (_, work) = r.api.get(&r.manager.cookie, "/api/v1/me/work").await;
+        assert_eq!(work["review_count"], 1);
+        let (_, review) = r.detail(&r.manager, &changeset).await;
+        assert_eq!(proposal_of(&review, &change["id"])["routed_to_me"], true);
+    }
+
+    #[tokio::test]
+    async fn a_lead_who_loses_the_role_passes_the_proposal_to_the_managers() {
+        let r = Routed::start().await;
+        let (changeset, _, promise) = r.supplier_changeset().await;
+        assert_eq!(r.inbox(&r.manager).await, Vec::<String>::new());
+
+        r.remove_from_event(&r.lead).await;
+
+        assert_eq!(r.inbox(&r.manager).await, [changeset.as_str()]);
+        let (_, work) = r.api.get(&r.manager.cookie, "/api/v1/me/work").await;
+        assert_eq!(work["review_count"], 2);
+        let (_, review) = r.detail(&r.manager, &changeset).await;
+        assert_eq!(proposal_of(&review, &promise["id"])["routed_to_me"], true);
+    }
+
+    #[tokio::test]
+    async fn the_inbox_counts_the_open_proposals_of_the_caller() {
+        let r = Routed::start().await;
+        let venue = r.api.field(&r.manager.cookie, &r.event, "venue").await;
+        let fact = venue_body(&r.event, &venue, "Flugfeld")["proposals"][0].clone();
+        let person = Uuid::now_v7();
+        let supplier = Routed::new_person(person);
+        let mut promise = r.commitment(person, Some(&r.workstream));
+        promise["depends_on"] = json!([supplier["id"]]);
+        r.propose(vec![fact, supplier, promise]).await;
+
+        for (member, count) in [(&r.lead, 2), (&r.manager, 1)] {
+            let (_, inbox) = r
+                .api
+                .get(&member.cookie, "/api/v1/changesets?status=open")
+                .await;
+            assert_eq!(inbox["items"][0]["open_proposals"], count, "{inbox}");
+            let (_, work) = r.api.get(&member.cookie, "/api/v1/me/work").await;
+            assert_eq!(work["review_count"], count);
+        }
     }
 
     #[tokio::test]
