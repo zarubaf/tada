@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { BERND, EVENT, json, ME, problem, renderWork } from "../test/fakeWorkServer";
+import { EVENT, json, ME, problem, renderWork } from "../test/fakeWorkServer";
 import { ActionsPage } from "./ActionsPage";
 
 const user = userEvent.setup({ delay: null });
@@ -17,6 +17,8 @@ function action(over: Record<string, unknown> = {}) {
     due_date: "2030-05-18",
     status: "open",
     version: 2,
+    can_change: true,
+    next_statuses: ["in-progress", "blocked", "done", "canceled"],
     ...over,
   };
 }
@@ -39,12 +41,13 @@ describe("ActionsPage", () => {
     expect(within(table).getByText("offen")).toBeInTheDocument();
   });
 
-  it("shows the edit control to the owner, the lead and a manager only", async () => {
+  it("shows the edit control where the server says the caller can change the action", async () => {
     render({
       lists: {
         "/actions": [
-          action({ id: "a1", local_id: "ACT-001", owner_user_id: ME, workstream_id: null }),
-          action({ id: "a2", local_id: "ACT-002", owner_user_id: BERND, workstream_id: "w1" }),
+          action({ id: "a1", local_id: "ACT-001" }),
+          // An owner who became a viewer: the server refuses, so the page offers no edit.
+          action({ id: "a2", local_id: "ACT-002", can_change: false, next_statuses: [] }),
         ],
       },
     });
@@ -54,30 +57,8 @@ describe("ActionsPage", () => {
     expect(screen.queryByRole("button", { name: "ACT-002 bearbeiten" })).not.toBeInTheDocument();
   });
 
-  it("shows every edit control to an event manager", async () => {
-    render({
-      eventManager: true,
-      lists: { "/actions": [action({ owner_user_id: BERND, workstream_id: null })] },
-    });
-
-    await screen.findByRole("table", { name: "Aufgaben" });
-    expect(screen.getByRole("button", { name: "ACT-001 bearbeiten" })).toBeInTheDocument();
-  });
-
-  it("shows the edit control to the lead of the workstream", async () => {
-    render({
-      workstreams: [
-        { id: "w1", name: "Bodenbetrieb", lead_user_id: ME, status: "active", version: 1 },
-      ],
-      lists: { "/actions": [action({ owner_user_id: BERND })] },
-    });
-
-    await screen.findByRole("table", { name: "Aufgaben" });
-    expect(screen.getByRole("button", { name: "ACT-001 bearbeiten" })).toBeInTheDocument();
-  });
-
   it("the action form offers only allowed statuses", async () => {
-    render({ lists: { "/actions": [action({ status: "done" })] } });
+    render({ lists: { "/actions": [action({ status: "done", next_statuses: ["open"] })] } });
     await screen.findByRole("table", { name: "Aufgaben" });
 
     await user.click(screen.getByRole("button", { name: "ACT-001 bearbeiten" }));

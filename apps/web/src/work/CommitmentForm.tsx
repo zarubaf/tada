@@ -9,7 +9,6 @@ import { TextField } from "../ui/TextField";
 import type { Directory } from "./directory";
 import { blankToNull, fieldErrors, type SaveFailure, saveFailure } from "./fieldErrors";
 import { NO_WORKSTREAM, OwnerSelect, WorkstreamSelect } from "./fields";
-import { commitmentStatusChoices } from "./status";
 import { usePromisorSearch } from "./usePromisorSearch";
 import styles from "./Work.module.css";
 
@@ -228,7 +227,7 @@ export function CommitmentForm({
       {record && (
         <Select
           label={t("work-field-status")}
-          options={commitmentStatusChoices(record.status).map((s) => ({
+          options={[record.status, ...record.next_statuses].map((s) => ({
             id: s,
             label: t(`commitment-status-${s}`),
           }))}

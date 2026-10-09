@@ -13,7 +13,6 @@ import { DirectoryGate } from "./DirectoryGate";
 import { type Directory, useDirectory } from "./directory";
 import { MakeFirmDialog } from "./MakeFirmDialog";
 import { RegisterView } from "./RegisterView";
-import { canMakeFirm } from "./status";
 import { useRegister } from "./useRegister";
 import { useRegisterPage } from "./useRegisterPage";
 import styles from "./Work.module.css";
@@ -110,7 +109,7 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
               {t("commitment-evidence")}
             </Button>
           )}
-          {directory.mayChange(row) && (
+          {row.can_change && (
             <Button
               aria-label={t("work-edit-of", { id: row.local_id })}
               onPress={() => page.edit(row)}
@@ -118,7 +117,7 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
               {t("work-edit")}
             </Button>
           )}
-          {directory.mayChange(row) && canMakeFirm(row.status) && (
+          {row.can_make_firm && (
             <Button
               aria-label={t("make-firm-of", { id: row.local_id })}
               onPress={() => {

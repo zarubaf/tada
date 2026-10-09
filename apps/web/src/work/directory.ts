@@ -1,5 +1,6 @@
 // What the work pages need to know about the event: the names of the members, the workstreams, and
-// whether the member manages the event. The server decides each action; this only hides controls.
+// whether the member manages the event. The server says per record what the caller may do
+// (`can_change`); `isManager` serves only the workstreams, which have no such field yet.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Api, type Problem, problemMessage, type Workstream } from "../api/client";
 import { loadOrganizationMembers } from "../events/eventMembers";
@@ -11,12 +12,6 @@ export interface Choice {
   label: string;
 }
 
-/** The part of a record that decides who may change it. */
-export interface Changeable {
-  owner_user_id: string;
-  workstream_id?: string | null | undefined;
-}
-
 export interface Directory {
   workstreams: Workstream[];
   /** True for an event manager and for an owner or admin of the organization. */
@@ -24,8 +19,6 @@ export interface Directory {
   nameOf: (userId: string) => string;
   /** The members that can own a record or lead a workstream. */
   assignees: Choice[];
-  /** The owner, the lead of the workstream of the record, and an event manager may change it. */
-  mayChange: (record: Changeable) => boolean;
 }
 
 export type DirectoryState =
@@ -103,7 +96,6 @@ export function useDirectory(
     if (loaded) {
       const isManager = loaded.eventManager || organizationManager;
       const nameOf = (userId: string) => loaded.names.get(userId) ?? "";
-      const leads = new Map(loaded.workstreams.map((w) => [w.id, w.lead_user_id]));
       return {
         kind: "loaded",
         directory: {
@@ -111,15 +103,11 @@ export function useDirectory(
           isManager,
           nameOf,
           assignees: loaded.contributors,
-          mayChange: (record) =>
-            isManager ||
-            record.owner_user_id === me ||
-            (record.workstream_id != null && leads.get(record.workstream_id) === me),
         },
       };
     }
     return error ? failed(error.error) : { kind: "loading" };
-  }, [loaded, error, me, organizationManager]);
+  }, [loaded, error, organizationManager]);
 
   return { state, reload };
 }
