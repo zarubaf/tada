@@ -649,7 +649,7 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: &tada_app::members::Invitation,
-            _: tada_app::domain::ids::UserId,
+            _: tada_app::members::Inviter,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<tada_app::members::InvitationInsert, tada_app::store::StoreError> {
             unreachable!()

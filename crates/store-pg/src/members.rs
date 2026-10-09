@@ -12,8 +12,8 @@ use tada_app::domain::identity::{DisplayName, Email, EventRole};
 use tada_app::domain::ids::{EventId, InvitationId, OrganizationId, UserId};
 use tada_app::event_members::takes_last_manager;
 use tada_app::members::{
-    Invitation, InvitationInsert, LockedMembership, MemberCursor, MemberStore, OrganizationMember,
-    Refusal, Remover,
+    Invitation, InvitationInsert, Inviter, LockedMembership, MemberCursor, MemberStore,
+    OrganizationMember, Refusal, Remover,
 };
 use tada_app::outbound::Purpose;
 use tada_app::store::StoreError;
@@ -234,7 +234,7 @@ impl MemberStore for Database {
         &self,
         scope: OrgScope,
         invitation: &Invitation,
-        invited_by: UserId,
+        inviter: Inviter,
         audit: &AuditEvent,
     ) -> Result<InvitationInsert, StoreError> {
         let organization_id = scope.organization_id();
@@ -274,8 +274,8 @@ impl MemberStore for Database {
             return Ok(InvitationInsert::AlreadyMember);
         }
 
-        let pending = sqlx::query_scalar!(
-            "SELECT id FROM invitation
+        let pending = sqlx::query!(
+            "SELECT id, role FROM invitation
              WHERE organization_id = $1 AND email = $2 AND status = 'pending'",
             organization_id.as_uuid(),
             invitation.email.as_str(),
@@ -283,6 +283,13 @@ impl MemberStore for Database {
         .fetch_all(&mut *tx)
         .await
         .map_err(store_error)?;
+        // A replacement revokes, so it has the role ceiling of a revocation (ADR 0056).
+        for row in &pending {
+            if !inviter.may_replace(organization_role(&row.role)?) {
+                return Ok(InvitationInsert::Forbidden);
+            }
+        }
+        let pending: Vec<Uuid> = pending.into_iter().map(|row| row.id).collect();
         let replaced =
             revoke_invitations(&mut tx, organization_id, &pending, invitation.created_at)
                 .await
@@ -296,7 +303,7 @@ impl MemberStore for Database {
             invitation.email.as_str(),
             invitation.display_name.as_str(),
             invitation.role.as_str(),
-            invited_by.as_uuid(),
+            inviter.user_id().as_uuid(),
             invitation.created_at.to_sqlx() as _,
         )
         .execute(&mut *tx)
@@ -557,7 +564,7 @@ mod tests {
                 Some(inviter.scope()),
             );
             self.db()
-                .invite(inviter.scope(), invitation, inviter.user_id(), &audit)
+                .invite(inviter.scope(), invitation, Inviter::of(inviter), &audit)
                 .await
         }
 
