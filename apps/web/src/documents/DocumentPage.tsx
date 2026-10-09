@@ -210,10 +210,7 @@ function DocumentBody({
   const focusAfterCommit = useFocusAfterCommit();
   // The page arrived: focus goes to the heading of the document.
   useEffect(() => focusAfterCommit(() => heading.current), [focusAfterCommit, heading]);
-  const newest = useMemo(
-    () => [...versions].sort((a, b) => b.number - a.number).find((v) => v.kind === "upload"),
-    [versions],
-  );
+  const newest = useMemo(() => [...versions].sort((a, b) => b.number - a.number)[0], [versions]);
   const preview = previewKind(newest);
   return (
     <>
@@ -258,7 +255,8 @@ function DocumentBody({
             </FileLink>
           </div>
         )}
-        {!preview && <p>{t("document-preview-none")}</p>}
+        {newest?.kind === "draft" && <p>{t("document-preview-draft")}</p>}
+        {newest?.kind === "upload" && !preview && <p>{t("document-preview-none")}</p>}
       </section>
     </>
   );

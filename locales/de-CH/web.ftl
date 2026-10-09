@@ -240,6 +240,7 @@ document-draft-no-download = Ein Entwurf hat keine Datei zum Herunterladen.
 document-preview-title = Vorschau der neuesten Version
 document-preview-of = Vorschau von { $name }
 document-preview-open = Vorschau in neuem Tab öffnen
+document-preview-draft = Die neueste Version ist ein Entwurf und hat keine Datei zur Vorschau.
 document-preview-none = Für diesen Dateityp gibt es keine Vorschau. Laden Sie die Datei herunter.
 
 ## Event memberships

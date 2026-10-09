@@ -177,6 +177,14 @@ describe("DocumentPage", () => {
     expect(within(table).getAllByRole("link")).toHaveLength(1);
   });
 
+  it("previews the newest version, also when it is a draft", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft]);
+
+    const preview = await screen.findByRole("region", { name: "Vorschau der neuesten Version" });
+    expect(within(preview).getByText(/neueste Version ist ein Entwurf/)).toBeInTheDocument();
+    expect(within(preview).queryByRole("link")).not.toBeInTheDocument();
+  });
+
   it("opens a PDF preview in a new tab and shows a text preview in a frame", async () => {
     setup([version(1, "Programm.pdf", "application/pdf")]);
     const link = await screen.findByRole("link", { name: "Vorschau in neuem Tab öffnen" });

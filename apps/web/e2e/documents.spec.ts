@@ -152,7 +152,8 @@ for (const viewport of viewports) {
       await setTheme(page, theme);
       await expect(page.getByRole("table", { name: "Versionen" })).toBeVisible();
       await expect(page.getByText("Anna Muster").first()).toBeVisible();
-      await expect(page.frameLocator("iframe").getByText("Notizen zum Flugtag")).toBeVisible();
+      // The newest version is the draft, so the preview says so and shows no file.
+      await expect(page.getByText(/neueste Version ist ein Entwurf/)).toBeVisible();
 
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
