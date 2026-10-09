@@ -16,6 +16,7 @@ use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
 use tada_domain::events::{Event, EventKey};
 use tada_domain::facts::{FactValue, FieldKey, FieldStatus, ValueError};
+use tada_domain::identity::Email;
 use tada_domain::ids::{ChangesetId, UserId};
 use tada_domain::sources::SourceText;
 use uuid::Uuid;
@@ -78,6 +79,8 @@ pub struct LinkTarget {
     pub user_name: String,
     /// The name of the organization of the code.
     pub organization_name: String,
+    /// The address of the user. The bot shows only its masked form (`sign_in::email_hint`).
+    pub email: Email,
 }
 
 impl Debug for LinkTarget {

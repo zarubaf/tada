@@ -6,6 +6,7 @@ use jiff_sqlx::ToSqlx;
 use secrecy::ExposeSecret;
 use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
+use tada_app::domain::identity::Email;
 use tada_app::domain::ids::UserId;
 use tada_app::store::StoreError;
 use tada_app::telegram::{
@@ -13,7 +14,7 @@ use tada_app::telegram::{
 };
 
 use crate::Database;
-use crate::error::store_error;
+use crate::error::{InvalidRow, store_error};
 use crate::token::{hash_token, new_token};
 
 #[async_trait]
@@ -55,9 +56,10 @@ impl TelegramLinks for Database {
                  WHERE code_hash = $1 AND claimed_by IS NULL AND expires_at > $4
                  RETURNING organization_id, user_id
              )
-             SELECT u.display_name AS user_name, o.name AS organization_name
+             SELECT u.display_name AS user_name, o.name AS organization_name, e.email
              FROM claimed c
              JOIN app_user u ON u.id = c.user_id
+             JOIN email_identity e ON e.user_id = c.user_id
              JOIN organization o ON o.id = c.organization_id",
             hash_token(code),
             account.0,
@@ -67,10 +69,16 @@ impl TelegramLinks for Database {
         .fetch_optional(&self.pool)
         .await
         .map_err(store_error)?;
-        Ok(target.map(|row| LinkTarget {
-            user_name: row.user_name,
-            organization_name: row.organization_name,
-        }))
+        target
+            .map(|row| {
+                Ok(LinkTarget {
+                    user_name: row.user_name,
+                    organization_name: row.organization_name,
+                    email: Email::parse(&row.email)
+                        .map_err(|_| InvalidRow("email_identity.email"))?,
+                })
+            })
+            .transpose()
     }
 
     async fn accept(&self, account: TelegramUserId, now: Timestamp) -> Result<bool, StoreError> {
