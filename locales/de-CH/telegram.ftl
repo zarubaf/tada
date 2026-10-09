@@ -4,9 +4,9 @@ telegram-help =
     Senden Sie mir den Verknüpfungscode aus tada. Sie finden ihn in tada unter „Telegram verknüpfen“.
     Mit „/vorschlag KÜRZEL FELD WERT“ schlagen Sie eine Änderung vor, zum Beispiel „/vorschlag FLY28 date_window 2030-05..2030-06“.
     Mit /trennen heben Sie die Verknüpfung mit tada auf.
-# $account: the display name of the tada account of the code. $organization: the name of its organization.
+# $account: the display name of the tada account of the code. $email: its masked address, for example „a…@example.org“. $organization: the name of its organization.
 telegram-link-claimed =
-    Dieser Code gehört zum tada-Konto „{ $account }“ in der Organisation „{ $organization }“.
+    Dieser Code gehört zum tada-Konto „{ $account }“ ({ $email }) in der Organisation „{ $organization }“.
     Ist das Ihr eigenes Konto? Dann senden Sie /bestaetigen.
     Ist es nicht Ihr Konto, senden Sie /trennen. Dann verknüpft tada nichts.
 telegram-link-accepted = Danke. Bestätigen Sie die Verknüpfung jetzt in tada. Erst danach ist Ihr Telegram-Konto verknüpft.

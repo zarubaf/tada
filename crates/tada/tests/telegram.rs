@@ -205,6 +205,8 @@ async fn the_telegram_account_sees_the_tada_account_and_consents_first() {
     let replies = converse(&test, vec![update(1, &format!("/start {}", code.code))], 1).await;
     assert!(replies[0].contains(&name), "{}", replies[0]);
     assert!(replies[0].contains("testwil"), "{}", replies[0]);
+    // A display name is not unique; the masked address of the account is a second sign.
+    assert!(replies[0].contains("m…@example.org"), "{}", replies[0]);
     assert!(replies[0].contains("/bestaetigen"), "{}", replies[0]);
     let requests = list_link_requests(&attacker, &test.database, &SystemClock)
         .await

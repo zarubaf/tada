@@ -26,6 +26,7 @@ use tada_app::identity::IdentityStore;
 use tada_app::parties::PartyStore;
 use tada_app::problem::{CommandError, ProblemCode};
 use tada_app::proposals::{ProposalStore, ProposeError, ProposeStores};
+use tada_app::sign_in::email_hint;
 use tada_app::sources::SourceStore;
 use tada_app::telegram::{
     FactMessage, TelegramActError, TelegramLinks, TelegramName, TelegramUserId, accept_link_claim,
@@ -217,6 +218,7 @@ impl Gateway {
                     "telegram-link-claimed",
                     &[
                         ("account", &target.user_name),
+                        ("email", &email_hint(&target.email)),
                         ("organization", &target.organization_name),
                     ],
                 )
