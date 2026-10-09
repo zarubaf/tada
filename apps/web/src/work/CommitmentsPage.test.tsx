@@ -5,6 +5,9 @@ import { EVENT, json, ME, problem, renderWork } from "../test/fakeWorkServer";
 import { CommitmentsPage } from "./CommitmentsPage";
 
 const user = userEvent.setup({ delay: null });
+// The promisor search waits 250 ms after the last key, then fetches persons and institutions.
+// findBy waits 1 s by default, which a loaded machine can exceed.
+const SEARCH_TIMEOUT = { timeout: 3000 };
 
 const generators = { id: "i1", local_id: "INS-001", name: "Testwil Generatoren AG", version: 1 };
 
@@ -199,7 +202,11 @@ describe("CommitmentsPage", () => {
       "Testwil",
     );
     await user.click(
-      await screen.findByRole("option", { name: "Testwil Generatoren AG (INS-001)" }),
+      await screen.findByRole(
+        "option",
+        { name: "Testwil Generatoren AG (INS-001)" },
+        SEARCH_TIMEOUT,
+      ),
     );
     await user.type(screen.getByRole("textbox", { name: "Bedingung" }), "bei Bestellung");
     await user.click(screen.getByRole("button", { name: "Erfassen" }));
@@ -221,7 +228,7 @@ describe("CommitmentsPage", () => {
 
     await user.type(screen.getByRole("combobox", { name: "Zugesagt von (Pflichtfeld)" }), "Gener");
 
-    await screen.findByRole("option", { name: "Testwil Generatoren AG (INS-001)" });
+    await screen.findByRole("option", { name: "Testwil Generatoren AG (INS-001)" }, SEARCH_TIMEOUT);
     expect(
       calls.some((c) => c.call === "GET /api/v1/institutions" && c.query === "?limit=6&q=Gener"),
     ).toBe(true);
