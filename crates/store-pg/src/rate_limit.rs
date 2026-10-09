@@ -34,36 +34,17 @@ impl PgRateLimiter {
         Self { key }
     }
 
-    /// Deletes the counters of the windows that ended more than one window ago and counts one
+    /// Deletes the counters of the windows that ended (`delete_ended_counters`) and counts one
     /// request against each of `limits` in the window of `now`. The caller commits the transaction
     /// of `conn`.
-    ///
-    /// The cleanup keeps the previous window, so a process whose clock is up to one window behind
-    /// never writes a counter that another process deletes. It skips locked rows, so two processes
-    /// at a window boundary never wait for each other, and cannot deadlock (ADR 0025, ADR 0056).
     pub(crate) async fn hit(
         &self,
         conn: &mut PgConnection,
         limits: &[RateLimit<'_>],
         now: Timestamp,
     ) -> Result<RateDecision, StoreError> {
+        delete_ended_counters(&mut *conn, now).await?;
         let window = RateWindow::containing(now);
-        let ended = window
-            .start
-            .saturating_sub(WINDOW)
-            .unwrap_or(Timestamp::MIN);
-        sqlx::query!(
-            "DELETE FROM rate_limit_counter
-             WHERE (key, window_start) IN (
-                 SELECT key, window_start FROM rate_limit_counter
-                 WHERE window_start < $1
-                 FOR UPDATE SKIP LOCKED
-             )",
-            ended.to_sqlx() as _,
-        )
-        .execute(&mut *conn)
-        .await
-        .map_err(store_error)?;
         let mut decision = RateDecision::Allowed;
         for limit in limits {
             let count = sqlx::query_scalar!(
@@ -99,6 +80,31 @@ impl PgRateLimiter {
         }
         Ok(mac.finalize().into_bytes().into())
     }
+}
+
+/// Deletes the counters of the windows that ended more than one window before the window of `now`.
+///
+/// The cleanup keeps the previous window, so a process whose clock is up to one window behind never
+/// writes a counter that another process deletes. It skips locked rows, so two processes at a window
+/// boundary never wait for each other, and cannot deadlock (ADR 0025, ADR 0056).
+async fn delete_ended_counters(conn: &mut PgConnection, now: Timestamp) -> Result<u64, StoreError> {
+    let ended = RateWindow::containing(now)
+        .start
+        .saturating_sub(WINDOW)
+        .unwrap_or(Timestamp::MIN);
+    sqlx::query!(
+        "DELETE FROM rate_limit_counter
+             WHERE (key, window_start) IN (
+                 SELECT key, window_start FROM rate_limit_counter
+                 WHERE window_start < $1
+                 FOR UPDATE SKIP LOCKED
+             )",
+        ended.to_sqlx() as _,
+    )
+    .execute(conn)
+    .await
+    .map(|done| done.rows_affected())
+    .map_err(store_error)
 }
 
 #[cfg(test)]
