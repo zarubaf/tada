@@ -4332,8 +4332,12 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "A name that helps the member to find the token again: 1 to 100 characters.",
-            "example": "Claude Code"
+            "description": "A name that helps the member to find the token again. tada removes the spaces at the ends and counts the characters (Unicode scalar values).",
+            "examples": [
+              "Claude Code"
+            ],
+            "maxLength": 200,
+            "minLength": 1
           },
           "scope": {
             "$ref": "#/components/schemas/ApiTokenScope"

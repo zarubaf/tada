@@ -159,9 +159,11 @@ export function TokensPage({ api }: { api: Api }) {
       return;
     }
     if (error?.code === "validation-failed") {
-      const pointers = (error.errors ?? []).map((e) => e.pointer);
+      const errors = error.errors ?? [];
+      const pointers = errors.map((e) => e.pointer);
       if (pointers.includes("/name")) {
-        setNameError(t("tokens-error-name"));
+        const tooLong = errors.some((e) => e.pointer === "/name" && e.code === "too-long");
+        setNameError(t(tooLong ? "tokens-error-name-too-long" : "tokens-error-name"));
         focusAfterCommit(() => firstInvalidField(form.current));
         return;
       }
@@ -180,8 +182,9 @@ export function TokensPage({ api }: { api: Api }) {
       return;
     }
     const trimmed = name.trim();
-    if (trimmed === "" || trimmed.length > 100) {
-      setNameError(t(trimmed === "" ? "tokens-error-name" : "tokens-error-name-too-long"));
+    // The server owns the length limit (the contract gives it); a too long name comes back as a field problem.
+    if (trimmed === "") {
+      setNameError(t("tokens-error-name"));
       focusAfterCommit(() => firstInvalidField(form.current));
       return;
     }

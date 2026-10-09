@@ -156,6 +156,23 @@ describe("TokensPage", () => {
     await waitFor(() => expect(document.activeElement).toBe(name));
   });
 
+  it("leaves the length limit of the name to the server and shows its answer", async () => {
+    const { count } = setup({
+      answers: {
+        "POST /api/v1/tokens": () =>
+          problem(422, "validation-failed", [{ pointer: "/name", code: "too-long" }]),
+      },
+    });
+    await fillAndConfirm("x".repeat(150));
+
+    await user.click(await createButton());
+
+    expect(await screen.findByText("Der Name ist zu lang. Kürzen Sie ihn.")).toBeTruthy();
+    expect(count("POST /api/v1/tokens")).toBe(1);
+    const name = screen.getByRole("textbox", { name: /Name/ });
+    expect(name.getAttribute("aria-invalid")).toBe("true");
+  });
+
   it("shows clearly that an owner switched off MCP tokens, and does not offer to create", async () => {
     const { count } = setup({ enabled: false });
 
