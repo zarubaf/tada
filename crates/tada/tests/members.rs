@@ -414,6 +414,27 @@ async fn an_admin_cannot_revoke_an_owner_invitation() {
     assert_eq!(status, StatusCode::NO_CONTENT);
 }
 
+/// The attack: an admin invites the address of a pending owner invitation again, as member. The new
+/// invitation would replace, and so revoke and lower, the owner invitation. Only an owner can.
+#[tokio::test]
+async fn an_admin_cannot_replace_an_owner_invitation() {
+    let app = App::start().await;
+    let owner = app.member("Olga Owner", OrganizationRole::Owner).await;
+    let admin = app.member("Adam Admin", OrganizationRole::Admin).await;
+    let (_, invitation) = app.invite(&owner, "otto@example.org", "owner").await;
+
+    for role in ["member", "admin"] {
+        let (status, problem) = app.invite(&admin, "otto@example.org", role).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["code"], "forbidden");
+    }
+    let (_, page) = app.get(&owner, "/api/v1/invitations").await;
+    assert_eq!(page["items"], json!([invitation]));
+
+    let (status, _) = app.invite(&owner, "otto@example.org", "admin").await;
+    assert_eq!(status, StatusCode::CREATED);
+}
+
 #[tokio::test]
 async fn the_last_owner_cannot_leave_and_an_admin_cannot_remove_an_owner() {
     let app = App::start().await;

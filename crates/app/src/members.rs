@@ -81,6 +81,9 @@ pub enum InvitationInsert {
     IdTaken,
     /// The email address belongs to a member of the organization.
     AlreadyMember,
+    /// A pending invitation of the address has a role that the inviter does not manage, so the
+    /// inviter cannot replace it (ADR 0056).
+    Forbidden,
 }
 
 /// The result of a successful `InviteMember`.
@@ -165,6 +168,34 @@ impl Remover {
     }
 }
 
+/// The member who invites. It holds the role rule of a replacement (ADR 0056), so the store can
+/// apply it to the pending invitations of the address.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Inviter {
+    user_id: UserId,
+    role: OrganizationRole,
+}
+
+impl Inviter {
+    pub fn of(caller: &MemberCaller) -> Self {
+        Self {
+            user_id: caller.user_id(),
+            role: caller.organization_role(),
+        }
+    }
+
+    /// The `invited_by` of the new invitation.
+    pub fn user_id(self) -> UserId {
+        self.user_id
+    }
+
+    /// True if this inviter can replace, and so revoke, a pending invitation with the role `role`:
+    /// the same ceiling as for a revocation. An admin cannot replace an owner invitation.
+    pub fn may_replace(self, role: OrganizationRole) -> bool {
+        manages(self.role, role)
+    }
+}
+
 /// True if a member with the role `manager` can give or take the role `role`:
 /// owners and admins manage the roles up to their own role (ADR 0056).
 fn manages(manager: OrganizationRole, role: OrganizationRole) -> bool {
@@ -184,14 +215,15 @@ pub trait MemberStore: Debug + Send + Sync {
         limit: u32,
     ) -> Result<Vec<OrganizationMember>, StoreError>;
 
-    /// Inserts the invitation and queues its mail (ADR 0042), all in one transaction.
+    /// Inserts the invitation of `inviter` and queues its mail (ADR 0042), all in one transaction.
     /// It first revokes each pending invitation of the same email address and records an
     /// `InvitationReplace` event of the actor of `audit` for each one. Then it records `audit`.
+    /// If `inviter` may not replace one of them (`Inviter::may_replace`), it changes nothing.
     async fn invite(
         &self,
         scope: OrgScope,
         invitation: &Invitation,
-        invited_by: UserId,
+        inviter: Inviter,
         audit: &AuditEvent,
     ) -> Result<InvitationInsert, StoreError>;
 
@@ -463,7 +495,8 @@ pub async fn list_members(
 /// Invites a person into the organization and queues the invitation mail (ADR 0056).
 ///
 /// An owner invites with the role owner, admin or member; an admin with admin or member.
-/// A new invitation replaces a pending invitation of the same email address.
+/// A new invitation replaces a pending invitation of the same email address, if the caller manages
+/// its role: an admin cannot replace an owner invitation.
 pub async fn invite_member(
     caller: &MemberCaller,
     input: NewInvitation,
@@ -483,10 +516,11 @@ pub async fn invite_member(
     )
     .with_roles(None, Some(AuditRole::Organization(invitation.role)));
     match store
-        .invite(scope, &invitation, caller.user_id(), &audit)
+        .invite(scope, &invitation, Inviter::of(caller), &audit)
         .await?
     {
         InvitationInsert::Inserted => Ok(Invited::New(invitation)),
+        InvitationInsert::Forbidden => Err(InviteMemberError::Forbidden),
         InvitationInsert::AlreadyMember => {
             Err(InviteMemberError::invalid("email", "already-member"))
         }
@@ -699,6 +733,14 @@ mod tests {
     }
 
     #[test]
+    fn an_admin_replaces_invitations_up_to_admin_only() {
+        let admin = Inviter::of(&caller(Admin));
+        assert!(admin.may_replace(Member) && admin.may_replace(Admin));
+        assert!(!admin.may_replace(Owner));
+        assert!(Inviter::of(&caller(Owner)).may_replace(Owner));
+    }
+
+    #[test]
     fn owners_and_admins_remove_members_up_to_their_own_role() {
         let roles = [Owner, Admin, Member];
         let allowed = |remover, target| removal(remover, target).is_none();
@@ -823,13 +865,14 @@ mod tests {
             &self,
             _: OrgScope,
             invitation: &Invitation,
-            invited_by: UserId,
+            inviter: Inviter,
             audit: &AuditEvent,
         ) -> Result<InvitationInsert, StoreError> {
-            self.invited
-                .lock()
-                .unwrap()
-                .push((invitation.clone(), invited_by, audit.clone()));
+            self.invited.lock().unwrap().push((
+                invitation.clone(),
+                inviter.user_id(),
+                audit.clone(),
+            ));
             Ok(self.insert)
         }
 
