@@ -180,7 +180,10 @@ describe("CommitmentsPage", () => {
     await screen.findByText("Noch keine Zusagen");
 
     await user.type(screen.getByRole("textbox", { name: "Zusage (Pflichtfeld)" }), "Lieferung");
-    await user.click(await screen.findByRole("button", { name: /Zugesagt von/ }));
+    await user.type(
+      screen.getByRole("combobox", { name: "Zugesagt von (Pflichtfeld)" }),
+      "Testwil",
+    );
     await user.click(
       await screen.findByRole("option", { name: "Testwil Generatoren AG (INS-001)" }),
     );
@@ -194,6 +197,20 @@ describe("CommitmentsPage", () => {
       promisor: { kind: "institution", id: "i1" },
       condition: "bei Bestellung",
     });
+  });
+
+  it("searches the promisor on the server with the typed text", async () => {
+    const { calls } = render({
+      lists: { "/commitments": [], "/persons": [], "/institutions": [generators] },
+    });
+    await screen.findByText("Noch keine Zusagen");
+
+    await user.type(screen.getByRole("combobox", { name: "Zugesagt von (Pflichtfeld)" }), "Gener");
+
+    await screen.findByRole("option", { name: "Testwil Generatoren AG (INS-001)" });
+    expect(
+      calls.some((c) => c.call === "GET /api/v1/institutions" && c.query === "?limit=6&q=Gener"),
+    ).toBe(true);
   });
 
   it("asks for a promisor before it sends", async () => {
