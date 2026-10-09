@@ -21,7 +21,10 @@ pub const SIGN_IN_PER_IP: u32 = 30;
 pub const WINDOW: SignedDuration = SignedDuration::from_hours(1);
 /// The shortest time between two magic-link mails to one address: at most one mail in each
 /// window of this length. It is shorter than the life of a magic link (`MAGIC_LINK_LIFETIME`).
-pub const MAIL_COOLDOWN: SignedDuration = SignedDuration::from_mins(5);
+///
+/// The design needs older magic links to stay valid when the worker sends a new one: else each
+/// request of an attacker makes the link in the inbox of the member invalid.
+pub const MAIL_COOLDOWN: SignedDuration = SignedDuration::from_mins(10);
 
 /// The network that one client limit counts: an IPv4 address, or the /64 prefix of an IPv6
 /// address. A host with IPv6 usually has a whole /64 and can send from each address of it.
@@ -166,7 +169,7 @@ mod tests {
             at("2030-05-18T09:00:00Z")
         );
         let cooldown = RateWindow::containing(at("2030-05-18T08:59:59Z"), MAIL_COOLDOWN);
-        assert_eq!(cooldown.start, at("2030-05-18T08:55:00Z"));
+        assert_eq!(cooldown.start, at("2030-05-18T08:50:00Z"));
         assert_eq!(cooldown.end(), at("2030-05-18T09:00:00Z"));
     }
 
@@ -196,7 +199,7 @@ mod tests {
         ));
         // A suppressed request finds the link of the last mail still valid for this time or more.
         assert!(
-            crate::outbound::MAGIC_LINK_LIFETIME - MAIL_COOLDOWN >= SignedDuration::from_mins(10)
+            crate::outbound::MAGIC_LINK_LIFETIME - MAIL_COOLDOWN >= SignedDuration::from_mins(5)
         );
     }
 

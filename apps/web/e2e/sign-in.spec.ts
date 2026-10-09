@@ -150,7 +150,9 @@ test("the sign-in page works with the keyboard only", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Anmeldelink senden" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(
-    page.getByText("Wenn die Adresse bekannt ist, erhalten Sie in Kürze eine E-Mail."),
+    page.getByText(
+      "Wenn die Adresse bekannt ist, ist eine E-Mail mit einem Anmeldelink unterwegs oder schon in Ihrem Postfach. Verwenden Sie den Link in der neuesten E-Mail.",
+    ),
   ).toBeVisible();
 });
 

@@ -380,7 +380,8 @@ async fn the_31st_request_from_one_ip_address_is_rate_limited() {
         request_link_from(&app.router, support::PEER, "person30@example.org").await;
     assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(problem["code"], "rate-limited");
-    assert!(response.headers().contains_key(header::RETRY_AFTER));
+    // The window started at the time of the test clock and lasts one hour.
+    assert_eq!(response.headers()[header::RETRY_AFTER], "3600");
 
     support::logs::assert_clean(&["person0@example.org", "person30@example.org"]);
 }
@@ -456,7 +457,7 @@ async fn one_address_gets_at_most_one_mail_in_each_cooldown_also_with_two_proces
         app.clock.advance(SignedDuration::from_mins(1));
     }
     app.run_jobs().await;
-    assert_eq!(app.mailer.sent().len(), 12, "one mail in each 5 minutes");
+    assert_eq!(app.mailer.sent().len(), 6, "one mail in each 10 minutes");
 
     support::logs::assert_clean(&["anna@example.org", "198.51.100.1"]);
 }
