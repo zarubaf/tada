@@ -3128,6 +3128,200 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/events/{event_id}/workstreams": {
+      "get": {
+        "tags": [
+          "workstreams"
+        ],
+        "summary": "Lists the workstreams of an event, in the order of their names.",
+        "operationId": "list_workstreams",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All workstreams of the event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkstreamPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "workstreams"
+        ],
+        "summary": "Creates a workstream in the event. Only event managers can do this.\nA lead without the contributor or manager role gives `validation-failed` with the field code `unknown-member`.",
+        "operationId": "create_workstream",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkstreamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new workstream.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workstream"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/workstreams/{id}": {
+      "patch": {
+        "tags": [
+          "workstreams"
+        ],
+        "summary": "Renames a workstream, changes its lead or opens or closes it. Only event managers can do this.\nA workstream of another event is not found.",
+        "operationId": "change_workstream",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the workstream.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeWorkstreamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed workstream.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workstream"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
@@ -3818,6 +4012,43 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "ChangeWorkstreamRequest": {
+        "type": "object",
+        "description": "The input of `ChangeWorkstream`. A field that is absent stays as it is.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lead_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WorkstreamStatus"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "expected_version": {
@@ -5068,6 +5299,34 @@
             "format": "int32",
             "description": "The version of the notice that the member confirmed: `GetTokenNotice` gives it.\nAny other version than the current one, also a missing one, gives `validation-failed` with the code `not-confirmed`.",
             "minimum": 0
+          }
+        }
+      },
+      "CreateWorkstreamRequest": {
+        "type": "object",
+        "description": "The input of `CreateWorkstream`.",
+        "required": [
+          "name",
+          "lead_user_id"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The UUIDv7 of the new workstream. A client that sends it can retry the request safely."
+          },
+          "name": {
+            "type": "string",
+            "description": "1 to 200 characters, unique in the event whatever its case.",
+            "example": "Gelände"
+          },
+          "lead_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A member with the contributor or manager role in the event."
           }
         }
       },
@@ -7582,6 +7841,67 @@
             "$ref": "#/components/schemas/FactDiff"
           }
         }
+      },
+      "Workstream": {
+        "type": "object",
+        "description": "A workstream of an event.",
+        "required": [
+          "id",
+          "event_id",
+          "name",
+          "lead_user_id",
+          "status",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lead_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The member who leads the workstream: a contributor or manager of the event."
+          },
+          "status": {
+            "$ref": "#/components/schemas/WorkstreamStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. A command that changes the workstream needs it."
+          }
+        }
+      },
+      "WorkstreamPage": {
+        "type": "object",
+        "description": "The workstreams of an event. An event has few, so the list has one page.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Workstream"
+            }
+          }
+        }
+      },
+      "WorkstreamStatus": {
+        "type": "string",
+        "description": "The status of a workstream. A closed workstream accepts no new records.",
+        "enum": [
+          "active",
+          "closed"
+        ]
       }
     }
   }

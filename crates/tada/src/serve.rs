@@ -62,6 +62,7 @@ pub async fn run(
         tokens: Arc::new(db.clone()),
         privacy: Arc::new(db.clone()),
         parties: Arc::new(db.clone()),
+        workstreams: Arc::new(db.clone()),
     };
 
     // The MCP server for the AI clients of members (ADR 0040). Only personal API tokens open it.

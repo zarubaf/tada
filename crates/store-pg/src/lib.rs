@@ -26,6 +26,7 @@
 //! An invitation (`members::invite`) takes kind 1, then kind 7. The acceptance of an invitation takes kind 7, then kind 8.
 //! The removal of a member (`members::lock_membership`) takes kind 8, then kind 9, and its cascade deletes rows of kind 10.
 //! A change of an event role (`event_members::lock_member`) takes kind 9.
+//! A change of a workstream (`workstreams::change`) locks its one row and takes no other kind.
 
 mod actor;
 mod audit;
@@ -58,6 +59,7 @@ pub mod testing;
 mod token;
 mod tokens;
 mod values;
+mod workstreams;
 
 pub use database::{Database, MigrationFailed};
 pub use facts::SyncCatalogError;
