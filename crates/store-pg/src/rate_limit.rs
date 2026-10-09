@@ -35,33 +35,27 @@ impl PgRateLimiter {
         Self { key }
     }
 
-    /// Deletes the counters of the windows that ended (`delete_ended_counters`) and counts one
-    /// request against each of `limits` in the window of `now`. The caller commits the transaction
-    /// of `conn`.
+    /// Counts one request against `limit` in its window of `now`. The caller commits the
+    /// transaction of `conn`, and deletes the ended counters first (`delete_ended_counters`).
     pub(crate) async fn hit(
         &self,
         conn: &mut PgConnection,
-        limits: &[RateLimit<'_>],
+        limit: &RateLimit<'_>,
         now: Timestamp,
     ) -> Result<RateDecision, StoreError> {
-        delete_ended_counters(&mut *conn, now).await?;
-        let window = RateWindow::containing(now);
-        let mut decision = RateDecision::Allowed;
-        for limit in limits {
-            let count = sqlx::query_scalar!(
-                "INSERT INTO rate_limit_counter (key, window_start, count) VALUES ($1, $2, 1)
+        let window = RateWindow::containing(now, limit.window);
+        let count = sqlx::query_scalar!(
+            "INSERT INTO rate_limit_counter (key, window_start, count) VALUES ($1, $2, 1)
                  ON CONFLICT (key, window_start) DO UPDATE SET count = rate_limit_counter.count + 1
                  RETURNING count",
-                &self.key_of(limit.subject)?[..],
-                window.start.to_sqlx() as _,
-            )
-            .fetch_one(&mut *conn)
-            .await
-            .map_err(store_error)?;
-            let count = u32::try_from(count).unwrap_or(u32::MAX);
-            decision = decision.and(RateDecision::of(count, limit.limit, now));
-        }
-        Ok(decision)
+            &self.key_of(limit.subject)?[..],
+            window.start.to_sqlx() as _,
+        )
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(store_error)?;
+        let count = u32::try_from(count).unwrap_or(u32::MAX);
+        Ok(RateDecision::of(count, limit, now))
     }
 
     /// The key of a counter. A prefix for each kind of subject keeps the kinds apart.
@@ -100,8 +94,11 @@ impl Database {
 /// The cleanup keeps the previous window, so a process whose clock is up to one window behind never
 /// writes a counter that another process deletes. It skips locked rows, so two processes at a window
 /// boundary never wait for each other, and cannot deadlock (ADR 0025, ADR 0065).
-async fn delete_ended_counters(conn: &mut PgConnection, now: Timestamp) -> Result<u64, StoreError> {
-    let ended = RateWindow::containing(now)
+pub(crate) async fn delete_ended_counters(
+    conn: &mut PgConnection,
+    now: Timestamp,
+) -> Result<u64, StoreError> {
+    let ended = RateWindow::containing(now, WINDOW)
         .start
         .saturating_sub(WINDOW)
         .unwrap_or(Timestamp::MIN);
@@ -124,7 +121,7 @@ async fn delete_ended_counters(conn: &mut PgConnection, now: Timestamp) -> Resul
 mod tests {
     use jiff::SignedDuration;
     use tada_app::domain::identity::Email;
-    use tada_app::rate_limit::sign_in_limits;
+    use tada_app::rate_limit::{SIGN_IN_PER_IP, SignInLimits, sign_in_limits};
 
     use super::*;
     use crate::testing::TestDatabase;
@@ -139,39 +136,73 @@ mod tests {
         PgRateLimiter::new(SecretString::from("test rate limit key"))
     }
 
+    /// Deletes the ended counters and counts one request against `limit`, as a sign-in request does.
     async fn hit(
         test: &TestDatabase,
         limiter: &PgRateLimiter,
-        limits: &[RateLimit<'_>],
+        limit: &RateLimit<'_>,
         now: Timestamp,
     ) -> RateDecision {
         let mut tx = test.database.pool.begin().await.unwrap();
-        let decision = limiter.hit(&mut tx, limits, now).await.unwrap();
+        delete_ended_counters(&mut tx, now).await.unwrap();
+        let decision = limiter.hit(&mut tx, limit, now).await.unwrap();
         tx.commit().await.unwrap();
         decision
+    }
+
+    /// Counts one request against both limits of a sign-in request.
+    async fn hit_both(
+        test: &TestDatabase,
+        limiter: &PgRateLimiter,
+        limits: &SignInLimits<'_>,
+        now: Timestamp,
+    ) {
+        hit(test, limiter, &limits.client, now).await;
+        hit(test, limiter, &limits.mail, now).await;
     }
 
     #[tokio::test]
     async fn the_request_after_the_limit_is_limited_until_the_window_ends() {
         let test = TestDatabase::start().await;
         let email = Email::parse("anna@example.org").unwrap();
-        let limits = sign_in_limits(&email, IP.parse().unwrap());
-        for _ in 0..5 {
+        let limit = sign_in_limits(&email, IP.parse().unwrap()).client;
+        for _ in 0..SIGN_IN_PER_IP {
             assert_eq!(
-                hit(&test, &limiter(), &limits, now()).await,
+                hit(&test, &limiter(), &limit, now()).await,
                 RateDecision::Allowed
             );
         }
         // Another limiter with the same key counts in the same rows, as a second process does.
         assert_eq!(
-            hit(&test, &limiter(), &limits, now()).await,
+            hit(&test, &limiter(), &limit, now()).await,
             RateDecision::Limited {
                 retry_after: SignedDuration::from_mins(15)
             }
         );
         let next_window = now() + SignedDuration::from_mins(15);
         assert_eq!(
-            hit(&test, &limiter(), &limits, next_window).await,
+            hit(&test, &limiter(), &limit, next_window).await,
+            RateDecision::Allowed
+        );
+    }
+
+    #[tokio::test]
+    async fn the_mail_limit_allows_one_request_in_each_cooldown() {
+        let test = TestDatabase::start().await;
+        let email = Email::parse("anna@example.org").unwrap();
+        let limit = sign_in_limits(&email, IP.parse().unwrap()).mail;
+        assert_eq!(
+            hit(&test, &limiter(), &limit, now()).await,
+            RateDecision::Allowed
+        );
+        let later = now() + SignedDuration::from_mins(4);
+        assert!(matches!(
+            hit(&test, &limiter(), &limit, later).await,
+            RateDecision::Limited { .. }
+        ));
+        let next_cooldown = now() + SignedDuration::from_mins(5);
+        assert_eq!(
+            hit(&test, &limiter(), &limit, next_cooldown).await,
             RateDecision::Allowed
         );
     }
@@ -180,7 +211,7 @@ mod tests {
     async fn the_counters_hold_no_address() {
         let test = TestDatabase::start().await;
         let email = Email::parse("anna@example.org").unwrap();
-        hit(
+        hit_both(
             &test,
             &limiter(),
             &sign_in_limits(&email, IP.parse().unwrap()),
@@ -199,9 +230,9 @@ mod tests {
         let test = TestDatabase::start().await;
         let email = Email::parse("anna@example.org").unwrap();
         let limits = sign_in_limits(&email, IP.parse().unwrap());
-        hit(&test, &limiter(), &limits, now()).await;
+        hit_both(&test, &limiter(), &limits, now()).await;
         let other = PgRateLimiter::new(SecretString::from("another key"));
-        hit(&test, &other, &limits, now()).await;
+        hit_both(&test, &other, &limits, now()).await;
         let rows: i64 = test
             .scalar("SELECT count(*) FROM rate_limit_counter WHERE count = 1")
             .await;
@@ -220,6 +251,7 @@ mod tests {
 
     /// A hit deletes the counters of the windows that ended more than one window ago, and keeps the
     /// previous window: a process with a clock up to one window behind still writes there.
+    /// The counters of the mail cooldown follow the same rule, so none stays longer than two hours.
     #[tokio::test]
     async fn each_hit_deletes_the_counters_of_windows_that_ended_one_window_ago() {
         let test = TestDatabase::start().await;
@@ -227,9 +259,9 @@ mod tests {
         let ben = Email::parse("ben@example.org").unwrap();
         let at = |time: &str| time.parse::<Timestamp>().unwrap();
         let limits = sign_in_limits(&anna, IP.parse().unwrap());
-        hit(&test, &limiter(), &limits, at("2030-05-18T07:30:00Z")).await;
-        hit(&test, &limiter(), &limits, at("2030-05-18T08:30:00Z")).await;
-        hit(
+        hit_both(&test, &limiter(), &limits, at("2030-05-18T07:30:00Z")).await;
+        hit_both(&test, &limiter(), &limits, at("2030-05-18T08:30:00Z")).await;
+        hit_both(
             &test,
             &limiter(),
             &sign_in_limits(&ben, "198.51.100.1".parse().unwrap()),
@@ -237,8 +269,9 @@ mod tests {
         )
         .await;
         let eight = at("2030-05-18T08:00:00Z");
+        let half_past_eight = at("2030-05-18T08:30:00Z");
         let nine = at("2030-05-18T09:00:00Z");
-        assert_eq!(windows(&test).await, [eight, eight, nine, nine]);
+        assert_eq!(windows(&test).await, [eight, half_past_eight, nine, nine]);
     }
 
     /// The worker deletes the ended counters without a sign-in request, so no counter stays longer than
@@ -249,8 +282,8 @@ mod tests {
         let anna = Email::parse("anna@example.org").unwrap();
         let at = |time: &str| time.parse::<Timestamp>().unwrap();
         let limits = sign_in_limits(&anna, IP.parse().unwrap());
-        hit(&test, &limiter(), &limits, at("2030-05-18T07:30:00Z")).await;
-        hit(&test, &limiter(), &limits, at("2030-05-18T08:30:00Z")).await;
+        hit_both(&test, &limiter(), &limits, at("2030-05-18T07:30:00Z")).await;
+        hit_both(&test, &limiter(), &limits, at("2030-05-18T08:30:00Z")).await;
 
         let deleted = test
             .database
@@ -259,7 +292,8 @@ mod tests {
             .unwrap();
         assert_eq!(deleted, 2);
         let eight = at("2030-05-18T08:00:00Z");
-        assert_eq!(windows(&test).await, [eight, eight]);
+        let half_past_eight = at("2030-05-18T08:30:00Z");
+        assert_eq!(windows(&test).await, [eight, half_past_eight]);
     }
 
     /// Two processes at the hour boundary: the one with the later clock does not wait for the
@@ -268,28 +302,27 @@ mod tests {
     async fn a_hit_in_a_new_window_does_not_wait_for_a_hit_in_the_previous_window() {
         let test = TestDatabase::start().await;
         let anna = Email::parse("anna@example.org").unwrap();
-        let limits = sign_in_limits(&anna, IP.parse().unwrap());
-        // The counters of the previous window exist, so the next hit there locks them.
+        let limit = sign_in_limits(&anna, IP.parse().unwrap()).client;
+        // The counter of the previous window exists, so the next hit there locks it.
         hit(
             &test,
             &limiter(),
-            &limits,
+            &limit,
             "2030-05-18T08:30:00Z".parse().unwrap(),
         )
         .await;
         let mut before = test.database.pool.begin().await.unwrap();
-        limiter()
-            .hit(
-                &mut before,
-                &limits,
-                "2030-05-18T08:59:59Z".parse().unwrap(),
-            )
-            .await
-            .unwrap();
+        let earlier: Timestamp = "2030-05-18T08:59:59Z".parse().unwrap();
+        delete_ended_counters(&mut before, earlier).await.unwrap();
+        limiter().hit(&mut before, &limit, earlier).await.unwrap();
 
         let mut after = test.database.pool.begin().await.unwrap();
         let limiter = limiter();
-        let later = limiter.hit(&mut after, &limits, "2030-05-18T09:00:01Z".parse().unwrap());
+        let later_now: Timestamp = "2030-05-18T09:00:01Z".parse().unwrap();
+        let later = async {
+            delete_ended_counters(&mut after, later_now).await?;
+            limiter.hit(&mut after, &limit, later_now).await
+        };
         let decision = tokio::time::timeout(std::time::Duration::from_secs(2), later)
             .await
             .expect("the hit waits for the other transaction")
@@ -302,6 +335,6 @@ mod tests {
                 .fetch_all(&test.database.pool)
                 .await
                 .unwrap();
-        assert_eq!(counts, [2, 2, 1, 1]);
+        assert_eq!(counts, [2, 1]);
     }
 }

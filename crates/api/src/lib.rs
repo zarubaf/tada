@@ -656,7 +656,7 @@ mod tests {
         async fn queue_magic_link(
             &self,
             _: &tada_app::domain::identity::Email,
-            _: &[tada_app::rate_limit::RateLimit<'_>],
+            _: &tada_app::rate_limit::SignInLimits<'_>,
             _: Option<uuid::Uuid>,
             _: jiff::Timestamp,
         ) -> Result<tada_app::rate_limit::RateDecision, tada_app::store::StoreError> {
