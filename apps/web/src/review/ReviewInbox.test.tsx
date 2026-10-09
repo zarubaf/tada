@@ -220,6 +220,8 @@ function fakeServer(overrides: Record<string, Handler> = {}) {
     "GET /api/v1/events": () => json(200, { items: [EVENT] }),
     "GET /api/v1/changesets": () => json(200, { items: openItems }),
     "GET /api/v1/events/:id/fields": () => json(200, { items: [venueField] }),
+    "GET /api/v1/events/:id/profile": () =>
+      json(200, { facts: [], proposals: [], open_questions: [] }),
     "POST /api/v1/changesets/:id/apply": () =>
       json(200, {
         proposals: [{ id: P_FIELD, status: "accepted" }],
@@ -333,6 +335,44 @@ describe("the detail", () => {
     expect(within(card).getByRole("button", { name: /^Ablehnen/ })).toBeEnabled();
   });
 
+  it("does not name an AI client in the conflict text, because a member can be the author", async () => {
+    renderAt(`/inbox/${CS_OLD}`);
+
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    expect(within(card).queryByText(/KI-Client/)).not.toBeInTheDocument();
+  });
+
+  it("disables „Bearbeiten und annehmen“ for a value type that this client does not know", async () => {
+    const CS_UNKNOWN = "0199b8e0-0000-7000-8000-000000000c08";
+    CHANGESETS.set(CS_UNKNOWN, {
+      ...oldChangeset,
+      id: CS_UNKNOWN,
+      proposals: [
+        proposal("0199b8e0-0000-7000-8000-0000000001c1", {
+          operation: {
+            kind: "set-fact",
+            event_id: EVENT.id,
+            field_id: VENUE,
+            state: "accepted",
+            value: { type: "text", text: "Flugplatz Testwil" },
+            expected_version: null,
+          },
+        }),
+      ],
+    });
+    renderAt(
+      `/inbox/${CS_UNKNOWN}`,
+      fakeServer({
+        "GET /api/v1/events/:id/fields": () =>
+          json(200, { items: [{ ...venueField, value_type: { type: "duration" } }] }),
+      }),
+    );
+
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    expect(within(card).getByRole("button", { name: /^Bearbeiten und annehmen/ })).toBeDisabled();
+    expect(within(card).getByText("Diesen Wert können Sie hier nicht bearbeiten.")).toBeVisible();
+  });
+
   it("shows the failure of the detail with a retry", async () => {
     renderAt(
       `/inbox/${CS_NEW}`,
@@ -357,10 +397,24 @@ describe("a draft proposal", () => {
       },
       draft,
     });
+  const FACT_LINK = "tada:fact/0199b8e0-0000-7000-8000-0000000002a1?v=2";
+  const HIDDEN_LINK = "tada:fact/0199b8e0-0000-7000-8000-0000000002a2?v=1";
   const rendering = {
-    markdown: "# Titel",
-    lint_warnings: [{ line: 1, kind: "number" }],
-    links: {},
+    markdown: `# Konzept\n\nDer Ort ist [](${FACT_LINK}).\n\nEs kommen 500 Gäste.\n\nDas Konto ist [](${HIDDEN_LINK}).`,
+    lint_warnings: [
+      { line: 3, kind: "number" },
+      { line: 3, kind: "robot" },
+    ],
+    links: {
+      [FACT_LINK]: {
+        kind: "fact",
+        fact_id: "0199b8e0-0000-7000-8000-0000000002a1",
+        version: 2,
+        state: "assumption",
+        value: { type: "text", text: "Flugplatz Testwil" },
+      },
+      [HIDDEN_LINK]: { kind: "hidden" },
+    },
   };
 
   function server() {
@@ -396,7 +450,27 @@ describe("a draft proposal", () => {
     expect(
       within(card).getByText("Das Dokument entsteht, wenn Sie den Entwurf annehmen."),
     ).toBeInTheDocument();
-    expect(within(card).getByText("1 Hinweis der Prüfung")).toBeInTheDocument();
+  });
+
+  it("shows the lint warnings of the draft with their lines", async () => {
+    server();
+
+    const card = await screen.findByRole("article", { name: "Dokumentenentwurf „Ablauf Samstag“" });
+    expect(within(card).getByText("2 Hinweise der Prüfung")).toBeInTheDocument();
+    expect(within(card).getByText("Zeile 3: Zahl ausserhalb eines Fakt-Links")).toBeInTheDocument();
+    // The list of kinds is open: a kind that this client lacks gets a general text.
+    expect(within(card).getByText("Zeile 3: Anderer Hinweis")).toBeInTheDocument();
+  });
+
+  it("renders the draft with the cited values and „entfernt“ for a hidden target", async () => {
+    server();
+
+    const card = await screen.findByRole("article", { name: "Dokumentenentwurf „Ablauf Samstag“" });
+    expect(await within(card).findByText("Flugplatz Testwil")).toBeInTheDocument();
+    expect(within(card).getByText("Annahme")).toBeInTheDocument();
+    expect(within(card).getByText("entfernt")).toBeInTheDocument();
+    // The card has h3 for its title and h4 for its sections: the draft sits below them.
+    expect(within(card).getByRole("heading", { level: 5, name: "Konzept" })).toBeInTheDocument();
   });
 
   it("links an existing document and renders without a draft", async () => {

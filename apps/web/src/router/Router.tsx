@@ -166,11 +166,20 @@ export interface LinkProps {
    * or the pages of the documents of one event, whose paths do not start with the path of the link.
    */
   within?: string;
+  /** For a link whose words do not name its target alone, for example in a table. */
+  "aria-label"?: string;
   children: ReactNode;
 }
 
 /** A link that changes the path without a page load. The current page gets `aria-current`. */
-export function Link({ to, className, exact, within, children }: LinkProps) {
+export function Link({
+  to,
+  className,
+  exact,
+  within,
+  "aria-label": ariaLabel,
+  children,
+}: LinkProps) {
   const { pathname, navigate } = useLocation();
   const current =
     pathname === to ||
@@ -191,6 +200,7 @@ export function Link({ to, className, exact, within, children }: LinkProps) {
     <a
       href={to}
       className={className}
+      aria-label={ariaLabel}
       aria-current={current ? "page" : undefined}
       onClick={onClick}
     >

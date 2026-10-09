@@ -156,4 +156,13 @@ describe("isEditable", () => {
     expect(isEditable({ type: "reference", target: "event" })).toBe(false);
     expect(isEditable(text)).toBe(true);
   });
+
+  it("excludes a value type that a newer server adds", () => {
+    expect(isEditable({ type: "duration" } as unknown as ValueType)).toBe(false);
+  });
+
+  it("makes no value of a value type that it does not know", () => {
+    const unknown = { type: "duration" } as unknown as ValueType;
+    expect(draftToValue(unknown, emptyDraft())).toEqual({ ok: false, errors: {} });
+  });
 });

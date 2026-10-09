@@ -55,9 +55,22 @@ export function emptyDraft(): Draft {
   };
 }
 
-/** True for a value type that the reviewer can edit. A reference points to a record. */
+const EDITABLE = new Set<string>([
+  "text",
+  "boolean",
+  "quantity",
+  "money",
+  "date",
+  "date-window",
+  "choice",
+]);
+
+/**
+ * True for a value type that the reviewer can edit. A reference points to a record. The list of
+ * value types is open: a type that this client does not know is not editable either.
+ */
 export function isEditable(type: ValueType): boolean {
-  return type.type !== "reference";
+  return EDITABLE.has(type.type);
 }
 
 const DECIMAL = /^-?\d+([.,]\d+)?$/;
@@ -195,7 +208,8 @@ export function draftToValue(type: ValueType, draft: Draft): DraftResult {
         return { ok: false, errors: { keys: t("value-error-choice-single") } };
       }
       return { ok: true, value: { type: "choice", keys: draft.keys } };
-    case "reference":
+    default:
+      // A reference, or a value type of a newer server: no form makes a value for it.
       return { ok: false, errors: {} };
   }
 }

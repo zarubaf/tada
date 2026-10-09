@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { type Api, createApi } from "./api/client";
+import { DocumentDiffPage } from "./documents/DocumentDiffPage";
 import { DocumentPage } from "./documents/DocumentPage";
 import { DocumentsPage } from "./documents/DocumentsPage";
 import { CreateEventForm } from "./events/CreateEventForm";
@@ -90,6 +91,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   <Route path="/documents/:documentId">
                     <DocumentPage api={api} />
+                  </Route>
+                  <Route path="/documents/:documentId/diff">
+                    <DocumentDiffPage api={api} />
                   </Route>
                   <Route path="/privacy">
                     <PrivacyPage api={api} />

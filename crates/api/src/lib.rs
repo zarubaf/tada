@@ -159,9 +159,7 @@ pub fn router_with(state: ApiState, web_root: Option<&Path>, adapters: Router) -
         .route("/.well-known/", any(not_found))
         .route("/.well-known/{*path}", any(not_found));
     let router = match web_root {
-        Some(root) => router.fallback_service(
-            ServeDir::new(root).fallback(ServeFile::new(root.join("index.html"))),
-        ),
+        Some(root) => router.fallback_service(web_client(root)),
         None => router.fallback(not_found),
     };
     router
@@ -174,6 +172,26 @@ pub fn router_with(state: ApiState, web_root: Option<&Path>, adapters: Router) -
         ))
         .merge(health::routes().with_state(state))
         .layer(middleware::map_response(no_referrer))
+}
+
+/// The policy of the web client: the one file that the Vite server of development sends too.
+/// It allows no remote image, as a second defense next to the safe Markdown renderer (ADR 0058).
+const WEB_CLIENT_POLICY: &str = include_str!("../../../apps/web/content-security-policy.txt");
+
+/// The built web client from `root`, with the content security policy on each of its responses.
+/// Only these responses carry it: the API and its downloads set their own policies.
+fn web_client(root: &Path) -> Router {
+    Router::new()
+        .fallback_service(ServeDir::new(root).fallback(ServeFile::new(root.join("index.html"))))
+        .layer(middleware::map_response(
+            |mut response: Response| async move {
+                response.headers_mut().insert(
+                    header::CONTENT_SECURITY_POLICY,
+                    HeaderValue::from_static(WEB_CLIENT_POLICY.trim_ascii_end()),
+                );
+                response
+            },
+        ))
 }
 
 /// No response sends its URL as the referrer of the next request (ADR 0008).
@@ -1055,6 +1073,42 @@ mod tests {
         assert!(body.contains("\"code\":\"not-found\""));
         let (status, _) = get(&router, "/api/v1/events").await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn the_web_client_gets_a_content_security_policy_that_allows_no_remote_image() {
+        let web = tempfile::tempdir().unwrap();
+        fs::write(web.path().join("index.html"), "<html>tada</html>").unwrap();
+        fs::create_dir(web.path().join("assets")).unwrap();
+        fs::write(web.path().join("assets/app.js"), "console.log(1)").unwrap();
+        let router = router(state(), Some(web.path()));
+
+        // The page, a file and a route of the client all carry the policy (ADR 0058).
+        for path in ["/", "/assets/app.js", "/events/FLY28"] {
+            let response = router
+                .clone()
+                .oneshot(Request::get(path).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            let policy = response.headers()[header::CONTENT_SECURITY_POLICY]
+                .to_str()
+                .unwrap()
+                .to_owned();
+            assert!(policy.contains("img-src 'self';"), "{path}: {policy}");
+            assert!(policy.contains("default-src 'none'"), "{path}: {policy}");
+        }
+
+        // The API answers keep their own policies: a download sets one, a problem needs none.
+        let response = router
+            .clone()
+            .oneshot(Request::get("/api/v1/nothing").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert!(
+            !response
+                .headers()
+                .contains_key(header::CONTENT_SECURITY_POLICY)
+        );
     }
 
     #[tokio::test]

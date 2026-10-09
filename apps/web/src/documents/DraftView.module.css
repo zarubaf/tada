@@ -1,0 +1,54 @@
+@layer components {
+  .draft {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .removed,
+  .note {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .removed {
+    font-style: italic;
+  }
+
+  .cited {
+    text-decoration: underline dotted;
+    text-underline-offset: 0.2em;
+  }
+
+  .sourceMark {
+    margin-inline-start: var(--space-0-5);
+    color: var(--color-accent-text);
+    font-size: var(--font-size-sm);
+  }
+
+  .hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sources {
+    display: grid;
+    gap: var(--space-2);
+    max-width: 40rem;
+  }
+
+  .heading {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .list {
+    display: grid;
+    gap: var(--space-3);
+    padding-inline-start: var(--space-6);
+    list-style: decimal;
+  }
+}

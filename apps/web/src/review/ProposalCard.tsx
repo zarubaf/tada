@@ -1,6 +1,7 @@
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { type ReactNode, type Ref, useId } from "react";
 import type { ApplyEdit, Proposal } from "../api/client";
+import type { DraftEnvironment } from "../documents/DraftView";
 import { Excerpt } from "../evidence/Excerpt";
 import { isEditable } from "../facts/valueDraft";
 import { t } from "../i18n";
@@ -15,6 +16,8 @@ import styles from "./ProposalCard.module.css";
 export interface ProposalCardProps {
   proposal: Proposal;
   fields: Map<string, FieldInfo>;
+  /** Where a draft of the proposal is read. */
+  draftEnvironment: DraftEnvironment | undefined;
   conflict: Conflict | undefined;
   /** The titles of the proposals this one needs. */
   needs: string[];
@@ -128,7 +131,11 @@ export function ProposalCard(props: ProposalCardProps) {
       )}
 
       <Section title={t("inbox-section-change")}>
-        <OperationDetails proposal={proposal} fields={fields} />
+        <OperationDetails
+          proposal={proposal}
+          fields={fields}
+          draftEnvironment={props.draftEnvironment}
+        />
         {needs.length > 0 && (
           <p className={styles.note}>{t("inbox-depends-on", { titles: needs.join(", ") })}</p>
         )}

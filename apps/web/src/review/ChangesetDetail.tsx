@@ -183,6 +183,9 @@ export function ChangesetDetail({
   const timeZone = scopes.timeZone(changeset.event_id);
   const { proposals } = changeset;
   const fields = fieldInfos(changeset, catalog);
+  const draftEnvironment = changeset.event_id
+    ? { api, eventId: changeset.event_id, timeZone }
+    : undefined;
   const titleOf = (id: string) => {
     const proposal = proposals.find((candidate) => candidate.id === id);
     return proposal ? operationTitle(proposal.operation, fields) : id;
@@ -353,6 +356,7 @@ export function ChangesetDetail({
               <ProposalCard
                 proposal={proposal}
                 fields={fields}
+                draftEnvironment={draftEnvironment}
                 conflict={conflictOf(proposal, proposals)}
                 needs={proposal.depends_on.map(titleOf)}
                 neededBy={proposals

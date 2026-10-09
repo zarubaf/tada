@@ -73,4 +73,35 @@ describe("Markdown", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("Quelle")).toBeInTheDocument();
   });
+
+  it("hands a tada link to the renderer of the page, with its destination", () => {
+    render(
+      <Markdown renderLink={(href, children) => <b data-href={href}>{children}!</b>}>
+        {"[Quelle](tada:source/0198f5a6-7c1e-7000-8000-000000000001#0-5) und [](tada:fact/x?v=1)"}
+      </Markdown>,
+    );
+    expect(screen.getByText("Quelle!")).toHaveAttribute(
+      "data-href",
+      "tada:source/0198f5a6-7c1e-7000-8000-000000000001#0-5",
+    );
+    expect(screen.getByText("!")).toHaveAttribute("data-href", "tada:fact/x?v=1");
+  });
+
+  it("does not hand any other link to the renderer of the page", () => {
+    render(
+      <Markdown renderLink={() => <i>falsch</i>}>
+        {"[Beispiel](https://example.org) [Skript](javascript:alert(1))"}
+      </Markdown>,
+    );
+    expect(screen.queryByText("falsch")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Beispiel" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Skript" })).not.toBeInTheDocument();
+  });
+
+  it("shifts the headings to the level that the page needs, and stops at h6", () => {
+    render(<Markdown headingLevel={5}>{"# Eins\n\n## Zwei\n\n### Drei"}</Markdown>);
+    expect(screen.getByRole("heading", { level: 5, name: "Eins" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 6, name: "Zwei" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 6, name: "Drei" })).toBeInTheDocument();
+  });
 });

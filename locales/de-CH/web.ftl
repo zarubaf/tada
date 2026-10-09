@@ -79,6 +79,7 @@ evidence-document-version = { $name }, Version { $number }
 evidence-author-unknown = Unbekanntes Mitglied
 evidence-author-ai = KI-Client
 evidence-author-service = Dienst
+evidence-author-other = Unbekannter Absender
 
 ## The state of knowledge of a value (doc/design/tokens.md).
 knowledge-accepted = Bestätigt
@@ -240,6 +241,60 @@ document-preview-title = Vorschau der neuesten Version
 document-preview-of = Vorschau von { $name }
 document-preview-open = Vorschau in neuem Tab öffnen
 document-preview-none = Für diesen Dateityp gibt es keine Vorschau. Laden Sie die Datei herunter.
+
+## Drafts: approval, changed facts and the difference of two versions (ADR 0051)
+
+document-facts-changed-title = Fakten geändert
+document-facts-changed-text = Mindestens ein Fakt, den die neueste Version nennt, hat seither eine neue Version. Die Version bleibt unverändert. Ein neuer Entwurf kann die neuen Werte nennen.
+document-approve = Version freigeben
+# $number: the number of the approved version.
+document-approved = Version { $number } ist freigegeben.
+document-approve-invalid = Diese Version kann nicht mehr freigegeben werden. Die Seite zeigt den aktuellen Stand.
+document-diff-link = Unterschiede
+# $number: the number of the older version.
+document-diff-link-to = Unterschiede zu Version { $number }
+document-diff-back = Zurück zum Dokument
+# $from: the number of the older version. $to: the number of the newer version.
+document-diff-title = Unterschiede: Version { $from } zu Version { $to }
+document-diff-title-plain = Unterschiede
+document-diff-missing = Wählen Sie zwei Entwurfsversionen in der Liste der Versionen aus.
+document-diff-facts = Fakten
+document-diff-facts-none = Die Entwürfe nennen dieselben Fakten.
+document-diff-fact-unknown = Unbekannter Fakt
+# $label: the label of the field. $from, $to: fact versions.
+document-diff-fact-changed = { $label }: Version { $from } zu Version { $to }
+# $label: the label of the field. $version: the fact version.
+document-diff-fact-added = Neu: { $label }, Version { $version }
+document-diff-fact-removed = Entfallen: { $label }, Version { $version }
+document-diff-lines = Zeilen
+document-diff-lines-same = Die Zeilen sind gleich.
+document-diff-column-change = Änderung
+document-diff-column-old = Alt
+document-diff-column-new = Neu
+document-diff-column-text = Text
+document-diff-added = hinzugefügt
+document-diff-removed = entfernt
+document-diff-unchanged = unverändert
+
+## Drafts: the rendered text, its sources and the lint (ADR 0051, ADR 0058)
+
+draft-removed = entfernt
+# $value: the value as the member sees it, with its state of knowledge. $label: the field.
+draft-fact-evidence = { $value }, Beleg zu { $label }
+# $version: the fact version that the draft cites.
+draft-fact-older = (Version { $version } des Fakts, seither geändert)
+# $line: the line of the draft, from 1. $kind: what the lint found.
+draft-lint-line = Zeile { $line }: { $kind }
+draft-lint-number = Zahl ausserhalb eines Fakt-Links
+draft-lint-date = Datum ausserhalb eines Fakt-Links
+draft-lint-money = Betrag ausserhalb eines Fakt-Links
+draft-lint-raw-html = HTML im Text. tada zeigt es nicht an.
+draft-lint-other = Anderer Hinweis
+draft-sources = Quellen
+# $number: the number of the source in the text.
+draft-source-number = Quelle { $number }
+# $id: the start of the ID of the source version.
+draft-source-version = Quellversion { $id }
 
 ## Event memberships
 
@@ -514,8 +569,8 @@ inbox-status-withdrawn = Zurückgezogen
 inbox-accept = Annehmen
 inbox-edit = Bearbeiten und annehmen
 inbox-reject = Ablehnen
-inbox-conflict-fact-changed = Jemand hat den Wert nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Der KI-Client kann einen neuen Vorschlag zum aktuellen Wert machen.
-inbox-conflict-target-changed = Der Eintrag hat sich nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Der KI-Client kann einen neuen Vorschlag machen.
+inbox-conflict-fact-changed = Jemand hat den Wert nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Wer ihn gemacht hat, kann einen neuen Vorschlag zum aktuellen Wert machen.
+inbox-conflict-target-changed = Der Eintrag hat sich nach dem Vorschlag geändert. Lehnen Sie den Vorschlag ab. Wer ihn gemacht hat, kann einen neuen Vorschlag machen.
 inbox-conflict-dependency = Ein Vorschlag, von dem dieser abhängt, hat einen Konflikt. Lehnen Sie beide ab.
 # $titles: the titles of the proposals, separated by commas.
 inbox-depends-on = Setzt voraus: { $titles }

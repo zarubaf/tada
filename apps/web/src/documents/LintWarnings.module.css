@@ -1,0 +1,21 @@
+@layer components {
+  .warnings {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-warning-subtle);
+  }
+
+  .title {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .list {
+    display: grid;
+    gap: var(--space-0-5);
+    padding-inline-start: var(--space-4);
+    list-style: disc;
+    font-size: var(--font-size-sm);
+  }
+}

@@ -33,32 +33,36 @@
     font-weight: var(--font-weight-semibold);
   }
 
-  .changed {
+  .list {
     display: grid;
     gap: var(--space-1);
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--color-warning-subtle);
+    padding-inline-start: var(--space-6);
+    list-style: disc;
   }
 
-  .changedTitle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    font-weight: var(--font-weight-semibold);
+  /* The words of a change are for assistive technology; the marker and the color support them. */
+  .words {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
-  .help,
-  .muted {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
+  .text {
+    display: inline-block;
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    overflow-wrap: anywhere;
   }
 
-  .frame {
-    width: 100%;
-    height: 24rem;
-    border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-lg);
-    background: var(--color-bg-surface);
+  .text[data-kind="added"] {
+    background: var(--color-success-subtle);
+  }
+
+  .text[data-kind="removed"] {
+    background: var(--color-danger-subtle);
+    text-decoration: line-through;
   }
 }
