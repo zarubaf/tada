@@ -51,6 +51,9 @@ pub struct ProposalReview {
     /// True if the review routing gives the proposal to the caller (ADR 0067). An event manager can review each
     /// proposal of the event, also one that is not routed to the manager.
     pub routed_to_me: bool,
+    /// True if the caller reviews the open proposal now: it is in the Review Inbox of the caller (ADR 0067).
+    /// For an event manager, this includes an overdue proposal of another reviewer.
+    pub can_review: bool,
     /// Why the proposal conflicts. `None` unless the status is `Conflict`.
     pub conflict: Option<ConflictReason>,
     /// The current version of the fact that a `SetFact` proposal sets, or `None`.
@@ -92,11 +95,17 @@ pub async fn get_changeset(
 ) -> Result<ChangesetReview, ReviewQueryError> {
     let scope = caller.scope();
     let reviewable = reviewable(caller, id, stores).await?;
-    let routed: Vec<bool> = reviewable
+    let now = clock.now();
+    let routed: Vec<(bool, bool)> = reviewable
         .changeset
         .proposals
         .iter()
-        .map(|proposal| reviewable.routed_to(caller, proposal.id))
+        .map(|proposal| {
+            (
+                reviewable.routed_to(caller, proposal.id),
+                reviewable.can_review(caller, proposal.id, now),
+            )
+        })
         .collect();
     let Reviewable {
         changeset,
@@ -105,9 +114,8 @@ pub async fn get_changeset(
         ..
     } = reviewable;
     let texts = evidence_texts(caller, &changeset, source, stores).await?;
-    let now = clock.now();
     let mut proposals = Vec::new();
-    for (proposal, routed_to_me) in changeset.proposals.into_iter().zip(routed) {
+    for (proposal, (routed_to_me, can_review)) in changeset.proposals.into_iter().zip(routed) {
         let status = proposal_status(&results, proposal.id);
         let current = match proposal.operation {
             Operation::SetFact {
@@ -172,6 +180,7 @@ pub async fn get_changeset(
             stale: status.is_stale(changeset.created_at, now),
             overdue: status.is_overdue(changeset.created_at, now),
             routed_to_me,
+            can_review,
             status,
             excerpts,
             current,

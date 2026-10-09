@@ -1061,12 +1061,16 @@ mod routing {
         assert_eq!(status, StatusCode::OK, "{review}");
         let shown = proposal_of(&review, &change["id"]);
         assert_eq!(shown["routed_to_me"], true);
+        assert_eq!(shown["can_review"], true);
         assert_eq!(shown["overdue"], false);
         let (status, _) = r.detail(&r.lead, &changeset).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
 
         let (status, applied) = r.apply(&r.other, &changeset, &[&change]).await;
         assert_eq!(status, StatusCode::OK, "{applied}");
+        // A closed proposal takes no review.
+        let (_, review) = r.detail(&r.other, &changeset).await;
+        assert_eq!(proposal_of(&review, &change["id"])["can_review"], false);
         let (_, read) = r
             .api
             .get(
@@ -1138,7 +1142,9 @@ mod routing {
         };
         assert_eq!(r.inbox(&manager).await, Vec::<String>::new(), "day 3");
         let (_, review) = r.detail(&manager, &changeset).await;
-        assert_eq!(proposal_of(&review, &promise["id"])["overdue"], false);
+        let shown = proposal_of(&review, &promise["id"]);
+        assert_eq!(shown["overdue"], false);
+        assert_eq!(shown["can_review"], false);
 
         r.api.clock.advance(SignedDuration::from_hours(24));
         let manager = Member {
@@ -1150,6 +1156,8 @@ mod routing {
         let shown = proposal_of(&review, &promise["id"]);
         assert_eq!(shown["overdue"], true);
         assert_eq!(shown["routed_to_me"], false);
+        // The manager acts on the overdue proposal from the inbox.
+        assert_eq!(shown["can_review"], true);
     }
 
     #[tokio::test]
@@ -1304,6 +1312,7 @@ mod routing {
 
         let (_, review) = r.detail(&r.author, &changeset).await;
         assert_eq!(proposal_of(&review, &fact["id"])["routed_to_me"], false);
+        assert_eq!(proposal_of(&review, &fact["id"])["can_review"], false);
         let (status, problem) = r.apply(&r.author, &changeset, &[&change]).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
         assert_eq!(problem["code"], "forbidden");
