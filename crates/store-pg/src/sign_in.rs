@@ -118,6 +118,20 @@ impl SignInStore for Database {
         now: Timestamp,
     ) -> Result<Option<SecretString>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
+        // The lock on the user comes first, so that two redeems of two links of one user wait for
+        // each other in one order. Without it, each one locks its own link and then waits for the
+        // link of the other one in the delete of all links: a deadlock. The lock lets the inserts
+        // that refer to the user pass.
+        sqlx::query!(
+            "SELECT u.id FROM app_user u
+             JOIN magic_link l ON l.user_id = u.id
+             WHERE l.token_hash = $1
+             FOR NO KEY UPDATE OF u",
+            hash_token(token),
+        )
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(store_error)?;
         // The delete locks the row, so a second redeem of the same token finds nothing.
         let link = sqlx::query!(
             r#"DELETE FROM magic_link WHERE token_hash = $1
@@ -629,6 +643,27 @@ mod tests {
             .unwrap();
         assert!(again.is_none());
         assert_eq!(count(&test, "session").await, 1);
+    }
+
+    /// Two links of one user redeemed at the same moment: one signs in, the other finds nothing.
+    /// Neither ends in a deadlock (a 500).
+    #[tokio::test]
+    async fn two_links_of_one_user_redeemed_at_once_give_one_session() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let anna = user(&test, "anna@example.org").await;
+        test.add_membership(testwil, anna, OrganizationRole::Member)
+            .await;
+        for _ in 0..10 {
+            let first = magic_link(&test, anna, now() + SignedDuration::from_mins(15)).await;
+            let second = magic_link(&test, anna, now() + SignedDuration::from_mins(15)).await;
+            let (a, b) = tokio::join!(
+                test.database.redeem_magic_link(&first, None, None, now()),
+                test.database.redeem_magic_link(&second, None, None, now()),
+            );
+            let sessions = [a.unwrap(), b.unwrap()];
+            assert_eq!(sessions.iter().filter(|s| s.is_some()).count(), 1);
+        }
     }
 
     #[tokio::test]
