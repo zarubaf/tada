@@ -120,3 +120,12 @@ pub fn count_messages(level: &str, text: &str) -> usize {
         })
         .count()
 }
+
+/// The captured lines whose message is `message`, as JSON.
+pub fn lines_with_message(message: &str) -> Vec<Value> {
+    lines()
+        .iter()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .filter(|line| line["message"] == message)
+        .collect()
+}
