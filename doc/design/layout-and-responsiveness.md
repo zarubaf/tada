@@ -21,7 +21,8 @@ The app shell has three layouts. The viewport width selects the layout.
 └──────────────────────────┘
 ```
 
-- The bottom bar has four items: „Meine Arbeit“, „Eingang“, „Anlässe“ and „Mehr“.
+- The bottom bar has four items: „Meine Arbeit“, „Eingang“, „Anlässe“ and „Einstellungen“.
+- The member menu holds „Personen“ and „Institutionen“, so the narrow layout reaches them too.
 - The bottom bar shows a count badge on „Eingang“ when proposals wait for the member.
 - The evidence panel and the filters open as sheets from the bottom, up to 90 % of the screen height.
 - The page gutter is `--space-4`.
