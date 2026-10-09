@@ -409,6 +409,13 @@ impl MemberStore for Database {
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
+        // A removal ends all sessions of the member, also in other organizations: tada cannot tell
+        // a stolen session from the member's own one, and a kept session could choose this
+        // organization again after a new invitation.
+        sqlx::query!("DELETE FROM session WHERE user_id = $1", member.as_uuid())
+            .execute(&mut *tx)
+            .await
+            .map_err(store_error)?;
         // The log of each event shows that the member left it (ADR 0061).
         for (event, role) in locked.event_roles {
             let left = audit
@@ -837,6 +844,33 @@ mod tests {
                 )
             ]
         );
+    }
+
+    /// A removal ends each session of the member, in each organization; other sessions stay.
+    #[tokio::test]
+    async fn a_removal_ends_all_sessions_of_the_member() {
+        let f = Fixture::start().await;
+        let anna = f.member("Anna Muster", OrganizationRole::Member).await;
+        let musterhausen = f.test.create_organization("musterhausen").await;
+        f.test
+            .add_membership(musterhausen, anna, OrganizationRole::Member)
+            .await;
+        let now = NOW.parse().unwrap();
+        f.test
+            .sign_in(anna, Some(f.scope().organization_id()), now)
+            .await;
+        f.test.sign_in(anna, Some(musterhausen), now).await;
+        f.test.sign_in(anna, None, now).await;
+        f.test
+            .sign_in(f.owner.user_id(), Some(f.scope().organization_id()), now)
+            .await;
+
+        assert_eq!(f.remove(anna).await, None);
+        let left: Vec<Uuid> = sqlx::query_scalar("SELECT user_id FROM session")
+            .fetch_all(&f.db().pool)
+            .await
+            .unwrap();
+        assert_eq!(left, [f.owner.user_id().as_uuid()]);
     }
 
     #[tokio::test]
