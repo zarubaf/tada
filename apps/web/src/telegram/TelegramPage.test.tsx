@@ -159,6 +159,26 @@ describe("TelegramPage", () => {
     );
   });
 
+  it("asks for a new sign-in when the session is too old to link, and signs out on request", async () => {
+    const { calls } = setup({
+      answers: {
+        [CONFIRM]: () => problem(403, "recent-sign-in-required"),
+        "POST /api/v1/sign-out": () => new Response(null, { status: 204 }),
+      },
+    });
+    await user.click(await screen.findByRole("button", { name: "Bernd Beispiel bestätigen" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Verknüpfen" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Melden Sie sich für diesen Schritt neu an.",
+    );
+    await user.click(screen.getByRole("button", { name: "Neu anmelden" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/sign-in"));
+    expect(calls).toContain("POST /api/v1/sign-out");
+  });
+
   it("loads the requests again on request", async () => {
     setup({ requests: [[], [request]] });
     await screen.findByText("Keine offenen Anfragen");

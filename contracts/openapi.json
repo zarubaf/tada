@@ -301,6 +301,7 @@
         "x-tada-problem-codes": [
           "unauthenticated",
           "organization-required",
+          "recent-sign-in-required",
           "forbidden",
           "not-found",
           "invalid-transition",
@@ -2299,6 +2300,7 @@
         "x-tada-problem-codes": [
           "unauthenticated",
           "organization-required",
+          "recent-sign-in-required",
           "forbidden",
           "not-found",
           "record-version-conflict",
@@ -2350,6 +2352,7 @@
           "malformed-request",
           "unauthenticated",
           "organization-required",
+          "recent-sign-in-required",
           "forbidden",
           "not-found",
           "record-version-conflict",
@@ -2399,6 +2402,7 @@
           "malformed-request",
           "unauthenticated",
           "organization-required",
+          "recent-sign-in-required",
           "forbidden",
           "not-found",
           "record-version-conflict",
@@ -2440,6 +2444,7 @@
         "x-tada-problem-codes": [
           "unauthenticated",
           "organization-required",
+          "recent-sign-in-required",
           "forbidden",
           "not-found",
           "record-version-conflict",
@@ -2481,6 +2486,7 @@
         "x-tada-problem-codes": [
           "unauthenticated",
           "organization-required",
+          "recent-sign-in-required",
           "forbidden",
           "not-found",
           "record-version-conflict",
@@ -2544,6 +2550,7 @@
           "malformed-request",
           "unauthenticated",
           "organization-required",
+          "recent-sign-in-required",
           "forbidden",
           "not-found",
           "record-version-conflict",

@@ -8,6 +8,7 @@ import {
 } from "../api/client";
 import { failureOf } from "../api/failure";
 import { LOCALE, t } from "../i18n";
+import { SignInAgain } from "../session/SignInAgain";
 import { loadMcpSwitch } from "../settings/mcpSwitch";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
@@ -77,6 +78,8 @@ export function TokensPage({ api }: { api: Api }) {
   const [secret, setSecret] = useState<string>();
   const [revoking, setRevoking] = useState<ApiToken>();
   const [busy, setBusy] = useState(false);
+  // The server asks for a new sign-in before it creates a token.
+  const [signInAgain, setSignInAgain] = useState(false);
   // Both live regions are in the page from the start, so that a text set later is announced.
   const [failure, setFailure] = useState<string>();
   const [confirmation, setConfirmation] = useState<string>();
@@ -146,6 +149,11 @@ export function TokensPage({ api }: { api: Api }) {
     error: Problem | undefined,
     result: Parameters<typeof failureOf>[0],
   ) => {
+    if (error?.code === "recent-sign-in-required") {
+      setSignInAgain(true);
+      showFailure(problemMessage(error));
+      return;
+    }
     if (error?.code === "forbidden") {
       // Only the switch tells the two reasons of a refusal apart. Without it, the text stays neutral.
       const feature = await loadMcp();
@@ -333,6 +341,7 @@ export function TokensPage({ api }: { api: Api }) {
             </Button>
           </div>
         </form>
+        {signInAgain && <SignInAgain />}
 
         {secret !== undefined && (
           <div ref={secretBox} tabIndex={-1} className={styles.secret}>

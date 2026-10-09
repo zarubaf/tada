@@ -135,6 +135,9 @@ pub enum Confirmed {
 
 #[derive(Debug, thiserror::Error)]
 pub enum LinkError {
+    /// The session of the caller started too long ago to link an account (`session::RECENT_SIGN_IN`).
+    #[error("the action needs a recent sign-in")]
+    RecentSignInRequired,
     #[error("no open link request with this ID")]
     NotFound,
     #[error("the Telegram account or the user has another link")]
@@ -145,6 +148,7 @@ pub enum LinkError {
 
 impl LinkError {
     pub const CODES: &[ProblemCode] = &[
+        ProblemCode::RecentSignInRequired,
         ProblemCode::NotFound,
         ProblemCode::InvalidTransition,
         ProblemCode::Unavailable,
@@ -155,6 +159,7 @@ impl LinkError {
 impl CommandError for LinkError {
     fn code(&self) -> ProblemCode {
         match self {
+            Self::RecentSignInRequired => ProblemCode::RecentSignInRequired,
             Self::NotFound => ProblemCode::NotFound,
             Self::AlreadyLinked => ProblemCode::InvalidTransition,
             Self::Store(error) => error.code(),
@@ -206,14 +211,20 @@ pub async fn list_link_requests(
 }
 
 /// Step 3: the member confirms a request. Only then does tada bind the account to the user.
+/// A link lets the account act as the member without a session, so the confirmation needs a
+/// session younger than `session::RECENT_SIGN_IN`, as an API token does.
 pub async fn confirm_link(
     caller: &MemberCaller,
     request_id: Uuid,
     links: &dyn TelegramLinks,
     clock: &dyn Clock,
 ) -> Result<TelegramUserId, LinkError> {
+    let now = clock.now();
+    if !caller.signed_in_recently(now) {
+        return Err(LinkError::RecentSignInRequired);
+    }
     match links
-        .confirm(caller.scope(), caller.user_id(), request_id, clock.now())
+        .confirm(caller.scope(), caller.user_id(), request_id, now)
         .await?
     {
         Confirmed::Linked(account) => Ok(account),

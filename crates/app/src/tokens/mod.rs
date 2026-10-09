@@ -205,6 +205,9 @@ pub trait TokenStore: Debug + Send + Sync {
 
 #[derive(Debug, thiserror::Error)]
 pub enum TokenError {
+    /// The session of the caller started too long ago to create a token (`session::RECENT_SIGN_IN`).
+    #[error("the action needs a recent sign-in")]
+    RecentSignInRequired,
     /// The caller cannot do this: for example, a member without the right to propose asks for a
     /// `propose` token (ADR 0052), or a member who is not an owner changes a feature.
     #[error("the caller cannot do this")]
@@ -226,6 +229,7 @@ pub enum TokenError {
 impl TokenError {
     /// All codes of the token commands and queries, for the API contract (ADR 0037).
     pub const CODES: &[ProblemCode] = &[
+        ProblemCode::RecentSignInRequired,
         ProblemCode::Forbidden,
         ProblemCode::NotFound,
         ProblemCode::RecordVersionConflict,
@@ -238,6 +242,7 @@ impl TokenError {
 impl CommandError for TokenError {
     fn code(&self) -> ProblemCode {
         match self {
+            Self::RecentSignInRequired => ProblemCode::RecentSignInRequired,
             Self::Forbidden | Self::Disabled => ProblemCode::Forbidden,
             Self::NotFound => ProblemCode::NotFound,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
@@ -318,6 +323,8 @@ fn check(request: &TokenRequest, now: Timestamp) -> Result<TokenName, TokenError
 
 /// Creates a personal API token of the caller in the caller's organization (ADR 0039).
 ///
+/// The session of the caller must be younger than `session::RECENT_SIGN_IN`, so that a stolen
+/// session cannot create a token that outlives it.
 /// The member must confirm the current token notice (ADR 0045), and the organization must not
 /// switch off MCP tokens. A `propose` token needs the right to propose in at least one event (ADR 0052).
 /// The result holds the secret; tada shows it once.
@@ -329,6 +336,9 @@ pub async fn create_token(
     clock: &dyn Clock,
 ) -> Result<CreatedToken, TokenError> {
     let now = clock.now();
+    if !caller.signed_in_recently(now) {
+        return Err(TokenError::RecentSignInRequired);
+    }
     let name = check(&request, now)?;
     let scope = caller.scope();
     if !tokens_enabled(scope, tokens).await? {

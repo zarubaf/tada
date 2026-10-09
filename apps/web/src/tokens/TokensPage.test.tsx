@@ -133,6 +133,26 @@ describe("TokensPage", () => {
     );
   });
 
+  it("asks for a new sign-in when the session is too old for a token, and signs out on request", async () => {
+    const { count } = setup({
+      answers: {
+        "POST /api/v1/tokens": () => problem(403, "recent-sign-in-required"),
+        "POST /api/v1/sign-out": () => new Response(null, { status: 204 }),
+      },
+    });
+    await fillAndConfirm();
+    await user.click(await createButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Melden Sie sich für diesen Schritt neu an.",
+    );
+    expect(screen.queryByText(SECRET)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Neu anmelden" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/sign-in"));
+    expect(count("POST /api/v1/sign-out")).toBe(1);
+  });
+
   it("keeps the secret out of storage and drops it when the member leaves the page", async () => {
     const { view } = setup();
     await fillAndConfirm();
