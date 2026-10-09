@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE workstream\n             SET name = COALESCE($4, name),\n                 lead_user_id = COALESCE($5, lead_user_id),\n                 status = COALESCE($6, status),\n                 version = version + 1,\n                 updated_at = now()\n             WHERE organization_id = $1 AND event_id = $2 AND id = $3\n             RETURNING id, event_id, name, lead_user_id, status, version",
+  "query": "UPDATE workstream\n             SET name = COALESCE($4, name),\n                 lead_user_id = COALESCE($5, lead_user_id),\n                 status = COALESCE($6, status),\n                 version = version + 1,\n                 updated_at = $7\n             WHERE organization_id = $1 AND event_id = $2 AND id = $3\n             RETURNING id, event_id, name, lead_user_id, status, version",
   "describe": {
     "columns": [
       {
@@ -77,7 +77,8 @@
         "Uuid",
         "Text",
         "Uuid",
-        "Text"
+        "Text",
+        "Timestamptz"
       ]
     },
     "nullable": [
@@ -89,5 +90,5 @@
       false
     ]
   },
-  "hash": "b8dacf4b132379da19bd0079914a9be308bc5a2abb77e503187fd5c757d6f53c"
+  "hash": "4dc7dc8a15cc53b683f17bee4ebef66963d56d869c7c0bf06b376643f9028776"
 }

@@ -40,6 +40,7 @@ impl WorkstreamStore for Memory {
         _: WorkstreamId,
         _: &WorkstreamUpdate,
         _: RecordVersion,
+        _: Timestamp,
         _: &AuditEvent,
     ) -> Result<Changed, StoreError> {
         unreachable!()
