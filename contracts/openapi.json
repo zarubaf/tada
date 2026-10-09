@@ -9644,7 +9644,8 @@
           "status",
           "stale",
           "overdue",
-          "routed_to_me"
+          "routed_to_me",
+          "can_review"
         ],
         "properties": {
           "id": {
@@ -9687,6 +9688,10 @@
           "routed_to_me": {
             "type": "boolean",
             "description": "True if the review routing gives the proposal to the caller: as the owner of the record, as the lead of the\nworkstream, or as an event manager when it goes to no other reviewer (ADR 0067).\nAn event manager can review each proposal of the event, also when this is false."
+          },
+          "can_review": {
+            "type": "boolean",
+            "description": "True if the caller reviews the open proposal now, so a client offers accept and reject for it: it is in the\nReview Inbox of the caller (ADR 0067). For an event manager, this includes an overdue proposal of another\nreviewer. Apply and reject accept each proposal with this flag."
           },
           "conflict_reason": {
             "oneOf": [

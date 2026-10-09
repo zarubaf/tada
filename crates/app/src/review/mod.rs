@@ -934,6 +934,17 @@ impl Reviewable {
         self.routes.routed_to(caller.user_id(), self.access, id)
     }
 
+    /// True if the caller reviews the proposal now: it is open and in the Review Inbox of the caller (rule 6).
+    /// Apply and reject then accept it, because the inbox shows only proposals that the caller may review.
+    fn can_review(&self, caller: &MemberCaller, id: ProposalId, now: Timestamp) -> bool {
+        let status = proposal_status(&self.results, id);
+        let overdue = status.is_overdue(self.changeset.created_at, now);
+        status == ProposalStatus::Open
+            && self
+                .routes
+                .in_inbox_of(caller.user_id(), self.access, id, overdue)
+    }
+
     /// The caller must review each of `ids` (ADR 0067, rule 7). Else the review changes nothing.
     fn require<'a>(
         &self,

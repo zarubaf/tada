@@ -225,6 +225,10 @@ pub struct Proposal {
     /// workstream, or as an event manager when it goes to no other reviewer (ADR 0067).
     /// An event manager can review each proposal of the event, also when this is false.
     pub routed_to_me: bool,
+    /// True if the caller reviews the open proposal now, so a client offers accept and reject for it: it is in the
+    /// Review Inbox of the caller (ADR 0067). For an event manager, this includes an overdue proposal of another
+    /// reviewer. Apply and reject accept each proposal with this flag.
+    pub can_review: bool,
     /// Why the proposal conflicts, at the time of the read. It is present only if the status is `conflict`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conflict_reason: Option<ConflictReason>,
@@ -754,6 +758,7 @@ impl From<AppProposalReview> for Proposal {
             stale: review.stale,
             overdue: review.overdue,
             routed_to_me: review.routed_to_me,
+            can_review: review.can_review,
             conflict_reason: review.conflict.map(ConflictReason::from),
             current: review.current.map(CurrentFact::from),
             draft: review.draft.map(DraftRendering::from),
