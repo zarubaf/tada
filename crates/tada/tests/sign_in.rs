@@ -422,3 +422,23 @@ async fn the_31st_request_from_one_ip_address_is_rate_limited() {
 
     support::logs::assert_clean(&["person0@example.org", "person30@example.org"]);
 }
+
+/// A host with IPv6 has a whole /64 and can send each request from another address of it.
+#[tokio::test]
+async fn the_31st_request_from_one_ipv6_network_is_rate_limited() {
+    let app = App::start().await;
+    for n in 0..30u16 {
+        let peer = IpAddr::from([0x2001, 0xdb8, 0, 0x64, 0, 0, 0, n + 1]);
+        let (response, _) =
+            request_link_from(&app.router, peer, &format!("person{n}@example.org")).await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED, "request {}", n + 1);
+    }
+    let peer = IpAddr::from([0x2001, 0xdb8, 0, 0x64, 0xffff, 0, 0, 1]);
+    let (response, problem) = request_link_from(&app.router, peer, "person30@example.org").await;
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(problem["code"], "rate-limited");
+
+    let other_network = IpAddr::from([0x2001, 0xdb8, 0, 0x65, 0, 0, 0, 1]);
+    let (response, _) = request_link_from(&app.router, other_network, "person31@example.org").await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED, "another /64");
+}

@@ -4,23 +4,51 @@
 //! The counters are in the database, so that all `serve` processes share them (ADR 0025).
 
 use std::fmt;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv6Addr};
 
 use jiff::{SignedDuration, Timestamp};
 use tada_domain::identity::Email;
 
 /// The sign-in requests for one email address in one window.
 pub const SIGN_IN_PER_EMAIL: u32 = 5;
-/// The sign-in requests from one IP address in one window.
+/// The sign-in requests from one client network in one window.
 pub const SIGN_IN_PER_IP: u32 = 30;
 /// The length of each window.
 pub const WINDOW: SignedDuration = SignedDuration::from_hours(1);
+
+/// The network that one client limit counts: an IPv4 address, or the /64 prefix of an IPv6
+/// address. A host with IPv6 usually has a whole /64 and can send from each address of it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ClientNetwork(IpAddr);
+
+impl ClientNetwork {
+    /// The network of the client `address`. An IPv4 client of an IPv6 socket counts as IPv4.
+    pub fn of(address: IpAddr) -> Self {
+        Self(match address.to_canonical() {
+            IpAddr::V4(address) => IpAddr::V4(address),
+            IpAddr::V6(address) => {
+                IpAddr::V6(Ipv6Addr::from(u128::from(address) & !u128::from(u64::MAX)))
+            }
+        })
+    }
+
+    /// The first address of the network.
+    pub fn address(self) -> IpAddr {
+        self.0
+    }
+}
+
+impl fmt::Debug for ClientNetwork {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("ClientNetwork(redacted)")
+    }
+}
 
 /// What a limit counts. The store keeps only a keyed hash of it (ADR 0056).
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum RateSubject<'a> {
     Email(&'a Email),
-    Ip(IpAddr),
+    Ip(ClientNetwork),
 }
 
 impl fmt::Debug for RateSubject<'_> {
@@ -48,7 +76,7 @@ pub fn sign_in_limits(email: &Email, client_ip: IpAddr) -> [RateLimit<'_>; 2] {
             limit: SIGN_IN_PER_EMAIL,
         },
         RateLimit {
-            subject: RateSubject::Ip(client_ip),
+            subject: RateSubject::Ip(ClientNetwork::of(client_ip)),
             limit: SIGN_IN_PER_IP,
         },
     ]
@@ -155,6 +183,29 @@ mod tests {
             RateDecision::Allowed.and(RateDecision::Allowed),
             RateDecision::Allowed
         );
+    }
+
+    fn network(address: &str) -> IpAddr {
+        ClientNetwork::of(address.parse().unwrap()).address()
+    }
+
+    #[test]
+    fn an_ipv6_client_counts_by_its_64_prefix_and_an_ipv4_client_by_its_address() {
+        assert_eq!(
+            network("2001:db8:1:2:aaaa:bbbb:cccc:dddd"),
+            network("2001:db8:1:2::1")
+        );
+        assert_eq!(
+            network("2001:db8:1:2::1"),
+            "2001:db8:1:2::".parse::<IpAddr>().unwrap()
+        );
+        assert_ne!(network("2001:db8:1:2::1"), network("2001:db8:1:3::1"));
+        assert_eq!(
+            network("203.0.113.7"),
+            "203.0.113.7".parse::<IpAddr>().unwrap()
+        );
+        assert_ne!(network("203.0.113.7"), network("203.0.113.8"));
+        assert_eq!(network("::ffff:203.0.113.7"), network("203.0.113.7"));
     }
 
     #[test]
