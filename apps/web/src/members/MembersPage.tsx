@@ -275,15 +275,17 @@ export function MembersPage({ api }: { api: Api }) {
     {
       id: "actions",
       header: t("members-column-actions"),
-      cell: (invitation) => (
-        <Button
-          variant="danger"
-          aria-label={t("invitations-revoke-of", { name: invitation.display_name })}
-          onPress={() => setConfirming({ kind: "invitation", item: invitation })}
-        >
-          {t("invitations-revoke")}
-        </Button>
-      ),
+      // An admin cannot revoke an owner invitation: the same rule as for a removal (ADR 0056).
+      cell: (invitation) =>
+        canRemove(role, invitation.role) && (
+          <Button
+            variant="danger"
+            aria-label={t("invitations-revoke-of", { name: invitation.display_name })}
+            onPress={() => setConfirming({ kind: "invitation", item: invitation })}
+          >
+            {t("invitations-revoke")}
+          </Button>
+        ),
     },
   ];
 
