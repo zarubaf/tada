@@ -71,6 +71,8 @@ Routing of proposals:
    Event managers keep the right to review each proposal of their event.
    A contributor reads the changesets of the event that hold a proposal for the contributor.
    A viewer reads none.
+   The review of a changeset marks each proposal with `can_review`: the proposal is open and in the Review Inbox of the caller.
+   A client offers accept and reject by this flag, so it does not repeat the routing.
 7. An apply request stays all or nothing (ADR 0050).
    The caller must be a reviewer of each selected proposal and of each dependency.
    Otherwise the request returns `forbidden` and changes nothing.
@@ -90,6 +92,10 @@ Routing of proposals:
   Rule 5 lets one reviewer accept a new promisor with its commitment.
   A changeset that mixes other proposals can need a manager and a lead.
 - The reviewers are computed from the owner, the lead and their current roles, so the apply reads the memberships of the event.
+- The apply computes the reviewers before its transaction starts.
+  A lead who is replaced, or a member who loses the role, in that short time can still apply once.
+  This is an accepted race at club scale.
+  A later change can move the check into the transaction of the apply.
 - The 3 days are provisional.
   The stale constant of 14 days is provisional too.
 
