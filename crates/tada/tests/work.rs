@@ -160,6 +160,12 @@ async fn a_contributor_creates_and_changes_an_action() {
     assert_eq!(changed["status"], "in-progress");
     assert_eq!(changed["due_date"], Value::Null);
     assert_eq!(changed["version"], 2);
+    // The owner can change the action and sees the statuses that can follow.
+    assert_eq!(changed["can_change"], true);
+    assert_eq!(
+        changed["next_statuses"],
+        json!(["open", "blocked", "done", "canceled"])
+    );
 
     let (status, problem) = api
         .patch(
@@ -177,6 +183,8 @@ async fn a_contributor_creates_and_changes_an_action() {
         .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(page["items"].as_array().unwrap().len(), 1);
+    assert_eq!(page["items"][0]["can_change"], false);
+    assert_eq!(page["items"][0]["next_statuses"], json!([]));
     let (status, page) = api.get(&e.viewer, &format!("{actions}?owner=me")).await;
     assert_eq!(status, StatusCode::OK);
     assert!(page["items"].as_array().unwrap().is_empty());

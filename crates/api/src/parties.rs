@@ -84,6 +84,8 @@ pub struct Person {
     /// The evidence of the accepted proposals that created or changed the person,
     /// from the sources that the caller can read.
     pub evidence: Vec<RecordEvidence>,
+    /// True if the caller can change the person: an owner or an admin.
+    pub can_change: bool,
 }
 
 impl From<Shown<PersonView>> for Person {
@@ -91,6 +93,7 @@ impl From<Shown<PersonView>> for Person {
         let Shown {
             record: person,
             evidence,
+            can_change,
         } = shown;
         Self {
             id: person.id.as_uuid(),
@@ -101,6 +104,7 @@ impl From<Shown<PersonView>> for Person {
             user_id: person.user_id.map(UserId::as_uuid),
             version: person.version.get(),
             evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
+            can_change,
         }
     }
 }
@@ -121,6 +125,8 @@ pub struct Institution {
     /// The evidence of the accepted proposals that created or changed the institution,
     /// from the sources that the caller can read.
     pub evidence: Vec<RecordEvidence>,
+    /// True if the caller can change the institution: an owner or an admin.
+    pub can_change: bool,
 }
 
 impl From<Shown<InstitutionView>> for Institution {
@@ -128,6 +134,7 @@ impl From<Shown<InstitutionView>> for Institution {
         let Shown {
             record: institution,
             evidence,
+            can_change,
         } = shown;
         Self {
             id: institution.id.as_uuid(),
@@ -138,6 +145,7 @@ impl From<Shown<InstitutionView>> for Institution {
             phone: institution.phone.map(|phone| phone.as_str().to_owned()),
             version: institution.version.get(),
             evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
+            can_change,
         }
     }
 }

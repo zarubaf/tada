@@ -8,21 +8,19 @@ use tada_domain::work::{CommitmentStatus, ConditionText, FirmReason};
 use uuid::Uuid;
 
 use super::checks::{
-    changed, check_owner, check_promisor, check_workstream, created, parse_text, require_change,
-    require_create,
+    changed, check_owner, check_promisor, check_workstream, created, may_change, parse_text,
+    require_change, require_create, show, show_one,
 };
 use super::{
     CommitmentFields, CommitmentView, NewCommitmentRecord, WorkError, WorkPorts, WorkQuery,
 };
-use crate::access::{self, Principal};
+use crate::access::{self, EventAccess, Principal};
 use crate::audit::AuditAction;
 use crate::caller::MemberCaller;
 use crate::paging::Page;
 use crate::problem::FieldError;
 use crate::proposals::text_error_code;
-use crate::records::{
-    Checker, NumberCursor, RecordRef, Shown, audit, page, record_id, shown, shown_one,
-};
+use crate::records::{Checker, NumberCursor, Shown, audit, page, record_id};
 
 /// The input of `create_commitment`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,7 +63,7 @@ pub async fn create_commitment(
     input: NewCommitment,
     ports: WorkPorts<'_>,
 ) -> Result<Shown<CommitmentView>, WorkError> {
-    require_create(caller, event, ports.identity).await?;
+    let access = require_create(caller, event, ports.identity).await?;
     let scope = caller.scope();
     let id = CommitmentId::from_uuid(
         record_id(input.id).map_err(|error| WorkError::Invalid(vec![error]))?,
@@ -108,16 +106,25 @@ pub async fn create_commitment(
             .create_commitment(scope, &commitment, ports.clock.now(), &audit)
             .await?,
     )?;
-    Ok(Shown::created(commitment))
+    let can_change = may_change(
+        caller,
+        access,
+        event,
+        commitment.fields.owner,
+        commitment.fields.workstream_id,
+        ports.workstreams,
+    )
+    .await?;
+    Ok(Shown::created(commitment, can_change))
 }
 
-/// The current commitment, if the caller can change it.
+/// The current commitment and the access of the caller, if the caller can change the commitment.
 async fn changeable_commitment(
     caller: &MemberCaller,
     event: EventId,
     id: CommitmentId,
     ports: WorkPorts<'_>,
-) -> Result<CommitmentView, WorkError> {
+) -> Result<(EventAccess, CommitmentView), WorkError> {
     let access = access::event_access(caller, event, ports.identity).await?;
     let current = ports
         .work
@@ -133,7 +140,7 @@ async fn changeable_commitment(
         ports.workstreams,
     )
     .await?;
-    Ok(current)
+    Ok((access, current))
 }
 
 async fn store_commitment_change(
@@ -144,9 +151,9 @@ async fn store_commitment_change(
     expected: RecordVersion,
     action: AuditAction,
     ports: WorkPorts<'_>,
-) -> Result<Shown<CommitmentView>, WorkError> {
+) -> Result<CommitmentView, WorkError> {
     let audit = audit(caller, action, id.as_uuid());
-    let commitment = changed(
+    changed(
         ports
             .work
             .change_commitment(
@@ -159,15 +166,7 @@ async fn store_commitment_change(
                 &audit,
             )
             .await?,
-    )?;
-    Ok(shown_one(
-        caller,
-        commitment,
-        RecordRef::Commitment(id),
-        ports.identity,
-        ports.work,
     )
-    .await?)
 }
 
 /// Changes a commitment: its owner, the lead of its workstream or an event manager can do it.
@@ -179,7 +178,7 @@ pub async fn change_commitment(
     change: CommitmentChange,
     ports: WorkPorts<'_>,
 ) -> Result<Shown<CommitmentView>, WorkError> {
-    let current = changeable_commitment(caller, event, id, ports).await?;
+    let (access, current) = changeable_commitment(caller, event, id, ports).await?;
     let old = &current.fields;
     let CommitmentChange {
         text,
@@ -229,7 +228,7 @@ pub async fn change_commitment(
         status,
         firm_reason: old.firm_reason.clone(),
     };
-    store_commitment_change(
+    let commitment = store_commitment_change(
         caller,
         event,
         id,
@@ -238,7 +237,8 @@ pub async fn change_commitment(
         AuditAction::CommitmentChange,
         ports,
     )
-    .await
+    .await?;
+    Ok(show_one(caller, access, event, commitment, ports).await?)
 }
 
 /// Makes a conditional commitment firm, with a reason. The condition stays as history (ADR 0068).
@@ -250,7 +250,7 @@ pub async fn make_commitment_firm(
     input: FirmInput,
     ports: WorkPorts<'_>,
 ) -> Result<Shown<CommitmentView>, WorkError> {
-    let current = changeable_commitment(caller, event, id, ports).await?;
+    let (access, current) = changeable_commitment(caller, event, id, ports).await?;
     let reason = FirmReason::parse(&input.reason).map_err(|error| {
         WorkError::Invalid(vec![FieldError::new("reason", text_error_code(error))])
     })?;
@@ -262,7 +262,7 @@ pub async fn make_commitment_firm(
         firm_reason: Some(reason),
         ..current.fields
     };
-    store_commitment_change(
+    let commitment = store_commitment_change(
         caller,
         event,
         id,
@@ -271,7 +271,8 @@ pub async fn make_commitment_firm(
         AuditAction::CommitmentFirm,
         ports,
     )
-    .await
+    .await?;
+    Ok(show_one(caller, access, event, commitment, ports).await?)
 }
 
 /// One commitment of the event, with its evidence. Each reader of the event sees it.
@@ -281,20 +282,13 @@ pub async fn get_commitment(
     id: CommitmentId,
     ports: WorkPorts<'_>,
 ) -> Result<Shown<CommitmentView>, WorkError> {
-    access::event_access(caller, event, ports.identity).await?;
+    let access = access::event_access(caller, event, ports.identity).await?;
     let commitment = ports
         .work
         .commitment(caller.scope(), event, id)
         .await?
         .ok_or(WorkError::NotFound)?;
-    Ok(shown_one(
-        caller,
-        commitment,
-        RecordRef::Commitment(id),
-        ports.identity,
-        ports.work,
-    )
-    .await?)
+    Ok(show_one(caller, access, event, commitment, ports).await?)
 }
 
 /// The commitments of the event that match `query`, in the order of their numbers, with their evidence.
@@ -304,19 +298,12 @@ pub async fn list_commitments(
     query: WorkQuery<CommitmentStatus>,
     ports: WorkPorts<'_>,
 ) -> Result<Page<Shown<CommitmentView>, NumberCursor>, WorkError> {
-    access::event_access(caller, event, ports.identity).await?;
+    let access = access::event_access(caller, event, ports.identity).await?;
     let items = ports
         .work
         .commitments(caller.scope(), event, &query.filter())
         .await?;
     let Page { items, next } = page(items, query.limit, |commitment| commitment.local_number);
-    let items = shown(
-        caller,
-        items,
-        |commitment| RecordRef::Commitment(commitment.id),
-        ports.identity,
-        ports.work,
-    )
-    .await?;
+    let items = show(caller, access, event, items, ports).await?;
     Ok(Page { items, next })
 }

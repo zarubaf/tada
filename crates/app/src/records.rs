@@ -158,24 +158,28 @@ pub struct Shown<T> {
     /// The evidence of the accepted proposals that created or changed the record, as far as the caller can read
     /// their sources. A direct command adds none.
     pub evidence: Vec<RecordEvidenceView>,
+    /// True if the caller can change the record now, by the rule of its kind.
+    pub can_change: bool,
 }
 
 impl<T> Shown<T> {
     /// A record that a direct create made: a direct command carries no evidence (ADR 0068),
     /// and a new record has no earlier version.
-    pub(crate) fn created(record: T) -> Self {
+    pub(crate) fn created(record: T, can_change: bool) -> Self {
         Self {
             record,
             evidence: Vec::new(),
+            can_change,
         }
     }
 }
 
-/// The records with the evidence that `caller` can read.
+/// The records with the evidence that `caller` can read, and with the right of `caller` to change each.
 pub(crate) async fn shown<T>(
     caller: &impl Principal,
     records: Vec<T>,
     record_ref: impl Fn(&T) -> RecordRef,
+    can_change: impl Fn(&T) -> bool,
     identity: &dyn IdentityStore,
     store: &dyn EvidenceStore,
 ) -> Result<Vec<Shown<T>>, StoreError> {
@@ -192,16 +196,18 @@ pub(crate) async fn shown<T>(
         .into_iter()
         .map(|record| Shown {
             evidence: evidence.remove(&record_ref(&record)).unwrap_or_default(),
+            can_change: can_change(&record),
             record,
         })
         .collect())
 }
 
-/// One record with the evidence that `caller` can read.
+/// One record with the evidence that `caller` can read, and with the right of `caller` to change it.
 pub(crate) async fn shown_one<T>(
     caller: &impl Principal,
     record: T,
     record_ref: RecordRef,
+    can_change: bool,
     identity: &dyn IdentityStore,
     store: &dyn EvidenceStore,
 ) -> Result<Shown<T>, StoreError> {
@@ -212,5 +218,9 @@ pub(crate) async fn shown_one<T>(
         .into_iter()
         .map(|(_, passage)| passage)
         .collect();
-    Ok(Shown { record, evidence })
+    Ok(Shown {
+        record,
+        evidence,
+        can_change,
+    })
 }
