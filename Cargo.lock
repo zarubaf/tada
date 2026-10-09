@@ -3743,6 +3743,7 @@ version = "0.1.0"
 dependencies = [
  "fluent-bundle",
  "frankenstein",
+ "serde_json",
  "tada-app",
  "tokio",
  "tracing",

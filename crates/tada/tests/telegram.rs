@@ -584,7 +584,7 @@ async fn an_event_key_in_two_organizations_of_the_member_is_ambiguous() {
 }
 
 #[tokio::test]
-async fn an_update_that_does_not_decode_stays_out_of_the_log() {
+async fn an_update_that_does_not_decode_is_skipped_and_stays_out_of_the_log() {
     support::logs::install();
     let test = TestDatabase::start().await;
     // The date is not a number, so the Bot API client cannot decode the batch.
@@ -623,4 +623,10 @@ async fn an_update_that_does_not_decode_stays_out_of_the_log() {
     let replies = api.replies.lock().unwrap().clone();
     assert_eq!(replies.len(), 1, "{replies:?}");
     assert!(replies[0].starts_with("Dieser Code ist ungültig"));
+    let offsets = api.offsets.lock().unwrap().clone();
+    assert_eq!(
+        offsets[1],
+        json!(6),
+        "the next request must skip the update that does not decode: {offsets:?}"
+    );
 }

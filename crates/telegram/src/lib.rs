@@ -31,7 +31,7 @@ use tada_app::telegram::{
     member_for, propose_fact,
 };
 
-use crate::bot_error::BotFailure;
+use crate::bot_error::{BotFailure, offset_past};
 use crate::command::{Incomplete, ProposeCommand, parse_propose};
 use crate::messages::Messages;
 
@@ -108,6 +108,11 @@ impl Gateway {
                 }
                 Err(error) => {
                     tracing::warn!(error = %BotFailure(&error), "the Bot API request failed");
+                    if let Some((next, skipped)) = offset_past(&error) {
+                        tracing::warn!(skipped, "the gateway skips updates that do not decode");
+                        offset = Some(next);
+                        continue;
+                    }
                     tokio::select! {
                         () = &mut stop => return,
                         () = tokio::time::sleep(RETRY_DELAY) => {}
