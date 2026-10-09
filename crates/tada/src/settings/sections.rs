@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use ipnet::IpNet;
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 use tada_adapters::mail::SmtpTls;
 use tada_adapters::storage::{S3Config, S3Storage};
 use tada_app::domain::identity::Email;
@@ -348,8 +348,12 @@ const RATE_LIMIT_KEY: Setting = Setting {
     kind: "file path",
     default: None,
     secret: true,
-    description: "The file that contains the key of the rate-limit counters. The counters keep an HMAC of each address with it. All `serve` processes need the same key.",
+    description: "The file that contains the key of the rate-limit counters, at least 32 bytes. The counters keep an HMAC of each address with it. All `serve` processes need the same key.",
 };
+
+/// The shortest key of the rate-limit counters. A shorter key lets a person with a copy of the
+/// counters find the key by brute force, and then each IPv4 address.
+const RATE_LIMIT_KEY_MIN_BYTES: usize = 32;
 
 impl Section for SignIn {
     fn settings() -> Vec<&'static Setting> {
@@ -357,9 +361,16 @@ impl Section for SignIn {
     }
 
     fn read(source: &mut Source<'_>) -> Option<Self> {
-        Some(Self {
-            rate_limit_key: source.secret(&RATE_LIMIT_KEY)?,
-        })
+        let rate_limit_key = source.secret(&RATE_LIMIT_KEY)?;
+        // Only the length: the value stays in the secret.
+        if rate_limit_key.expose_secret().len() < RATE_LIMIT_KEY_MIN_BYTES {
+            source.error(
+                &RATE_LIMIT_KEY,
+                &format!("must have at least {RATE_LIMIT_KEY_MIN_BYTES} bytes"),
+            );
+            return None;
+        }
+        Some(Self { rate_limit_key })
     }
 }
 
