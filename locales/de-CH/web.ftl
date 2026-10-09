@@ -336,6 +336,14 @@ event-members-remove-title = { $name } entfernen?
 event-members-remove-text = { $name } verliert die Rolle in diesem Anlass und sieht den Anlass nicht mehr.
 event-members-remove-self = Sie entfernen Ihre eigene Rolle als Anlassleitung. Danach können Sie die Mitglieder dieses Anlasses womöglich nicht mehr verwalten.
 event-members-remove-cancel = Abbrechen
+members-end-sessions = Sitzungen beenden
+# $name: the display name of the member.
+members-end-sessions-of = Sitzungen von { $name } beenden
+members-end-sessions-title = Sitzungen beenden?
+# $name: the display name of the member.
+members-end-sessions-text = tada meldet { $name } auf allen Geräten ab, zum Beispiel nach dem Verlust eines Geräts. { $name } bleibt Mitglied und meldet sich mit einem neuen Link an.
+# $name: the display name of the member.
+members-end-sessions-ended = Sitzungen von { $name } beendet.
 
 ## Members and invitations (settings)
 
@@ -389,6 +397,13 @@ settings-nav-members = Mitglieder
 settings-nav-telegram = Telegram
 settings-nav-tokens = API-Token
 settings-nav-organization = Organisation
+settings-nav-account = Konto
+account-title = Konto
+account-sessions-title = Sitzungen
+account-sessions-text = Haben Sie ein Gerät verloren, oder meldet sich jemand anderes mit Ihrem Konto an? Melden Sie sich überall ab. Danach melden Sie sich mit einem neuen Link an.
+account-sign-out-everywhere = Überall abmelden
+account-sign-out-everywhere-title = Überall abmelden?
+account-sign-out-everywhere-text = tada beendet alle Ihre Sitzungen, in jeder Organisation und auf jedem Gerät, auch diese hier. Ihre Mitgliedschaften bleiben.
 telegram-title = Telegram verknüpfen
 telegram-intro = Verknüpfen Sie Ihr Telegram-Konto mit tada, um tada im Chat zu nutzen.
 telegram-steps-title = So geht es

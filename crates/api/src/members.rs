@@ -6,9 +6,9 @@ use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use tada_app::domain::ids::{InvitationId, UserId};
 use tada_app::members::{
-    self as app, Invitation as AppInvitation, InviteMemberError, Invited, ListInvitationsError,
-    ListMembersError, MemberCursor, NewInvitation, OrganizationMember, RemoveMemberError,
-    RevokeInvitationError,
+    self as app, EndSessionsError, Invitation as AppInvitation, InviteMemberError, Invited,
+    ListInvitationsError, ListMembersError, MemberCursor, NewInvitation, OrganizationMember,
+    RemoveMemberError, RevokeInvitationError,
 };
 use tada_app::problem::ProblemCode;
 use utoipa::{IntoParams, ToSchema};
@@ -27,6 +27,7 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
         .routes(routes!(list_members))
         .routes(routes!(remove_member))
+        .routes(routes!(end_member_sessions))
         .routes(routes!(list_invitations, invite_member))
         .routes(routes!(revoke_invitation))
 }
@@ -41,6 +42,10 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         (
             "remove_member",
             codes(&[AUTHENTICATED, PATH, JSON_BODY, RemoveMemberError::CODES]),
+        ),
+        (
+            "end_member_sessions",
+            codes(&[AUTHENTICATED, PATH, EndSessionsError::CODES]),
         ),
         (
             "invite_member",
@@ -214,7 +219,8 @@ async fn list_members(
 ///
 /// Owners and admins remove members; only an owner removes an owner. Each member can leave.
 /// The last owner and the only event manager of an event stay: this gives `invalid-transition`.
-/// The member loses access with the next request.
+/// The removal ends all sessions and the Telegram link of the member, in each organization, and
+/// revokes the pending invitations that the member created.
 #[utoipa::path(
     post,
     path = "/members/{user_id}/remove",
@@ -374,4 +380,35 @@ mod tests {
             );
         }
     }
+}
+
+/// Ends all sessions of a member, in each organization, without a removal: for example after a
+/// session theft. The membership stays, and the member signs in again with a magic link.
+///
+/// Owners and admins end the sessions of members up to their own role; only an owner ends the
+/// sessions of an owner. A member ends the own sessions with `/session/sign-out-everywhere`.
+#[utoipa::path(
+    post,
+    path = "/members/{user_id}/sessions/end",
+    operation_id = "end_member_sessions",
+    tag = "members",
+    params(("user_id" = Uuid, Path, description = "The ID of the member.")),
+    responses(
+        (status = NO_CONTENT, description = "The member has no session any more."),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn end_member_sessions(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+    Path(user_id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    app::end_sessions(
+        &caller,
+        UserId::from_uuid(user_id),
+        state.members.as_ref(),
+        state.identity.as_ref(),
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
 }

@@ -14,6 +14,7 @@ use crate::access::Principal;
 use crate::audit::{AuditAction, AuditEvent, AuditRole};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
+use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
@@ -247,6 +248,16 @@ pub trait MemberStore: Debug + Send + Sync {
         audit: &AuditEvent,
     ) -> Result<bool, StoreError>;
 
+    /// Ends all sessions of `member`, in each organization, and deletes the magic links of `member`,
+    /// if `member` is a member of the organization of `scope`. Records `audit` in the same
+    /// transaction. Returns false if `member` is no member.
+    async fn end_sessions(
+        &self,
+        scope: OrgScope,
+        member: UserId,
+        audit: &AuditEvent,
+    ) -> Result<bool, StoreError>;
+
     /// Removes the organization membership of `member` with its event memberships and its API tokens, if
     /// `remover` allows it for the locked rows. The same transaction ends all sessions and the Telegram
     /// link of `member`, in each organization, and revokes the pending invitations that `member` created, at `now`, with an
@@ -391,6 +402,43 @@ impl RevokeInvitationError {
 }
 
 impl CommandError for RevokeInvitationError {
+    fn code(&self) -> ProblemCode {
+        match self {
+            Self::NotFound => ProblemCode::NotFound,
+            Self::Forbidden => ProblemCode::Forbidden,
+            Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EndSessionsError {
+    #[error("the user is not a member of the organization")]
+    NotFound,
+    #[error("the caller cannot end the sessions of this member")]
+    Forbidden,
+    #[error(transparent)]
+    Store(#[from] StoreError),
+}
+
+impl EndSessionsError {
+    /// All codes that this command can return, for the API contract (ADR 0037).
+    pub const CODES: &[ProblemCode] = &[
+        ProblemCode::NotFound,
+        ProblemCode::Forbidden,
+        ProblemCode::Unavailable,
+        ProblemCode::Internal,
+    ];
+}
+
+impl CommandError for EndSessionsError {
     fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
@@ -621,6 +669,45 @@ pub async fn revoke_invitation(
         Ok(())
     } else {
         Err(RevokeInvitationError::NotFound)
+    }
+}
+
+/// Ends all sessions of `member`, in each organization, without a removal: the remedy for a stolen
+/// session, also for the last owner and the only event manager, whom a removal refuses.
+///
+/// Each member ends the own sessions ("sign out everywhere"), the current one included. Owners and
+/// admins end the sessions of members up to their own role: only an owner ends the sessions of an
+/// owner (ADR 0056). The membership, the API tokens and the Telegram link stay.
+pub async fn end_sessions(
+    caller: &MemberCaller,
+    member: UserId,
+    store: &dyn MemberStore,
+    identity: &dyn IdentityStore,
+) -> Result<(), EndSessionsError> {
+    let scope = caller.scope();
+    if member != caller.user_id() {
+        if !caller.organization_role().is_owner_or_admin() {
+            return Err(EndSessionsError::Forbidden);
+        }
+        let role = identity
+            .membership(scope, member)
+            .await?
+            .ok_or(EndSessionsError::NotFound)?;
+        if !manages(caller.organization_role(), role) {
+            return Err(EndSessionsError::Forbidden);
+        }
+    }
+    let audit = AuditEvent::new(
+        caller.actor(),
+        AuditAction::OrganizationMembershipEndSessions,
+        Some(scope.organization_id().as_uuid()),
+        Some(scope),
+    )
+    .about(member);
+    if store.end_sessions(scope, member, &audit).await? {
+        Ok(())
+    } else {
+        Err(EndSessionsError::NotFound)
     }
 }
 
@@ -893,6 +980,15 @@ mod tests {
             _: OrgScope,
             _: InvitationId,
             _: Timestamp,
+            _: &AuditEvent,
+        ) -> Result<bool, StoreError> {
+            unreachable!()
+        }
+
+        async fn end_sessions(
+            &self,
+            _: OrgScope,
+            _: UserId,
             _: &AuditEvent,
         ) -> Result<bool, StoreError> {
             unreachable!()

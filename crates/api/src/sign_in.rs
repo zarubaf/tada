@@ -10,6 +10,7 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use tada_app::domain::ids::OrganizationId;
 use tada_app::identity::Membership;
+use tada_app::members::{self, EndSessionsError};
 use tada_app::problem::ProblemCode;
 use tada_app::session::{self, ChooseOrganizationError, SessionError};
 use tada_app::sign_in::{self as app, Accepted, RequestSignInError, SignInError};
@@ -21,8 +22,10 @@ use uuid::Uuid;
 
 use crate::ApiState;
 use crate::client_ip::ClientIp;
-use crate::contract::{JSON_BODY, codes};
-use crate::extract::{Json, SessionToken, expired_session_cookie, request_id, session_cookie};
+use crate::contract::{AUTHENTICATED, JSON_BODY, codes};
+use crate::extract::{
+    Caller, Json, SessionToken, expired_session_cookie, request_id, session_cookie,
+};
 use crate::problem::{ApiError, Problem};
 use crate::roles::OrganizationRole;
 
@@ -34,6 +37,7 @@ pub(crate) fn routes() -> OpenApiRouter<ApiState> {
         .routes(routes!(get_session))
         .routes(routes!(choose_organization))
         .routes(routes!(sign_out))
+        .routes(routes!(sign_out_everywhere))
         .routes(routes!(preview_invitation))
         .routes(routes!(accept_invitation))
 }
@@ -62,6 +66,10 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
             ]),
         ),
         ("sign_out", codes(&[StoreError::CODES])),
+        (
+            "sign_out_everywhere",
+            codes(&[AUTHENTICATED, EndSessionsError::CODES]),
+        ),
         (
             "preview_invitation",
             codes(&[JSON_BODY, SignInError::CODES]),
@@ -354,6 +362,37 @@ async fn sign_out(
     if let Some(token) = token {
         session::sign_out(token.as_str(), state.sessions.as_ref()).await?;
     }
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    response
+        .headers_mut()
+        .insert(header::SET_COOKIE, expired_session_cookie()?);
+    Ok(response)
+}
+
+/// Signs out everywhere: ends all sessions of the member, in each organization, the current one
+/// included, and clears the cookie. The remedy for a stolen session; the member signs in again
+/// with a magic link.
+#[utoipa::path(
+    post,
+    path = "/session/sign-out-everywhere",
+    operation_id = "sign_out_everywhere",
+    tag = "sign-in",
+    responses(
+        (status = NO_CONTENT, description = "All sessions of the member ended."),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn sign_out_everywhere(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+) -> Result<Response, ApiError> {
+    members::end_sessions(
+        &caller,
+        caller.user_id(),
+        state.members.as_ref(),
+        state.identity.as_ref(),
+    )
+    .await?;
     let mut response = StatusCode::NO_CONTENT.into_response();
     response
         .headers_mut()

@@ -172,6 +172,23 @@ describe("MembersPage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("ends the sessions of a member after a confirmation, and the member stays", async () => {
+    const { calls } = setup({
+      answers: { "POST /sessions/end": () => new Response(null, { status: 204 }) },
+    });
+
+    await user.click(
+      await screen.findByRole("button", { name: "Sitzungen von Bernd Beispiel beenden" }),
+    );
+    const dialog = await screen.findByRole("alertdialog", { name: "Sitzungen beenden?" });
+    expect(dialog).toHaveTextContent("bleibt Mitglied");
+    await user.click(within(dialog).getByRole("button", { name: "Sitzungen beenden" }));
+
+    expect(await screen.findByText("Sitzungen von Bernd Beispiel beendet.")).toBeInTheDocument();
+    expect(calls.some((c) => c.call === "POST /api/v1/members/u2/sessions/end")).toBe(true);
+    expect(screen.getByText("Bernd Beispiel")).toBeInTheDocument();
+  });
+
   it("keeps the live regions in the page from the start", async () => {
     setup({});
 

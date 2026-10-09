@@ -16,6 +16,8 @@ pub enum AuditAction {
     /// A new invitation of the same email address revoked a pending invitation (ADR 0008).
     InvitationReplace,
     OrganizationMembershipRemove,
+    /// A member ended all own sessions, or an owner or admin ended all sessions of a member.
+    OrganizationMembershipEndSessions,
     EventCreate,
     EventMembershipAdd,
     EventMembershipChangeRole,
@@ -71,6 +73,7 @@ impl AuditAction {
             Self::InvitationAccept => "invitation.accept",
             Self::InvitationReplace => "invitation.replace",
             Self::OrganizationMembershipRemove => "organization_membership.remove",
+            Self::OrganizationMembershipEndSessions => "organization_membership.end_sessions",
             Self::EventCreate => "event.create",
             Self::EventMembershipAdd => "event_membership.add",
             Self::EventMembershipChangeRole => "event_membership.change_role",
@@ -110,7 +113,9 @@ impl AuditAction {
             | Self::InvitationReplace => "invitation",
             // An organization membership has no ID of its own: the record ID is its organization,
             // and the subject is its member.
-            Self::OrganizationMembershipRemove => "organization_membership",
+            Self::OrganizationMembershipRemove | Self::OrganizationMembershipEndSessions => {
+                "organization_membership"
+            }
             Self::EventCreate => "event",
             // An event membership has no ID of its own: the record ID is its event,
             // and the subject is its member.

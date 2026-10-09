@@ -680,6 +680,15 @@ mod tests {
             unreachable!()
         }
 
+        async fn end_sessions(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::UserId,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
         async fn remove(
             &self,
             _: tada_app::caller::OrgScope,

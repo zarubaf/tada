@@ -37,7 +37,10 @@ interface Loadable<T> {
 const loading = <T,>(): Loadable<T> => ({ kind: "loading", items: [] });
 
 /** What the member confirms: the removal of a member or the revocation of an invitation. */
-type Confirming = { kind: "member"; item: Member } | { kind: "invitation"; item: Invitation };
+type Confirming =
+  | { kind: "member"; item: Member }
+  | { kind: "sessions"; item: Member }
+  | { kind: "invitation"; item: Invitation };
 
 /**
  * „Mitglieder“ in the settings: the members, and for owners and admins the pending invitations
@@ -180,7 +183,17 @@ export function MembersPage({ api }: { api: Api }) {
     setConfirmation(undefined);
     setBusy(true);
     try {
-      if (confirming.kind === "member") {
+      if (confirming.kind === "sessions") {
+        const { item } = confirming;
+        const { response, error } = await api.POST("/api/v1/members/{user_id}/sessions/end", {
+          params: { path: { user_id: item.user_id } },
+        });
+        if (response.ok) {
+          setConfirmation(t("members-end-sessions-ended", { name: item.display_name }));
+        } else {
+          fail({ error, response });
+        }
+      } else if (confirming.kind === "member") {
         const { item } = confirming;
         const { response, error } = await api.POST("/api/v1/members/{user_id}/remove", {
           params: { path: { user_id: item.user_id } },
@@ -242,13 +255,22 @@ export function MembersPage({ api }: { api: Api }) {
           </Button>
         ) : (
           canRemove(role, member.role) && (
-            <Button
-              variant="danger"
-              aria-label={t("members-remove-of", { name: member.display_name })}
-              onPress={() => setConfirming({ kind: "member", item: member })}
-            >
-              {t("members-remove")}
-            </Button>
+            <div className={styles.rowActions}>
+              {/* The remedy for a stolen session, also where a removal is not possible. */}
+              <Button
+                aria-label={t("members-end-sessions-of", { name: member.display_name })}
+                onPress={() => setConfirming({ kind: "sessions", item: member })}
+              >
+                {t("members-end-sessions")}
+              </Button>
+              <Button
+                variant="danger"
+                aria-label={t("members-remove-of", { name: member.display_name })}
+                onPress={() => setConfirming({ kind: "member", item: member })}
+              >
+                {t("members-remove")}
+              </Button>
+            </div>
           )
         ),
     },
@@ -310,17 +332,23 @@ export function MembersPage({ api }: { api: Api }) {
         text: t("invitations-revoke-text", { name }),
         confirm: t("invitations-revoke"),
       }
-    : leaving
+    : confirming?.kind === "sessions"
       ? {
-          title: t("members-leave-title"),
-          text: t("members-leave-text"),
-          confirm: t("members-leave"),
+          title: t("members-end-sessions-title"),
+          text: t("members-end-sessions-text", { name }),
+          confirm: t("members-end-sessions"),
         }
-      : {
-          title: t("members-remove-title"),
-          text: t("members-remove-text", { name }),
-          confirm: t("members-remove"),
-        };
+      : leaving
+        ? {
+            title: t("members-leave-title"),
+            text: t("members-leave-text"),
+            confirm: t("members-leave"),
+          }
+        : {
+            title: t("members-remove-title"),
+            text: t("members-remove-text", { name }),
+            confirm: t("members-remove"),
+          };
 
   return (
     <div className={styles.page}>

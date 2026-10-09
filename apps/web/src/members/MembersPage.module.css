@@ -34,6 +34,12 @@
   }
 
   /* The primary action is full width in a narrow form and on the right in a wide one (ADR 0019). */
+  .rowActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
   .actions {
     display: grid;
   }

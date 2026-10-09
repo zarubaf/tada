@@ -637,6 +637,38 @@
         ]
       }
     },
+    "/api/v1/session/sign-out-everywhere": {
+      "post": {
+        "tags": [
+          "sign-in"
+        ],
+        "summary": "Signs out everywhere: ends all sessions of the member, in each organization, the current one\nincluded, and clears the cookie. The remedy for a stolen session; the member signs in again\nwith a magic link.",
+        "operationId": "sign_out_everywhere",
+        "responses": {
+          "204": {
+            "description": "All sessions of the member ended."
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/invitations/preview": {
       "post": {
         "tags": [
@@ -1066,7 +1098,7 @@
           "members"
         ],
         "summary": "Removes a member from the organization, with all event memberships and API tokens of the member.",
-        "description": "Owners and admins remove members; only an owner removes an owner. Each member can leave.\nThe last owner and the only event manager of an event stay: this gives `invalid-transition`.\nThe member loses access with the next request.",
+        "description": "Owners and admins remove members; only an owner removes an owner. Each member can leave.\nThe last owner and the only event manager of an event stay: this gives `invalid-transition`.\nThe removal ends all sessions and the Telegram link of the member, in each organization, and\nrevokes the pending invitations that the member created.",
         "operationId": "remove_member",
         "parameters": [
           {
@@ -1115,6 +1147,52 @@
           "invalid-transition",
           "payload-too-large",
           "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/members/{user_id}/sessions/end": {
+      "post": {
+        "tags": [
+          "members"
+        ],
+        "summary": "Ends all sessions of a member, in each organization, without a removal: for example after a\nsession theft. The membership stays, and the member signs in again with a magic link.",
+        "description": "Owners and admins end the sessions of members up to their own role; only an owner ends the\nsessions of an owner. A member ends the own sessions with `/session/sign-out-everywhere`.",
+        "operationId": "end_member_sessions",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The ID of the member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The member has no session any more."
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
           "unavailable",
           "internal"
         ]

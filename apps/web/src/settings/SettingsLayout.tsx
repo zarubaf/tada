@@ -15,6 +15,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
         <NavLink to="/settings/telegram">{t("settings-nav-telegram")}</NavLink>
         <NavLink to="/settings/tokens">{t("settings-nav-tokens")}</NavLink>
         <NavLink to="/settings/organization">{t("settings-nav-organization")}</NavLink>
+        <NavLink to="/settings/account">{t("settings-nav-account")}</NavLink>
       </SubNav>
       {children}
     </Page>
