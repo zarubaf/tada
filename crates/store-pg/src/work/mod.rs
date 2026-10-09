@@ -21,11 +21,11 @@ use tada_app::domain::work::{
     FirmReason,
 };
 use tada_app::parties::PartyRef;
+use tada_app::records::{Changed, Created, NumberCursor};
 use tada_app::store::StoreError;
 use tada_app::work::{
     ActionFields, ActionView, CommitmentFields, CommitmentView, InEvent, MyWork, NewActionRecord,
-    NewCommitmentRecord, RecordEvidenceView, WorkChanged, WorkCreated, WorkCursor, WorkFilter,
-    WorkStore,
+    NewCommitmentRecord, RecordEvidenceView, WorkFilter, WorkStore,
 };
 
 use crate::Database;
@@ -226,7 +226,7 @@ impl Select {
 }
 
 /// The first number that a page starts after. A cursor beyond the largest number gives an empty page.
-fn after_number(after: Option<WorkCursor>) -> i64 {
+fn after_number(after: Option<NumberCursor>) -> i64 {
     after.map_or(0, |cursor| i64::try_from(cursor.0).unwrap_or(i64::MAX))
 }
 
@@ -588,11 +588,11 @@ impl WorkStore for Database {
         action: &NewActionRecord,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkCreated<ActionView>, StoreError> {
+    ) -> Result<Created<ActionView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         match insert_action(&mut tx, scope, action, at).await {
             Ok(_) => {}
-            Err(error) if violates(&error, "action_pkey") => return Ok(WorkCreated::IdTaken),
+            Err(error) if violates(&error, "action_pkey") => return Ok(Created::IdTaken),
             Err(error) => return Err(store_error(error)),
         }
         audit::record(&mut tx, audit).await.map_err(store_error)?;
@@ -601,7 +601,7 @@ impl WorkStore for Database {
             .map_err(store_error)?
             .ok_or(InvalidRow("action"))?;
         tx.commit().await.map_err(store_error)?;
-        Ok(WorkCreated::Created(view))
+        Ok(Created::Created(view))
     }
 
     async fn change_action(
@@ -613,7 +613,7 @@ impl WorkStore for Database {
         expected: RecordVersion,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkChanged<ActionView>, StoreError> {
+    ) -> Result<Changed<ActionView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         let updated = update_action(&mut tx, scope, event, id, fields, expected, at)
             .await
@@ -622,14 +622,14 @@ impl WorkStore for Database {
             .await
             .map_err(store_error)?;
         let Some(view) = current else {
-            return Ok(WorkChanged::NotFound);
+            return Ok(Changed::NotFound);
         };
         if updated.is_none() {
-            return Ok(WorkChanged::VersionConflict);
+            return Ok(Changed::VersionConflict);
         }
         audit::record(&mut tx, audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
-        Ok(WorkChanged::Changed(view))
+        Ok(Changed::Changed(view))
     }
 
     async fn action(
@@ -663,11 +663,11 @@ impl WorkStore for Database {
         commitment: &NewCommitmentRecord,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkCreated<CommitmentView>, StoreError> {
+    ) -> Result<Created<CommitmentView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         match insert_commitment(&mut tx, scope, commitment, at).await {
             Ok(_) => {}
-            Err(error) if violates(&error, "commitment_pkey") => return Ok(WorkCreated::IdTaken),
+            Err(error) if violates(&error, "commitment_pkey") => return Ok(Created::IdTaken),
             Err(error) => return Err(store_error(error)),
         }
         audit::record(&mut tx, audit).await.map_err(store_error)?;
@@ -676,7 +676,7 @@ impl WorkStore for Database {
             .map_err(store_error)?
             .ok_or(InvalidRow("commitment"))?;
         tx.commit().await.map_err(store_error)?;
-        Ok(WorkCreated::Created(view))
+        Ok(Created::Created(view))
     }
 
     async fn change_commitment(
@@ -688,7 +688,7 @@ impl WorkStore for Database {
         expected: RecordVersion,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkChanged<CommitmentView>, StoreError> {
+    ) -> Result<Changed<CommitmentView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         let updated = update_commitment(&mut tx, scope, event, id, fields, expected, at)
             .await
@@ -697,14 +697,14 @@ impl WorkStore for Database {
             .await
             .map_err(store_error)?;
         let Some(view) = current else {
-            return Ok(WorkChanged::NotFound);
+            return Ok(Changed::NotFound);
         };
         if updated.is_none() {
-            return Ok(WorkChanged::VersionConflict);
+            return Ok(Changed::VersionConflict);
         }
         audit::record(&mut tx, audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
-        Ok(WorkChanged::Changed(view))
+        Ok(Changed::Changed(view))
     }
 
     async fn commitment(

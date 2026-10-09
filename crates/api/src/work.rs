@@ -13,9 +13,10 @@ use tada_app::domain::work::{
     ActionStatus as DomainActionStatus, CommitmentStatus as DomainStatus,
 };
 use tada_app::problem::ProblemCode;
+use tada_app::records::NumberCursor;
 use tada_app::work::{
     self as app, ActionChange, ActionView, CommitmentChange, CommitmentView, FirmInput, InEvent,
-    NewAction, NewCommitment, RecordEvidenceView, WorkCursor, WorkError, WorkPorts, WorkQuery,
+    NewAction, NewCommitment, RecordEvidenceView, WorkError, WorkPorts, WorkQuery,
 };
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -429,14 +430,14 @@ pub struct MakeFirmRequest {
     pub expected_version: i64,
 }
 
-fn encode_cursor(cursor: &WorkCursor) -> String {
+fn encode_cursor(cursor: &NumberCursor) -> String {
     cursor::encode(cursor.0.to_string())
 }
 
-fn decode_cursor(text: &str) -> Result<WorkCursor, ApiError> {
+fn decode_cursor(text: &str) -> Result<NumberCursor, ApiError> {
     cursor::decode_text(text)?
         .parse()
-        .map(WorkCursor)
+        .map(NumberCursor)
         .map_err(|_| cursor::invalid())
 }
 

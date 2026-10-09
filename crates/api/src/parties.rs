@@ -5,10 +5,11 @@ use axum::http::StatusCode;
 use serde::{Deserialize, Deserializer, Serialize};
 use tada_app::domain::ids::{InstitutionId, PersonId, UserId};
 use tada_app::parties::{
-    self as app, InstitutionChange, InstitutionView, NewInstitution, NewPerson, PartyCursor,
-    PartyError, PartyReadError, PersonChange, PersonView,
+    self as app, InstitutionChange, InstitutionView, NewInstitution, NewPerson, PartyError,
+    PartyReadError, PersonChange, PersonView,
 };
 use tada_app::problem::ProblemCode;
+use tada_app::records::NumberCursor;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -216,14 +217,14 @@ pub struct ChangeInstitutionRequest {
     pub expected_version: i64,
 }
 
-fn encode_cursor(cursor: &PartyCursor) -> String {
+fn encode_cursor(cursor: &NumberCursor) -> String {
     cursor::encode(cursor.0.to_string())
 }
 
-fn decode_cursor(text: &str) -> Result<PartyCursor, ApiError> {
+fn decode_cursor(text: &str) -> Result<NumberCursor, ApiError> {
     cursor::decode_text(text)?
         .parse()
-        .map(PartyCursor)
+        .map(NumberCursor)
         .map_err(|_| cursor::invalid())
 }
 

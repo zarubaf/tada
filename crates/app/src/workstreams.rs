@@ -5,17 +5,18 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use jiff::Timestamp;
 use tada_domain::RecordVersion;
-use tada_domain::ids::{self, EventId, UserId, WorkstreamId};
+use tada_domain::ids::{EventId, UserId, WorkstreamId};
 use tada_domain::work::{WorkstreamName, WorkstreamStatus};
 use uuid::Uuid;
 
-use crate::access::{self, AccessError, EventAccess};
+use crate::access::{self, AccessError, EventAccess, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::IdentityStore;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::text_error_code;
+use crate::records;
 use crate::store::StoreError;
 
 /// A workstream of an event.
@@ -212,15 +213,6 @@ fn parse_name(name: &str) -> Result<WorkstreamName, WorkstreamError> {
     WorkstreamName::parse(name).map_err(|error| invalid("name", text_error_code(error)))
 }
 
-fn audit(caller: &MemberCaller, action: AuditAction, id: WorkstreamId) -> AuditEvent {
-    AuditEvent::new(
-        caller.actor(),
-        action,
-        Some(id.as_uuid()),
-        Some(caller.scope()),
-    )
-}
-
 /// Creates a workstream in the event. Only event managers do this.
 pub async fn create_workstream(
     caller: &MemberCaller,
@@ -231,11 +223,9 @@ pub async fn create_workstream(
     clock: &dyn Clock,
 ) -> Result<Workstream, WorkstreamError> {
     require_manager(caller, event, identity).await?;
-    let id = match input.id {
-        Some(id) if !ids::is_record_id(id) => return Err(invalid("id", "not-uuid-v7")),
-        Some(id) => WorkstreamId::from_uuid(id),
-        None => WorkstreamId::from_uuid(Uuid::now_v7()),
-    };
+    let id = WorkstreamId::from_uuid(
+        records::record_id(input.id).map_err(|error| WorkstreamError::Invalid(vec![error]))?,
+    );
     let name = parse_name(&input.name)?;
     check_lead(caller.scope(), event, input.lead, identity).await?;
     let workstream = Workstream {
@@ -246,7 +236,7 @@ pub async fn create_workstream(
         status: WorkstreamStatus::Active,
         version: RecordVersion::FIRST,
     };
-    let audit = audit(caller, AuditAction::WorkstreamCreate, id);
+    let audit = records::audit(caller, AuditAction::WorkstreamCreate, id.as_uuid());
     match store
         .create(caller.scope(), &workstream, clock.now(), &audit)
         .await?
@@ -277,7 +267,7 @@ pub async fn change_workstream(
         lead: change.lead,
         status: change.status,
     };
-    let audit = audit(caller, AuditAction::WorkstreamChange, id);
+    let audit = records::audit(caller, AuditAction::WorkstreamChange, id.as_uuid());
     match store
         .change(
             caller.scope(),
@@ -299,7 +289,7 @@ pub async fn change_workstream(
 
 /// The workstreams of the event. Each reader of the event sees them.
 pub async fn list_workstreams(
-    caller: &MemberCaller,
+    caller: &impl Principal,
     event: EventId,
     identity: &dyn IdentityStore,
     store: &dyn WorkstreamStore,

@@ -1080,7 +1080,7 @@ mod tests {
             _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<
-            tada_app::parties::PartyChanged<tada_app::parties::PersonView>,
+            tada_app::records::Changed<tada_app::parties::PersonView>,
             tada_app::store::StoreError,
         > {
             unreachable!()
@@ -1098,7 +1098,7 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: Option<&str>,
-            _: Option<tada_app::parties::PartyCursor>,
+            _: Option<tada_app::records::NumberCursor>,
             _: u32,
         ) -> Result<Vec<tada_app::parties::PersonView>, tada_app::store::StoreError> {
             unreachable!()
@@ -1124,7 +1124,7 @@ mod tests {
             _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<
-            tada_app::parties::PartyChanged<tada_app::parties::InstitutionView>,
+            tada_app::records::Changed<tada_app::parties::InstitutionView>,
             tada_app::store::StoreError,
         > {
             unreachable!()
@@ -1143,7 +1143,7 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: Option<&str>,
-            _: Option<tada_app::parties::PartyCursor>,
+            _: Option<tada_app::records::NumberCursor>,
             _: u32,
         ) -> Result<Vec<tada_app::parties::InstitutionView>, tada_app::store::StoreError> {
             unreachable!()
@@ -1217,7 +1217,7 @@ mod tests {
             _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<
-            tada_app::work::WorkCreated<tada_app::work::ActionView>,
+            tada_app::records::Created<tada_app::work::ActionView>,
             tada_app::store::StoreError,
         > {
             unreachable!()
@@ -1233,7 +1233,7 @@ mod tests {
             _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<
-            tada_app::work::WorkChanged<tada_app::work::ActionView>,
+            tada_app::records::Changed<tada_app::work::ActionView>,
             tada_app::store::StoreError,
         > {
             unreachable!()
@@ -1264,7 +1264,7 @@ mod tests {
             _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<
-            tada_app::work::WorkCreated<tada_app::work::CommitmentView>,
+            tada_app::records::Created<tada_app::work::CommitmentView>,
             tada_app::store::StoreError,
         > {
             unreachable!()
@@ -1280,7 +1280,7 @@ mod tests {
             _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<
-            tada_app::work::WorkChanged<tada_app::work::CommitmentView>,
+            tada_app::records::Changed<tada_app::work::CommitmentView>,
             tada_app::store::StoreError,
         > {
             unreachable!()

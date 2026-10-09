@@ -139,20 +139,20 @@ impl PartyStore for Memory {
         expected: RecordVersion,
         _: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<PartyChanged<PersonView>, StoreError> {
+    ) -> Result<Changed<PersonView>, StoreError> {
         let mut persons = self.persons.lock().unwrap();
         let Some(person) = persons.iter_mut().find(|person| person.id == id) else {
-            return Ok(PartyChanged::NotFound);
+            return Ok(Changed::NotFound);
         };
         if person.version != expected {
-            return Ok(PartyChanged::VersionConflict);
+            return Ok(Changed::VersionConflict);
         }
         person.name = fields.name.clone();
         person.email = fields.email.clone();
         person.phone = fields.phone.clone();
         person.version = RecordVersion::new(person.version.get() + 1).unwrap();
         self.audit.lock().unwrap().push(audit.clone());
-        Ok(PartyChanged::Changed(person.clone()))
+        Ok(Changed::Changed(person.clone()))
     }
 
     async fn person(&self, _: OrgScope, id: PersonId) -> Result<Option<PersonView>, StoreError> {
@@ -164,7 +164,7 @@ impl PartyStore for Memory {
         &self,
         _: OrgScope,
         query: Option<&str>,
-        after: Option<PartyCursor>,
+        after: Option<NumberCursor>,
         limit: u32,
     ) -> Result<Vec<PersonView>, StoreError> {
         let persons = self.persons.lock().unwrap();
@@ -210,13 +210,13 @@ impl PartyStore for Memory {
         expected: RecordVersion,
         _: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<PartyChanged<InstitutionView>, StoreError> {
+    ) -> Result<Changed<InstitutionView>, StoreError> {
         let mut institutions = self.institutions.lock().unwrap();
         let Some(found) = institutions.iter_mut().find(|found| found.id == id) else {
-            return Ok(PartyChanged::NotFound);
+            return Ok(Changed::NotFound);
         };
         if found.version != expected {
-            return Ok(PartyChanged::VersionConflict);
+            return Ok(Changed::VersionConflict);
         }
         found.name = fields.name.clone();
         found.kind = fields.kind;
@@ -224,7 +224,7 @@ impl PartyStore for Memory {
         found.phone = fields.phone.clone();
         found.version = RecordVersion::new(found.version.get() + 1).unwrap();
         self.audit.lock().unwrap().push(audit.clone());
-        Ok(PartyChanged::Changed(found.clone()))
+        Ok(Changed::Changed(found.clone()))
     }
 
     async fn institution(
@@ -240,7 +240,7 @@ impl PartyStore for Memory {
         &self,
         _: OrgScope,
         _: Option<&str>,
-        after: Option<PartyCursor>,
+        after: Option<NumberCursor>,
         limit: u32,
     ) -> Result<Vec<InstitutionView>, StoreError> {
         let institutions = self.institutions.lock().unwrap();
@@ -505,7 +505,7 @@ async fn the_list_filters_by_name_and_pages_by_number() {
     .await
     .unwrap();
     assert_eq!(all.items.len(), 2);
-    assert_eq!(all.next, Some(PartyCursor(2)));
+    assert_eq!(all.next, Some(NumberCursor(2)));
     let rest = list_persons(
         &anna(),
         None,

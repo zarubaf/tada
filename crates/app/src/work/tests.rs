@@ -10,10 +10,11 @@ use super::*;
 use crate::audit::AuditAction;
 use crate::caller::MemberCaller;
 use crate::identity::{Membership, UserRef};
-use crate::parties::{
-    InstitutionFields, InstitutionView, PartyChanged, PartyCursor, PersonFields, PersonView,
+use crate::parties::{InstitutionFields, InstitutionView, PersonFields, PersonView};
+use crate::records::{Changed, Created, NumberCursor};
+use crate::workstreams::{
+    Changed as WorkstreamChanged, Created as WorkstreamCreated, Workstream, WorkstreamUpdate,
 };
-use crate::workstreams::{Changed, Created, Workstream, WorkstreamUpdate};
 use uuid::Uuid;
 
 fn testwil() -> OrganizationId {
@@ -178,7 +179,7 @@ impl WorkstreamStore for Memory {
         _: &Workstream,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<Created, StoreError> {
+    ) -> Result<WorkstreamCreated, StoreError> {
         unreachable!()
     }
 
@@ -191,7 +192,7 @@ impl WorkstreamStore for Memory {
         _: RecordVersion,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<Changed, StoreError> {
+    ) -> Result<WorkstreamChanged, StoreError> {
         unreachable!()
     }
 
@@ -247,7 +248,7 @@ impl PartyStore for Memory {
         _: RecordVersion,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<PartyChanged<PersonView>, StoreError> {
+    ) -> Result<Changed<PersonView>, StoreError> {
         unreachable!()
     }
 
@@ -271,7 +272,7 @@ impl PartyStore for Memory {
         &self,
         _: OrgScope,
         _: Option<&str>,
-        _: Option<PartyCursor>,
+        _: Option<NumberCursor>,
         _: u32,
     ) -> Result<Vec<PersonView>, StoreError> {
         unreachable!()
@@ -296,7 +297,7 @@ impl PartyStore for Memory {
         _: RecordVersion,
         _: Timestamp,
         _: &AuditEvent,
-    ) -> Result<PartyChanged<InstitutionView>, StoreError> {
+    ) -> Result<Changed<InstitutionView>, StoreError> {
         unreachable!()
     }
 
@@ -312,7 +313,7 @@ impl PartyStore for Memory {
         &self,
         _: OrgScope,
         _: Option<&str>,
-        _: Option<PartyCursor>,
+        _: Option<NumberCursor>,
         _: u32,
     ) -> Result<Vec<InstitutionView>, StoreError> {
         unreachable!()
@@ -335,10 +336,10 @@ impl WorkStore for Memory {
         action: &NewActionRecord,
         _: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkCreated<ActionView>, StoreError> {
+    ) -> Result<Created<ActionView>, StoreError> {
         let mut all = self.actions.lock().unwrap();
         if all.iter().any(|known| known.id == action.id) {
-            return Ok(WorkCreated::IdTaken);
+            return Ok(Created::IdTaken);
         }
         let view = ActionView {
             id: action.id,
@@ -349,7 +350,7 @@ impl WorkStore for Memory {
         };
         all.push(view.clone());
         self.audit.lock().unwrap().push(audit.action());
-        Ok(WorkCreated::Created(view))
+        Ok(Created::Created(view))
     }
 
     async fn change_action(
@@ -361,21 +362,21 @@ impl WorkStore for Memory {
         expected: RecordVersion,
         _: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkChanged<ActionView>, StoreError> {
+    ) -> Result<Changed<ActionView>, StoreError> {
         let mut all = self.actions.lock().unwrap();
         let Some(known) = all
             .iter_mut()
             .find(|known| known.id == id && known.event_id == event)
         else {
-            return Ok(WorkChanged::NotFound);
+            return Ok(Changed::NotFound);
         };
         if known.version != expected {
-            return Ok(WorkChanged::VersionConflict);
+            return Ok(Changed::VersionConflict);
         }
         known.fields = fields.clone();
         known.version = next(known.version);
         self.audit.lock().unwrap().push(audit.action());
-        Ok(WorkChanged::Changed(known.clone()))
+        Ok(Changed::Changed(known.clone()))
     }
 
     async fn action(
@@ -419,7 +420,7 @@ impl WorkStore for Memory {
         commitment: &NewCommitmentRecord,
         _: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkCreated<CommitmentView>, StoreError> {
+    ) -> Result<Created<CommitmentView>, StoreError> {
         let mut all = self.commitments.lock().unwrap();
         let Party::Person(person) = commitment.promisor else {
             unreachable!()
@@ -440,7 +441,7 @@ impl WorkStore for Memory {
         };
         all.push(view.clone());
         self.audit.lock().unwrap().push(audit.action());
-        Ok(WorkCreated::Created(view))
+        Ok(Created::Created(view))
     }
 
     async fn change_commitment(
@@ -452,21 +453,21 @@ impl WorkStore for Memory {
         expected: RecordVersion,
         _: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<WorkChanged<CommitmentView>, StoreError> {
+    ) -> Result<Changed<CommitmentView>, StoreError> {
         let mut all = self.commitments.lock().unwrap();
         let Some(known) = all
             .iter_mut()
             .find(|known| known.id == id && known.event_id == event)
         else {
-            return Ok(WorkChanged::NotFound);
+            return Ok(Changed::NotFound);
         };
         if known.version != expected {
-            return Ok(WorkChanged::VersionConflict);
+            return Ok(Changed::VersionConflict);
         }
         known.fields = fields.clone();
         known.version = next(known.version);
         self.audit.lock().unwrap().push(audit.action());
-        Ok(WorkChanged::Changed(known.clone()))
+        Ok(Changed::Changed(known.clone()))
     }
 
     async fn commitment(
@@ -1020,7 +1021,7 @@ async fn a_list_pages_and_filters_by_owner() {
         .await
         .unwrap();
     assert_eq!(first.items.len(), 1);
-    assert_eq!(first.next, Some(WorkCursor(1)));
+    assert_eq!(first.next, Some(NumberCursor(1)));
     let second = list_actions(
         &caller(VIEWER),
         open_day(),

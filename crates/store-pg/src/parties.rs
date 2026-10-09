@@ -12,9 +12,9 @@ use tada_app::domain::identity::Email;
 use tada_app::domain::ids::{InstitutionId, LocalIdKind, PersonId, UserId};
 use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber, normalized_name};
 use tada_app::parties::{
-    InstitutionFields, InstitutionView, PartyChanged, PartyCursor, PartyRef, PartyStore,
-    PersonFields, PersonView, names_match,
+    InstitutionFields, InstitutionView, PartyRef, PartyStore, PersonFields, PersonView, names_match,
 };
+use tada_app::records::{Changed, NumberCursor};
 use tada_app::store::StoreError;
 
 use crate::Database;
@@ -106,7 +106,7 @@ fn filtered<T>(
 }
 
 /// The first number that a page starts after. A cursor beyond the largest number gives an empty page.
-fn after_number(after: Option<PartyCursor>) -> i64 {
+fn after_number(after: Option<NumberCursor>) -> i64 {
     after.map_or(0, |cursor| i64::try_from(cursor.0).unwrap_or(i64::MAX))
 }
 
@@ -208,7 +208,7 @@ impl PartyStore for Database {
         expected: RecordVersion,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<PartyChanged<PersonView>, StoreError> {
+    ) -> Result<Changed<PersonView>, StoreError> {
         let organization = scope.organization_id().as_uuid();
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         let row = sqlx::query_as!(
@@ -238,14 +238,14 @@ impl PartyStore for Database {
             .await
             .map_err(store_error)?;
             return Ok(if exists {
-                PartyChanged::VersionConflict
+                Changed::VersionConflict
             } else {
-                PartyChanged::NotFound
+                Changed::NotFound
             });
         };
         audit::record(&mut tx, audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
-        Ok(PartyChanged::Changed(row.try_into()?))
+        Ok(Changed::Changed(row.try_into()?))
     }
 
     async fn person(
@@ -270,7 +270,7 @@ impl PartyStore for Database {
         &self,
         scope: OrgScope,
         query: Option<&str>,
-        after: Option<PartyCursor>,
+        after: Option<NumberCursor>,
         limit: u32,
     ) -> Result<Vec<PersonView>, StoreError> {
         let rows = sqlx::query_as!(
@@ -325,7 +325,7 @@ impl PartyStore for Database {
         expected: RecordVersion,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<PartyChanged<InstitutionView>, StoreError> {
+    ) -> Result<Changed<InstitutionView>, StoreError> {
         let organization = scope.organization_id().as_uuid();
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         let row = sqlx::query_as!(
@@ -357,14 +357,14 @@ impl PartyStore for Database {
             .await
             .map_err(store_error)?;
             return Ok(if exists {
-                PartyChanged::VersionConflict
+                Changed::VersionConflict
             } else {
-                PartyChanged::NotFound
+                Changed::NotFound
             });
         };
         audit::record(&mut tx, audit).await.map_err(store_error)?;
         tx.commit().await.map_err(store_error)?;
-        Ok(PartyChanged::Changed(row.try_into()?))
+        Ok(Changed::Changed(row.try_into()?))
     }
 
     async fn institution(
@@ -389,7 +389,7 @@ impl PartyStore for Database {
         &self,
         scope: OrgScope,
         query: Option<&str>,
-        after: Option<PartyCursor>,
+        after: Option<NumberCursor>,
         limit: u32,
     ) -> Result<Vec<InstitutionView>, StoreError> {
         let rows = sqlx::query_as!(

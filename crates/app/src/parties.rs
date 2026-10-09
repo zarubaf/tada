@@ -5,7 +5,6 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use jiff::Timestamp;
 use tada_domain::RecordVersion;
-use tada_domain::facts::TextError;
 use tada_domain::identity::{Email, EmailError};
 use tada_domain::ids::{InstitutionId, LocalIdKind, PersonId, UserId};
 use tada_domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber, normalized_name};
@@ -18,6 +17,8 @@ use crate::clock::Clock;
 use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
+use crate::proposals::text_error_code;
+use crate::records::{Changed, Checker, NumberCursor, audit, page};
 use crate::store::StoreError;
 
 /// A person of the organization, as the commands and queries show it.
@@ -86,20 +87,6 @@ pub struct InstitutionFields {
     pub phone: Option<PhoneNumber>,
 }
 
-/// The result of a change in the store.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PartyChanged<T> {
-    Changed(T),
-    /// The organization has no such record.
-    NotFound,
-    /// The record has another version.
-    VersionConflict,
-}
-
-/// The position after the last record of a page: its local number (ADR 0044).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PartyCursor(pub u64);
-
 /// The repository port for persons and institutions. Each method stays inside `scope`.
 /// A create or a change records its audit event in the same transaction.
 #[async_trait]
@@ -124,7 +111,7 @@ pub trait PartyStore: Debug + Send + Sync {
         expected: RecordVersion,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<PartyChanged<PersonView>, StoreError>;
+    ) -> Result<Changed<PersonView>, StoreError>;
 
     async fn person(&self, scope: OrgScope, id: PersonId)
     -> Result<Option<PersonView>, StoreError>;
@@ -135,7 +122,7 @@ pub trait PartyStore: Debug + Send + Sync {
         &self,
         scope: OrgScope,
         query: Option<&str>,
-        after: Option<PartyCursor>,
+        after: Option<NumberCursor>,
         limit: u32,
     ) -> Result<Vec<PersonView>, StoreError>;
 
@@ -158,7 +145,7 @@ pub trait PartyStore: Debug + Send + Sync {
         expected: RecordVersion,
         at: Timestamp,
         audit: &AuditEvent,
-    ) -> Result<PartyChanged<InstitutionView>, StoreError>;
+    ) -> Result<Changed<InstitutionView>, StoreError>;
 
     async fn institution(
         &self,
@@ -171,7 +158,7 @@ pub trait PartyStore: Debug + Send + Sync {
         &self,
         scope: OrgScope,
         query: Option<&str>,
-        after: Option<PartyCursor>,
+        after: Option<NumberCursor>,
         limit: u32,
     ) -> Result<Vec<InstitutionView>, StoreError>;
 
@@ -330,52 +317,32 @@ impl CommandError for PartyReadError {
     }
 }
 
-/// Collects the invalid fields of one input.
-#[derive(Default)]
-struct Checker(Vec<FieldError>);
-
-impl Checker {
-    fn name(&mut self, input: &str) -> Option<PartyName> {
-        PartyName::parse(input)
-            .map_err(|error| self.0.push(FieldError::new("name", text_code(error))))
-            .ok()
-    }
-
-    fn kind(&mut self, input: &str) -> Option<InstitutionKind> {
-        let kind = InstitutionKind::parse(input);
-        if kind.is_none() {
-            self.0.push(FieldError::new("kind", "unknown"));
-        }
-        kind
-    }
-
-    fn email(&mut self, input: Option<&str>) -> Option<Email> {
-        let input = input?;
-        Email::parse(input)
-            .map_err(|error| self.0.push(FieldError::new("email", email_code(error))))
-            .ok()
-    }
-
-    fn phone(&mut self, input: Option<&str>) -> Option<PhoneNumber> {
-        let input = input?;
-        PhoneNumber::parse(input)
-            .map_err(|error| self.0.push(FieldError::new("phone", text_code(error))))
-            .ok()
-    }
-
-    fn finish<T>(self, value: Option<T>) -> Result<T, PartyError> {
-        match value {
-            Some(value) if self.0.is_empty() => Ok(value),
-            _ => Err(PartyError::Invalid(self.0)),
-        }
-    }
+fn parse_name(check: &mut Checker, input: &str) -> Option<PartyName> {
+    check.parse("name", input, PartyName::parse, text_error_code)
 }
 
-fn text_code(error: TextError) -> &'static str {
-    match error {
-        TextError::Empty => "empty",
-        TextError::TooLong => "too-long",
-        TextError::ControlCharacter => "control-character",
+fn parse_kind(check: &mut Checker, input: &str) -> Option<InstitutionKind> {
+    let kind = InstitutionKind::parse(input);
+    if kind.is_none() {
+        check.push("kind", "unknown");
+    }
+    kind
+}
+
+fn parse_email(check: &mut Checker, input: Option<&str>) -> Option<Email> {
+    check.parse("email", input?, Email::parse, email_code)
+}
+
+fn parse_phone(check: &mut Checker, input: Option<&str>) -> Option<PhoneNumber> {
+    check.parse("phone", input?, PhoneNumber::parse, text_error_code)
+}
+
+/// The record of a change, or why the store did not change it.
+fn changed<T>(result: Changed<T>) -> Result<T, PartyError> {
+    match result {
+        Changed::Changed(view) => Ok(view),
+        Changed::NotFound => Err(PartyError::NotFound),
+        Changed::VersionConflict => Err(PartyError::VersionConflict),
     }
 }
 
@@ -431,10 +398,6 @@ async fn require_read(
     }
 }
 
-fn audit(caller: &MemberCaller, action: AuditAction, record: Uuid) -> AuditEvent {
-    AuditEvent::new(caller.actor(), action, Some(record), Some(caller.scope()))
-}
-
 /// Creates a person. A member with the contributor or manager role in any event can do it,
 /// and so can an owner or an admin.
 pub async fn create_person(
@@ -446,15 +409,15 @@ pub async fn create_person(
 ) -> Result<PersonView, PartyError> {
     require_create(caller, identity).await?;
     let mut check = Checker::default();
-    let name = check.name(&input.name);
-    let email = check.email(input.email.as_deref());
-    let phone = check.phone(input.phone.as_deref());
+    let name = parse_name(&mut check, &input.name);
+    let email = parse_email(&mut check, input.email.as_deref());
+    let phone = parse_phone(&mut check, input.phone.as_deref());
     if let Some(user) = input.user_id
         && identity.membership(caller.scope(), user).await?.is_none()
     {
-        check.0.push(FieldError::new("user_id", "unknown-member"));
+        check.push("user_id", "unknown-member");
     }
-    let name = check.finish(name)?;
+    let name = check.finish(name).map_err(PartyError::Invalid)?;
     let id = PersonId::from_uuid(Uuid::now_v7());
     let audit = audit(caller, AuditAction::PersonCreate, id.as_uuid());
     let fields = PersonFields { name, email, phone };
@@ -486,39 +449,36 @@ pub async fn change_person(
     }
     let mut check = Checker::default();
     let name = match &change.name {
-        Some(name) => check.name(name),
+        Some(name) => parse_name(&mut check, name),
         None => Some(current.name.clone()),
     };
     let email = merged(
         &change.email,
         &current.email,
-        |text| check.email(text),
+        |text| parse_email(&mut check, text),
         Email::clone,
     );
     let phone = merged(
         &change.phone,
         &current.phone,
-        |text| check.phone(text),
+        |text| parse_phone(&mut check, text),
         PhoneNumber::clone,
     );
-    let name = check.finish(name)?;
+    let name = check.finish(name).map_err(PartyError::Invalid)?;
     let audit = audit(caller, AuditAction::PersonChange, id.as_uuid());
     let fields = PersonFields { name, email, phone };
-    match store
-        .change_person(
-            scope,
-            id,
-            &fields,
-            change.expected_version,
-            clock.now(),
-            &audit,
-        )
-        .await?
-    {
-        PartyChanged::Changed(person) => Ok(person),
-        PartyChanged::NotFound => Err(PartyError::NotFound),
-        PartyChanged::VersionConflict => Err(PartyError::VersionConflict),
-    }
+    changed(
+        store
+            .change_person(
+                scope,
+                id,
+                &fields,
+                change.expected_version,
+                clock.now(),
+                &audit,
+            )
+            .await?,
+    )
 }
 
 /// The persons whose name contains `query`, in the order of their numbers.
@@ -526,21 +486,17 @@ pub async fn change_person(
 pub async fn list_persons(
     caller: &impl Principal,
     query: Option<&str>,
-    after: Option<PartyCursor>,
+    after: Option<NumberCursor>,
     limit: PageLimit,
     identity: &dyn IdentityStore,
     store: &dyn PartyStore,
-) -> Result<Page<PersonView, PartyCursor>, PartyReadError> {
+) -> Result<Page<PersonView, NumberCursor>, PartyReadError> {
     require_read(caller, identity).await?;
     let query = normalized_query(query);
-    let (items, next) = page(
-        store
-            .persons(caller.scope(), query.as_deref(), after, limit.get() + 1)
-            .await?,
-        limit,
-        |person| person.local_number,
-    );
-    Ok(Page { items, next })
+    let items = store
+        .persons(caller.scope(), query.as_deref(), after, limit.get() + 1)
+        .await?;
+    Ok(page(items, limit, |person| person.local_number))
 }
 
 pub async fn get_person(
@@ -566,11 +522,11 @@ pub async fn create_institution(
 ) -> Result<InstitutionView, PartyError> {
     require_create(caller, identity).await?;
     let mut check = Checker::default();
-    let name = check.name(&input.name);
-    let kind = check.kind(&input.kind);
-    let email = check.email(input.email.as_deref());
-    let phone = check.phone(input.phone.as_deref());
-    let (name, kind) = check.finish(name.zip(kind))?;
+    let name = parse_name(&mut check, &input.name);
+    let kind = parse_kind(&mut check, &input.kind);
+    let email = parse_email(&mut check, input.email.as_deref());
+    let phone = parse_phone(&mut check, input.phone.as_deref());
+    let (name, kind) = check.finish(name.zip(kind)).map_err(PartyError::Invalid)?;
     let id = InstitutionId::from_uuid(Uuid::now_v7());
     let audit = audit(caller, AuditAction::InstitutionCreate, id.as_uuid());
     let fields = InstitutionFields {
@@ -603,26 +559,26 @@ pub async fn change_institution(
     }
     let mut check = Checker::default();
     let name = match &change.name {
-        Some(name) => check.name(name),
+        Some(name) => parse_name(&mut check, name),
         None => Some(current.name.clone()),
     };
     let kind = match &change.kind {
-        Some(kind) => check.kind(kind),
+        Some(kind) => parse_kind(&mut check, kind),
         None => Some(current.kind),
     };
     let email = merged(
         &change.email,
         &current.email,
-        |text| check.email(text),
+        |text| parse_email(&mut check, text),
         Email::clone,
     );
     let phone = merged(
         &change.phone,
         &current.phone,
-        |text| check.phone(text),
+        |text| parse_phone(&mut check, text),
         PhoneNumber::clone,
     );
-    let (name, kind) = check.finish(name.zip(kind))?;
+    let (name, kind) = check.finish(name.zip(kind)).map_err(PartyError::Invalid)?;
     let audit = audit(caller, AuditAction::InstitutionChange, id.as_uuid());
     let fields = InstitutionFields {
         name,
@@ -630,42 +586,35 @@ pub async fn change_institution(
         email,
         phone,
     };
-    match store
-        .change_institution(
-            scope,
-            id,
-            &fields,
-            change.expected_version,
-            clock.now(),
-            &audit,
-        )
-        .await?
-    {
-        PartyChanged::Changed(institution) => Ok(institution),
-        PartyChanged::NotFound => Err(PartyError::NotFound),
-        PartyChanged::VersionConflict => Err(PartyError::VersionConflict),
-    }
+    changed(
+        store
+            .change_institution(
+                scope,
+                id,
+                &fields,
+                change.expected_version,
+                clock.now(),
+                &audit,
+            )
+            .await?,
+    )
 }
 
 /// The institutions whose name contains `query`. The permission is the one of `list_persons`.
 pub async fn list_institutions(
     caller: &impl Principal,
     query: Option<&str>,
-    after: Option<PartyCursor>,
+    after: Option<NumberCursor>,
     limit: PageLimit,
     identity: &dyn IdentityStore,
     store: &dyn PartyStore,
-) -> Result<Page<InstitutionView, PartyCursor>, PartyReadError> {
+) -> Result<Page<InstitutionView, NumberCursor>, PartyReadError> {
     require_read(caller, identity).await?;
     let query = normalized_query(query);
-    let (items, next) = page(
-        store
-            .institutions(caller.scope(), query.as_deref(), after, limit.get() + 1)
-            .await?,
-        limit,
-        |institution| institution.local_number,
-    );
-    Ok(Page { items, next })
+    let items = store
+        .institutions(caller.scope(), query.as_deref(), after, limit.get() + 1)
+        .await?;
+    Ok(page(items, limit, |institution| institution.local_number))
 }
 
 pub async fn get_institution(
@@ -684,21 +633,6 @@ pub async fn get_institution(
 /// The normalized search text, or `None` if it has no characters.
 fn normalized_query(query: Option<&str>) -> Option<String> {
     query.map(normalized_name).filter(|text| !text.is_empty())
-}
-
-/// Cuts the extra record that shows a next page, and gives the cursor of that page.
-fn page<T>(
-    mut items: Vec<T>,
-    limit: PageLimit,
-    number: impl Fn(&T) -> u64,
-) -> (Vec<T>, Option<PartyCursor>) {
-    let more = items.len() > limit.get() as usize;
-    items.truncate(limit.get() as usize);
-    let next = more
-        .then(|| items.last())
-        .flatten()
-        .map(|last| PartyCursor(number(last)));
-    (items, next)
 }
 
 #[cfg(test)]

@@ -7,19 +7,18 @@ use tada_domain::work::ActionStatus;
 use uuid::Uuid;
 
 use super::checks::{
-    Checker, audit, check_owner, check_workstream, page, parse_description, parse_title, record_id,
+    changed, check_owner, check_workstream, created, parse_description, parse_title,
     require_change, require_create,
 };
 use super::{
-    ActionFields, ActionView, NewActionRecord, WorkChanged, WorkCreated, WorkCursor, WorkError,
-    WorkPorts, WorkQuery, WorkStore,
+    ActionFields, ActionView, NewActionRecord, WorkError, WorkPorts, WorkQuery, WorkStore,
 };
-use crate::access;
+use crate::access::{self, Principal};
 use crate::audit::AuditAction;
 use crate::caller::MemberCaller;
 use crate::identity::IdentityStore;
 use crate::paging::Page;
-use crate::problem::FieldError;
+use crate::records::{Checker, NumberCursor, audit, page, record_id};
 
 /// The input of `create_action`, as the caller gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,7 +53,8 @@ pub async fn create_action(
 ) -> Result<ActionView, WorkError> {
     require_create(caller, event, ports.identity).await?;
     let scope = caller.scope();
-    let id = ActionId::from_uuid(record_id(input.id)?);
+    let id =
+        ActionId::from_uuid(record_id(input.id).map_err(|error| WorkError::Invalid(vec![error]))?);
     let mut check = Checker::default();
     let title = parse_title(&mut check, &input.title);
     let description = parse_description(&mut check, input.description.as_deref());
@@ -62,10 +62,9 @@ pub async fn create_action(
     if let Some(workstream) = input.workstream {
         check_workstream(&mut check, scope, event, workstream, ports.workstreams).await?;
     }
-    check.finish()?;
-    let (Some(title), Some(description)) = (title, description) else {
-        unreachable!("a checker without errors has all values")
-    };
+    let (title, description) = check
+        .finish(title.zip(description))
+        .map_err(WorkError::Invalid)?;
     let action = NewActionRecord {
         id,
         event_id: event,
@@ -79,14 +78,12 @@ pub async fn create_action(
         },
     };
     let audit = audit(caller, AuditAction::ActionCreate, id.as_uuid());
-    match ports
-        .work
-        .create_action(scope, &action, ports.clock.now(), &audit)
-        .await?
-    {
-        WorkCreated::Created(view) => Ok(view),
-        WorkCreated::IdTaken => Err(WorkError::Invalid(vec![FieldError::new("id", "taken")])),
-    }
+    created(
+        ports
+            .work
+            .create_action(scope, &action, ports.clock.now(), &audit)
+            .await?,
+    )
 }
 
 /// Changes an action: its owner, the lead of its workstream or an event manager can do it.
@@ -154,10 +151,9 @@ pub async fn change_action(
     {
         check_workstream(&mut check, scope, event, new, ports.workstreams).await?;
     }
-    check.finish()?;
-    let (Some(title), Some(description)) = (title, description) else {
-        unreachable!("a checker without errors has all values")
-    };
+    let (title, description) = check
+        .finish(title.zip(description))
+        .map_err(WorkError::Invalid)?;
     let status = match status {
         Some(next) if next != old.status && !old.status.can_change_to(next) => {
             return Err(WorkError::InvalidTransition);
@@ -174,28 +170,25 @@ pub async fn change_action(
         status,
     };
     let audit = audit(caller, AuditAction::ActionChange, id.as_uuid());
-    match ports
-        .work
-        .change_action(
-            scope,
-            event,
-            id,
-            &fields,
-            expected_version,
-            ports.clock.now(),
-            &audit,
-        )
-        .await?
-    {
-        WorkChanged::Changed(view) => Ok(view),
-        WorkChanged::NotFound => Err(WorkError::NotFound),
-        WorkChanged::VersionConflict => Err(WorkError::VersionConflict),
-    }
+    changed(
+        ports
+            .work
+            .change_action(
+                scope,
+                event,
+                id,
+                &fields,
+                expected_version,
+                ports.clock.now(),
+                &audit,
+            )
+            .await?,
+    )
 }
 
 /// One action of the event. Each reader of the event sees it.
 pub async fn get_action(
-    caller: &MemberCaller,
+    caller: &impl Principal,
     event: EventId,
     id: ActionId,
     identity: &dyn IdentityStore,
@@ -209,12 +202,12 @@ pub async fn get_action(
 
 /// The actions of the event that match `query`, in the order of their numbers.
 pub async fn list_actions(
-    caller: &MemberCaller,
+    caller: &impl Principal,
     event: EventId,
     query: WorkQuery<ActionStatus>,
     identity: &dyn IdentityStore,
     work: &dyn WorkStore,
-) -> Result<Page<ActionView, WorkCursor>, WorkError> {
+) -> Result<Page<ActionView, NumberCursor>, WorkError> {
     access::event_access(caller, event, identity).await?;
     let items = work.actions(caller.scope(), event, &query.filter()).await?;
     Ok(page(items, query.limit, |action| action.local_number))
