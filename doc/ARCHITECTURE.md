@@ -198,6 +198,10 @@ Rules and database queries do counting, deadlines, permissions, reservation over
   All other routes keep the default limit of `axum`.
   Each running upload holds at most about 9 MiB in memory: one part of 8 MiB for the object storage and the 1 MiB of the inspection.
   Slice 1 does not limit the number of uploads that run at the same time.
+- An upload checks the access of the member before the stream starts.
+  The publish after the stream does not check it again.
+  Thus an owner or admin can remove a member during a long upload, and tada still publishes the version of that upload.
+  This is a known limit of Slice 1: a removed member loses access with the next request, and one upload is one long request.
 - A download sends `Content-Disposition` with the RFC 6266 file name, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'self'; sandbox`, `Cross-Origin-Resource-Policy: same-origin` and `Cache-Control: private, no-store` ([ADR 0009](adr/0009-object-storage.md)).
   Only PDF and plain text can be inline. Each other type is an attachment, also if the client asks for inline.
 - A draft has at most 200,000 characters of Markdown ([ADR 0051](adr/0051-document-drafts-and-provenance.md)).
