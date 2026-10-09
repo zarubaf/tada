@@ -348,7 +348,7 @@ members-remove = Entfernen
 members-remove-of = { $name } entfernen
 members-remove-title = Mitglied entfernen?
 # $name: the display name of the member.
-members-remove-text = { $name } verliert den Zugang zur Organisation und zu allen Anlässen.
+members-remove-text = { $name } verliert den Zugang zur Organisation und zu allen Anlässen. tada meldet { $name } auf allen Geräten ab.
 members-remove-cancel = Abbrechen
 invitations-title = Offene Einladungen
 invitations-loading = Einladungen werden geladen
@@ -372,7 +372,7 @@ invite-error-display_name = Der Name hat 1 bis 100 Zeichen.
 members-leave = Organisation verlassen
 members-leave-title = Organisation verlassen?
 members-leave-text = Sie verlieren den Zugang zur Organisation und zu allen Anlässen.
-members-leave-warning = Sie entfernen sich selbst. Danach sehen Sie diese Organisation nicht mehr und können nur über eine neue Einladung zurückkehren.
+members-leave-warning = Sie entfernen sich selbst. Danach sehen Sie diese Organisation nicht mehr und können nur über eine neue Einladung zurückkehren. tada meldet Sie auf allen Geräten ab.
 members-remove-last = Die Organisation braucht mindestens eine Organisationsleitung, und jeder Anlass braucht eine Anlassleitung. Bestimmen Sie zuerst jemand anderen.
 members-conflict = Jemand hat die Mitglieder inzwischen geändert. Die Liste ist neu geladen. Versuchen Sie es erneut.
 members-loaded-more = Weitere Mitglieder geladen.

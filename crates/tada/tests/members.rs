@@ -257,16 +257,20 @@ async fn each_member_lists_the_members_and_only_owners_and_admins_see_the_addres
     assert_eq!(problem["code"], "malformed-request");
 }
 
-/// The removed member keeps the session, but loses the organization with the next request
-/// (ADR 0056). A member of another organization sees only that one.
+/// A removal ends all sessions of the member, also a session in another organization: tada cannot
+/// tell a stolen session from the member's own one. The member signs in again with a magic link.
 #[tokio::test]
-async fn a_removed_member_loses_the_organization_with_the_next_request() {
+async fn a_removed_member_is_signed_out_everywhere() {
     let app = App::start().await;
     let owner = app.member("Olga Owner", OrganizationRole::Owner).await;
     let anna = app.member("Anna Muster", OrganizationRole::Member).await;
     let musterhausen = app.test.create_organization("musterhausen").await;
     app.test
         .add_membership(musterhausen, anna.id, OrganizationRole::Member)
+        .await;
+    let elsewhere = app
+        .test
+        .sign_in(anna.id, Some(musterhausen), app.clock.now())
         .await;
     let (status, _) = app.get(&anna, "/api/v1/members").await;
     assert_eq!(status, StatusCode::OK);
@@ -283,19 +287,21 @@ async fn a_removed_member_loses_the_organization_with_the_next_request() {
     let (status, _) = app.remove(&owner, anna.id).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
 
-    let (status, problem) = app.get(&anna, "/api/v1/members").await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(problem["code"], "organization-required");
-    let (status, session) = app.get(&anna, "/api/v1/session").await;
-    assert_eq!(status, StatusCode::OK);
-    assert!(session.get("organization").is_none());
-    let names: Vec<_> = session["memberships"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|membership| membership["name"].as_str().unwrap())
-        .collect();
-    assert_eq!(names, ["musterhausen"]);
+    for cookie in [&anna.cookie, &elsewhere] {
+        let (status, problem) = app
+            .call(Some(cookie), Method::GET, "/api/v1/session", None)
+            .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(problem["code"], "unauthenticated");
+    }
+    assert_eq!(
+        app.count(&format!(
+            "SELECT count(*) FROM session WHERE user_id = '{}'",
+            anna.id.as_uuid()
+        ))
+        .await,
+        0
+    );
 
     let (status, _) = app.remove(&owner, anna.id).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
@@ -310,6 +316,41 @@ async fn a_removed_member_loses_the_organization_with_the_next_request() {
         &anna.id.as_uuid().to_string(),
     ]);
     support::logs::assert_route_logged("/api/v1/members/{user_id}/remove");
+}
+
+/// The attack: a stolen session outlives the removal of its member. After a new invitation it
+/// would choose the organization again. The removal ends it, so it stays out.
+#[tokio::test]
+async fn a_stolen_session_does_not_come_back_with_a_new_invitation() {
+    let app = App::start().await;
+    let owner = app.member("Olga Owner", OrganizationRole::Owner).await;
+    let anna = app.member("Anna Muster", OrganizationRole::Member).await;
+    let stolen = anna.cookie.clone();
+
+    let (status, _) = app.remove(&owner, anna.id).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = app
+        .invite(&owner, "anna.muster@example.org", "member")
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let token = app.mailed_token(LINK).await;
+    let (status, _) = app.accept(&token).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let body = json!({"organization_id": app.testwil.as_uuid()});
+    let (status, problem) = app
+        .call(
+            Some(&stolen),
+            Method::POST,
+            "/api/v1/session/organization",
+            Some(&body),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "{problem}");
+    let (status, _) = app
+        .call(Some(&stolen), Method::GET, "/api/v1/members", None)
+        .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
