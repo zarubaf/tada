@@ -92,6 +92,10 @@ pub async fn approve_version(
     {
         return Err(ApproveError::Forbidden);
     }
+    // A redacted draft has no content to approve (ADR 0072).
+    if draft.version.redacted {
+        return Err(ApproveError::InvalidTransition);
+    }
     let approval = Approval {
         version_id,
         expected_version,

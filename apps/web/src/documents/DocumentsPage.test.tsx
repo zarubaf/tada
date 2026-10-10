@@ -15,6 +15,7 @@ function makeDocument(id: string, readableId: string, name: string): Document {
     name,
     owner: "u1",
     created_at: "2030-05-18T08:00:00Z",
+    redacted: false,
     version: 1,
     newest_version: {
       id: `${id}-v1`,
@@ -28,6 +29,7 @@ function makeDocument(id: string, readableId: string, name: string): Document {
       uploaded_by: "u1",
       source_version_id: `${id}-v1`,
       created_at: "2030-05-18T08:00:00Z",
+      redacted: false,
     },
   };
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, local_number, name, email, phone, user_id, version\n             FROM person WHERE organization_id = $1 AND local_number > $2\n             ORDER BY local_number",
+  "query": "SELECT id, local_number, name AS \"name!\", kind, email, phone, version\n             FROM institution WHERE organization_id = $1 AND local_number > $2\n             ORDER BY local_number",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "person",
+            "table": "institution",
             "name": "id"
           }
         }
@@ -20,52 +20,52 @@
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "person",
+            "table": "institution",
             "name": "local_number"
           }
         }
       },
       {
         "ordinal": 2,
-        "name": "name",
+        "name": "name!",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "person",
+            "table": "institution",
             "name": "name"
           }
         }
       },
       {
         "ordinal": 3,
-        "name": "email",
+        "name": "kind",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "person",
-            "name": "email"
+            "table": "institution",
+            "name": "kind"
           }
         }
       },
       {
         "ordinal": 4,
-        "name": "phone",
+        "name": "email",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "person",
-            "name": "phone"
+            "table": "institution",
+            "name": "email"
           }
         }
       },
       {
         "ordinal": 5,
-        "name": "user_id",
-        "type_info": "Uuid",
+        "name": "phone",
+        "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "person",
-            "name": "user_id"
+            "table": "institution",
+            "name": "phone"
           }
         }
       },
@@ -75,7 +75,7 @@
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "person",
+            "table": "institution",
             "name": "version"
           }
         }
@@ -90,12 +90,12 @@
     "nullable": [
       false,
       false,
-      false,
       true,
+      false,
       true,
       true,
       false
     ]
   },
-  "hash": "d309ee19e132d274965241f5b66164eceec6decf41ba2bdd486f3c102b483b9e"
+  "hash": "acc258795c43ae8c7c39241ac9e95d6168684f4be543ec19da0dc55a278f4115"
 }

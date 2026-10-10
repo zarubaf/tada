@@ -90,15 +90,20 @@ pub async fn diff_versions(
             .ok_or(ReadDocumentError::NotFound)
     };
     let (older, newer) = (draft(from).await?, draft(to).await?);
-    Ok(compare(&older, &newer))
+    compare(&older, &newer).ok_or(ReadDocumentError::ContentRedacted)
 }
 
-/// The difference between two drafts.
-pub(crate) fn compare(older: &StoredDraft, newer: &StoredDraft) -> VersionDiff {
-    VersionDiff {
-        lines: line_changes(older.markdown.as_str(), newer.markdown.as_str()),
+/// The difference between two drafts, or `None` if a legal redaction removed the Markdown of one (ADR 0072).
+pub(crate) fn compare(older: &StoredDraft, newer: &StoredDraft) -> Option<VersionDiff> {
+    let (Some(old_markdown), Some(new_markdown)) =
+        (older.markdown.as_present(), newer.markdown.as_present())
+    else {
+        return None;
+    };
+    Some(VersionDiff {
+        lines: line_changes(old_markdown.as_str(), new_markdown.as_str()),
         facts: fact_diff(&older.manifest, &newer.manifest),
-    }
+    })
 }
 
 fn line_changes(older: &str, newer: &str) -> Vec<LineChange> {
@@ -156,6 +161,7 @@ mod tests {
     use jiff::Timestamp;
     use tada_domain::documents::DraftMarkdown;
     use tada_domain::ids::{EventId, UserId};
+    use tada_domain::redaction::Redactable;
     use uuid::Uuid;
 
     use super::*;
@@ -179,15 +185,16 @@ mod tests {
                 id: DocumentVersionId::from_uuid(Uuid::now_v7()),
                 document_id: DocumentId::from_uuid(Uuid::from_u128(2)),
                 number: 1,
-                sha256: [0; 32],
+                sha256: Redactable::Present([0; 32]),
                 uploaded_by: UserId::from_uuid(Uuid::from_u128(3)),
                 created_at: Timestamp::UNIX_EPOCH,
+                redacted: false,
                 content: VersionContent::Draft {
                     status: DraftStatus::Draft,
                 },
             },
             status: DraftStatus::Draft,
-            markdown: DraftMarkdown::parse(markdown).unwrap(),
+            markdown: Redactable::Present(DraftMarkdown::parse(markdown).unwrap()),
             manifest: ProvenanceManifest {
                 facts,
                 sources: Vec::new(),
@@ -204,6 +211,7 @@ mod tests {
         );
 
         let lines: Vec<_> = compare(&older, &newer)
+            .unwrap()
             .lines
             .into_iter()
             .map(|line| (line.kind, line.old_line, line.new_line, line.text))
@@ -245,7 +253,7 @@ mod tests {
         let older = draft("a\n", vec![cited(1, 1), cited(2, 1), cited(3, 2)]);
         let newer = draft("a\n", vec![cited(1, 2), cited(3, 2), cited(4, 1)]);
 
-        let diff = compare(&older, &newer).facts;
+        let diff = compare(&older, &newer).unwrap().facts;
 
         assert_eq!(
             diff.changed,
@@ -264,7 +272,16 @@ mod tests {
         let older = draft("a\n", vec![cited(1, 1), cited(1, 2)]);
         let newer = draft("a\n", vec![cited(1, 2)]);
 
-        assert_eq!(compare(&older, &newer).facts, FactDiff::default());
+        assert_eq!(compare(&older, &newer).unwrap().facts, FactDiff::default());
+    }
+
+    #[test]
+    fn a_redacted_draft_has_no_difference() {
+        let older = draft("a\n", vec![]);
+        let mut newer = draft("b\n", vec![]);
+        newer.markdown = Redactable::Redacted;
+        assert_eq!(compare(&older, &newer), None);
+        assert_eq!(compare(&newer, &older), None);
     }
 
     #[test]

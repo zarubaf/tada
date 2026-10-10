@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT blob_key AS \"blob_key!\", sha256 FROM document_version\n             WHERE organization_id = $1 AND blob_key IS NOT NULL\n             ORDER BY id",
+  "query": "SELECT blob_key AS \"blob_key!\", sha256 AS \"sha256!\" FROM document_version\n               WHERE organization_id = $1 AND blob_key IS NOT NULL AND redacted_at IS NULL\n               ORDER BY id",
   "describe": {
     "columns": [
       {
@@ -16,7 +16,7 @@
       },
       {
         "ordinal": 1,
-        "name": "sha256",
+        "name": "sha256!",
         "type_info": "Bytea",
         "origin": {
           "Table": {
@@ -33,8 +33,8 @@
     },
     "nullable": [
       true,
-      false
+      true
     ]
   },
-  "hash": "2b9d8eb541b6aa4bd9d505c8a5d5c2ca4d1d4077c350f8a9b50f0848ce9011dc"
+  "hash": "b4e2af6a1c3fa18b10e5ea75bc54039066142ada5e884a8f178b9112d0cd7c05"
 }

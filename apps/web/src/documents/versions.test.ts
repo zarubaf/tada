@@ -16,6 +16,7 @@ function version(
     sha256: "0",
     uploaded_by: "u1",
     created_at: "2030-05-18T08:00:00Z",
+    redacted: false,
   };
 }
 

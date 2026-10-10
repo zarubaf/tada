@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT v.id, v.document_id, d.event_id, v.number, v.kind, v.blob_key, v.media_type,\n                  v.size_bytes, v.sha256, v.file_name, v.uploaded_by, v.source_version_id, v.status,\n                  v.created_at AS \"created_at: jiff_sqlx::Timestamp\"\n           FROM document_version v\n           JOIN document d ON d.organization_id = v.organization_id AND d.id = v.document_id\n           WHERE v.organization_id = $1\n             AND ($2::uuid IS NULL OR v.document_id = $2)\n             AND ($3::uuid IS NULL OR v.id = $3)\n           ORDER BY v.document_id, v.number",
+  "query": "SELECT v.id, v.document_id, d.event_id, v.number, v.kind, v.blob_key, v.media_type,\n                  v.size_bytes, v.sha256, v.file_name, v.uploaded_by, v.source_version_id, v.status,\n                  v.created_at AS \"created_at: jiff_sqlx::Timestamp\", v.redacted_at IS NOT NULL AS \"redacted!\"\n           FROM document_version v\n           JOIN document d ON d.organization_id = v.organization_id AND d.id = v.document_id\n           WHERE v.organization_id = $1\n             AND ($2::uuid IS NULL OR v.document_id = $2)\n             AND ($3::uuid IS NULL OR v.id = $3)\n           ORDER BY v.document_id, v.number",
   "describe": {
     "columns": [
       {
@@ -156,6 +156,12 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 14,
+        "name": "redacted!",
+        "type_info": "Bool",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -174,13 +180,14 @@
       true,
       true,
       true,
+      true,
+      true,
       false,
       true,
+      true,
       false,
-      true,
-      true,
-      false
+      null
     ]
   },
-  "hash": "68ff287bc894569978da28242df26379f08d2e0de8b4bf810793447ea1fed7a3"
+  "hash": "b9acea79515996a3cfa4138557cc679f920bc97c94d2b19ae02b692a0b60aed0"
 }

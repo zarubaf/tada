@@ -128,7 +128,7 @@ impl EvidenceStore for Database {
             r#"SELECT e.action_id, e.commitment_id, e.person_id, e.institution_id, e.record_version,
                       e.proposal_id, e.source_version_id,
                       v.captured_at AS "captured_at: jiff_sqlx::Timestamp",
-                      e.start_offset, e.end_offset, e.quote, e.page
+                      e.start_offset, e.end_offset, e.quote AS "quote!", e.page
                FROM record_evidence e
                JOIN source_version v
                    ON v.organization_id = e.organization_id AND v.id = e.source_version_id

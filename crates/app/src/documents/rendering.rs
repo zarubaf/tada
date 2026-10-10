@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use tada_domain::RecordVersion;
 use tada_domain::documents::DraftMarkdown;
 use tada_domain::ids::{DocumentId, DocumentVersionId, EventId, FactId, SourceVersionId};
+use tada_domain::redaction::Redactable;
 use tada_domain::sources::Evidence;
 
 use super::{
@@ -95,6 +96,8 @@ pub(crate) async fn resolve_links(
             .texts(scope, &reach, &ids)
             .await?
             .into_iter()
+            // A redacted source version has no passage to show (ADR 0072).
+            .filter(|text| text.text != Redactable::Redacted)
             .map(|text| text.id)
             .collect()
     };
@@ -126,12 +129,16 @@ pub async fn get_draft(
 }
 
 /// The draft version `id` as `reader` sees it: its Markdown, its lint warnings and the target of each link.
+/// A redacted version answers `content-redacted` (ADR 0072).
 pub async fn render_context(
     reader: &impl Principal,
     id: DocumentVersionId,
     stores: DocumentReads<'_>,
 ) -> Result<Rendering, ReadDocumentError> {
     let draft = get_draft(reader, id, stores).await?;
+    let Redactable::Present(markdown) = draft.markdown else {
+        return Err(ReadDocumentError::ContentRedacted);
+    };
     let links = resolve_links(
         reader,
         draft.event_id,
@@ -146,8 +153,8 @@ pub async fn render_context(
         draft: DraftRendering {
             // A version stores no lint warnings; only its proposal does, and a version does not name its proposal.
             // The lint is deterministic, so it gives the warnings of the proposal while the lint rules stay the same.
-            lint_warnings: drafts::lint(draft.markdown.as_str()),
-            markdown: draft.markdown,
+            lint_warnings: drafts::lint(markdown.as_str()),
+            markdown,
             links,
         },
     })

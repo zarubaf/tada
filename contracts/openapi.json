@@ -1427,6 +1427,7 @@
           "unauthenticated",
           "organization-required",
           "not-found",
+          "content-redacted",
           "unavailable",
           "internal"
         ]
@@ -1557,6 +1558,7 @@
           "unauthenticated",
           "organization-required",
           "not-found",
+          "content-redacted",
           "unavailable",
           "internal"
         ]
@@ -1608,6 +1610,7 @@
           "unauthenticated",
           "organization-required",
           "not-found",
+          "content-redacted",
           "unavailable",
           "internal"
         ]
@@ -1758,6 +1761,7 @@
           "unauthenticated",
           "organization-required",
           "not-found",
+          "content-redacted",
           "unavailable",
           "internal"
         ]
@@ -1809,6 +1813,7 @@
           "unauthenticated",
           "organization-required",
           "not-found",
+          "content-redacted",
           "unavailable",
           "internal"
         ]
@@ -1947,6 +1952,7 @@
           "unauthenticated",
           "organization-required",
           "not-found",
+          "content-redacted",
           "unavailable",
           "internal"
         ]
@@ -7300,6 +7306,7 @@
           "event_id",
           "readable_id",
           "name",
+          "redacted",
           "owner",
           "created_at",
           "version",
@@ -7320,7 +7327,11 @@
           },
           "name": {
             "type": "string",
-            "description": "The file name of the first upload."
+            "description": "The file name of the first upload. It is empty after a legal redaction (ADR 0072)."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction: the name is gone (ADR 0072)."
           },
           "owner": {
             "type": "string",
@@ -7380,7 +7391,8 @@
           "kind",
           "sha256",
           "uploaded_by",
-          "created_at"
+          "created_at",
+          "redacted"
         ],
         "properties": {
           "id": {
@@ -7416,7 +7428,7 @@
               "string",
               "null"
             ],
-            "description": "The file name of the upload, without control characters and path separators. It is absent for a draft."
+            "description": "The file name of the upload, without control characters and path separators. It is absent for a draft\nand after a legal redaction."
           },
           "media_type": {
             "type": [
@@ -7436,7 +7448,7 @@
           },
           "sha256": {
             "type": "string",
-            "description": "The SHA-256 hash of the content, as lowercase hexadecimal digits."
+            "description": "The SHA-256 hash of the content, as lowercase hexadecimal digits. It is empty after a legal redaction."
           },
           "uploaded_by": {
             "type": "string",
@@ -7454,6 +7466,10 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the file or the Markdown is gone, and a download or a rendering\nanswers `content-redacted`."
           }
         }
       },

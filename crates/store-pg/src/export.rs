@@ -665,9 +665,10 @@ impl ExportSource for Database {
             tables.push(table_rows(&mut tx, exported, &users, organization).await?);
         }
         let blobs = sqlx::query!(
-            "SELECT blob_key AS \"blob_key!\", sha256 FROM document_version
-             WHERE organization_id = $1 AND blob_key IS NOT NULL
-             ORDER BY id",
+            // A redacted version has no object any more (ADR 0072).
+            r#"SELECT blob_key AS "blob_key!", sha256 AS "sha256!" FROM document_version
+               WHERE organization_id = $1 AND blob_key IS NOT NULL AND redacted_at IS NULL
+               ORDER BY id"#,
             organization,
         )
         .fetch_all(&mut *tx)

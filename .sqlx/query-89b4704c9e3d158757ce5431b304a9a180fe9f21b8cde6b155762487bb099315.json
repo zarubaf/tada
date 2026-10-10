@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, operation, operation_version, reason, manifest, lint_warnings\n             FROM proposal\n             WHERE organization_id = $1 AND changeset_id = $2\n             ORDER BY id",
+  "query": "SELECT id, operation AS \"operation!\", operation_version, reason AS \"reason!\", manifest, lint_warnings\n             FROM proposal\n             WHERE organization_id = $1 AND changeset_id = $2\n             ORDER BY id",
   "describe": {
     "columns": [
       {
@@ -16,7 +16,7 @@
       },
       {
         "ordinal": 1,
-        "name": "operation",
+        "name": "operation!",
         "type_info": "Jsonb",
         "origin": {
           "Table": {
@@ -38,7 +38,7 @@
       },
       {
         "ordinal": 3,
-        "name": "reason",
+        "name": "reason!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -80,10 +80,10 @@
       false,
       false,
       false,
-      false,
+      true,
       true,
       true
     ]
   },
-  "hash": "e90bdadd9baf2ff40ca6f3307a019a39e7921cd65ed3810b542d1ba573c1ad13"
+  "hash": "89b4704c9e3d158757ce5431b304a9a180fe9f21b8cde6b155762487bb099315"
 }

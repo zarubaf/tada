@@ -271,6 +271,29 @@ impl TestDatabase {
             .unwrap()
     }
 
+    /// Runs `statements` in one transaction with the setting of a legal redaction (ADR 0072), so that a test
+    /// outside this crate can make a tombstone before the redaction command exists.
+    ///
+    /// # Panics
+    ///
+    /// If a statement fails.
+    #[allow(clippy::unwrap_used)]
+    pub async fn redact(&self, statements: &[&str]) {
+        let mut tx = self.database.pool.begin().await.unwrap();
+        sqlx::query("SET LOCAL tada.redaction = 'on'")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        for statement in statements {
+            // A test writes the statements; they hold no input from outside.
+            sqlx::query(AssertSqlSafe((*statement).to_owned()))
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+        }
+        tx.commit().await.unwrap();
+    }
+
     /// Queues an outbound intent in a transaction that commits if `commit` is true and rolls back
     /// otherwise.
     ///

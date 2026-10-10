@@ -270,7 +270,7 @@ impl FactStore for Database {
         let evidence_rows = sqlx::query_as!(
             EvidenceRow,
             r#"SELECT e.fact_version_id, s.captured_at AS "captured_at: jiff_sqlx::Timestamp",
-                      e.source_version_id, e.start_offset, e.end_offset, e.quote, e.page
+                      e.source_version_id, e.start_offset, e.end_offset, e.quote AS "quote!", e.page
                FROM evidence_link e
                JOIN source_version s ON s.organization_id = e.organization_id AND s.id = e.source_version_id
                WHERE e.organization_id = $1 AND e.fact_version_id = ANY($2)

@@ -6,6 +6,7 @@ use jiff::Timestamp;
 use tada_domain::ids::{ChangesetId, EventId, SourceVersionId};
 use tada_domain::parties::Party;
 use tada_domain::proposals::{Operation, Proposal};
+use tada_domain::redaction::Redactable;
 use tada_domain::sources::{Excerpt, SourceText};
 
 use super::links::duplicates;
@@ -224,7 +225,7 @@ async fn evidence_texts(
     }
     let reach = access::source_reach(caller, stores.identity).await?;
     for version in stores.sources.texts(caller.scope(), &reach, &cited).await? {
-        if let Some(text) = version.text {
+        if let Redactable::Present(Some(text)) = version.text {
             texts.insert(version.id, text);
         }
     }

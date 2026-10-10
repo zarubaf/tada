@@ -201,7 +201,7 @@ impl SourceStore for Memory {
         _: OrgScope,
         _: &SourceReach,
         _: SourceVersionId,
-    ) -> Result<Option<String>, StoreError> {
+    ) -> Result<Option<tada_domain::redaction::Redactable<String>>, StoreError> {
         unreachable!()
     }
 
@@ -268,7 +268,7 @@ impl DocumentStore for Memory {
                 id: *document,
                 event_id: *event,
                 local_number: 1,
-                name: "Konzept".to_owned(),
+                name: tada_domain::redaction::Redactable::Present("Konzept".to_owned()),
                 owner: anna(),
                 created_at: Timestamp::UNIX_EPOCH,
                 version: RecordVersion::FIRST,
@@ -276,9 +276,10 @@ impl DocumentStore for Memory {
                     id: DocumentVersionId::from_uuid(Uuid::now_v7()),
                     document_id: *document,
                     number: 1,
-                    sha256: [0; 32],
+                    sha256: tada_domain::redaction::Redactable::Present([0; 32]),
                     uploaded_by: anna(),
                     created_at: Timestamp::UNIX_EPOCH,
+                    redacted: false,
                     content: VersionContent::Draft {
                         status: crate::documents::DraftStatus::Draft,
                     },
@@ -1231,7 +1232,9 @@ fn memory_with_targets() -> (Memory, [SourceVersionId; 3]) {
             event,
             SourceVersionText {
                 id,
-                text: Some(SourceText::normalize(LEAFLET)),
+                text: tada_domain::redaction::Redactable::Present(Some(SourceText::normalize(
+                    LEAFLET,
+                ))),
             },
         ));
     }
@@ -1383,7 +1386,7 @@ async fn a_draft_cannot_cite_a_source_without_text() {
         Some(open_day()),
         SourceVersionText {
             id: pdf,
-            text: None,
+            text: tada_domain::redaction::Redactable::Present(None),
         },
     ));
     let anna = contributor(&memory);
@@ -1516,7 +1519,7 @@ async fn a_fact_cannot_cite_a_source_of_another_event_or_without_text() {
         Some(open_day()),
         SourceVersionText {
             id: pdf,
-            text: None,
+            text: tada_domain::redaction::Redactable::Present(None),
         },
     ));
     let anna = contributor(&memory);

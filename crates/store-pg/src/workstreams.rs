@@ -107,14 +107,14 @@ impl WorkstreamStore for Database {
         }
         let updated = sqlx::query_as!(
             WorkstreamRow,
-            "UPDATE workstream
+            r#"UPDATE workstream
              SET name = COALESCE($4, name),
                  lead_user_id = COALESCE($5, lead_user_id),
                  status = COALESCE($6, status),
                  version = version + 1,
                  updated_at = $7
              WHERE organization_id = $1 AND event_id = $2 AND id = $3
-             RETURNING id, event_id, name, lead_user_id, status, version",
+             RETURNING id, event_id, name AS "name!", lead_user_id, status, version"#,
             scope.organization_id().as_uuid(),
             event.as_uuid(),
             id.as_uuid(),
@@ -143,8 +143,8 @@ impl WorkstreamStore for Database {
     ) -> Result<Option<Workstream>, StoreError> {
         let row = sqlx::query_as!(
             WorkstreamRow,
-            "SELECT id, event_id, name, lead_user_id, status, version FROM workstream
-             WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+            r#"SELECT id, event_id, name AS "name!", lead_user_id, status, version FROM workstream
+             WHERE organization_id = $1 AND event_id = $2 AND id = $3"#,
             scope.organization_id().as_uuid(),
             event.as_uuid(),
             id.as_uuid(),
@@ -158,9 +158,9 @@ impl WorkstreamStore for Database {
     async fn list(&self, scope: OrgScope, event: EventId) -> Result<Vec<Workstream>, StoreError> {
         let rows = sqlx::query_as!(
             WorkstreamRow,
-            "SELECT id, event_id, name, lead_user_id, status, version FROM workstream
+            r#"SELECT id, event_id, name AS "name!", lead_user_id, status, version FROM workstream
              WHERE organization_id = $1 AND event_id = $2
-             ORDER BY lower(name), id",
+             ORDER BY lower(name), id"#,
             scope.organization_id().as_uuid(),
             event.as_uuid(),
         )
