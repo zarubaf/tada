@@ -116,6 +116,9 @@ pub struct ListMembersQuery {
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     pub cursor: Option<String>,
+    /// Only members whose display name contains this text. Owners and admins also match the email
+    /// address. Case, accents and extra spaces do not matter.
+    pub q: Option<String>,
 }
 
 /// The input of `RemoveMember`.
@@ -208,7 +211,14 @@ async fn list_members(
 ) -> Result<axum::Json<MemberPage>, ApiError> {
     let limit = page_limit(query.limit)?;
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
-    let page = app::list_members(&caller, after, limit, state.members.as_ref()).await?;
+    let page = app::list_members(
+        &caller,
+        query.q.as_deref(),
+        after,
+        limit,
+        state.members.as_ref(),
+    )
+    .await?;
     Ok(axum::Json(MemberPage {
         items: page.items.into_iter().map(Member::from).collect(),
         next_cursor: page.next.map(encode_cursor),

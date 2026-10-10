@@ -1059,6 +1059,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only members whose display name contains this text. Owners and admins also match the email\naddress. Case, accents and extra spaces do not matter.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {

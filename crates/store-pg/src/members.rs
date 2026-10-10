@@ -10,10 +10,11 @@ use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::identity::{DisplayName, Email, EventRole};
 use tada_app::domain::ids::{EventId, InvitationId, OrganizationId, UserId};
+use tada_app::domain::parties::normalized_name;
 use tada_app::event_members::takes_last_manager;
 use tada_app::members::{
-    Invitation, InvitationInsert, Inviter, LockedMembership, MemberCursor, MemberStore,
-    OrganizationMember, Refusal, Remover,
+    Invitation, InvitationInsert, Inviter, LockedMembership, MemberCursor, MemberSearch,
+    MemberStore, OrganizationMember, Refusal, Remover,
 };
 use tada_app::outbound::Purpose;
 use tada_app::store::StoreError;
@@ -59,6 +60,13 @@ struct MemberRow {
     email: Option<String>,
     role: String,
     version: i64,
+}
+
+/// Whether the normalized text of `search` is part of the display name, or of the address if the
+/// search covers addresses.
+fn matches(row: &MemberRow, search: &MemberSearch) -> bool {
+    let has = |text: &str| normalized_name(text).contains(&search.text);
+    has(&row.display_name) || (search.email && row.email.as_deref().is_some_and(has))
 }
 
 impl TryFrom<MemberRow> for OrganizationMember {
@@ -197,6 +205,7 @@ impl MemberStore for Database {
     async fn list(
         &self,
         scope: OrgScope,
+        search: Option<&MemberSearch>,
         after: Option<MemberCursor>,
         limit: u32,
     ) -> Result<Vec<OrganizationMember>, StoreError> {
@@ -219,13 +228,17 @@ impl MemberStore for Database {
                LIMIT $3"#,
             scope.organization_id().as_uuid(),
             after.map(|cursor| cursor.0.as_uuid()),
-            i64::from(limit),
+            // Club scale: with a search, the filter below runs in Rust (the normalization is a Rust
+            // function, ADR 0069), so the query returns all rows after the cursor.
+            search.map_or(i64::from(limit), |_| i64::MAX),
         )
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
         Ok(rows
             .into_iter()
+            .filter(|row| search.is_none_or(|search| matches(row, search)))
+            .take(limit as usize)
             .map(OrganizationMember::try_from)
             .collect::<Result<_, _>>()?)
     }
@@ -843,7 +856,7 @@ mod tests {
         let f = Fixture::start().await;
         let berta = f.member("Berta Beispiel", OrganizationRole::Member).await;
         let anna = f.member("Anna Muster", OrganizationRole::Admin).await;
-        let first = f.db().list(f.scope(), None, 2).await.unwrap();
+        let first = f.db().list(f.scope(), None, None, 2).await.unwrap();
         let names: Vec<_> = first.iter().map(|m| m.display_name.as_str()).collect();
         assert_eq!(names, ["Anna Muster", "Berta Beispiel"]);
         assert_eq!(first[0].user_id, anna);
@@ -852,7 +865,7 @@ mod tests {
         assert!(first[0].email.is_some());
         let rest = f
             .db()
-            .list(f.scope(), Some(MemberCursor(berta)), 2)
+            .list(f.scope(), None, Some(MemberCursor(berta)), 2)
             .await
             .unwrap();
         let names: Vec<_> = rest.iter().map(|m| m.display_name.as_str()).collect();
@@ -860,7 +873,7 @@ mod tests {
 
         let musterhausen = f.test.create_organization("musterhausen").await;
         let other = MemberCaller::new(anna, musterhausen, OrganizationRole::Owner).scope();
-        assert!(f.db().list(other, None, 10).await.unwrap().is_empty());
+        assert!(f.db().list(other, None, None, 10).await.unwrap().is_empty());
 
         // A cursor with a user of another organization reads nothing of that user.
         let stranger = f
@@ -875,7 +888,7 @@ mod tests {
             .await;
         let foreign = f
             .db()
-            .list(f.scope(), Some(MemberCursor(stranger)), 10)
+            .list(f.scope(), None, Some(MemberCursor(stranger)), 10)
             .await
             .unwrap();
         assert!(foreign.is_empty(), "{foreign:?}");

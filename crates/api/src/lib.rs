@@ -638,6 +638,7 @@ mod tests {
         async fn list(
             &self,
             _: tada_app::caller::OrgScope,
+            _: Option<&tada_app::members::MemberSearch>,
             _: Option<tada_app::members::MemberCursor>,
             _: u32,
         ) -> Result<Vec<tada_app::members::OrganizationMember>, tada_app::store::StoreError>
