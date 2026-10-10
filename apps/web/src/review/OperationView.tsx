@@ -15,10 +15,10 @@ import { type DraftEnvironment, ProposalDraft } from "../documents/DraftView";
 import { LintWarnings } from "../documents/LintWarnings";
 import { formatDate, formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
-import { Link } from "../router/Router";
 import { DisputeNotes } from "../ui/DisputeNotes";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Redacted } from "../ui/Redacted";
+import { StandaloneLink } from "../ui/StandaloneLink";
 import { ActionStatusLabel, CommitmentStatusLabel } from "../work/WorkStatus";
 import styles from "./OperationView.module.css";
 import { NO_NAMES, type RecordNames } from "./recordNames";
@@ -343,9 +343,11 @@ export function OperationDetails({
           ) : (
             <>
               <p>{t("inbox-draft-existing")}</p>
-              <Link to={`/documents/${encodeURIComponent(operation.document.document_id)}`}>
+              <StandaloneLink
+                to={`/documents/${encodeURIComponent(operation.document.document_id)}`}
+              >
                 {t("inbox-draft-open")}
-              </Link>
+              </StandaloneLink>
             </>
           )}
           {draft && <LintWarnings warnings={draft.lint_warnings} />}

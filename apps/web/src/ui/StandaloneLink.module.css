@@ -1,8 +1,18 @@
 @layer components {
-  /* The link stands alone, so its target meets the pointer target size (doc/design/tokens.md). */
+  /*
+   * The link stands alone, so its target meets the pointer target size (doc/design/tokens.md).
+   * It has the link color and an underline, so that color is not the only sign of a link.
+   */
   .standalone {
     display: inline-flex;
     align-items: center;
     min-height: var(--control-height-lg);
+    color: var(--color-accent-text);
+    text-decoration: underline;
+    text-underline-offset: var(--space-0-5);
+  }
+
+  .standalone:hover {
+    text-decoration-thickness: 2px;
   }
 }

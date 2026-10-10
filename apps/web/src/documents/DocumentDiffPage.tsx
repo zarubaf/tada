@@ -11,12 +11,13 @@ import { EventPage } from "../events/EventPage";
 import { type ProfileState, useEventContext } from "../events/eventContext";
 import { formatLabel } from "../facts/formatValue";
 import { t } from "../i18n";
-import { Link, useParams } from "../router/Router";
+import { useParams } from "../router/Router";
 import { type Column, DataTable } from "../ui/DataTable";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { Page } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
+import { StandaloneLink } from "../ui/StandaloneLink";
 import styles from "./DocumentDiffPage.module.css";
 
 type State =
@@ -126,7 +127,9 @@ function DiffBody({
     facts.removed.length === 0;
   return (
     <>
-      <Link to={`/documents/${encodeURIComponent(document.id)}`}>{t("document-diff-back")}</Link>
+      <StandaloneLink to={`/documents/${encodeURIComponent(document.id)}`}>
+        {t("document-diff-back")}
+      </StandaloneLink>
       <header className={styles.header}>
         <p className={styles.key}>{document.readable_id}</p>
         <h2 ref={heading} tabIndex={-1} className={styles.title}>

@@ -40,6 +40,7 @@
 
   .facts {
     display: grid;
+    margin: 0;
     border-block-start: 1px solid var(--color-border-subtle);
   }
 
@@ -65,6 +66,12 @@
     justify-content: space-between;
     gap: var(--space-2);
     min-width: 0;
+  }
+
+  /* The notes stand under the value, on a row of their own, in one left edge. */
+  .notes {
+    order: 1;
+    flex-basis: 100%;
   }
 
   @media (width >= 40rem) {
