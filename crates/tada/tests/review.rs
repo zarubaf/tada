@@ -646,6 +646,62 @@ mod review {
 mod work {
     use super::*;
 
+    /// Only an owner or admin links an account to a person (ADR 0069), so a proposal never does.
+    #[tokio::test]
+    async fn accepted_person_proposal_has_no_user_link() {
+        let api = Api::start().await;
+        let owner = api.member("testwil", OrganizationRole::Owner).await;
+        let contributor = api.member("testwil", OrganizationRole::Member).await;
+        let event = api.create_event(&owner.cookie, "TEST30").await;
+        api.add_to_event(&owner.cookie, &event, &contributor, "event-contributor")
+            .await;
+
+        let person = Uuid::now_v7();
+        let mut new_person = proposal(
+            json!({"kind": "create-person", "id": person, "name": "Moritz Muster"}),
+            "Wer klärt die Bewilligung?",
+        );
+        // An unknown field is no way to link an account.
+        new_person["operation"]["user_id"] = json!(contributor.user.as_uuid());
+        let (status, rejected) = api
+            .post(
+                &contributor.cookie,
+                &format!("/api/v1/events/{event}/changesets"),
+                &json!({"source_text": SOURCE, "proposals": [new_person.clone()]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{rejected}");
+
+        new_person["operation"]
+            .as_object_mut()
+            .unwrap()
+            .remove("user_id");
+        let (status, changeset) = api
+            .post(
+                &contributor.cookie,
+                &format!("/api/v1/events/{event}/changesets"),
+                &json!({"source_text": SOURCE, "proposals": [new_person.clone()]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::CREATED, "{changeset}");
+        let changeset = changeset["id"].as_str().unwrap();
+        let (status, applied) = api
+            .post(
+                &owner.cookie,
+                &format!("/api/v1/changesets/{changeset}/apply"),
+                &json!({"selected": [new_person["id"]]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+
+        let (status, read) = api
+            .get(&owner.cookie, &format!("/api/v1/persons/{person}"))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{read}");
+        assert_eq!(read["name"], "Moritz Muster");
+        assert!(read["user_id"].is_null(), "{read}");
+    }
+
     #[tokio::test]
     async fn a_proposal_through_http_creates_a_conditional_commitment_that_stays_conditional() {
         let api = Api::start().await;
