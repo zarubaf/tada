@@ -90,6 +90,7 @@ The ADRs are the authority for the decisions in this project.
 | [0072](0072-legal-redaction-and-deletion-journal.md)            | Legal redaction and deletion journal                     | Proposed                           |
 | [0073](0073-person-export-and-dispute-notes.md)                 | Person export and dispute notes                          | Proposed                           |
 | [0074](0074-orphan-sweep.md)                                    | Orphan sweep of the object storage                       | Proposed                           |
+| [0075](0075-versions-of-tada-and-its-components.md)             | Versions of tada and its components                      | Proposed                           |
 
 ## New ADR
 
