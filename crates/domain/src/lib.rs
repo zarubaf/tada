@@ -10,6 +10,7 @@ pub mod ids;
 pub mod name;
 pub mod parties;
 pub mod proposals;
+pub mod redaction;
 pub mod sources;
 pub mod work;
 
