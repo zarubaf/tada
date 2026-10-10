@@ -9,6 +9,8 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
+use futures::stream::BoxStream;
+use jiff::Timestamp;
 use tada_domain::ids::OrganizationId;
 use uuid::Uuid;
 
@@ -35,12 +37,36 @@ impl BlobKey {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// The key of an object in the form that `new` generates, or `None` for any other name,
+    /// for example the objects under the prefix of the deletion journal.
+    pub fn parse(name: &str) -> Option<Self> {
+        let (organization, object) = name.split_once('/')?;
+        let canonical =
+            |part: &str| Uuid::parse_str(part).is_ok_and(|id| id.hyphenated().to_string() == part);
+        (canonical(organization) && canonical(object)).then(|| Self(name.to_owned()))
+    }
 }
 
 impl Display for BlobKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
+}
+
+/// An object in the listing of the store.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObjectInfo {
+    pub key: String,
+    pub last_modified: Timestamp,
+}
+
+/// A multipart upload that neither completed nor aborted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UploadInfo {
+    pub key: String,
+    pub upload_id: String,
+    pub initiated: Timestamp,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -71,4 +97,38 @@ pub trait BlobStore: Debug + Send + Sync {
 
     /// Infrastructure query (ADR 0039): the key names the object, and the key starts with the organization ID.
     async fn delete(&self, key: &BlobKey) -> Result<(), BlobError>;
+
+    /// Streams all objects whose key starts with `prefix`, page by page.
+    /// Infrastructure query (ADR 0039): the sweep of orphan objects reads the whole bucket, and the store has no organization scope.
+    fn list(&self, prefix: &str) -> BoxStream<'static, Result<ObjectInfo, BlobError>>;
+
+    /// All multipart uploads under `prefix` that neither completed nor aborted.
+    /// Infrastructure query (ADR 0039): the sweep of orphan objects reads the whole bucket, and the store has no organization scope.
+    async fn list_incomplete_uploads(&self, prefix: &str) -> Result<Vec<UploadInfo>, BlobError>;
+
+    /// Aborts the multipart upload and deletes its parts.
+    /// Infrastructure query (ADR 0039): the key names the object, and the key starts with the organization ID.
+    async fn abort_upload(&self, key: &str, upload_id: &str) -> Result<(), BlobError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_only_the_keys_that_new_generates() {
+        let key = BlobKey::new(OrganizationId::from_uuid(Uuid::now_v7()));
+        assert_eq!(BlobKey::parse(key.as_str()), Some(key));
+        for name in [
+            "redaction-journal/2030-05-18.json",
+            "redaction-journal/a/b",
+            "not-a-uuid/not-a-uuid",
+            "",
+            "0198f2b0-0000-7000-8000-000000000000",
+            "0198f2b0-0000-7000-8000-000000000000/0198F2B0-0000-7000-8000-000000000001",
+            "0198f2b0-0000-7000-8000-000000000000/0198f2b0-0000-7000-8000-000000000001/x",
+        ] {
+            assert_eq!(BlobKey::parse(name), None, "{name}");
+        }
+    }
 }

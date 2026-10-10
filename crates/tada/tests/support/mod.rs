@@ -19,6 +19,7 @@ use axum::Router;
 use axum::body::Body;
 use axum::extract::ConnectInfo;
 use axum::http::{Method, Request, Response, header, request};
+use futures::stream::BoxStream;
 use jiff::{SignedDuration, Timestamp};
 use secrecy::SecretString;
 use serde_json::Value;
@@ -26,7 +27,7 @@ use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
 use tada_api::ApiState;
 pub use tada_api::SESSION_COOKIE;
 use tada_app::auth::Authenticator;
-use tada_app::blobs::{BlobError, BlobKey, BlobStore, ByteStream};
+use tada_app::blobs::{BlobError, BlobKey, BlobStore, ByteStream, ObjectInfo, UploadInfo};
 use tada_app::clock::Clock;
 use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::outbound::SendOutbound;
@@ -124,6 +125,18 @@ impl BlobStore for NoObjectStorage {
     }
 
     async fn delete(&self, _: &BlobKey) -> Result<(), BlobError> {
+        Self::missing()
+    }
+
+    fn list(&self, _: &str) -> BoxStream<'static, Result<ObjectInfo, BlobError>> {
+        Self::missing()
+    }
+
+    async fn list_incomplete_uploads(&self, _: &str) -> Result<Vec<UploadInfo>, BlobError> {
+        Self::missing()
+    }
+
+    async fn abort_upload(&self, _: &str, _: &str) -> Result<(), BlobError> {
         Self::missing()
     }
 }

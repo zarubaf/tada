@@ -322,11 +322,13 @@ mod tests {
     use std::collections::BTreeMap;
 
     use futures::StreamExt;
+    use futures::stream::BoxStream;
     use jiff::Timestamp;
     use serde_json::json;
     use uuid::Uuid;
 
     use super::*;
+    use crate::blobs::{ObjectInfo, UploadInfo};
 
     const NOW: &str = "2030-05-18T08:00:00Z";
 
@@ -390,6 +392,18 @@ mod tests {
 
         async fn delete(&self, _: &BlobKey) -> Result<(), BlobError> {
             unreachable!("the export never deletes objects")
+        }
+
+        fn list(&self, _: &str) -> BoxStream<'static, Result<ObjectInfo, BlobError>> {
+            unreachable!("the export never lists objects")
+        }
+
+        async fn list_incomplete_uploads(&self, _: &str) -> Result<Vec<UploadInfo>, BlobError> {
+            unreachable!("the export never lists uploads")
+        }
+
+        async fn abort_upload(&self, _: &str, _: &str) -> Result<(), BlobError> {
+            unreachable!("the export never aborts uploads")
         }
     }
 

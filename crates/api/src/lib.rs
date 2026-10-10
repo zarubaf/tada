@@ -827,6 +827,27 @@ mod tests {
         ) -> Result<(), tada_app::blobs::BlobError> {
             unreachable!()
         }
+
+        fn list(
+            &self,
+            _: &str,
+        ) -> futures::stream::BoxStream<
+            'static,
+            Result<tada_app::blobs::ObjectInfo, tada_app::blobs::BlobError>,
+        > {
+            unreachable!()
+        }
+
+        async fn list_incomplete_uploads(
+            &self,
+            _: &str,
+        ) -> Result<Vec<tada_app::blobs::UploadInfo>, tada_app::blobs::BlobError> {
+            unreachable!()
+        }
+
+        async fn abort_upload(&self, _: &str, _: &str) -> Result<(), tada_app::blobs::BlobError> {
+            unreachable!()
+        }
     }
 
     /// The stores of facts and review. The tests of this module never read facts.

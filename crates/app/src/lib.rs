@@ -19,6 +19,7 @@ pub mod jobs;
 pub mod mail;
 pub mod members;
 pub mod my_work;
+pub mod orphans;
 pub mod outbound;
 pub mod paging;
 pub mod parties;

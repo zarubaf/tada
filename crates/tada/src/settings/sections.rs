@@ -20,7 +20,7 @@ use super::{Section, Setting, Source};
 /// The settings of `tada serve`.
 pub type ServeSettings = (Database, Http, Storage, PublicUrl, SignIn, Uploads);
 /// The settings of `tada worker`.
-pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp);
+pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp, Storage);
 /// The settings of `tada telegram`.
 pub type TelegramSettings = (Database, Telegram);
 /// The settings of `tada bootstrap`.
