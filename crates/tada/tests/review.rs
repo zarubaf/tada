@@ -1161,6 +1161,37 @@ mod routing {
     }
 
     #[tokio::test]
+    async fn can_review_false_when_dependency_not_reviewable() {
+        let r = Routed::start().await;
+        let person = Uuid::now_v7();
+        let supplier = Routed::new_person(person);
+        // The action has no workstream, so only the managers review it. The lead reviews the commitment.
+        let action = proposal(
+            json!({
+                "kind": "create-action", "id": Uuid::now_v7(), "event_id": r.event,
+                "title": "Bewilligung klären", "owner": r.lead.user.as_uuid(),
+            }),
+            "Wer klärt die Bewilligung?",
+        );
+        let mut promise = r.commitment(person, Some(&r.workstream));
+        promise["depends_on"] = json!([supplier["id"], action["id"]]);
+        let changeset = r
+            .propose(vec![supplier, action.clone(), promise.clone()])
+            .await;
+
+        let (status, review) = r.detail(&r.lead, &changeset).await;
+        assert_eq!(status, StatusCode::OK, "{review}");
+        let shown = proposal_of(&review, &promise["id"]);
+        assert_eq!(shown["routed_to_me"], true);
+        assert_eq!(shown["can_review"], false);
+        let (status, _) = r.apply(&r.lead, &changeset, &[&promise]).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        // The manager reviews the action and so can review nothing less than the lead can.
+        let (_, review) = r.detail(&r.manager, &changeset).await;
+        assert_eq!(proposal_of(&review, &action["id"])["can_review"], true);
+    }
+
+    #[tokio::test]
     async fn a_manager_can_still_apply_a_routed_proposal() {
         let r = Routed::start().await;
         let (changeset, _, promise) = r.supplier_changeset().await;

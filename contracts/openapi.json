@@ -9699,7 +9699,7 @@
           },
           "can_review": {
             "type": "boolean",
-            "description": "True if the caller reviews the open proposal now, so a client offers accept and reject for it: it is in the\nReview Inbox of the caller (ADR 0067). For an event manager, this includes an overdue proposal of another\nreviewer. Apply and reject accept each proposal with this flag."
+            "description": "True if the caller reviews the open proposal now, so a client offers accept and reject for it: it is in the\nReview Inbox of the caller (ADR 0067). For an event manager, this includes an overdue proposal of another\nreviewer. It is false if the caller cannot review an open dependency that an apply of the proposal accepts\nwith it. Apply and reject accept each proposal with this flag."
           },
           "conflict_reason": {
             "oneOf": [

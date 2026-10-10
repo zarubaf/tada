@@ -227,7 +227,8 @@ pub struct Proposal {
     pub routed_to_me: bool,
     /// True if the caller reviews the open proposal now, so a client offers accept and reject for it: it is in the
     /// Review Inbox of the caller (ADR 0067). For an event manager, this includes an overdue proposal of another
-    /// reviewer. Apply and reject accept each proposal with this flag.
+    /// reviewer. It is false if the caller cannot review an open dependency that an apply of the proposal accepts
+    /// with it. Apply and reject accept each proposal with this flag.
     pub can_review: bool,
     /// Why the proposal conflicts, at the time of the read. It is present only if the status is `conflict`.
     #[serde(skip_serializing_if = "Option::is_none")]

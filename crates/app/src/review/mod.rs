@@ -13,7 +13,7 @@ pub mod routing;
 mod selection;
 mod steps;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
 use async_trait::async_trait;
@@ -934,7 +934,8 @@ impl Reviewable {
         self.routes.routed_to(caller.user_id(), self.access, id)
     }
 
-    /// True if the caller reviews the proposal now: it is open and in the Review Inbox of the caller (rule 6).
+    /// True if the caller reviews the proposal now: it is open and in the Review Inbox of the caller (rule 6),
+    /// and the caller may review each open dependency that an apply of the proposal accepts with it.
     /// Apply and reject then accept it, because the inbox shows only proposals that the caller may review.
     fn can_review(&self, caller: &MemberCaller, id: ProposalId, now: Timestamp) -> bool {
         let status = proposal_status(&self.results, id);
@@ -943,6 +944,12 @@ impl Reviewable {
             && self
                 .routes
                 .in_inbox_of(caller.user_id(), self.access, id, overdue)
+            && to_apply(
+                &self.changeset.proposals,
+                &HashSet::from([id]),
+                &self.results,
+            )
+            .is_ok_and(|closure| closure.iter().all(|id| self.may_review(caller, *id)))
     }
 
     /// The caller must review each of `ids` (ADR 0067, rule 7). Else the review changes nothing.
