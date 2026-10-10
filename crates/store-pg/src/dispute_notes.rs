@@ -9,7 +9,9 @@ use sqlx::types::Uuid;
 use sqlx::{PgConnection, Row};
 use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
-use tada_app::dispute_notes::{DisputeNote, DisputeNoteStore, NoteCreated, NoteKey};
+use tada_app::dispute_notes::{
+    DisputeNote, DisputeNoteReads, DisputeNoteStore, NoteCreated, NoteKey,
+};
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{DisputeNoteId, FactId, SourceVersionId, UserId};
 use tada_app::domain::redaction::{DisputeNoteText, DisputeTarget, DisputeTargetKind};
@@ -155,7 +157,10 @@ impl DisputeNoteStore for Database {
         tx.commit().await.map_err(store_error)?;
         Ok(NoteCreated::Created(note.clone()))
     }
+}
 
+#[async_trait]
+impl DisputeNoteReads for Database {
     async fn notes(
         &self,
         scope: OrgScope,

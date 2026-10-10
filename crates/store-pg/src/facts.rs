@@ -317,6 +317,7 @@ impl FactStore for Database {
             fields,
             proposals: proposals::open_fact_proposals(&self.pool, scope, event).await?,
             open_questions: proposals::open_questions(&self.pool, scope, event).await?,
+            dispute_notes: Default::default(),
         })
     }
 

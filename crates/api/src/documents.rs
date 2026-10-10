@@ -15,14 +15,13 @@ use futures::TryStreamExt;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use tada_app::blobs::ByteStream;
-use tada_app::dispute_notes::{DisputeNotes, NoteKey};
+use tada_app::dispute_notes::NoteKey;
 use tada_app::documents::{
     self as app, ApproveError, DocumentCursor, DocumentReads, DocumentStores, DocumentView,
     DraftRendering as AppDraftRendering, DraftStatus, LineKind, ReadDocumentError, Resolution,
     UploadError, VersionContent, VersionDiff as AppVersionDiff, VersionView,
 };
 use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId};
-use tada_app::domain::redaction::{DisputeTarget, DisputeTargetKind};
 use tada_app::drafts::{CitedFact as AppCitedFact, LintKind, LintWarning as AppLintWarning};
 use tada_app::problem::ProblemCode;
 use utoipa::{IntoParams, ToSchema};
@@ -33,7 +32,7 @@ use uuid::Uuid;
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::cursor;
-use crate::dispute_notes::{DisputeNote, ShowsDisputeNotes, shown, with_notes};
+use crate::dispute_notes::{DisputeNote, shown};
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
 use crate::values::{FactState, Passage, Value, stored_state_parts};
@@ -226,35 +225,6 @@ pub struct DocumentVersion {
     pub dispute_notes: Vec<DisputeNote>,
 }
 
-impl ShowsDisputeNotes for DocumentVersion {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        keys.push(self.note_key());
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        self.dispute_notes = shown(notes, &self.note_key());
-    }
-}
-
-impl DocumentVersion {
-    fn note_key(&self) -> NoteKey {
-        NoteKey::Target(DisputeTarget {
-            kind: DisputeTargetKind::DocumentVersion,
-            id: self.id,
-        })
-    }
-}
-
-impl ShowsDisputeNotes for Document {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        self.newest_version.note_keys(keys);
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        self.newest_version.set_notes(notes);
-    }
-}
-
 impl From<VersionView> for DocumentVersion {
     fn from(version: VersionView) -> Self {
         let (kind, status, file) = match &version.content {
@@ -282,7 +252,10 @@ impl From<VersionView> for DocumentVersion {
             source_version_id: file.map(|file| file.source_version_id.as_uuid()),
             created_at: version.created_at,
             redacted: version.redacted,
-            dispute_notes: Vec::new(),
+            dispute_notes: shown(
+                &version.dispute_notes,
+                &NoteKey::document_version(version.id),
+            ),
         }
     }
 }
@@ -397,10 +370,7 @@ async fn upload_document(
         state.clock.as_ref(),
     )
     .await?;
-    Ok((
-        StatusCode::CREATED,
-        axum::Json(with_notes(&state, &caller, Document::from(document)).await?),
-    ))
+    Ok((StatusCode::CREATED, axum::Json(document.into())))
 }
 
 /// Uploads a file as a new version of the document. The older versions stay unchanged.
@@ -437,10 +407,7 @@ async fn upload_document_version(
         state.clock.as_ref(),
     )
     .await?;
-    Ok((
-        StatusCode::CREATED,
-        axum::Json(with_notes(&state, &caller, Document::from(document)).await?),
-    ))
+    Ok((StatusCode::CREATED, axum::Json(document.into())))
 }
 
 /// The parameters of `ListDocuments`.
@@ -497,9 +464,8 @@ async fn list_documents(
         state.document_reads(),
     )
     .await?;
-    let items: Vec<Document> = page.items.into_iter().map(Document::from).collect();
     Ok(axum::Json(DocumentPage {
-        items: with_notes(&state, &caller, items).await?,
+        items: page.items.into_iter().map(Document::from).collect(),
         next_cursor: page.next.map(encode_cursor),
     }))
 }
@@ -524,11 +490,10 @@ async fn get_document(
     let id = DocumentId::from_uuid(document_id);
     let document = app::get_document(&caller, id, state.document_reads()).await?;
     let facts_changed = app::facts_changed(&caller, id, state.document_reads()).await?;
-    let document = Document {
+    Ok(axum::Json(Document {
         facts_changed: Some(facts_changed),
         ..document.into()
-    };
-    Ok(axum::Json(with_notes(&state, &caller, document).await?))
+    }))
 }
 
 /// All versions of a document.
@@ -561,9 +526,8 @@ async fn list_document_versions(
         state.document_reads(),
     )
     .await?;
-    let items: Vec<DocumentVersion> = versions.into_iter().map(DocumentVersion::from).collect();
     Ok(axum::Json(DocumentVersionList {
-        items: with_notes(&state, &caller, items).await?,
+        items: versions.into_iter().map(DocumentVersion::from).collect(),
     }))
 }
 
@@ -843,9 +807,7 @@ async fn approve_document_version(
         state.clock.as_ref(),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, DocumentVersion::from(version)).await?,
-    ))
+    Ok(axum::Json(version.into()))
 }
 
 /// The parameters of `DiffDocumentVersions`.
@@ -1130,6 +1092,7 @@ mod tests {
             content: VersionContent::Draft {
                 status: DraftStatus::Review,
             },
+            dispute_notes: Default::default(),
         };
         let json = serde_json::to_value(DocumentVersion::from(version)).unwrap();
         assert_eq!(json["kind"], "draft");

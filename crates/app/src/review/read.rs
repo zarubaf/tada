@@ -16,6 +16,7 @@ use super::{
 use crate::access;
 use crate::caller::{Actor, MemberCaller};
 use crate::clock::Clock;
+use crate::dispute_notes::{self, Disputable, DisputeNotes, NoteKey};
 use crate::documents::{DraftRendering, resolve_links};
 use crate::facts::FactVersionRef;
 use crate::parties::PartyRef;
@@ -76,6 +77,30 @@ pub struct ProposalReview {
     /// The existing records of the same kind with a similar name, for an open proposal that creates a person or an
     /// institution (ADR 0069). `None` for each other proposal.
     pub duplicates: Option<Vec<PartyRef>>,
+    /// The dispute notes of the proposal, of the sources of its evidence and of the current fact version
+    /// (ADR 0073). The notes of the links of a draft are in `draft`.
+    pub dispute_notes: DisputeNotes,
+}
+
+impl Disputable for ProposalReview {
+    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
+        keys.push(NoteKey::proposal(self.proposal.id));
+        keys.extend(
+            self.proposal
+                .evidence
+                .iter()
+                .map(|evidence| NoteKey::source_version(evidence.source_version_id)),
+        );
+        keys.extend(
+            self.current
+                .iter()
+                .map(|fact| NoteKey::fact_version(fact.id)),
+        );
+    }
+
+    fn set_dispute_notes(&mut self, notes: DisputeNotes) {
+        self.dispute_notes = notes;
+    }
 }
 
 /// Why a proposal conflicts.
@@ -158,11 +183,14 @@ pub async fn get_changeset(
                     stores.sources,
                 )
                 .await?;
-                Some(DraftRendering {
+                let mut rendering = DraftRendering {
                     markdown: markdown.clone(),
                     lint_warnings: provenance.lint_warnings.clone(),
                     links,
-                })
+                    dispute_notes: DisputeNotes::default(),
+                };
+                dispute_notes::attach(scope, &mut rendering, stores.facts).await?;
+                Some(rendering)
             }
             _ => None,
         };
@@ -206,8 +234,10 @@ pub async fn get_changeset(
             draft,
             duplicates,
             proposal,
+            dispute_notes: DisputeNotes::default(),
         });
     }
+    dispute_notes::attach_all(scope, &mut proposals, stores.facts).await?;
     Ok(ChangesetReview {
         id: changeset.id,
         event_id: changeset.event_id,

@@ -14,6 +14,7 @@ use super::{
     DocumentReads, ReadDocumentError, StoredDraft, VersionView, check_may_read, get_document,
 };
 use crate::access::{self, Principal};
+use crate::dispute_notes::{self, Disputable, DisputeNotes, NoteKey};
 use crate::drafts::{self, LintWarning, ProvenanceManifest};
 use crate::facts::{FactStore, FactVersionRef};
 use crate::identity::IdentityStore;
@@ -40,6 +41,28 @@ pub struct DraftRendering {
     pub markdown: DraftMarkdown,
     pub lint_warnings: Vec<LintWarning>,
     pub links: Links,
+    /// The dispute notes of the fact versions and passages that the reader can see (ADR 0073).
+    pub dispute_notes: DisputeNotes,
+}
+
+impl Disputable for DraftRendering {
+    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
+        keys.extend(
+            self.links
+                .values()
+                .filter_map(|resolution| match resolution {
+                    Resolution::Fact(fact) => Some(NoteKey::fact_version(fact.id)),
+                    Resolution::Source(evidence) => {
+                        Some(NoteKey::source_version(evidence.source_version_id))
+                    }
+                    Resolution::Hidden => None,
+                }),
+        );
+    }
+
+    fn set_dispute_notes(&mut self, notes: DisputeNotes) {
+        self.dispute_notes = notes;
+    }
 }
 
 /// A draft version as one reader sees it.
@@ -128,12 +151,14 @@ pub async fn get_draft(
     id: DocumentVersionId,
     stores: DocumentReads<'_>,
 ) -> Result<StoredDraft, ReadDocumentError> {
-    let draft = stores
+    let mut draft = stores
         .documents
         .draft(reader.scope(), id)
         .await?
         .ok_or(ReadDocumentError::NotFound)?;
     check_may_read(reader, draft.event_id, stores.identity).await?;
+    dispute_notes::attach(reader.scope(), &mut draft, stores.documents).await?;
+    dispute_notes::attach(reader.scope(), &mut draft.version, stores.documents).await?;
     Ok(draft)
 }
 
@@ -157,15 +182,18 @@ pub async fn render_context(
         stores.sources,
     )
     .await?;
+    let mut rendering = DraftRendering {
+        // A version stores no lint warnings; only its proposal does, and a version does not name its proposal.
+        // The lint is deterministic, so it gives the warnings of the proposal while the lint rules stay the same.
+        lint_warnings: drafts::lint(markdown.as_str()),
+        markdown,
+        links,
+        dispute_notes: DisputeNotes::default(),
+    };
+    dispute_notes::attach(reader.scope(), &mut rendering, stores.documents).await?;
     Ok(Rendering {
         version: draft.version,
-        draft: DraftRendering {
-            // A version stores no lint warnings; only its proposal does, and a version does not name its proposal.
-            // The lint is deterministic, so it gives the warnings of the proposal while the lint rules stay the same.
-            lint_warnings: drafts::lint(markdown.as_str()),
-            markdown,
-            links,
-        },
+        draft: rendering,
     })
 }
 

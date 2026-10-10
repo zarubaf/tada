@@ -138,6 +138,23 @@ impl IdentityStore for Memory {
     }
 }
 
+#[async_trait::async_trait]
+impl crate::dispute_notes::DisputeNoteReads for Memory {
+    async fn notes(
+        &self,
+        _: crate::caller::OrgScope,
+        _: &[crate::dispute_notes::NoteKey],
+    ) -> Result<
+        Vec<(
+            crate::dispute_notes::NoteKey,
+            crate::dispute_notes::DisputeNote,
+        )>,
+        crate::store::StoreError,
+    > {
+        Ok(Vec::new())
+    }
+}
+
 #[async_trait]
 impl FactStore for Memory {
     async fn catalog(&self, _: OrgScope, _: EventId) -> Result<Vec<FieldDefinition>, StoreError> {
@@ -290,6 +307,7 @@ impl DocumentStore for Memory {
                     content: VersionContent::Draft {
                         status: crate::documents::DraftStatus::Draft,
                     },
+                    dispute_notes: Default::default(),
                 },
             }))
     }

@@ -1453,6 +1453,27 @@ mod tests {
         }
     }
 
+    /// The fakes of the stores that extend the read of dispute notes. No test reads one.
+    macro_rules! no_dispute_note_reads {
+        ($($fake:ty),*) => {$(
+            #[async_trait::async_trait]
+            impl tada_app::dispute_notes::DisputeNoteReads for $fake {
+                async fn notes(
+                    &self,
+                    _: tada_app::caller::OrgScope,
+                    _: &[tada_app::dispute_notes::NoteKey],
+                ) -> Result<
+                    Vec<(tada_app::dispute_notes::NoteKey, tada_app::dispute_notes::DisputeNote)>,
+                    tada_app::store::StoreError,
+                > {
+                    unreachable!()
+                }
+            }
+        )*};
+    }
+
+    no_dispute_note_reads!(NoDocuments, NoReview, NoParties, NoWork);
+
     #[derive(Debug)]
     struct NoPersonData;
 
@@ -1496,20 +1517,6 @@ mod tests {
             _: tada_app::domain::ids::UserId,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<tada_app::dispute_notes::NoteCreated, tada_app::store::StoreError> {
-            unreachable!()
-        }
-
-        async fn notes(
-            &self,
-            _: tada_app::caller::OrgScope,
-            _: &[tada_app::dispute_notes::NoteKey],
-        ) -> Result<
-            Vec<(
-                tada_app::dispute_notes::NoteKey,
-                tada_app::dispute_notes::DisputeNote,
-            )>,
-            tada_app::store::StoreError,
-        > {
             unreachable!()
         }
     }

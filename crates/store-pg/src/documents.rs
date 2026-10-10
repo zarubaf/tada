@@ -117,6 +117,7 @@ impl VersionRow {
             created_at: self.created_at.to_jiff(),
             redacted: self.redacted,
             content: self.content()?,
+            dispute_notes: Default::default(),
         })
     }
 
@@ -712,6 +713,7 @@ impl DocumentStore for Database {
             status,
             version,
             manifest,
+            dispute_notes: Default::default(),
         }))
     }
 

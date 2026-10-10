@@ -9,11 +9,13 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use jiff::Timestamp;
 use tada_domain::RecordVersion;
-use tada_domain::ids::{DisputeNoteId, FactId, SourceVersionId, UserId};
+use tada_domain::ids::{
+    DisputeNoteId, DocumentVersionId, FactId, FactVersionId, ProposalId, SourceVersionId, UserId,
+};
 use tada_domain::redaction::{DisputeNoteError, DisputeNoteText, DisputeTarget, DisputeTargetKind};
 use uuid::Uuid;
 
-use crate::access::{self, Principal};
+use crate::access;
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -40,7 +42,35 @@ pub enum NoteKey {
     FactVersion { fact: FactId, number: RecordVersion },
 }
 
-/// The notes of the records of one read, oldest first.
+impl NoteKey {
+    /// The notes of the source item of a passage or of an evidence link.
+    pub fn source_version(id: SourceVersionId) -> Self {
+        Self::SourceVersion(id)
+    }
+
+    pub fn fact_version(id: FactVersionId) -> Self {
+        Self::target(DisputeTargetKind::FactVersion, id.as_uuid())
+    }
+
+    pub fn fact_number(fact: FactId, number: RecordVersion) -> Self {
+        Self::FactVersion { fact, number }
+    }
+
+    pub fn document_version(id: DocumentVersionId) -> Self {
+        Self::target(DisputeTargetKind::DocumentVersion, id.as_uuid())
+    }
+
+    pub fn proposal(id: ProposalId) -> Self {
+        Self::target(DisputeTargetKind::Proposal, id.as_uuid())
+    }
+
+    fn target(kind: DisputeTargetKind, id: Uuid) -> Self {
+        Self::Target(DisputeTarget { kind, id })
+    }
+}
+
+/// The notes of the records of one read, oldest first. Each read result that shows evidence or facts carries
+/// them, so each reader of a target sees its notes (ADR 0073).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DisputeNotes(HashMap<NoteKey, Vec<DisputeNote>>);
 
@@ -48,6 +78,81 @@ impl DisputeNotes {
     pub fn of(&self, key: &NoteKey) -> &[DisputeNote] {
         self.0.get(key).map_or(&[], Vec::as_slice)
     }
+
+    /// The notes of `keys` only.
+    fn only(&self, keys: &[NoteKey]) -> Self {
+        Self(
+            keys.iter()
+                .filter_map(|key| self.0.get(key).map(|notes| (*key, notes.clone())))
+                .collect(),
+        )
+    }
+}
+
+/// The repository port that reads dispute notes. The stores of the reads that show evidence or facts extend it.
+#[async_trait]
+pub trait DisputeNoteReads: Debug + Send + Sync {
+    /// The notes of the records `keys` that a redaction did not remove, oldest first.
+    async fn notes(
+        &self,
+        scope: OrgScope,
+        keys: &[NoteKey],
+    ) -> Result<Vec<(NoteKey, DisputeNote)>, StoreError>;
+}
+
+/// A read result that shows evidence or facts and carries their dispute notes.
+pub(crate) trait Disputable {
+    /// Adds the records whose notes the result shows.
+    fn note_keys(&self, keys: &mut Vec<NoteKey>);
+    /// Sets the notes of the result.
+    fn set_dispute_notes(&mut self, notes: DisputeNotes);
+}
+
+/// The notes of `keys`.
+async fn read(
+    scope: OrgScope,
+    keys: &[NoteKey],
+    store: &dyn DisputeNoteReads,
+) -> Result<DisputeNotes, StoreError> {
+    let mut notes = DisputeNotes::default();
+    if keys.is_empty() {
+        return Ok(notes);
+    }
+    for (key, note) in store.notes(scope, keys).await? {
+        notes.0.entry(key).or_default().push(note);
+    }
+    Ok(notes)
+}
+
+/// Sets the dispute notes of one read result.
+pub(crate) async fn attach<T: Disputable>(
+    scope: OrgScope,
+    result: &mut T,
+    store: &dyn DisputeNoteReads,
+) -> Result<(), StoreError> {
+    attach_all(scope, std::slice::from_mut(result), store).await
+}
+
+/// Sets the dispute notes of each read result, with one read for all of them.
+pub(crate) async fn attach_all<T: Disputable>(
+    scope: OrgScope,
+    results: &mut [T],
+    store: &dyn DisputeNoteReads,
+) -> Result<(), StoreError> {
+    let keys: Vec<Vec<NoteKey>> = results
+        .iter()
+        .map(|result| {
+            let mut keys = Vec::new();
+            result.note_keys(&mut keys);
+            keys
+        })
+        .collect();
+    let all: Vec<NoteKey> = keys.iter().flatten().copied().collect();
+    let notes = read(scope, &all, store).await?;
+    for (result, keys) in results.iter_mut().zip(&keys) {
+        result.set_dispute_notes(notes.only(keys));
+    }
+    Ok(())
 }
 
 /// What a create of a note found.
@@ -79,13 +184,6 @@ pub trait DisputeNoteStore: Debug + Send + Sync {
         author: UserId,
         audit: &AuditEvent,
     ) -> Result<NoteCreated, StoreError>;
-
-    /// The notes of the records `keys` that a redaction did not remove, oldest first.
-    async fn notes(
-        &self,
-        scope: OrgScope,
-        keys: &[NoteKey],
-    ) -> Result<Vec<(NoteKey, DisputeNote)>, StoreError>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -209,23 +307,6 @@ pub async fn create_dispute_note(
         NoteCreated::NotFound => Err(DisputeNoteCommandError::NotFound),
         NoteCreated::Redacted => Err(DisputeNoteCommandError::InvalidTransition),
     }
-}
-
-/// The notes of the records `keys`, for a read that shows them.
-/// The caller read the records with the access checks of that read; the notes add no record to it.
-pub async fn dispute_notes(
-    caller: &impl Principal,
-    keys: Vec<NoteKey>,
-    store: &dyn DisputeNoteStore,
-) -> Result<DisputeNotes, StoreError> {
-    if keys.is_empty() {
-        return Ok(DisputeNotes::default());
-    }
-    let mut notes = DisputeNotes::default();
-    for (key, note) in store.notes(caller.scope(), &keys).await? {
-        notes.0.entry(key).or_default().push(note);
-    }
-    Ok(notes)
 }
 
 #[cfg(test)]

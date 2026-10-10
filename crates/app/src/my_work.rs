@@ -95,6 +95,7 @@ fn in_events<T>(items: Vec<Shown<InEvent<T>>>) -> Vec<InEvent<Shown<T>>> {
                 record: shown.record.record,
                 evidence: shown.evidence,
                 can_change: shown.can_change,
+                dispute_notes: shown.dispute_notes,
             },
         })
         .collect()

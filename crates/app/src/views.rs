@@ -855,6 +855,7 @@ mod tests {
                 owner: UserId::from_uuid(Uuid::from_u128(1)),
                 version: RecordVersion::FIRST,
             }],
+            dispute_notes: Default::default(),
         };
         let view = ProfileView::new(&event(), &profile, &core_catalog());
         let json = serde_json::to_value(&view).unwrap();
@@ -896,6 +897,7 @@ mod tests {
                 fields: vec![entry("exact_dates", FactState::Unknown)],
                 proposals: Vec::new(),
                 open_questions: Vec::new(),
+                dispute_notes: Default::default(),
             },
             &[],
         );

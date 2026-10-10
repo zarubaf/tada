@@ -30,6 +30,7 @@ use crate::audit::{AuditAction, AuditEvent};
 use crate::blobs::{BlobError, BlobKey, BlobStore, ByteStream};
 use crate::caller::{Actor, MemberCaller, OrgScope};
 use crate::clock::Clock;
+use crate::dispute_notes::{self, Disputable, DisputeNoteReads, DisputeNotes, NoteKey};
 use crate::drafts::ProvenanceManifest;
 use crate::facts::FactStore;
 use crate::identity::IdentityStore;
@@ -107,6 +108,28 @@ pub struct VersionView {
     /// True after a legal redaction (ADR 0072): the version keeps its structure, but its file or Markdown is gone.
     pub redacted: bool,
     pub content: VersionContent,
+    /// The dispute notes of the version (ADR 0073). The store leaves them empty; the reads fill them.
+    pub dispute_notes: DisputeNotes,
+}
+
+impl Disputable for VersionView {
+    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
+        keys.push(NoteKey::document_version(self.id));
+    }
+
+    fn set_dispute_notes(&mut self, notes: DisputeNotes) {
+        self.dispute_notes = notes;
+    }
+}
+
+impl Disputable for DocumentView {
+    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
+        self.newest_version.note_keys(keys);
+    }
+
+    fn set_dispute_notes(&mut self, notes: DisputeNotes) {
+        self.newest_version.set_dispute_notes(notes);
+    }
 }
 
 impl VersionView {
@@ -204,6 +227,24 @@ pub struct StoredDraft {
     pub markdown: Redactable<DraftMarkdown>,
     /// The fact versions and source passages that the draft cites, fixed with its proposal.
     pub manifest: ProvenanceManifest,
+    /// The dispute notes of the cited fact versions (ADR 0073). The cited sources need the access check of a
+    /// rendering, so their notes come with `render_context` only.
+    pub dispute_notes: DisputeNotes,
+}
+
+impl Disputable for StoredDraft {
+    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
+        keys.extend(
+            self.manifest
+                .facts
+                .iter()
+                .map(|fact| NoteKey::fact_number(fact.fact_id, fact.version)),
+        );
+    }
+
+    fn set_dispute_notes(&mut self, notes: DisputeNotes) {
+        self.dispute_notes = notes;
+    }
 }
 
 /// The approval of a draft version by an event manager (ADR 0052).
@@ -293,7 +334,7 @@ pub enum Published {
 
 /// The repository port for documents and their versions. Each method stays inside `scope`.
 #[async_trait]
-pub trait DocumentStore: Debug + Send + Sync {
+pub trait DocumentStore: DisputeNoteReads + Debug + Send + Sync {
     /// Publishes an upload in one transaction, or changes nothing.
     ///
     /// It checks the storage quota of the organization, with a lock, so that concurrent uploads cannot pass it together.
@@ -763,6 +804,7 @@ pub async fn list_documents(
         .await?;
     let more = items.len() > limit.get() as usize;
     items.truncate(limit.get() as usize);
+    dispute_notes::attach_all(caller.scope(), &mut items, stores.documents).await?;
     let next = more
         .then(|| items.last())
         .flatten()
@@ -776,12 +818,13 @@ pub async fn get_document(
     id: DocumentId,
     stores: DocumentReads<'_>,
 ) -> Result<DocumentView, ReadDocumentError> {
-    let document = stores
+    let mut document = stores
         .documents
         .get(caller.scope(), id)
         .await?
         .ok_or(ReadDocumentError::NotFound)?;
     check_may_read(caller, document.event_id, stores.identity).await?;
+    dispute_notes::attach(caller.scope(), &mut document, stores.documents).await?;
     Ok(document)
 }
 
@@ -792,7 +835,9 @@ pub async fn list_versions(
     stores: DocumentReads<'_>,
 ) -> Result<Vec<VersionView>, ReadDocumentError> {
     get_document(caller, id, stores).await?;
-    Ok(stores.documents.versions(caller.scope(), id).await?)
+    let mut versions = stores.documents.versions(caller.scope(), id).await?;
+    dispute_notes::attach_all(caller.scope(), &mut versions, stores.documents).await?;
+    Ok(versions)
 }
 
 /// The upload version `id` and the stream of its file. A draft version has no file: it is not found here.
@@ -853,6 +898,7 @@ mod tests {
                     size_bytes: 10,
                     source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(5)),
                 }),
+                dispute_notes: Default::default(),
             },
         }
     }

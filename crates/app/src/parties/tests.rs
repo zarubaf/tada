@@ -112,6 +112,23 @@ fn next_number<T>(items: &[T]) -> u64 {
     items.len() as u64 + 1
 }
 
+#[async_trait::async_trait]
+impl crate::dispute_notes::DisputeNoteReads for Memory {
+    async fn notes(
+        &self,
+        _: crate::caller::OrgScope,
+        _: &[crate::dispute_notes::NoteKey],
+    ) -> Result<
+        Vec<(
+            crate::dispute_notes::NoteKey,
+            crate::dispute_notes::DisputeNote,
+        )>,
+        crate::store::StoreError,
+    > {
+        Ok(Vec::new())
+    }
+}
+
 #[async_trait]
 impl EvidenceStore for Memory {
     async fn evidence_of(
