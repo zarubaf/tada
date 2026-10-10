@@ -213,7 +213,10 @@ pub struct RecordEvidence {
     pub captured_at: jiff::Timestamp,
     pub start_offset: u32,
     pub end_offset: u32,
+    /// Empty after a legal redaction of the source (ADR 0072).
     pub quote: String,
+    /// True after a legal redaction of the source: the quote is empty (ADR 0072).
+    pub redacted: bool,
     pub page: Option<u32>,
 }
 
@@ -226,7 +229,8 @@ impl From<RecordEvidenceView> for RecordEvidence {
             captured_at: evidence.captured_at,
             start_offset: evidence.start_offset,
             end_offset: evidence.end_offset,
-            quote: evidence.quote,
+            redacted: evidence.quote.as_present().is_none(),
+            quote: evidence.quote.as_present().cloned().unwrap_or_default(),
             page: evidence.page,
         }
     }

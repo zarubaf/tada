@@ -6,6 +6,7 @@ use serde::Serialize;
 use tada_app::access::AccessError;
 use tada_app::domain::facts::{FieldDefinition, FieldScope, FieldStatus as DomainFieldStatus};
 use tada_app::domain::ids::EventId;
+use tada_app::domain::redaction::Redactable;
 use tada_app::facts::{
     self as app, EventProfile as AppProfile, OpenProposalRef, OpenQuestionRef, ProfileEntry,
 };
@@ -20,7 +21,7 @@ use crate::actors::Author;
 use crate::contract::{AUTHENTICATED, PATH, codes};
 use crate::extract::{Caller, Path};
 use crate::problem::{ApiError, Problem};
-use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts};
+use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts, stored_state_parts};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
@@ -68,6 +69,8 @@ pub struct Fact {
     /// True for an approximate value, for example "about 20,000". It is absent if the state is `unknown`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approximate: Option<bool>,
+    /// True after a legal redaction (ADR 0072): the state stays, the value and `approximate` are absent.
+    pub redacted: bool,
     /// The number of the current fact version. A proposal that changes the fact expects it.
     pub version: i64,
     /// The passages of source versions that support the current fact version.
@@ -82,7 +85,10 @@ pub struct Fact {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct FactEvidence {
     pub source_version_id: Uuid,
+    /// Its quote is empty after a legal redaction of the source.
     pub passage: Passage,
+    /// True after a legal redaction of the source (ADR 0072).
+    pub redacted: bool,
     /// The time when tada captured the source version.
     pub captured_at: Timestamp,
 }
@@ -141,7 +147,7 @@ impl From<AppProfile> for EventProfile {
 
 impl From<ProfileEntry> for Fact {
     fn from(entry: ProfileEntry) -> Self {
-        let (state, value, approximate) = state_parts(&entry.state);
+        let (state, value, approximate, redacted) = stored_state_parts(&entry.state);
         Self {
             id: entry.fact_id.as_uuid(),
             field_id: entry.field.id.as_uuid(),
@@ -149,6 +155,7 @@ impl From<ProfileEntry> for Fact {
             state,
             value,
             approximate,
+            redacted,
             version: entry.version.get(),
             accepted_by: entry.accepted_by.into(),
             accepted_at: entry.accepted_at,
@@ -158,6 +165,7 @@ impl From<ProfileEntry> for Fact {
                 .map(|dated| FactEvidence {
                     source_version_id: dated.evidence.source_version_id.as_uuid(),
                     passage: (&dated.evidence.passage).into(),
+                    redacted: dated.evidence.passage.quote == Redactable::Redacted,
                     captured_at: dated.captured_at,
                 })
                 .collect(),

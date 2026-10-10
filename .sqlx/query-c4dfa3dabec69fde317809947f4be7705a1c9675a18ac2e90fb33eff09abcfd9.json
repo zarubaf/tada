@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT p.id, p.changeset_id, p.operation AS \"operation!\", p.operation_version,\n                  p.created_at AS \"created_at: jiff_sqlx::Timestamp\"\n           FROM proposal p\n           WHERE p.organization_id = $1 AND p.event_id = $2 AND p.target_kind = 'fact'\n             AND NOT EXISTS (\n                 SELECT 1 FROM review_result r\n                 WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id\n             )\n           ORDER BY p.created_at, p.id",
+  "query": "SELECT p.id, p.changeset_id, p.operation, p.operation_version,\n                  p.created_at AS \"created_at: jiff_sqlx::Timestamp\"\n           FROM proposal p\n           WHERE p.organization_id = $1 AND p.event_id = $2 AND p.target_kind = 'fact'\n             AND p.redacted_at IS NULL\n             AND NOT EXISTS (\n                 SELECT 1 FROM review_result r\n                 WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id\n             )\n           ORDER BY p.created_at, p.id",
   "describe": {
     "columns": [
       {
@@ -27,7 +27,7 @@
       },
       {
         "ordinal": 2,
-        "name": "operation!",
+        "name": "operation",
         "type_info": "Jsonb",
         "origin": {
           "Table": {
@@ -73,5 +73,5 @@
       false
     ]
   },
-  "hash": "0f7ffdaf86fcce0553fd9df9ed6a6cbf74af2b11363684c766b387f5b88b71b1"
+  "hash": "c4dfa3dabec69fde317809947f4be7705a1c9675a18ac2e90fb33eff09abcfd9"
 }

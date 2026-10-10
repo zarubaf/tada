@@ -9,6 +9,7 @@ use tada_app::domain::facts::{
     self as domain, FactValue, Label as DomainLabel, ReferenceId, ValueType as DomainValueType,
     Valued,
 };
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::Passage as DomainPassage;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -98,6 +99,35 @@ pub(crate) fn state_parts(
         ),
         domain::FactState::Unknown => (FactState::Unknown, None, None),
     }
+}
+
+/// The parts of a stored fact state, and true if a legal redaction removed the value (ADR 0072).
+/// A redacted value is absent, like the value of an unknown fact.
+pub(crate) fn stored_state_parts(
+    state: &domain::FactState<Redactable<Valued>>,
+) -> (FactState, Option<Value>, Option<bool>, bool) {
+    let redacted = matches!(
+        state,
+        domain::FactState::Accepted(Redactable::Redacted)
+            | domain::FactState::Assumption(Redactable::Redacted)
+    );
+    let present = match state {
+        domain::FactState::Accepted(Redactable::Present(valued)) => {
+            domain::FactState::Accepted(valued.clone())
+        }
+        domain::FactState::Assumption(Redactable::Present(valued)) => {
+            domain::FactState::Assumption(valued.clone())
+        }
+        domain::FactState::Accepted(Redactable::Redacted) => {
+            return (FactState::Accepted, None, None, true);
+        }
+        domain::FactState::Assumption(Redactable::Redacted) => {
+            return (FactState::Assumption, None, None, true);
+        }
+        domain::FactState::Unknown => domain::FactState::Unknown,
+    };
+    let (state, value, approximate) = state_parts(&present);
+    (state, value, approximate, redacted)
 }
 
 fn value(valued: &Valued) -> Value {
@@ -254,6 +284,7 @@ pub struct Passage {
     pub start: u32,
     /// The offset after the last character.
     pub end: u32,
+    /// Empty after a legal redaction of the source (ADR 0072).
     pub quote: String,
     /// The page of a PDF, from 1.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -265,7 +296,7 @@ impl From<&DomainPassage> for Passage {
         Self {
             start: passage.start,
             end: passage.end,
-            quote: passage.quote.clone(),
+            quote: passage.quote.as_present().cloned().unwrap_or_default(),
             page: passage.page,
         }
     }

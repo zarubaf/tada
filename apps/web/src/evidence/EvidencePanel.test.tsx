@@ -63,11 +63,13 @@ const fact: Fact = {
   state: "accepted",
   value: { type: "text", text: "Flugplatz Testwil" },
   version: 2,
+  redacted: false,
   evidence: [
     {
       source_version_id: SOURCE_VERSION,
       passage: { start: 10, end: 27, quote: "Flugplatz Testwil", page: 3 },
       captured_at: "2026-10-03T12:12:00Z",
+      redacted: false,
     },
   ],
   accepted_by: { kind: "member", id: MEMBER_ID, channel: "web" },

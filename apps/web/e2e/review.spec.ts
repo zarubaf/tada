@@ -297,7 +297,7 @@ async function fakeInbox(page: Page): Promise<unknown[]> {
   await page.route(/\/api\/v1\/changesets\?/, (route) => route.fulfill(json({ items })));
   await page.route(/\/api\/v1\/changesets\/[^/]+$/, (route) => {
     const id = route.request().url().split("/").pop() as string;
-    return route.fulfill(json(changesets[id]));
+    return route.fulfill(json({ redacted_proposals: [], ...(changesets[id] as object) }));
   });
   await page.route(/\/api\/v1\/changesets\/[^/]+\/apply$/, (route) => {
     applies.push(route.request().postDataJSON());

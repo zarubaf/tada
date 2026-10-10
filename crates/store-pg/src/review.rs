@@ -21,6 +21,7 @@ use tada_app::domain::ids::{
     SourceVersionId,
 };
 use tada_app::domain::proposals::{DraftDocument, Operation};
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::review::{
     ApplyOutcome, ApplyPlan, ApplyStep, LocalRecord, NewLocalId, OpenChangeset, OpenProposal,
@@ -169,10 +170,12 @@ impl ReviewStore for Database {
         let organization = scope.organization_id().as_uuid();
         let event = event.map(EventId::as_uuid);
         let proposals = sqlx::query!(
-            r#"SELECT p.changeset_id, p.id, p.operation AS "operation!", p.operation_version
+            // A proposal that a legal redaction emptied is no longer open for a review (ADR 0072).
+            r#"SELECT p.changeset_id, p.id, p.operation, p.operation_version
                FROM proposal p
                JOIN changeset c ON c.organization_id = p.organization_id AND c.id = p.changeset_id
                WHERE p.organization_id = $1 AND ($2::uuid IS NULL OR c.event_id = $2)
+                 AND p.redacted_at IS NULL
                  AND NOT EXISTS (
                      SELECT 1 FROM review_result r
                      WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id
@@ -1002,7 +1005,7 @@ async fn insert_review_text(
         passage: Passage {
             start: 0,
             end: length,
-            quote: text.as_str().to_owned(),
+            quote: Redactable::Present(text.as_str().to_owned()),
             page: None,
         },
     })
@@ -1096,16 +1099,18 @@ async fn insert_fact_version(
     } in evidence
     {
         sqlx::query!(
+            // A quote that a legal redaction removed stays a tombstone in its copy (ADR 0072).
             "INSERT INTO evidence_link
-                 (id, organization_id, fact_version_id, source_version_id, start_offset, end_offset, quote, page)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                 (id, organization_id, fact_version_id, source_version_id, start_offset, end_offset, quote, page,
+                  redacted_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7::text IS NULL THEN now() END)",
             Uuid::now_v7(),
             organization,
             version,
             source_version_id.as_uuid(),
             offset(passage.start)?,
             offset(passage.end)?,
-            passage.quote,
+            passage.quote.as_present().map(String::as_str),
             passage.page.map(offset).transpose()?,
         )
         .execute(&mut *conn)

@@ -14,8 +14,8 @@ use tada_app::domain::sources::{Evidence, Passage};
 use tada_app::facts::{DatedEvidence, EventProfile, FactStore, FactVersionRef, ProfileEntry};
 use tada_app::store::StoreError;
 
-use crate::Database;
 use crate::error::{InvalidRow, store_error};
+use crate::{Database, redacted};
 use crate::{actor, proposals, values};
 
 /// The sync of a shipped field catalog failed. It changed nothing.
@@ -192,7 +192,7 @@ struct EvidenceRow {
     source_version_id: Uuid,
     start_offset: i32,
     end_offset: i32,
-    quote: String,
+    quote: Option<String>,
     page: Option<i32>,
 }
 
@@ -207,7 +207,7 @@ impl TryFrom<EvidenceRow> for DatedEvidence {
                 passage: Passage {
                     start: offset(row.start_offset)?,
                     end: offset(row.end_offset)?,
-                    quote: row.quote,
+                    quote: redacted::content(row.quote),
                     page: row.page.map(offset).transpose()?,
                 },
             },
@@ -270,7 +270,7 @@ impl FactStore for Database {
         let evidence_rows = sqlx::query_as!(
             EvidenceRow,
             r#"SELECT e.fact_version_id, s.captured_at AS "captured_at: jiff_sqlx::Timestamp",
-                      e.source_version_id, e.start_offset, e.end_offset, e.quote AS "quote!", e.page
+                      e.source_version_id, e.start_offset, e.end_offset, e.quote, e.page
                FROM evidence_link e
                JOIN source_version s ON s.organization_id = e.organization_id AND s.id = e.source_version_id
                WHERE e.organization_id = $1 AND e.fact_version_id = ANY($2)
@@ -295,7 +295,7 @@ impl FactStore for Database {
                 Ok(ProfileEntry {
                     fact_id: FactId::from_uuid(row.fact_id),
                     version: record_version(row.number)?,
-                    state: values::fact_state_from_columns(&row.state, row.value, row.approximate)?,
+                    state: values::stored_fact_state(&row.state, row.value, row.approximate)?,
                     evidence: evidence.remove(&row.version_id).unwrap_or_default(),
                     accepted_by: actor::from_json(&row.accepted_by)?,
                     accepted_at: row.accepted_at.to_jiff(),
@@ -346,7 +346,7 @@ impl FactStore for Database {
             id: FactVersionId::from_uuid(row.id),
             fact_id: FactId::from_uuid(row.fact_id),
             number: record_version(row.number)?,
-            state: values::fact_state_from_columns(&row.state, row.value, row.approximate)?,
+            state: values::stored_fact_state(&row.state, row.value, row.approximate)?,
         }))
     }
 
@@ -380,7 +380,7 @@ impl FactStore for Database {
                     id: FactVersionId::from_uuid(row.id),
                     fact_id: FactId::from_uuid(row.fact_id),
                     number: record_version(row.number)?,
-                    state: values::fact_state_from_columns(&row.state, row.value, row.approximate)?,
+                    state: values::stored_fact_state(&row.state, row.value, row.approximate)?,
                 })
             })
             .collect()
@@ -396,6 +396,7 @@ mod tests {
         Unit, ValueType, Valued, core_catalog,
     };
     use tada_app::domain::ids::{OrganizationId, UserId};
+    use tada_app::domain::redaction::Redactable;
     use tada_app::domain::sources::{Passage, SourceText};
     use tada_app::sources::SourceStore;
 
@@ -555,7 +556,7 @@ mod tests {
             .bind(evidence.source_version_id.as_uuid())
             .bind(i32::try_from(passage.start).unwrap())
             .bind(i32::try_from(passage.end).unwrap())
-            .bind(&passage.quote)
+            .bind(passage.quote.as_present())
             .bind(passage.page.map(|page| i32::try_from(page).unwrap()))
             .execute(&test.database.pool)
             .await
@@ -583,7 +584,7 @@ mod tests {
         let passage = Passage {
             start,
             end: start + u32::try_from(quote.chars().count()).unwrap(),
-            quote: quote.to_owned(),
+            quote: tada_app::domain::redaction::Redactable::Present(quote.to_owned()),
             page: None,
         };
         passage.check(text.as_str()).unwrap();
@@ -786,7 +787,7 @@ mod tests {
                 field: date_window.clone(),
                 fact_id: fact,
                 version: RecordVersion::new(2).unwrap(),
-                state: assumption.clone(),
+                state: assumption.clone().map(Redactable::Present),
                 evidence: vec![DatedEvidence {
                     evidence: source,
                     captured_at: captured_at.to_jiff(),
@@ -811,7 +812,7 @@ mod tests {
             id: version,
             fact_id: fact,
             number: RecordVersion::new(2).unwrap(),
-            state: assumption,
+            state: assumption.map(Redactable::Present),
         };
         assert_eq!(current.unwrap(), Some(expected));
         let missing = db.current_version(scope, event, core("venue").id).await;
@@ -847,10 +848,15 @@ mod tests {
 
         let profile = db.profile(scope_of(testwil), open_day).await.unwrap();
         let states: Vec<_> = profile.fields.iter().map(|entry| &entry.state).collect();
-        assert_eq!(states, [&FactState::Accepted(venue("Flugfeld Testwil"))]);
+        assert_eq!(
+            states,
+            [&FactState::Accepted(Redactable::Present(venue(
+                "Flugfeld Testwil"
+            )))]
+        );
         assert_eq!(
             profile.fields[0].evidence[0].evidence.passage.quote,
-            "Flugfeld Testwil"
+            tada_app::domain::redaction::Redactable::Present("Flugfeld Testwil".to_owned())
         );
 
         let other = scope_of(musterhausen);

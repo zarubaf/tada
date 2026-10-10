@@ -19,7 +19,7 @@ use crate::clock::Clock;
 use crate::documents::{DraftRendering, resolve_links};
 use crate::facts::FactVersionRef;
 use crate::parties::PartyRef;
-use crate::proposals::Changeset;
+use crate::proposals::{Changeset, RedactedProposal};
 use crate::store::StoreError;
 
 /// Each excerpt of the evidence shows at most this number of characters before and after its passage.
@@ -36,6 +36,15 @@ pub struct ChangesetReview {
     pub created_at: Timestamp,
     /// The proposals in the order of the changeset.
     pub proposals: Vec<ProposalReview>,
+    /// The proposals that a legal redaction emptied, with their review status (ADR 0072).
+    pub redacted: Vec<RedactedProposalReview>,
+}
+
+/// A proposal that a legal redaction emptied, as a reviewer sees it (ADR 0072).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedactedProposalReview {
+    pub proposal: RedactedProposal,
+    pub status: ProposalStatus,
 }
 
 /// One proposal as a reviewer sees it.
@@ -43,7 +52,8 @@ pub struct ChangesetReview {
 pub struct ProposalReview {
     pub proposal: Proposal,
     /// One excerpt of the source text for each passage of the evidence of the proposal, in the same order.
-    pub excerpts: Vec<Excerpt>,
+    /// A legal redaction of the source removes the excerpt (ADR 0072).
+    pub excerpts: Vec<Redactable<Excerpt>>,
     pub status: ProposalStatus,
     /// True if the proposal is open and older than `STALE_AFTER`.
     pub stale: bool,
@@ -171,8 +181,15 @@ pub async fn get_changeset(
             .evidence
             .iter()
             .map(|evidence| {
+                // A legal redaction of the source removes the text and the quote together (ADR 0072).
+                if evidence.passage.quote == Redactable::Redacted {
+                    return Some(Redactable::Redacted);
+                }
                 let text = texts.get(&evidence.source_version_id)?;
-                evidence.passage.excerpt(text.as_str(), EXCERPT_CONTEXT)
+                evidence
+                    .passage
+                    .excerpt(text.as_str(), EXCERPT_CONTEXT)
+                    .map(Redactable::Present)
             })
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| StoreError::Internal(Box::new(PassageOutsideText)))?;
@@ -198,6 +215,14 @@ pub async fn get_changeset(
         source_version_id: changeset.source_version_id,
         created_at: changeset.created_at,
         proposals,
+        redacted: changeset
+            .redacted
+            .into_iter()
+            .map(|proposal| RedactedProposalReview {
+                status: proposal_status(&results, proposal.id),
+                proposal,
+            })
+            .collect(),
     })
 }
 
@@ -207,10 +232,13 @@ pub async fn get_changeset(
 async fn evidence_texts(
     caller: &MemberCaller,
     changeset: &Changeset,
-    source: SourceText,
+    source: Redactable<SourceText>,
     stores: ReviewStores<'_>,
 ) -> Result<HashMap<SourceVersionId, SourceText>, StoreError> {
-    let mut texts = HashMap::from([(changeset.source_version_id, source)]);
+    let mut texts = HashMap::new();
+    if let Redactable::Present(source) = source {
+        texts.insert(changeset.source_version_id, source);
+    }
     let mut cited: Vec<SourceVersionId> = changeset
         .proposals
         .iter()

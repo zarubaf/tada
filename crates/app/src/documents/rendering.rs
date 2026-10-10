@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use tada_domain::RecordVersion;
 use tada_domain::documents::DraftMarkdown;
+use tada_domain::facts::FactState;
 use tada_domain::ids::{DocumentId, DocumentVersionId, EventId, FactId, SourceVersionId};
 use tada_domain::redaction::Redactable;
 use tada_domain::sources::Evidence;
@@ -78,6 +79,14 @@ pub(crate) async fn resolve_links(
         let resolution = found
             .iter()
             .find(|version| (version.fact_id, version.number) == (fact.fact_id, fact.version))
+            // A redacted fact version has no value to show (ADR 0072).
+            .filter(|version| {
+                !matches!(
+                    version.state,
+                    FactState::Accepted(Redactable::Redacted)
+                        | FactState::Assumption(Redactable::Redacted)
+                )
+            })
             .map_or(Resolution::Hidden, |version| {
                 Resolution::Fact(version.clone())
             });

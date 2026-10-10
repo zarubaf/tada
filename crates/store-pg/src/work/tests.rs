@@ -482,7 +482,9 @@ async fn a_commitment_shows_its_evidence() {
                 captured_at: "2030-05-02T08:00:00Z".parse().unwrap(),
                 start_offset: 0,
                 end_offset: 23,
-                quote: "Lieferung Freitag 15:00".to_owned(),
+                quote: tada_app::domain::redaction::Redactable::Present(
+                    "Lieferung Freitag 15:00".to_owned()
+                ),
                 page: None,
             }
         )]

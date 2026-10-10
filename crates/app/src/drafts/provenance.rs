@@ -74,7 +74,7 @@ mod tests {
             passage: Passage {
                 start: 4,
                 end: 120,
-                quote: String::new(),
+                quote: tada_domain::redaction::Redactable::Present(String::new()),
                 page: None,
             },
         };

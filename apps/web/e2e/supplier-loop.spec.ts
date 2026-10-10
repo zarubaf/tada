@@ -159,6 +159,7 @@ async function fakeLoop(page: Page): Promise<Requests> {
   await page.route(/\/api\/v1\/changesets\/[^/]+$/, (route) =>
     route.fulfill(
       json({
+        redacted_proposals: [],
         ...changeset,
         proposals: changeset.proposals.map((entry) => ({
           ...entry,

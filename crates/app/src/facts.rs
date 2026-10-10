@@ -73,7 +73,8 @@ pub struct ProfileEntry {
     pub fact_id: FactId,
     /// The number of the current fact version.
     pub version: RecordVersion,
-    pub state: FactState<Valued>,
+    /// A legal redaction removes the value and keeps the state (ADR 0072).
+    pub state: FactState<Redactable<Valued>>,
     /// The evidence links of the fact version.
     pub evidence: Vec<DatedEvidence>,
     /// The reviewer who accepted the fact version.
@@ -95,7 +96,8 @@ pub struct FactVersionRef {
     pub id: FactVersionId,
     pub fact_id: FactId,
     pub number: RecordVersion,
-    pub state: FactState<Valued>,
+    /// A legal redaction removes the value and keeps the state (ADR 0072).
+    pub state: FactState<Redactable<Valued>>,
 }
 
 /// The repository port for field definitions and facts. Each method stays inside `scope`.
@@ -269,10 +271,15 @@ pub async fn date_window(
         FactValue::DateWindow(window) => Ok(window),
         _ => Err(StoreError::Internal(Box::new(ReservedFieldMismatch(KEY)))),
     };
+    // A redacted date window has no value to plan with (ADR 0072).
     Ok(match current.state {
-        FactState::Accepted(valued) => FactState::Accepted(window(valued)?),
-        FactState::Assumption(valued) => FactState::Assumption(window(valued)?),
-        FactState::Unknown => FactState::Unknown,
+        FactState::Accepted(Redactable::Present(valued)) => FactState::Accepted(window(valued)?),
+        FactState::Assumption(Redactable::Present(valued)) => {
+            FactState::Assumption(window(valued)?)
+        }
+        FactState::Accepted(Redactable::Redacted)
+        | FactState::Assumption(Redactable::Redacted)
+        | FactState::Unknown => FactState::Unknown,
     })
 }
 
@@ -404,7 +411,7 @@ mod tests {
             id: FactVersionId::from_uuid(Uuid::from_u128(30)),
             fact_id: FactId::from_uuid(Uuid::from_u128(31)),
             number: RecordVersion::FIRST,
-            state,
+            state: state.map(Redactable::Present),
         }
     }
 

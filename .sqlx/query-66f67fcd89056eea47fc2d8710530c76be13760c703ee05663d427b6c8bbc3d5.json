@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT e.proposal_id, e.source_version_id, e.start_offset, e.end_offset, e.quote AS \"quote!\", e.page\n             FROM proposal_evidence e\n             JOIN proposal p ON p.organization_id = e.organization_id AND p.id = e.proposal_id\n             WHERE e.organization_id = $1 AND p.changeset_id = $2\n             ORDER BY e.id",
+  "query": "SELECT e.proposal_id, e.source_version_id, e.start_offset, e.end_offset, e.quote, e.page\n             FROM proposal_evidence e\n             JOIN proposal p ON p.organization_id = e.organization_id AND p.id = e.proposal_id\n             WHERE e.organization_id = $1 AND p.changeset_id = $2\n             ORDER BY e.id",
   "describe": {
     "columns": [
       {
@@ -49,7 +49,7 @@
       },
       {
         "ordinal": 4,
-        "name": "quote!",
+        "name": "quote",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -85,5 +85,5 @@
       true
     ]
   },
-  "hash": "03ee9fd6fa5d53c0b5e0b6127c061dda5d4d627c23fc82e77f7b2824a9680f8f"
+  "hash": "66f67fcd89056eea47fc2d8710530c76be13760c703ee05663d427b6c8bbc3d5"
 }

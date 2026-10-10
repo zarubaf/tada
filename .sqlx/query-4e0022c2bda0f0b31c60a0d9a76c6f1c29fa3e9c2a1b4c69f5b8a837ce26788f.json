@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO record_evidence\n                 (id, organization_id, action_id, commitment_id, person_id, institution_id, record_version,\n                  proposal_id, source_version_id, start_offset, end_offset, quote, page, redacted_at)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,\n                     CASE WHEN $12::text IS NULL THEN now() END)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4e0022c2bda0f0b31c60a0d9a76c6f1c29fa3e9c2a1b4c69f5b8a837ce26788f"
+}

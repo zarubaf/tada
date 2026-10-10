@@ -967,7 +967,7 @@ mod tests {
         ) -> Result<
             Option<(
                 tada_app::proposals::Changeset,
-                tada_app::domain::sources::SourceText,
+                tada_app::domain::redaction::Redactable<tada_app::domain::sources::SourceText>,
             )>,
             tada_app::store::StoreError,
         > {
