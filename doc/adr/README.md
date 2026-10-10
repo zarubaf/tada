@@ -86,6 +86,10 @@ The ADRs are the authority for the decisions in this project.
 | [0068](0068-actions-and-commitments.md)                         | Actions and commitments                                  | Accepted                           |
 | [0069](0069-persons-and-institutions.md)                        | Persons and institutions                                 | Accepted                           |
 | [0070](0070-ai-security-review-replaces-the-external-review.md) | An AI security review replaces the external review       | Accepted                           |
+| [0071](0071-event-closing-and-retention.md)                     | Event closing, retention and housekeeping                | Proposed                           |
+| [0072](0072-legal-redaction-and-deletion-journal.md)            | Legal redaction and deletion journal                     | Proposed                           |
+| [0073](0073-person-export-and-dispute-notes.md)                 | Person export and dispute notes                          | Proposed                           |
+| [0074](0074-orphan-sweep.md)                                    | Orphan sweep of the object storage                       | Proposed                           |
 
 ## New ADR
 
