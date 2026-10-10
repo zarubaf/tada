@@ -1,8 +1,10 @@
 @layer components {
   .checkbox {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--space-2);
+    min-width: var(--control-height-lg);
+    min-height: var(--control-height-lg);
     cursor: pointer;
   }
 

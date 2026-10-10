@@ -10,12 +10,12 @@ import {
 } from "../api/client";
 import { formatDateTime } from "../facts/formatValue";
 import { t } from "../i18n";
-import { Link } from "../router/Router";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { Skeleton } from "../ui/Skeleton";
+import { StandaloneLink } from "../ui/StandaloneLink";
 import { authorName } from "./authorName";
 import styles from "./ChangesetDetail.module.css";
 import { conflictOf } from "./conflict";
@@ -389,9 +389,9 @@ export function ChangesetDetail({
       onKeyDown={onKeyDown}
     >
       <header className={styles.header}>
-        <Link to="/inbox" className={styles.back}>
+        <StandaloneLink to="/inbox" className={styles.back}>
           {t("inbox-back")}
-        </Link>
+        </StandaloneLink>
         <h2 ref={heading} tabIndex={-1} className={styles.title}>
           {t("inbox-detail-of", { title })}
         </h2>

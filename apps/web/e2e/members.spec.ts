@@ -114,6 +114,21 @@ test("at 320 px the tables do not scroll sideways and each row action is in reac
   expect(await textOverflows(page)).toEqual([]);
 });
 
+test("at 320 px all four items of the bottom bar are inside the viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await fakeSession(page, sessionWithRole("owner"));
+  await fakeMembers(page, true);
+  await page.goto("/settings/members");
+  const items = page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link");
+  await expect(items).toHaveCount(4);
+  for (const item of await items.all()) {
+    const box = await item.boundingBox();
+    expect(box?.x).toBeGreaterThanOrEqual(0);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(320);
+  }
+  expect(await textOverflows(page)).toEqual([]);
+});
+
 test("at 375 px a focused element never hides under the bottom bar", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 640 });
   await fakeSession(page, sessionWithRole("owner"));
