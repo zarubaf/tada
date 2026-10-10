@@ -14,6 +14,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { Page, PageTitle } from "../ui/Page";
+import { redactedOr } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import { StatusLabel } from "../ui/StatusLabel";
@@ -114,7 +115,11 @@ export function MyWorkPage({ api }: { api: Api }) {
       mono: true,
     },
     { id: "text", header: t("commitment-column-text"), cell: (row) => row.text },
-    { id: "promisor", header: t("commitment-column-promisor"), cell: (row) => row.promisor.name },
+    {
+      id: "promisor",
+      header: t("commitment-column-promisor"),
+      cell: (row) => redactedOr(row.promisor.redacted, row.promisor.name),
+    },
     {
       id: "due",
       header: t("work-column-due"),

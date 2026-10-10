@@ -216,4 +216,16 @@ describe("EventsPage toolbar", () => {
     await screen.findByText("Noch keine Anlässe erfasst");
     expect(screen.queryByRole("link", { name: "Anlass erfassen" })).not.toBeInTheDocument();
   });
+
+  it("keeps the name of a redacted event", async () => {
+    const { api } = fakeApi(
+      json(200, { items: [{ ...event("TEST31", "Fly-in 2031"), redacted: true }] }),
+    );
+    render(<EventsPage api={api} />);
+
+    const table = await screen.findByRole("table", { name: "Anlässe" });
+    expect(within(table).getByText("TEST31")).toBeInTheDocument();
+    expect(within(table).getByText("Fly-in 2031")).toBeInTheDocument();
+    expect(within(table).queryByText("entfernt")).not.toBeInTheDocument();
+  });
 });

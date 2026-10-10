@@ -37,6 +37,14 @@ function json(status: number, body: unknown, type = "application/json") {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": type } });
 }
 
+function problem(status: number, code: string) {
+  return json(
+    status,
+    { type: "", code, title: "", status, instance: "", request_id: "r1" },
+    "application/problem+json",
+  );
+}
+
 function setup(answers: Record<string, () => Response> = {}) {
   const calls: { call: string; body: unknown }[] = [];
   const fetch = async (request: Request) => {
@@ -157,5 +165,77 @@ describe("PersonDataProtection", () => {
       }),
     );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it.each([
+    [403, "forbidden", "Sie haben keine Berechtigung für diese Aktion."],
+    [404, "not-found", "Das gibt es nicht, oder Sie dürfen es nicht sehen."],
+    [409, "invalid-transition", "Diese Änderung ist im aktuellen Zustand nicht möglich."],
+  ])("shows the refusal %i of a redaction and keeps the list", async (status, code, message) => {
+    setup({ "POST /api/v1/redactions": () => problem(status, code) });
+    await user.click(await screen.findByRole("checkbox", { name: /Beat Muster fliegt mit/ }));
+    await user.click(screen.getByRole("button", { name: "Entfernen" }));
+    const dialog = await screen.findByRole("alertdialog");
+
+    await user.click(within(dialog).getByRole("button", { name: "Endgültig entfernen" }));
+
+    expect(await screen.findByText(message)).toBeVisible();
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(screen.getByRole("checkbox", { name: /Beat Muster fliegt mit/ })).toBeChecked();
+  });
+
+  it.each([
+    [403, "forbidden", "Sie haben keine Berechtigung für diese Aktion."],
+    [404, "not-found", "Das gibt es nicht, oder Sie dürfen es nicht sehen."],
+    [409, "invalid-transition", "Dieser Eintrag ist schon entfernt."],
+  ])("shows the refusal %i of a dispute in the dialog", async (status, code, message) => {
+    setup({ "POST /api/v1/dispute-notes": () => problem(status, code) });
+    await user.click(await screen.findByRole("checkbox", { name: /Beat Muster fliegt mit/ }));
+    await user.click(screen.getByRole("button", { name: "Bestreiten" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByRole("textbox", { name: "Einwand" }), "Falsch.");
+
+    await user.click(within(dialog).getByRole("button", { name: "Einwand speichern" }));
+
+    expect(await within(dialog).findByText(message)).toBeVisible();
+  });
+
+  it("shows the failure of the mention list", async () => {
+    setup({ "GET /api/v1/persons/p1/mentions": () => problem(500, "internal") });
+
+    expect(await screen.findByText("Ein unerwarteter Fehler ist aufgetreten.")).toBeVisible();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    // The export does not depend on the list.
+    expect(screen.getByRole("link", { name: "Export herunterladen" })).toBeVisible();
+  });
+
+  it("moves focus to the list heading after a redaction and after a dispute", async () => {
+    setup({
+      "POST /api/v1/redactions": () => json(200, { applied: ["s1"], already: 0 }),
+      "POST /api/v1/dispute-notes": () =>
+        json(201, {
+          id: "n",
+          target_kind: "fact-version",
+          target_id: "f1",
+          text: "x",
+          created_at: "2026-10-10T08:00:00Z",
+        }),
+    });
+    await user.click(await screen.findByRole("checkbox", { name: /Beat Muster fliegt mit/ }));
+    await user.click(screen.getByRole("button", { name: "Entfernen" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Endgültig entfernen",
+      }),
+    );
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Erwähnungen" })).toHaveFocus());
+
+    await user.click(screen.getByRole("checkbox", { name: /Angabe/ }));
+    await user.click(screen.getByRole("button", { name: "Bestreiten" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByRole("textbox", { name: "Einwand" }), "x");
+    await user.click(within(dialog).getByRole("button", { name: "Einwand speichern" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Erwähnungen" })).toHaveFocus());
   });
 });

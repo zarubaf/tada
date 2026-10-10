@@ -37,3 +37,4 @@ mention-kind-action = Aufgabe
 mention-kind-commitment = Zusage
 mention-kind-workstream = Arbeitsbereich
 mention-kind-promisor = Zusagende Partei
+person-data-dispute-redacted = Dieser Eintrag ist schon entfernt.

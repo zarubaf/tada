@@ -17,6 +17,7 @@ const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", tim
 
 const columns: Column<Event>[] = [
   { id: "key", header: t("events-column-key"), cell: (event) => event.key, mono: true },
+  // A redacted event keeps its name (ADR 0072).
   { id: "name", header: t("events-column-name"), cell: (event) => event.name },
   { id: "time-zone", header: t("events-column-time-zone"), cell: (event) => event.time_zone },
   {

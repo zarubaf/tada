@@ -8,7 +8,7 @@ import { DisputeNotes } from "../ui/DisputeNotes";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { KnowledgeState } from "../ui/KnowledgeState";
-import { Redacted } from "../ui/Redacted";
+import { Redacted, redactedOr } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventOverview.module.css";
 import { useEventContext } from "./eventContext";
@@ -95,7 +95,8 @@ export function EventOverview({ api }: { api: Api }) {
           <ul className={styles.questions}>
             {open_questions.map((question) => (
               <li key={question.id}>
-                <span className={styles.id}>{question.local_id}</span> {question.text}
+                <span className={styles.id}>{question.local_id}</span>{" "}
+                {redactedOr(question.redacted, question.text)}
               </li>
             ))}
           </ul>

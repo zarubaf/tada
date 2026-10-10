@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import personDataMessages from "../../../../locales/de-CH/person-data.ftl?raw";
 import { type Api, problemMessage } from "../api/client";
 import { addMessages, hasMessage, t } from "../i18n";
@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { FileLink } from "../ui/FileLink";
+import { useFocusAfterCommit } from "../ui/focus";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Redacted } from "../ui/Redacted";
 import { DisputeDialog } from "./DisputeDialog";
@@ -81,6 +82,8 @@ export default function PersonDataProtection({ api, personId }: { api: Api; pers
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string>();
   const [done, setDone] = useState<string>();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const load = useCallback(async () => {
     try {
@@ -120,6 +123,7 @@ export default function PersonDataProtection({ api, personId }: { api: Api; pers
       } else {
         setDone(t("person-data-redacted", { count: chosen.length }));
         setSelected(new Set());
+        focusAfterCommit(() => heading.current);
         await load();
       }
     } catch {
@@ -137,8 +141,11 @@ export default function PersonDataProtection({ api, personId }: { api: Api; pers
     try {
       const result = await data.dispute(target, text);
       if (result.error || !result.response.ok) {
-        return result.error?.code === "validation-failed"
-          ? t("person-data-dispute-error")
+        if (result.error?.code === "validation-failed") {
+          return t("person-data-dispute-error");
+        }
+        return result.error?.code === "invalid-transition"
+          ? t("person-data-dispute-redacted")
           : problemMessage(result.error);
       }
     } catch {
@@ -147,6 +154,7 @@ export default function PersonDataProtection({ api, personId }: { api: Api; pers
     setDisputing(false);
     setSelected(new Set());
     setDone(t("person-data-disputed-done"));
+    focusAfterCommit(() => heading.current);
     await load();
     return undefined;
   };
@@ -164,7 +172,9 @@ export default function PersonDataProtection({ api, personId }: { api: Api; pers
         </FileLink>
       </p>
 
-      <h3 className={styles.subheading}>{t("person-data-mentions")}</h3>
+      <h3 ref={heading} tabIndex={-1} className={styles.subheading}>
+        {t("person-data-mentions")}
+      </h3>
       {mentions === undefined ? (
         !failure && <p>{t("person-data-mentions-loading")}</p>
       ) : mentions.length === 0 ? (

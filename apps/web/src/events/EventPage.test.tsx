@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi, type Event } from "../api/client";
@@ -262,5 +262,23 @@ describe("EventPage", () => {
 
     await userEvent.click(within(alert).getByRole("button", { name: "Erneut versuchen" }));
     expect(await screen.findByRole("heading", { name: event.name })).toBeInTheDocument();
+  });
+
+  it("keeps the name of a redacted event and shows entfernt for a redacted date window", async () => {
+    const { api } = fakeApiWithProfile(
+      () =>
+        json(200, {
+          facts: [{ ...dateWindowFact, value: undefined, redacted: true }],
+          proposals: [],
+          open_questions: [],
+        }),
+      json(200, { ...event, redacted: true }),
+    );
+    renderAt(`/events/${event.id}`, api);
+
+    const heading = await screen.findByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent(event.name);
+    const header = heading.closest("header") as HTMLElement;
+    await waitFor(() => expect(within(header).getAllByText("entfernt")).toHaveLength(1));
   });
 });

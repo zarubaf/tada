@@ -10,6 +10,7 @@ import { Button } from "../ui/Button";
 import type { Column } from "../ui/DataTable";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
+import { redactedOr } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import { TextField } from "../ui/TextField";
 import styles from "./PartiesPage.module.css";
@@ -56,7 +57,11 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
 
   const columns: Column<Party>[] = [
     { id: "id", header: t("parties-column-id"), cell: (row) => row.local_id, mono: true },
-    { id: "name", header: t("parties-column-name"), cell: (row) => row.name },
+    {
+      id: "name",
+      header: t("parties-column-name"),
+      cell: (row) => redactedOr(row.redacted, row.name),
+    },
     ...(person
       ? []
       : [
@@ -68,13 +73,15 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
         ]),
     { id: "email", header: t("parties-column-email"), cell: (row) => row.email ?? "" },
     { id: "phone", header: t("parties-column-phone"), cell: (row) => row.phone ?? "" },
-    ...(register.state.kind === "loaded" && register.state.items.some((row) => row.can_change)
+    ...(register.state.kind === "loaded" &&
+    register.state.items.some((row) => row.can_change && !row.redacted)
       ? [
           {
             id: "actions",
             header: t("parties-column-actions"),
             cell: (row: Party) =>
-              row.can_change && (
+              row.can_change &&
+              !row.redacted && (
                 <Button
                   aria-label={t("parties-edit-of", { name: row.name })}
                   onPress={() => page.edit(row)}

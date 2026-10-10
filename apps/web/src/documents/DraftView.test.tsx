@@ -284,4 +284,38 @@ describe("DraftView", () => {
     await screen.findByText("Text");
     expect(shown).toBe(1);
   });
+
+  it("shows the dispute note at the link whose URI keys it, and at no other", async () => {
+    const rendering: DraftRendering = {
+      ...draft(`Am [Datum](${dateLink}) im [Protokoll](${sourceLink}) und [Ort](${venueLink}).`, {
+        [sourceLink]: {
+          kind: "source",
+          source_version_id: SOURCE,
+          passage: { start: 0, end: 5, quote: "Hallo zusammen" },
+        },
+      }),
+      link_dispute_notes: {
+        [dateLink]: [{ text: "Datum bestritten.", created_at: "2030-05-03T08:00:00Z" }],
+        [sourceLink]: [{ text: "Quelle bestritten.", created_at: "2030-05-03T08:00:00Z" }],
+      },
+    };
+    show({
+      ...rendering,
+      links: {
+        ...rendering.links,
+        [dateLink]: {
+          kind: "fact",
+          fact_id: FACT_DATE,
+          version: 2,
+          state: "accepted",
+          value: dateFact.value,
+        },
+      },
+    } as DraftRendering);
+
+    expect(await screen.findByText("Einwand: Datum bestritten.")).toBeInTheDocument();
+    const sources = screen.getByRole("region", { name: "Quellen" });
+    expect(within(sources).getByText("Einwand: Quelle bestritten.")).toBeInTheDocument();
+    expect(screen.getAllByText(/^Einwand:/)).toHaveLength(2);
+  });
 });
