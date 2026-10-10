@@ -3,13 +3,13 @@
 use serde_json::{Map, Value};
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
-use tada_app::audit::{AuditEvent, RoleChange};
+use tada_app::audit::AuditEvent;
 use tada_app::domain::ids::{OrganizationId, UserId};
-use tada_app::domain::redaction::RedactionReason;
 
 /// The `detail` column: the role change `{"old_role": ..., "new_role": ...}` without the key of a missing
 /// role (ADR 0061), and the reason of a legal redaction `{"reason": ...}` (ADR 0072). `None` without either.
-fn detail(roles: Option<RoleChange>, reason: Option<RedactionReason>) -> Option<Value> {
+fn detail(event: &AuditEvent) -> Option<Value> {
+    let (roles, reason) = (event.roles(), event.reason());
     let mut detail = Map::new();
     if let Some(old) = roles.and_then(|roles| roles.old) {
         detail.insert("old_role".to_owned(), old.as_str().into());
@@ -42,7 +42,7 @@ pub(crate) async fn record(conn: &mut PgConnection, event: &AuditEvent) -> Resul
         event.record_kind(),
         event.record_id(),
         event.subject().map(UserId::as_uuid),
-        detail(event.roles(), event.reason()),
+        detail(event),
     )
     .execute(conn)
     .await
