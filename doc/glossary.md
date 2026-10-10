@@ -121,6 +121,19 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | escalation | A message to a workstream lead or the PM about an unresolved item.                                                                        |              |
 | policy     | A configured rule that permits an automatic action.                                                                                       |              |
 
+## Data protection
+
+| Term             | Meaning                                                                                                                                 | Avoid                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| closed event     | An event with the status `closed`. It is read-only for every role. An owner or admin can reopen it (ADR 0071).                          | archived event           |
+| retention period | The number of months after which a job redacts closed events or sources. An owner sets it; empty means off (ADR 0071).                  | expiry, time to live     |
+| redaction        | The audited removal of the content of a record. The record stays as a tombstone (ADR 0072).                                             | deletion, erasure        |
+| tombstone        | The state of a redacted record: its content is empty, `redacted_at` is set, and the ID stays. The UI shows „entfernt“ (ADR 0072).       | placeholder, soft delete |
+| deletion journal | The append-only objects in the object storage that record each redaction by ID. A replay applies them after a restore (ADR 0072).       | redaction log            |
+| dispute note     | A text of an owner on immutable evidence that says the data is disputed. Each reader of the evidence sees it (ADR 0073).                | comment, annotation      |
+| mention          | A place where the name, email address or phone number of a person appears in a text, or where a record refers to the person (ADR 0073). | hit, reference           |
+| orphan object    | An object in the object storage that no document version with content refers to. The orphan sweep deletes it (ADR 0074).                | dangling file            |
+
 ## Architecture
 
 | Term             | Meaning                                                                                                                                           | Avoid                                            |

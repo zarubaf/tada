@@ -73,6 +73,23 @@ pgvector comes only if an evaluation shows a benefit.
 4. The owner accepts, edits or rejects it. Silence is never acceptance.
 5. If the target record changed, the proposal goes into conflict and needs a new evaluation.
 
+### A redaction
+
+1. An owner chooses the targets, or the retention job of the worker finds a closed event whose period ended ([ADR 0071](adr/0071-event-closing-and-retention.md)).
+2. `app::redaction` applies the rules and calls the `RedactionStore` port.
+   `store-pg` sets `tada.redaction` for the transaction. The immutability triggers then accept the tombstone update and nothing else.
+3. The same transaction writes the `redaction` row, the audit event and the job `write-redaction-journal`.
+4. After the commit, the stored object of a redacted document version is deleted, if any.
+5. The job writes the journal object. After a restore, `tada redactions replay` applies the journal again ([ADR 0072](adr/0072-legal-redaction-and-deletion-journal.md)).
+
+### Daily sweeps
+
+The worker runs three sweeps once in 24 hours, each in the pattern of the counter sweep ([ADR 0065](adr/0065-worker-deletes-ended-rate-limit-counters.md)):
+
+- Retention: redacts closed events and sources whose period ended ([ADR 0071](adr/0071-event-closing-and-retention.md)).
+- Housekeeping: deletes technical rows after their periods ([ADR 0071](adr/0071-event-closing-and-retention.md)).
+- Orphan sweep: deletes objects that no document version refers to and aborts old incomplete uploads ([ADR 0074](adr/0074-orphan-sweep.md)).
+
 ### A scheduled reminder
 
 1. The worker finds due checks from accepted state and the configured policy.
