@@ -15,6 +15,7 @@ mod json_schema;
 mod members;
 mod origin;
 mod parties;
+mod person_data;
 mod privacy;
 mod problem;
 mod redactions;
@@ -51,6 +52,7 @@ use tada_app::health::DependencyCheck;
 use tada_app::identity::IdentityStore;
 use tada_app::members::MemberStore;
 use tada_app::parties::PartyStore;
+use tada_app::person_data::PersonDataStore;
 use tada_app::privacy::PrivacyStore;
 use tada_app::problem::ProblemCode;
 use tada_app::proposals::ProposalStore;
@@ -114,6 +116,8 @@ pub struct ApiState {
     pub workstreams: Arc<dyn WorkstreamStore>,
     /// The actions and commitments of events (ADR 0068).
     pub work: Arc<dyn WorkStore>,
+    /// The mentions and the export of a person (ADR 0073).
+    pub person_data: Arc<dyn PersonDataStore>,
     /// The dispute notes about evidence (ADR 0073).
     pub dispute_notes: Arc<dyn DisputeNoteStore>,
     /// Legal redaction (ADR 0072).
@@ -141,6 +145,7 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(parties::routes())
                 .merge(workstreams::routes())
                 .merge(work::routes())
+                .merge(person_data::routes())
                 .merge(dispute_notes::routes())
                 .merge(redactions::routes()),
         )
@@ -165,6 +170,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(parties::problem_codes())
         .chain(workstreams::problem_codes())
         .chain(work::problem_codes())
+        .chain(person_data::problem_codes())
         .chain(dispute_notes::problem_codes())
         .chain(redactions::problem_codes())
         .collect()
@@ -1451,6 +1457,29 @@ mod tests {
     struct NoPersonData;
 
     #[async_trait::async_trait]
+    impl tada_app::person_data::PersonDataStore for NoPersonData {
+        async fn find_mentions(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::PersonId,
+            _: &[String],
+        ) -> Result<Vec<tada_app::person_data::FoundMention>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn export(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::PersonId,
+            _: Option<tada_app::domain::ids::UserId>,
+            _: &[String],
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::person_data::PersonRecords, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
     impl tada_app::dispute_notes::DisputeNoteStore for NoPersonData {
         async fn target_exists(
             &self,
@@ -1553,6 +1582,7 @@ mod tests {
             parties: Arc::new(NoParties),
             workstreams: Arc::new(NoWorkstreams),
             work: Arc::new(NoWork),
+            person_data: Arc::new(NoPersonData),
             dispute_notes: Arc::new(NoPersonData),
             redaction: Arc::new(NoPersonData),
         }

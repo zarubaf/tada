@@ -9,9 +9,12 @@ mod support;
 use axum::body::Body;
 use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
+use support::SESSION_COOKIE;
+use support::files::pdf;
 use support::organization::{Client, Filled, fill, organization, router};
 use tada_adapters::storage::testing::TestGarage;
 use tada_app::caller::OrganizationRole;
+use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
@@ -19,6 +22,8 @@ use uuid::Uuid;
 struct World {
     test: TestDatabase,
     garage: TestGarage,
+    organization: OrganizationId,
+    owner_id: UserId,
     owner: Client,
     event: String,
 }
@@ -26,24 +31,36 @@ struct World {
 impl World {
     async fn start() -> Self {
         let (test, garage) = tokio::join!(TestDatabase::start(), TestGarage::start());
-        let (_, _, owner) = organization(&test, &garage, "testwil").await;
+        let (organization, owner_id, owner) = organization(&test, &garage, "testwil").await;
         let event = owner.create_event("OPEN30", "Open Day Testwil").await;
-        Self::with(test, garage, owner, event)
+        Self::with(test, garage, organization, owner_id, owner, event)
     }
 
     /// An organization that `fill` filled, with a Telegram link of the owner to `telegram_user`.
     async fn filled(telegram_user: i64) -> (Self, Filled) {
         let (test, garage) = tokio::join!(TestDatabase::start(), TestGarage::start());
-        let (organization, _, owner) = organization(&test, &garage, "testwil").await;
+        let (organization, owner_id, owner) = organization(&test, &garage, "testwil").await;
         let filled = fill(&test, &owner, organization, telegram_user).await;
         let event = filled.event.clone();
-        (Self::with(test, garage, owner, event), filled)
+        (
+            Self::with(test, garage, organization, owner_id, owner, event),
+            filled,
+        )
     }
 
-    fn with(test: TestDatabase, garage: TestGarage, owner: Client, event: String) -> Self {
+    fn with(
+        test: TestDatabase,
+        garage: TestGarage,
+        organization: OrganizationId,
+        owner_id: UserId,
+        owner: Client,
+        event: String,
+    ) -> Self {
         Self {
             test,
             garage,
+            organization,
+            owner_id,
             owner,
             event,
         }
@@ -56,6 +73,11 @@ impl World {
             router: router(&self.test, &self.garage),
             cookie,
         }
+    }
+
+    async fn person(&self, body: Value) -> String {
+        let person = self.owner.post("/api/v1/persons", &body).await;
+        person["id"].as_str().unwrap().to_owned()
     }
 
     /// A changeset with the source text `text` and a date proposal whose evidence is `quote`.
@@ -76,6 +98,27 @@ impl World {
             .await
     }
 
+    async fn action(&self, title: &str) -> String {
+        self.action_with(json!({"title": title})).await
+    }
+
+    async fn action_with(&self, mut body: Value) -> String {
+        body["owner_user_id"] = json!(self.owner_id.as_uuid());
+        let action = self
+            .owner
+            .post(&format!("/api/v1/events/{}/actions", self.event), &body)
+            .await;
+        action["id"].as_str().unwrap().to_owned()
+    }
+
+    async fn mentions(&self, person: &str) -> Vec<Value> {
+        let mentions = self
+            .owner
+            .get(&format!("/api/v1/persons/{person}/mentions"))
+            .await;
+        mentions["items"].as_array().unwrap().clone()
+    }
+
     async fn source_item(&self, changeset: &Value) -> Uuid {
         let version = changeset["source_version_id"].as_str().unwrap();
         self.test
@@ -84,6 +127,15 @@ impl World {
             ))
             .await
     }
+}
+
+fn kinds(mentions: &[Value]) -> Vec<&str> {
+    let mut kinds: Vec<&str> = mentions
+        .iter()
+        .map(|mention| mention["kind"].as_str().unwrap())
+        .collect();
+    kinds.sort_unstable();
+    kinds
 }
 
 /// A request of `client` with a JSON body.
@@ -98,13 +150,269 @@ async fn call(
     client.call(request, body).await
 }
 
+/// Each key of a JSON value, also in nested objects and arrays.
+fn keys(value: &Value, into: &mut Vec<String>) {
+    match value {
+        Value::Object(map) => {
+            for (key, value) in map {
+                into.push(key.clone());
+                keys(value, into);
+            }
+        }
+        Value::Array(items) => items.iter().for_each(|item| keys(item, into)),
+        _ => {}
+    }
+}
+
+#[tokio::test]
+async fn mentions_find_name_email_phone_case_insensitive() {
+    let world = World::start().await;
+    let person = world
+        .person(json!({"name": "Beat Muster", "email": "beat.muster@example.org", "phone": "079 555 01 02"}))
+        .await;
+    let changeset = world
+        .changeset(
+            "Kontakt: BEAT MUSTER, Tel 079 555 01 02. Das Open Day ist im Mai 2030.",
+            "im Mai 2030",
+        )
+        .await;
+    let action = world
+        .action("Mail an Beat.Muster@Example.org schicken")
+        .await;
+    world.action("Zelt aufstellen").await;
+    let padding = "Lange Notiz zum Gelände und zur Zufahrt. ".repeat(10);
+    let long = world
+        .action_with(json!({"title": "Rückruf", "description": format!("{padding}Rückruf von beat muster. {padding}")}))
+        .await;
+    let commitment = world
+        .owner
+        .post(
+            &format!("/api/v1/events/{}/commitments", world.event),
+            &json!({"text": "Generator liefern", "promisor": {"kind": "person", "id": person},
+                    "owner_user_id": world.owner_id.as_uuid()}),
+        )
+        .await;
+
+    let mentions = world.mentions(&person).await;
+    assert_eq!(
+        kinds(&mentions),
+        ["action", "action", "promisor", "source-item"],
+        "{mentions:?}"
+    );
+    let source = mentions
+        .iter()
+        .find(|m| m["kind"] == "source-item")
+        .unwrap();
+    assert_eq!(
+        source["id"],
+        world.source_item(&changeset).await.to_string()
+    );
+    assert_eq!(source["event_id"], world.event.as_str());
+    assert_eq!(source["redacted"], false);
+    assert_eq!(source["disputed"], false);
+    assert!(
+        source["excerpt"].as_str().unwrap().contains("BEAT MUSTER"),
+        "{source}"
+    );
+    let mail = mentions
+        .iter()
+        .find(|m| m["id"] == action.as_str())
+        .unwrap();
+    assert!(
+        mail["excerpt"]
+            .as_str()
+            .unwrap()
+            .contains("Beat.Muster@Example.org")
+    );
+    let promisor = mentions.iter().find(|m| m["kind"] == "promisor").unwrap();
+    assert_eq!(promisor["id"], commitment["id"]);
+    assert_eq!(promisor["excerpt"], "Generator liefern");
+    // The excerpt of a long text has at most 200 characters around the match.
+    let long = mentions.iter().find(|m| m["id"] == long.as_str()).unwrap();
+    let excerpt = long["excerpt"].as_str().unwrap();
+    assert!(excerpt.chars().count() <= 200, "{excerpt}");
+    assert!(excerpt.contains("beat muster"), "{excerpt}");
+}
+
+/// A name in the file name of an upload or in the name of a document is a mention of the document version.
+#[tokio::test]
+async fn mentions_find_the_file_name_and_the_document_name() {
+    let world = World::start().await;
+    let person = world.person(json!({"name": "Beat Muster"})).await;
+    let documents = format!("/api/v1/events/{}/documents", world.event);
+    let offer = world
+        .owner
+        .upload(&documents, "Offerte Beat Muster.pdf", pdf("Angebot"))
+        .await;
+    let contract = world
+        .owner
+        .upload(&documents, "Vertrag.pdf", pdf("Vertrag"))
+        .await;
+    world
+        .owner
+        .upload(&documents, "Programm.pdf", pdf("Programm"))
+        .await;
+    let contract_id = contract["id"].as_str().unwrap();
+    world
+        .test
+        .execute(&[&format!(
+            "UPDATE document SET name = 'Vertrag mit Beat Muster' WHERE id = '{contract_id}'"
+        )])
+        .await;
+    let version_of = |document: &str| {
+        format!("SELECT id FROM document_version WHERE document_id = '{document}'")
+    };
+    let offer_version = world
+        .test
+        .scalar::<Uuid>(&version_of(offer["id"].as_str().unwrap()))
+        .await;
+    let contract_version = world.test.scalar::<Uuid>(&version_of(contract_id)).await;
+
+    let mentions = world.mentions(&person).await;
+    assert_eq!(
+        kinds(&mentions),
+        ["document-version", "document-version"],
+        "{mentions:?}"
+    );
+    for version in [offer_version, contract_version] {
+        let mention = mentions
+            .iter()
+            .find(|m| m["id"] == version.to_string())
+            .unwrap();
+        assert!(
+            mention["excerpt"].as_str().unwrap().contains("Beat Muster"),
+            "{mention}"
+        );
+        assert_eq!(mention["event_id"], world.event.as_str());
+    }
+}
+
+#[tokio::test]
+async fn mentions_escape_like_wildcards() {
+    let world = World::start().await;
+    let person = world.person(json!({"name": "100%_x"})).await;
+    let literal = world.action("Gast 100%_x kommt").await;
+    // With `%` and `_` as wildcards, the name would match these texts too.
+    world.action("Gast 100 Tische und 1x Bühne").await;
+    world.action("Gast 100%ax kommt").await;
+
+    let mentions = world.mentions(&person).await;
+    assert_eq!(mentions.len(), 1, "{mentions:?}");
+    assert_eq!(mentions[0]["id"], literal.as_str());
+}
+
+#[tokio::test]
+async fn short_terms_ignored() {
+    let world = World::start().await;
+    let person = world.person(json!({"name": "Al", "phone": "12"})).await;
+    world.action("Alpenfest in der Halle 12").await;
+
+    assert_eq!(world.mentions(&person).await, Vec::<Value>::new());
+}
+
+#[tokio::test]
+async fn export_contains_account_data_when_linked_and_no_secrets() {
+    let (world, filled) = World::filled(4_200_001).await;
+    let email: String = world
+        .test
+        .scalar(&format!(
+            "SELECT email FROM email_identity WHERE user_id = '{}'",
+            world.owner_id
+        ))
+        .await;
+    let linked = world
+        .person(json!({"name": "Owner Testwil", "user_id": world.owner_id.as_uuid()}))
+        .await;
+    let unlinked = world.person(json!({"name": "Beat Muster"})).await;
+    world.action("Anruf bei Owner Testwil").await;
+
+    let request = support::request(Method::GET, &format!("/api/v1/persons/{linked}/export"))
+        .header(
+            header::COOKIE,
+            format!("{SESSION_COOKIE}={}", world.owner.cookie),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let response = world.owner.router.clone();
+    let response = tower::ServiceExt::oneshot(response, request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()[header::CONTENT_DISPOSITION],
+        "attachment; filename=\"person-PER-001.json\""
+    );
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let text = String::from_utf8(body.to_vec()).unwrap();
+    let export: Value = serde_json::from_str(&text).unwrap();
+
+    assert_eq!(export["format_version"], 1);
+    assert_eq!(export["organization"]["id"], world.organization.to_string());
+    assert_eq!(export["person"]["id"], linked.as_str());
+    assert_eq!(export["person"]["local_id"], "PER-001");
+    assert_eq!(export["mentions"].as_array().unwrap().len(), 1, "{export}");
+    assert_eq!(export["mentions"][0]["text"], "Anruf bei Owner Testwil");
+    let account = &export["account"];
+    assert_eq!(account["user_id"], world.owner_id.to_string());
+    assert_eq!(account["email"], email.as_str());
+    assert_eq!(account["organization_role"], "owner");
+    assert_eq!(account["telegram"]["telegram_user_id"], 4_200_001);
+    assert!(
+        !account["sessions"].as_array().unwrap().is_empty(),
+        "{account}"
+    );
+    assert_eq!(account["api_tokens"][0]["name"], "Claude Code");
+    assert!(!account["audit_events"].as_array().unwrap().is_empty());
+    assert!(account["event_memberships"].is_array());
+    assert!(account["invitations"].is_array());
+
+    // No secret and no hash of a secret.
+    let mut names = Vec::new();
+    keys(&export, &mut names);
+    for name in &names {
+        assert!(!name.contains("hash") && !name.contains("secret"), "{name}");
+    }
+    for secret in &filled.secrets {
+        assert!(!text.contains(secret.as_str()), "the export holds a secret");
+    }
+    let hashes: String = world
+        .test
+        .scalar(
+            "SELECT string_agg(encode(token_hash, 'hex'), ',') FROM (
+                 SELECT token_hash FROM session UNION ALL SELECT token_hash FROM api_token) AS hashes",
+        )
+        .await;
+    for hash in hashes.split(',') {
+        assert!(!text.contains(hash), "the export holds a token hash");
+    }
+    assert_eq!(
+        world
+            .test
+            .scalar::<i64>(&format!(
+                "SELECT count(*) FROM audit_event WHERE action = 'person.export' AND record_id = '{linked}'"
+            ))
+            .await,
+        1
+    );
+
+    // A person without an account has no account data.
+    let export = world
+        .owner
+        .get(&format!("/api/v1/persons/{unlinked}/export"))
+        .await;
+    assert_eq!(export["account"], Value::Null, "{export}");
+}
+
 #[tokio::test]
 async fn only_owner_reads_mentions_exports_redacts_disputes() {
     let (world, filled) = World::filled(4_200_002).await;
+    let person = world.person(json!({"name": "Beat Muster"})).await;
     let changeset = world
         .changeset("Beat Muster kommt im Mai 2030.", "im Mai 2030")
         .await;
     let item = world.source_item(&changeset).await;
+    let mentions = format!("/api/v1/persons/{person}/mentions");
+    let export = format!("/api/v1/persons/{person}/export");
     let redaction = json!({"targets": [{"kind": "source-item", "id": item}], "reason": "request"});
     let note =
         json!({"target_kind": "source-item", "target_id": item, "text": "Das stimmt nicht."});
@@ -129,6 +437,8 @@ async fn only_owner_reads_mentions_exports_redacts_disputes() {
     ];
     for (client, code) in &callers {
         for (method, path, body) in [
+            (Method::GET, mentions.as_str(), None),
+            (Method::GET, export.as_str(), None),
             (Method::POST, "/api/v1/redactions", Some(&redaction)),
             (Method::POST, "/api/v1/dispute-notes", Some(&note)),
         ] {
@@ -140,7 +450,7 @@ async fn only_owner_reads_mentions_exports_redacts_disputes() {
     // The REST API takes no API token, and the MCP server has no tool for these features (ADR 0073).
     let token = filled.secrets[3].as_str();
     for (method, path, body) in [
-        (Method::POST, "/api/v1/dispute-notes", Some(&note)),
+        (Method::GET, mentions.as_str(), None),
         (Method::POST, "/api/v1/redactions", Some(&redaction)),
     ] {
         let request = support::request(method, path)
@@ -166,7 +476,7 @@ async fn only_owner_reads_mentions_exports_redacts_disputes() {
     assert!(!tools.is_empty());
     for tool in tools {
         let name = tool["name"].as_str().unwrap();
-        for word in ["redact", "dispute"] {
+        for word in ["mention", "export", "redact", "dispute"] {
             assert!(!name.contains(word), "{name}");
         }
     }
@@ -175,7 +485,8 @@ async fn only_owner_reads_mentions_exports_redacts_disputes() {
         world
             .test
             .scalar::<i64>(
-                "SELECT (SELECT count(*) FROM redaction) + (SELECT count(*) FROM dispute_note)"
+                "SELECT (SELECT count(*) FROM redaction) + (SELECT count(*) FROM dispute_note)
+                 + (SELECT count(*) FROM audit_event WHERE action = 'person.export')"
             )
             .await,
         0
@@ -248,7 +559,14 @@ async fn dispute_note_visible_to_readers_of_target() {
         "Einwand zu source-item."
     );
 
-    // A text over 1000 characters is refused.
+    // The note marks the mention as disputed. A text over 1000 characters is refused.
+    let person = world.person(json!({"name": "Open Day"})).await;
+    let mentions = world.mentions(&person).await;
+    let source = mentions
+        .iter()
+        .find(|m| m["kind"] == "source-item")
+        .unwrap();
+    assert_eq!(source["disputed"], true, "{mentions:?}");
     let (status, problem) = call(
         &world.owner,
         Method::POST,
@@ -270,6 +588,7 @@ async fn dispute_note_visible_to_readers_of_target() {
 #[tokio::test]
 async fn redaction_api_rejects_event_kind() {
     let world = World::start().await;
+    let person = world.person(json!({"name": "Beat Muster"})).await;
     let changeset = world
         .changeset("Beat Muster kommt im Mai 2030.", "im Mai 2030")
         .await;
@@ -311,4 +630,30 @@ async fn redaction_api_rejects_event_kind() {
     assert_eq!(redacted["already"], 0);
     let again = world.owner.post("/api/v1/redactions", &body).await;
     assert_eq!(again, json!({"applied": [], "already": 1}));
+    assert!(world.mentions(&person).await.is_empty());
+
+    // A redacted row that refers to the person by ID shows as redacted, without an excerpt.
+    let commitment = world
+        .owner
+        .post(
+            &format!("/api/v1/events/{}/commitments", world.event),
+            &json!({"text": "Generator liefern", "promisor": {"kind": "person", "id": person},
+                    "owner_user_id": world.owner_id.as_uuid()}),
+        )
+        .await;
+    let id = commitment["id"].as_str().unwrap();
+    world
+        .test
+        .redact(&[&format!(
+            "UPDATE commitment SET text = NULL, condition = NULL, firm_reason = NULL, redacted_at = now()
+             WHERE id = '{id}'"
+        )])
+        .await;
+    let mentions = world.mentions(&person).await;
+    assert_eq!(
+        mentions,
+        [
+            json!({"kind": "promisor", "id": id, "event_id": world.event, "redacted": true, "disputed": false})
+        ]
+    );
 }

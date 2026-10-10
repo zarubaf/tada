@@ -100,6 +100,16 @@ impl Party {
     }
 }
 
+/// The fewest characters of a term that the mention search of a person uses (ADR 0073).
+pub const MENTION_TERM_MIN_CHARS: usize = 3;
+
+/// A name, an email address or a phone number as a term of the mention search (ADR 0073): without the spaces at the
+/// ends and in NFC, the form of the source texts (ADR 0060). `None` for a term with fewer than 3 characters.
+pub fn mention_term(value: &str) -> Option<String> {
+    let term: String = value.trim().nfc().collect();
+    (term.chars().count() >= MENTION_TERM_MIN_CHARS).then_some(term)
+}
+
 /// The form of a name for matching (ADR 0069): Unicode NFKC, lowercase, without diacritics, `ß` as `ss`,
 /// each character that is not a letter or a digit as a space, and single spaces.
 /// For example, "Müller-Bau AG" and "Müller Bau AG" both give "muller bau ag".
@@ -123,6 +133,15 @@ pub fn normalized_name(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_mention_term_is_nfc_and_has_three_characters() {
+        // "Mü" with a combining diaeresis becomes one character.
+        assert_eq!(mention_term(" Mu\u{308}ller "), Some("Müller".to_owned()));
+        assert_eq!(mention_term("Al"), None);
+        assert_eq!(mention_term("  12 "), None);
+        assert_eq!(mention_term("Ali"), Some("Ali".to_owned()));
+    }
 
     #[test]
     fn normalized_name_ignores_case_accents_and_spaces() {

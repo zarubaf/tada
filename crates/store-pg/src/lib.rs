@@ -55,6 +55,7 @@ mod local_ids;
 mod members;
 mod outbound;
 mod parties;
+mod person_data;
 mod privacy;
 mod proposals;
 pub mod rate_limit;

@@ -34,6 +34,7 @@ Mentions:
   Each term has at least 3 characters.
   The match is a case-insensitive match of the term inside the text, after NFC normalization ([ADR 0060](0060-unicode-normalization-of-source-texts.md)).
 - It searches source versions, fact versions, proposals, open questions, actions, commitments, workstreams and the Markdown of document versions.
+  A document version also matches by the file name of its upload and by the name of its document.
 - It also lists the records that refer to the person by ID, such as the promisor of a commitment.
 - tada does not guess other spellings. The owner can search more with the existing search.
 
