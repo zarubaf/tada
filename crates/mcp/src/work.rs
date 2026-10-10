@@ -17,6 +17,7 @@ use tada_app::domain::parties::Party;
 use tada_app::domain::work::{ActionStatus, CommitmentStatus};
 use tada_app::paging::PageLimit;
 use tada_app::parties::{self, InstitutionView, PersonView};
+use tada_app::problem::{FieldError, ProblemCode};
 use tada_app::records::{RecordEvidenceView, Shown};
 use tada_app::work::{self, ActionView, CommitmentView, WorkPorts, WorkQuery};
 use tada_app::workstreams::{self, Workstream};
@@ -456,6 +457,7 @@ Each list holds the first matches in the order of their numbers; if more is true
         Parameters(input): Parameters<PartiesInput>,
     ) -> Result<Json<PartyList>, ToolError> {
         let caller = caller(&parts)?;
+        check_query(&input.q)?;
         let (identity, store) = (&*self.identity, &*self.parties);
         let limit = PageLimit::LARGEST;
         let persons =
@@ -473,6 +475,19 @@ Each list holds the first matches in the order of their numbers; if more is true
             more: persons.next.is_some() || institutions.next.is_some(),
         }))
     }
+}
+
+/// The search text has the same bounds as the `q` of the HTTP endpoint: 1 to `MAX_QUERY_CHARS` characters.
+fn check_query(q: &str) -> Result<(), ToolError> {
+    let code = match q.chars().count() {
+        0 => "empty",
+        n if n > MAX_QUERY_CHARS => "too-long",
+        _ => return Ok(()),
+    };
+    Err(ToolError::problem(
+        ProblemCode::ValidationFailed,
+        &[FieldError::new("q", code)],
+    ))
 }
 
 /// The first page of the largest size, without a filter but the status.

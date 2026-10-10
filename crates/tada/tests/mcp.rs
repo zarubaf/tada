@@ -1474,6 +1474,21 @@ async fn mcp_search_parties_finds_an_institution() {
     assert!(none["persons"].as_array().unwrap().is_empty());
 }
 
+#[tokio::test]
+async fn search_parties_rejects_empty_and_201_chars() {
+    let mcp = Mcp::start().await;
+    for (q, code) in [("", "empty"), ("a".repeat(201).as_str(), "too-long")] {
+        let body = mcp.call("search_parties", json!({"q": q})).await;
+        assert_eq!(body["result"]["isError"], true, "{body}");
+        let problem = &body["result"]["structuredContent"];
+        assert_eq!(problem["code"], "validation-failed", "{body}");
+        assert_eq!(problem["errors"][0]["pointer"], "/q", "{body}");
+        assert_eq!(problem["errors"][0]["code"], code, "{body}");
+    }
+    let longest = "a".repeat(200);
+    mcp.result("search_parties", json!({"q": longest})).await;
+}
+
 /// A viewer reads work through a `read` token; only a `propose` token proposes a commitment (ADR 0052).
 #[tokio::test]
 async fn a_viewer_token_reads_but_a_read_token_cannot_propose_a_commitment() {
