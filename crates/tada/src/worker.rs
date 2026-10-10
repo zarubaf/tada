@@ -17,6 +17,7 @@ use tada_app::outbound::SendOutbound;
 use tada_app::public_url::PublicUrl;
 use tada_app::rate_limit::WINDOW;
 use tada_app::redaction::WriteRedactionJournal;
+use tada_app::retention;
 use tada_store_pg::Database;
 use uuid::Uuid;
 
@@ -84,6 +85,7 @@ pub async fn run(
     let mut counter_sweep = Sweep::every(WINDOW);
     let mut orphan_sweep = Sweep::daily();
     let mut housekeeping_sweep = Sweep::daily();
+    let mut retention_sweep = Sweep::daily();
     'outer: loop {
         tokio::select! {
             () = &mut stop => break,
@@ -129,6 +131,41 @@ pub async fn run(
                 Err(error) => {
                     housekeeping_sweep.failed(now);
                     tracing::warn!(%error, "cannot run the housekeeping");
+                }
+            }
+        }
+        if let Some(day) = retention_sweep.due(now) {
+            match retention::run(&db, &db, blobs.as_ref(), now).await {
+                Ok(report) if report.completed() => {
+                    tracing::info!(
+                        events = report.events,
+                        sources = report.sources,
+                        "the retention job completed"
+                    );
+                    retention_sweep.done(day);
+                }
+                Ok(report) => {
+                    // The redacted rows are done. The next attempt finds the failed targets only.
+                    for failed in &report.failed {
+                        tracing::warn!(
+                            organization_id = %failed.organization_id,
+                            kind = failed.target.kind.as_str(),
+                            id = %failed.target.id,
+                            code = failed.code.as_str(),
+                            "cannot redact a target at the end of its retention period"
+                        );
+                    }
+                    tracing::warn!(
+                        events = report.events,
+                        sources = report.sources,
+                        failed = report.failed.len(),
+                        "the retention job completed with failed targets"
+                    );
+                    retention_sweep.failed(now);
+                }
+                Err(error) => {
+                    retention_sweep.failed(now);
+                    tracing::warn!(%error, "cannot find the targets of the retention job");
                 }
             }
         }

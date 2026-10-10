@@ -33,6 +33,7 @@ pub mod public_url;
 pub mod rate_limit;
 pub mod records;
 pub mod redaction;
+pub mod retention;
 pub mod review;
 pub mod search;
 pub mod session;

@@ -101,6 +101,9 @@ pub enum Refused {
     NotFound,
     /// The target is an event that is not closed. Only a closed event can be redacted (ADR 0071).
     EventNotClosed,
+    /// Retention found the source item free, and an event holds it now. A source that an event holds
+    /// follows the period of the event (ADR 0071).
+    SourceHeld,
 }
 
 /// What a replay of one journal entry found.
@@ -163,7 +166,7 @@ pub enum RedactionError {
     /// A target does not exist in the caller's organization.
     #[error("a target does not exist")]
     NotFound,
-    /// The target is an event that is not closed.
+    /// The target is an event that is not closed, or a source that an event holds and retention would redact.
     #[error("the event is not closed")]
     InvalidTransition,
     #[error("invalid values")]
@@ -294,7 +297,7 @@ pub async fn redact_for_retention(
 fn refused(refused: Refused) -> RedactionError {
     match refused {
         Refused::NotFound => RedactionError::NotFound,
-        Refused::EventNotClosed => RedactionError::InvalidTransition,
+        Refused::EventNotClosed | Refused::SourceHeld => RedactionError::InvalidTransition,
     }
 }
 

@@ -93,6 +93,7 @@ pub fn api_state_on(
         sources: database.clone(),
         tokens: database.clone(),
         privacy: database.clone(),
+        retention: database.clone(),
         parties: database.clone(),
         workstreams: database.clone(),
         work: database.clone(),

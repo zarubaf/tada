@@ -89,6 +89,65 @@ fn state_sql(kind: RedactionTargetKind) -> &'static str {
     }
 }
 
+/// The SQL condition that evidence of an active event cites a version of the source item `s` (ADR 0071):
+/// an evidence link of a fact, the evidence of a proposal, or the evidence of a work record or a party.
+/// Retention leaves such a source alone; it becomes due when the event closes.
+macro_rules! cited_by_active_event {
+    () => {
+        "EXISTS (
+            SELECT 1 FROM source_version v
+            WHERE v.organization_id = s.organization_id AND v.source_item_id = s.id AND (
+                EXISTS (
+                    SELECT 1 FROM evidence_link l
+                    JOIN fact_version fv ON fv.organization_id = l.organization_id AND fv.id = l.fact_version_id
+                    JOIN fact f ON f.organization_id = fv.organization_id AND f.id = fv.fact_id
+                    JOIN event e ON e.organization_id = f.organization_id AND e.id = f.event_id
+                    WHERE l.organization_id = v.organization_id AND l.source_version_id = v.id
+                      AND e.status = 'active')
+                OR EXISTS (
+                    SELECT 1 FROM proposal_evidence pe
+                    JOIN proposal p ON p.organization_id = pe.organization_id AND p.id = pe.proposal_id
+                    JOIN event e ON e.organization_id = p.organization_id AND e.id = p.event_id
+                    WHERE pe.organization_id = v.organization_id AND pe.source_version_id = v.id
+                      AND e.status = 'active')
+                OR EXISTS (
+                    SELECT 1 FROM record_evidence r
+                    JOIN proposal p ON p.organization_id = r.organization_id AND p.id = r.proposal_id
+                    JOIN event e ON e.organization_id = p.organization_id AND e.id = p.event_id
+                    WHERE r.organization_id = v.organization_id AND r.source_version_id = v.id
+                      AND e.status = 'active')))"
+    };
+}
+pub(crate) use cited_by_active_event;
+
+/// True if an event holds the source item, so that it follows the period of the event and not its own.
+/// It holds it if the item belongs to the event, or if evidence of an active event cites it.
+/// The caller holds the lock of the item. The versions are locked here: a writer that cites one takes
+/// `FOR SHARE` on it (`share_sources`), so a citation that commits later waits for the redaction and then
+/// sees the tombstone.
+async fn source_held(
+    conn: &mut PgConnection,
+    organization: Uuid,
+    id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query(
+        "SELECT id FROM source_version WHERE organization_id = $1 AND source_item_id = $2 ORDER BY id FOR UPDATE",
+    )
+    .bind(organization)
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query_scalar(concat!(
+        "SELECT s.event_id IS NOT NULL OR ",
+        cited_by_active_event!(),
+        " FROM source_item s WHERE s.organization_id = $1 AND s.id = $2"
+    ))
+    .bind(organization)
+    .bind(id)
+    .fetch_one(conn)
+    .await
+}
+
 async fn state(
     conn: &mut PgConnection,
     organization: Uuid,
@@ -678,6 +737,16 @@ impl RedactionStore for Database {
                             .map_err(store_error)? =>
                 {
                     return Ok(Err(Refused::EventNotClosed));
+                }
+                // The row is locked, so a source that retention found without an event cannot get one now.
+                Some(false)
+                    if reason == RedactionReason::Retention
+                        && target.kind == RedactionTargetKind::SourceItem
+                        && source_held(&mut tx, organization.as_uuid(), target.id)
+                            .await
+                            .map_err(store_error)? =>
+                {
+                    return Ok(Err(Refused::SourceHeld));
                 }
                 Some(false) => {
                     let redaction = Redaction {

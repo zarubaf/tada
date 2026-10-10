@@ -20,6 +20,7 @@ mod privacy;
 mod problem;
 mod redactions;
 mod request_id;
+mod retention;
 mod review;
 mod roles;
 mod sign_in;
@@ -58,6 +59,7 @@ use tada_app::problem::ProblemCode;
 use tada_app::proposals::ProposalStore;
 use tada_app::public_url::PublicUrl;
 use tada_app::redaction::RedactionStore;
+use tada_app::retention::RetentionStore;
 use tada_app::review::ReviewStore;
 use tada_app::session::SessionStore;
 use tada_app::sign_in::{SignInRequestStore, SignInStore};
@@ -110,6 +112,8 @@ pub struct ApiState {
     pub tokens: Arc<dyn TokenStore>,
     /// The privacy notice of the organization (ADR 0045).
     pub privacy: Arc<dyn PrivacyStore>,
+    /// The retention periods of the organization (ADR 0071).
+    pub retention: Arc<dyn RetentionStore>,
     /// Persons and institutions (ADR 0069).
     pub parties: Arc<dyn PartyStore>,
     /// The workstreams of events (ADR 0067).
@@ -142,6 +146,7 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(review::routes())
                 .merge(tokens::routes())
                 .merge(privacy::routes())
+                .merge(retention::routes())
                 .merge(parties::routes())
                 .merge(workstreams::routes())
                 .merge(work::routes())
@@ -167,6 +172,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(review::problem_codes())
         .chain(tokens::problem_codes())
         .chain(privacy::problem_codes())
+        .chain(retention::problem_codes())
         .chain(parties::problem_codes())
         .chain(workstreams::problem_codes())
         .chain(work::problem_codes())
@@ -1562,6 +1568,43 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct NoRetention;
+
+    #[async_trait::async_trait]
+    impl tada_app::retention::RetentionStore for NoRetention {
+        async fn get(
+            &self,
+            _: tada_app::caller::OrgScope,
+        ) -> Result<tada_app::retention::Retention, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn set(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::retention::RetentionPeriods,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<Option<tada_app::retention::Retention>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn due_for_retention(
+            &self,
+            _: &tada_app::caller::ServiceCaller<tada_app::caller::JobRunner>,
+            _: jiff::Timestamp,
+        ) -> Result<
+            Vec<(
+                tada_app::domain::ids::OrganizationId,
+                tada_app::domain::redaction::RedactionTarget,
+            )>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
@@ -1586,6 +1629,7 @@ mod tests {
             sources: Arc::new(NoReview),
             tokens: Arc::new(NoTokens),
             privacy: Arc::new(NoPrivacy),
+            retention: Arc::new(NoRetention),
             parties: Arc::new(NoParties),
             workstreams: Arc::new(NoWorkstreams),
             work: Arc::new(NoWork),

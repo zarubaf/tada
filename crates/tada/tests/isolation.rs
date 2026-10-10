@@ -713,6 +713,13 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
             json!({"markdown": "Datenschutz Testwil", "expected_version": t.a_privacy_version}),
             Expect::Writes,
         )],
+        // The retention periods.
+        "get_retention" => vec![get(api("/organization/retention".into()), READS)],
+        "set_retention" => vec![post(
+            api("/organization/retention/set".into()),
+            json!({"closed_event_months": 24, "source_months": null, "expected_version": 1}),
+            Expect::Writes,
+        )],
         _ => return None,
     };
     Some(attempts)

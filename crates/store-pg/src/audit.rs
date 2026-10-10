@@ -7,7 +7,8 @@ use tada_app::audit::AuditEvent;
 use tada_app::domain::ids::{OrganizationId, UserId};
 
 /// The `detail` column: the role change `{"old_role": ..., "new_role": ...}` without the key of a missing
-/// role (ADR 0061), and the reason of a legal redaction `{"reason": ...}` (ADR 0072). `None` without either.
+/// role (ADR 0061), the reason of a legal redaction `{"reason": ...}` (ADR 0072) and the two retention periods
+/// `{"closed_event_months": ..., "source_months": ...}`, each a number or null (ADR 0071). `None` without any.
 fn detail(event: &AuditEvent) -> Option<Value> {
     let (roles, reason) = (event.roles(), event.reason());
     let mut detail = Map::new();
@@ -20,7 +21,16 @@ fn detail(event: &AuditEvent) -> Option<Value> {
     if let Some(reason) = reason {
         detail.insert("reason".to_owned(), reason.as_str().into());
     }
-    (roles.is_some() || reason.is_some()).then_some(Value::Object(detail))
+    if let Some(periods) = event.retention() {
+        let months =
+            |months: Option<tada_app::retention::Months>| months.map(|months| months.get());
+        detail.insert(
+            "closed_event_months".to_owned(),
+            months(periods.closed_event).into(),
+        );
+        detail.insert("source_months".to_owned(), months(periods.source).into());
+    }
+    (!detail.is_empty()).then_some(Value::Object(detail))
 }
 
 /// Adds an audit event inside the transaction of a command. A rollback removes it with the change.
@@ -213,6 +223,10 @@ mod tests {
             ("member", "web", r#"{"reason": "mood"}"#),
             ("member", "web", r#"{"reason": null}"#),
             ("member", "web", r#"{"reason": 1}"#),
+            ("member", "web", r#"{"closed_event_months": 0}"#),
+            ("member", "web", r#"{"closed_event_months": 121}"#),
+            ("member", "web", r#"{"source_months": 1.5}"#),
+            ("member", "web", r#"{"source_months": "6"}"#),
             ("robot", "web", "null"),
             ("member", "fax", "null"),
         ] {
@@ -230,7 +244,18 @@ mod tests {
             .unwrap_err();
             assert_eq!(crate::testing::sqlstate(&error), "23514", "{detail}");
         }
-        // The reason of a redaction is the one other key (ADR 0072).
+        // The retention periods are numbers or null (ADR 0071).
+        sqlx::query(
+            r#"INSERT INTO audit_event
+                   (id, occurred_at, actor_kind, actor_id, channel, action, record_kind, detail)
+               VALUES ($1, now(), 'member', $1, 'web', 'organization.set_retention', 'organization',
+                       '{"closed_event_months": 6, "source_months": null}')"#,
+        )
+        .bind(Uuid::now_v7())
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
+        // The reason of a redaction is the other key (ADR 0072).
         sqlx::query(
             r#"INSERT INTO audit_event
                    (id, occurred_at, actor_kind, actor_id, channel, action, record_kind, detail)

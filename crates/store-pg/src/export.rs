@@ -64,6 +64,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "privacy_notice_version",
             "retention_closed_event_months",
             "retention_source_months",
+            "retention_version",
         ],
     ),
     exported(

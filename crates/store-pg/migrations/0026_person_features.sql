@@ -14,7 +14,9 @@ ALTER TABLE organization
     ADD COLUMN retention_closed_event_months smallint
         CONSTRAINT organization_retention_closed_event_months CHECK (retention_closed_event_months BETWEEN 1 AND 120),
     ADD COLUMN retention_source_months smallint
-        CONSTRAINT organization_retention_source_months CHECK (retention_source_months BETWEEN 1 AND 120);
+        CONSTRAINT organization_retention_source_months CHECK (retention_source_months BETWEEN 1 AND 120),
+    ADD COLUMN retention_version bigint NOT NULL DEFAULT 1
+        CONSTRAINT organization_retention_version CHECK (retention_version >= 1);
 
 -- The end of the last organization membership of an account, and its anonymization 90 days later (ADR 0071).
 ALTER TABLE app_user
@@ -298,19 +300,36 @@ CREATE TABLE dispute_note (
 
 CREATE INDEX dispute_note_target ON dispute_note (organization_id, target_kind, target_id);
 
--- The audit detail can name the reason of a redaction (ADR 0072), next to the role names of migration 0011.
+-- The audit detail can name the reason of a redaction (ADR 0072) and the two retention periods (ADR 0071),
+-- next to the role names of migration 0011. A period is a whole number of months from 1 to 120, or null.
 ALTER TABLE audit_event
     DROP CONSTRAINT audit_event_detail_roles,
     ADD CONSTRAINT audit_event_detail_roles CHECK (
         detail IS NULL OR (
             jsonb_typeof(detail) = 'object'
             AND detail <> '{}'::jsonb
-            AND detail - 'old_role' - 'new_role' - 'reason' = '{}'::jsonb
+            AND detail - 'old_role' - 'new_role' - 'reason' - 'closed_event_months' - 'source_months' = '{}'::jsonb
             AND coalesce(detail ->> 'old_role', 'member') IN
                 ('owner', 'admin', 'member', 'event-manager', 'event-contributor', 'event-viewer')
             AND coalesce(detail ->> 'new_role', 'member') IN
                 ('owner', 'admin', 'member', 'event-manager', 'event-contributor', 'event-viewer')
             AND coalesce(detail ->> 'reason', 'request') IN ('request', 'retention')
+        )
+    ),
+    ADD CONSTRAINT audit_event_detail_retention CHECK (
+        detail IS NULL OR (
+            CASE coalesce(jsonb_typeof(detail -> 'closed_event_months'), 'null')
+                WHEN 'null' THEN true
+                WHEN 'number' THEN (detail ->> 'closed_event_months')::numeric BETWEEN 1 AND 120
+                    AND (detail ->> 'closed_event_months')::numeric = trunc((detail ->> 'closed_event_months')::numeric)
+                ELSE false
+            END
+            AND CASE coalesce(jsonb_typeof(detail -> 'source_months'), 'null')
+                WHEN 'null' THEN true
+                WHEN 'number' THEN (detail ->> 'source_months')::numeric BETWEEN 1 AND 120
+                    AND (detail ->> 'source_months')::numeric = trunc((detail ->> 'source_months')::numeric)
+                ELSE false
+            END
         )
     ),
     ADD CONSTRAINT audit_event_detail_reason_string CHECK (

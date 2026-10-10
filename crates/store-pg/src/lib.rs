@@ -61,6 +61,7 @@ mod proposals;
 pub mod rate_limit;
 mod redacted;
 mod redaction;
+mod retention;
 mod review;
 mod session;
 mod sign_in;
