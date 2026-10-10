@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { type Api, createApi } from "./api/client";
 import { DocumentPage } from "./documents/DocumentPage";
 import { DocumentsPage } from "./documents/DocumentsPage";
@@ -18,6 +18,7 @@ import { Shell } from "./shell/Shell";
 import { InvitationPage } from "./sign-in/InvitationPage";
 import { MagicLinkPage } from "./sign-in/MagicLinkPage";
 import { SignInPage } from "./sign-in/SignInPage";
+import { RouteSuspense } from "./ui/RouteSuspense";
 import { SkipLink } from "./ui/SkipLink";
 import { MyWorkPage } from "./work/MyWorkPage";
 
@@ -75,9 +76,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
       <Routes>
         {Gallery && (
           <Route path="/_gallery">
-            <Suspense>
+            <RouteSuspense>
               <Gallery />
-            </Suspense>
+            </RouteSuspense>
           </Route>
         )}
         <Route path="*">
@@ -115,9 +116,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   <Route path="/events/:eventId/members">
                     <EventPage api={api}>
-                      <Suspense>
+                      <RouteSuspense>
                         <EventMembersPage api={api} />
-                      </Suspense>
+                      </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/documents">
@@ -127,46 +128,46 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   <Route path="/events/:eventId/actions">
                     <EventPage api={api}>
-                      <Suspense>
+                      <RouteSuspense>
                         <ActionsPage api={api} />
-                      </Suspense>
+                      </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/commitments">
                     <EventPage api={api}>
-                      <Suspense>
+                      <RouteSuspense>
                         <CommitmentsPage api={api} />
-                      </Suspense>
+                      </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/workstreams">
                     <EventPage api={api}>
-                      <Suspense>
+                      <RouteSuspense>
                         <WorkstreamsPage api={api} />
-                      </Suspense>
+                      </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/documents/:documentId">
                     <DocumentPage api={api} />
                   </Route>
                   <Route path="/documents/:documentId/diff">
-                    <Suspense>
+                    <RouteSuspense>
                       <DocumentDiffPage api={api} />
-                    </Suspense>
+                    </RouteSuspense>
                   </Route>
                   <Route path="/privacy">
                     <PrivacyPage api={api} />
                   </Route>
                   {/* The register of persons and institutions */}
                   <Route path="/persons">
-                    <Suspense>
+                    <RouteSuspense>
                       <PartiesPage api={api} kind="person" />
-                    </Suspense>
+                    </RouteSuspense>
                   </Route>
                   <Route path="/institutions">
-                    <Suspense>
+                    <RouteSuspense>
                       <PartiesPage api={api} kind="institution" />
-                    </Suspense>
+                    </RouteSuspense>
                   </Route>
                   {/* The Review Inbox */}
                   <Route path="/inbox">

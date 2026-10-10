@@ -98,6 +98,7 @@ not-found-text = Diese Adresse gibt es nicht. Prüfen Sie den Link oder wählen 
 ## Session
 
 session-loading = Sitzung wird geladen
+page-loading = Seite wird geladen
 skip-link = Zum Inhalt springen
 shell-nav = Hauptnavigation
 nav-my-work = Meine Arbeit
