@@ -34,7 +34,7 @@
 
   .note {
     padding: var(--space-3);
-    border-left: 3px solid var(--color-warning);
+    border-inline-start: var(--space-1) solid var(--color-warning);
     background: var(--color-warning-subtle);
   }
 }

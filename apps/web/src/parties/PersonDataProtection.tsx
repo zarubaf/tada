@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import personDataMessages from "../../../../locales/de-CH/person-data.ftl?raw";
 import { type Api, problemMessage } from "../api/client";
 import { addMessages, hasMessage, t } from "../i18n";
-import { Link } from "../router/Router";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -10,6 +9,7 @@ import { FileLink } from "../ui/FileLink";
 import { useFocusAfterCommit } from "../ui/focus";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Redacted } from "../ui/Redacted";
+import { StandaloneLink } from "../ui/StandaloneLink";
 import { DisputeDialog } from "./DisputeDialog";
 import styles from "./PersonDataProtection.module.css";
 import { exportUrl, isTarget, type Mention, mentionKey, personDataApi } from "./personDataApi";
@@ -51,7 +51,13 @@ function MentionRow({
   const label = `${kindName(mention)}: ${text}`;
   const path = recordPath(mention);
   return (
-    <li className={styles.mention}>
+    <li
+      className={
+        mention.redacted || !isTarget(mention)
+          ? `${styles.mention} ${styles.plain}`
+          : styles.mention
+      }
+    >
       {mention.redacted ? (
         <>
           <span className={styles.kind}>{kindName(mention)}:</span>
@@ -60,7 +66,7 @@ function MentionRow({
       ) : isTarget(mention) ? (
         <Checkbox label={label} isSelected={selected} onChange={onSelect} />
       ) : path ? (
-        <Link to={path}>{label}</Link>
+        <StandaloneLink to={path}>{label}</StandaloneLink>
       ) : (
         <span>{label}</span>
       )}

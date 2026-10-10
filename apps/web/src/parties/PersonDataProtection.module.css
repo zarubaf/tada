@@ -1,15 +1,19 @@
 @layer components {
   .section {
     display: grid;
+    max-width: 40rem;
     gap: var(--space-3);
   }
 
   .heading {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lg);
   }
 
+  /* The space above a heading is larger than the space below it (doc/design/tokens.md). */
   .subheading {
+    margin-block-start: var(--space-3);
     font-size: var(--font-size-md);
     font-weight: var(--font-weight-semibold);
   }
@@ -30,9 +34,17 @@
 
   .mention {
     display: flex;
+    min-height: var(--row-height);
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
+  }
+
+  /* A row without a checkbox keeps the text edge of the rows with one: box plus gap. */
+  .plain {
+    --box-edge: calc(var(--space-5) + var(--space-2));
+
+    padding-inline-start: var(--box-edge);
   }
 
   .kind {
@@ -47,6 +59,7 @@
   }
 
   .hint {
+    max-width: 70ch;
     color: var(--color-text-muted);
     font-size: var(--font-size-sm);
   }

@@ -485,10 +485,10 @@ export function ChangesetDetail({
 
       {changeset.redacted_proposals.length > 0 && (
         <section className={styles.redacted} aria-labelledby="inbox-redacted-title">
-          <h3 id="inbox-redacted-title" className={styles.summaryTitle}>
+          <h3 id="inbox-redacted-title" className={styles.redactedTitle}>
             {t("inbox-redacted-title")}
           </h3>
-          <ul>
+          <ul className={styles.redactedList}>
             {changeset.redacted_proposals.map((gone) => (
               <li key={gone.id}>
                 <Redacted />{" "}

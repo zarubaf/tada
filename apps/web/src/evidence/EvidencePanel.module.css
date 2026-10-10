@@ -6,6 +6,7 @@
 
   .accepted {
     display: grid;
+    margin: 0;
     gap: var(--space-2);
   }
 

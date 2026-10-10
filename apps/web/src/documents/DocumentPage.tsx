@@ -12,7 +12,7 @@ import { useEventContext, useEventWritable } from "../events/eventContext";
 import { loadOrganizationMembers } from "../events/eventMembers";
 import { useManagesEvent } from "../events/useManagesEvent";
 import { LOCALE, t } from "../i18n";
-import { Link, useParams } from "../router/Router";
+import { useParams } from "../router/Router";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { DisputeNotes } from "../ui/DisputeNotes";
@@ -23,6 +23,7 @@ import { LiveRegion } from "../ui/LiveRegion";
 import { Page } from "../ui/Page";
 import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
+import { StandaloneLink } from "../ui/StandaloneLink";
 import styles from "./DocumentPage.module.css";
 import { DraftView } from "./DraftView";
 import { formatSize, hashPrefix } from "./format";
@@ -247,12 +248,12 @@ function DiffLink({
 }) {
   const previous = previousDraft(versions, version);
   return previous ? (
-    <Link
+    <StandaloneLink
       to={diffPath(documentId, previous, version)}
       aria-label={t("document-diff-link-to", { number: previous.number })}
     >
       {t("document-diff-link")}
-    </Link>
+    </StandaloneLink>
   ) : null;
 }
 
@@ -376,9 +377,9 @@ function DocumentBody({
 
   return (
     <>
-      <Link to={`/events/${encodeURIComponent(document.event_id)}/documents`}>
+      <StandaloneLink to={`/events/${encodeURIComponent(document.event_id)}/documents`}>
         {t("document-back")}
-      </Link>
+      </StandaloneLink>
       <header className={styles.header}>
         <p className={styles.key}>{document.readable_id}</p>
         <h2 ref={heading} tabIndex={-1} className={styles.title}>

@@ -121,7 +121,7 @@ export function EventOverview({ api }: { api: Api }) {
                       formatValue(row.fact ?? {}, row.field?.value_type)
                     )}
                   </KnowledgeState>
-                  <DisputeNotes notes={row.fact?.dispute_notes} />
+                  <DisputeNotes notes={row.fact?.dispute_notes} className={styles.notes} />
                   {row.fact && (
                     <Button
                       ref={(button) => {
