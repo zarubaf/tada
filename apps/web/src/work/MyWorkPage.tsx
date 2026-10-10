@@ -9,13 +9,13 @@ import {
 } from "../api/client";
 import { formatDate } from "../facts/formatValue";
 import { t } from "../i18n";
-import { Link } from "../router/Router";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
 import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
+import { StandaloneLink } from "../ui/StandaloneLink";
 import { StatusLabel } from "../ui/StatusLabel";
 import { isOverdue, todayLocal } from "./dueDate";
 import styles from "./MyWorkPage.module.css";
@@ -35,7 +35,9 @@ function Reference({
   register: "actions" | "commitments";
 }) {
   return (
-    <Link to={`/events/${row.event_id}/${register}`}>{`${row.event_key}/${row.local_id}`}</Link>
+    <StandaloneLink
+      to={`/events/${row.event_id}/${register}`}
+    >{`${row.event_key}/${row.local_id}`}</StandaloneLink>
   );
 }
 
@@ -153,7 +155,9 @@ export function MyWorkPage({ api }: { api: Api }) {
         )}
         {work && work.review_count > 0 && (
           <p>
-            <Link to="/inbox">{t("my-work-review", { count: work.review_count })}</Link>
+            <StandaloneLink to="/inbox">
+              {t("my-work-review", { count: work.review_count })}
+            </StandaloneLink>
           </p>
         )}
         {work && work.actions.length === 0 && work.commitments.length === 0 && (

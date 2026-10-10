@@ -2,7 +2,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { type Api, type Document, problemMessage } from "../api/client";
 import { uploadDocument, uploadMessage } from "../api/upload";
 import { LOCALE, t } from "../i18n";
-import { Link, useParams } from "../router/Router";
+import { useParams } from "../router/Router";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
@@ -11,6 +11,7 @@ import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Skeleton } from "../ui/Skeleton";
+import { StandaloneLink } from "../ui/StandaloneLink";
 import { TextField } from "../ui/TextField";
 import styles from "./DocumentsPage.module.css";
 import { formatSize, mediaTypeKind } from "./format";
@@ -28,7 +29,9 @@ const columns: Column<Document>[] = [
   {
     id: "name",
     header: t("documents-column-name"),
-    cell: (d) => <Link to={`/documents/${encodeURIComponent(d.id)}`}>{d.name}</Link>,
+    cell: (d) => (
+      <StandaloneLink to={`/documents/${encodeURIComponent(d.id)}`}>{d.name}</StandaloneLink>
+    ),
   },
   {
     id: "type",

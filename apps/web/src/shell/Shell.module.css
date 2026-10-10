@@ -63,8 +63,25 @@
    * the medium layout below (the `--bp-medium` comments of the other style sheets).
    */
   @media (width < 40rem) {
+    /*
+     * The four items share the width of the bar and wrap their labels to two lines. At 320 px
+     * "Einstellungen" at the UI size does not fit its share, so the labels use the small size.
+     */
+    .nav {
+      padding-inline: var(--space-2);
+    }
+
     .nav > a {
+      flex: 1 1 auto;
+      justify-content: center;
+      gap: var(--space-1);
+      min-width: 0;
       min-height: var(--bottom-bar-item-height);
+      padding-inline: var(--space-1);
+      font-size: var(--font-size-sm);
+      line-height: var(--line-height-sm);
+      text-align: center;
+      overflow-wrap: anywhere;
     }
   }
 

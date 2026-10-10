@@ -50,7 +50,7 @@ export function AccountPage({ api }: { api: Api }) {
       <LiveRegion kind="alert">{failure}</LiveRegion>
       <section className={styles.section} aria-labelledby="account-title">
         <PageTitle id="account-title">{t("account-title")}</PageTitle>
-        <h2>{t("account-sessions-title")}</h2>
+        <h2 className={styles.heading}>{t("account-sessions-title")}</h2>
         <p>{t("account-sessions-text")}</p>
         <div>
           <Button variant="danger" onPress={() => setConfirming(true)}>

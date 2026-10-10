@@ -11,6 +11,12 @@
     max-width: 40rem;
   }
 
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lg);
+  }
+
   .skeleton {
     display: grid;
     gap: var(--space-2);

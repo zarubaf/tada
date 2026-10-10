@@ -1,0 +1,8 @@
+@layer components {
+  /* The link stands alone, so its target meets the pointer target size (doc/design/tokens.md). */
+  .standalone {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-height-lg);
+  }
+}
