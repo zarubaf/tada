@@ -1,19 +1,20 @@
 import { type FormEvent, useRef, useState } from "react";
-import { type Problem, problemMessage } from "../api/client";
+import { type Api, type Problem, problemMessage } from "../api/client";
 import { hasMessage, t } from "../i18n";
 import { type SaveFailure, saveFailure } from "../registers/saveFailure";
 import { Button } from "../ui/Button";
+import { ComboBox } from "../ui/ComboBox";
 import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { Select } from "../ui/Select";
 import { TextField } from "../ui/TextField";
 import styles from "./PartiesPage.module.css";
 import type { Party, PartyApi, PartyKind } from "./partyApi";
+import { useAccountSearch } from "./useAccountSearch";
 
 const KINDS = ["authority", "company", "club", "other"] as const;
 
 const FIELDS = ["name", "email", "phone", "user_id"] as const;
 type Field = (typeof FIELDS)[number];
-const NO_ACCOUNT = "none";
 type FieldErrors = Partial<Record<Field, string>>;
 
 /** The message for each invalid value of a `validation-failed` problem that has one. */
@@ -47,7 +48,7 @@ export function PartyForm({
   api,
   kind,
   record,
-  accounts,
+  memberApi,
   onSaved,
   onFailed,
   onStart,
@@ -58,10 +59,10 @@ export function PartyForm({
   /** The record to change. Without it, the form creates a record. */
   record?: Party;
   /**
-   * The members that a person can link to. Without it, the form has no account field: only an
-   * owner or an admin links a person to an account (ADR 0069).
+   * The API to search the members that a person can link to. Without it, the form has no account
+   * field: only an owner or an admin links a person to an account (ADR 0069).
    */
-  accounts?: { id: string; label: string }[];
+  memberApi?: Api;
   onSaved: (record: Party) => void;
   onFailed: (failure: SaveFailure) => void;
   onStart: () => void;
@@ -70,9 +71,20 @@ export function PartyForm({
   const [name, setName] = useState(record?.name ?? "");
   const [email, setEmail] = useState(record?.email ?? "");
   const [phone, setPhone] = useState(record?.phone ?? "");
-  const [userId, setUserId] = useState(
-    record && "user_id" in record ? (record.user_id ?? NO_ACCOUNT) : NO_ACCOUNT,
-  );
+  // The account of a record is an ID without a name here, so the input says only that a link exists.
+  const linked = record && "user_id" in record ? (record.user_id ?? undefined) : undefined;
+  const linkedText = linked === undefined ? "" : t("party-account-linked");
+  const [userId, setUserId] = useState<string | undefined>(linked);
+  const [accountText, setAccountText] = useState(linkedText);
+  // The text of the chosen option: the search stops while the input shows it.
+  const [accountLabel, setAccountLabel] = useState<string | undefined>(linkedText);
+  // The same label for the handlers: the combo box reports the choice and its text in one event.
+  const chosenLabel = useRef<string | undefined>(linkedText);
+  const chooseAccount = (id: string | undefined, label: string | undefined) => {
+    setUserId(id);
+    setAccountLabel(label);
+    chosenLabel.current = label;
+  };
   const [partyKind, setPartyKind] = useState(record && "kind" in record ? record.kind : "other");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
@@ -80,6 +92,7 @@ export function PartyForm({
   const focusAfterCommit = useFocusAfterCommit();
   const focusInvalidField = () => focusAfterCommit(() => firstInvalidField(form.current));
   const changing = record !== undefined;
+  const accountSearch = useAccountSearch(memberApi, accountText, accountText !== accountLabel);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -100,7 +113,7 @@ export function PartyForm({
         email: blankToNull(email),
         phone: blankToNull(phone),
         ...(kind === "institution" && { kind: partyKind }),
-        ...(accounts && { user_id: userId === NO_ACCOUNT ? null : userId }),
+        ...(memberApi && { user_id: userId ?? null }),
       };
       const { data, error, response } = changing
         ? await api.change(record, input)
@@ -110,7 +123,8 @@ export function PartyForm({
           setName("");
           setEmail("");
           setPhone("");
-          setUserId(NO_ACCOUNT);
+          chooseAccount(undefined, undefined);
+          setAccountText("");
           setPartyKind("other");
           focusAfterCommit(() => form.current?.querySelector<HTMLElement>("input"));
         }
@@ -164,13 +178,24 @@ export function PartyForm({
         error={errors.phone}
         autoComplete="off"
       />
-      {kind === "person" && accounts && (
-        <Select
+      {kind === "person" && memberApi && (
+        <ComboBox
           label={t("party-account")}
-          options={[{ id: NO_ACCOUNT, label: t("party-account-none") }, ...accounts]}
-          value={userId}
-          onChange={setUserId}
-          error={errors.user_id}
+          options={accountSearch.options}
+          inputValue={accountText}
+          onInputChange={(text) => {
+            setAccountText(text);
+            // Text that no option gave is no choice: the earlier member stays unlinked.
+            if (text !== chosenLabel.current) {
+              chooseAccount(undefined, chosenLabel.current);
+            }
+          }}
+          selectedKey={userId}
+          onSelectionChange={(id) => {
+            chooseAccount(id, accountSearch.options.find((option) => option.id === id)?.label);
+          }}
+          isLoading={accountSearch.loading}
+          error={errors.user_id ?? accountSearch.failure}
         />
       )}
       <div className={styles.actions}>
