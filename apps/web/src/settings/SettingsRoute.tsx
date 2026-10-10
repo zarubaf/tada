@@ -1,6 +1,6 @@
-import { type ReactNode, Suspense } from "react";
+import type { ReactNode } from "react";
 import { t } from "../i18n";
-import { SkeletonLines } from "../ui/Skeleton";
+import { RouteSuspense } from "../ui/RouteSuspense";
 import { SettingsLayout } from "./SettingsLayout";
 
 /**
@@ -10,7 +10,7 @@ import { SettingsLayout } from "./SettingsLayout";
 export function SettingsRoute({ children }: { children: ReactNode }) {
   return (
     <SettingsLayout>
-      <Suspense fallback={<SkeletonLines label={t("settings-loading")} />}>{children}</Suspense>
+      <RouteSuspense label={t("settings-loading")}>{children}</RouteSuspense>
     </SettingsLayout>
   );
 }
