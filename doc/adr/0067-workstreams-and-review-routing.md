@@ -1,7 +1,7 @@
 # 0067. Workstreams and review routing
 
-- Status: Proposed
-- Date: 2026-10-09
+- Status: Accepted
+- Date: 2026-10-10
 - Amends: [0050](0050-proposals-and-review.md), [0052](0052-event-roles-and-ownership.md)
 
 ## Context

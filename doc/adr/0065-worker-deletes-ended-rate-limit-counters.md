@@ -1,7 +1,7 @@
 # 0065. The worker deletes ended rate-limit counters
 
-- Status: Proposed
-- Date: 2026-10-09
+- Status: Accepted
+- Date: 2026-10-10
 - Amends: [0056](0056-sign-in-details.md)
 - Amended by: [0070](0070-ai-security-review-replaces-the-external-review.md)
 
