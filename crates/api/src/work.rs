@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use tada_app::caller::MemberCaller;
 use tada_app::dispute_notes::{DisputeNotes, NoteKey};
 use tada_app::domain::ids::{
-    ActionId, CommitmentId, EventId, InstitutionId, PersonId, SourceVersionId, UserId, WorkstreamId,
+    ActionId, CommitmentId, EventId, InstitutionId, PersonId, UserId, WorkstreamId,
 };
 use tada_app::domain::parties::Party;
 use tada_app::domain::work::{
@@ -27,7 +27,7 @@ use uuid::Uuid;
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::cursor;
-use crate::dispute_notes::{DisputeNote, ShowsDisputeNotes, shown, with_notes};
+use crate::dispute_notes::{DisputeNote, shown};
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::parties::{PartyKind, PartyRef};
 use crate::problem::{ApiError, Problem};
@@ -176,6 +176,7 @@ impl From<Shown<ActionView>> for Action {
             record: action,
             evidence,
             can_change,
+            dispute_notes,
         } = shown;
         let local_id = action.local_id();
         let fields = action.fields;
@@ -196,7 +197,10 @@ impl From<Shown<ActionView>> for Action {
             due_date: fields.due_date,
             status: fields.status.into(),
             version: action.version.get(),
-            evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
+            evidence: evidence
+                .into_iter()
+                .map(|evidence| RecordEvidence::new(evidence, &dispute_notes))
+                .collect(),
             // A redacted action cannot change (ADR 0072).
             can_change: can_change && !redacted,
             next_statuses: if redacted { Vec::new() } else { next_statuses },
@@ -227,25 +231,11 @@ pub struct RecordEvidence {
     pub dispute_notes: Vec<DisputeNote>,
 }
 
-impl ShowsDisputeNotes for RecordEvidence {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        keys.push(self.note_key());
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        self.dispute_notes = shown(notes, &self.note_key());
-    }
-}
-
 impl RecordEvidence {
-    fn note_key(&self) -> NoteKey {
-        NoteKey::SourceVersion(SourceVersionId::from_uuid(self.source_version_id))
-    }
-}
-
-impl From<RecordEvidenceView> for RecordEvidence {
-    fn from(evidence: RecordEvidenceView) -> Self {
+    /// The passage with the notes of its source from `notes`.
+    pub(crate) fn new(evidence: RecordEvidenceView, notes: &DisputeNotes) -> Self {
         Self {
+            dispute_notes: shown(notes, &NoteKey::source_version(evidence.source_version_id)),
             record_version: evidence.record_version.get(),
             proposal_id: evidence.proposal_id.as_uuid(),
             source_version_id: evidence.source_version_id.as_uuid(),
@@ -255,7 +245,6 @@ impl From<RecordEvidenceView> for RecordEvidence {
             redacted: evidence.quote.as_present().is_none(),
             quote: evidence.quote.as_present().cloned().unwrap_or_default(),
             page: evidence.page,
-            dispute_notes: Vec::new(),
         }
     }
 }
@@ -304,6 +293,7 @@ impl From<Shown<CommitmentView>> for Commitment {
             record: commitment,
             evidence,
             can_change,
+            dispute_notes,
         } = shown;
         let local_id = commitment.local_id();
         let fields = commitment.fields;
@@ -326,32 +316,15 @@ impl From<Shown<CommitmentView>> for Commitment {
             status: fields.status.into(),
             firm_reason: fields.firm_reason.map(|text| text.as_str().to_owned()),
             version: commitment.version.get(),
-            evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
+            evidence: evidence
+                .into_iter()
+                .map(|evidence| RecordEvidence::new(evidence, &dispute_notes))
+                .collect(),
             // A redacted commitment cannot change (ADR 0072).
             can_change: can_change && !redacted,
             next_statuses: if redacted { Vec::new() } else { next_statuses },
             can_make_firm: can_make_firm && !redacted,
         }
-    }
-}
-
-impl ShowsDisputeNotes for Action {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        self.evidence.note_keys(keys);
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        self.evidence.set_notes(notes);
-    }
-}
-
-impl ShowsDisputeNotes for Commitment {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        self.evidence.note_keys(keys);
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        self.evidence.set_notes(notes);
     }
 }
 
@@ -563,9 +536,8 @@ async fn list_actions(
     };
     let page =
         app::list_actions(&caller, EventId::from_uuid(event_id), query, ports(&state)).await?;
-    let items: Vec<Action> = page.items.into_iter().map(Action::from).collect();
     Ok(axum::Json(ActionPage {
-        items: with_notes(&state, &caller, items).await?,
+        items: page.items.into_iter().map(Action::from).collect(),
         next_cursor: page.next.as_ref().map(encode_cursor),
     }))
 }
@@ -601,10 +573,7 @@ async fn create_action(
     };
     let action =
         app::create_action(&caller, EventId::from_uuid(event_id), input, ports(&state)).await?;
-    Ok((
-        StatusCode::CREATED,
-        axum::Json(with_notes(&state, &caller, Action::from(action)).await?),
-    ))
+    Ok((StatusCode::CREATED, axum::Json(action.into())))
 }
 
 /// Reads one action of the event.
@@ -634,9 +603,7 @@ async fn get_action(
         ports(&state),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, Action::from(action)).await?,
-    ))
+    Ok(axum::Json(action.into()))
 }
 
 /// Changes an action. Its owner, the lead of its workstream or an event manager can do it.
@@ -681,9 +648,7 @@ async fn change_action(
         ports(&state),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, Action::from(action)).await?,
-    ))
+    Ok(axum::Json(action.into()))
 }
 
 /// Lists the commitments of an event in the order of their numbers. Each reader of the event can do it.
@@ -713,9 +678,8 @@ async fn list_commitments(
     };
     let page =
         app::list_commitments(&caller, EventId::from_uuid(event_id), query, ports(&state)).await?;
-    let items: Vec<Commitment> = page.items.into_iter().map(Commitment::from).collect();
     Ok(axum::Json(CommitmentPage {
-        items: with_notes(&state, &caller, items).await?,
+        items: page.items.into_iter().map(Commitment::from).collect(),
         next_cursor: page.next.as_ref().map(encode_cursor),
     }))
 }
@@ -751,10 +715,7 @@ async fn create_commitment(
     };
     let commitment =
         app::create_commitment(&caller, EventId::from_uuid(event_id), input, ports(&state)).await?;
-    Ok((
-        StatusCode::CREATED,
-        axum::Json(with_notes(&state, &caller, Commitment::from(commitment)).await?),
-    ))
+    Ok((StatusCode::CREATED, axum::Json(commitment.into())))
 }
 
 /// Reads one commitment of the event, with its evidence.
@@ -784,9 +745,7 @@ async fn get_commitment(
         ports(&state),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, Commitment::from(commitment)).await?,
-    ))
+    Ok(axum::Json(commitment.into()))
 }
 
 /// Changes a commitment. Its owner, the lead of its workstream or an event manager can do it.
@@ -831,9 +790,7 @@ async fn change_commitment(
         ports(&state),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, Commitment::from(commitment)).await?,
-    ))
+    Ok(axum::Json(commitment.into()))
 }
 
 /// Makes a conditional commitment firm. The people who change the commitment can do it.
@@ -871,9 +828,7 @@ async fn make_commitment_firm(
         ports(&state),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, Commitment::from(commitment)).await?,
-    ))
+    Ok(axum::Json(commitment.into()))
 }
 
 /// An action in "My Work", with the key of its event.
@@ -907,26 +862,6 @@ pub struct MyWork {
     pub review_count: u32,
 }
 
-impl ShowsDisputeNotes for MyWork {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        self.actions
-            .iter()
-            .for_each(|mine| mine.action.note_keys(keys));
-        self.commitments
-            .iter()
-            .for_each(|mine| mine.commitment.note_keys(keys));
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        self.actions
-            .iter_mut()
-            .for_each(|mine| mine.action.set_notes(notes));
-        self.commitments
-            .iter_mut()
-            .for_each(|mine| mine.commitment.set_notes(notes));
-    }
-}
-
 /// Lists the open actions and commitments that the caller owns.
 /// It leaves out the events where the caller has no event role.
 #[utoipa::path(
@@ -944,7 +879,7 @@ async fn my_work(
     Caller(caller): Caller,
 ) -> Result<axum::Json<MyWork>, ApiError> {
     let view = tada_app::my_work::my_work(&caller, ports(&state), state.review.as_ref()).await?;
-    let work = MyWork {
+    Ok(axum::Json(MyWork {
         actions: view
             .actions
             .into_iter()
@@ -962,6 +897,5 @@ async fn my_work(
             })
             .collect(),
         review_count: view.review_count,
-    };
-    Ok(axum::Json(with_notes(&state, &caller, work).await?))
+    }))
 }

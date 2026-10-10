@@ -1,11 +1,10 @@
-//! `/api/v1/dispute-notes`: the objection of a person to immutable evidence (ADR 0073), and the notes that each
-//! read of evidence or facts shows.
+//! `/api/v1/dispute-notes`: the objection of a person to immutable evidence (ADR 0073), and the form of the notes
+//! that each read of evidence or facts shows. The app reads attach the notes.
 
 use axum::extract::State;
 use axum::http::StatusCode;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
-use tada_app::access::Principal;
 use tada_app::dispute_notes::{
     self as app, DisputeNote as AppDisputeNote, DisputeNoteCommandError, DisputeNotes,
     NewDisputeNote, NoteKey,
@@ -50,41 +49,9 @@ impl From<&AppDisputeNote> for DisputeNote {
     }
 }
 
-/// A response that shows evidence or facts, and so the dispute notes about them (ADR 0073).
-/// Its conversion from the app view leaves the notes empty; `with_notes` fills them.
-pub(crate) trait ShowsDisputeNotes {
-    /// Adds the records whose notes the response shows.
-    fn note_keys(&self, keys: &mut Vec<NoteKey>);
-    /// Sets the notes of each record.
-    fn set_notes(&mut self, notes: &DisputeNotes);
-}
-
-impl<T: ShowsDisputeNotes> ShowsDisputeNotes for Vec<T> {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        self.iter().for_each(|item| item.note_keys(keys));
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        self.iter_mut().for_each(|item| item.set_notes(notes));
-    }
-}
-
 /// The notes of `key` as a response shows them.
 pub(crate) fn shown(notes: &DisputeNotes, key: &NoteKey) -> Vec<DisputeNote> {
     notes.of(key).iter().map(DisputeNote::from).collect()
-}
-
-/// The response with the dispute notes of its records. The caller read the records with their access checks.
-pub(crate) async fn with_notes<T: ShowsDisputeNotes>(
-    state: &ApiState,
-    caller: &impl Principal,
-    mut response: T,
-) -> Result<T, ApiError> {
-    let mut keys = Vec::new();
-    response.note_keys(&mut keys);
-    let notes = app::dispute_notes(caller, keys, state.dispute_notes.as_ref()).await?;
-    response.set_notes(&notes);
-    Ok(response)
 }
 
 /// The input of `CreateDisputeNote`.

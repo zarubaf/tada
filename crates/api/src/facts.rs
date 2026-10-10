@@ -5,9 +5,8 @@ use jiff::Timestamp;
 use serde::Serialize;
 use tada_app::access::AccessError;
 use tada_app::dispute_notes::{DisputeNotes, NoteKey};
-use tada_app::domain::RecordVersion;
 use tada_app::domain::facts::{FieldDefinition, FieldScope, FieldStatus as DomainFieldStatus};
-use tada_app::domain::ids::{EventId, FactId, SourceVersionId};
+use tada_app::domain::ids::EventId;
 use tada_app::domain::redaction::Redactable;
 use tada_app::facts::{
     self as app, EventProfile as AppProfile, OpenProposalRef, OpenQuestionRef, ProfileEntry,
@@ -21,7 +20,7 @@ use uuid::Uuid;
 use crate::ApiState;
 use crate::actors::Author;
 use crate::contract::{AUTHENTICATED, PATH, codes};
-use crate::dispute_notes::{DisputeNote, ShowsDisputeNotes, shown, with_notes};
+use crate::dispute_notes::{DisputeNote, shown};
 use crate::extract::{Caller, Path};
 use crate::problem::{ApiError, Problem};
 use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts, stored_state_parts};
@@ -143,7 +142,11 @@ pub struct OpenQuestion {
 impl From<AppProfile> for EventProfile {
     fn from(profile: AppProfile) -> Self {
         Self {
-            facts: profile.fields.into_iter().map(Fact::from).collect(),
+            facts: profile
+                .fields
+                .into_iter()
+                .map(|entry| Fact::new(entry, &profile.dispute_notes))
+                .collect(),
             proposals: profile
                 .proposals
                 .into_iter()
@@ -158,8 +161,8 @@ impl From<AppProfile> for EventProfile {
     }
 }
 
-impl From<ProfileEntry> for Fact {
-    fn from(entry: ProfileEntry) -> Self {
+impl Fact {
+    fn new(entry: ProfileEntry, notes: &DisputeNotes) -> Self {
         let (state, value, approximate, redacted) = stored_state_parts(&entry.state);
         Self {
             id: entry.fact_id.as_uuid(),
@@ -180,47 +183,14 @@ impl From<ProfileEntry> for Fact {
                     passage: (&dated.evidence.passage).into(),
                     redacted: dated.evidence.passage.quote == Redactable::Redacted,
                     captured_at: dated.captured_at,
-                    dispute_notes: Vec::new(),
+                    dispute_notes: shown(
+                        notes,
+                        &NoteKey::source_version(dated.evidence.source_version_id),
+                    ),
                 })
                 .collect(),
-            dispute_notes: Vec::new(),
+            dispute_notes: shown(notes, &NoteKey::fact_number(entry.fact_id, entry.version)),
         }
-    }
-}
-
-impl ShowsDisputeNotes for EventProfile {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        for fact in &self.facts {
-            keys.extend(fact.note_key());
-            keys.extend(fact.evidence.iter().map(FactEvidence::note_key));
-        }
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        for fact in &mut self.facts {
-            if let Some(key) = fact.note_key() {
-                fact.dispute_notes = shown(notes, &key);
-            }
-            for evidence in &mut fact.evidence {
-                evidence.dispute_notes = shown(notes, &evidence.note_key());
-            }
-        }
-    }
-}
-
-impl Fact {
-    /// The current fact version: the profile names it by its number.
-    fn note_key(&self) -> Option<NoteKey> {
-        RecordVersion::new(self.version).map(|number| NoteKey::FactVersion {
-            fact: FactId::from_uuid(self.id),
-            number,
-        })
-    }
-}
-
-impl FactEvidence {
-    fn note_key(&self) -> NoteKey {
-        NoteKey::SourceVersion(SourceVersionId::from_uuid(self.source_version_id))
     }
 }
 
@@ -338,9 +308,7 @@ async fn get_event_profile(
         state.facts.as_ref(),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, EventProfile::from(profile)).await?,
-    ))
+    Ok(axum::Json(profile.into()))
 }
 
 /// Lists the field catalog of an event: the shipped fields and the fields of the event, in the order of their keys.

@@ -9,6 +9,7 @@ use crate::access::{self, AccessError, EventClosed};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::MemberCaller;
 use crate::clock::Clock;
+use crate::dispute_notes;
 use crate::problem::{CommandError, ProblemCode};
 use crate::store::StoreError;
 
@@ -117,7 +118,11 @@ pub async fn approve_version(
         .approve(caller.scope(), &approval, &audit)
         .await?
     {
-        Approved::Approved(version) => Ok(*version),
+        Approved::Approved(version) => {
+            let mut version = *version;
+            dispute_notes::attach(caller.scope(), &mut version, stores.documents).await?;
+            Ok(version)
+        }
         Approved::NotFound => Err(ApproveError::NotFound),
         Approved::VersionConflict => Err(ApproveError::VersionConflict),
         Approved::InvalidTransition => Err(ApproveError::InvalidTransition),

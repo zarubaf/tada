@@ -3,7 +3,6 @@
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::{Deserialize, Deserializer, Serialize};
-use tada_app::dispute_notes::{DisputeNotes, NoteKey};
 use tada_app::domain::ids::{InstitutionId, PersonId, UserId};
 use tada_app::domain::parties::{Party, PartyName};
 use tada_app::domain::redaction::Redactable;
@@ -21,7 +20,6 @@ use uuid::Uuid;
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::cursor;
-use crate::dispute_notes::{ShowsDisputeNotes, with_notes};
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
 use crate::work::RecordEvidence;
@@ -145,6 +143,7 @@ impl From<Shown<PersonView>> for Person {
             record: person,
             evidence,
             can_change,
+            dispute_notes,
         } = shown;
         Self {
             id: person.id.as_uuid(),
@@ -155,7 +154,10 @@ impl From<Shown<PersonView>> for Person {
             phone: person.phone.map(|phone| phone.as_str().to_owned()),
             user_id: person.user_id.map(UserId::as_uuid),
             version: person.version.get(),
-            evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
+            evidence: evidence
+                .into_iter()
+                .map(|evidence| RecordEvidence::new(evidence, &dispute_notes))
+                .collect(),
             can_change: can_change && person.name.as_present().is_some(),
         }
     }
@@ -190,6 +192,7 @@ impl From<Shown<InstitutionView>> for Institution {
             record: institution,
             evidence,
             can_change,
+            dispute_notes,
         } = shown;
         Self {
             id: institution.id.as_uuid(),
@@ -200,29 +203,12 @@ impl From<Shown<InstitutionView>> for Institution {
             email: institution.email.map(|email| email.as_str().to_owned()),
             phone: institution.phone.map(|phone| phone.as_str().to_owned()),
             version: institution.version.get(),
-            evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
+            evidence: evidence
+                .into_iter()
+                .map(|evidence| RecordEvidence::new(evidence, &dispute_notes))
+                .collect(),
             can_change: can_change && institution.name.as_present().is_some(),
         }
-    }
-}
-
-impl ShowsDisputeNotes for Person {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        self.evidence.note_keys(keys);
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        self.evidence.set_notes(notes);
-    }
-}
-
-impl ShowsDisputeNotes for Institution {
-    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        self.evidence.note_keys(keys);
-    }
-
-    fn set_notes(&mut self, notes: &DisputeNotes) {
-        self.evidence.set_notes(notes);
     }
 }
 
@@ -371,9 +357,8 @@ async fn list_persons(
         state.parties.as_ref(),
     )
     .await?;
-    let items: Vec<Person> = page.items.into_iter().map(Person::from).collect();
     Ok(axum::Json(PersonPage {
-        items: with_notes(&state, &caller, items).await?,
+        items: page.items.into_iter().map(Person::from).collect(),
         next_cursor: page.next.as_ref().map(encode_cursor),
     }))
 }
@@ -411,10 +396,7 @@ async fn create_person(
         state.clock.as_ref(),
     )
     .await?;
-    Ok((
-        StatusCode::CREATED,
-        axum::Json(with_notes(&state, &caller, Person::from(person)).await?),
-    ))
+    Ok((StatusCode::CREATED, axum::Json(person.into())))
 }
 
 /// Reads one person.
@@ -441,9 +423,7 @@ async fn get_person(
         state.parties.as_ref(),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, Person::from(person)).await?,
-    ))
+    Ok(axum::Json(person.into()))
 }
 
 /// Changes a person. Only an owner or an admin can do it.
@@ -482,9 +462,7 @@ async fn change_person(
         state.clock.as_ref(),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, Person::from(person)).await?,
-    ))
+    Ok(axum::Json(person.into()))
 }
 
 /// Lists the institutions of the organization in the order of their numbers.
@@ -516,9 +494,8 @@ async fn list_institutions(
         state.parties.as_ref(),
     )
     .await?;
-    let items: Vec<Institution> = page.items.into_iter().map(Institution::from).collect();
     Ok(axum::Json(InstitutionPage {
-        items: with_notes(&state, &caller, items).await?,
+        items: page.items.into_iter().map(Institution::from).collect(),
         next_cursor: page.next.as_ref().map(encode_cursor),
     }))
 }
@@ -556,10 +533,7 @@ async fn create_institution(
         state.clock.as_ref(),
     )
     .await?;
-    Ok((
-        StatusCode::CREATED,
-        axum::Json(with_notes(&state, &caller, Institution::from(institution)).await?),
-    ))
+    Ok((StatusCode::CREATED, axum::Json(institution.into())))
 }
 
 /// Reads one institution.
@@ -586,9 +560,7 @@ async fn get_institution(
         state.parties.as_ref(),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, Institution::from(institution)).await?,
-    ))
+    Ok(axum::Json(institution.into()))
 }
 
 /// Changes an institution. Only an owner or an admin can do it.
@@ -627,7 +599,5 @@ async fn change_institution(
         state.clock.as_ref(),
     )
     .await?;
-    Ok(axum::Json(
-        with_notes(&state, &caller, Institution::from(institution)).await?,
-    ))
+    Ok(axum::Json(institution.into()))
 }

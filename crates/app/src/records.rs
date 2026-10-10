@@ -25,6 +25,7 @@ use uuid::Uuid;
 use crate::access::{self, Principal, SourceReach};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
+use crate::dispute_notes::{self, Disputable, DisputeNoteReads, DisputeNotes, NoteKey};
 use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::FieldError;
@@ -143,7 +144,7 @@ pub struct RecordEvidenceView {
 
 /// The repository port for the evidence of records. The record stores extend it.
 #[async_trait]
-pub trait EvidenceStore: Debug + Send + Sync {
+pub trait EvidenceStore: DisputeNoteReads + Debug + Send + Sync {
     /// The evidence of `records` whose source version `reach` can read, in the order of record version and offset.
     async fn evidence_of(
         &self,
@@ -162,6 +163,22 @@ pub struct Shown<T> {
     pub evidence: Vec<RecordEvidenceView>,
     /// True if the caller can change the record now, by the rule of its kind.
     pub can_change: bool,
+    /// The dispute notes of the sources of the evidence (ADR 0073).
+    pub dispute_notes: DisputeNotes,
+}
+
+impl<T> Disputable for Shown<T> {
+    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
+        keys.extend(
+            self.evidence
+                .iter()
+                .map(|evidence| NoteKey::source_version(evidence.source_version_id)),
+        );
+    }
+
+    fn set_dispute_notes(&mut self, notes: DisputeNotes) {
+        self.dispute_notes = notes;
+    }
 }
 
 impl<T> Shown<T> {
@@ -172,6 +189,7 @@ impl<T> Shown<T> {
             record,
             evidence: Vec::new(),
             can_change,
+            dispute_notes: DisputeNotes::default(),
         }
     }
 }
@@ -194,14 +212,17 @@ pub(crate) async fn shown<T>(
     for (record, passage) in store.evidence_of(caller.scope(), &refs, &reach).await? {
         evidence.entry(record).or_default().push(passage);
     }
-    Ok(records
+    let mut shown: Vec<Shown<T>> = records
         .into_iter()
         .map(|record| Shown {
             evidence: evidence.remove(&record_ref(&record)).unwrap_or_default(),
             can_change: can_change(&record),
             record,
+            dispute_notes: DisputeNotes::default(),
         })
-        .collect())
+        .collect();
+    dispute_notes::attach_all(caller.scope(), &mut shown, store).await?;
+    Ok(shown)
 }
 
 /// One record with the evidence that `caller` can read, and with the right of `caller` to change it.
@@ -220,9 +241,12 @@ pub(crate) async fn shown_one<T>(
         .into_iter()
         .map(|(_, passage)| passage)
         .collect();
-    Ok(Shown {
+    let mut shown = Shown {
         record,
         evidence,
         can_change,
-    })
+        dispute_notes: DisputeNotes::default(),
+    };
+    dispute_notes::attach(caller.scope(), &mut shown, store).await?;
+    Ok(shown)
 }

@@ -486,6 +486,23 @@ async fn finds_documents_by_name_and_stores_the_text_of_a_text_file() {
 struct LostCommit<'a>(&'a dyn DocumentStore);
 
 #[async_trait]
+impl tada_app::dispute_notes::DisputeNoteReads for LostCommit<'_> {
+    async fn notes(
+        &self,
+        scope: OrgScope,
+        keys: &[tada_app::dispute_notes::NoteKey],
+    ) -> Result<
+        Vec<(
+            tada_app::dispute_notes::NoteKey,
+            tada_app::dispute_notes::DisputeNote,
+        )>,
+        StoreError,
+    > {
+        self.0.notes(scope, keys).await
+    }
+}
+
+#[async_trait]
 impl DocumentStore for LostCommit<'_> {
     async fn publish(
         &self,

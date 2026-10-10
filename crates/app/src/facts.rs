@@ -20,6 +20,7 @@ use tada_domain::sources::Evidence;
 
 use crate::access::{self, AccessError, Principal};
 use crate::caller::{Actor, OrgScope};
+use crate::dispute_notes::{self, Disputable, DisputeNoteReads, DisputeNotes, NoteKey};
 use crate::identity::IdentityStore;
 use crate::store::StoreError;
 
@@ -34,6 +35,27 @@ pub struct EventProfile {
     pub proposals: Vec<OpenProposalRef>,
     /// The open questions of the event, in the order of their event-local numbers.
     pub open_questions: Vec<OpenQuestionRef>,
+    /// The dispute notes of the current fact versions and of the sources of their evidence (ADR 0073).
+    /// The store leaves them empty; `get_event_profile` reads them.
+    pub dispute_notes: DisputeNotes,
+}
+
+impl Disputable for EventProfile {
+    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
+        for entry in &self.fields {
+            keys.push(NoteKey::fact_number(entry.fact_id, entry.version));
+            keys.extend(
+                entry
+                    .evidence
+                    .iter()
+                    .map(|dated| NoteKey::source_version(dated.evidence.source_version_id)),
+            );
+        }
+    }
+
+    fn set_dispute_notes(&mut self, notes: DisputeNotes) {
+        self.dispute_notes = notes;
+    }
 }
 
 /// An open proposal that sets the fact of a field.
@@ -103,7 +125,7 @@ pub struct FactVersionRef {
 /// The repository port for field definitions and facts. Each method stays inside `scope`.
 /// Shipped field definitions have no organization; each organization reads them (ADR 0049).
 #[async_trait]
-pub trait FactStore: Debug + Send + Sync {
+pub trait FactStore: DisputeNoteReads + Debug + Send + Sync {
     /// The field catalog of the event: the shipped fields and the fields of the event, in the order of their keys.
     async fn catalog(
         &self,
@@ -143,7 +165,9 @@ pub async fn get_event_profile(
     if !access.can_read() {
         return Err(AccessError::NotFound);
     }
-    Ok(store.profile(caller.scope(), event).await?)
+    let mut profile = store.profile(caller.scope(), event).await?;
+    dispute_notes::attach(caller.scope(), &mut profile, store).await?;
+    Ok(profile)
 }
 
 /// The field catalog of the event, for each caller who can read the event.
@@ -324,6 +348,23 @@ mod tests {
         EventId::from_uuid(Uuid::from_u128(20))
     }
 
+    #[async_trait::async_trait]
+    impl crate::dispute_notes::DisputeNoteReads for Memory {
+        async fn notes(
+            &self,
+            _: crate::caller::OrgScope,
+            _: &[crate::dispute_notes::NoteKey],
+        ) -> Result<
+            Vec<(
+                crate::dispute_notes::NoteKey,
+                crate::dispute_notes::DisputeNote,
+            )>,
+            crate::store::StoreError,
+        > {
+            Ok(Vec::new())
+        }
+    }
+
     #[async_trait]
     impl FactStore for Memory {
         async fn catalog(
@@ -339,6 +380,7 @@ mod tests {
                 fields: Vec::new(),
                 proposals: Vec::new(),
                 open_questions: Vec::new(),
+                dispute_notes: Default::default(),
             })
         }
 
@@ -437,6 +479,7 @@ mod tests {
                 fields: Vec::new(),
                 proposals: Vec::new(),
                 open_questions: Vec::new(),
+                dispute_notes: Default::default(),
             }
         );
     }

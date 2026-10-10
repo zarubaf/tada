@@ -192,6 +192,7 @@ mod tests {
                 content: VersionContent::Draft {
                     status: DraftStatus::Draft,
                 },
+                dispute_notes: Default::default(),
             },
             status: DraftStatus::Draft,
             markdown: Redactable::Present(DraftMarkdown::parse(markdown).unwrap()),
@@ -199,6 +200,7 @@ mod tests {
                 facts,
                 sources: Vec::new(),
             },
+            dispute_notes: Default::default(),
         }
     }
 
