@@ -10,6 +10,7 @@ import {
 import { EventPage } from "../events/EventPage";
 import { useEventContext } from "../events/eventContext";
 import { loadOrganizationMembers } from "../events/eventMembers";
+import { useManagesEvent } from "../events/useManagesEvent";
 import { LOCALE, t } from "../i18n";
 import { Link, useParams } from "../router/Router";
 import { Button } from "../ui/Button";
@@ -26,7 +27,6 @@ import styles from "./DocumentPage.module.css";
 import { DraftView } from "./DraftView";
 import { formatSize, hashPrefix } from "./format";
 import { LintWarnings } from "./LintWarnings";
-import { useCanApprove } from "./useCanApprove";
 import { diffPath, isApprovable, newestVersion, previousDraft } from "./versions";
 
 const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" });
@@ -326,7 +326,7 @@ function DocumentBody({
   const rendering = useRendering(api, newest?.kind === "draft" ? newest.id : undefined);
   const previewHeading = useRef<HTMLHeadingElement>(null);
   const { retried, retry } = useRetry(() => previewHeading.current);
-  const canApprove = useCanApprove(api, document.event_id);
+  const canApprove = useManagesEvent(api, document.event_id);
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState<string>();
   const [failed, setFailed] = useState<string>();
