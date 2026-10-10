@@ -42,15 +42,15 @@ pub trait Principal: crate::caller::sealed::Sealed {
     fn organization_role(&self) -> OrganizationRole;
 }
 
-/// What a caller can do in one event.
+/// What an event role allows in one event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EventAccess {
+pub enum EventLevel {
     Manager,
     Contributor,
     Viewer,
 }
 
-impl EventAccess {
+impl EventLevel {
     pub fn can_read(self) -> bool {
         true
     }
@@ -72,7 +72,39 @@ impl EventAccess {
     }
 }
 
-impl From<EventRole> for EventAccess {
+/// What a caller can do in one event: the rights of its role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EventAccess {
+    level: EventLevel,
+}
+
+impl EventAccess {
+    pub fn level(self) -> EventLevel {
+        self.level
+    }
+
+    pub fn can_read(self) -> bool {
+        self.level.can_read()
+    }
+
+    pub fn can_propose(self) -> bool {
+        self.level.can_propose()
+    }
+
+    pub fn can_review(self) -> bool {
+        self.level.can_review()
+    }
+
+    pub fn can_manage_members(self) -> bool {
+        self.level.can_manage_members()
+    }
+
+    pub fn can_approve_documents(self) -> bool {
+        self.level.can_approve_documents()
+    }
+}
+
+impl From<EventRole> for EventLevel {
     fn from(role: EventRole) -> Self {
         match role {
             EventRole::EventManager => Self::Manager,
@@ -140,14 +172,14 @@ async fn role_access(
     user: UserId,
     role: OrganizationRole,
     identity: &dyn IdentityStore,
-) -> Result<Option<EventAccess>, StoreError> {
+) -> Result<Option<EventLevel>, StoreError> {
     if manages_all_events(role) {
-        return Ok(Some(EventAccess::Manager));
+        return Ok(Some(EventLevel::Manager));
     }
     Ok(identity
         .event_role(scope, event, user)
         .await?
-        .map(EventAccess::from))
+        .map(EventLevel::from))
 }
 
 /// The access of `caller` to the event `event_id` at the time of the call (ADR 0039, ADR 0052).
@@ -163,7 +195,7 @@ pub async fn event_access(
     if sees_all_events(caller) && !identity.event_exists(scope, event_id).await? {
         return Err(AccessError::NotFound);
     }
-    role_access(
+    let level = role_access(
         scope,
         event_id,
         caller.user_id(),
@@ -171,7 +203,8 @@ pub async fn event_access(
         identity,
     )
     .await?
-    .ok_or(AccessError::NotFound)
+    .ok_or(AccessError::NotFound)?;
+    Ok(EventAccess { level })
 }
 
 /// True if `caller` can propose in at least one event of its organization (ADR 0052):
@@ -188,7 +221,7 @@ pub async fn proposes_in_some_event(
         .event_roles_of(caller.scope(), caller.user_id())
         .await?
         .into_iter()
-        .any(|(_, role)| EventAccess::from(role).can_propose()))
+        .any(|(_, role)| EventLevel::from(role).can_propose()))
 }
 
 /// True if the caller can read in some event: any event role, or the organization role owner or admin.
@@ -225,7 +258,7 @@ pub async fn readable_events(
         .event_roles_of(caller.scope(), caller.user_id())
         .await?
         .into_iter()
-        .filter(|(_, role)| EventAccess::from(*role).can_read())
+        .filter(|(_, role)| EventLevel::from(*role).can_read())
         .map(|(event, _)| event)
         .collect();
     Ok(EventReach::Events(events))
@@ -290,7 +323,7 @@ pub async fn member_access(
     event: EventId,
     user: UserId,
     identity: &dyn IdentityStore,
-) -> Result<Option<EventAccess>, StoreError> {
+) -> Result<Option<EventLevel>, StoreError> {
     match identity.membership(scope, user).await? {
         None => Ok(None),
         Some(role) => role_access(scope, event, user, role, identity).await,
@@ -416,7 +449,7 @@ mod tests {
         let identity = identity();
         for role in [OrganizationRole::Owner, OrganizationRole::Admin] {
             let access = event_access(&caller(testwil(), role), open_day(), &identity).await;
-            assert_eq!(access.unwrap(), EventAccess::Manager);
+            assert_eq!(access.unwrap().level(), EventLevel::Manager);
         }
     }
 
@@ -433,9 +466,9 @@ mod tests {
         let identity = identity();
         let member = caller(testwil(), OrganizationRole::Member);
         for (role, expected) in [
-            (EventRole::EventManager, EventAccess::Manager),
-            (EventRole::EventContributor, EventAccess::Contributor),
-            (EventRole::EventViewer, EventAccess::Viewer),
+            (EventRole::EventManager, EventLevel::Manager),
+            (EventRole::EventContributor, EventLevel::Contributor),
+            (EventRole::EventViewer, EventLevel::Viewer),
         ] {
             identity
                 .roles
@@ -443,7 +476,7 @@ mod tests {
                 .unwrap()
                 .insert((open_day(), anna()), role);
             let access = event_access(&member, open_day(), &identity).await;
-            assert_eq!(access.unwrap(), expected);
+            assert_eq!(access.unwrap().level(), expected);
         }
     }
 
@@ -498,7 +531,7 @@ mod tests {
             .insert((open_day(), anna()), EventRole::EventViewer);
         assert_eq!(
             access(open_day(), anna()).await.unwrap(),
-            Some(EventAccess::Viewer)
+            Some(EventLevel::Viewer)
         );
         assert_eq!(access(new_event, anna()).await.unwrap(), None);
 
@@ -511,7 +544,7 @@ mod tests {
         for event in [open_day(), new_event] {
             assert_eq!(
                 access(event, bruno).await.unwrap(),
-                Some(EventAccess::Manager)
+                Some(EventLevel::Manager)
             );
         }
         let elsewhere = caller(musterhausen(), OrganizationRole::Member).scope();
@@ -611,7 +644,7 @@ mod tests {
 
     #[test]
     fn each_access_has_the_rights_of_its_event_role() {
-        let rights = |access: EventAccess| {
+        let rights = |access: EventLevel| {
             [
                 access.can_read(),
                 access.can_propose(),
@@ -620,13 +653,13 @@ mod tests {
                 access.can_approve_documents(),
             ]
         };
-        assert_eq!(rights(EventAccess::Manager), [true; 5]);
+        assert_eq!(rights(EventLevel::Manager), [true; 5]);
         assert_eq!(
-            rights(EventAccess::Contributor),
+            rights(EventLevel::Contributor),
             [true, true, false, false, false]
         );
         assert_eq!(
-            rights(EventAccess::Viewer),
+            rights(EventLevel::Viewer),
             [true, false, false, false, false]
         );
     }

@@ -28,7 +28,7 @@ pub use self::commitments::{
     CommitmentChange, FirmInput, NewCommitment, change_commitment, create_commitment,
     get_commitment, list_commitments, make_commitment_firm,
 };
-use crate::access::{AccessError, EventAccess, EventReach};
+use crate::access::{AccessError, EventLevel, EventReach};
 use crate::audit::AuditEvent;
 use crate::caller::OrgScope;
 use crate::clock::Clock;
@@ -391,15 +391,15 @@ impl From<AccessError> for WorkError {
 /// True if `caller` can change a work record with the owner `owner` in a workstream with the lead `lead` (ADR 0067):
 /// its owner, the lead of its workstream, or an event manager. A viewer changes nothing.
 pub fn may_change_work(
-    access: EventAccess,
+    access: EventLevel,
     caller: UserId,
     owner: UserId,
     lead: Option<UserId>,
 ) -> bool {
     match access {
-        EventAccess::Manager => true,
-        EventAccess::Contributor => caller == owner || lead == Some(caller),
-        EventAccess::Viewer => false,
+        EventLevel::Manager => true,
+        EventLevel::Contributor => caller == owner || lead == Some(caller),
+        EventLevel::Viewer => false,
     }
 }
 

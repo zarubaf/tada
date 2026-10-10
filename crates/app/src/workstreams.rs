@@ -10,7 +10,7 @@ use tada_domain::redaction::Redactable;
 use tada_domain::work::{WorkstreamName, WorkstreamStatus};
 use uuid::Uuid;
 
-use crate::access::{self, AccessError, EventAccess, Principal};
+use crate::access::{self, AccessError, EventLevel, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -198,8 +198,8 @@ async fn require_manager(
     event: EventId,
     identity: &dyn IdentityStore,
 ) -> Result<(), WorkstreamError> {
-    match access::event_access(caller, event, identity).await? {
-        EventAccess::Manager => Ok(()),
+    match access::event_access(caller, event, identity).await?.level() {
+        EventLevel::Manager => Ok(()),
         _ => Err(WorkstreamError::Forbidden),
     }
 }

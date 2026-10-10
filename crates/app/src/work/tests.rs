@@ -804,28 +804,23 @@ async fn the_view_tells_the_reader_its_right_and_the_next_statuses() {
 #[test]
 fn may_change_work_follows_the_permission_table() {
     let (owner, lead, other) = (user(OWNER), user(LEAD), user(OTHER));
+    assert!(may_change_work(EventLevel::Contributor, owner, owner, None));
     assert!(may_change_work(
-        EventAccess::Contributor,
-        owner,
-        owner,
-        None
-    ));
-    assert!(may_change_work(
-        EventAccess::Contributor,
+        EventLevel::Contributor,
         lead,
         owner,
         Some(lead)
     ));
-    assert!(may_change_work(EventAccess::Manager, other, owner, None));
+    assert!(may_change_work(EventLevel::Manager, other, owner, None));
     assert!(!may_change_work(
-        EventAccess::Contributor,
+        EventLevel::Contributor,
         other,
         owner,
         Some(lead)
     ));
     // A viewer changes nothing, not even a record that it owned before.
     assert!(!may_change_work(
-        EventAccess::Viewer,
+        EventLevel::Viewer,
         owner,
         owner,
         Some(owner)

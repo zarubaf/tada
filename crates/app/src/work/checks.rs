@@ -7,7 +7,7 @@ use tada_domain::parties::Party;
 use tada_domain::work::{ActionDescription, ActionTitle, CommitmentText};
 
 use super::{ActionView, CommitmentView, WorkError, WorkPorts, may_change_work};
-use crate::access::{self, EventAccess, Principal};
+use crate::access::{self, EventAccess, EventLevel, Principal};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::identity::IdentityStore;
 use crate::parties::PartyStore;
@@ -65,7 +65,7 @@ pub(crate) async fn is_possible_owner(
 ) -> Result<bool, StoreError> {
     Ok(access::member_access(scope, event, user, identity)
         .await?
-        .is_some_and(EventAccess::can_propose))
+        .is_some_and(EventLevel::can_propose))
 }
 
 /// A new workstream of a record must be active and in the event. A store failure stops the command.
@@ -179,7 +179,7 @@ impl ChangeRights {
     /// True if the caller can change a record with the owner `owner` in the workstream `workstream`.
     pub(crate) fn allow(&self, owner: UserId, workstream: Option<WorkstreamId>) -> bool {
         let lead = workstream.and_then(|id| self.leads.get(&id).copied());
-        may_change_work(self.access, self.caller, owner, lead)
+        may_change_work(self.access.level(), self.caller, owner, lead)
     }
 }
 
