@@ -14,6 +14,7 @@ const beat = {
   name: "Beat Muster",
   email: "beat@example.org",
   phone: "+41 00 000 00 01",
+  user_id: ME,
   version: 2,
   can_change: true,
 };
@@ -47,14 +48,16 @@ interface Setup {
   kind?: "person" | "institution";
   /** The server says whether the caller can change the records. */
   canChange?: boolean;
+  /** The organization role of the caller. */
+  role?: "owner" | "admin" | "member";
   /** Answers by `METHOD /path-suffix`. */
   answers?: Record<string, () => Response>;
 }
 
 /** A fake server that filters the list by `q`. It records `METHOD path?query` and the body. */
-function setup({ kind = "person", canChange = true, answers = {} }: Setup = {}) {
+function setup({ kind = "person", canChange = true, role = "member", answers = {} }: Setup = {}) {
   const calls: { call: string; body: unknown }[] = [];
-  const own = { organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" };
+  const own = { organization_id: "o1", name: "Fliegergruppe Testwil", role };
   const session = {
     user_id: ME,
     display_name: "Anna Muster",
@@ -81,6 +84,14 @@ function setup({ kind = "person", canChange = true, answers = {} }: Setup = {}) 
     }
     if (url.pathname.endsWith("/session")) {
       return json(200, session);
+    }
+    if (url.pathname.endsWith("/members")) {
+      return json(200, {
+        items: [
+          { user_id: ME, display_name: "Anna Muster", role: "owner", version: 1 },
+          { user_id: "u2", display_name: "Bruno Beispiel", role: "member", version: 1 },
+        ],
+      });
     }
     if (request.method === "GET" && url.pathname.endsWith("s")) {
       const q = url.searchParams.get("q")?.toLowerCase() ?? "";
@@ -220,5 +231,52 @@ describe("PartiesPage", () => {
       phone: "+41 00 000 00 01",
       expected_version: 2,
     });
+  });
+
+  it("hides the account field from a member who is no owner or admin", async () => {
+    const { calls } = setup({ role: "member" });
+    await screen.findByRole("table", { name: "Personen" });
+
+    expect(screen.queryByRole("button", { name: /Konto/ })).not.toBeInTheDocument();
+    expect(calls.some((c) => c.call.includes("/members"))).toBe(false);
+  });
+
+  it("lets an owner or admin link a new person to an account", async () => {
+    const { calls } = setup({
+      role: "admin",
+      answers: { "POST /persons": () => json(201, { ...clara, id: "p3", name: "Dora" }) },
+    });
+    await screen.findByRole("table", { name: "Personen" });
+
+    await user.type(screen.getByRole("textbox", { name: "Name (Pflichtfeld)" }), "Dora");
+    await user.click(await screen.findByRole("button", { name: /Konto/ }));
+    await user.click(await screen.findByRole("option", { name: "Bruno Beispiel" }));
+    await user.click(screen.getByRole("button", { name: "Erfassen" }));
+
+    await screen.findByText("Dora", { selector: "td" });
+    expect(calls.find((c) => c.call === "POST /api/v1/persons")?.body).toEqual({
+      name: "Dora",
+      user_id: "u2",
+    });
+  });
+
+  it("lets an owner clear the account of a person in a change", async () => {
+    const { calls } = setup({
+      role: "owner",
+      answers: { "PATCH /persons/p1": () => json(200, { ...beat, version: 3 }) },
+    });
+    await screen.findByRole("table", { name: "Personen" });
+    await user.click(screen.getByRole("button", { name: "Beat Muster bearbeiten" }));
+
+    await user.click(await screen.findByRole("button", { name: /Konto/ }));
+    await user.click(await screen.findByRole("option", { name: "Kein Konto" }));
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(calls.find((c) => c.call === "PATCH /api/v1/persons/p1")?.body).toMatchObject({
+        user_id: null,
+        expected_version: 2,
+      }),
+    );
   });
 });

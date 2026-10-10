@@ -11,7 +11,9 @@ import type { Party, PartyApi, PartyKind } from "./partyApi";
 
 const KINDS = ["authority", "company", "club", "other"] as const;
 
-type Field = "name" | "email" | "phone";
+type Field = "name" | "email" | "phone" | "user_id";
+const FIELDS: readonly string[] = ["name", "email", "phone", "user_id"];
+const NO_ACCOUNT = "none";
 type FieldErrors = Partial<Record<Field, string>>;
 
 /** The message for each invalid value of a `validation-failed` problem that has one. */
@@ -19,12 +21,16 @@ function fieldErrors(problem: Problem): FieldErrors {
   const result: FieldErrors = {};
   for (const { pointer, code } of problem.errors ?? []) {
     const field = pointer.slice(1);
-    if (field === "name" || field === "email" || field === "phone") {
+    if (isField(field)) {
       const specific = `party-error-${field}-${code}`;
       result[field] = t(hasMessage(specific) ? specific : `party-error-${field}`);
     }
   }
   return result;
+}
+
+function isField(field: string): field is Field {
+  return FIELDS.includes(field);
 }
 
 /** What the member typed; an empty optional field is no value. */
@@ -41,6 +47,7 @@ export function PartyForm({
   api,
   kind,
   record,
+  accounts,
   onSaved,
   onFailed,
   onStart,
@@ -50,6 +57,11 @@ export function PartyForm({
   kind: PartyKind;
   /** The record to change. Without it, the form creates a record. */
   record?: Party;
+  /**
+   * The members that a person can link to. Without it, the form has no account field: only an
+   * owner or an admin links a person to an account (ADR 0069).
+   */
+  accounts?: { id: string; label: string }[];
   onSaved: (record: Party) => void;
   onFailed: (failure: SaveFailure) => void;
   onStart: () => void;
@@ -58,6 +70,9 @@ export function PartyForm({
   const [name, setName] = useState(record?.name ?? "");
   const [email, setEmail] = useState(record?.email ?? "");
   const [phone, setPhone] = useState(record?.phone ?? "");
+  const [userId, setUserId] = useState(
+    record && "user_id" in record ? (record.user_id ?? NO_ACCOUNT) : NO_ACCOUNT,
+  );
   const [partyKind, setPartyKind] = useState(record && "kind" in record ? record.kind : "other");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
@@ -85,6 +100,7 @@ export function PartyForm({
         email: blankToNull(email),
         phone: blankToNull(phone),
         ...(kind === "institution" && { kind: partyKind }),
+        ...(accounts && { user_id: userId === NO_ACCOUNT ? null : userId }),
       };
       const { data, error, response } = changing
         ? await api.change(record, input)
@@ -94,6 +110,7 @@ export function PartyForm({
           setName("");
           setEmail("");
           setPhone("");
+          setUserId(NO_ACCOUNT);
           setPartyKind("other");
           focusAfterCommit(() => form.current?.querySelector<HTMLElement>("input"));
         }
@@ -147,6 +164,15 @@ export function PartyForm({
         error={errors.phone}
         autoComplete="off"
       />
+      {kind === "person" && accounts && (
+        <Select
+          label={t("party-account")}
+          options={[{ id: NO_ACCOUNT, label: t("party-account-none") }, ...accounts]}
+          value={userId}
+          onChange={setUserId}
+          error={errors.user_id}
+        />
+      )}
       <div className={styles.actions}>
         {onCancel && (
           <Button onPress={onCancel} isDisabled={busy}>

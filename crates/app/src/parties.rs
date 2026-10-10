@@ -74,12 +74,14 @@ pub struct PartyRef {
     pub name: PartyName,
 }
 
-/// The values of a person that a change replaces. The user account never changes.
+/// The values of a person that a create sets and a change replaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PersonFields {
     pub name: PartyName,
     pub email: Option<Email>,
     pub phone: Option<PhoneNumber>,
+    /// The account of the person. Only an owner or an admin sets it (ADR 0069).
+    pub user_id: Option<UserId>,
 }
 
 /// The values of an institution that a change replaces.
@@ -101,7 +103,6 @@ pub trait PartyStore: EvidenceStore + Debug + Send + Sync {
         scope: OrgScope,
         id: PersonId,
         fields: &PersonFields,
-        user_id: Option<UserId>,
         at: Timestamp,
         audit: &AuditEvent,
     ) -> Result<Created<PersonView>, StoreError>;
@@ -229,12 +230,14 @@ pub struct NewInstitution {
     pub phone: Option<String>,
 }
 
-/// A change of a person. A field that is `None` stays as it is; `Some(None)` clears email or phone.
+/// A change of a person. A field that is `None` stays as it is;
+/// `Some(None)` clears email, phone or the account.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PersonChange {
     pub name: Option<String>,
     pub email: Option<Option<String>>,
     pub phone: Option<Option<String>>,
+    pub user_id: Option<Option<UserId>>,
     pub expected_version: RecordVersion,
 }
 
@@ -404,6 +407,21 @@ fn merged<T: Clone, P>(
     }
 }
 
+/// The account of a person: it must belong to a member of the organization.
+async fn check_member(
+    check: &mut Checker,
+    user: Option<UserId>,
+    caller: &MemberCaller,
+    identity: &dyn IdentityStore,
+) -> Result<Option<UserId>, StoreError> {
+    if let Some(user) = user
+        && identity.membership(caller.scope(), user).await?.is_none()
+    {
+        check.push("user_id", "unknown-member");
+    }
+    Ok(user)
+}
+
 async fn require_create(
     caller: &MemberCaller,
     identity: &dyn IdentityStore,
@@ -440,7 +458,7 @@ async fn require_read(
 }
 
 /// Creates a person. A member with the contributor or manager role in any event can do it,
-/// and so can an owner or an admin.
+/// and so can an owner or an admin. Only an owner or an admin links the person to an account.
 pub async fn create_person(
     caller: &MemberCaller,
     input: NewPerson,
@@ -449,29 +467,26 @@ pub async fn create_person(
     clock: &dyn Clock,
 ) -> Result<Shown<PersonView>, PartyError> {
     require_create(caller, identity).await?;
+    if input.user_id.is_some() {
+        require_change(caller)?;
+    }
     let id = PersonId::from_uuid(new_id(input.id)?);
     let mut check = Checker::default();
     let name = parse_name(&mut check, &input.name);
     let email = parse_email(&mut check, input.email.as_deref());
     let phone = parse_phone(&mut check, input.phone.as_deref());
-    if let Some(user) = input.user_id
-        && identity.membership(caller.scope(), user).await?.is_none()
-    {
-        check.push("user_id", "unknown-member");
-    }
+    let user_id = check_member(&mut check, input.user_id, caller, identity).await?;
     let name = check.finish(name).map_err(PartyError::Invalid)?;
     let audit = audit(caller, AuditAction::PersonCreate, id.as_uuid());
-    let fields = PersonFields { name, email, phone };
+    let fields = PersonFields {
+        name,
+        email,
+        phone,
+        user_id,
+    };
     let person = created(
         store
-            .create_person(
-                caller.scope(),
-                id,
-                &fields,
-                input.user_id,
-                clock.now(),
-                &audit,
-            )
+            .create_person(caller.scope(), id, &fields, clock.now(), &audit)
             .await?,
     )?;
     Ok(Shown::created(person, may_change_parties(caller)))
@@ -489,7 +504,11 @@ pub async fn change_person(
     require_change(caller)?;
     let scope = caller.scope();
     let current = store.person(scope, id).await?.ok_or(PartyError::NotFound)?;
-    if change.name.is_none() && change.email.is_none() && change.phone.is_none() {
+    if change.name.is_none()
+        && change.email.is_none()
+        && change.phone.is_none()
+        && change.user_id.is_none()
+    {
         return Err(PartyError::Invalid(Vec::new()));
     }
     if current.version != change.expected_version {
@@ -512,9 +531,18 @@ pub async fn change_person(
         |text| parse_phone(&mut check, text),
         PhoneNumber::clone,
     );
+    let user_id = match change.user_id {
+        None => current.user_id,
+        Some(user) => check_member(&mut check, user, caller, identity).await?,
+    };
     let name = check.finish(name).map_err(PartyError::Invalid)?;
     let audit = audit(caller, AuditAction::PersonChange, id.as_uuid());
-    let fields = PersonFields { name, email, phone };
+    let fields = PersonFields {
+        name,
+        email,
+        phone,
+        user_id,
+    };
     let person = changed(
         store
             .change_person(

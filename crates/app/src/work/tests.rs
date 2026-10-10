@@ -256,7 +256,6 @@ impl PartyStore for Memory {
         _: OrgScope,
         _: PersonId,
         _: &PersonFields,
-        _: Option<UserId>,
         _: Timestamp,
         _: &AuditEvent,
     ) -> Result<Created<PersonView>, StoreError> {

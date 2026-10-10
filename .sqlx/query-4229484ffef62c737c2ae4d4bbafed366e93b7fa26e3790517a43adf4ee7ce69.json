@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE person\n             SET name = $4, email = $5, phone = $6, version = version + 1, updated_at = $7\n             WHERE organization_id = $1 AND id = $2 AND version = $3\n             RETURNING id, local_number, name, email, phone, user_id, version",
+  "query": "UPDATE person\n             SET name = $4, email = $5, phone = $6, user_id = $7, version = version + 1,\n                 updated_at = $8\n             WHERE organization_id = $1 AND id = $2 AND version = $3\n             RETURNING id, local_number, name, email, phone, user_id, version",
   "describe": {
     "columns": [
       {
@@ -89,6 +89,7 @@
         "Text",
         "Text",
         "Text",
+        "Uuid",
         "Timestamptz"
       ]
     },
@@ -102,5 +103,5 @@
       false
     ]
   },
-  "hash": "91a6ba45b8503533223c542c2f7235709ada79d580b0b9b5d4c1a8947dcc9cf4"
+  "hash": "4229484ffef62c737c2ae4d4bbafed366e93b7fa26e3790517a43adf4ee7ce69"
 }

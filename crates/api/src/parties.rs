@@ -226,7 +226,8 @@ pub struct CreatePersonRequest {
     pub email: Option<String>,
     /// 1 to 50 characters, as written.
     pub phone: Option<String>,
-    /// A member of the caller's organization.
+    /// A member of the caller's organization. Only an owner or an admin can set it;
+    /// for any other caller the request gets `forbidden`.
     pub user_id: Option<Uuid>,
 }
 
@@ -247,12 +248,14 @@ pub struct CreateInstitutionRequest {
 }
 
 /// Tells an absent field from a field that is `null`: the first keeps the value, the second clears it.
-fn present<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Option<String>>, D::Error> {
-    Option::<String>::deserialize(deserializer).map(Some)
+fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+    deserializer: D,
+) -> Result<Option<Option<T>>, D::Error> {
+    Option::<T>::deserialize(deserializer).map(Some)
 }
 
-/// The input of `ChangePerson`. An absent field stays as it is. `null` clears email or phone.
-/// A request needs at least one field to change.
+/// The input of `ChangePerson`. An absent field stays as it is. `null` clears email, phone or `user_id`.
+/// A request needs at least one field to change. Only an owner or an admin can call it.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ChangePersonRequest {
     pub name: Option<String>,
@@ -262,6 +265,10 @@ pub struct ChangePersonRequest {
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<String>)]
     pub phone: Option<Option<String>>,
+    /// A member of the caller's organization.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<Uuid>)]
+    pub user_id: Option<Option<Uuid>>,
     #[schema(minimum = 1)]
     pub expected_version: i64,
 }
@@ -415,6 +422,7 @@ async fn change_person(
         name: request.name,
         email: request.email,
         phone: request.phone,
+        user_id: request.user_id.map(|user| user.map(UserId::from_uuid)),
         expected_version: record_version(request.expected_version)?,
     };
     let person = app::change_person(
