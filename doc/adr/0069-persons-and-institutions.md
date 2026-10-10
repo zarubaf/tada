@@ -40,8 +40,8 @@ Permissions:
   They set or clear the link when they create the person and when they change it.
   A create with a link from any other caller returns `forbidden`, and the API stores nothing.
   A link to a user who is no member gives the field error `unknown-member` on `user_id`.
-- A proposal never links an account: the operation `CreatePerson` has no field for it.
   Each reader of the person sees the link.
+- A proposal never links an account: the operation `CreatePerson` has no field for it.
 
 Proposals:
 
