@@ -64,6 +64,18 @@ Scope: decisions, risks, requirements, milestones, participations, templates, th
 The evidence of a proposal gets the capture time of its source version, as the design asks ([components](design/components.md)).
 The Review Inbox shows the time of the changeset until then.
 
+Planning views keep the record types fixed and make fields and views configurable:
+
+- The record types and their states stay fixed, because the review routing, the reminders and the retention depend on them.
+- An event manager adds custom fields to actions and commitments in the web client. They use the field definitions of [ADR 0049](adr/0049-entities-and-fact-model.md).
+- An event manager saves views of an event: a table, a board and a timeline. A view keeps its filter, grouping and sort order.
+- An action gets an optional start date.
+  The timeline shows actions as bars, grouped by workstream, with the milestones and the date of the event.
+- The resource view shows the open actions of each member for each week.
+- Not in scope: dependencies between actions, a critical path, automatic rescheduling and time tracking.
+
+A new ADR records the views and the custom fields of work records before the work starts.
+
 Acceptance:
 
 - (12) A simple club event can be organized without purchasing a separate task-management tool. Sub-slice 2f completes this criterion.
