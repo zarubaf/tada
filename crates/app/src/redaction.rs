@@ -130,12 +130,12 @@ pub trait RedactionStore: Debug + Send + Sync {
         actor: &Actor,
     ) -> Result<Result<RedactionOutcome, Refused>, StoreError>;
 
-    /// True if the target is redacted. False also if it does not exist.
-    async fn is_redacted(
+    /// True if the target is redacted, false if it has content, and `None` if it does not exist in the organization.
+    async fn redacted(
         &self,
         scope: OrgScope,
         target: RedactionTarget,
-    ) -> Result<bool, StoreError>;
+    ) -> Result<Option<bool>, StoreError>;
 
     /// The redaction with the ID, as its journal object holds it.
     async fn redaction(

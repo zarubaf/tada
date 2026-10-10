@@ -174,14 +174,25 @@ async fn redact_source_item_clears_text_hash_and_quotes() {
         .await,
         1
     );
-    assert!(
+    assert_eq!(
         test.database
-            .is_redacted(
+            .redacted(
                 scope(),
                 target(RedactionTargetKind::SourceItem, MEMBER_TEXT)
             )
             .await
-            .unwrap()
+            .unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        test.database
+            .redacted(
+                scope(),
+                target(RedactionTargetKind::SourceItem, &Uuid::now_v7().to_string())
+            )
+            .await
+            .unwrap(),
+        None
     );
 }
 

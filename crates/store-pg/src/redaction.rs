@@ -712,17 +712,16 @@ impl RedactionStore for Database {
         Ok(Ok(outcome))
     }
 
-    async fn is_redacted(
+    async fn redacted(
         &self,
         scope: OrgScope,
         target: RedactionTarget,
-    ) -> Result<bool, StoreError> {
+    ) -> Result<Option<bool>, StoreError> {
         // The lock of `state` ends with the transaction of this one statement.
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        let redacted = state(&mut conn, scope.organization_id().as_uuid(), target)
+        state(&mut conn, scope.organization_id().as_uuid(), target)
             .await
-            .map_err(store_error)?;
-        Ok(redacted.unwrap_or(false))
+            .map_err(store_error)
     }
 
     async fn redaction(
