@@ -32,6 +32,17 @@ pub enum Resolution {
     Hidden,
 }
 
+impl Resolution {
+    /// The record whose dispute notes the link shows. A hidden target shows none.
+    pub fn note_key(&self) -> Option<NoteKey> {
+        match self {
+            Self::Fact(fact) => Some(NoteKey::fact_version(fact.id)),
+            Self::Source(evidence) => Some(NoteKey::source_version(evidence.source_version_id)),
+            Self::Hidden => None,
+        }
+    }
+}
+
 /// The target of each `tada:` link of a draft, by the canonical text of the link (ADR 0058).
 pub type Links = BTreeMap<String, Resolution>;
 
@@ -47,17 +58,7 @@ pub struct DraftRendering {
 
 impl Disputable for DraftRendering {
     fn note_keys(&self, keys: &mut Vec<NoteKey>) {
-        keys.extend(
-            self.links
-                .values()
-                .filter_map(|resolution| match resolution {
-                    Resolution::Fact(fact) => Some(NoteKey::fact_version(fact.id)),
-                    Resolution::Source(evidence) => {
-                        Some(NoteKey::source_version(evidence.source_version_id))
-                    }
-                    Resolution::Hidden => None,
-                }),
-        );
+        keys.extend(self.links.values().filter_map(Resolution::note_key));
     }
 
     fn set_dispute_notes(&mut self, notes: DisputeNotes) {

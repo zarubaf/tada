@@ -11,6 +11,7 @@ use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tada_app::dispute_notes::{DisputeNotes, NoteKey};
 use tada_app::domain::events::EventKey;
 use tada_app::domain::ids::{UserId, WorkstreamId};
 use tada_app::domain::parties::{Party, PartyName};
@@ -22,6 +23,7 @@ use tada_app::paging::PageLimit;
 use tada_app::parties::{self, InstitutionView, PersonView};
 use tada_app::problem::{FieldError, ProblemCode};
 use tada_app::records::{RecordEvidenceView, Shown};
+use tada_app::views::{DisputeNoteView, note_views};
 use tada_app::work::{self, ActionView, CommitmentView, WorkPorts, WorkQuery};
 use tada_app::workstreams::{self, Workstream};
 use uuid::Uuid;
@@ -159,11 +161,15 @@ pub(crate) struct EvidenceItem {
     quote: String,
     /// True after a legal redaction of the source: the quote is empty (ADR 0072).
     redacted: bool,
+    /// The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    dispute_notes: Vec<DisputeNoteView>,
 }
 
-impl From<&RecordEvidenceView> for EvidenceItem {
-    fn from(evidence: &RecordEvidenceView) -> Self {
+impl EvidenceItem {
+    fn new(evidence: &RecordEvidenceView, notes: &DisputeNotes) -> Self {
         Self {
+            dispute_notes: note_views(notes, &NoteKey::source_version(evidence.source_version_id)),
             record_version: evidence.record_version.get(),
             source_version_id: evidence.source_version_id.as_uuid(),
             start: evidence.start_offset,
@@ -175,7 +181,11 @@ impl From<&RecordEvidenceView> for EvidenceItem {
 }
 
 fn evidence<T>(shown: &Shown<T>) -> Vec<EvidenceItem> {
-    shown.evidence.iter().map(EvidenceItem::from).collect()
+    shown
+        .evidence
+        .iter()
+        .map(|evidence| EvidenceItem::new(evidence, &shown.dispute_notes))
+        .collect()
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

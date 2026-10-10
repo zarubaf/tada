@@ -17,12 +17,43 @@ use tada_domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus};
 use uuid::Uuid;
 
 use crate::caller::Actor;
+use crate::dispute_notes::{DisputeNotes, NoteKey};
 use crate::documents::{DocumentView, StoredDraft, VersionContent, VersionView};
 use crate::facts::{
     DatedEvidence, EventProfile, OpenProposalRef, OpenQuestionRef, ProfileEntry, value_schema,
 };
 use crate::proposals::ValueInput;
 use crate::sources::{SourceHit, SourcePassage};
+
+/// A dispute note: the objection of a person to a fact version or to a source (ADR 0073).
+#[derive(Clone, Serialize, JsonSchema)]
+pub struct DisputeNoteView {
+    pub text: String,
+    /// RFC 3339.
+    #[schemars(with = "String")]
+    pub created_at: Timestamp,
+}
+
+/// The text can name a person, so `Debug` shows the time only (ADR 0035).
+impl std::fmt::Debug for DisputeNoteView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DisputeNoteView")
+            .field("created_at", &self.created_at)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The notes of `key` as a view shows them.
+pub fn note_views(notes: &DisputeNotes, key: &NoteKey) -> Vec<DisputeNoteView> {
+    notes
+        .of(key)
+        .iter()
+        .map(|note| DisputeNoteView {
+            text: note.text.as_str().to_owned(),
+            created_at: note.created_at,
+        })
+        .collect()
+}
 
 /// An event that the caller can read.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -224,6 +255,9 @@ pub struct FactView {
     /// True after a legal redaction: the value is gone (ADR 0072).
     pub redacted: bool,
     pub evidence: Vec<EvidenceView>,
+    /// The dispute notes about it (ADR 0073), oldest first: a person objects to it. Absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub dispute_notes: Vec<DisputeNoteView>,
     /// The reviewer who accepted the current fact version.
     pub accepted_by: AuthorView,
     /// RFC 3339. The time of the acceptance of the current fact version.
@@ -238,6 +272,9 @@ pub struct UnknownView {
     pub fact_id: Uuid,
     pub version: i64,
     pub evidence: Vec<EvidenceView>,
+    /// The dispute notes about it (ADR 0073), oldest first: a person objects to it. Absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub dispute_notes: Vec<DisputeNoteView>,
     /// The reviewer who accepted the current fact version.
     pub accepted_by: AuthorView,
     /// RFC 3339. The time of the acceptance of the current fact version.
@@ -288,6 +325,9 @@ pub struct EvidenceView {
     /// RFC 3339. The time when tada captured the source version.
     #[schemars(with = "String")]
     pub captured_at: Timestamp,
+    /// The dispute notes about it (ADR 0073), oldest first: a person objects to it. Absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub dispute_notes: Vec<DisputeNoteView>,
 }
 
 /// The quote can contain personal data, so `Debug` shows the range only (ADR 0035).
@@ -366,13 +406,23 @@ impl ProfileView {
         };
         for entry in &profile.fields {
             match &entry.state {
-                FactState::Accepted(valued) => view.accepted.push(fact_view(entry, valued)),
-                FactState::Assumption(valued) => view.assumptions.push(fact_view(entry, valued)),
+                FactState::Accepted(valued) => {
+                    view.accepted
+                        .push(fact_view(entry, valued, &profile.dispute_notes));
+                }
+                FactState::Assumption(valued) => {
+                    view.assumptions
+                        .push(fact_view(entry, valued, &profile.dispute_notes));
+                }
                 FactState::Unknown => view.unknowns.push(UnknownView {
                     field_key: entry.field.key.as_str().to_owned(),
                     fact_id: entry.fact_id.as_uuid(),
                     version: entry.version.get(),
-                    evidence: entry.evidence.iter().map(evidence_view).collect(),
+                    evidence: evidence_views(entry, &profile.dispute_notes),
+                    dispute_notes: note_views(
+                        &profile.dispute_notes,
+                        &NoteKey::fact_number(entry.fact_id, entry.version),
+                    ),
                     accepted_by: entry.accepted_by.into(),
                     accepted_at: entry.accepted_at,
                 }),
@@ -382,7 +432,7 @@ impl ProfileView {
     }
 }
 
-fn fact_view(entry: &ProfileEntry, valued: &Redactable<Valued>) -> FactView {
+fn fact_view(entry: &ProfileEntry, valued: &Redactable<Valued>, notes: &DisputeNotes) -> FactView {
     FactView {
         field_key: entry.field.key.as_str().to_owned(),
         fact_id: entry.fact_id.as_uuid(),
@@ -392,14 +442,23 @@ fn fact_view(entry: &ProfileEntry, valued: &Redactable<Valued>) -> FactView {
             .map(|valued| ValueInput::from(&valued.value)),
         approximate: valued.as_present().is_some_and(|valued| valued.approximate),
         redacted: valued.as_present().is_none(),
-        evidence: entry.evidence.iter().map(evidence_view).collect(),
+        evidence: evidence_views(entry, notes),
+        dispute_notes: note_views(notes, &NoteKey::fact_number(entry.fact_id, entry.version)),
         accepted_by: entry.accepted_by.into(),
         accepted_at: entry.accepted_at,
     }
 }
 
+fn evidence_views(entry: &ProfileEntry, notes: &DisputeNotes) -> Vec<EvidenceView> {
+    entry
+        .evidence
+        .iter()
+        .map(|dated| evidence_view(dated, notes))
+        .collect()
+}
+
 /// The one mapping of an evidence link to its view.
-fn evidence_view(dated: &DatedEvidence) -> EvidenceView {
+fn evidence_view(dated: &DatedEvidence, notes: &DisputeNotes) -> EvidenceView {
     let evidence = &dated.evidence;
     EvidenceView {
         source_version_id: evidence.source_version_id.as_uuid(),
@@ -414,6 +473,7 @@ fn evidence_view(dated: &DatedEvidence) -> EvidenceView {
         redacted: evidence.passage.quote == Redactable::Redacted,
         page: evidence.passage.page,
         captured_at: dated.captured_at,
+        dispute_notes: note_views(notes, &NoteKey::source_version(evidence.source_version_id)),
     }
 }
 
@@ -616,6 +676,9 @@ pub struct DraftVersionView {
     /// True after a legal redaction: the Markdown is gone (ADR 0072).
     pub redacted: bool,
     pub manifest: ManifestView,
+    /// The dispute notes about the version (ADR 0073), oldest first: a person objects to it. Absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub dispute_notes: Vec<DisputeNoteView>,
 }
 
 /// The Markdown is document content, so `Debug` leaves it out (ADR 0035).
@@ -641,6 +704,9 @@ pub struct ManifestView {
 pub struct CitedFactView {
     pub fact_id: Uuid,
     pub version: i64,
+    /// The dispute notes about the fact version (ADR 0073), oldest first: a person objects to it. Absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub dispute_notes: Vec<DisputeNoteView>,
 }
 
 /// A passage that a draft cites. get_source_passage gives its text.
@@ -672,6 +738,10 @@ impl From<&StoredDraft> for DraftVersionView {
                     .map(|fact| CitedFactView {
                         fact_id: fact.fact_id.as_uuid(),
                         version: fact.version.get(),
+                        dispute_notes: note_views(
+                            &draft.dispute_notes,
+                            &NoteKey::fact_number(fact.fact_id, fact.version),
+                        ),
                     })
                     .collect(),
                 sources: draft
@@ -685,6 +755,10 @@ impl From<&StoredDraft> for DraftVersionView {
                     })
                     .collect(),
             },
+            dispute_notes: note_views(
+                &draft.version.dispute_notes,
+                &NoteKey::document_version(draft.version.id),
+            ),
         }
     }
 }

@@ -631,11 +631,25 @@ pub struct DraftRendering {
     pub lint_warnings: Vec<LintWarning>,
     /// The target of each `tada:` link, by the exact text of its destination.
     pub links: BTreeMap<String, LinkTarget>,
+    /// The dispute notes about the fact version or the source of each link that the reader can see (ADR 0073),
+    /// by the same text as `links`, oldest first. A link without a note is not in it; it is absent if no link has one.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[schema(required = false)]
+    pub link_dispute_notes: BTreeMap<String, Vec<DisputeNote>>,
 }
 
 impl From<AppDraftRendering> for DraftRendering {
     fn from(draft: AppDraftRendering) -> Self {
+        let link_dispute_notes = draft
+            .links
+            .iter()
+            .filter_map(|(link, target)| {
+                let notes = shown(&draft.dispute_notes, &target.note_key()?);
+                (!notes.is_empty()).then(|| (link.clone(), notes))
+            })
+            .collect();
         Self {
+            link_dispute_notes,
             markdown: draft.markdown.as_str().to_owned(),
             lint_warnings: draft
                 .lint_warnings
