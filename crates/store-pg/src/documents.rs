@@ -28,7 +28,7 @@ use tada_app::uploads::detect::FileType;
 
 use crate::Database;
 use crate::error::{InvalidRow, store_error};
-use crate::{actor, audit};
+use crate::{actor, audit, redaction};
 
 /// The kind of a source item, a source version and a document version of an uploaded file.
 const UPLOAD: &str = "upload";
@@ -377,7 +377,8 @@ async fn version_target(
     }
 }
 
-/// The source item of the uploads of the document: the item of its first upload, or a new item.
+/// The source item of the uploads of the document: the item of its first upload, or a new item if there is none
+/// or a legal redaction removed it.
 /// Each upload of a document is a version of the same source item (ADR 0050).
 async fn source_item(
     conn: &mut PgConnection,
@@ -399,7 +400,11 @@ async fn source_item(
     )
     .fetch_optional(&mut *conn)
     .await?;
-    if let Some(item) = existing {
+    // A redaction locks the item before it reads its versions, so a version that goes in here is either in its
+    // cascade or comes after it. A redacted item takes no new version: the upload starts a new item (ADR 0072).
+    if let Some(item) = existing
+        && !redaction::share_source_item(conn, organization, item).await?
+    {
         return Ok(item);
     }
     let item = Uuid::now_v7();
@@ -498,9 +503,10 @@ async fn insert_version(
     Ok(())
 }
 
-/// The keys among `$1` that a live document version refers to. The sweep of orphan objects deletes the others.
-const LIVE_BLOB_KEYS: &str =
-    "SELECT DISTINCT blob_key FROM document_version WHERE blob_key = ANY($1)";
+/// The keys among `$1` that a document version with content refers to. The sweep of orphan objects deletes
+/// the others, also the object of a redacted version (ADR 0072).
+const LIVE_BLOB_KEYS: &str = "SELECT DISTINCT blob_key FROM document_version
+     WHERE blob_key = ANY($1) AND redacted_at IS NULL";
 
 #[async_trait]
 impl BlobReferences for Database {
@@ -1437,5 +1443,84 @@ mod tests {
         let review = insert(4).await;
         update(review, "status = 'review'").await.unwrap();
         update(review, "status = 'archived'").await.unwrap();
+    }
+
+    /// A redaction of the source item of the uploads locks the item first. An upload that comes while it runs
+    /// waits, and then starts a new item: no unredacted version goes into the redacted item (ADR 0072).
+    #[tokio::test]
+    async fn an_upload_during_a_redaction_of_its_item_starts_a_new_item() {
+        let test = TestDatabase::start().await;
+        let f = fixture(&test, "testwil").await;
+        let first = upload(&f, new_document(&f), "Programm.txt", b"Version eins");
+        let document = published(&test, &f, &first).await;
+        let item: Uuid = test
+            .scalar(&format!(
+                "SELECT source_item_id FROM source_version WHERE id = '{}'",
+                first.source_version_id
+            ))
+            .await;
+        // The redaction on its own connection: first the lock of the item.
+        let mut redaction = test.database.pool.begin().await.unwrap();
+        sqlx::query("SELECT 1 FROM source_item WHERE id = $1 FOR UPDATE")
+            .bind(item)
+            .execute(&mut *redaction)
+            .await
+            .unwrap();
+
+        let second = upload(
+            &f,
+            UploadTarget::Existing(document.id),
+            "Programm.txt",
+            b"Version zwei",
+        );
+        let database = test.database.clone();
+        let (scope, audit) = (f.scope(), audit_of(&f, &second));
+        let uploading = {
+            let second = second.clone();
+            tokio::spawn(async move { database.publish(scope, &second, &audit).await })
+        };
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        assert!(
+            !uploading.is_finished(),
+            "the upload waits for the redaction"
+        );
+
+        for statement in [
+            "SET LOCAL tada.redaction = 'on'",
+            "UPDATE source_item SET redacted_at = now() WHERE id = $1",
+            "UPDATE source_version
+             SET text = NULL, url = NULL, sha256 = NULL,
+                 author_actor = jsonb_build_object('kind', author_actor -> 'kind', 'id', author_actor -> 'id'),
+                 redacted_at = now()
+             WHERE source_item_id = $1",
+        ] {
+            let query = sqlx::query(statement);
+            let query = if statement.contains("$1") {
+                query.bind(item)
+            } else {
+                query
+            };
+            query.execute(&mut *redaction).await.unwrap();
+        }
+        redaction.commit().await.unwrap();
+
+        assert!(matches!(
+            uploading.await.unwrap().unwrap(),
+            Published::Published(_)
+        ));
+        let (new_item, text): (Uuid, Option<String>) =
+            sqlx::query_as("SELECT source_item_id, text FROM source_version WHERE id = $1")
+                .bind(second.source_version_id.as_uuid())
+                .fetch_one(&test.database.pool)
+                .await
+                .unwrap();
+        assert_ne!(new_item, item, "the new version starts a new item");
+        assert_eq!(text.as_deref(), Some("Version zwei"));
+        let unredacted: i64 = test
+            .scalar(&format!(
+                "SELECT count(*) FROM source_version WHERE source_item_id = '{item}' AND redacted_at IS NULL"
+            ))
+            .await;
+        assert_eq!(unredacted, 0);
     }
 }

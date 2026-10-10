@@ -13,7 +13,11 @@ use support::files::pdf;
 use support::organization::organization;
 use tada_adapters::storage::testing::TestGarage;
 use tada_app::blobs::{BlobKey, BlobStore, ByteStream};
+use tada_app::caller::{MemberCaller, OrganizationRole};
+use tada_app::domain::ids::UserId;
+use tada_app::domain::redaction::{RedactionReason, RedactionTarget, RedactionTargetKind};
 use tada_app::orphans::{SWEEP_GRACE, SweepReport, sweep};
+use tada_app::redaction::RedactionStore;
 use tada_store_pg::testing::TestDatabase;
 
 const JOURNAL: &str = "redaction-journal/2030-05-18.json";
@@ -92,17 +96,36 @@ async fn sweep_keeps_referenced_young_and_journal() {
     assert_eq!(garage.open_uploads().await, 0);
 }
 
-/// A redacted version keeps its row but not its object. The column comes with the redaction migration.
+/// A redacted version keeps its row but not its object (ADR 0072).
 #[tokio::test]
-#[ignore = "needs document_version.redacted_at"]
 async fn sweep_deletes_the_object_of_a_redacted_version() {
     let test = TestDatabase::start().await;
     let garage = TestGarage::start().await;
-    let (_, referenced) = uploaded(&test, &garage).await;
-    test.scalar::<i64>(
-        "WITH u AS (UPDATE document_version SET redacted_at = now() RETURNING 1) SELECT count(*) FROM u",
-    )
-    .await;
+    let (organization, referenced) = uploaded(&test, &garage).await;
+    let owner = MemberCaller::new(
+        UserId::from_uuid(
+            test.scalar("SELECT uploaded_by FROM document_version")
+                .await,
+        ),
+        organization,
+        OrganizationRole::Owner,
+    );
+    // The store redacts the version and leaves the object, as a failed delete after the commit does.
+    let target = RedactionTarget {
+        kind: RedactionTargetKind::DocumentVersion,
+        id: test.scalar("SELECT id FROM document_version").await,
+    };
+    test.database
+        .redact(
+            owner.scope(),
+            &[target],
+            RedactionReason::Request,
+            &owner.actor(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(garage.keys().await, vec![referenced.clone()]);
 
     let later = Timestamp::now() + SWEEP_GRACE + SignedDuration::from_mins(1);
     let report = sweep(&garage.storage, &test.database, later).await.unwrap();
