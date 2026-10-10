@@ -9,6 +9,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use tada_domain::ids::{ActionId, CommitmentId, EventId, ProposalId, UserId, WorkstreamId};
+use tada_domain::parties::Party;
 use tada_domain::proposals::{NewRecord, Operation};
 
 use super::selection::closure;
@@ -125,13 +126,11 @@ pub fn in_inbox_of(
 /// Any other dependency keeps its own reviewers, so a `depends_on` entry cannot move a proposal to another reviewer.
 fn refers_to_new_record(dependent: &Operation, dependency: &Operation) -> bool {
     let new_party = match dependency.new_record() {
-        Some(NewRecord::Person(id)) => id.as_uuid(),
-        Some(NewRecord::Institution(id)) => id.as_uuid(),
+        Some(NewRecord::Person(id)) => Party::Person(id),
+        Some(NewRecord::Institution(id)) => Party::Institution(id),
         _ => return false,
     };
-    dependent
-        .promisor()
-        .is_some_and(|promisor| promisor.as_uuid() == new_party)
+    dependent.promisor() == Some(new_party)
 }
 
 /// One proposal of a changeset as the routing sees it.
@@ -343,8 +342,8 @@ impl RoutingLookup for RoutingFacts {
 #[cfg(test)]
 mod tests {
     use tada_domain::RecordVersion;
-    use tada_domain::ids::{FieldDefinitionId, PersonId};
-    use tada_domain::parties::{Party, PartyName};
+    use tada_domain::ids::{FieldDefinitionId, InstitutionId, PersonId};
+    use tada_domain::parties::{InstitutionKind, Party, PartyName};
     use tada_domain::work::{ActionStatus, ActionTitle, CommitmentText};
     use uuid::Uuid;
 
@@ -422,6 +421,16 @@ mod tests {
         Operation::CreatePerson {
             id: person,
             name: PartyName::parse("Moritz Muster").unwrap(),
+            email: None,
+            phone: None,
+        }
+    }
+
+    fn new_institution(institution: InstitutionId) -> Operation {
+        Operation::CreateInstitution {
+            id: institution,
+            name: PartyName::parse("Gemeinde Testwil").unwrap(),
+            kind: InstitutionKind::Authority,
             email: None,
             phone: None,
         }
@@ -513,6 +522,20 @@ mod tests {
         }
         // A manager who is the lead gets the proposal as the lead.
         assert!(routed_to(user(LEAD), EventAccess::Manager, &lead, &[]));
+    }
+
+    #[test]
+    fn refers_to_new_record_needs_same_kind() {
+        let uuid = Uuid::from_u128(60);
+        let person = PersonId::from_uuid(uuid);
+        let institution = InstitutionId::from_uuid(uuid);
+        let promise = new_commitment(person, None);
+        assert!(refers_to_new_record(&promise, &new_person(person)));
+        // The same UUID with another kind is another record.
+        assert!(!refers_to_new_record(
+            &promise,
+            &new_institution(institution)
+        ));
     }
 
     #[test]
