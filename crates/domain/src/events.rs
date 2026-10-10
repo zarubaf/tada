@@ -6,6 +6,7 @@ use jiff::tz::TimeZone;
 use crate::RecordVersion;
 use crate::ids::{EventId, OrganizationId};
 use crate::name::{self, NameError};
+use crate::work::InvalidTransition;
 
 /// An event. All fields hold checked values.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,9 +104,70 @@ impl EventTimeZone {
     }
 }
 
+/// The status of an event: it takes changes while active and only reads once closed (ADR 0045).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventStatus {
+    Active,
+    Closed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("this is not an event status")]
+pub struct UnknownEventStatus;
+
+impl EventStatus {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Closed => "closed",
+        }
+    }
+}
+
+impl std::str::FromStr for EventStatus {
+    type Err = UnknownEventStatus;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "active" => Ok(Self::Active),
+            "closed" => Ok(Self::Closed),
+            _ => Err(UnknownEventStatus),
+        }
+    }
+}
+
+/// Only a closed event reopens, and only if no redaction touched it: a redaction removes content for good.
+pub fn can_reopen(status: EventStatus, redacted: bool) -> Result<(), InvalidTransition> {
+    if status == EventStatus::Closed && !redacted {
+        Ok(())
+    } else {
+        Err(InvalidTransition)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reopen_refused_after_redaction() {
+        assert_eq!(can_reopen(EventStatus::Closed, false), Ok(()));
+        assert_eq!(
+            can_reopen(EventStatus::Closed, true),
+            Err(InvalidTransition)
+        );
+        assert_eq!(
+            can_reopen(EventStatus::Active, false),
+            Err(InvalidTransition)
+        );
+    }
+
+    #[test]
+    fn event_status_round_trips() {
+        for status in [EventStatus::Active, EventStatus::Closed] {
+            assert_eq!(status.as_str().parse::<EventStatus>(), Ok(status));
+        }
+    }
 
     #[test]
     fn debug_of_an_event_name_hides_the_name() {
