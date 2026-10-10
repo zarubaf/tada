@@ -348,7 +348,20 @@ async fn find_or_create_user(
             .await
             .map_err(store_error)?;
     if let Some(id) = existing {
-        return Ok(UserId::from_uuid(id));
+        // The housekeeping anonymizes an account under this lock, so a user that it anonymized at the
+        // same moment is gone for this acceptance: its address is free, and the invitee gets a new account.
+        // The lock lasts to the end of the transaction, so the housekeeping cannot anonymize this user
+        // while the acceptance adds the membership (ADR 0071).
+        let anonymized = sqlx::query_scalar::<_, bool>(
+            "SELECT anonymized_at IS NOT NULL FROM app_user WHERE id = $1 FOR UPDATE",
+        )
+        .bind(id)
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(store_error)?;
+        if !anonymized {
+            return Ok(UserId::from_uuid(id));
+        }
     }
     let id = Uuid::now_v7();
     sqlx::query!(
@@ -398,6 +411,12 @@ async fn add_membership(
     .as_deref()
     .map(organization_role)
     .transpose()?;
+    // A membership ends the 90 days of the account (ADR 0071).
+    sqlx::query("UPDATE app_user SET membership_ended_at = NULL WHERE id = $1")
+        .bind(user_id.as_uuid())
+        .execute(&mut *conn)
+        .await
+        .map_err(store_error)?;
     let accepted = accepted_role(existing, invited);
     match existing {
         None => {
@@ -818,6 +837,97 @@ mod tests {
             .unwrap();
         assert!(session.is_none());
         assert_eq!(count(&test, "organization_membership").await, 0);
+    }
+
+    /// A membership that starts again ends the 90 days of the account (ADR 0071).
+    #[tokio::test]
+    async fn an_acceptance_clears_the_end_of_the_membership() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let berta = test
+            .create_user(
+                &DisplayName::parse("Berta Beispiel").unwrap(),
+                &email("berta@example.org"),
+            )
+            .await;
+        sqlx::query("UPDATE app_user SET membership_ended_at = $2 WHERE id = $1")
+            .bind(berta.as_uuid())
+            .bind((now() - SignedDuration::from_hours(24)).to_sqlx())
+            .execute(&test.database.pool)
+            .await
+            .unwrap();
+        let id = invitation(&test, testwil).await;
+        let token =
+            invitation_token(&test, testwil, id, now() + SignedDuration::from_mins(1)).await;
+
+        test.database
+            .accept_invitation(&token, None, None, None, now())
+            .await
+            .unwrap()
+            .unwrap();
+
+        let ended: Option<jiff_sqlx::Timestamp> = test
+            .scalar(&format!(
+                "SELECT membership_ended_at FROM app_user WHERE id = '{}'",
+                berta.as_uuid()
+            ))
+            .await;
+        assert!(ended.is_none());
+        assert_eq!(count(&test, "organization_membership").await, 1);
+    }
+
+    /// The housekeeping anonymizes the account of the invitee while the acceptance runs. The acceptance
+    /// waits for the lock, finds the account anonymized and makes a new account for the address.
+    #[tokio::test]
+    async fn an_acceptance_does_not_attach_a_membership_to_an_account_that_is_anonymized() {
+        let test = TestDatabase::start().await;
+        let testwil = test.create_organization("testwil").await;
+        let old = test
+            .create_user(
+                &DisplayName::parse("Berta Beispiel").unwrap(),
+                &email("berta@example.org"),
+            )
+            .await;
+        let id = invitation(&test, testwil).await;
+        let token =
+            invitation_token(&test, testwil, id, now() + SignedDuration::from_mins(1)).await;
+        let mut housekeeping = test.database.pool.begin().await.unwrap();
+        sqlx::query(
+            "UPDATE app_user SET display_name = 'entfernt', anonymized_at = now() WHERE id = $1",
+        )
+        .bind(old.as_uuid())
+        .execute(&mut *housekeeping)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM email_identity WHERE user_id = $1")
+            .bind(old.as_uuid())
+            .execute(&mut *housekeeping)
+            .await
+            .unwrap();
+        let database = test.database.clone();
+        let accept = tokio::spawn(async move {
+            database
+                .accept_invitation(&token, None, None, None, now())
+                .await
+        });
+        // The acceptance has read the old address and waits for the lock of the account.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        housekeeping.commit().await.unwrap();
+        assert!(accept.await.unwrap().unwrap().is_some());
+
+        let members: Vec<Uuid> = sqlx::query_scalar("SELECT user_id FROM organization_membership")
+            .fetch_all(&test.database.pool)
+            .await
+            .unwrap();
+        assert_eq!(members.len(), 1);
+        assert_ne!(members[0], old.as_uuid());
+        let owner_of_address: Uuid = sqlx::query_scalar(
+            "SELECT user_id FROM email_identity WHERE email = 'berta@example.org'",
+        )
+        .fetch_one(&test.database.pool)
+        .await
+        .unwrap();
+        assert_eq!(owner_of_address, members[0]);
     }
 
     #[tokio::test]

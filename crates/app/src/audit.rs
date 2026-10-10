@@ -83,6 +83,8 @@ pub enum AuditAction {
     EventRedact,
     /// An owner exported the data about a person (ADR 0073).
     PersonExport,
+    /// The housekeeping anonymized an account 90 days after its last membership ended (ADR 0071).
+    AppUserAnonymize,
     /// An owner added a dispute note to immutable evidence (ADR 0073). The event holds no text.
     DisputeNoteCreate,
 }
@@ -135,6 +137,7 @@ impl AuditAction {
             Self::InstitutionRedact => "institution.redact",
             Self::EventRedact => "event.redact",
             Self::PersonExport => "person.export",
+            Self::AppUserAnonymize => "app_user.anonymize",
             Self::DisputeNoteCreate => "dispute_note.create",
         }
     }
@@ -180,6 +183,7 @@ impl AuditAction {
             Self::InstitutionCreate | Self::InstitutionChange | Self::InstitutionRedact => {
                 "institution"
             }
+            Self::AppUserAnonymize => "app_user",
             Self::SourceItemRedact => "source_item",
             Self::FactVersionRedact => "fact_version",
             Self::DisputeNoteCreate => "dispute_note",

@@ -20,6 +20,10 @@ use tada_store_pg::testing::TestDatabase;
 const FIXTURE_0015: &str = include_str!("fixtures/0015.sql");
 
 /// Invented work records and parties at the schema of migration 0025. It adds to `FIXTURE_0015`.
+/// An account without membership at the schema of migration 0025, for example a former member.
+const ACCOUNT_WITHOUT_MEMBERSHIP: &str = "INSERT INTO app_user (id, display_name, created_at)
+     VALUES ('0190a000-0000-7000-8000-0000000000f1', 'Berta Beispiel', '2030-05-01T08:00:00Z');";
+
 const FIXTURE_0025: &str = include_str!("fixtures/0025.sql");
 
 /// The rows of each table, as JSON text in a fixed order, with the columns of each table at the cut only.
@@ -234,7 +238,11 @@ async fn an_upgrade_keeps_the_concept_the_sources_the_relationships_and_the_old_
 /// with an active event, no retention and no redaction.
 #[tokio::test]
 async fn upgrade_from_0025_keeps_rows() {
-    let test = upgrade_keeps_rows(25, &[FIXTURE_0015, FIXTURE_0025]).await;
+    let test = upgrade_keeps_rows(
+        25,
+        &[FIXTURE_0015, FIXTURE_0025, ACCOUNT_WITHOUT_MEMBERSHIP],
+    )
+    .await;
     let pool = test.pool();
 
     assert_eq!(
@@ -253,6 +261,16 @@ async fn upgrade_from_0025_keeps_rows() {
         )
         .await,
         ["off off"]
+    );
+    // The account without membership starts its 90 days at the migration. The member has no end.
+    assert_eq!(
+        text(
+            pool,
+            "SELECT display_name || ' ' || (membership_ended_at IS NOT NULL) || ' ' || (anonymized_at IS NULL)
+             FROM app_user ORDER BY display_name"
+        )
+        .await,
+        ["Anna Muster false true", "Berta Beispiel true true"]
     );
     let redacted: i64 = sqlx::query_scalar(
         "SELECT (SELECT count(*) FROM source_item WHERE redacted_at IS NOT NULL)

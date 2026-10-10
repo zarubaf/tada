@@ -42,6 +42,7 @@ mod evidence;
 mod export;
 mod facts;
 mod heartbeat;
+mod housekeeping;
 mod identity;
 mod jobs;
 mod local_ids;

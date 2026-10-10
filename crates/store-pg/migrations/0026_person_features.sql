@@ -316,3 +316,9 @@ ALTER TABLE audit_event
     ADD CONSTRAINT audit_event_detail_reason_string CHECK (
         detail IS NULL OR coalesce(jsonb_typeof(detail -> 'reason'), 'string') = 'string'
     );
+
+-- An account without membership starts the 90 days of its anonymization at this migration (ADR 0071).
+-- The accounts of Slice 1 and 2a could lose their last membership before the column existed.
+UPDATE app_user SET membership_ended_at = now()
+WHERE anonymized_at IS NULL AND membership_ended_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM organization_membership m WHERE m.user_id = app_user.id);

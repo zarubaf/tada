@@ -470,6 +470,17 @@ impl MemberStore for Database {
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
+        // The last membership starts the 90 days of the account (ADR 0071).
+        sqlx::query(
+            "UPDATE app_user SET membership_ended_at = $2
+             WHERE id = $1
+               AND NOT EXISTS (SELECT 1 FROM organization_membership WHERE user_id = $1)",
+        )
+        .bind(member.as_uuid())
+        .bind(now.to_sqlx())
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
         // A removal ends all sessions of the member, also in other organizations: tada cannot tell
         // a stolen session from the member's own one, and a kept session could choose this
         // organization again after a new invitation.
@@ -983,6 +994,32 @@ mod tests {
             0,
             "the Telegram link ends too"
         );
+    }
+
+    /// The removal of the last membership starts the 90 days of the account (ADR 0071).
+    /// A member who keeps another membership has no end.
+    #[tokio::test]
+    async fn a_removal_marks_the_end_of_the_last_membership_only() {
+        let f = Fixture::start().await;
+        let anna = f.member("Anna Muster", OrganizationRole::Member).await;
+        let ben = f.member("Ben Beispiel", OrganizationRole::Member).await;
+        let musterhausen = f.test.create_organization("musterhausen").await;
+        f.test
+            .add_membership(musterhausen, ben, OrganizationRole::Member)
+            .await;
+
+        assert_eq!(f.remove(anna).await, None);
+        assert_eq!(f.remove(ben).await, None);
+
+        let ended = |user: UserId| {
+            format!(
+                "SELECT membership_ended_at = '{NOW}'::timestamptz FROM app_user WHERE id = '{}'",
+                user.as_uuid()
+            )
+        };
+        assert!(f.test.scalar::<bool>(&ended(anna)).await);
+        let ben_ended: Option<bool> = f.test.scalar(&ended(ben)).await;
+        assert_eq!(ben_ended, None, "Ben is still a member of Musterhausen");
     }
 
     /// A Telegram confirmation that runs at the same time as the removal cannot keep its link: the

@@ -6,7 +6,9 @@ use std::time::Duration;
 use anyhow::Context;
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
+use tada_app::caller::{JobRunner, ServiceCaller};
 use tada_app::clock::Clock;
+use tada_app::housekeeping::HousekeepingStore;
 use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::mail::{MailTexts, Mailer};
 use tada_app::orphans;
@@ -74,6 +76,7 @@ pub async fn run(
     // The counters that a sweep can delete change only when a new window starts (ADR 0065).
     let mut counter_sweep = Sweep::every(WINDOW);
     let mut orphan_sweep = Sweep::daily();
+    let mut housekeeping_sweep = Sweep::daily();
     'outer: loop {
         tokio::select! {
             () = &mut stop => break,
@@ -107,6 +110,18 @@ pub async fn run(
                 Err(error) => {
                     orphan_sweep.failed(now);
                     tracing::warn!(%error, "cannot sweep the orphan objects");
+                }
+            }
+        }
+        if let Some(day) = housekeeping_sweep.due(now) {
+            match db.run(&ServiceCaller::<JobRunner>::new(), now).await {
+                Ok(report) => {
+                    tracing::info!(?report, "the housekeeping completed");
+                    housekeeping_sweep.done(day);
+                }
+                Err(error) => {
+                    housekeeping_sweep.failed(now);
+                    tracing::warn!(%error, "cannot run the housekeeping");
                 }
             }
         }

@@ -14,6 +14,7 @@ pub mod events;
 pub mod export;
 pub mod facts;
 pub mod health;
+pub mod housekeeping;
 pub mod identity;
 pub mod jobs;
 pub mod mail;
