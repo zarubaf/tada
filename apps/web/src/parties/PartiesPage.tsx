@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import type { Api } from "../api/client";
 import { t } from "../i18n";
+import { canManage } from "../members/roles";
 import { RegisterView } from "../registers/RegisterView";
 import { useRegister } from "../registers/useRegister";
 import { useRegisterPage } from "../registers/useRegisterPage";
+import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import type { Column } from "../ui/DataTable";
 import { LiveRegion } from "../ui/LiveRegion";
@@ -12,7 +14,6 @@ import { TextField } from "../ui/TextField";
 import styles from "./PartiesPage.module.css";
 import { PartyForm } from "./PartyForm";
 import { type Party, type PartyKind, partyApi } from "./partyApi";
-import { useAccounts } from "./useAccounts";
 
 /**
  * „Personen“ and „Institutionen“: the register of the organization, a search by name and the form
@@ -21,7 +22,7 @@ import { useAccounts } from "./useAccounts";
 export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
   const party = useMemo(() => partyApi(api, kind), [api, kind]);
   const person = kind === "person";
-  const accounts = useAccounts(api);
+  const manages = canManage(useSession().organization?.role);
   const [query, setQuery] = useState("");
   const search = query.trim();
   // A new search is a new `fetchPage`, so the register loads the first page again.
@@ -125,7 +126,7 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
           key={editing ? `${editing.id}:${editing.version}` : "new"}
           api={party}
           kind={kind}
-          {...(person && accounts && { accounts })}
+          {...(person && manages && { memberApi: api })}
           {...(editing && { record: editing })}
           onStart={page.start}
           onSaved={saved}

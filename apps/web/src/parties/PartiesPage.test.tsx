@@ -86,11 +86,13 @@ function setup({ kind = "person", canChange = true, role = "member", answers = {
       return json(200, session);
     }
     if (url.pathname.endsWith("/members")) {
+      const q = url.searchParams.get("q")?.toLowerCase() ?? "";
+      const members = [
+        { user_id: ME, display_name: "Anna Muster", role: "owner", version: 1 },
+        { user_id: "u2", display_name: "Bruno Beispiel", role: "member", version: 1 },
+      ];
       return json(200, {
-        items: [
-          { user_id: ME, display_name: "Anna Muster", role: "owner", version: 1 },
-          { user_id: "u2", display_name: "Bruno Beispiel", role: "member", version: 1 },
-        ],
+        items: members.filter((m) => m.display_name.toLowerCase().includes(q)),
       });
     }
     if (request.method === "GET" && url.pathname.endsWith("s")) {
@@ -249,7 +251,7 @@ describe("PartiesPage", () => {
     await screen.findByRole("table", { name: "Personen" });
 
     await user.type(screen.getByRole("textbox", { name: "Name (Pflichtfeld)" }), "Dora");
-    await user.click(await screen.findByRole("button", { name: /Konto/ }));
+    await user.type(await screen.findByRole("combobox", { name: "Konto" }), "bru");
     await user.click(await screen.findByRole("option", { name: "Bruno Beispiel" }));
     await user.click(screen.getByRole("button", { name: "Erfassen" }));
 
@@ -260,6 +262,39 @@ describe("PartiesPage", () => {
     });
   });
 
+  it("does not link the member of an earlier choice after the text changed", async () => {
+    const { calls } = setup({
+      role: "admin",
+      answers: { "POST /persons": () => json(201, { ...clara, id: "p3", name: "Dora" }) },
+    });
+    await screen.findByRole("table", { name: "Personen" });
+
+    await user.type(screen.getByRole("textbox", { name: "Name (Pflichtfeld)" }), "Dora");
+    const account = await screen.findByRole("combobox", { name: "Konto" });
+    await user.type(account, "bru");
+    await user.click(await screen.findByRole("option", { name: "Bruno Beispiel" }));
+    await user.type(account, " und andere");
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Erfassen", hidden: true }));
+
+    await screen.findByText("Dora", { selector: "td" });
+    // A new person without a link has no `user_id`.
+    expect(calls.find((c) => c.call === "POST /api/v1/persons")?.body).toEqual({ name: "Dora" });
+  });
+
+  it("account picker searches members by q", async () => {
+    const { calls } = setup({ role: "admin" });
+    await screen.findByRole("table", { name: "Personen" });
+
+    await user.type(await screen.findByRole("combobox", { name: "Konto" }), "bru");
+
+    await screen.findByRole("option", { name: "Bruno Beispiel" });
+    expect(screen.queryByRole("option", { name: "Anna Muster" })).not.toBeInTheDocument();
+    const members = calls.filter((c) => c.call.includes("/members")).map((c) => c.call);
+    expect(members).toContain("GET /api/v1/members?limit=6&q=bru");
+    expect(members.some((call) => call.includes("limit=200"))).toBe(false);
+  });
+
   it("lets an owner clear the account of a person in a change", async () => {
     const { calls } = setup({
       role: "owner",
@@ -268,14 +303,33 @@ describe("PartiesPage", () => {
     await screen.findByRole("table", { name: "Personen" });
     await user.click(screen.getByRole("button", { name: "Beat Muster bearbeiten" }));
 
-    await user.click(await screen.findByRole("button", { name: /Konto/ }));
-    await user.click(await screen.findByRole("option", { name: "Kein Konto" }));
+    const account = await screen.findByRole("combobox", { name: "Konto" });
+    expect(account).toHaveValue("Verknüpft");
+    await user.clear(account);
+    await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
       expect(calls.find((c) => c.call === "PATCH /api/v1/persons/p1")?.body).toMatchObject({
         user_id: null,
         expected_version: 2,
+      }),
+    );
+  });
+
+  it("keeps the account of a person in a change that leaves it alone", async () => {
+    const { calls } = setup({
+      role: "owner",
+      answers: { "PATCH /persons/p1": () => json(200, { ...beat, version: 3 }) },
+    });
+    await screen.findByRole("table", { name: "Personen" });
+    await user.click(screen.getByRole("button", { name: "Beat Muster bearbeiten" }));
+    await screen.findByRole("combobox", { name: "Konto" });
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(calls.find((c) => c.call === "PATCH /api/v1/persons/p1")?.body).toMatchObject({
+        user_id: ME,
       }),
     );
   });
