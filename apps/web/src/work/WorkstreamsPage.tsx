@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
 import { LiveRegion } from "../ui/LiveRegion";
+import { redactedOr } from "../ui/Redacted";
 import { DirectoryGate } from "./DirectoryGate";
 import { type Directory, useDirectory } from "./directory";
 import styles from "./Work.module.css";
@@ -53,7 +54,11 @@ function Workstreams({
   };
 
   const columns: Column<Workstream>[] = [
-    { id: "name", header: t("workstream-column-name"), cell: (row) => row.name },
+    {
+      id: "name",
+      header: t("workstream-column-name"),
+      cell: (row) => redactedOr(row.redacted, row.name),
+    },
     {
       id: "lead",
       header: t("workstream-column-lead"),
@@ -69,14 +74,15 @@ function Workstreams({
           {
             id: "actions",
             header: t("work-column-actions"),
-            cell: (row: Workstream) => (
-              <Button
-                aria-label={t("workstream-edit-of", { name: row.name })}
-                onPress={() => page.edit(row)}
-              >
-                {t("work-edit")}
-              </Button>
-            ),
+            cell: (row: Workstream) =>
+              !row.redacted && (
+                <Button
+                  aria-label={t("workstream-edit-of", { name: row.name })}
+                  onPress={() => page.edit(row)}
+                >
+                  {t("work-edit")}
+                </Button>
+              ),
           },
         ]
       : []),

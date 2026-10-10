@@ -267,4 +267,39 @@ describe("EventOverview", () => {
     const heading = await screen.findByRole("heading", { name: "Offene Fragen" });
     expect(heading).toHaveFocus();
   });
+
+  it("shows entfernt for a redacted open question and a redacted value, with the note", async () => {
+    setup({
+      profile: () =>
+        json(200, {
+          ...profile,
+          facts: [
+            fact("venue", "accepted", undefined, {
+              redacted: true,
+              dispute_notes: [{ text: "Ort bestritten.", created_at: "2026-10-05T07:00:00Z" }],
+            }),
+          ],
+          open_questions: [
+            {
+              id: "q1",
+              local_id: "QST-001",
+              text: "",
+              redacted: true,
+              owner_id: MEMBER_ID,
+              version: 1,
+            },
+          ],
+        }),
+    });
+
+    const questions = (await screen.findByRole("heading", { name: "Offene Fragen" })).closest(
+      "section",
+    ) as HTMLElement;
+    expect(within(questions).getByText("entfernt")).toBeInTheDocument();
+    const facts = (await screen.findByRole("heading", { name: "Fakten" })).closest(
+      "section",
+    ) as HTMLElement;
+    expect(within(facts).getByText("entfernt")).toBeInTheDocument();
+    expect(within(facts).getByText("Einwand: Ort bestritten.")).toBeInTheDocument();
+  });
 });

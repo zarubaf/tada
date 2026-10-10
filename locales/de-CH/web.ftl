@@ -600,6 +600,8 @@ inbox-status-accepted = Angenommen
 inbox-status-accepted-with-edit = Mit Änderung angenommen
 inbox-status-rejected = Abgelehnt
 inbox-status-withdrawn = Zurückgezogen
+# Proposals that a legal redaction emptied (ADR 0072).
+inbox-redacted-title = Entfernte Vorschläge
 inbox-accept = Annehmen
 inbox-edit = Bearbeiten und annehmen
 inbox-reject = Ablehnen

@@ -248,4 +248,60 @@ describe("CommitmentsPage", () => {
     ).toBeInTheDocument();
     expect(calls.some((c) => c.call.startsWith("POST"))).toBe(false);
   });
+
+  it("shows entfernt for a redacted commitment and its promisor, and offers no edit", async () => {
+    render({
+      lists: {
+        "/commitments": [
+          commitment({
+            text: "",
+            condition: null,
+            redacted: true,
+            promisor: {
+              kind: "institution",
+              id: "i1",
+              local_id: "INS-001",
+              name: "",
+              redacted: true,
+            },
+          }),
+        ],
+      },
+    });
+
+    const table = await screen.findByRole("table", { name: "Zusagen" });
+    expect(within(table).getAllByText("entfernt")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "COM-001 bearbeiten" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "COM-001 verbindlich machen" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows entfernt for the quote of redacted evidence and the dispute note of another", async () => {
+    const base = (commitment().evidence as Record<string, unknown>[])[0] as Record<string, unknown>;
+    render({
+      lists: {
+        "/commitments": [
+          commitment({
+            evidence: [
+              { ...base, quote: "", redacted: true },
+              {
+                ...base,
+                proposal_id: "p2",
+                redacted: false,
+                dispute_notes: [{ text: "Falsch zitiert.", created_at: "2030-05-02T08:00:00Z" }],
+              },
+            ],
+          }),
+        ],
+      },
+    });
+    await screen.findByRole("table", { name: "Zusagen" });
+
+    await user.click(screen.getByRole("button", { name: "Beleg zu COM-001" }));
+
+    const sheet = await screen.findByRole("dialog", { name: "Beleg zu COM-001" });
+    expect(within(sheet).getByText("entfernt")).toBeInTheDocument();
+    expect(within(sheet).getByText("Einwand: Falsch zitiert.")).toBeInTheDocument();
+  });
 });

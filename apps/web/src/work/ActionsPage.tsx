@@ -10,6 +10,7 @@ import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import type { Column } from "../ui/DataTable";
 import { LiveRegion } from "../ui/LiveRegion";
+import { redactedOr } from "../ui/Redacted";
 import { ActionForm } from "./ActionForm";
 import { DirectoryGate } from "./DirectoryGate";
 import { type Directory, useDirectory } from "./directory";
@@ -55,7 +56,11 @@ function Actions({ api, eventId, directory }: { api: Api; eventId: string; direc
 
   const columns: Column<Action>[] = [
     { id: "id", header: t("work-column-id"), cell: (row) => row.local_id, mono: true },
-    { id: "title", header: t("action-column-title"), cell: (row) => row.title },
+    {
+      id: "title",
+      header: t("action-column-title"),
+      cell: (row) => redactedOr(row.redacted, row.title),
+    },
     {
       id: "owner",
       header: t("work-column-owner"),
@@ -64,7 +69,10 @@ function Actions({ api, eventId, directory }: { api: Api; eventId: string; direc
     {
       id: "workstream",
       header: t("work-column-workstream"),
-      cell: (row) => directory.workstreams.find((w) => w.id === row.workstream_id)?.name ?? "",
+      cell: (row) => {
+        const stream = directory.workstreams.find((w) => w.id === row.workstream_id);
+        return stream ? redactedOr(stream.redacted, stream.name) : "";
+      },
     },
     {
       id: "due",
@@ -81,7 +89,8 @@ function Actions({ api, eventId, directory }: { api: Api; eventId: string; direc
       id: "actions",
       header: t("work-column-actions"),
       cell: (row) =>
-        row.can_change && (
+        row.can_change &&
+        !row.redacted && (
           <Button
             aria-label={t("work-edit-of", { id: row.local_id })}
             onPress={() => page.edit(row)}

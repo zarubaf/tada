@@ -243,7 +243,56 @@ const workChangeset = {
   ],
 };
 
+const CS_NOTES = "0199b8e0-0000-7000-8000-000000000c06";
+const CS_GONE = "0199b8e0-0000-7000-8000-000000000c07";
+
+/** A proposal and the current fact with dispute notes, and a current fact that is redacted. */
+const notesChangeset = {
+  ...oldChangeset,
+  id: CS_NOTES,
+  proposals: [
+    {
+      ...proposal(P_VENUE, {
+        stale: true,
+        dispute_notes: [{ text: "Der Vorschlag ist falsch.", created_at: "2028-02-02T09:00:00Z" }],
+        operation: {
+          kind: "set-fact",
+          event_id: EVENT.id,
+          field_id: VENUE,
+          state: "accepted",
+          value: { type: "text", text: "Flugplatz Testwil" },
+          expected_version: 1,
+        },
+        current: {
+          fact_id: "0199b8e0-0000-7000-8000-0000000002a1",
+          version: 2,
+          state: "accepted",
+          redacted: true,
+          dispute_notes: [{ text: "Der Wert ist umstritten.", created_at: "2028-02-02T09:00:00Z" }],
+        },
+      }),
+    },
+  ],
+};
+
+/** A changeset where retention emptied one proposal. */
+const redactedChangeset = {
+  ...newChangeset,
+  id: CS_GONE,
+  redacted_proposals: [
+    {
+      id: "0199b8e0-0000-7000-8000-0000000001e1",
+      operation_kind: "set_fact",
+      depends_on: [],
+      status: "rejected",
+      redacted: true,
+    },
+  ],
+};
+
 const CHANGESETS = new Map<string, unknown>([
+  [CS_NOTES, notesChangeset],
+  [CS_GONE, redactedChangeset],
   [CS_WORK, workChangeset],
   [CS_OLD, oldChangeset],
   [CS_NEW, newChangeset],
@@ -319,7 +368,9 @@ function fakeServer(overrides: Record<string, Handler> = {}) {
     calls.push({ method: request.method, path: url.pathname, body });
     if (detail?.[1] && request.method === "GET") {
       const changeset = CHANGESETS.get(detail[1]);
-      return changeset ? json(200, changeset) : problem("not-found", 404);
+      return changeset
+        ? json(200, { redacted_proposals: [], ...changeset })
+        : problem("not-found", 404);
     }
     const handler = routes[`${request.method} ${generic}`];
     return handler ? handler(request) : json(200, { items: [] });
@@ -349,6 +400,19 @@ describe("the list", () => {
     expect(links[0]).toHaveTextContent("Veraltet");
     expect(links[1]).not.toHaveTextContent("Veraltet");
     expect(links[2]).toHaveTextContent("Organisation");
+  });
+
+  it("keeps the name of a redacted event in the scope title", async () => {
+    renderAt(
+      "/inbox",
+      fakeServer({
+        "GET /api/v1/events": () => json(200, { items: [{ ...EVENT, redacted: true }] }),
+      }),
+    );
+
+    const list = await screen.findByRole("region", { name: "Offene Änderungen" });
+    const links = await within(list).findAllByRole("link");
+    await waitFor(() => expect(links[0]).toHaveTextContent("FLY28 Fly-in Musterhausen"));
   });
 
   it("shows the count in the navigation from the same list", async () => {
@@ -1213,5 +1277,24 @@ describe("a link whose dependents go to another reviewer", () => {
     expect(within(card).queryByRole("checkbox", { name: /Bestehenden Eintrag/ })).toBeNull();
     expect(within(card).getByText(/anderer Prüfer/)).toBeInTheDocument();
     CHANGESETS.set(CS_WORK, workChangeset);
+  });
+
+  describe("redacted content and dispute notes", () => {
+    it("shows the dispute note of a proposal and of the current fact, and entfernt for its value", async () => {
+      renderAt(`/inbox/${CS_NOTES}`);
+
+      const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+      expect(within(card).getByText("Einwand: Der Vorschlag ist falsch.")).toBeInTheDocument();
+      expect(within(card).getByText("Einwand: Der Wert ist umstritten.")).toBeInTheDocument();
+      expect(within(card).getByText("entfernt")).toBeInTheDocument();
+    });
+
+    it("lists a proposal that a redaction emptied, without a card", async () => {
+      renderAt(`/inbox/${CS_GONE}`);
+
+      const section = await screen.findByRole("region", { name: "Entfernte Vorschläge" });
+      expect(within(section).getByText("entfernt")).toBeInTheDocument();
+      expect(within(section).getByText("Abgelehnt")).toBeInTheDocument();
+    });
   });
 });

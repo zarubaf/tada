@@ -10,6 +10,7 @@ import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import type { Column } from "../ui/DataTable";
 import { LiveRegion } from "../ui/LiveRegion";
+import { redactedOr } from "../ui/Redacted";
 import { CommitmentEvidence } from "./CommitmentEvidence";
 import { CommitmentForm } from "./CommitmentForm";
 import { DirectoryGate } from "./DirectoryGate";
@@ -65,7 +66,7 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
       header: t("commitment-column-text"),
       cell: (row) => (
         <>
-          {row.text}
+          {redactedOr(row.redacted, row.text)}
           {row.condition && (
             <span className={styles.condition}>
               {t("commitment-condition-line", { condition: row.condition })}
@@ -79,7 +80,11 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
         </>
       ),
     },
-    { id: "promisor", header: t("commitment-column-promisor"), cell: (row) => row.promisor.name },
+    {
+      id: "promisor",
+      header: t("commitment-column-promisor"),
+      cell: (row) => redactedOr(row.promisor.redacted, row.promisor.name),
+    },
     {
       id: "owner",
       header: t("work-column-owner"),
@@ -109,7 +114,7 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
               {t("commitment-evidence")}
             </Button>
           )}
-          {row.can_change && (
+          {row.can_change && !row.redacted && (
             <Button
               aria-label={t("work-edit-of", { id: row.local_id })}
               onPress={() => page.edit(row)}
@@ -117,7 +122,7 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
               {t("work-edit")}
             </Button>
           )}
-          {row.can_make_firm && (
+          {row.can_make_firm && !row.redacted && (
             <Button
               aria-label={t("make-firm-of", { id: row.local_id })}
               onPress={() => {

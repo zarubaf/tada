@@ -100,4 +100,15 @@ describe("WorkstreamsPage", () => {
       await screen.findByText("Diesen Namen gibt es in diesem Anlass schon."),
     ).toBeInTheDocument();
   });
+
+  it("shows entfernt for a redacted workstream and offers no edit", async () => {
+    render({
+      role: "admin",
+      workstreams: [{ ...ground, name: "", redacted: true }],
+    });
+
+    const table = await screen.findByRole("table", { name: "Arbeitsbereiche" });
+    expect(within(table).getByText("entfernt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /bearbeiten/ })).not.toBeInTheDocument();
+  });
 });

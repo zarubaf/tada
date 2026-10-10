@@ -350,4 +350,18 @@ describe("PartiesPage", () => {
     await screen.findByRole("heading", { name: /bearbeiten/ });
     expect(screen.queryByRole("heading", { name: "Datenschutz" })).toBeNull();
   });
+
+  it("shows entfernt for a redacted person and offers no edit", async () => {
+    setup({
+      role: "owner",
+      answers: {
+        "GET /persons": () =>
+          json(200, { items: [{ ...beat, name: "", email: null, phone: null, redacted: true }] }),
+      },
+    });
+
+    const table = await screen.findByRole("table", { name: "Personen" });
+    expect(within(table).getByText("entfernt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /bearbeiten/ })).not.toBeInTheDocument();
+  });
 });

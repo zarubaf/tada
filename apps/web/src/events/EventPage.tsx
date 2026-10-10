@@ -93,6 +93,7 @@ export function EventPage({
         <EventContext value={context}>
           <header className={styles.header}>
             <p className={styles.key}>{state.event.key}</p>
+            {/* A redacted event keeps its name (ADR 0072). */}
             <PageTitle ref={heading}>{state.event.name}</PageTitle>
             <DateWindow profile={profile} />
           </header>

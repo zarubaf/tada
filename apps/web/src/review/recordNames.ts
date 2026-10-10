@@ -81,7 +81,9 @@ export async function loadRecordNames(api: Api, changeset: Changeset): Promise<R
               params: { path },
             });
             for (const item of data?.items ?? []) {
-              workstreams.set(item.id, item.name);
+              if (!item.redacted) {
+                workstreams.set(item.id, item.name);
+              }
             }
           }),
         ]
@@ -94,14 +96,18 @@ export async function loadRecordNames(api: Api, changeset: Changeset): Promise<R
             params: { path: { person_id: id } },
           });
           if (person.data) {
-            partyNames.set(id, person.data.name);
+            if (!person.data.redacted) {
+              partyNames.set(id, person.data.name);
+            }
             return;
           }
           const institution = await api.GET("/api/v1/institutions/{institution_id}", {
             params: { path: { institution_id: id } },
           });
           if (institution.data) {
-            partyNames.set(id, institution.data.name);
+            if (!institution.data.redacted) {
+              partyNames.set(id, institution.data.name);
+            }
           }
         }),
       ),
@@ -111,7 +117,7 @@ export async function loadRecordNames(api: Api, changeset: Changeset): Promise<R
           params: { path: { ...path, id } },
         });
         if (data) {
-          records.set(id, `${data.local_id} ${data.title}`);
+          records.set(id, data.redacted ? data.local_id : `${data.local_id} ${data.title}`);
         }
       }),
     ),
@@ -121,7 +127,7 @@ export async function loadRecordNames(api: Api, changeset: Changeset): Promise<R
           params: { path: { ...path, id } },
         });
         if (data) {
-          records.set(id, `${data.local_id} ${data.text}`);
+          records.set(id, data.redacted ? data.local_id : `${data.local_id} ${data.text}`);
         }
       }),
     ),

@@ -40,6 +40,7 @@ export function useEventScopes(api: Api): Scopes {
           return t("inbox-scope-organization");
         }
         const event = events.get(eventId);
+        // A redacted event keeps its name (ADR 0072).
         return event ? `${event.key} ${event.name}` : t("inbox-event-unknown");
       },
       timeZone: (eventId) => (eventId && events.get(eventId)?.time_zone) || BROWSER_ZONE,

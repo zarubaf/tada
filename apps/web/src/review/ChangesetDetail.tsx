@@ -9,11 +9,12 @@ import {
   type ReviewResult,
 } from "../api/client";
 import { formatDateTime } from "../facts/formatValue";
-import { t } from "../i18n";
+import { hasMessage, t } from "../i18n";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import { authorName } from "./authorName";
@@ -473,6 +474,24 @@ export function ChangesetDetail({
           );
         })}
       </ol>
+
+      {changeset.redacted_proposals.length > 0 && (
+        <section className={styles.redacted} aria-labelledby="inbox-redacted-title">
+          <h3 id="inbox-redacted-title" className={styles.summaryTitle}>
+            {t("inbox-redacted-title")}
+          </h3>
+          <ul>
+            {changeset.redacted_proposals.map((gone) => (
+              <li key={gone.id}>
+                <Redacted />{" "}
+                {hasMessage(`inbox-status-${gone.status}`) && (
+                  <span>{t(`inbox-status-${gone.status}`)}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {selected.size > 0 && (
         <section className={styles.summary} aria-labelledby="inbox-summary-title">

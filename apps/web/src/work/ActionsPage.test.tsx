@@ -176,4 +176,14 @@ describe("ActionsPage", () => {
     const options = within(await screen.findByRole("listbox")).getAllByRole("option");
     expect(options.map((option) => option.textContent)).toEqual(["Anna Muster", "Bernd Beispiel"]);
   });
+
+  it("shows entfernt for a redacted action and offers no edit", async () => {
+    render({
+      lists: { "/actions": [action({ title: "", redacted: true })] },
+    });
+
+    const table = await screen.findByRole("table", { name: "Aufgaben" });
+    expect(within(table).getByText("entfernt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "ACT-001 bearbeiten" })).not.toBeInTheDocument();
+  });
 });
