@@ -18,6 +18,11 @@ pub struct Event {
     pub time_zone: EventTimeZone,
     pub version: RecordVersion,
     pub created_at: Timestamp,
+    pub status: EventStatus,
+    /// Set exactly when the event is closed. Retention counts its period from this time (ADR 0071).
+    pub closed_at: Option<Timestamp>,
+    /// Set when retention redacted the event (ADR 0072). Such an event stays closed.
+    pub redacted_at: Option<Timestamp>,
 }
 
 /// The short key of an event, unique in its organization, for example `FLY28` (ADR 0038):
@@ -136,6 +141,15 @@ impl std::str::FromStr for EventStatus {
     }
 }
 
+/// Only an active event closes.
+pub fn can_close(status: EventStatus) -> Result<(), InvalidTransition> {
+    if status == EventStatus::Active {
+        Ok(())
+    } else {
+        Err(InvalidTransition)
+    }
+}
+
 /// Only a closed event reopens, and only if no redaction touched it: a redaction removes content for good.
 pub fn can_reopen(status: EventStatus, redacted: bool) -> Result<(), InvalidTransition> {
     if status == EventStatus::Closed && !redacted {
@@ -160,6 +174,12 @@ mod tests {
             can_reopen(EventStatus::Active, false),
             Err(InvalidTransition)
         );
+    }
+
+    #[test]
+    fn only_an_active_event_closes() {
+        assert_eq!(can_close(EventStatus::Active), Ok(()));
+        assert_eq!(can_close(EventStatus::Closed), Err(InvalidTransition));
     }
 
     #[test]

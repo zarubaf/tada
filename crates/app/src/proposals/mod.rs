@@ -32,7 +32,7 @@ pub use self::input::{
 };
 pub(crate) use self::input::{parse_date, state_from_input, text_error_code, value_error_code};
 pub(crate) use self::work::{owner_refusal, workstream_refusal};
-use crate::access::{self, AccessError, Principal};
+use crate::access::{self, AccessError, EventClosed, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, AiCaller, MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -217,6 +217,9 @@ pub enum ProposeError {
     Forbidden,
     #[error("invalid values")]
     Invalid(Vec<FieldError>),
+    /// The event is closed and takes no writes (ADR 0071).
+    #[error(transparent)]
+    Closed(#[from] EventClosed),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -227,6 +230,7 @@ impl ProposeError {
         ProblemCode::Forbidden,
         ProblemCode::NotFound,
         ProblemCode::ValidationFailed,
+        ProblemCode::EventClosed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -247,6 +251,7 @@ impl CommandError for ProposeError {
             Self::NotFound => ProblemCode::NotFound,
             Self::Forbidden => ProblemCode::Forbidden,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
+            Self::Closed(_) => ProblemCode::EventClosed,
             Self::Store(error) => error.code(),
         }
     }
@@ -459,9 +464,11 @@ async fn authorize(
         return Err(ProposeError::Forbidden);
     }
     let allowed = match event_id {
-        Some(event) => access::event_access(caller, event, identity)
-            .await?
-            .can_propose(),
+        Some(event) => {
+            let access = access::event_access(caller, event, identity).await?;
+            access::require_writable(&access)?;
+            access.can_propose()
+        }
         None => access::sees_all_events(caller),
     };
     if allowed {

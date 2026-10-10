@@ -482,31 +482,33 @@ pub(crate) async fn update_commitment(
     .await
 }
 
-/// The keys of the events in `events`, or of each event of the organization for `None`.
-async fn event_keys_of(
+/// The keys of the active events in `events`, or of each active event of the organization for `None`.
+/// A closed event is read-only (ADR 0071), so its open records are no work of anyone: they drop out of
+/// „Meine Arbeit“ as its proposals drop out of the Review Inbox, and they come back when the event reopens.
+async fn active_event_keys(
     conn: &mut PgConnection,
     scope: OrgScope,
     events: Option<&[Uuid]>,
 ) -> Result<HashMap<Uuid, EventKey>, StoreError> {
-    let rows = sqlx::query!(
+    let rows: Vec<(Uuid, String)> = sqlx::query_as(
         "SELECT id, key FROM event
-         WHERE organization_id = $1 AND ($2::uuid[] IS NULL OR id = ANY($2))",
-        scope.organization_id().as_uuid(),
-        events,
+         WHERE organization_id = $1 AND status = 'active' AND ($2::uuid[] IS NULL OR id = ANY($2))",
     )
+    .bind(scope.organization_id().as_uuid())
+    .bind(events)
     .fetch_all(&mut *conn)
     .await
     .map_err(store_error)?;
     rows.into_iter()
-        .map(|row| {
-            let key = EventKey::parse(&row.key).map_err(|_| InvalidRow("event key"))?;
-            Ok((row.id, key))
+        .map(|(id, key)| {
+            let key = EventKey::parse(&key).map_err(|_| InvalidRow("event key"))?;
+            Ok((id, key))
         })
         .collect()
 }
 
 /// Adds the event key to each record and sorts them: due date first, none last, then event key and number.
-/// The select read only the records of the events in `keys`.
+/// A record of an event that is not in `keys` drops out.
 fn in_events<T>(
     items: Vec<T>,
     keys: &HashMap<Uuid, EventKey>,
@@ -731,7 +733,7 @@ impl WorkStore for Database {
             EventReach::Events(events) => Some(events.iter().map(|id| id.as_uuid()).collect()),
         };
         let mut conn = self.pool.acquire().await.map_err(store_error)?;
-        let keys = event_keys_of(&mut conn, scope, events.as_deref()).await?;
+        let keys = active_event_keys(&mut conn, scope, events.as_deref()).await?;
         let select = Select::open_of(user, events);
         let actions = select_actions(&mut conn, scope, &select)
             .await

@@ -33,7 +33,7 @@ pub use self::read::{
     ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, RedactedProposalReview,
     get_changeset,
 };
-use crate::access::{self, AccessError, EventLevel, Principal};
+use crate::access::{self, AccessError, EventAccess, EventClosed, EventLevel, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -461,6 +461,9 @@ pub enum ApplyError {
     /// The target records of these proposals changed after the proposal. Their status is `conflict` now.
     #[error("a target record changed after the proposal")]
     Conflict(Vec<ProposalId>),
+    /// The event is closed and takes no writes (ADR 0071).
+    #[error(transparent)]
+    Closed(#[from] EventClosed),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -473,6 +476,7 @@ impl ApplyError {
         ProblemCode::ValidationFailed,
         ProblemCode::InvalidTransition,
         ProblemCode::RecordVersionConflict,
+        ProblemCode::EventClosed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -496,6 +500,7 @@ impl CommandError for ApplyError {
             Self::Invalid(_) => ProblemCode::ValidationFailed,
             Self::InvalidTransition => ProblemCode::InvalidTransition,
             Self::Conflict(_) => ProblemCode::RecordVersionConflict,
+            Self::Closed(_) => ProblemCode::EventClosed,
             Self::Store(error) => error.code(),
         }
     }
@@ -556,6 +561,7 @@ pub async fn apply_changeset(
 ) -> Result<Applied, ApplyError> {
     let scope = caller.scope();
     let reviewable = reviewable(caller, changeset_id, stores).await?;
+    access::require_writable(&reviewable.access)?;
     let given = selection(&reviewable.changeset, &input.selected, "selected")?;
     let selected = to_apply(&reviewable.changeset.proposals, &given, &reviewable.results)?;
     reviewable.require(caller, &selected)?;
@@ -660,6 +666,7 @@ pub async fn reject_proposals(
 ) -> Result<Rejected, ApplyError> {
     let scope = caller.scope();
     let reviewable = reviewable(caller, changeset_id, stores).await?;
+    access::require_writable(&reviewable.access)?;
     let given = selection(&reviewable.changeset, &ids, "proposal_ids")?;
     let is_open = |id: ProposalId| proposal_status(&reviewable.results, id) == ProposalStatus::Open;
     if !given.iter().all(|id| is_open(*id)) {
@@ -835,7 +842,8 @@ async fn inbox(
     let mut routing: HashMap<Option<EventId>, (EventLevel, RoutingFacts)> = HashMap::new();
     for event in events {
         let access = match changeset_access(caller, event, ports.identity).await {
-            Ok(access) if access.can_propose() => access,
+            // A closed event takes no review, so its open proposals leave the inbox until it reopens (ADR 0071).
+            Ok(access) if access.can_propose() && access.is_writable() => access.level(),
             Ok(_) | Err(ReviewQueryError::NotFound | ReviewQueryError::Forbidden) => continue,
             Err(ReviewQueryError::Store(error)) => return Err(error),
         };
@@ -910,10 +918,10 @@ async fn changeset_access(
     caller: &impl Principal,
     event: Option<EventId>,
     identity: &dyn IdentityStore,
-) -> Result<EventLevel, ReviewQueryError> {
+) -> Result<EventAccess, ReviewQueryError> {
     match event {
-        Some(event) => Ok(access::event_access(caller, event, identity).await?.level()),
-        None if access::sees_all_events(caller) => Ok(EventLevel::Manager),
+        Some(event) => Ok(access::event_access(caller, event, identity).await?),
+        None if access::sees_all_events(caller) => Ok(EventAccess::organization_wide()),
         None => Err(ReviewQueryError::NotFound),
     }
 }
@@ -924,17 +932,19 @@ struct Reviewable {
     /// A legal redaction removes the text (ADR 0072).
     source: Redactable<SourceText>,
     results: Vec<ReviewRecord>,
-    access: EventLevel,
+    access: EventAccess,
     routes: ChangesetRoutes,
 }
 
 impl Reviewable {
     fn may_review(&self, caller: &MemberCaller, id: ProposalId) -> bool {
-        self.routes.may_review(caller.user_id(), self.access, id)
+        self.routes
+            .may_review(caller.user_id(), self.access.level(), id)
     }
 
     fn routed_to(&self, caller: &MemberCaller, id: ProposalId) -> bool {
-        self.routes.routed_to(caller.user_id(), self.access, id)
+        self.routes
+            .routed_to(caller.user_id(), self.access.level(), id)
     }
 
     /// True if the caller reviews the proposal now: it is open and in the Review Inbox of the caller (rule 6),
@@ -944,9 +954,10 @@ impl Reviewable {
         let status = proposal_status(&self.results, id);
         let overdue = status.is_overdue(self.changeset.created_at, now);
         status == ProposalStatus::Open
+            && self.access.is_writable()
             && self
                 .routes
-                .in_inbox_of(caller.user_id(), self.access, id, overdue)
+                .in_inbox_of(caller.user_id(), self.access.level(), id, overdue)
             && to_apply(
                 &self.changeset.proposals,
                 &HashSet::from([id]),
@@ -1017,7 +1028,7 @@ async fn reviewable(
         // A legal redaction can empty each proposal (ADR 0072); an event manager still sees the tombstones.
         || (reviewable.changeset.proposals.is_empty()
             && !reviewable.changeset.redacted.is_empty()
-            && reviewable.access == EventLevel::Manager);
+            && reviewable.access.level() == EventLevel::Manager);
     if reviews_some {
         Ok(reviewable)
     } else {

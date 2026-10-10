@@ -12,7 +12,8 @@ use crate::work::{
     ActionView, ChangeRights, CommitmentView, InEvent, WorkError, WorkPorts, WorkRecord,
 };
 
-/// What "My Work" shows (spec 2a, section 4).
+/// What "My Work" shows (spec 2a, section 4): the work of the active events only. A closed event is read-only
+/// (ADR 0071), so its records leave the list, as its proposals leave the Review Inbox.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MyWorkView {
     /// The actions with the status `open`, `in-progress` or `blocked`.

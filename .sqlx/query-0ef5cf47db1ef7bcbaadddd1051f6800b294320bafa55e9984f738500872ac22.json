@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, organization_id, key, name, time_zone, version,\n                      created_at AS \"created_at: jiff_sqlx::Timestamp\"\n               FROM event\n               WHERE organization_id = $1 AND id = $2",
+  "query": "SELECT e.id, e.organization_id, e.key, e.name, e.time_zone, e.version, e.status,\n                      e.created_at AS \"created_at: jiff_sqlx::Timestamp\",\n                      e.closed_at AS \"closed_at: jiff_sqlx::Timestamp\",\n                      e.redacted_at AS \"redacted_at: jiff_sqlx::Timestamp\"\n               FROM event e\n               JOIN event_membership m ON m.organization_id = e.organization_id AND m.event_id = e.id\n               WHERE e.organization_id = $1\n                 AND m.user_id = $2\n                 AND ($3::text IS NULL OR (e.key, e.id) > ($3, $4))\n               ORDER BY e.key, e.id\n               LIMIT $5",
   "describe": {
     "columns": [
       {
@@ -71,6 +71,17 @@
       },
       {
         "ordinal": 6,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
         "name": "created_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz",
         "origin": {
@@ -79,12 +90,37 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 8,
+        "name": "closed_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "closed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "redacted_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "redacted_at"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid"
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Int8"
       ]
     },
     "nullable": [
@@ -94,8 +130,11 @@
       false,
       false,
       false,
-      false
+      false,
+      false,
+      true,
+      true
     ]
   },
-  "hash": "dce3cb2bc60b5941f6aec8d79eaf737ec2cf88c099766dc66ca1c94b6621a166"
+  "hash": "0ef5cf47db1ef7bcbaadddd1051f6800b294320bafa55e9984f738500872ac22"
 }

@@ -524,6 +524,38 @@ async fn my_open_work_orders_by_due_date_and_leaves_out_closed_records() {
     assert_eq!(commitments, [&commitment]);
 }
 
+/// A closed event is read-only, so its open records leave „Meine Arbeit“ and come back when it reopens.
+#[tokio::test]
+async fn my_open_work_leaves_out_the_records_of_a_closed_event() {
+    let f = Fixture::start().await;
+    f.action("Generator bestellen", None).await;
+    f.commitment(None).await;
+    let db = &f.test.database;
+    let set_status = |status: &str| {
+        format!(
+            "UPDATE event SET status = '{status}', closed_at = CASE WHEN '{status}' = 'closed' THEN now() END
+             WHERE id = '{}'",
+            f.event.as_uuid()
+        )
+    };
+
+    f.test.execute(&[&set_status("closed")]).await;
+    let closed = db
+        .my_open_work(f.scope, f.owner, &EventReach::Organization)
+        .await
+        .unwrap();
+    assert!(closed.actions.is_empty());
+    assert!(closed.commitments.is_empty());
+
+    f.test.execute(&[&set_status("active")]).await;
+    let reopened = db
+        .my_open_work(f.scope, f.owner, &EventReach::Organization)
+        .await
+        .unwrap();
+    assert_eq!(reopened.actions.len(), 1);
+    assert_eq!(reopened.commitments.len(), 1);
+}
+
 /// The store reads the events that the app gives (`access::readable_events`); it decides no access itself.
 #[tokio::test]
 async fn my_open_work_reads_only_the_given_events() {

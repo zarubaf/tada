@@ -380,8 +380,15 @@ mod tests {
             unreachable!()
         }
 
-        async fn event_exists(&self, scope: OrgScope, event: EventId) -> Result<bool, StoreError> {
-            Ok(scope.organization_id() == testwil() && event == open_day())
+        async fn event_status(
+            &self,
+            scope: OrgScope,
+            event: EventId,
+        ) -> Result<Option<tada_domain::events::EventStatus>, StoreError> {
+            Ok(
+                (scope.organization_id() == testwil() && event == open_day())
+                    .then_some(tada_domain::events::EventStatus::Active),
+            )
         }
 
         async fn event_role(

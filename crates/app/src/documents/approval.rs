@@ -5,7 +5,7 @@ use tada_domain::RecordVersion;
 use tada_domain::ids::DocumentVersionId;
 
 use super::{Approval, Approved, DocumentReads, VersionView};
-use crate::access::{self, AccessError};
+use crate::access::{self, AccessError, EventClosed};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::MemberCaller;
 use crate::clock::Clock;
@@ -26,6 +26,9 @@ pub enum ApproveError {
     /// The version is approved, superseded or archived, or a newer version is approved.
     #[error("the status of the version does not allow its approval")]
     InvalidTransition,
+    /// The event is closed and takes no writes (ADR 0071).
+    #[error(transparent)]
+    Closed(#[from] EventClosed),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -37,6 +40,7 @@ impl ApproveError {
         ProblemCode::NotFound,
         ProblemCode::RecordVersionConflict,
         ProblemCode::InvalidTransition,
+        ProblemCode::EventClosed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -49,6 +53,7 @@ impl CommandError for ApproveError {
             Self::Forbidden => ProblemCode::Forbidden,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
             Self::InvalidTransition => ProblemCode::InvalidTransition,
+            Self::Closed(_) => ProblemCode::EventClosed,
             Self::Store(error) => error.code(),
         }
     }
@@ -86,10 +91,9 @@ pub async fn approve_version(
         .draft(caller.scope(), version_id)
         .await?
         .ok_or(ApproveError::NotFound)?;
-    if !access::event_access(caller, draft.event_id, stores.identity)
-        .await?
-        .can_approve_documents()
-    {
+    let access = access::event_access(caller, draft.event_id, stores.identity).await?;
+    access::require_writable(&access)?;
+    if !access.can_approve_documents() {
         return Err(ApproveError::Forbidden);
     }
     // A redacted draft has no content to approve (ADR 0072).

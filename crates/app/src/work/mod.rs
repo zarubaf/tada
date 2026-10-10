@@ -28,7 +28,7 @@ pub use self::commitments::{
     CommitmentChange, FirmInput, NewCommitment, change_commitment, create_commitment,
     get_commitment, list_commitments, make_commitment_firm,
 };
-use crate::access::{AccessError, EventLevel, EventReach};
+use crate::access::{AccessError, EventClosed, EventLevel, EventReach};
 use crate::audit::AuditEvent;
 use crate::caller::OrgScope;
 use crate::clock::Clock;
@@ -289,7 +289,8 @@ pub trait WorkStore: EvidenceStore + Debug + Send + Sync {
         commitments: &[CommitmentId],
     ) -> Result<WorkOwners, StoreError>;
 
-    /// The open records that `user` owns in the events of `events` (`access::readable_events`).
+    /// The open records that `user` owns in the active events of `events` (`access::readable_events`).
+    /// A closed event is read-only (ADR 0071), so its records leave the list, as in the Review Inbox.
     async fn my_open_work(
         &self,
         scope: OrgScope,
@@ -322,6 +323,9 @@ pub enum WorkError {
     InvalidTransition,
     #[error("the record changed after the caller read it")]
     VersionConflict,
+    /// The event is closed and takes no writes (ADR 0071).
+    #[error(transparent)]
+    Closed(#[from] EventClosed),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -334,6 +338,7 @@ impl WorkError {
         ProblemCode::ValidationFailed,
         ProblemCode::InvalidTransition,
         ProblemCode::RecordVersionConflict,
+        ProblemCode::EventClosed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -354,6 +359,7 @@ impl CommandError for WorkError {
             Self::Invalid(_) => ProblemCode::ValidationFailed,
             Self::InvalidTransition => ProblemCode::InvalidTransition,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
+            Self::Closed(_) => ProblemCode::EventClosed,
             Self::Store(error) => error.code(),
         }
     }

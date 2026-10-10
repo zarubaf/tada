@@ -74,7 +74,11 @@ impl IdentityStore for Memory {
             .then_some(OrganizationRole::Member))
     }
 
-    async fn event_exists(&self, _: OrgScope, _: EventId) -> Result<bool, StoreError> {
+    async fn event_status(
+        &self,
+        _: OrgScope,
+        _: EventId,
+    ) -> Result<Option<tada_domain::events::EventStatus>, StoreError> {
         unreachable!()
     }
 

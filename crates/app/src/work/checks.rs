@@ -103,13 +103,24 @@ pub(super) async fn check_promisor(
     Ok(())
 }
 
+/// The access of the caller to an event that takes writes (ADR 0071).
+pub(super) async fn writable_access(
+    caller: &MemberCaller,
+    event: EventId,
+    identity: &dyn IdentityStore,
+) -> Result<EventAccess, WorkError> {
+    let access = access::event_access(caller, event, identity).await?;
+    access::require_writable(&access)?;
+    Ok(access)
+}
+
 /// The caller must be a contributor or a manager of the event. Returns the access of the caller.
 pub(super) async fn require_create(
     caller: &MemberCaller,
     event: EventId,
     identity: &dyn IdentityStore,
 ) -> Result<EventAccess, WorkError> {
-    let access = access::event_access(caller, event, identity).await?;
+    let access = writable_access(caller, event, identity).await?;
     if access.can_propose() {
         Ok(access)
     } else {
@@ -179,7 +190,7 @@ impl ChangeRights {
     /// True if the caller can change a record with the owner `owner` in the workstream `workstream`.
     pub(crate) fn allow(&self, owner: UserId, workstream: Option<WorkstreamId>) -> bool {
         let lead = workstream.and_then(|id| self.leads.get(&id).copied());
-        may_change_work(self.access.level(), self.caller, owner, lead)
+        self.access.is_writable() && may_change_work(self.access.level(), self.caller, owner, lead)
     }
 }
 

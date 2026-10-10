@@ -356,6 +356,27 @@ mod tests {
         ) -> Result<Vec<tada_app::domain::events::Event>, tada_app::store::StoreError> {
             unreachable!()
         }
+
+        async fn close(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<Option<tada_app::domain::events::Event>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn reopen(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<Option<tada_app::domain::events::Event>, tada_app::store::StoreError> {
+            unreachable!()
+        }
     }
 
     #[derive(Debug)]
@@ -471,11 +492,12 @@ mod tests {
             unreachable!()
         }
 
-        async fn event_exists(
+        async fn event_status(
             &self,
             _: tada_app::caller::OrgScope,
             _: tada_app::domain::ids::EventId,
-        ) -> Result<bool, tada_app::store::StoreError> {
+        ) -> Result<Option<tada_app::domain::events::EventStatus>, tada_app::store::StoreError>
+        {
             unreachable!()
         }
 
