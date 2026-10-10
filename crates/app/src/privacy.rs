@@ -8,9 +8,9 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use tada_domain::RecordVersion;
 
-use crate::access::Principal;
+use crate::access;
 use crate::audit::{AuditAction, AuditEvent};
-use crate::caller::{MemberCaller, OrgScope, OrganizationRole};
+use crate::caller::{MemberCaller, OrgScope};
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
 
@@ -108,7 +108,7 @@ pub async fn set_privacy_notice(
     expected_version: RecordVersion,
     store: &dyn PrivacyStore,
 ) -> Result<PrivacyNotice, PrivacyError> {
-    if caller.organization_role() != OrganizationRole::Owner {
+    if !access::is_owner(caller) {
         return Err(PrivacyError::Forbidden);
     }
     if let Some(text) = &markdown {

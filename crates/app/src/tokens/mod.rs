@@ -17,10 +17,9 @@ use tada_domain::identity::TokenName;
 use tada_domain::ids::{ApiTokenId, OrganizationId, UserId};
 use uuid::Uuid;
 
-use crate::access::{self, Principal};
+use crate::access;
 use crate::audit::{AuditAction, AuditEvent};
 use crate::auth::{Authenticated, AuthenticationError, Authenticator, Credential};
-use crate::caller::OrganizationRole;
 use crate::caller::{AiCaller, MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::IdentityStore;
@@ -419,7 +418,7 @@ pub async fn set_feature(
     expected_version: RecordVersion,
     tokens: &dyn TokenStore,
 ) -> Result<FeatureState, TokenError> {
-    if caller.organization_role() != OrganizationRole::Owner {
+    if !access::is_owner(caller) {
         return Err(TokenError::Forbidden);
     }
     let scope = caller.scope();

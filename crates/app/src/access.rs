@@ -122,6 +122,11 @@ pub(crate) fn sees_all_events(caller: &impl Principal) -> bool {
     manages_all_events(caller.organization_role())
 }
 
+/// True if the caller is an owner of its organization. Owner-only actions ask this one question.
+pub fn is_owner(caller: &impl Principal) -> bool {
+    caller.organization_role() == OrganizationRole::Owner
+}
+
 /// The one statement of the rule of ADR 0052: owners and admins act as event manager in each event of their organization.
 fn manages_all_events(role: OrganizationRole) -> bool {
     role.is_owner_or_admin()
@@ -392,6 +397,18 @@ mod tests {
 
     fn caller(organization: OrganizationId, role: OrganizationRole) -> MemberCaller {
         MemberCaller::new(anna(), organization, role)
+    }
+
+    #[test]
+    fn only_an_owner_is_an_owner() {
+        let roles = [
+            (OrganizationRole::Owner, true),
+            (OrganizationRole::Admin, false),
+            (OrganizationRole::Member, false),
+        ];
+        for (role, expected) in roles {
+            assert_eq!(is_owner(&caller(testwil(), role)), expected);
+        }
     }
 
     #[tokio::test]
