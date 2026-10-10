@@ -11,6 +11,8 @@ export interface PartyInput {
   kind?: string;
   email: string | null;
   phone: string | null;
+  /** The account of a person. Only an owner or an admin sends it; `null` clears it in a change. */
+  user_id?: string | null;
 }
 
 type Answer<T> = Promise<{ data?: T; error?: Problem | undefined; response: Response }>;
@@ -30,6 +32,7 @@ function optional(input: PartyInput) {
     name: input.name,
     ...(input.email === null ? {} : { email: input.email }),
     ...(input.phone === null ? {} : { phone: input.phone }),
+    ...(typeof input.user_id === "string" && { user_id: input.user_id }),
   };
 }
 

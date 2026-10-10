@@ -73,8 +73,10 @@ pub(super) async fn write_record(
                 name: name.clone(),
                 email: email.clone(),
                 phone: phone.clone(),
+                // A proposal never links an account (ADR 0069).
+                user_id: None,
             };
-            let number = insert_person(conn, scope, *id, &fields, None, plan.now).await?;
+            let number = insert_person(conn, scope, *id, &fields, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Person(*id), number)?);
             (RecordRef::Person(*id), 1)
         }

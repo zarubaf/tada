@@ -1082,7 +1082,6 @@ mod tests {
             _: tada_app::caller::OrgScope,
             _: tada_app::domain::ids::PersonId,
             _: &tada_app::parties::PersonFields,
-            _: Option<tada_app::domain::ids::UserId>,
             _: jiff::Timestamp,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<

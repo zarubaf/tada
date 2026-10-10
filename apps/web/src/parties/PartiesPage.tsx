@@ -12,6 +12,7 @@ import { TextField } from "../ui/TextField";
 import styles from "./PartiesPage.module.css";
 import { PartyForm } from "./PartyForm";
 import { type Party, type PartyKind, partyApi } from "./partyApi";
+import { useAccounts } from "./useAccounts";
 
 /**
  * „Personen“ and „Institutionen“: the register of the organization, a search by name and the form
@@ -20,6 +21,7 @@ import { type Party, type PartyKind, partyApi } from "./partyApi";
 export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
   const party = useMemo(() => partyApi(api, kind), [api, kind]);
   const person = kind === "person";
+  const accounts = useAccounts(api);
   const [query, setQuery] = useState("");
   const search = query.trim();
   // A new search is a new `fetchPage`, so the register loads the first page again.
@@ -123,6 +125,7 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
           key={editing ? `${editing.id}:${editing.version}` : "new"}
           api={party}
           kind={kind}
+          {...(person && accounts && { accounts })}
           {...(editing && { record: editing })}
           onStart={page.start}
           onSaved={saved}

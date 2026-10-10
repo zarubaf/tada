@@ -5236,7 +5236,7 @@
       },
       "ChangePersonRequest": {
         "type": "object",
-        "description": "The input of `ChangePerson`. An absent field stays as it is. `null` clears email or phone.\nA request needs at least one field to change.",
+        "description": "The input of `ChangePerson`. An absent field stays as it is. `null` clears email, phone or `user_id`.\nA request needs at least one field to change. Only an owner or an admin can call it.",
         "required": [
           "expected_version"
         ],
@@ -5258,6 +5258,14 @@
               "string",
               "null"
             ]
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "A member of the caller's organization."
           },
           "expected_version": {
             "type": "integer",
@@ -7116,7 +7124,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "A member of the caller's organization."
+            "description": "A member of the caller's organization. Only an owner or an admin can set it;\nfor any other caller the request gets `forbidden`."
           }
         }
       },

@@ -126,7 +126,6 @@ impl PartyStore for Memory {
         _: OrgScope,
         id: PersonId,
         fields: &PersonFields,
-        user_id: Option<UserId>,
         _: Timestamp,
         audit: &AuditEvent,
     ) -> Result<Created<PersonView>, StoreError> {
@@ -140,7 +139,7 @@ impl PartyStore for Memory {
             name: fields.name.clone(),
             email: fields.email.clone(),
             phone: fields.phone.clone(),
-            user_id,
+            user_id: fields.user_id,
             version: RecordVersion::FIRST,
         };
         persons.push(person.clone());
@@ -167,6 +166,7 @@ impl PartyStore for Memory {
         person.name = fields.name.clone();
         person.email = fields.email.clone();
         person.phone = fields.phone.clone();
+        person.user_id = fields.user_id;
         person.version = RecordVersion::new(person.version.get() + 1).unwrap();
         self.audit.lock().unwrap().push(audit.clone());
         Ok(Changed::Changed(person.clone()))
@@ -301,6 +301,7 @@ fn rename(name: &str, expected: RecordVersion) -> PersonChange {
         name: Some(name.to_owned()),
         email: None,
         phone: None,
+        user_id: None,
         expected_version: expected,
     }
 }
@@ -321,7 +322,7 @@ async fn a_contributor_creates_a_person() {
         user_id: Some(user(2)),
         ..new_person(" Beat Muster ")
     };
-    let created = create_person(&anna(), input, &memory, &memory, &FixedClock)
+    let created = create_person(&carla(), input, &memory, &memory, &FixedClock)
         .await
         .unwrap()
         .record;
@@ -332,6 +333,75 @@ async fn a_contributor_creates_a_person() {
     let audit = memory.audit.lock().unwrap();
     assert_eq!(audit.len(), 1);
     assert_eq!(audit[0].action(), AuditAction::PersonCreate);
+}
+
+/// Only an owner or an admin links a person to an account (ADR 0069): the refusal stores nothing.
+#[tokio::test]
+async fn a_contributor_cannot_link_a_person_to_an_account() {
+    let memory = Memory::default();
+    let input = NewPerson {
+        user_id: Some(user(2)),
+        ..new_person("Beat Muster")
+    };
+    let error = create_person(&anna(), input, &memory, &memory, &FixedClock)
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), ProblemCode::Forbidden);
+    assert!(memory.persons.lock().unwrap().is_empty());
+    assert!(memory.audit.lock().unwrap().is_empty());
+}
+
+/// An owner or an admin links, changes and clears the account of a person through a change.
+#[tokio::test]
+async fn an_admin_links_and_clears_the_account_of_a_person() {
+    let memory = Memory::default();
+    let created = person(&memory, "Beat Muster").await;
+    let link = PersonChange {
+        user_id: Some(Some(user(2))),
+        ..rename("Beat Muster", created.version)
+    };
+    let linked = change_person(&carla(), created.id, link, &memory, &memory, &FixedClock)
+        .await
+        .unwrap()
+        .record;
+    assert_eq!(linked.user_id, Some(user(2)));
+
+    let keep = rename("Beat Beispiel", linked.version);
+    let kept = change_person(&carla(), created.id, keep, &memory, &memory, &FixedClock)
+        .await
+        .unwrap()
+        .record;
+    assert_eq!(kept.user_id, Some(user(2)));
+
+    let clear = PersonChange {
+        user_id: Some(None),
+        ..rename("Beat Beispiel", kept.version)
+    };
+    let cleared = change_person(&carla(), created.id, clear, &memory, &memory, &FixedClock)
+        .await
+        .unwrap()
+        .record;
+    assert_eq!(cleared.user_id, None);
+}
+
+#[tokio::test]
+async fn a_change_links_only_a_member_of_the_organization() {
+    let memory = Memory::default();
+    let created = person(&memory, "Beat Muster").await;
+    let change = PersonChange {
+        name: None,
+        email: None,
+        phone: None,
+        user_id: Some(Some(user(99))),
+        expected_version: created.version,
+    };
+    let error = change_person(&carla(), created.id, change, &memory, &memory, &FixedClock)
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), ProblemCode::ValidationFailed);
+    assert_eq!(error.field_errors()[0].field.as_ref(), "user_id");
+    assert_eq!(error.field_errors()[0].code, "unknown-member");
+    assert_eq!(memory.persons.lock().unwrap()[0].user_id, None);
 }
 
 /// A client chooses the ID of a new person or institution as of a work record (ADR 0038): a UUIDv7 that is free.
@@ -455,6 +525,7 @@ async fn a_change_keeps_what_it_does_not_name_and_clears_what_it_empties() {
         name: None,
         email: Some(None),
         phone: None,
+        user_id: None,
         expected_version: created.version,
     };
     let changed = change_person(&carla(), created.id, change, &memory, &memory, &FixedClock)
@@ -475,6 +546,7 @@ async fn a_change_without_a_field_is_invalid() {
         name: None,
         email: None,
         phone: None,
+        user_id: None,
         expected_version: created.version,
     };
     let error = change_person(&carla(), created.id, empty, &memory, &memory, &FixedClock)
@@ -582,7 +654,7 @@ async fn invalid_values_name_their_fields() {
         user_id: Some(user(99)),
         ..new_person("  ")
     };
-    let error = create_person(&anna(), input, &memory, &memory, &FixedClock)
+    let error = create_person(&carla(), input, &memory, &memory, &FixedClock)
         .await
         .unwrap_err();
     assert_eq!(error.code(), ProblemCode::ValidationFailed);

@@ -30,15 +30,18 @@ Permissions:
 | Command                           | Who                                                        |
 | --------------------------------- | ---------------------------------------------------------- |
 | Create a person or an institution | a member with the contributor or manager role in any event |
+| Link a person to an account       | organization owner or admin                                |
 | Change a person or an institution | organization owner or admin                                |
 | Read persons and institutions     | each member with any event role, owners and admins         |
 
 - A member without an event role does not see persons and institutions (ADR 0052).
 - A record of another organization is invisible. A command that names one returns `validation-failed` with the field code `unknown-record`.
-- The member who creates a person can link it to the user account of any member of the organization.
-  No command changes the link later.
+- Only an organization owner or admin links a person to the user account of a member of the organization.
+  They set or clear the link when they create the person and when they change it.
+  A create with a link from any other caller returns `forbidden`, and the API stores nothing.
+  A link to a user who is no member gives the field error `unknown-member` on `user_id`.
+- A proposal never links an account: the operation `CreatePerson` has no field for it.
   Each reader of the person sees the link.
-  Slice 2b decides if only owners and admins may set it.
 
 Proposals:
 

@@ -15,6 +15,7 @@ use tada_adapters::clock::SystemClock;
 use tada_app::caller::OrganizationRole;
 use tada_app::session::SessionAuthenticator;
 use tada_store_pg::testing::TestDatabase;
+use uuid::Uuid;
 
 struct Api {
     router: axum::Router,
@@ -218,4 +219,69 @@ async fn two_changes_with_the_same_version_have_one_winner() {
     let mut statuses = [first.0, second.0];
     statuses.sort();
     assert_eq!(statuses, [StatusCode::OK, StatusCode::CONFLICT]);
+}
+
+#[tokio::test]
+async fn only_an_owner_or_admin_links_a_person_to_an_account() {
+    let api = Api::start().await;
+    let owner = api.member("testwil", OrganizationRole::Owner).await;
+    let (_, contributor_id, cookie) = api.test.member("testwil", OrganizationRole::Member).await;
+    let contributor = Member {
+        router: api.router.clone(),
+        cookie,
+    };
+    let (_, event) = owner
+        .post(
+            "/api/v1/events",
+            json!({"key": "TEST30", "name": "Open Day Testwil"}),
+        )
+        .await;
+    let (status, body) = owner
+        .post(
+            &format!(
+                "/api/v1/events/{}/memberships",
+                event["id"].as_str().unwrap()
+            ),
+            json!({"user_id": contributor_id.as_uuid(), "event_role": "event-contributor"}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    let account = contributor_id.as_uuid().to_string();
+
+    // A contributor creates a person, but cannot link it; nothing is stored.
+    let (status, body) = contributor
+        .post(
+            "/api/v1/persons",
+            json!({"name": "Beat Muster", "user_id": account}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    let (_, list) = owner.get("/api/v1/persons").await;
+    assert!(list["items"].as_array().unwrap().is_empty());
+    let (status, body) = contributor
+        .post("/api/v1/persons", json!({"name": "Beat Muster"}))
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+
+    // An owner links the person through a change, and clears the link again.
+    let path = format!("/api/v1/persons/{}", body["id"].as_str().unwrap());
+    let (status, linked) = owner
+        .patch(&path, json!({"user_id": account, "expected_version": 1}))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{linked}");
+    assert_eq!(linked["user_id"], account);
+    let (status, problem) = owner
+        .patch(
+            &path,
+            json!({"user_id": Uuid::now_v7(), "expected_version": 2}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    assert_eq!(problem["errors"][0]["pointer"], "/user_id");
+    assert_eq!(problem["errors"][0]["code"], "unknown-member");
+    let (status, cleared) = owner
+        .patch(&path, json!({"user_id": null, "expected_version": 2}))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cleared}");
+    assert_eq!(cleared["user_id"], Value::Null);
 }

@@ -117,7 +117,6 @@ pub(crate) async fn insert_person(
     scope: OrgScope,
     id: PersonId,
     fields: &PersonFields,
-    user_id: Option<UserId>,
     at: Timestamp,
 ) -> Result<i64, sqlx::Error> {
     let organization = scope.organization_id().as_uuid();
@@ -133,7 +132,7 @@ pub(crate) async fn insert_person(
         fields.name.as_str(),
         fields.email.as_ref().map(Email::as_str),
         fields.phone.as_ref().map(PhoneNumber::as_str),
-        user_id.map(UserId::as_uuid),
+        fields.user_id.map(UserId::as_uuid),
         at.to_sqlx() as _,
     )
     .execute(&mut *conn)
@@ -179,12 +178,11 @@ impl PartyStore for Database {
         scope: OrgScope,
         id: PersonId,
         fields: &PersonFields,
-        user_id: Option<UserId>,
         at: Timestamp,
         audit: &AuditEvent,
     ) -> Result<Created<PersonView>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let number = match insert_person(&mut tx, scope, id, fields, user_id, at).await {
+        let number = match insert_person(&mut tx, scope, id, fields, at).await {
             Ok(number) => number,
             Err(error) if violates(&error, "person_pkey") => return Ok(Created::IdTaken),
             Err(error) => return Err(store_error(error)),
@@ -197,7 +195,7 @@ impl PartyStore for Database {
             name: fields.name.clone(),
             email: fields.email.clone(),
             phone: fields.phone.clone(),
-            user_id,
+            user_id: fields.user_id,
             version: RecordVersion::FIRST,
         }))
     }
@@ -216,7 +214,8 @@ impl PartyStore for Database {
         let row = sqlx::query_as!(
             PersonRow,
             "UPDATE person
-             SET name = $4, email = $5, phone = $6, version = version + 1, updated_at = $7
+             SET name = $4, email = $5, phone = $6, user_id = $7, version = version + 1,
+                 updated_at = $8
              WHERE organization_id = $1 AND id = $2 AND version = $3
              RETURNING id, local_number, name, email, phone, user_id, version",
             organization,
@@ -225,6 +224,7 @@ impl PartyStore for Database {
             fields.name.as_str(),
             fields.email.as_ref().map(Email::as_str),
             fields.phone.as_ref().map(PhoneNumber::as_str),
+            fields.user_id.map(UserId::as_uuid),
             at.to_sqlx() as _,
         )
         .fetch_optional(&mut *tx)
