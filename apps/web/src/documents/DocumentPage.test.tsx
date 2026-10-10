@@ -205,6 +205,21 @@ describe("DocumentPage", () => {
     expect(screen.getByRole("link", { name: "Mitglieder" })).toBeInTheDocument();
   });
 
+  it("shows entfernt without a download for a redacted version and the note of another", async () => {
+    setup([
+      { ...version(1, "", "application/pdf"), redacted: true },
+      {
+        ...version(2, "Programm v2.pdf", "application/pdf"),
+        dispute_notes: [{ text: "Falsches Datum.", created_at: "2030-05-20T08:00:00Z" }],
+      },
+    ]);
+
+    const table = await screen.findByRole("table", { name: "Versionen" });
+    expect(within(table).getAllByText("entfernt")).toHaveLength(2);
+    expect(within(table).getAllByRole("link", { name: /herunterladen/ })).toHaveLength(1);
+    expect(within(table).getByText("Einwand: Falsches Datum.")).toBeVisible();
+  });
+
   it("moves focus to the heading when a retry succeeds", async () => {
     failures.documents = 1;
     setup([version(1, "Programm.pdf", "application/pdf")]);

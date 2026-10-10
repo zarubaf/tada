@@ -14,11 +14,13 @@ import { LOCALE, t } from "../i18n";
 import { Link, useParams } from "../router/Router";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
+import { DisputeNotes } from "../ui/DisputeNotes";
 import { FileLink } from "../ui/FileLink";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page } from "../ui/Page";
+import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./DocumentPage.module.css";
 import { DraftView } from "./DraftView";
@@ -133,7 +135,19 @@ export function DocumentPage({ api }: { api: Api }) {
       cell: (v) => v.number,
       numeric: true,
     },
-    { id: "file", header: t("document-column-file"), cell: versionLabel },
+    {
+      id: "file",
+      header: t("document-column-file"),
+      cell: (v) =>
+        v.redacted ? (
+          <Redacted />
+        ) : (
+          <>
+            {versionLabel(v)}
+            <DisputeNotes notes={v.dispute_notes} />
+          </>
+        ),
+    },
     {
       id: "hash",
       header: t("document-column-hash"),
@@ -157,7 +171,9 @@ export function DocumentPage({ api }: { api: Api }) {
       id: "actions",
       header: t("document-column-actions"),
       cell: (v) =>
-        v.kind === "upload" ? (
+        v.redacted ? (
+          <Redacted />
+        ) : v.kind === "upload" ? (
           <FileLink
             download
             href={contentUrl(v)}

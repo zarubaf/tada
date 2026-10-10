@@ -25,7 +25,7 @@ export function CommitmentEvidence({
       <ul className={styles.evidenceList}>
         {evidence.map((item) => (
           <li key={`${item.proposal_id}:${item.start_offset}:${item.end_offset}`}>
-            <Excerpt quote={item.quote} />
+            <Excerpt quote={item.quote} redacted={item.redacted} notes={item.dispute_notes} />
             <p className={styles.meta}>
               {t("commitment-evidence-version", { version: item.record_version })}
             </p>

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import type { Api } from "../api/client";
 import { t } from "../i18n";
 import { canManage } from "../members/roles";
@@ -10,10 +10,14 @@ import { Button } from "../ui/Button";
 import type { Column } from "../ui/DataTable";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
+import { Skeleton } from "../ui/Skeleton";
 import { TextField } from "../ui/TextField";
 import styles from "./PartiesPage.module.css";
 import { PartyForm } from "./PartyForm";
 import { type Party, type PartyKind, partyApi } from "./partyApi";
+
+// Only an owner opens it, so the initial bundle does not carry it (ADR 0024).
+const PersonDataProtection = lazy(() => import("./PersonDataProtection"));
 
 /**
  * „Personen“ and „Institutionen“: the register of the organization, a search by name and the form
@@ -22,7 +26,8 @@ import { type Party, type PartyKind, partyApi } from "./partyApi";
 export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
   const party = useMemo(() => partyApi(api, kind), [api, kind]);
   const person = kind === "person";
-  const manages = canManage(useSession().organization?.role);
+  const role = useSession().organization?.role;
+  const manages = canManage(role);
   const [query, setQuery] = useState("");
   const search = query.trim();
   // A new search is a new `fetchPage`, so the register loads the first page again.
@@ -134,6 +139,12 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
           {...(editing && { onCancel: () => page.closeForm() })}
         />
       </section>
+
+      {person && role === "owner" && editing && (
+        <Suspense fallback={<Skeleton />}>
+          <PersonDataProtection key={editing.id} api={api} personId={editing.id} />
+        </Suspense>
+      )}
     </Page>
   );
 }

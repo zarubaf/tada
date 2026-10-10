@@ -1,0 +1,58 @@
+@layer components {
+  .section {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .subheading {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mention {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .kind {
+    color: var(--color-text-muted);
+  }
+
+  .flag {
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
+    background: var(--color-warning-subtle);
+    font-size: var(--font-size-sm);
+  }
+
+  .hint {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .dialogForm {
+    display: grid;
+    gap: var(--space-3);
+  }
+}

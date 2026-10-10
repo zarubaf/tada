@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { createApi, type Fact } from "../api/client";
+import { createApi, type Fact, type FactEvidence } from "../api/client";
 import { EvidencePanel } from "./EvidencePanel";
 
 const EVENT_ID = "0199b8e0-0000-7000-8000-000000000001";
@@ -120,6 +120,48 @@ describe("EvidencePanel", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Ort" });
     expect(within(dialog).getByText("Für diesen Wert gibt es keinen Beleg.")).toBeVisible();
+  });
+
+  it("shows entfernt for the passage of a redacted source, not an empty quote", async () => {
+    renderPanel({
+      evidence: [
+        {
+          source_version_id: SOURCE_VERSION,
+          passage: { start: 10, end: 27, quote: "" },
+          captured_at: "2026-10-03T12:12:00Z",
+          redacted: true,
+        },
+      ],
+    });
+
+    const dialog = await screen.findByRole("dialog", { name: "Ort" });
+    expect(within(dialog).getByText("entfernt")).toBeVisible();
+    expect(dialog.querySelector("mark")).toBeNull();
+  });
+
+  it("shows entfernt for a redacted value and keeps the state", async () => {
+    renderPanel({ redacted: true, value: undefined });
+
+    const dialog = await screen.findByRole("dialog", { name: "Ort" });
+    expect(within(dialog).getAllByText("entfernt").length).toBeGreaterThan(0);
+    expect(within(dialog).queryByText("Flugplatz Testwil", { selector: "span" })).toBeNull();
+  });
+
+  it("shows a dispute note under the evidence and one under the value", async () => {
+    renderPanel({
+      dispute_notes: [{ text: "Der Ort ist falsch.", created_at: "2026-10-05T07:00:00Z" }],
+      evidence: [
+        {
+          ...(fact.evidence[0] as FactEvidence),
+          dispute_notes: [{ text: "Die Quelle ist veraltet.", created_at: "2026-10-05T07:00:00Z" }],
+        },
+      ],
+    });
+
+    const dialog = await screen.findByRole("dialog", { name: "Ort" });
+    expect(within(dialog).getByText("Einwand: Der Ort ist falsch.")).toBeVisible();
+    const source = within(dialog).getByText("Seite 3").closest("li") as HTMLElement;
+    expect(within(source).getByText("Einwand: Die Quelle ist veraltet.")).toBeVisible();
   });
 
   it("closes with the close button and with Escape", async () => {

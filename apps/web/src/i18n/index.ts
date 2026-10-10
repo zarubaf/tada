@@ -11,6 +11,14 @@ if (errors.length > 0) {
   throw new Error(`invalid Fluent messages: ${errors.map(String).join("; ")}`);
 }
 
+/** Adds the messages of a file that a lazy part of the client brings (ADR 0024). */
+export function addMessages(source: string): void {
+  const failed = bundle.addResource(new FluentResource(source));
+  if (failed.length > 0) {
+    throw new Error(`invalid Fluent messages: ${failed.map(String).join("; ")}`);
+  }
+}
+
 /** Returns true if the locale has the message `id`. */
 export function hasMessage(id: string): boolean {
   return bundle.hasMessage(id);

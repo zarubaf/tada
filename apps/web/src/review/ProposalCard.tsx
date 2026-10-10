@@ -7,6 +7,7 @@ import { isEditable } from "../facts/valueDraft";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
+import { DisputeNotes } from "../ui/DisputeNotes";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Skeleton } from "../ui/Skeleton";
 import type { Conflict } from "./conflict";
@@ -172,6 +173,7 @@ export function ProposalCard(props: ProposalCardProps) {
           draftEnvironment={props.draftEnvironment}
           names={props.names}
         />
+        <DisputeNotes notes={proposal.dispute_notes} />
         {isOpen && duplicates.length > 0 && !props.canLink && (
           <p className={styles.note}>{t("inbox-link-other-reviewer")}</p>
         )}
@@ -213,6 +215,8 @@ export function ProposalCard(props: ProposalCardProps) {
                   before={evidence.excerpt.before}
                   quote={evidence.excerpt.quote}
                   after={evidence.excerpt.after}
+                  redacted={evidence.excerpt.redacted}
+                  notes={evidence.dispute_notes}
                 />
                 <p className={styles.note}>
                   {t("inbox-source-version", { id: evidence.source_version_id.slice(0, 8) })}

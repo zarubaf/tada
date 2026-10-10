@@ -4,9 +4,11 @@ import { EvidencePanel } from "../evidence/EvidencePanel";
 import { formatDateTime, formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
+import { DisputeNotes } from "../ui/DisputeNotes";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { KnowledgeState } from "../ui/KnowledgeState";
+import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventOverview.module.css";
 import { useEventContext } from "./eventContext";
@@ -112,10 +114,13 @@ export function EventOverview({ api }: { api: Api }) {
                 <dt>{row.label}</dt>
                 <dd>
                   <KnowledgeState state={state}>
-                    {state === "unknown"
-                      ? undefined
-                      : formatValue(row.fact ?? {}, row.field?.value_type)}
+                    {state === "unknown" ? undefined : row.fact?.redacted ? (
+                      <Redacted />
+                    ) : (
+                      formatValue(row.fact ?? {}, row.field?.value_type)
+                    )}
                   </KnowledgeState>
+                  <DisputeNotes notes={row.fact?.dispute_notes} />
                   {row.fact && (
                     <Button
                       ref={(button) => {

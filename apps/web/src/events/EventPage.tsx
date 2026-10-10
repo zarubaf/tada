@@ -8,6 +8,7 @@ import { InlineError } from "../ui/InlineError";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { NavLink, SubNav } from "../ui/NavLink";
 import { Page, PageTitle } from "../ui/Page";
+import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventPage.module.css";
 import { EventContext, type ProfileState, useEventProfile } from "./eventContext";
@@ -128,7 +129,11 @@ function DateWindow({ profile }: { profile: ProfileState }) {
         {field ? formatLabel(field.label) : t("field-date_window")}:{" "}
       </span>
       <KnowledgeState state={state}>
-        {state === "unknown" ? undefined : formatValue(fact ?? {}, field?.value_type)}
+        {state === "unknown" ? undefined : fact?.redacted ? (
+          <Redacted />
+        ) : (
+          formatValue(fact ?? {}, field?.value_type)
+        )}
       </KnowledgeState>
     </p>
   );
