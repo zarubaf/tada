@@ -35,6 +35,7 @@ Acceptance: the data-protection gate of ADR 0045 closes.
 
 Scope: durable scheduled checks, AI PM checks, internal Telegram reminders, the webhook mode and the health endpoints of the `telegram` process role (ADR 0011).
 The scheduled checks use the job queue of [ADR 0054](adr/0054-job-queue-implementation.md).
+The product version and the versions of the components in the footer of the web client come here too ([ADR 0075](adr/0075-versions-of-tada-and-its-components.md)).
 
 Acceptance:
 
