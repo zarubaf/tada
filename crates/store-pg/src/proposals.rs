@@ -34,7 +34,7 @@ use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::error::{InvalidRow, store_error};
-use crate::{actor, audit, drafts, redacted, sources, values};
+use crate::{actor, audit, drafts, redacted, redaction, sources, values};
 
 /// The format of `proposal.operation`.
 const OPERATION_VERSION: i32 = 1;
@@ -655,6 +655,23 @@ impl ProposalStore for Database {
         audit: &AuditEvent,
     ) -> Result<Inserted, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
+        // The checks read the cited texts before this transaction. A redaction that committed since then
+        // removed them, so the copies of their quotes must not go in (ADR 0072).
+        let redacted = redaction::share_sources(
+            &mut tx,
+            scope.organization_id().as_uuid(),
+            &cited_sources(changeset),
+        )
+        .await
+        .map_err(store_error)?;
+        if !redacted.is_empty() {
+            return Ok(Inserted::CitesRedacted(
+                redacted
+                    .into_iter()
+                    .map(SourceVersionId::from_uuid)
+                    .collect(),
+            ));
+        }
         let item = sources::TextItem {
             kind: sources::TextKind::MemberText,
             event: changeset.event_id,
@@ -815,6 +832,27 @@ impl ProposalStore for Database {
             redacted::content(changeset.text.as_deref().map(SourceText::normalize)),
         )))
     }
+}
+
+/// The source versions that the evidence and the draft manifests of a changeset cite, without its intake.
+fn cited_sources(changeset: &Changeset) -> Vec<Uuid> {
+    let evidence = changeset
+        .proposals
+        .iter()
+        .flat_map(|proposal| &proposal.evidence);
+    let manifests = changeset
+        .drafts
+        .iter()
+        .flat_map(|draft| &draft.manifest.sources);
+    let mut ids: Vec<Uuid> = evidence
+        .chain(manifests)
+        .map(|evidence| evidence.source_version_id)
+        .filter(|id| *id != changeset.source_version_id)
+        .map(SourceVersionId::as_uuid)
+        .collect();
+    ids.sort();
+    ids.dedup();
+    ids
 }
 
 async fn insert_changeset(

@@ -35,7 +35,7 @@ use crate::error::{InvalidRow, store_error};
 use crate::local_ids::next_local_number;
 use crate::proposals::operation_from_json;
 use crate::sources::{TextItem, TextKind};
-use crate::{actor, audit, drafts, events, sources, values};
+use crate::{actor, audit, drafts, events, redaction, sources, values};
 
 mod records;
 
@@ -91,8 +91,23 @@ impl ReviewStore for Database {
 
     async fn apply(&self, scope: OrgScope, plan: &ApplyPlan) -> Result<ApplyOutcome, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
+        let organization = scope.organization_id().as_uuid();
+        // The plan holds the quotes that the review read before this transaction. The cited source versions are
+        // locked first; a redaction that committed since then turns each quote of them into a tombstone (ADR 0072).
+        let redacted = redaction::share_sources(&mut tx, organization, &cited_sources(plan))
+            .await
+            .map_err(store_error)?;
+        let plan = &without_redacted_quotes(plan, &redacted);
         let proposals: Vec<ProposalId> = plan.steps.iter().map(|step| step.proposal_id).collect();
         if !lock_open(&mut tx, scope, plan.changeset_id, &proposals).await? {
+            return Ok(ApplyOutcome::NotOpen);
+        }
+        // A redaction of a proposal empties and rejects it; one that committed after the review read it is not open.
+        let ids: Vec<Uuid> = proposals.iter().map(|id| id.as_uuid()).collect();
+        if redaction::share_proposals(&mut tx, organization, &ids)
+            .await
+            .map_err(store_error)?
+        {
             return Ok(ApplyOutcome::NotOpen);
         }
         lock_targets(&mut tx, scope, &plan.steps)
@@ -246,6 +261,41 @@ impl ReviewStore for Database {
 }
 
 /// Locks the changeset for the rest of the transaction, then checks that none of `proposals` has a review result.
+/// The source versions that the evidence of the steps cites.
+fn cited_sources(plan: &ApplyPlan) -> Vec<Uuid> {
+    let mut ids: Vec<Uuid> = plan
+        .steps
+        .iter()
+        .flat_map(|step| match &step.evidence {
+            StepEvidence::Proposal(evidence) | StepEvidence::RecordEdit(evidence) => {
+                evidence.as_slice()
+            }
+            StepEvidence::Edit | StepEvidence::Link(_) => &[],
+        })
+        .map(|evidence| evidence.source_version_id.as_uuid())
+        .collect();
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+/// The plan with a tombstone for each quote of a redacted source version.
+fn without_redacted_quotes(plan: &ApplyPlan, redacted: &[Uuid]) -> ApplyPlan {
+    let mut plan = plan.clone();
+    for step in &mut plan.steps {
+        if let StepEvidence::Proposal(evidence) | StepEvidence::RecordEdit(evidence) =
+            &mut step.evidence
+        {
+            for cited in evidence.iter_mut() {
+                if redacted.contains(&cited.source_version_id.as_uuid()) {
+                    cited.passage.quote = Redactable::Redacted;
+                }
+            }
+        }
+    }
+    plan
+}
+
 async fn lock_open(
     conn: &mut PgConnection,
     scope: OrgScope,

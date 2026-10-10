@@ -21,11 +21,16 @@ Tombstone:
 - Content per target:
   - Source version: text, URL, hash and the personal parts of the author. The actor kind and ID stay. The search vector becomes empty. The quotes that copy the text are redacted too: in evidence links, proposal evidence and record evidence.
   - Fact version: the value.
-  - Document version: the Markdown and the file name. The stored object is deleted after the commit. This is best effort, and the orphan sweep ([ADR 0074](0074-orphan-sweep.md)) is the backstop.
+  - Document version: the Markdown, the file name and the hash. The stored object is deleted after the commit. This is best effort, and the orphan sweep ([ADR 0074](0074-orphan-sweep.md)) is the backstop.
+    An upload version and its source version hold the same file, so a redaction of one redacts the other too.
   - Proposal: the text values of the operation (the kind and the IDs stay), the reason, the quotes of the manifest and the lint warnings.
   - Person and institution: name, email address, phone number and account link.
+    The proposals that created the person or institution lose their text values and their reason too, as a proposal target does.
   - Event (by retention only): all source items, fact versions and proposals of the event, the texts of open questions, actions, commitments and workstreams, the quotes of record evidence, the document names and versions, and the dispute notes.
 - The name of an event, the field labels, statuses, dates, numbers and IDs stay after an event redaction. They should not name a person.
+- A redacted fact version, proposal, action, commitment, person or institution also loses the quotes of its evidence.
+- The dispute notes about a redacted source item, fact version, document version or proposal are redacted too.
+- A redaction that empties an open proposal also rejects it, in the same transaction. The reviewer is the actor of the redaction, and the result has no free text.
 
 Trigger rule:
 
@@ -34,6 +39,8 @@ Trigger rule:
 - `OLD.redacted_at` is NULL and `NEW.redacted_at` is not NULL.
 - Only content columns change, and only to NULL.
 - Every other UPDATE and every DELETE stays refused. This holds also with the setting on.
+- A redaction locks its target and the cited source items and versions `FOR UPDATE` before it reads the content that copies them.
+  Each writer that copies or cites a source version locks it `FOR SHARE` first. A writer that finds the version redacted refuses, writes a tombstone of the quote, or starts a new source item.
 - Only the `RedactionStore` port sets the setting. The `app::redaction` module owns the rules, and `store-pg` implements the port.
 - A test proves that an UPDATE of another column, a non-NULL content value or a redacted row fails with the setting on.
 

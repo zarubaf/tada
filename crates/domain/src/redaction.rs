@@ -5,7 +5,7 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 /// The kind of record that a redaction targets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum RedactionTargetKind {
     SourceItem,
     FactVersion,
@@ -55,8 +55,8 @@ impl FromStr for RedactionTargetKind {
     }
 }
 
-/// One record that a redaction targets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// One record that a redaction targets. The order (kind, then ID) is the lock order of a redaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RedactionTarget {
     pub kind: RedactionTargetKind,
     pub id: Uuid,

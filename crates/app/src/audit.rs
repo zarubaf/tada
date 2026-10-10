@@ -2,6 +2,7 @@
 
 use tada_domain::identity::{EventRole, OrganizationRole};
 use tada_domain::ids::{InvitationId, OrganizationId, UserId};
+use tada_domain::redaction::{RedactionReason, RedactionTargetKind};
 use uuid::Uuid;
 
 use crate::caller::{Actor, Bootstrap, Channel, OrgScope, ServiceCaller};
@@ -142,6 +143,19 @@ impl AuditAction {
         }
     }
 
+    /// The action that records a legal redaction of a target of `kind` (ADR 0072).
+    pub fn redaction_of(kind: RedactionTargetKind) -> Self {
+        match kind {
+            RedactionTargetKind::SourceItem => Self::SourceItemRedact,
+            RedactionTargetKind::FactVersion => Self::FactVersionRedact,
+            RedactionTargetKind::DocumentVersion => Self::DocumentVersionRedact,
+            RedactionTargetKind::Proposal => Self::ProposalRedact,
+            RedactionTargetKind::Person => Self::PersonRedact,
+            RedactionTargetKind::Institution => Self::InstitutionRedact,
+            RedactionTargetKind::Event => Self::EventRedact,
+        }
+    }
+
     /// The kind of the record that `record_id` identifies.
     pub fn record_kind(self) -> &'static str {
         match self {
@@ -227,6 +241,8 @@ pub struct AuditEvent {
     organization_id: Option<OrganizationId>,
     subject: Option<UserId>,
     roles: Option<RoleChange>,
+    /// Why a legal redaction ran. The only value besides role names that the detail can hold.
+    reason: Option<RedactionReason>,
 }
 
 impl AuditEvent {
@@ -246,6 +262,7 @@ impl AuditEvent {
             organization_id: scope.map(OrgScope::organization_id),
             subject: None,
             roles: None,
+            reason: None,
         }
     }
 
@@ -290,6 +307,7 @@ impl AuditEvent {
             organization_id: Some(organization_id),
             subject: None,
             roles: None,
+            reason: None,
         }
         .about(user_id);
         if existing == Some(accepted) {
@@ -313,6 +331,7 @@ impl AuditEvent {
             organization_id: self.organization_id,
             subject: None,
             roles: None,
+            reason: None,
         }
     }
 
@@ -331,6 +350,19 @@ impl AuditEvent {
     pub fn with_roles(self, old: Option<AuditRole>, new: Option<AuditRole>) -> Self {
         let roles = (old.is_some() || new.is_some()).then_some(RoleChange { old, new });
         Self { roles, ..self }
+    }
+
+    /// The reason of a legal redaction (ADR 0072).
+    #[must_use]
+    pub fn with_reason(self, reason: RedactionReason) -> Self {
+        Self {
+            reason: Some(reason),
+            ..self
+        }
+    }
+
+    pub fn reason(&self) -> Option<RedactionReason> {
+        self.reason
     }
 
     pub fn subject(&self) -> Option<UserId> {

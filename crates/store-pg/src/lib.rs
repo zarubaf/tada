@@ -28,6 +28,11 @@
 //! A change of an event role (`event_members::lock_member`) takes kind 9.
 //! A change of a workstream (`workstreams::change`) locks its one row and takes no other kind.
 //! A change of an action or a commitment (`work::lock_version`) locks its one row and takes no other kind.
+//! A legal redaction (`redaction::apply`) locks its target row and the cited source items and versions `FOR UPDATE`
+//! before it reads its cascade, and then updates content rows, among them document rows (kind 6).
+//! Each writer that copies or cites a source version takes `FOR SHARE` on it first (`redaction::share_sources`):
+//! a proposal insert at its start, an apply before kind 2, an upload of a new version on its source item after kind 6.
+//! So a writer and a redaction wait for each other, and no copy of redacted content goes in (ADR 0072).
 
 mod actor;
 mod audit;
@@ -53,6 +58,7 @@ mod privacy;
 mod proposals;
 pub mod rate_limit;
 mod redacted;
+mod redaction;
 mod review;
 mod session;
 mod sign_in;

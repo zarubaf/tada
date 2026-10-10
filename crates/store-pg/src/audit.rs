@@ -5,18 +5,22 @@ use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::audit::{AuditEvent, RoleChange};
 use tada_app::domain::ids::{OrganizationId, UserId};
+use tada_app::domain::redaction::RedactionReason;
 
-/// The `detail` column of a role change: `{"old_role": ..., "new_role": ...}`, without the key of
-/// a missing role (ADR 0061).
-fn detail(roles: RoleChange) -> Value {
+/// The `detail` column: the role change `{"old_role": ..., "new_role": ...}` without the key of a missing
+/// role (ADR 0061), and the reason of a legal redaction `{"reason": ...}` (ADR 0072). `None` without either.
+fn detail(roles: Option<RoleChange>, reason: Option<RedactionReason>) -> Option<Value> {
     let mut detail = Map::new();
-    if let Some(old) = roles.old {
+    if let Some(old) = roles.and_then(|roles| roles.old) {
         detail.insert("old_role".to_owned(), old.as_str().into());
     }
-    if let Some(new) = roles.new {
+    if let Some(new) = roles.and_then(|roles| roles.new) {
         detail.insert("new_role".to_owned(), new.as_str().into());
     }
-    Value::Object(detail)
+    if let Some(reason) = reason {
+        detail.insert("reason".to_owned(), reason.as_str().into());
+    }
+    (roles.is_some() || reason.is_some()).then_some(Value::Object(detail))
 }
 
 /// Adds an audit event inside the transaction of a command. A rollback removes it with the change.
@@ -38,7 +42,7 @@ pub(crate) async fn record(conn: &mut PgConnection, event: &AuditEvent) -> Resul
         event.record_kind(),
         event.record_id(),
         event.subject().map(UserId::as_uuid),
-        event.roles().map(detail),
+        detail(event.roles(), event.reason()),
     )
     .execute(conn)
     .await

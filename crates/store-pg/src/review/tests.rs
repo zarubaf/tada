@@ -22,6 +22,7 @@ use crate::testing::TestDatabase;
 mod approvals;
 mod drafts;
 mod links;
+mod races;
 mod work;
 
 const SOURCE: &str = "Das Open Day findet im Mai 2030 statt. Wir rechnen mit 20000 Besuchern.";

@@ -141,11 +141,14 @@ pub struct RedactedProposal {
 }
 
 /// The result of `ProposalStore::insert`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Inserted {
     Inserted,
     /// A changeset or a proposal with one of the IDs exists. The store changed nothing.
     IdTaken,
+    /// A legal redaction removed the text of these cited source versions after the checks read it (ADR 0072).
+    /// The store changed nothing.
+    CitesRedacted(Vec<SourceVersionId>),
 }
 
 /// The repository port for changesets and proposals. Each method that reads or writes organization data stays inside `scope`.
@@ -159,7 +162,8 @@ pub trait ProposalStore: Debug + Send + Sync {
 
     /// Stores `source` as a source version of the kind `member-text` with the ID `changeset.source_version_id`,
     /// then the changeset with its proposals, their dependencies, their evidence and the provenance of its drafts, then `audit`.
-    /// It writes all of them in one transaction, or nothing.
+    /// It writes all of them in one transaction, or nothing. It locks each cited source version first, and refuses
+    /// if a redaction removed its text (ADR 0072).
     async fn insert(
         &self,
         scope: OrgScope,
@@ -347,12 +351,48 @@ pub async fn create_changeset(
         .await?
     {
         Inserted::Inserted => Ok(Created::New(changeset)),
+        Inserted::CitesRedacted(redacted) => {
+            Err(ProposeError::Invalid(cites_redacted(&changeset, &redacted)))
+        }
         // A concurrent request stored a changeset with one of the IDs first.
         Inserted::IdTaken => match stores.proposals.get(scope, id).await? {
             Some(stored) => intake.existing(stored),
             None => Err(invalid("id", "taken")),
         },
     }
+}
+
+/// The entry code `no-text` for each citation of a source version that a redaction emptied after the checks:
+/// the same code as a citation of a source version that was redacted before them.
+fn cites_redacted(changeset: &Changeset, redacted: &[SourceVersionId]) -> Vec<FieldError> {
+    let mut errors = Vec::new();
+    for (index, proposal) in changeset.proposals.iter().enumerate() {
+        for (number, evidence) in proposal.evidence.iter().enumerate() {
+            if redacted.contains(&evidence.source_version_id) {
+                errors.push(FieldError::new(
+                    format!("proposals/{index}/evidence/{number}"),
+                    "no-text",
+                ));
+            }
+        }
+        let draft = changeset
+            .drafts
+            .iter()
+            .find(|draft| draft.proposal_id == proposal.id);
+        if draft.is_some_and(|draft| {
+            draft
+                .manifest
+                .sources
+                .iter()
+                .any(|cited| redacted.contains(&cited.source_version_id))
+        }) {
+            errors.push(FieldError::new(
+                format!("proposals/{index}/operation/markdown"),
+                "no-text",
+            ));
+        }
+    }
+    errors
 }
 
 /// The content of a new changeset, to compare it with a stored changeset of the same ID.

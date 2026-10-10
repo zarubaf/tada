@@ -30,6 +30,7 @@ pub mod proposals;
 pub mod public_url;
 pub mod rate_limit;
 pub mod records;
+pub mod redaction;
 pub mod review;
 pub mod search;
 pub mod session;
