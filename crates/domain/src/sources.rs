@@ -3,6 +3,7 @@
 use unicode_normalization::UnicodeNormalization;
 
 use crate::ids::SourceVersionId;
+use crate::redaction::Redactable;
 
 /// The normalized text of a source version: Unicode NFC with `\n` line ends.
 /// The character offsets of a passage count in this text.
@@ -35,7 +36,8 @@ pub struct Passage {
     pub start: u32,
     /// The offset after the last character.
     pub end: u32,
-    pub quote: String,
+    /// The copy of the text of the range. A legal redaction of the source removes it (ADR 0072).
+    pub quote: Redactable<String>,
     /// The page of a PDF, from 1.
     pub page: Option<u32>,
 }
@@ -79,17 +81,18 @@ impl Passage {
         Ok(Self {
             start,
             end,
-            quote: quote(text, start, end)?.to_owned(),
+            quote: Redactable::Present(quote(text, start, end)?.to_owned()),
             page: None,
         })
     }
 
     /// Returns `Ok` if `quote` is the text from `start` to `end` of `text`, the normalized text of the source version.
+    /// A redacted quote matches no text.
     pub fn check(&self, text: &str) -> Result<(), PassageError> {
         if self.page == Some(0) {
             return Err(PassageError::Page);
         }
-        if quote(text, self.start, self.end)? == self.quote {
+        if self.quote.as_present().map(String::as_str) == Some(quote(text, self.start, self.end)?) {
             Ok(())
         } else {
             Err(PassageError::QuoteMismatch)
@@ -169,7 +172,7 @@ mod tests {
         Passage {
             start,
             end,
-            quote: quote.to_owned(),
+            quote: Redactable::Present(quote.to_owned()),
             page: None,
         }
     }
@@ -205,6 +208,11 @@ mod tests {
             passage(5, 13, "Flugfeld").check(TEXT),
             Err(PassageError::QuoteMismatch)
         );
+        let redacted = Passage {
+            quote: Redactable::Redacted,
+            ..passage(4, 12, "Flugfeld")
+        };
+        assert_eq!(redacted.check(TEXT), Err(PassageError::QuoteMismatch));
     }
 
     #[test]
@@ -223,7 +231,7 @@ mod tests {
     #[test]
     fn a_range_gives_the_passage_with_its_quote() {
         let passage = Passage::of_range(TEXT, 13, 19).unwrap();
-        assert_eq!(passage.quote, "öffnet");
+        assert_eq!(passage.quote, Redactable::Present("öffnet".to_owned()));
         assert_eq!(passage.check(TEXT), Ok(()));
         assert_eq!(Passage::of_range(TEXT, 4, 4), Err(PassageError::Empty));
         assert_eq!(

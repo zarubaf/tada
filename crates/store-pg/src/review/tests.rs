@@ -1333,7 +1333,10 @@ async fn a_fact_applies_with_the_evidence_of_another_source_version_of_its_event
     )
     .await
     .unwrap();
-    assert_eq!(review.proposals[0].excerpts[0].quote, "20000 Besuchern");
+    assert_eq!(
+        review.proposals[0].excerpts[0].as_present().unwrap().quote,
+        "20000 Besuchern"
+    );
 
     apply(&test, &open_day.manager, &changeset, select(&[id]))
         .await
@@ -1443,4 +1446,101 @@ async fn sources_and_fact_versions_never_change() {
     .await
     .unwrap_err();
     assert_eq!(crate::testing::sqlstate(&error), "23503");
+}
+
+/// A legal redaction empties a proposal and the quotes of its source (ADR 0072). The review shows the tombstones:
+/// the emptied proposal with its kind and status, and the other proposal with a redacted excerpt. Once each
+/// proposal is emptied, an event manager still reads the changeset, and the inbox no longer lists it.
+#[tokio::test]
+async fn a_redacted_proposal_reads_as_a_tombstone_in_the_review() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let (kept, emptied) = (Uuid::now_v7(), Uuid::now_v7());
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![
+            proposal(
+                kept,
+                date_window(open_day.event, 5, None),
+                &[],
+                "im Mai 2030",
+            ),
+            proposal(
+                emptied,
+                question(open_day.event, Uuid::now_v7(), open_day.manager.user_id()),
+                &[],
+                "20000 Besuchern",
+            ),
+        ],
+    )
+    .await;
+    test.redact(&[
+        &format!(
+            "UPDATE source_version SET text = NULL, url = NULL, sha256 = NULL, redacted_at = now(),
+                 author_actor = jsonb_build_object('kind', author_actor -> 'kind', 'id', author_actor -> 'id')
+             WHERE id = '{}'",
+            changeset.source_version_id
+        ),
+        &format!(
+            "UPDATE proposal_evidence SET quote = NULL, redacted_at = now() WHERE proposal_id IN ('{kept}', '{emptied}')"
+        ),
+        &format!(
+            "UPDATE proposal SET operation = jsonb_build_object('kind', operation -> 'kind'), reason = NULL,
+                 redacted_at = now()
+             WHERE id = '{emptied}'"
+        ),
+    ])
+    .await;
+
+    let review = tada_app::review::get_changeset(
+        &open_day.manager,
+        changeset.id,
+        stores(&test),
+        &FixedClock,
+    )
+    .await
+    .unwrap();
+    assert_eq!(review.proposals.len(), 1);
+    assert_eq!(review.proposals[0].proposal.id.as_uuid(), kept);
+    assert_eq!(
+        review.proposals[0].excerpts,
+        [tada_app::domain::redaction::Redactable::Redacted]
+    );
+    assert_eq!(review.redacted.len(), 1);
+    assert_eq!(review.redacted[0].proposal.id.as_uuid(), emptied);
+    assert_eq!(
+        review.redacted[0].proposal.operation_kind,
+        "create_open_question"
+    );
+    assert_eq!(review.redacted[0].status, ProposalStatus::Open);
+
+    test.redact(&[&format!(
+        "UPDATE proposal SET operation = jsonb_build_object('kind', operation -> 'kind'), reason = NULL,
+             redacted_at = now()
+         WHERE id = '{kept}'"
+    )])
+    .await;
+    let review = tada_app::review::get_changeset(
+        &open_day.manager,
+        changeset.id,
+        stores(&test),
+        &FixedClock,
+    )
+    .await
+    .unwrap();
+    assert!(review.proposals.is_empty());
+    assert_eq!(review.redacted.len(), 2);
+    let inbox = list_open_changesets(
+        &open_day.manager,
+        Some(open_day.event),
+        None,
+        PageLimit::new(10).unwrap(),
+        stores(&test),
+        &FixedClock,
+    )
+    .await
+    .unwrap();
+    assert!(inbox.items.is_empty(), "{inbox:?}");
 }

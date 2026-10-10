@@ -29,12 +29,12 @@ use tada_app::domain::work::{
 };
 use tada_app::drafts::DraftProvenance;
 use tada_app::facts::{OpenProposalRef, OpenQuestionRef};
-use tada_app::proposals::{Changeset, Inserted, ProposalStore};
+use tada_app::proposals::{Changeset, Inserted, ProposalStore, RedactedProposal};
 use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::error::{InvalidRow, store_error};
-use crate::{actor, audit, drafts, sources, values};
+use crate::{actor, audit, drafts, redacted, sources, values};
 
 /// The format of `proposal.operation`.
 const OPERATION_VERSION: i32 = 1;
@@ -688,11 +688,11 @@ impl ProposalStore for Database {
         &self,
         scope: OrgScope,
         id: ChangesetId,
-    ) -> Result<Option<(Changeset, SourceText)>, StoreError> {
+    ) -> Result<Option<(Changeset, Redactable<SourceText>)>, StoreError> {
         let organization = scope.organization_id().as_uuid();
         let Some(changeset) = sqlx::query!(
             r#"SELECT c.event_id, c.author, c.source_version_id,
-                      c.created_at AS "created_at: jiff_sqlx::Timestamp", v.text AS "text!"
+                      c.created_at AS "created_at: jiff_sqlx::Timestamp", v.text
                FROM changeset c
                JOIN source_version v ON v.organization_id = c.organization_id AND v.id = c.source_version_id
                WHERE c.organization_id = $1 AND c.id = $2"#,
@@ -706,7 +706,8 @@ impl ProposalStore for Database {
             return Ok(None);
         };
         let rows = sqlx::query!(
-            r#"SELECT id, operation AS "operation!", operation_version, reason AS "reason!", manifest, lint_warnings
+            r#"SELECT id, operation, operation_version, reason, manifest, lint_warnings,
+                      redacted_at IS NOT NULL AS "redacted!"
              FROM proposal
              WHERE organization_id = $1 AND changeset_id = $2
              ORDER BY id"#,
@@ -729,7 +730,7 @@ impl ProposalStore for Database {
         .map_err(store_error)?;
         // The evidence IDs are UUIDv7 in the order of the insert, so this keeps the order of the passages.
         let evidence = sqlx::query!(
-            r#"SELECT e.proposal_id, e.source_version_id, e.start_offset, e.end_offset, e.quote AS "quote!", e.page
+            r#"SELECT e.proposal_id, e.source_version_id, e.start_offset, e.end_offset, e.quote, e.page
              FROM proposal_evidence e
              JOIN proposal p ON p.organization_id = e.organization_id AND p.id = e.proposal_id
              WHERE e.organization_id = $1 AND p.changeset_id = $2
@@ -742,8 +743,28 @@ impl ProposalStore for Database {
         .map_err(store_error)?;
         let offset = |value: i32| u32::try_from(value).map_err(|_| InvalidRow("proposal_evidence"));
         let mut proposals = Vec::new();
+        let mut redacted = Vec::new();
         let mut draft_provenance = Vec::new();
         for row in rows {
+            let depends_on = dependencies
+                .iter()
+                .filter(|dependency| dependency.proposal_id == row.id)
+                .map(|dependency| ProposalId::from_uuid(dependency.depends_on))
+                .collect();
+            // The tombstone of a legal redaction keeps the kind of the operation only (ADR 0072).
+            if row.redacted {
+                redacted.push(RedactedProposal {
+                    id: ProposalId::from_uuid(row.id),
+                    operation_kind: row
+                        .operation
+                        .get("kind")
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or(InvalidRow(OPERATION))?
+                        .to_owned(),
+                    depends_on,
+                });
+                continue;
+            }
             if let (Some(manifest), Some(lint_warnings)) = (&row.manifest, &row.lint_warnings) {
                 draft_provenance.push(DraftProvenance {
                     proposal_id: ProposalId::from_uuid(row.id),
@@ -754,11 +775,7 @@ impl ProposalStore for Database {
             proposals.push(Proposal {
                 id: ProposalId::from_uuid(row.id),
                 operation: operation_from_json(row.operation_version, &row.operation)?,
-                depends_on: dependencies
-                    .iter()
-                    .filter(|dependency| dependency.proposal_id == row.id)
-                    .map(|dependency| ProposalId::from_uuid(dependency.depends_on))
-                    .collect(),
+                depends_on,
                 evidence: evidence
                     .iter()
                     .filter(|passage| passage.proposal_id == row.id)
@@ -770,13 +787,17 @@ impl ProposalStore for Database {
                             passage: Passage {
                                 start: offset(passage.start_offset)?,
                                 end: offset(passage.end_offset)?,
-                                quote: passage.quote.clone(),
+                                quote: redacted::content(passage.quote.clone()),
                                 page: passage.page.map(offset).transpose()?,
                             },
                         })
                     })
                     .collect::<Result<_, InvalidRow>>()?,
-                reason: Reason::parse(&row.reason).map_err(|_| InvalidRow("proposal.reason"))?,
+                reason: row
+                    .reason
+                    .as_deref()
+                    .and_then(|reason| Reason::parse(reason).ok())
+                    .ok_or(InvalidRow("proposal.reason"))?,
             });
         }
         Ok(Some((
@@ -787,9 +808,11 @@ impl ProposalStore for Database {
                 source_version_id: SourceVersionId::from_uuid(changeset.source_version_id),
                 created_at: changeset.created_at.to_jiff(),
                 proposals,
+                redacted,
                 drafts: draft_provenance,
             },
-            SourceText::normalize(&changeset.text),
+            // The stored text is normalized already; normalizing it again keeps it unchanged.
+            redacted::content(changeset.text.as_deref().map(SourceText::normalize)),
         )))
     }
 }
@@ -862,15 +885,16 @@ async fn insert_changeset(
             };
             sqlx::query!(
                 "INSERT INTO proposal_evidence
-                     (id, organization_id, proposal_id, source_version_id, start_offset, end_offset, quote, page)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                     (id, organization_id, proposal_id, source_version_id, start_offset, end_offset, quote, page,
+                      redacted_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7::text IS NULL THEN now() END)",
                 Uuid::now_v7(),
                 organization,
                 proposal.id.as_uuid(),
                 evidence.source_version_id.as_uuid(),
                 offset(passage.start)?,
                 offset(passage.end)?,
-                passage.quote,
+                passage.quote.as_present().map(String::as_str),
                 passage.page.map(offset).transpose()?,
             )
             .execute(&mut *conn)
@@ -887,10 +911,12 @@ pub(crate) async fn open_fact_proposals(
     event: EventId,
 ) -> Result<Vec<OpenProposalRef>, StoreError> {
     let rows = sqlx::query!(
-        r#"SELECT p.id, p.changeset_id, p.operation AS "operation!", p.operation_version,
+        // A proposal that a legal redaction emptied is no longer open for a review (ADR 0072).
+        r#"SELECT p.id, p.changeset_id, p.operation, p.operation_version,
                   p.created_at AS "created_at: jiff_sqlx::Timestamp"
            FROM proposal p
            WHERE p.organization_id = $1 AND p.event_id = $2 AND p.target_kind = 'fact'
+             AND p.redacted_at IS NULL
              AND NOT EXISTS (
                  SELECT 1 FROM review_result r
                  WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id

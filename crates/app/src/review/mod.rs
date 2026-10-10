@@ -23,13 +23,15 @@ use tada_domain::ids::{
     PersonId, ProposalId, UserId,
 };
 use tada_domain::proposals::Operation;
+use tada_domain::redaction::Redactable;
 use tada_domain::sources::{Evidence, SourceText};
 use tada_domain::work::FirmReason;
 
 pub use self::edits::RecordEditInput;
 pub use self::links::{Link, LinkedRecord, MAX_DUPLICATES};
 pub use self::read::{
-    ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, get_changeset,
+    ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, RedactedProposalReview,
+    get_changeset,
 };
 use crate::access::{self, AccessError, EventAccess, Principal};
 use crate::audit::{AuditAction, AuditEvent};
@@ -919,7 +921,8 @@ async fn changeset_access(
 /// A changeset that the caller reviews at least in part, with its review results and the reviewers of each proposal.
 struct Reviewable {
     changeset: Changeset,
-    source: SourceText,
+    /// A legal redaction removes the text (ADR 0072).
+    source: Redactable<SourceText>,
     results: Vec<ReviewRecord>,
     access: EventAccess,
     routes: ChangesetRoutes,
@@ -1010,7 +1013,11 @@ async fn reviewable(
         .changeset
         .proposals
         .iter()
-        .any(|proposal| reviewable.may_review(caller, proposal.id));
+        .any(|proposal| reviewable.may_review(caller, proposal.id))
+        // A legal redaction can empty each proposal (ADR 0072); an event manager still sees the tombstones.
+        || (reviewable.changeset.proposals.is_empty()
+            && !reviewable.changeset.redacted.is_empty()
+            && reviewable.access == EventAccess::Manager);
     if reviews_some {
         Ok(reviewable)
     } else {

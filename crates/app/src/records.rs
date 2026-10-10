@@ -19,6 +19,7 @@ use tada_domain::RecordVersion;
 use tada_domain::ids::{
     self, ActionId, CommitmentId, InstitutionId, PersonId, ProposalId, SourceVersionId,
 };
+use tada_domain::redaction::Redactable;
 use uuid::Uuid;
 
 use crate::access::{self, Principal, SourceReach};
@@ -135,7 +136,8 @@ pub struct RecordEvidenceView {
     pub captured_at: Timestamp,
     pub start_offset: u32,
     pub end_offset: u32,
-    pub quote: String,
+    /// A legal redaction of the source removes the quote (ADR 0072).
+    pub quote: Redactable<String>,
     pub page: Option<u32>,
 }
 

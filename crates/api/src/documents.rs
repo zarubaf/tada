@@ -33,7 +33,7 @@ use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::cursor;
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
-use crate::values::{FactState, Passage, Value, state_parts};
+use crate::values::{FactState, Passage, Value, stored_state_parts};
 
 /// The header with the file name of an upload, percent-encoded as UTF-8.
 const FILE_NAME_HEADER: HeaderName = HeaderName::from_static("x-file-name");
@@ -702,7 +702,8 @@ impl From<Resolution> for LinkTarget {
     fn from(resolution: Resolution) -> Self {
         match resolution {
             Resolution::Fact(fact) => {
-                let (state, value, approximate) = state_parts(&fact.state);
+                // `resolve_links` gives a redacted fact version as `Hidden` (ADR 0072).
+                let (state, value, approximate, _) = stored_state_parts(&fact.state);
                 Self::Fact {
                     fact_id: fact.fact_id.as_uuid(),
                     version: fact.number.get(),

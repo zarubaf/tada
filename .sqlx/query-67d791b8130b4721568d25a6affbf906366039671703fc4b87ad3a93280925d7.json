@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO proposal_evidence\n                     (id, organization_id, proposal_id, source_version_id, start_offset, end_offset, quote, page,\n                      redacted_at)\n                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7::text IS NULL THEN now() END)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "67d791b8130b4721568d25a6affbf906366039671703fc4b87ad3a93280925d7"
+}

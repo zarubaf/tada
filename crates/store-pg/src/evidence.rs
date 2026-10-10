@@ -14,9 +14,9 @@ use tada_app::domain::sources::Evidence;
 use tada_app::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 use tada_app::store::StoreError;
 
-use crate::Database;
 use crate::error::{InvalidRow, store_error};
 use crate::sources::readable_source_ids;
+use crate::{Database, redacted};
 
 struct EvidenceRow {
     action_id: Option<Uuid>,
@@ -29,7 +29,7 @@ struct EvidenceRow {
     captured_at: jiff_sqlx::Timestamp,
     start_offset: i32,
     end_offset: i32,
-    quote: String,
+    quote: Option<String>,
     page: Option<i32>,
 }
 
@@ -65,7 +65,7 @@ impl TryFrom<EvidenceRow> for RecordEvidenceView {
             captured_at: row.captured_at.to_jiff(),
             start_offset: offset(row.start_offset)?,
             end_offset: offset(row.end_offset)?,
-            quote: row.quote,
+            quote: redacted::content(row.quote),
             page: row.page.map(offset).transpose()?,
         })
     }
@@ -128,7 +128,7 @@ impl EvidenceStore for Database {
             r#"SELECT e.action_id, e.commitment_id, e.person_id, e.institution_id, e.record_version,
                       e.proposal_id, e.source_version_id,
                       v.captured_at AS "captured_at: jiff_sqlx::Timestamp",
-                      e.start_offset, e.end_offset, e.quote AS "quote!", e.page
+                      e.start_offset, e.end_offset, e.quote, e.page
                FROM record_evidence e
                JOIN source_version v
                    ON v.organization_id = e.organization_id AND v.id = e.source_version_id
@@ -178,8 +178,9 @@ pub(crate) async fn insert_evidence(
         sqlx::query!(
             "INSERT INTO record_evidence
                  (id, organization_id, action_id, commitment_id, person_id, institution_id, record_version,
-                  proposal_id, source_version_id, start_offset, end_offset, quote, page)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+                  proposal_id, source_version_id, start_offset, end_offset, quote, page, redacted_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                     CASE WHEN $12::text IS NULL THEN now() END)",
             Uuid::now_v7(),
             scope.organization_id().as_uuid(),
             action,
@@ -191,7 +192,8 @@ pub(crate) async fn insert_evidence(
             source_version_id.as_uuid(),
             offset(passage.start)?,
             offset(passage.end)?,
-            passage.quote,
+            // A quote that a legal redaction removed stays a tombstone in its copy (ADR 0072).
+            passage.quote.as_present().map(String::as_str),
             passage.page.map(offset).transpose()?,
         )
         .execute(&mut *conn)

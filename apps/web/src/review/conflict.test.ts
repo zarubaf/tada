@@ -35,6 +35,7 @@ function setFact(
             fact_id: "0199b8e0-0000-7000-8000-0000000000f2",
             version: currentVersion,
             state: "accepted",
+            redacted: false,
           },
     ...extra,
   };

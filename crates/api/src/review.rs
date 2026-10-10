@@ -10,6 +10,7 @@ use tada_app::domain::parties::Party as DomainParty;
 use tada_app::domain::proposals::{
     DraftDocument as DomainDraftDocument, Operation as DomainOperation,
 };
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::Excerpt as DomainExcerpt;
 use tada_app::facts::FactVersionRef;
 use tada_app::problem::ProblemCode;
@@ -39,7 +40,7 @@ use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::json_schema;
 use crate::parties::PartyRef;
 use crate::problem::{ApiError, Problem};
-use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts};
+use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts, stored_state_parts};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
@@ -202,6 +203,22 @@ pub struct Changeset {
     pub created_at: Timestamp,
     /// The proposals in the order of their IDs.
     pub proposals: Vec<Proposal>,
+    /// The proposals that a legal redaction emptied, in the order of their IDs (ADR 0072). They have no operation
+    /// values, no reason and no evidence, and nobody reviews them.
+    pub redacted_proposals: Vec<RedactedProposal>,
+}
+
+/// A proposal that a legal redaction emptied (ADR 0072).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RedactedProposal {
+    pub id: Uuid,
+    /// The kind of the operation, for example `set_fact`.
+    pub operation_kind: String,
+    /// The proposals of the same changeset that had to apply before this one.
+    pub depends_on: Vec<Uuid>,
+    pub status: ProposalStatus,
+    /// Always true.
+    pub redacted: bool,
 }
 
 /// One proposal with its evidence, its status and the current value of its target.
@@ -260,9 +277,12 @@ pub struct ProposalEvidence {
 /// A passage with the text around it: at most 100 characters before and after it.
 #[derive(Serialize, ToSchema)]
 pub struct Excerpt {
+    /// Empty after a legal redaction of the source (ADR 0072).
     pub before: String,
     pub quote: String,
     pub after: String,
+    /// True after a legal redaction of the source: the texts are empty (ADR 0072).
+    pub redacted: bool,
 }
 
 /// The excerpt copies the source text, so `Debug` shows its lengths only (ADR 0035).
@@ -279,12 +299,21 @@ impl std::fmt::Debug for Excerpt {
     }
 }
 
-impl From<DomainExcerpt> for Excerpt {
-    fn from(excerpt: DomainExcerpt) -> Self {
-        Self {
-            before: excerpt.before,
-            quote: excerpt.quote,
-            after: excerpt.after,
+impl From<Redactable<DomainExcerpt>> for Excerpt {
+    fn from(excerpt: Redactable<DomainExcerpt>) -> Self {
+        match excerpt {
+            Redactable::Present(excerpt) => Self {
+                before: excerpt.before,
+                quote: excerpt.quote,
+                after: excerpt.after,
+                redacted: false,
+            },
+            Redactable::Redacted => Self {
+                before: String::new(),
+                quote: String::new(),
+                after: String::new(),
+                redacted: true,
+            },
         }
     }
 }
@@ -345,17 +374,20 @@ pub struct CurrentFact {
     /// True for an approximate value, for example "about 20,000". It is absent if the state is `unknown`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approximate: Option<bool>,
+    /// True after a legal redaction (ADR 0072): the state stays, the value and `approximate` are absent.
+    pub redacted: bool,
 }
 
 impl From<FactVersionRef> for CurrentFact {
     fn from(current: FactVersionRef) -> Self {
-        let (state, value, approximate) = state_parts(&current.state);
+        let (state, value, approximate, redacted) = stored_state_parts(&current.state);
         Self {
             fact_id: current.fact_id.as_uuid(),
             version: current.number.get(),
             state,
             value,
             approximate,
+            redacted,
         }
     }
 }
@@ -733,6 +765,22 @@ impl From<ChangesetReview> for Changeset {
             source_version_id: review.source_version_id.as_uuid(),
             created_at: review.created_at,
             proposals: review.proposals.into_iter().map(Proposal::from).collect(),
+            redacted_proposals: review
+                .redacted
+                .into_iter()
+                .map(|redacted| RedactedProposal {
+                    id: redacted.proposal.id.as_uuid(),
+                    operation_kind: redacted.proposal.operation_kind,
+                    depends_on: redacted
+                        .proposal
+                        .depends_on
+                        .iter()
+                        .map(|id| id.as_uuid())
+                        .collect(),
+                    status: redacted.status.into(),
+                    redacted: true,
+                })
+                .collect(),
         }
     }
 }

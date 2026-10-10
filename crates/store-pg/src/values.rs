@@ -12,6 +12,7 @@ use tada_app::domain::facts::{
     Valued,
 };
 use tada_app::domain::ids::{DocumentId, EventId};
+use tada_app::domain::redaction::Redactable;
 
 use crate::error::InvalidRow;
 
@@ -193,6 +194,23 @@ pub(crate) fn fact_state_to_columns(
             valued.approximate,
         ),
         FactState::Unknown => ("unknown", None, false),
+    }
+}
+
+/// The state of a stored fact version. A value of a known state is NULL only after a legal redaction (ADR 0072).
+pub(crate) fn stored_fact_state(
+    state: &str,
+    value: Option<serde_json::Value>,
+    approximate: bool,
+) -> Result<FactState<Redactable<Valued>>, InvalidRow> {
+    match (state, value) {
+        ("accepted", None) => Ok(FactState::Accepted(Redactable::Redacted)),
+        ("assumption", None) => Ok(FactState::Assumption(Redactable::Redacted)),
+        (state, value) => Ok(match fact_state_from_columns(state, value, approximate)? {
+            FactState::Accepted(valued) => FactState::Accepted(Redactable::Present(valued)),
+            FactState::Assumption(valued) => FactState::Assumption(Redactable::Present(valued)),
+            FactState::Unknown => FactState::Unknown,
+        }),
     }
 }
 

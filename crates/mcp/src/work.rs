@@ -155,7 +155,10 @@ pub(crate) struct EvidenceItem {
     source_version_id: Uuid,
     start: u32,
     end: u32,
+    /// Empty after a legal redaction of the source (ADR 0072).
     quote: String,
+    /// True after a legal redaction of the source: the quote is empty (ADR 0072).
+    redacted: bool,
 }
 
 impl From<&RecordEvidenceView> for EvidenceItem {
@@ -165,7 +168,8 @@ impl From<&RecordEvidenceView> for EvidenceItem {
             source_version_id: evidence.source_version_id.as_uuid(),
             start: evidence.start_offset,
             end: evidence.end_offset,
-            quote: evidence.quote.clone(),
+            quote: text(&evidence.quote, String::as_str),
+            redacted: evidence.quote.as_present().is_none(),
         }
     }
 }

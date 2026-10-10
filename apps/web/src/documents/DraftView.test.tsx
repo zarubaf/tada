@@ -50,11 +50,13 @@ const dateFact: Fact = {
   state: "accepted",
   value: { type: "date", date: "2030-05-18" },
   version: 2,
+  redacted: false,
   evidence: [
     {
       source_version_id: SOURCE,
       passage: { start: 0, end: 5, quote: "18. Mai" },
       captured_at: "2030-05-01T08:00:00Z",
+      redacted: false,
     },
   ],
   accepted_by: author as Fact["accepted_by"],

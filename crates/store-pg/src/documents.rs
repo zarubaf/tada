@@ -687,7 +687,9 @@ impl DocumentStore for Database {
                         passage: Passage {
                             start: offset(row.start_offset)?,
                             end: offset(row.end_offset)?,
-                            quote: row.quote.ok_or(InvalidRow("source_version.text"))?,
+                            quote: Redactable::Present(
+                                row.quote.ok_or(InvalidRow("source_version.text"))?,
+                            ),
                             page: None,
                         },
                     })

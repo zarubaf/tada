@@ -275,6 +275,7 @@ mod facts {
                 "before": "Das Open Day findet ",
                 "quote": "im Mai oder Juni 2030",
                 "after": " statt. Wir erwarten ungefähr 20000 Leute. Der Ort ist noch offen. Wer klärt die Bewilligung?",
+                "redacted": false,
             })
         );
         assert!(window_proposal.get("current").is_none());

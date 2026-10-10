@@ -124,7 +124,14 @@ async fn a_draft_proposal_stores_its_manifest_and_lint_warnings_and_they_never_c
         panic!("not one draft");
     };
     assert_eq!(draft.manifest.facts[0].fact_id.as_uuid(), fact);
-    assert_eq!(draft.manifest.sources[0].passage.quote, "Open Day");
+    assert_eq!(
+        draft.manifest.sources[0]
+            .passage
+            .quote
+            .as_present()
+            .unwrap(),
+        "Open Day"
+    );
     assert_eq!(draft.lint_warnings.len(), 1, "the visitors in line 5");
     let (manifest, lint): (Value, Value) =
         sqlx::query_as("SELECT manifest, lint_warnings FROM proposal WHERE id = $1")

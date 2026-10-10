@@ -359,7 +359,8 @@ impl ProposalStore for Memory {
         &self,
         scope: OrgScope,
         id: ChangesetId,
-    ) -> Result<Option<(Changeset, SourceText)>, StoreError> {
+    ) -> Result<Option<(Changeset, tada_domain::redaction::Redactable<SourceText>)>, StoreError>
+    {
         assert_eq!(scope.organization_id(), testwil());
         let stored = self.stored.lock().unwrap();
         Ok(stored
@@ -368,7 +369,10 @@ impl ProposalStore for Memory {
             .map(|(changeset, source)| {
                 let mut changeset = changeset.clone();
                 changeset.proposals.sort_by_key(|proposal| proposal.id);
-                (changeset, source.clone())
+                (
+                    changeset,
+                    tada_domain::redaction::Redactable::Present(source.clone()),
+                )
             }))
     }
 }
@@ -509,7 +513,7 @@ async fn a_contributor_creates_a_changeset_with_its_source_and_an_audit_event() 
     };
     assert_eq!(
         proposal.evidence[0].passage.quote,
-        "20000 Besuchern pro Tag"
+        tada_domain::redaction::Redactable::Present("20000 Besuchern pro Tag".to_owned())
     );
 }
 
@@ -1305,7 +1309,7 @@ async fn a_draft_proposal_fixes_its_manifest_and_its_lint_warnings() {
         panic!("not one source");
     };
     assert_eq!(cited.source_version_id, source);
-    assert_eq!(cited.passage.quote, "Das Flugfeld");
+    assert_eq!(cited.passage.quote.as_present().unwrap(), "Das Flugfeld");
     assert_eq!(
         draft.lint_warnings,
         [LintWarning {
@@ -1508,7 +1512,7 @@ async fn a_fact_cites_a_passage_of_a_text_file_of_its_event() {
     let changeset = changeset_of(created.unwrap());
     let evidence = &changeset.proposals[0].evidence[0];
     assert_eq!(evidence.source_version_id, source);
-    assert_eq!(evidence.passage.quote, "Das Flugfeld");
+    assert_eq!(evidence.passage.quote.as_present().unwrap(), "Das Flugfeld");
 }
 
 #[tokio::test]

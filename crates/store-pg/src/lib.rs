@@ -51,6 +51,7 @@ mod parties;
 mod privacy;
 mod proposals;
 pub mod rate_limit;
+mod redacted;
 mod review;
 mod session;
 mod sign_in;

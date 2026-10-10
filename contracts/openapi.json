@@ -5348,7 +5348,8 @@
           "author",
           "source_version_id",
           "created_at",
-          "proposals"
+          "proposals",
+          "redacted_proposals"
         ],
         "properties": {
           "id": {
@@ -5381,6 +5382,13 @@
               "$ref": "#/components/schemas/Proposal"
             },
             "description": "The proposals in the order of their IDs."
+          },
+          "redacted_proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RedactedProposal"
+            },
+            "description": "The proposals that a legal redaction emptied, in the order of their IDs (ADR 0072). They have no operation\nvalues, no reason and no evidence, and nobody reviews them."
           }
         }
       },
@@ -7292,7 +7300,8 @@
         "required": [
           "fact_id",
           "version",
-          "state"
+          "state",
+          "redacted"
         ],
         "properties": {
           "fact_id": {
@@ -7315,6 +7324,10 @@
               "null"
             ],
             "description": "True for an approximate value, for example \"about 20,000\". It is absent if the state is `unknown`."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the state stays, the value and `approximate` are absent."
           }
         }
       },
@@ -7785,17 +7798,23 @@
         "required": [
           "before",
           "quote",
-          "after"
+          "after",
+          "redacted"
         ],
         "properties": {
           "before": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction of the source (ADR 0072)."
           },
           "quote": {
             "type": "string"
           },
           "after": {
             "type": "string"
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction of the source: the texts are empty (ADR 0072)."
           }
         }
       },
@@ -7807,6 +7826,7 @@
           "field_id",
           "field_key",
           "state",
+          "redacted",
           "version",
           "evidence",
           "accepted_by",
@@ -7837,6 +7857,10 @@
               "null"
             ],
             "description": "True for an approximate value, for example \"about 20,000\". It is absent if the state is `unknown`."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the state stays, the value and `approximate` are absent."
           },
           "version": {
             "type": "integer",
@@ -7923,6 +7947,7 @@
         "required": [
           "source_version_id",
           "passage",
+          "redacted",
           "captured_at"
         ],
         "properties": {
@@ -7931,7 +7956,12 @@
             "format": "uuid"
           },
           "passage": {
-            "$ref": "#/components/schemas/Passage"
+            "$ref": "#/components/schemas/Passage",
+            "description": "Its quote is empty after a legal redaction of the source."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction of the source (ADR 0072)."
           },
           "captured_at": {
             "type": "string",
@@ -9497,7 +9527,8 @@
             "minimum": 0
           },
           "quote": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction of the source (ADR 0072)."
           },
           "page": {
             "type": [
@@ -9888,7 +9919,8 @@
           "captured_at",
           "start_offset",
           "end_offset",
-          "quote"
+          "quote",
+          "redacted"
         ],
         "properties": {
           "record_version": {
@@ -9920,7 +9952,12 @@
             "minimum": 0
           },
           "quote": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction of the source (ADR 0072)."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction of the source: the quote is empty (ADR 0072)."
           },
           "page": {
             "type": [
@@ -9929,6 +9966,42 @@
             ],
             "format": "int32",
             "minimum": 0
+          }
+        }
+      },
+      "RedactedProposal": {
+        "type": "object",
+        "description": "A proposal that a legal redaction emptied (ADR 0072).",
+        "required": [
+          "id",
+          "operation_kind",
+          "depends_on",
+          "status",
+          "redacted"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_kind": {
+            "type": "string",
+            "description": "The kind of the operation, for example `set_fact`."
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The proposals of the same changeset that had to apply before this one."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProposalStatus"
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "Always true."
           }
         }
       },

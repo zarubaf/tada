@@ -645,7 +645,7 @@ async fn a_source_outside_the_citable_reach_of_the_event_renders_hidden() {
     let Resolution::Source(cited) = &links[&format!("tada:source/{source}#4-12")] else {
         panic!("not a source: {links:?}");
     };
-    assert_eq!(cited.passage.quote, "Open Day");
+    assert_eq!(cited.passage.quote.as_present().unwrap(), "Open Day");
     let Resolution::Fact(cited) = &links[&format!("tada:fact/{fact}?v=1")] else {
         panic!("not a fact: {links:?}");
     };

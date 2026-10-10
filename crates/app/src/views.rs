@@ -216,9 +216,13 @@ pub struct FactView {
     pub fact_id: Uuid,
     /// The number of the current fact version.
     pub version: i64,
-    pub value: ValueInput,
+    /// Absent after a legal redaction (ADR 0072).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<ValueInput>,
     /// True for an approximate value, for example "about 20,000".
     pub approximate: bool,
+    /// True after a legal redaction: the value is gone (ADR 0072).
+    pub redacted: bool,
     pub evidence: Vec<EvidenceView>,
     /// The reviewer who accepted the current fact version.
     pub accepted_by: AuthorView,
@@ -274,7 +278,10 @@ pub struct EvidenceView {
     pub start: u32,
     /// The offset after the last character.
     pub end: u32,
+    /// Empty after a legal redaction of the source (ADR 0072).
     pub quote: String,
+    /// True after a legal redaction of the source: the quote is empty (ADR 0072).
+    pub redacted: bool,
     /// The page of a PDF, from 1.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<u32>,
@@ -375,13 +382,16 @@ impl ProfileView {
     }
 }
 
-fn fact_view(entry: &ProfileEntry, valued: &Valued) -> FactView {
+fn fact_view(entry: &ProfileEntry, valued: &Redactable<Valued>) -> FactView {
     FactView {
         field_key: entry.field.key.as_str().to_owned(),
         fact_id: entry.fact_id.as_uuid(),
         version: entry.version.get(),
-        value: ValueInput::from(&valued.value),
-        approximate: valued.approximate,
+        value: valued
+            .as_present()
+            .map(|valued| ValueInput::from(&valued.value)),
+        approximate: valued.as_present().is_some_and(|valued| valued.approximate),
+        redacted: valued.as_present().is_none(),
         evidence: entry.evidence.iter().map(evidence_view).collect(),
         accepted_by: entry.accepted_by.into(),
         accepted_at: entry.accepted_at,
@@ -395,7 +405,13 @@ fn evidence_view(dated: &DatedEvidence) -> EvidenceView {
         source_version_id: evidence.source_version_id.as_uuid(),
         start: evidence.passage.start,
         end: evidence.passage.end,
-        quote: evidence.passage.quote.clone(),
+        quote: evidence
+            .passage
+            .quote
+            .as_present()
+            .cloned()
+            .unwrap_or_default(),
+        redacted: evidence.passage.quote == Redactable::Redacted,
         page: evidence.passage.page,
         captured_at: dated.captured_at,
     }
@@ -775,14 +791,14 @@ mod tests {
             field: field(key),
             fact_id: FactId::from_uuid(Uuid::now_v7()),
             version: RecordVersion::FIRST,
-            state,
+            state: state.map(Redactable::Present),
             evidence: vec![DatedEvidence {
                 evidence: Evidence {
                     source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(30)),
                     passage: Passage {
                         start: 4,
                         end: 12,
-                        quote: "Flugfeld".to_owned(),
+                        quote: Redactable::Present("Flugfeld".to_owned()),
                         page: None,
                     },
                 },

@@ -702,7 +702,7 @@ mod tests {
         let passage = Passage {
             start: hit.start,
             end: hit.end,
-            quote: hit.snippet.clone(),
+            quote: tada_app::domain::redaction::Redactable::Present(hit.snippet.clone()),
             page: None,
         };
         assert_eq!(passage.check(text), Ok(()));

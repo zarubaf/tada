@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{FactId, SourceVersionId};
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::{Evidence, Passage};
 use tada_app::drafts::{CitedFact, LintKind, LintWarning, ProvenanceManifest};
 
@@ -59,7 +60,13 @@ pub(crate) fn manifest_to_json(manifest: &ProvenanceManifest) -> serde_json::Val
                 source_version_id: source.source_version_id.as_uuid(),
                 start: source.passage.start,
                 end: source.passage.end,
-                quote: source.passage.quote.clone(),
+                // A manifest is fixed with its proposal, so its quotes are present (ADR 0051).
+                quote: source
+                    .passage
+                    .quote
+                    .as_present()
+                    .cloned()
+                    .unwrap_or_default(),
             })
             .collect(),
     };
@@ -89,7 +96,7 @@ pub(crate) fn manifest_from_json(
                 passage: Passage {
                     start: source.start,
                     end: source.end,
-                    quote: source.quote,
+                    quote: Redactable::Present(source.quote),
                     page: None,
                 },
             })
@@ -157,7 +164,7 @@ mod tests {
                 passage: Passage {
                     start: 4,
                     end: 12,
-                    quote: "Flugfeld".to_owned(),
+                    quote: tada_app::domain::redaction::Redactable::Present("Flugfeld".to_owned()),
                     page: None,
                 },
             }],

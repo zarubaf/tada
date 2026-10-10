@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT e.fact_version_id, s.captured_at AS \"captured_at: jiff_sqlx::Timestamp\",\n                      e.source_version_id, e.start_offset, e.end_offset, e.quote AS \"quote!\", e.page\n               FROM evidence_link e\n               JOIN source_version s ON s.organization_id = e.organization_id AND s.id = e.source_version_id\n               WHERE e.organization_id = $1 AND e.fact_version_id = ANY($2)\n               ORDER BY e.source_version_id, e.start_offset, e.id",
+  "query": "SELECT e.fact_version_id, s.captured_at AS \"captured_at: jiff_sqlx::Timestamp\",\n                      e.source_version_id, e.start_offset, e.end_offset, e.quote, e.page\n               FROM evidence_link e\n               JOIN source_version s ON s.organization_id = e.organization_id AND s.id = e.source_version_id\n               WHERE e.organization_id = $1 AND e.fact_version_id = ANY($2)\n               ORDER BY e.source_version_id, e.start_offset, e.id",
   "describe": {
     "columns": [
       {
@@ -60,7 +60,7 @@
       },
       {
         "ordinal": 5,
-        "name": "quote!",
+        "name": "quote",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -97,5 +97,5 @@
       true
     ]
   },
-  "hash": "b10161bd39560a80701d293a641b62b1268b5d6d91d7773163d0d966dd17ff34"
+  "hash": "c646b808623b213f7cac473bb4e0ca66ec70fe3f93e4478a3044b1c9ef97eb80"
 }

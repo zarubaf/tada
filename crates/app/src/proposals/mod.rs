@@ -21,6 +21,7 @@ use tada_domain::ids::{
     self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId,
 };
 use tada_domain::proposals::{DependencyError, Operation, Proposal, Reason, check_dependencies};
+use tada_domain::redaction::Redactable;
 use tada_domain::sources::{Evidence, Passage, PassageError, SourceText};
 use uuid::Uuid;
 
@@ -121,9 +122,22 @@ pub struct Changeset {
     /// The source version of the intake text. The evidence of a proposal can also cite other source versions.
     pub source_version_id: SourceVersionId,
     pub created_at: Timestamp,
+    /// The proposals with their content. A proposal that a legal redaction emptied is in `redacted` instead.
     pub proposals: Vec<Proposal>,
+    /// The proposals that a legal redaction emptied (ADR 0072). A review or an apply never sees them.
+    pub redacted: Vec<RedactedProposal>,
     /// The provenance manifest and the lint warnings of each draft proposal, fixed at its creation (ADR 0051).
     pub drafts: Vec<DraftProvenance>,
+}
+
+/// A proposal that a legal redaction emptied (ADR 0072). It keeps its ID, the kind of its operation and the
+/// proposals that it depends on; its values, its reason and its evidence are gone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedactedProposal {
+    pub id: ProposalId,
+    /// The kind of the operation, for example `set_fact`.
+    pub operation_kind: String,
+    pub depends_on: Vec<ProposalId>,
 }
 
 /// The result of `ProposalStore::insert`.
@@ -155,12 +169,12 @@ pub trait ProposalStore: Debug + Send + Sync {
     ) -> Result<Inserted, StoreError>;
 
     /// The changeset `id` of the organization with the normalized text of its source version, or `None`.
-    /// Its proposals and drafts are in the order of their IDs.
+    /// Its proposals and drafts are in the order of their IDs. A legal redaction removes the text (ADR 0072).
     async fn get(
         &self,
         scope: OrgScope,
         id: ChangesetId,
-    ) -> Result<Option<(Changeset, SourceText)>, StoreError>;
+    ) -> Result<Option<(Changeset, Redactable<SourceText>)>, StoreError>;
 }
 
 /// The result of a successful `create_changeset`.
@@ -318,6 +332,7 @@ pub async fn create_changeset(
         source_version_id,
         created_at: clock.now(),
         proposals: proposals.clone(),
+        redacted: Vec::new(),
         drafts,
     };
     let audit = AuditEvent::new(
@@ -353,7 +368,11 @@ struct Intake<'a> {
 impl Intake<'_> {
     /// The stored changeset if it has the same content, else `id` `taken`.
     /// The same author is the same party for the same principal; the channel and the request can differ on a retry.
-    fn existing(&self, (stored, source): (Changeset, SourceText)) -> Result<Created, ProposeError> {
+    /// A redacted stored changeset is never the same as a new intake (ADR 0072).
+    fn existing(
+        &self,
+        (stored, source): (Changeset, Redactable<SourceText>),
+    ) -> Result<Created, ProposeError> {
         let author = |actor: &Actor| (actor.kind(), actor.id(), actor.principal());
         let mut proposals = self.proposals.to_vec();
         proposals.sort_by_key(|proposal| proposal.id);
@@ -374,7 +393,8 @@ impl Intake<'_> {
         };
         let same = stored.event_id == self.event_id
             && author(&stored.author) == author(&self.author)
-            && &source == self.source
+            && source.as_present() == Some(self.source)
+            && stored.redacted.is_empty()
             && stored.proposals.len() == self.proposals.len()
             && stored
                 .proposals
@@ -470,7 +490,7 @@ fn parse(
             let passage = Passage {
                 start: input.start,
                 end: input.end,
-                quote: input.quote,
+                quote: Redactable::Present(input.quote),
                 page: input.page,
             };
             // `check_cited_sources` checks a passage of another source version.
