@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tada_app::dispute_notes::NoteKey;
+use tada_app::dispute_notes::{DisputeNotes, NoteKey};
 use tada_app::domain::ids::{ChangesetId, EventId, LocalIdKind, ProposalId};
 use tada_app::domain::parties::Party as DomainParty;
 use tada_app::domain::proposals::{
@@ -388,12 +388,18 @@ pub struct CurrentFact {
     pub approximate: Option<bool>,
     /// True after a legal redaction (ADR 0072): the state stays, the value and `approximate` are absent.
     pub redacted: bool,
+    /// The dispute notes about the current fact version (ADR 0073), oldest first.
+    /// It is absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schema(required = false)]
+    pub dispute_notes: Vec<DisputeNote>,
 }
 
-impl From<FactVersionRef> for CurrentFact {
-    fn from(current: FactVersionRef) -> Self {
+impl CurrentFact {
+    fn new(current: FactVersionRef, notes: &DisputeNotes) -> Self {
         let (state, value, approximate, redacted) = stored_state_parts(&current.state);
         Self {
+            dispute_notes: shown(notes, &NoteKey::fact_version(current.id)),
             fact_id: current.fact_id.as_uuid(),
             version: current.number.get(),
             state,
@@ -825,7 +831,9 @@ impl From<AppProposalReview> for Proposal {
             routed_to_me: review.routed_to_me,
             can_review: review.can_review,
             conflict_reason: review.conflict.map(ConflictReason::from),
-            current: review.current.map(CurrentFact::from),
+            current: review
+                .current
+                .map(|current| CurrentFact::new(current, &review.dispute_notes)),
             draft: review.draft.map(DraftRendering::from),
             duplicates: review
                 .duplicates

@@ -138,6 +138,23 @@ fn kinds(mentions: &[Value]) -> Vec<&str> {
     kinds
 }
 
+/// The `structuredContent` of an MCP tool call with the API token `token`.
+async fn mcp_tool(world: &World, token: &str, name: &str, arguments: Value) -> Value {
+    let call = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                      "params": {"name": name, "arguments": arguments}});
+    let request = support::request(Method::POST, "/mcp")
+        .header(header::HOST, "tada.example.org")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::ACCEPT, "application/json, text/event-stream")
+        .header("mcp-protocol-version", "2025-06-18")
+        .body(Body::from(call.to_string()))
+        .unwrap();
+    let (response, body) = support::send(&world.owner.router, request).await;
+    assert_eq!(response.status(), StatusCode::OK, "{body}");
+    body["result"]["structuredContent"].clone()
+}
+
 /// A request of `client` with a JSON body.
 async fn call(
     client: &Client,
@@ -451,7 +468,9 @@ async fn only_owner_reads_mentions_exports_redacts_disputes() {
     let token = filled.secrets[3].as_str();
     for (method, path, body) in [
         (Method::GET, mentions.as_str(), None),
+        (Method::GET, export.as_str(), None),
         (Method::POST, "/api/v1/redactions", Some(&redaction)),
+        (Method::POST, "/api/v1/dispute-notes", Some(&note)),
     ] {
         let request = support::request(method, path)
             .header(header::AUTHORIZATION, format!("Bearer {token}"))
@@ -656,4 +675,116 @@ async fn redaction_api_rejects_event_kind() {
             json!({"kind": "promisor", "id": id, "event_id": world.event, "redacted": true, "disputed": false})
         ]
     );
+}
+
+#[tokio::test]
+async fn dispute_notes_reach_mcp_readers_and_the_current_fact_of_a_proposal() {
+    let world = World::start().await;
+    let changeset = world
+        .changeset("Das Open Day ist im Mai 2030.", "im Mai 2030")
+        .await;
+    world.owner.apply(&changeset).await;
+    let item = world.source_item(&changeset).await;
+    let fact_version = world
+        .test
+        .scalar::<Uuid>("SELECT id FROM fact_version")
+        .await;
+    for (kind, id, text) in [
+        ("source-item", item, "Die Quelle ist falsch."),
+        ("fact-version", fact_version, "Der Monat ist falsch."),
+    ] {
+        world
+            .owner
+            .post(
+                "/api/v1/dispute-notes",
+                &json!({"target_kind": kind, "target_id": id, "text": text}),
+            )
+            .await;
+    }
+
+    // An AI client of a member reads the profile through MCP and sees both notes.
+    let expires = jiff::Timestamp::now() + jiff::SignedDuration::from_hours(24);
+    let token = world
+        .owner
+        .post(
+            "/api/v1/tokens",
+            &json!({"name": "Claude Code", "scope": "read", "expires_at": expires.to_string(),
+                    "notice_version_confirmed": 1}),
+        )
+        .await;
+    let token = token["secret"].as_str().unwrap();
+    let profile = mcp_tool(
+        &world,
+        token,
+        "get_event_profile",
+        json!({"event_key": "OPEN30"}),
+    )
+    .await;
+    let fact = &profile["accepted"][0];
+    assert_eq!(
+        fact["dispute_notes"][0]["text"], "Der Monat ist falsch.",
+        "{profile}"
+    );
+    assert_eq!(
+        fact["evidence"][0]["dispute_notes"][0]["text"],
+        "Die Quelle ist falsch."
+    );
+
+    // A second proposal for the fact shows the notes of the current fact version to its reviewer.
+    let second = world
+        .changeset("Das Open Day ist doch im Mai 2030.", "im Mai 2030")
+        .await;
+    let review = world
+        .owner
+        .get(&format!(
+            "/api/v1/changesets/{}",
+            second["id"].as_str().unwrap()
+        ))
+        .await;
+    let current = &review["proposals"][0]["current"];
+    assert_eq!(
+        current["dispute_notes"][0]["text"], "Der Monat ist falsch.",
+        "{review}"
+    );
+}
+
+#[tokio::test]
+async fn a_redaction_of_a_source_item_redacts_its_dispute_notes() {
+    let world = World::start().await;
+    let changeset = world
+        .changeset("Beat Muster kommt im Mai 2030.", "im Mai 2030")
+        .await;
+    let item = world.source_item(&changeset).await;
+    world
+        .owner
+        .post(
+            "/api/v1/dispute-notes",
+            &json!({"target_kind": "source-item", "target_id": item, "text": "Beat Muster bestreitet es."}),
+        )
+        .await;
+    world
+        .owner
+        .post(
+            "/api/v1/redactions",
+            &json!({"targets": [{"kind": "source-item", "id": item}], "reason": "request"}),
+        )
+        .await;
+
+    assert_eq!(
+        world
+            .test
+            .scalar::<i64>(
+                "SELECT count(*) FROM dispute_note WHERE text IS NULL AND redacted_at IS NOT NULL"
+            )
+            .await,
+        1
+    );
+    let review = world
+        .owner
+        .get(&format!(
+            "/api/v1/changesets/{}",
+            changeset["id"].as_str().unwrap()
+        ))
+        .await;
+    assert!(!review.to_string().contains("bestreitet"), "{review}");
 }

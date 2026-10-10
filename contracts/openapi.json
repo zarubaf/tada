@@ -7782,6 +7782,13 @@
           "redacted": {
             "type": "boolean",
             "description": "True after a legal redaction (ADR 0072): the state stays, the value and `approximate` are absent."
+          },
+          "dispute_notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisputeNote"
+            },
+            "description": "The dispute notes about the current fact version (ADR 0073), oldest first.\nIt is absent if there is none."
           }
         }
       },
@@ -8105,6 +8112,19 @@
             "description": "The target of each `tada:` link, by the exact text of its destination.",
             "additionalProperties": {
               "$ref": "#/components/schemas/LinkTarget"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "link_dispute_notes": {
+            "type": "object",
+            "description": "The dispute notes about the fact version or the source of each link that the reader can see (ADR 0073),\nby the same text as `links`, oldest first. A link without a note is not in it; it is absent if no link has one.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/DisputeNote"
+              }
             },
             "propertyNames": {
               "type": "string"
