@@ -53,6 +53,7 @@ pub struct ProposalReview {
     pub routed_to_me: bool,
     /// True if the caller reviews the open proposal now: it is in the Review Inbox of the caller (ADR 0067).
     /// For an event manager, this includes an overdue proposal of another reviewer.
+    /// It is false if the caller cannot review an open dependency that an apply of the proposal accepts with it.
     pub can_review: bool,
     /// Why the proposal conflicts. `None` unless the status is `Conflict`.
     pub conflict: Option<ConflictReason>,
