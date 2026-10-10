@@ -82,6 +82,31 @@ fn note(row: &PgRow) -> Result<DisputeNote, StoreError> {
     })
 }
 
+/// The notes about the targets that a redaction did not remove, oldest first.
+pub(crate) async fn notes_of_targets(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    targets: &[DisputeTarget],
+) -> Result<Vec<DisputeNote>, StoreError> {
+    let kinds: Vec<&str> = targets.iter().map(|target| target.kind.as_str()).collect();
+    let ids: Vec<Uuid> = targets.iter().map(|target| target.id).collect();
+    let rows = sqlx::query(
+        "SELECT n.id, n.target_kind, n.target_id, n.text, n.created_at
+         FROM dispute_note n
+         JOIN (SELECT DISTINCT kind, id FROM unnest($2::text[], $3::uuid[]) AS t(kind, id)) AS t
+             ON n.target_kind = t.kind AND n.target_id = t.id
+         WHERE n.organization_id = $1 AND n.redacted_at IS NULL
+         ORDER BY n.created_at, n.id",
+    )
+    .bind(scope.organization_id().as_uuid())
+    .bind(&kinds)
+    .bind(&ids)
+    .fetch_all(conn)
+    .await
+    .map_err(store_error)?;
+    rows.iter().map(note).collect()
+}
+
 #[async_trait]
 impl DisputeNoteStore for Database {
     async fn target_exists(

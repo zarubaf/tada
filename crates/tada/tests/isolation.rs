@@ -524,6 +524,14 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
             Expect::NotFound,
         )],
         // The person features of an owner (ADR 0073).
+        "list_person_mentions" => vec![get(
+            api(format!("/persons/{}/mentions", t.b_person)),
+            Expect::NotFound,
+        )],
+        "export_person" => vec![get(
+            api(format!("/persons/{}/export", t.b_person)),
+            Expect::NotFound,
+        )],
         "create_dispute_note" => vec![post(
             api("/dispute-notes".into()),
             json!({"target_kind": "proposal", "target_id": t.b_proposal, "text": "Das stimmt nicht."}),

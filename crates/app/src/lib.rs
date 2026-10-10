@@ -25,6 +25,7 @@ pub mod orphans;
 pub mod outbound;
 pub mod paging;
 pub mod parties;
+pub mod person_data;
 pub mod privacy;
 pub mod problem;
 pub mod proposals;

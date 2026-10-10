@@ -96,6 +96,7 @@ pub fn api_state_on(
         parties: database.clone(),
         workstreams: database.clone(),
         work: database.clone(),
+        person_data: database.clone(),
         dispute_notes: database.clone(),
         redaction: database.clone(),
     }
