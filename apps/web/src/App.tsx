@@ -1,15 +1,12 @@
 import { lazy, Suspense } from "react";
 import { type Api, createApi } from "./api/client";
-import { DocumentDiffPage } from "./documents/DocumentDiffPage";
 import { DocumentPage } from "./documents/DocumentPage";
 import { DocumentsPage } from "./documents/DocumentsPage";
 import { CreateEventForm } from "./events/CreateEventForm";
-import { EventMembersPage } from "./events/EventMembersPage";
 import { EventOverview } from "./events/EventOverview";
 import { EventPage } from "./events/EventPage";
 import { EventsPage } from "./events/EventsPage";
 import { NotFoundPage } from "./NotFoundPage";
-import { PartiesPage } from "./parties/PartiesPage";
 import { PrivacyPage } from "./privacy/PrivacyPage";
 import { InboxProvider } from "./review/InboxProvider";
 import { ReviewInbox } from "./review/ReviewInbox";
@@ -49,6 +46,17 @@ const CommitmentsPage = lazy(() =>
 );
 const WorkstreamsPage = lazy(() =>
   import("./work/WorkstreamsPage").then((module) => ({ default: module.WorkstreamsPage })),
+);
+// The register of persons and institutions, the event members and the diff of two document
+// versions are seldom the first screen.
+const PartiesPage = lazy(() =>
+  import("./parties/PartiesPage").then((module) => ({ default: module.PartiesPage })),
+);
+const EventMembersPage = lazy(() =>
+  import("./events/EventMembersPage").then((module) => ({ default: module.EventMembersPage })),
+);
+const DocumentDiffPage = lazy(() =>
+  import("./documents/DocumentDiffPage").then((module) => ({ default: module.DocumentDiffPage })),
 );
 const AccountPage = lazy(() =>
   import("./settings/AccountPage").then((module) => ({ default: module.AccountPage })),
@@ -107,7 +115,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   <Route path="/events/:eventId/members">
                     <EventPage api={api}>
-                      <EventMembersPage api={api} />
+                      <Suspense>
+                        <EventMembersPage api={api} />
+                      </Suspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/documents">
@@ -140,17 +150,23 @@ export function App({ api = defaultApi }: { api?: Api }) {
                     <DocumentPage api={api} />
                   </Route>
                   <Route path="/documents/:documentId/diff">
-                    <DocumentDiffPage api={api} />
+                    <Suspense>
+                      <DocumentDiffPage api={api} />
+                    </Suspense>
                   </Route>
                   <Route path="/privacy">
                     <PrivacyPage api={api} />
                   </Route>
                   {/* The register of persons and institutions */}
                   <Route path="/persons">
-                    <PartiesPage api={api} kind="person" />
+                    <Suspense>
+                      <PartiesPage api={api} kind="person" />
+                    </Suspense>
                   </Route>
                   <Route path="/institutions">
-                    <PartiesPage api={api} kind="institution" />
+                    <Suspense>
+                      <PartiesPage api={api} kind="institution" />
+                    </Suspense>
                   </Route>
                   {/* The Review Inbox */}
                   <Route path="/inbox">
