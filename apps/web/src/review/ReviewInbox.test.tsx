@@ -355,7 +355,8 @@ describe("the list", () => {
     renderAt("/inbox");
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    expect(await within(nav).findByRole("link", { name: /Eingang/ })).toHaveTextContent("3 offen");
+    const link = await within(nav).findByRole("link", { name: /Eingang/ });
+    await waitFor(() => expect(link).toHaveTextContent("3 offen"));
   });
 
   it("shows the empty state when nothing waits", async () => {
