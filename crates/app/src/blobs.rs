@@ -11,8 +11,11 @@ use bytes::Bytes;
 use futures::Stream;
 use futures::stream::BoxStream;
 use jiff::Timestamp;
-use tada_domain::ids::OrganizationId;
+use tada_domain::ids::{OrganizationId, RedactionId};
 use uuid::Uuid;
+
+/// The prefix of the objects of the deletion journal (ADR 0072). The sweep of orphan objects keeps them.
+pub const JOURNAL_PREFIX: &str = "redaction-journal/";
 
 /// A stream of bytes, for an upload or a download. Nothing holds the whole file in memory (ADR 0043).
 pub type ByteStream = Pin<Box<dyn Stream<Item = Result<Bytes, io::Error>> + Send>>;
@@ -38,14 +41,44 @@ impl BlobKey {
         &self.0
     }
 
+    /// The key of the journal object of one redaction (ADR 0072):
+    /// `redaction-journal/{organization_id}/{redaction_id}.json`.
+    pub fn journal(organization_id: OrganizationId, redaction_id: RedactionId) -> Self {
+        Self(format!(
+            "{JOURNAL_PREFIX}{organization_id}/{redaction_id}.json"
+        ))
+    }
+
+    /// The organization and the redaction of a key in the form that `journal` generates,
+    /// or `None` for any other name.
+    pub fn parse_journal(name: &str) -> Option<(OrganizationId, RedactionId)> {
+        let (organization, redaction) = name
+            .strip_prefix(JOURNAL_PREFIX)?
+            .strip_suffix(".json")?
+            .split_once('/')?;
+        let organization = canonical_uuid(organization)?;
+        let redaction = canonical_uuid(redaction)?;
+        Some((
+            OrganizationId::from_uuid(organization),
+            RedactionId::from_uuid(redaction),
+        ))
+    }
+
     /// The key of an object in the form that `new` generates, or `None` for any other name,
     /// for example the objects under the prefix of the deletion journal.
     pub fn parse(name: &str) -> Option<Self> {
         let (organization, object) = name.split_once('/')?;
-        let canonical =
-            |part: &str| Uuid::parse_str(part).is_ok_and(|id| id.hyphenated().to_string() == part);
-        (canonical(organization) && canonical(object)).then(|| Self(name.to_owned()))
+        canonical_uuid(organization)?;
+        canonical_uuid(object)?;
+        Some(Self(name.to_owned()))
     }
+}
+
+/// The UUID of `part` if `part` is its lowercase hyphenated form, the only form that a key holds.
+fn canonical_uuid(part: &str) -> Option<Uuid> {
+    Uuid::parse_str(part)
+        .ok()
+        .filter(|id| id.hyphenated().to_string() == part)
 }
 
 impl Display for BlobKey {
@@ -129,6 +162,35 @@ mod tests {
             "0198f2b0-0000-7000-8000-000000000000/0198f2b0-0000-7000-8000-000000000001/x",
         ] {
             assert_eq!(BlobKey::parse(name), None, "{name}");
+        }
+    }
+
+    #[test]
+    fn a_journal_key_names_its_organization_and_redaction() {
+        let organization = OrganizationId::from_uuid(Uuid::now_v7());
+        let redaction = RedactionId::from_uuid(Uuid::now_v7());
+        let key = BlobKey::journal(organization, redaction);
+        assert_eq!(
+            key.as_str(),
+            format!("redaction-journal/{organization}/{redaction}.json")
+        );
+        assert_eq!(
+            BlobKey::parse_journal(key.as_str()),
+            Some((organization, redaction))
+        );
+        // The sweep of orphan objects never takes a journal object for an upload.
+        assert_eq!(BlobKey::parse(key.as_str()), None);
+        for name in [
+            "redaction-journal/2030-05-18.json",
+            &format!("redaction-journal/{organization}/{redaction}"),
+            &format!("redaction-journal/{organization}/{redaction}.json/x"),
+            &format!("{organization}/{redaction}.json"),
+            &format!(
+                "redaction-journal/{organization}/{}.json",
+                redaction.as_uuid().simple()
+            ),
+        ] {
+            assert_eq!(BlobKey::parse_journal(name), None, "{name}");
         }
     }
 }

@@ -31,10 +31,12 @@ use support::organization::{Client, SOURCE, fill, organization, router};
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
 use tada_adapters::storage::testing::TestGarage;
+use tada_app::blobs::{BlobStore, JOURNAL_PREFIX};
 use tada_app::caller::{OrganizationRole, ServiceCaller, TelegramGateway};
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::outbound::SEND_JOB;
+use tada_app::redaction::JOURNAL_JOB;
 use tada_app::telegram::{TelegramName, TelegramUserId, accept_link_claim, claim_link_code};
 use tada_store_pg::Database;
 use tada_store_pg::testing::TestDatabase;
@@ -83,7 +85,7 @@ const NOT_ORGANIZATION_SCOPED: &[(&str, &str)] = &[
 ];
 
 /// The job kinds that the isolation test runs. Each kind of a handler of the worker needs a case.
-const JOB_KINDS: &[&str] = &[SEND_JOB];
+const JOB_KINDS: &[&str] = &[SEND_JOB, JOURNAL_JOB];
 
 /// The slug and the name of organization B, and a word that only the texts of B hold.
 /// The checks ignore the case of letters.
@@ -735,13 +737,18 @@ fn each_operation_has_an_isolation_case_or_a_reason() {
 }
 
 /// The handlers of the worker, with a mailer into memory.
-fn worker_handlers(database: &Database, mailer: Arc<MemoryMailer>) -> Handlers {
+fn worker_handlers(
+    database: &Database,
+    mailer: Arc<MemoryMailer>,
+    blobs: Arc<dyn BlobStore>,
+) -> Handlers {
     tada::worker::handlers(
         database,
         mailer,
         Arc::new(FluentMailTexts::new().unwrap()),
         Arc::new(SystemClock),
         support::public_url(),
+        blobs,
     )
 }
 
@@ -754,7 +761,12 @@ async fn each_job_kind_of_the_worker_has_an_isolation_case() {
         &SecretString::from("unused"),
     )
     .unwrap();
-    let kinds = worker_handlers(&database, Arc::new(MemoryMailer::new())).kinds();
+    let kinds = worker_handlers(
+        &database,
+        Arc::new(MemoryMailer::new()),
+        Arc::new(support::NoObjectStorage),
+    )
+    .kinds();
     let covered: BTreeSet<&str> = JOB_KINDS.iter().copied().collect();
     assert_eq!(kinds, covered, "each job kind needs an isolation case");
 }
@@ -1459,7 +1471,11 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
         .await;
     let b_rows = rows(&world.test, world.b).await;
     let mailer = Arc::new(MemoryMailer::new());
-    let handlers = worker_handlers(&world.test.database, mailer.clone());
+    let handlers = worker_handlers(
+        &world.test.database,
+        mailer.clone(),
+        Arc::new(world.garage.storage.clone()),
+    );
     let ran = run_next(
         &world.test.database,
         &handlers,
@@ -1477,5 +1493,42 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
         rows(&world.test, world.b).await,
         b_rows,
         "the send job of A changed the rows of B"
+    );
+
+    // A journal job of A with the ID of a redaction of B writes no journal object: the handler reads the
+    // redaction in the organization of the job only.
+    let b_redaction = Uuid::now_v7();
+    world
+        .test
+        .scalar::<i64>(&format!(
+            "WITH r AS (INSERT INTO redaction (id, organization_id, target_kind, target_id, reason, redacted_at)
+                        VALUES ('{b_redaction}', '{}', 'person', '{}', 'request', now()) RETURNING 1),
+                  j AS (INSERT INTO job (id, organization_id, kind, version, payload, run_at, created_at)
+                        VALUES ('{}', '{}', '{JOURNAL_JOB}', 1, '{{\"redaction_id\": \"{b_redaction}\"}}',
+                                now() - interval '1 day', now()) RETURNING 1)
+             SELECT (SELECT count(*) FROM r) + (SELECT count(*) FROM j)",
+            world.b,
+            Uuid::now_v7(),
+            Uuid::now_v7(),
+            world.a,
+        ))
+        .await;
+    let ran = run_next(
+        &world.test.database,
+        &handlers,
+        Uuid::now_v7(),
+        Duration::from_secs(60),
+    )
+    .await
+    .unwrap();
+    assert!(matches!(ran, Ran::Failed(_)), "{ran:?}");
+    assert!(
+        world
+            .garage
+            .keys()
+            .await
+            .iter()
+            .all(|key| !key.starts_with(JOURNAL_PREFIX)),
+        "the journal job of A wrote the redaction of B"
     );
 }

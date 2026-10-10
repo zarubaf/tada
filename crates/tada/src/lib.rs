@@ -4,6 +4,7 @@
 pub mod bootstrap;
 pub mod export;
 pub mod logging;
+pub mod redactions;
 pub mod serve;
 pub mod settings;
 mod shutdown;

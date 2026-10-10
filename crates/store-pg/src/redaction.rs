@@ -22,21 +22,23 @@
 use async_trait::async_trait;
 use jiff_sqlx::{Timestamp as SqlxTimestamp, ToSqlx};
 use serde_json::json;
-use sqlx::PgConnection;
 use sqlx::types::Uuid;
+use sqlx::{PgConnection, Row};
 use tada_app::audit::{AuditAction, AuditEvent};
 use tada_app::blobs::BlobKey;
 use tada_app::caller::{Actor, ActorKind, OrgScope};
 use tada_app::domain::ids::RedactionId;
 use tada_app::domain::redaction::{RedactionReason, RedactionTarget, RedactionTargetKind};
 use tada_app::jobs::NewJob;
-use tada_app::redaction::{JOURNAL_JOB, Redaction, RedactionOutcome, RedactionStore};
+use tada_app::redaction::{
+    JOURNAL_JOB, Redaction, RedactionOutcome, RedactionStore, Refused, Replayed,
+};
 use tada_app::store::StoreError;
 
 use crate::Database;
 use crate::actor;
 use crate::audit::record;
-use crate::error::store_error;
+use crate::error::{InvalidRow, store_error};
 use crate::jobs::enqueue;
 
 /// The IDs of the rows that one target covers, for each table.
@@ -593,6 +595,49 @@ async fn apply(
     Ok(blob_keys)
 }
 
+/// True if the event is closed. Only a closed event can be redacted (ADR 0071).
+async fn event_is_closed(
+    conn: &mut PgConnection,
+    organization: Uuid,
+    event: Uuid,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar("SELECT status = 'closed' FROM event WHERE organization_id = $1 AND id = $2")
+        .bind(organization)
+        .bind(event)
+        .fetch_one(conn)
+        .await
+}
+
+/// Closes the event of a replayed event redaction if it is open, with the audit event `event.close`.
+/// The close time is the time of the redaction, unless the event has one.
+async fn close_for_replay(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    redaction: &Redaction,
+    actor: &Actor,
+) -> Result<(), sqlx::Error> {
+    let closed: Option<Uuid> = sqlx::query_scalar(
+        "UPDATE event SET status = 'closed', closed_at = coalesce(closed_at, $3), version = version + 1
+         WHERE organization_id = $1 AND id = $2 AND status <> 'closed'
+         RETURNING id",
+    )
+    .bind(scope.organization_id().as_uuid())
+    .bind(redaction.target.id)
+    .bind(redaction.redacted_at.to_sqlx())
+    .fetch_optional(&mut *conn)
+    .await?;
+    match closed {
+        Some(event) => {
+            record(
+                conn,
+                &AuditEvent::new(*actor, AuditAction::EventClose, Some(event), Some(scope)),
+            )
+            .await
+        }
+        None => Ok(()),
+    }
+}
+
 /// The time of the transaction: the time of each tombstone of the redaction.
 async fn transaction_time(conn: &mut PgConnection) -> Result<jiff::Timestamp, sqlx::Error> {
     let now: SqlxTimestamp = sqlx::query_scalar("SELECT now()").fetch_one(conn).await?;
@@ -607,7 +652,7 @@ impl RedactionStore for Database {
         targets: &[RedactionTarget],
         reason: RedactionReason,
         actor: &Actor,
-    ) -> Result<Option<RedactionOutcome>, StoreError> {
+    ) -> Result<Result<RedactionOutcome, Refused>, StoreError> {
         let organization = scope.organization_id();
         let mut tx = begin(self).await.map_err(store_error)?;
         let redacted_at = transaction_time(&mut tx).await.map_err(store_error)?;
@@ -624,8 +669,16 @@ impl RedactionStore for Database {
                 .map_err(store_error)?
             {
                 // The transaction rolls back when it drops.
-                None => return Ok(None),
+                None => return Ok(Err(Refused::NotFound)),
                 Some(true) => outcome.already += 1,
+                Some(false)
+                    if target.kind == RedactionTargetKind::Event
+                        && !event_is_closed(&mut tx, organization.as_uuid(), target.id)
+                            .await
+                            .map_err(store_error)? =>
+                {
+                    return Ok(Err(Refused::EventNotClosed));
+                }
                 Some(false) => {
                     let redaction = Redaction {
                         id: RedactionId::from_uuid(Uuid::now_v7()),
@@ -656,7 +709,7 @@ impl RedactionStore for Database {
             }
         }
         tx.commit().await.map_err(store_error)?;
-        Ok(Some(outcome))
+        Ok(Ok(outcome))
     }
 
     async fn is_redacted(
@@ -670,5 +723,70 @@ impl RedactionStore for Database {
             .await
             .map_err(store_error)?;
         Ok(redacted.unwrap_or(false))
+    }
+
+    async fn redaction(
+        &self,
+        scope: OrgScope,
+        id: RedactionId,
+    ) -> Result<Option<Redaction>, StoreError> {
+        let row = sqlx::query(
+            "SELECT target_kind, target_id, reason, redacted_at FROM redaction
+             WHERE organization_id = $1 AND id = $2",
+        )
+        .bind(scope.organization_id().as_uuid())
+        .bind(id.as_uuid())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let kind: String = row.try_get("target_kind").map_err(store_error)?;
+        let reason: String = row.try_get("reason").map_err(store_error)?;
+        let redacted_at: SqlxTimestamp = row.try_get("redacted_at").map_err(store_error)?;
+        Ok(Some(Redaction {
+            id,
+            organization_id: scope.organization_id(),
+            target: RedactionTarget {
+                kind: kind.parse().map_err(|_| InvalidRow("target_kind"))?,
+                id: row.try_get("target_id").map_err(store_error)?,
+            },
+            reason: reason.parse().map_err(|_| InvalidRow("reason"))?,
+            redacted_at: redacted_at.to_jiff(),
+        }))
+    }
+
+    async fn replay(
+        &self,
+        scope: OrgScope,
+        redaction: &Redaction,
+        actor: &Actor,
+    ) -> Result<Replayed, StoreError> {
+        let mut tx = begin(self).await.map_err(store_error)?;
+        let replayed = match state(&mut tx, scope.organization_id().as_uuid(), redaction.target)
+            .await
+            .map_err(store_error)?
+        {
+            None => Replayed::Missing,
+            Some(true) => Replayed::Already,
+            Some(false) => {
+                // A retention redaction needs a closed event. A backup from before the close holds the event
+                // open, so the replay closes it first, at the time of the redaction if it has no close time.
+                if redaction.target.kind == RedactionTargetKind::Event {
+                    close_for_replay(&mut tx, scope, redaction, actor)
+                        .await
+                        .map_err(store_error)?;
+                }
+                // The journal does not name the member who redacted, so the row names no one.
+                Replayed::Applied(
+                    apply(&mut tx, scope, redaction, None, actor)
+                        .await
+                        .map_err(store_error)?,
+                )
+            }
+        };
+        tx.commit().await.map_err(store_error)?;
+        Ok(replayed)
     }
 }

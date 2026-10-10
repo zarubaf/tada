@@ -277,13 +277,20 @@ impl TestDatabase {
     /// # Panics
     ///
     /// If a statement fails.
-    #[allow(clippy::unwrap_used)]
     pub async fn redact(&self, statements: &[&str]) {
+        self.execute(&[&["SET LOCAL tada.redaction = 'on'"], statements].concat())
+            .await;
+    }
+
+    /// Runs `statements` in one transaction, for a test outside this crate that changes rows as no command can,
+    /// for example a restore of a backup.
+    ///
+    /// # Panics
+    ///
+    /// If a statement fails.
+    #[allow(clippy::unwrap_used)]
+    pub async fn execute(&self, statements: &[&str]) {
         let mut tx = self.database.pool.begin().await.unwrap();
-        sqlx::query("SET LOCAL tada.redaction = 'on'")
-            .execute(&mut *tx)
-            .await
-            .unwrap();
         for statement in statements {
             // A test writes the statements; they hold no input from outside.
             sqlx::query(AssertSqlSafe((*statement).to_owned()))

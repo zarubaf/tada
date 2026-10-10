@@ -6,6 +6,7 @@ use std::time::Duration;
 use anyhow::Context;
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
+use tada_app::blobs::BlobStore;
 use tada_app::caller::{JobRunner, ServiceCaller};
 use tada_app::clock::Clock;
 use tada_app::housekeeping::HousekeepingStore;
@@ -15,6 +16,7 @@ use tada_app::orphans;
 use tada_app::outbound::SendOutbound;
 use tada_app::public_url::PublicUrl;
 use tada_app::rate_limit::WINDOW;
+use tada_app::redaction::WriteRedactionJournal;
 use tada_store_pg::Database;
 use uuid::Uuid;
 
@@ -39,9 +41,13 @@ pub fn handlers(
     texts: Arc<dyn MailTexts>,
     clock: Arc<dyn Clock>,
     public_url: PublicUrl,
+    blobs: Arc<dyn BlobStore>,
 ) -> Handlers {
     let send = SendOutbound::new(Arc::new(db.clone()), mailer, texts, clock, public_url);
-    Handlers::default().with(Arc::new(send))
+    let journal = WriteRedactionJournal::new(Arc::new(db.clone()), blobs);
+    Handlers::default()
+        .with(Arc::new(send))
+        .with(Arc::new(journal))
 }
 
 pub async fn run(
@@ -59,14 +65,15 @@ pub async fn run(
     })
     .context("invalid mail settings")?;
     let texts = FluentMailTexts::new().context("invalid mail texts")?;
+    let blobs = Arc::new(storage.open());
     let handlers = handlers(
         &db,
         Arc::new(mailer),
         Arc::new(texts),
         Arc::new(SystemClock),
         public_url,
+        blobs.clone(),
     );
-    let blobs = storage.open();
     let worker_id = Uuid::now_v7();
     tracing::info!(%worker_id, "worker started");
 
@@ -97,7 +104,7 @@ pub async fn run(
             }
         }
         if let Some(day) = orphan_sweep.due(now) {
-            match orphans::sweep(&blobs, &db, now).await {
+            match orphans::sweep(blobs.as_ref(), &db, now).await {
                 Ok(report) => {
                     tracing::info!(
                         deleted = report.deleted,

@@ -66,6 +66,8 @@ Deletion journal:
 - The object holds the redaction ID, the organization ID, the target kind and ID, the reason and the time. It holds no content.
 - The journal objects are append-only. Only the redaction job writes them.
 - The command `tada redactions replay` reads all journal objects, applies each redaction that is not yet applied in time order, and prints the counts. It is idempotent.
+- The replay acts as the service identity `redaction-replay`. It writes the `redaction` row with the ID, the reason and the time of the journal, and without an actor, because the journal does not name the member.
+- A restored database can hold open an event that the retention job redacted. The replay then closes the event first, with the audit event `event.close`, at the time of the redaction if the event has no close time. Outside the replay, a redaction of an open event is an invalid transition.
 - The operator keeps the journal objects out of a restore of the object storage and runs the replay after each restore ([ADR 0033](0033-deployment-outside-this-repository.md)).
 
 ## Consequences

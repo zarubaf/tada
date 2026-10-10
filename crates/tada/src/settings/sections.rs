@@ -27,6 +27,8 @@ pub type TelegramSettings = (Database, Telegram);
 pub type BootstrapSettings = (Database, PublicUrl);
 /// The settings of `tada export` (ADR 0059).
 pub type ExportSettings = (Database, Storage);
+/// The settings of `tada redactions replay` (ADR 0072).
+pub type RedactionsSettings = (Database, Storage);
 /// The settings of `tada migrate`.
 pub type MigrateSettings = (Database,);
 

@@ -7,7 +7,7 @@
 use tada_app::caller::{MemberCaller, OrgScope, OrganizationRole};
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::domain::redaction::{RedactionReason, RedactionTarget, RedactionTargetKind};
-use tada_app::redaction::{JOURNAL_JOB, RedactionOutcome, RedactionStore};
+use tada_app::redaction::{JOURNAL_JOB, RedactionOutcome, RedactionStore, Refused};
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
@@ -445,6 +445,93 @@ async fn redact_person_clears_contact_and_link() {
     );
 }
 
+/// The proposals that created a person or an institution copy its name and contact details.
+/// A redaction of the party redacts them too, so no copy stays at the level of the organization.
+#[tokio::test]
+async fn redact_person_and_institution_clears_the_proposals_that_created_them() {
+    let test = database().await;
+    let changeset = "0190a000-0000-7000-8000-0000000001c1";
+    let create_person = "0190a000-0000-7000-8000-0000000001c2";
+    let create_institution = "0190a000-0000-7000-8000-0000000001c3";
+    const INSTITUTION: &str = "0190a000-0000-7000-8000-000000000112";
+    test.execute(&[
+        &format!(
+            "INSERT INTO changeset (id, organization_id, event_id, author, source_version_id, created_at)
+             VALUES ('{changeset}', '{ORGANIZATION}', NULL,
+                     '{{\"kind\": \"member\", \"id\": \"{OWNER}\", \"principal\": null, \"channel\": \"web\", \"request_id\": null}}',
+                     '0190a000-0000-7000-8000-000000000012', '2030-05-06T07:00:00Z')"
+        ),
+        &format!(
+            "INSERT INTO proposal
+                 (id, organization_id, changeset_id, event_id, operation, operation_version, target_kind, target_id,
+                  expected_version, reason, created_at)
+             VALUES
+                 ('{create_person}', '{ORGANIZATION}', '{changeset}', NULL,
+                  '{{\"kind\": \"create_person\", \"id\": \"{PERSON}\", \"name\": \"Max Muster\",
+                    \"email\": \"max@example.org\", \"phone\": \"+41 00 000 00 00\"}}',
+                  1, 'person', '{PERSON}', NULL, 'Max Muster ist der Kontakt.', '2030-05-06T07:00:00Z'),
+                 ('{create_institution}', '{ORGANIZATION}', '{changeset}', NULL,
+                  '{{\"kind\": \"create_institution\", \"id\": \"{INSTITUTION}\", \"name\": \"Gemeinde Testwil\",
+                    \"institution_kind\": \"authority\", \"email\": \"gemeinde@example.org\", \"phone\": null}}',
+                  1, 'institution', '{INSTITUTION}', NULL, 'Die Gemeinde Testwil bewilligt.', '2030-05-06T07:00:00Z')"
+        ),
+        &format!(
+            "INSERT INTO review_result (id, organization_id, proposal_id, result, reviewer, created_at)
+             SELECT gen_random_uuid(), '{ORGANIZATION}', p, 'accepted',
+                    '{{\"kind\": \"member\", \"id\": \"{OWNER}\", \"principal\": null, \"channel\": \"web\", \"request_id\": null}}',
+                    '2030-05-06T08:00:00Z'
+             FROM unnest(ARRAY['{create_person}', '{create_institution}']::uuid[]) AS p"
+        ),
+    ])
+    .await;
+
+    redact(
+        &test,
+        &[
+            target(RedactionTargetKind::Person, PERSON),
+            target(RedactionTargetKind::Institution, INSTITUTION),
+        ],
+        RedactionReason::Request,
+    )
+    .await;
+
+    for (proposal, kind) in [
+        (create_person, "create_person"),
+        (create_institution, "create_institution"),
+    ] {
+        assert_eq!(
+            test.scalar::<serde_json::Value>(&format!(
+                "SELECT jsonb_build_object('operation', operation, 'reason', reason,
+                                           'redacted', redacted_at IS NOT NULL)
+                 FROM proposal WHERE id = '{proposal}'"
+            ))
+            .await,
+            serde_json::json!({"operation": {"kind": kind}, "reason": null, "redacted": true}),
+        );
+    }
+    for text in [
+        "Max Muster",
+        "max@example.org",
+        "+41 00 000 00 00",
+        "Testwil",
+        "gemeinde@",
+    ] {
+        assert_eq!(
+            count(
+                &test,
+                &format!(
+                    "SELECT count(*) FROM proposal
+                     WHERE target_kind IN ('person', 'institution')
+                       AND (operation::text LIKE '%{text}%' OR reason LIKE '%{text}%')"
+                )
+            )
+            .await,
+            0,
+            "{text} is gone from the proposals"
+        );
+    }
+}
+
 #[tokio::test]
 async fn redact_twice_is_noop() {
     let test = database().await;
@@ -626,7 +713,7 @@ async fn a_target_of_another_organization_is_not_found() {
         )
         .await
         .unwrap();
-    assert_eq!(outcome, None);
+    assert_eq!(outcome, Err(Refused::NotFound));
     // A missing target among others changes nothing.
     let outcome = test
         .database
@@ -644,7 +731,7 @@ async fn a_target_of_another_organization_is_not_found() {
         )
         .await
         .unwrap();
-    assert_eq!(outcome, None);
+    assert_eq!(outcome, Err(Refused::NotFound));
     assert_eq!(count(&test, "SELECT count(*) FROM redaction").await, 0);
     assert_eq!(
         count(
@@ -661,5 +748,100 @@ async fn a_target_of_another_organization_is_not_found() {
         )
         .await,
         0
+    );
+}
+
+#[tokio::test]
+async fn redacting_an_open_event_is_refused() {
+    let test = database().await;
+    let outcome = test
+        .database
+        .redact(
+            scope(),
+            &[
+                target(RedactionTargetKind::Person, PERSON),
+                target(RedactionTargetKind::Event, EVENT),
+            ],
+            RedactionReason::Retention,
+            &owner().actor(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(outcome, Err(Refused::EventNotClosed));
+    assert_eq!(count(&test, "SELECT count(*) FROM redaction").await, 0);
+    assert_eq!(
+        count(
+            &test,
+            "SELECT count(*) FROM person WHERE redacted_at IS NOT NULL"
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        count(
+            &test,
+            "SELECT count(*) FROM source_version WHERE redacted_at IS NOT NULL"
+        )
+        .await,
+        0
+    );
+}
+
+/// A writer that cites a source version holds `FOR SHARE` on it until its commit. A redaction that starts then
+/// waits, and its cascade covers the row that the writer added (ADR 0072).
+#[tokio::test]
+async fn a_redaction_waits_for_a_citing_writer_and_covers_its_row() {
+    let test = database().await;
+    let mut writer = test.pool().begin().await.unwrap();
+    let redacted: Vec<bool> = sqlx::query_scalar(
+        "SELECT redacted_at IS NOT NULL FROM source_version WHERE source_item_id = $1 ORDER BY id FOR SHARE",
+    )
+    .bind(uuid(MEMBER_TEXT))
+    .fetch_all(&mut *writer)
+    .await
+    .unwrap();
+    assert_eq!(redacted, [false, false]);
+    sqlx::query(
+        "INSERT INTO proposal_evidence (id, organization_id, proposal_id, source_version_id, start_offset, end_offset, quote)
+         VALUES ($1, $2, '0190a000-0000-7000-8000-000000000043', '0190a000-0000-7000-8000-000000000012', 35, 52,
+                 'Flieg mit Testwil')",
+    )
+    .bind(Uuid::now_v7())
+    .bind(uuid(ORGANIZATION))
+    .execute(&mut *writer)
+    .await
+    .unwrap();
+
+    let database = test.database.clone();
+    let redacting = tokio::spawn(async move {
+        database
+            .redact(
+                scope(),
+                &[target(RedactionTargetKind::SourceItem, MEMBER_TEXT)],
+                RedactionReason::Request,
+                &owner().actor(),
+            )
+            .await
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    assert!(
+        !redacting.is_finished(),
+        "the redaction waits for the writer"
+    );
+    writer.commit().await.unwrap();
+    redacting.await.unwrap().unwrap().unwrap();
+
+    assert_eq!(
+        count(
+            &test,
+            "SELECT count(*) FROM proposal_evidence WHERE quote IS NOT NULL"
+        )
+        .await,
+        0,
+        "the row of the writer is a tombstone too"
+    );
+    assert_eq!(
+        count(&test, "SELECT count(*) FROM proposal_evidence").await,
+        6
     );
 }
