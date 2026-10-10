@@ -206,6 +206,9 @@ mod tests {
                 "web",
                 r#"{"old_role": "member", "new_role": null}"#,
             ),
+            ("member", "web", r#"{"reason": "mood"}"#),
+            ("member", "web", r#"{"reason": null}"#),
+            ("member", "web", r#"{"reason": 1}"#),
             ("robot", "web", "null"),
             ("member", "fax", "null"),
         ] {
@@ -223,5 +226,15 @@ mod tests {
             .unwrap_err();
             assert_eq!(crate::testing::sqlstate(&error), "23514", "{detail}");
         }
+        // The reason of a redaction is the one other key (ADR 0072).
+        sqlx::query(
+            r#"INSERT INTO audit_event
+                   (id, occurred_at, actor_kind, actor_id, channel, action, record_kind, detail)
+               VALUES ($1, now(), 'service', $1, 'job', 'event.redact', 'event', '{"reason": "retention"}')"#,
+        )
+        .bind(Uuid::now_v7())
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
     }
 }

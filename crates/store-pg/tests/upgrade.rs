@@ -1,8 +1,8 @@
 //! The schema upgrade test (ADR 0006): data at an old schema keeps its values through all later migrations.
 //!
-//! The test applies the migrations up to `CUT`, loads the fixture of that schema, and then upgrades the database
+//! Each test applies the migrations up to a cut, loads the fixtures of that schema, and then upgrades the database
 //! as `tada migrate` does.
-//! Each later slice moves the cut to its own last migration and adds a fixture of that schema.
+//! A later slice that changes the schema of existing rows adds a cut at its own last migration and a fixture.
 //! The old fixtures stay, so each schema of a release keeps a test.
 
 // The helpers of this test file are not `#[test]` functions, so clippy.toml does not cover them.
@@ -15,12 +15,12 @@ use sqlx::{AssertSqlSafe, PgPool};
 use tada_app::domain::facts::{CORE_CATALOG_VERSION, core_catalog};
 use tada_store_pg::testing::TestDatabase;
 
-/// The last migration of the fixture schema.
+/// Invented data of one organization at the schema of migration 0015.
 /// Documents come in migration 0014 and drafts in 0015, so the fixture cannot be older.
-const CUT: i64 = 15;
+const FIXTURE_0015: &str = include_str!("fixtures/0015.sql");
 
-/// Invented data of one organization at the schema of `CUT`.
-const FIXTURE: &str = include_str!("fixtures/0015.sql");
+/// Invented work records and parties at the schema of migration 0025. It adds to `FIXTURE_0015`.
+const FIXTURE_0025: &str = include_str!("fixtures/0025.sql");
 
 /// The rows of each table, as JSON text in a fixed order, with the columns of each table at the cut only.
 type Snapshot = BTreeMap<String, Vec<String>>;
@@ -64,8 +64,9 @@ async fn text(pool: &PgPool, sql: &'static str) -> Vec<String> {
     sqlx::query_scalar(sql).fetch_all(pool).await.unwrap()
 }
 
-#[tokio::test]
-async fn an_upgrade_keeps_the_concept_the_sources_the_relationships_and_the_old_versions() {
+/// Applies the migrations up to `cut`, loads the fixtures, and upgrades the database as `tada migrate` does.
+/// Each row of the fixtures keeps the values of the columns of the old schema.
+async fn upgrade_keeps_rows(cut: i64, fixtures: &[&'static str]) -> TestDatabase {
     let test = TestDatabase::start_empty().await;
     let pool = test.pool();
 
@@ -73,20 +74,22 @@ async fn an_upgrade_keeps_the_concept_the_sources_the_relationships_and_the_old_
     let all = sqlx::migrate!();
     let old = Migrator::with_migrations(
         all.iter()
-            .filter(|migration| migration.version <= CUT)
+            .filter(|migration| migration.version <= cut)
             .cloned()
             .collect(),
     );
     assert!(
-        old.iter().any(|migration| migration.version == CUT),
+        old.iter().any(|migration| migration.version == cut),
         "the cut names a migration"
     );
     assert!(
-        all.iter().any(|migration| migration.version > CUT),
+        all.iter().any(|migration| migration.version > cut),
         "the upgrade applies at least one migration"
     );
     old.run(pool).await.unwrap();
-    sqlx::raw_sql(FIXTURE).execute(pool).await.unwrap();
+    for fixture in fixtures {
+        sqlx::raw_sql(*fixture).execute(pool).await.unwrap();
+    }
 
     let old_columns = columns(pool).await;
     let before = snapshot(pool, &old_columns).await;
@@ -121,6 +124,14 @@ async fn an_upgrade_keeps_the_concept_the_sources_the_relationships_and_the_old_
             assert!(shipped_field, "the upgrade added a row to {table}: {row}");
         }
     }
+
+    test
+}
+
+#[tokio::test]
+async fn an_upgrade_keeps_the_concept_the_sources_the_relationships_and_the_old_versions() {
+    let test = upgrade_keeps_rows(15, &[FIXTURE_0015]).await;
+    let pool = test.pool();
 
     // The concept: the old version and the approved version, with their Markdown.
     assert_eq!(
@@ -216,5 +227,57 @@ async fn an_upgrade_keeps_the_concept_the_sources_the_relationships_and_the_old_
             "1 0190a000-0000-7000-8000-000000000001/0190a000-0000-7000-8000-000000000192",
             "2 0190a000-0000-7000-8000-000000000001/0190a000-0000-7000-8000-000000000193",
         ]
+    );
+}
+
+/// The work records and parties of Slice 2a keep their values, and the new columns of migration 0026 start
+/// with an active event, no retention and no redaction.
+#[tokio::test]
+async fn upgrade_from_0025_keeps_rows() {
+    let test = upgrade_keeps_rows(25, &[FIXTURE_0015, FIXTURE_0025]).await;
+    let pool = test.pool();
+
+    assert_eq!(
+        text(
+            pool,
+            "SELECT status || ' ' || (closed_at IS NULL) || ' ' || (redacted_at IS NULL) FROM event"
+        )
+        .await,
+        ["active true true"]
+    );
+    assert_eq!(
+        text(
+            pool,
+            "SELECT coalesce(retention_closed_event_months::text, 'off') || ' '
+                    || coalesce(retention_source_months::text, 'off') FROM organization"
+        )
+        .await,
+        ["off off"]
+    );
+    let redacted: i64 = sqlx::query_scalar(
+        "SELECT (SELECT count(*) FROM source_item WHERE redacted_at IS NOT NULL)
+              + (SELECT count(*) FROM source_version WHERE redacted_at IS NOT NULL)
+              + (SELECT count(*) FROM fact_version WHERE redacted_at IS NOT NULL)
+              + (SELECT count(*) FROM proposal WHERE redacted_at IS NOT NULL)
+              + (SELECT count(*) FROM document_version WHERE redacted_at IS NOT NULL)
+              + (SELECT count(*) FROM record_evidence WHERE redacted_at IS NOT NULL)
+              + (SELECT count(*) FROM person WHERE redacted_at IS NOT NULL)
+              + (SELECT count(*) FROM commitment WHERE redacted_at IS NOT NULL)
+              + (SELECT count(*) FROM redaction)
+              + (SELECT count(*) FROM dispute_note)",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(redacted, 0);
+    assert_eq!(
+        text(
+            pool,
+            "SELECT c.text || ' / ' || p.name || ' / ' || e.quote
+             FROM commitment c JOIN person p ON p.id = c.person_id
+             JOIN record_evidence e ON e.commitment_id = c.id"
+        )
+        .await,
+        ["Bringt die Tische / Max Muster / Flieg mit Testwil"]
     );
 }

@@ -45,6 +45,7 @@ ALLOWED = {
 ALLOWED_COLUMNS = {
     "worker_heartbeat.queue_depth": "The number of due jobs. No data about a person.",
     "worker_heartbeat.oldest_due_seconds": "The age of the oldest due job. No data about a person.",
+    "source_item.redacted_at": "The time of a legal redaction of the item (ADR 0072). No data about a person.",
 }
 
 # Any `CREATE TABLE`, also with a modifier. The name after it must then be readable, or the check fails.

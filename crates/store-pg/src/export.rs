@@ -62,12 +62,21 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "storage_quota_bytes",
             "privacy_notice",
             "privacy_notice_version",
+            "retention_closed_event_months",
+            "retention_source_months",
         ],
     ),
     exported(
         "app_user",
         Rows::OfUsers("id"),
-        &["id", "display_name", "locale", "created_at"],
+        &[
+            "id",
+            "display_name",
+            "locale",
+            "created_at",
+            "membership_ended_at",
+            "anonymized_at",
+        ],
     ),
     exported(
         "email_identity",
@@ -106,6 +115,9 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "time_zone",
             "version",
             "created_at",
+            "status",
+            "closed_at",
+            "redacted_at",
         ],
     ),
     exported(
@@ -215,7 +227,14 @@ pub(crate) const EXPORTED: &[Exported] = &[
     exported(
         "source_item",
         Rows::OfOrganization,
-        &["id", "organization_id", "event_id", "kind", "created_at"],
+        &[
+            "id",
+            "organization_id",
+            "event_id",
+            "kind",
+            "created_at",
+            "redacted_at",
+        ],
     ),
     exported(
         "source_version",
@@ -232,6 +251,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "url",
             "retrieved_at",
             "captured_at",
+            "redacted_at",
         ],
     ),
     exported(
@@ -263,6 +283,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "created_at",
             "manifest",
             "lint_warnings",
+            "redacted_at",
         ],
     ),
     exported(
@@ -287,6 +308,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "end_offset",
             "quote",
             "page",
+            "redacted_at",
         ],
     ),
     exported(
@@ -321,6 +343,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "created_at",
             "accepted_by",
             "proposal_id",
+            "redacted_at",
         ],
     ),
     exported(
@@ -335,6 +358,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "end_offset",
             "quote",
             "page",
+            "redacted_at",
         ],
     ),
     exported(
@@ -350,6 +374,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "status",
             "version",
             "created_at",
+            "redacted_at",
         ],
     ),
     exported(
@@ -364,6 +389,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "owner_user_id",
             "created_at",
             "version",
+            "redacted_at",
         ],
     ),
     exported(
@@ -387,6 +413,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "approved_by",
             "approved_at",
             "markdown",
+            "redacted_at",
         ],
     ),
     exported(
@@ -424,6 +451,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "version",
             "created_at",
             "updated_at",
+            "redacted_at",
         ],
     ),
     exported(
@@ -440,6 +468,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "version",
             "created_at",
             "updated_at",
+            "redacted_at",
         ],
     ),
     exported(
@@ -455,6 +484,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "version",
             "created_at",
             "updated_at",
+            "redacted_at",
         ],
     ),
     exported(
@@ -474,6 +504,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "version",
             "created_at",
             "updated_at",
+            "redacted_at",
         ],
     ),
     exported(
@@ -496,6 +527,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "version",
             "created_at",
             "updated_at",
+            "redacted_at",
         ],
     ),
     exported(
@@ -515,6 +547,34 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "end_offset",
             "quote",
             "page",
+            "redacted_at",
+        ],
+    ),
+    exported(
+        "redaction",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "target_kind",
+            "target_id",
+            "reason",
+            "actor_id",
+            "redacted_at",
+        ],
+    ),
+    exported(
+        "dispute_note",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "target_kind",
+            "target_id",
+            "text",
+            "author_id",
+            "created_at",
+            "redacted_at",
         ],
     ),
 ];

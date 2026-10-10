@@ -61,6 +61,30 @@ pub enum AuditAction {
     CommitmentChange,
     /// A conditional commitment became firm. The commitment keeps the reason; the event holds no text (ADR 0068).
     CommitmentFirm,
+    /// An event manager, owner or admin closed an event (ADR 0071).
+    EventClose,
+    /// An owner or admin reopened a closed event (ADR 0071).
+    EventReopen,
+    /// An owner changed the retention periods of the organization (ADR 0071).
+    OrganizationSetRetention,
+    /// A legal redaction of a source item and all its versions (ADR 0072). The detail names the reason.
+    SourceItemRedact,
+    /// A legal redaction of a fact version (ADR 0072). The detail names the reason.
+    FactVersionRedact,
+    /// A legal redaction of a document version (ADR 0072). The detail names the reason.
+    DocumentVersionRedact,
+    /// A legal redaction of a proposal (ADR 0072). The detail names the reason.
+    ProposalRedact,
+    /// A legal redaction of a person (ADR 0072). The detail names the reason.
+    PersonRedact,
+    /// A legal redaction of an institution (ADR 0072). The detail names the reason.
+    InstitutionRedact,
+    /// The retention job redacted a closed event (ADR 0071, ADR 0072). The detail names the reason.
+    EventRedact,
+    /// An owner exported the data about a person (ADR 0073).
+    PersonExport,
+    /// An owner added a dispute note to immutable evidence (ADR 0073). The event holds no text.
+    DisputeNoteCreate,
 }
 
 impl AuditAction {
@@ -100,13 +124,27 @@ impl AuditAction {
             Self::CommitmentCreate => "commitment.create",
             Self::CommitmentChange => "commitment.change",
             Self::CommitmentFirm => "commitment.firm",
+            Self::EventClose => "event.close",
+            Self::EventReopen => "event.reopen",
+            Self::OrganizationSetRetention => "organization.set_retention",
+            Self::SourceItemRedact => "source_item.redact",
+            Self::FactVersionRedact => "fact_version.redact",
+            Self::DocumentVersionRedact => "document_version.redact",
+            Self::ProposalRedact => "proposal.redact",
+            Self::PersonRedact => "person.redact",
+            Self::InstitutionRedact => "institution.redact",
+            Self::EventRedact => "event.redact",
+            Self::PersonExport => "person.export",
+            Self::DisputeNoteCreate => "dispute_note.create",
         }
     }
 
     /// The kind of the record that `record_id` identifies.
     pub fn record_kind(self) -> &'static str {
         match self {
-            Self::OrganizationCreate | Self::OrganizationSetPrivacyNotice => "organization",
+            Self::OrganizationCreate
+            | Self::OrganizationSetPrivacyNotice
+            | Self::OrganizationSetRetention => "organization",
             Self::InvitationCreate
             | Self::InvitationRevoke
             | Self::InvitationAccept
@@ -116,23 +154,35 @@ impl AuditAction {
             Self::OrganizationMembershipRemove | Self::OrganizationMembershipEndSessions => {
                 "organization_membership"
             }
-            Self::EventCreate => "event",
+            Self::EventCreate | Self::EventClose | Self::EventReopen | Self::EventRedact => "event",
             // An event membership has no ID of its own: the record ID is its event,
             // and the subject is its member.
             Self::EventMembershipAdd
             | Self::EventMembershipChangeRole
             | Self::EventMembershipRemove => "event_membership",
             Self::ChangesetCreate => "changeset",
-            Self::ProposalAccept | Self::ProposalReject | Self::ProposalConflict => "proposal",
+            Self::ProposalAccept
+            | Self::ProposalReject
+            | Self::ProposalConflict
+            | Self::ProposalRedact => "proposal",
             Self::ApiTokenCreate | Self::ApiTokenRevoke => "api_token",
             // A feature has no ID of its own: the record ID is its organization.
             // Slice 1 has one feature, `mcp-tokens`; a second feature needs its name in the event.
             Self::OrganizationFeatureEnable | Self::OrganizationFeatureDisable => {
                 "organization_feature"
             }
-            Self::DocumentVersionUpload | Self::DocumentVersionApprove => "document_version",
-            Self::PersonCreate | Self::PersonChange => "person",
-            Self::InstitutionCreate | Self::InstitutionChange => "institution",
+            Self::DocumentVersionUpload
+            | Self::DocumentVersionApprove
+            | Self::DocumentVersionRedact => "document_version",
+            Self::PersonCreate | Self::PersonChange | Self::PersonRedact | Self::PersonExport => {
+                "person"
+            }
+            Self::InstitutionCreate | Self::InstitutionChange | Self::InstitutionRedact => {
+                "institution"
+            }
+            Self::SourceItemRedact => "source_item",
+            Self::FactVersionRedact => "fact_version",
+            Self::DisputeNoteCreate => "dispute_note",
             Self::WorkstreamCreate | Self::WorkstreamChange => "workstream",
             Self::ActionCreate | Self::ActionChange => "action",
             Self::CommitmentCreate | Self::CommitmentChange | Self::CommitmentFirm => "commitment",
