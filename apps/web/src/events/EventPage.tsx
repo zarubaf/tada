@@ -10,6 +10,7 @@ import { NavLink, SubNav } from "../ui/NavLink";
 import { Page, PageTitle } from "../ui/Page";
 import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
+import { CloseEvent } from "./CloseEvent";
 import styles from "./EventPage.module.css";
 import { EventContext, type ProfileState, useEventProfile } from "./eventContext";
 
@@ -97,6 +98,12 @@ export function EventPage({
             <PageTitle ref={heading}>{state.event.name}</PageTitle>
             <DateWindow profile={profile} />
           </header>
+          <CloseEvent
+            api={api}
+            event={state.event}
+            onChanged={(event) => setState({ kind: "loaded", event })}
+            onStale={() => void load()}
+          />
           <SubNav label={t("event-nav")}>
             <NavLink to={base} exact>
               {t("event-nav-overview")}

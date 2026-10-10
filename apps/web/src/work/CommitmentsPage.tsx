@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { Api, Commitment } from "../api/client";
-import { useEventContext } from "../events/eventContext";
+import { useEventContext, useEventWritable } from "../events/eventContext";
 import { formatDate } from "../facts/formatValue";
 import { t } from "../i18n";
 import { RegisterView } from "../registers/RegisterView";
@@ -35,6 +35,7 @@ export function CommitmentsPage({ api }: { api: Api }) {
 
 function Commitments({ api, directory }: { api: Api; directory: Directory }) {
   const { event } = useEventContext();
+  const writable = useEventWritable();
   const session = useSession();
   const fetchPage = useCallback(
     (cursor: string | undefined) =>
@@ -114,7 +115,7 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
               {t("commitment-evidence")}
             </Button>
           )}
-          {row.can_change && !row.redacted && (
+          {writable && row.can_change && !row.redacted && (
             <Button
               aria-label={t("work-edit-of", { id: row.local_id })}
               onPress={() => page.edit(row)}
@@ -122,7 +123,7 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
               {t("work-edit")}
             </Button>
           )}
-          {row.can_make_firm && !row.redacted && (
+          {writable && row.can_make_firm && !row.redacted && (
             <Button
               aria-label={t("make-firm-of", { id: row.local_id })}
               onPress={() => {
@@ -153,30 +154,32 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
         loadingLabel={t("commitments-loading")}
         empty={{ title: t("commitments-empty-title"), text: t("commitments-empty-text") }}
       />
-      <section className={styles.section} aria-labelledby="commitment-form-title">
-        <h2
-          id="commitment-form-title"
-          ref={page.formHeading}
-          tabIndex={-1}
-          className={styles.heading}
-        >
-          {editing
-            ? t("commitment-change-title", { id: editing.local_id })
-            : t("commitment-create-title")}
-        </h2>
-        <CommitmentForm
-          key={editing ? `${editing.id}:${editing.version}` : "new"}
-          api={api}
-          eventId={event.id}
-          directory={directory}
-          userId={session.user.id}
-          {...(editing && { record: editing })}
-          onStart={page.start}
-          onSaved={saved}
-          onFailed={page.fail}
-          {...(editing && { onCancel: () => page.closeForm() })}
-        />
-      </section>
+      {writable && (
+        <section className={styles.section} aria-labelledby="commitment-form-title">
+          <h2
+            id="commitment-form-title"
+            ref={page.formHeading}
+            tabIndex={-1}
+            className={styles.heading}
+          >
+            {editing
+              ? t("commitment-change-title", { id: editing.local_id })
+              : t("commitment-create-title")}
+          </h2>
+          <CommitmentForm
+            key={editing ? `${editing.id}:${editing.version}` : "new"}
+            api={api}
+            eventId={event.id}
+            directory={directory}
+            userId={session.user.id}
+            {...(editing && { record: editing })}
+            onStart={page.start}
+            onSaved={saved}
+            onFailed={page.fail}
+            {...(editing && { onCancel: () => page.closeForm() })}
+          />
+        </section>
+      )}
       {firming && (
         <MakeFirmDialog
           api={api}

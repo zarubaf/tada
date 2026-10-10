@@ -108,12 +108,20 @@ for (const viewport of viewports) {
         items: [{ feature: "mcp-tokens", enabled: true, version: 2 }],
       });
       await fakeJson(page, "/api/v1/organization/privacy-notice", { markdown: null, version: 1 });
+      await fakeJson(page, "/api/v1/organization/retention", {
+        closed_event_months: 24,
+        source_months: null,
+        version: 3,
+      });
       await page.goto("/settings/organization");
       await setTheme(page, theme);
       await expect(page.getByRole("switch", { name: "MCP-Token erlauben" })).toBeChecked();
       await expect(
         page.getByRole("textbox", { name: "Text der Datenschutzerklärung" }),
       ).toBeVisible();
+      await expect(
+        page.getByRole("textbox", { name: "Abgeschlossene Anlässe (Monate)" }),
+      ).toHaveValue("24");
 
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])

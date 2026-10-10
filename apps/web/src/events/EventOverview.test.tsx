@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApi, type Event } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
+import { SessionProvider } from "../session/SessionProvider";
 import { EventOverview } from "./EventOverview";
 import { EventPage } from "./EventPage";
 
@@ -124,9 +125,23 @@ function json(status: number, body: unknown) {
   });
 }
 
+const session = {
+  user_id: "u1",
+  display_name: "Anna Muster",
+  organization: { organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" },
+  memberships: [{ organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" }],
+};
+
 function setup(options: { profile?: () => Response } = {}) {
   const fetch = async (request: Request) => {
     const { pathname } = new URL(request.url);
+    if (pathname.endsWith("/session")) {
+      return json(200, session);
+    }
+    if (pathname.endsWith("/memberships")) {
+      // The member is no event manager: no control to close the event shows.
+      return json(403, { type: "", code: "forbidden", title: "", status: 403, instance: "" });
+    }
     if (pathname.endsWith("/profile")) {
       return options.profile?.() ?? json(200, profile);
     }
@@ -147,13 +162,15 @@ function setup(options: { profile?: () => Response } = {}) {
   window.history.replaceState(null, "", `/events/${EVENT_ID}`);
   render(
     <Router>
-      <Routes>
-        <Route path="/events/:eventId">
-          <EventPage api={api}>
-            <EventOverview api={api} />
-          </EventPage>
-        </Route>
-      </Routes>
+      <SessionProvider api={api}>
+        <Routes>
+          <Route path="/events/:eventId">
+            <EventPage api={api}>
+              <EventOverview api={api} />
+            </EventPage>
+          </Route>
+        </Routes>
+      </SessionProvider>
     </Router>,
   );
 }

@@ -1,0 +1,27 @@
+@layer components {
+  .banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-sunken);
+  }
+
+  .icon {
+    flex: none;
+    color: var(--color-text-muted);
+  }
+
+  .text {
+    display: grid;
+    flex: 1 1 16rem;
+    gap: var(--space-1);
+  }
+
+  .action {
+    flex: none;
+  }
+}

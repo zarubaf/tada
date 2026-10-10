@@ -29,6 +29,7 @@ import type { RecordNames } from "./recordNames";
 import { loadRecordNames } from "./recordNames";
 import { dependentsOf, deselect, select } from "./selection";
 import { shortcutOf } from "./shortcuts";
+import { useEventReviewable } from "./useEventReviewable";
 
 type State =
   | { kind: "loading" }
@@ -127,6 +128,8 @@ export function ChangesetDetail({
   // The proposals that the confirmation dialog will reject.
   const [rejecting, setRejecting] = useState<string[]>();
   const [busy, setBusy] = useState(false);
+  const eventId = state.kind === "loaded" ? state.changeset.event_id : undefined;
+  const reviewable = useEventReviewable(api, eventId);
   const heading = useRef<HTMLHeadingElement>(null);
   const editButtons = useRef(new Map<string, HTMLButtonElement>());
   const focusAfterCommit = useFocusAfterCommit();
@@ -158,7 +161,8 @@ export function ChangesetDetail({
     }
   }, [api, changesetId, fail]);
 
-  if (state.kind === "loading") {
+  // The page waits for the status of the event, so that no review control shows and then leaves.
+  if (state.kind === "loading" || !reviewable.known) {
     return (
       <section
         ref={ref}
@@ -210,7 +214,9 @@ export function ChangesetDetail({
     return proposal ? operationTitle(proposal.operation, fields) : id;
   };
   // The member reviews the proposals that the server marks; the others show read-only.
-  const open = proposals.filter((proposal) => proposal.status === "open" && proposal.can_review);
+  const open = proposals.filter(
+    (proposal) => reviewable.reviewable && proposal.status === "open" && proposal.can_review,
+  );
   const active = open.find((proposal) => proposal.id === activeId) ?? open[0];
 
   /** The proposals that an accept of `ids` would take: the selection or one proposal, and what they need. */
@@ -402,6 +408,7 @@ export function ChangesetDetail({
             {t("inbox-proposed-at", { time: formatDateTime(changeset.created_at, timeZone) })}
           </time>
         </p>
+        {reviewable.closed && <p className={styles.meta}>{t("inbox-event-closed")}</p>}
         {open.length > 0 && (
           <p className={styles.hints}>
             <span>{t("inbox-hints")}:</span>
@@ -421,6 +428,7 @@ export function ChangesetDetail({
             <li key={proposal.id}>
               <ProposalCard
                 proposal={proposal}
+                writable={reviewable.reviewable}
                 fields={fields}
                 draftEnvironment={draftEnvironment}
                 conflict={conflictOf(proposal, proposals)}

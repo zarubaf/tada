@@ -25,6 +25,15 @@ export function useEventContext(): EventContextValue {
   return value;
 }
 
+/**
+ * True while the member can write into the event. A closed event is read-only for every role
+ * (ADR 0071), so the pages hide their write controls when this is false. The server refuses the
+ * writes too; this only spares the member a failed request.
+ */
+export function useEventWritable(): boolean {
+  return useEventContext().event.status !== "closed";
+}
+
 /** Loads the profile and the field catalog of an event. */
 export function useEventProfile(
   api: Api,

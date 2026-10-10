@@ -192,10 +192,22 @@ event-overview-proposals-none = Es gibt keine offenen Vorschläge.
 event-overview-proposals-note = Diese Werte sind noch nicht geprüft. Sie ersetzen keinen bestätigten Wert.
 event-overview-proposed-at = vorgeschlagen am { $time }
 event-loading = Anlass wird geladen
+event-close = Anlass abschliessen
+event-close-title = Anlass abschliessen?
+event-close-text = Ein abgeschlossener Anlass ist schreibgeschützt. Niemand ändert ihn mehr, bis die Organisationsleitung ihn wieder öffnet.
+event-close-cancel = Abbrechen
+event-closed-on = Abgeschlossen am { $date }
+event-closed = Abgeschlossen
+event-closed-note = Dieser Anlass ist schreibgeschützt.
+event-closed-redacted = Die Aufbewahrungsfrist ist abgelaufen. Der Inhalt wurde entfernt. Der Anlass lässt sich nicht mehr öffnen.
+event-reopen = Wieder öffnen
+event-reopen-title = Anlass wieder öffnen?
+event-reopen-text = Der Anlass lässt sich danach wieder ändern. Schliessen Sie ihn später erneut ab.
 problem-not-found = Das gibt es nicht, oder Sie dürfen es nicht sehen.
 problem-validation-failed = Die Eingabe ist ungültig.
 problem-record-version-conflict = Jemand hat diesen Eintrag inzwischen geändert. Versuchen Sie es erneut.
 problem-invalid-transition = Diese Änderung ist im aktuellen Zustand nicht möglich.
+problem-event-closed = Dieser Anlass ist abgeschlossen. Er lässt sich nicht mehr ändern. Die Organisationsleitung kann ihn wieder öffnen.
 problem-payload-too-large = Die Datei ist zu gross.
 problem-unsupported-media-type = Dieser Dateityp ist nicht erlaubt.
 
@@ -569,6 +581,7 @@ inbox-detail-select = Wählen Sie in der Liste einen Eintrag.
 inbox-detail-of = Vorschläge zu { $title }
 inbox-detail-loading = Vorschläge werden geladen
 inbox-back = Zur Liste
+inbox-event-closed = Dieser Anlass ist abgeschlossen. Seine Vorschläge lassen sich nicht mehr prüfen.
 inbox-hints = Tastenkürzel
 inbox-hint-j = nächster Eintrag
 inbox-hint-k = vorheriger Eintrag
@@ -952,3 +965,20 @@ my-work-review =
 # $text: the objection of an owner about the shown evidence.
 dispute-note = Einwand: { $text }
 problem-content-redacted = Dieser Inhalt wurde entfernt.
+
+## Retention periods of the organization (ADR 0071)
+
+org-retention-title = Aufbewahrung
+org-retention-loading = Fristen werden geladen
+org-retention-intro = Nach Ablauf einer Frist entfernt tada den Inhalt automatisch. Ein leeres Feld heisst „keine automatische Löschung“.
+org-retention-accounting = Quellen können Rechnungen und Verträge enthalten. Dafür gilt eine Aufbewahrungspflicht von 10 Jahren (OR Art. 958f). Legen Sie eine Frist erst fest, wenn Sie das geprüft haben.
+org-retention-closed-label = Abgeschlossene Anlässe (Monate)
+org-retention-closed-help = Der Inhalt eines Anlasses wird so viele Monate nach dem Abschluss entfernt. 1 bis 120. Leer: keine automatische Löschung.
+org-retention-source-label = Quellen ohne Anlass (Monate)
+org-retention-source-help = Der Inhalt einer Quelle ohne Anlass wird so viele Monate nach dem Hochladen entfernt. 1 bis 120. Leer: keine automatische Löschung.
+org-retention-save = Speichern
+org-retention-saved = Fristen gespeichert.
+org-retention-error-out-of-range = Geben Sie eine Zahl von 1 bis 120 ein.
+org-retention-conflict = Jemand hat die Fristen inzwischen geändert. Das Formular zeigt jetzt die neuen Werte.
+org-retention-owner-only = Nur die Organisationsleitung ändert die Fristen.
+org-retention-owner-only-hidden = Nur die Organisationsleitung sieht und ändert die Fristen.

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApi } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
+import { SessionProvider } from "../session/SessionProvider";
 import { DocumentDiffPage } from "./DocumentDiffPage";
 
 const DOCUMENT_ID = "d1";
@@ -133,11 +134,13 @@ function setup(path: string, answer: unknown = diff) {
   window.history.replaceState(null, "", path);
   render(
     <Router>
-      <Routes>
-        <Route path="/documents/:documentId/diff">
-          <DocumentDiffPage api={api} />
-        </Route>
-      </Routes>
+      <SessionProvider api={api}>
+        <Routes>
+          <Route path="/documents/:documentId/diff">
+            <DocumentDiffPage api={api} />
+          </Route>
+        </Routes>
+      </SessionProvider>
     </Router>,
   );
 }

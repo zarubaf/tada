@@ -1,10 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { createApi, type EventMembership } from "../api/client";
+import { createApi, type Event, type EventMembership } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
+import { EVENT } from "../test/fakeWorkServer";
 import { EventMembersPage } from "./EventMembersPage";
+import { EventContext } from "./eventContext";
 
 const EVENT_ID = "0199b8e0-0000-7000-8000-000000000001";
 const ME = "0199b8e0-0000-7000-8000-0000000000b1";
@@ -37,10 +39,12 @@ interface Setup {
   items?: EventMembership[];
   /** Answers by `METHOD /path-suffix`, for example `POST /remove`. */
   answers?: Record<string, () => Response | Promise<Response>>;
+  /** The event of the page, active by default. */
+  event?: Event;
 }
 
 /** A fake server. It records `METHOD path` and the JSON body of each call. */
-function setup({ organizationRole = "member", items = [], answers = {} }: Setup) {
+function setup({ organizationRole = "member", items = [], answers = {}, event = EVENT }: Setup) {
   const calls: { call: string; body: unknown }[] = [];
   const organization = [
     { user_id: ME, display_name: "Anna Muster", role: "member", version: 1 },
@@ -83,7 +87,11 @@ function setup({ organizationRole = "member", items = [], answers = {} }: Setup)
       <SessionProvider api={api}>
         <Routes>
           <Route path="/events/:eventId/members">
-            <EventMembersPage api={api} />
+            <EventContext
+              value={{ event, profile: { kind: "loading" }, reloadProfile: async () => true }}
+            >
+              <EventMembersPage api={api} />
+            </EventContext>
           </Route>
         </Routes>
       </SessionProvider>
@@ -304,5 +312,20 @@ describe("EventMembersPage", () => {
     expect(
       calls.filter((c) => c.call === `GET /api/v1/events/${EVENT_ID}/memberships`),
     ).toHaveLength(2);
+  });
+
+  it("shows the members of a closed event without the controls", async () => {
+    const { calls } = setup({
+      items: [anna, bernd],
+      event: { ...EVENT, status: "closed", closed_at: "2030-07-01T10:00:00Z" },
+    });
+
+    const table = await screen.findByRole("table", { name: "Mitglieder des Anlasses" });
+    expect(within(table).getByText("Bernd Beispiel")).toBeInTheDocument();
+    expect(within(table).getByText("Mitarbeit")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Rolle von/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /entfernen/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Rolle vergeben" })).not.toBeInTheDocument();
+    expect(calls.map((c) => c.call)).not.toContain("GET /api/v1/members");
   });
 });
