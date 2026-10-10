@@ -523,6 +523,17 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
             json!({"name": "Testwil Generatoren AG", "expected_version": 1}),
             Expect::NotFound,
         )],
+        // The person features of an owner (ADR 0073).
+        "create_dispute_note" => vec![post(
+            api("/dispute-notes".into()),
+            json!({"target_kind": "proposal", "target_id": t.b_proposal, "text": "Das stimmt nicht."}),
+            Expect::NotFound,
+        )],
+        "create_redaction" => vec![post(
+            api("/redactions".into()),
+            json!({"targets": [{"kind": "person", "id": t.b_person}], "reason": "request"}),
+            Expect::NotFound,
+        )],
         // Documents and downloads.
         "list_documents" => vec![
             get(

@@ -1,7 +1,7 @@
 //! The record version for optimistic concurrency (ADR 0006).
 
 /// A number that increases with each change of a record. A new record has version 1.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RecordVersion(i64);
 
 impl RecordVersion {

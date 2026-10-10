@@ -4,6 +4,7 @@ mod actors;
 mod client_ip;
 mod contract;
 mod cursor;
+mod dispute_notes;
 mod documents;
 mod event_members;
 mod events;
@@ -16,6 +17,7 @@ mod origin;
 mod parties;
 mod privacy;
 mod problem;
+mod redactions;
 mod request_id;
 mod review;
 mod roles;
@@ -40,6 +42,7 @@ use ipnet::IpNet;
 use tada_app::auth::Authenticator;
 use tada_app::blobs::BlobStore;
 use tada_app::clock::Clock;
+use tada_app::dispute_notes::DisputeNoteStore;
 use tada_app::documents::DocumentStore;
 use tada_app::event_members::EventMemberStore;
 use tada_app::events::EventStore;
@@ -52,6 +55,7 @@ use tada_app::privacy::PrivacyStore;
 use tada_app::problem::ProblemCode;
 use tada_app::proposals::ProposalStore;
 use tada_app::public_url::PublicUrl;
+use tada_app::redaction::RedactionStore;
 use tada_app::review::ReviewStore;
 use tada_app::session::SessionStore;
 use tada_app::sign_in::{SignInRequestStore, SignInStore};
@@ -110,6 +114,10 @@ pub struct ApiState {
     pub workstreams: Arc<dyn WorkstreamStore>,
     /// The actions and commitments of events (ADR 0068).
     pub work: Arc<dyn WorkStore>,
+    /// The dispute notes about evidence (ADR 0073).
+    pub dispute_notes: Arc<dyn DisputeNoteStore>,
+    /// Legal redaction (ADR 0072).
+    pub redaction: Arc<dyn RedactionStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -132,7 +140,9 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(privacy::routes())
                 .merge(parties::routes())
                 .merge(workstreams::routes())
-                .merge(work::routes()),
+                .merge(work::routes())
+                .merge(dispute_notes::routes())
+                .merge(redactions::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -155,6 +165,8 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(parties::problem_codes())
         .chain(workstreams::problem_codes())
         .chain(work::problem_codes())
+        .chain(dispute_notes::problem_codes())
+        .chain(redactions::problem_codes())
         .collect()
 }
 
@@ -1435,6 +1447,85 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct NoPersonData;
+
+    #[async_trait::async_trait]
+    impl tada_app::dispute_notes::DisputeNoteStore for NoPersonData {
+        async fn target_exists(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::redaction::DisputeTarget,
+        ) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn create(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::dispute_notes::DisputeNote,
+            _: tada_app::domain::ids::UserId,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<tada_app::dispute_notes::NoteCreated, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn notes(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &[tada_app::dispute_notes::NoteKey],
+        ) -> Result<
+            Vec<(
+                tada_app::dispute_notes::NoteKey,
+                tada_app::dispute_notes::DisputeNote,
+            )>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl tada_app::redaction::RedactionStore for NoPersonData {
+        async fn redact(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &[tada_app::domain::redaction::RedactionTarget],
+            _: tada_app::domain::redaction::RedactionReason,
+            _: &tada_app::caller::Actor,
+        ) -> Result<
+            Result<tada_app::redaction::RedactionOutcome, tada_app::redaction::Refused>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn redacted(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::redaction::RedactionTarget,
+        ) -> Result<Option<bool>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn redaction(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::RedactionId,
+        ) -> Result<Option<tada_app::redaction::Redaction>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn replay(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::redaction::Redaction,
+            _: &tada_app::caller::Actor,
+        ) -> Result<tada_app::redaction::Replayed, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
@@ -1462,6 +1553,8 @@ mod tests {
             parties: Arc::new(NoParties),
             workstreams: Arc::new(NoWorkstreams),
             work: Arc::new(NoWork),
+            dispute_notes: Arc::new(NoPersonData),
+            redaction: Arc::new(NoPersonData),
         }
     }
 

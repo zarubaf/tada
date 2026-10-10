@@ -117,6 +117,55 @@ impl<T> Redactable<T> {
     }
 }
 
+/// The kind of immutable evidence that a dispute note can be about (ADR 0073).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DisputeTargetKind {
+    SourceItem,
+    FactVersion,
+    DocumentVersion,
+    Proposal,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("this is not a kind of dispute target")]
+pub struct UnknownDisputeTargetKind;
+
+impl DisputeTargetKind {
+    pub const ALL: [Self; 4] = [
+        Self::SourceItem,
+        Self::FactVersion,
+        Self::DocumentVersion,
+        Self::Proposal,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SourceItem => "source-item",
+            Self::FactVersion => "fact-version",
+            Self::DocumentVersion => "document-version",
+            Self::Proposal => "proposal",
+        }
+    }
+}
+
+impl FromStr for DisputeTargetKind {
+    type Err = UnknownDisputeTargetKind;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .into_iter()
+            .find(|kind| kind.as_str() == value)
+            .ok_or(UnknownDisputeTargetKind)
+    }
+}
+
+/// The evidence that a dispute note is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DisputeTarget {
+    pub kind: DisputeTargetKind,
+    pub id: Uuid,
+}
+
 /// The text of a dispute note: one to 1000 characters after the spaces at the ends are removed.
 /// The text can name a person, so `Debug` shows its length only (ADR 0035).
 #[derive(Clone, PartialEq, Eq)]
@@ -189,6 +238,17 @@ mod tests {
         assert_eq!(
             "other".parse::<RedactionTargetKind>(),
             Err(UnknownRedactionTargetKind)
+        );
+    }
+
+    #[test]
+    fn dispute_target_kind_round_trips() {
+        for kind in DisputeTargetKind::ALL {
+            assert_eq!(kind.as_str().parse::<DisputeTargetKind>(), Ok(kind));
+        }
+        assert_eq!(
+            "person".parse::<DisputeTargetKind>(),
+            Err(UnknownDisputeTargetKind)
         );
     }
 

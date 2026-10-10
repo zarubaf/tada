@@ -4,8 +4,10 @@ use axum::extract::State;
 use jiff::Timestamp;
 use serde::Serialize;
 use tada_app::access::AccessError;
+use tada_app::dispute_notes::{DisputeNotes, NoteKey};
+use tada_app::domain::RecordVersion;
 use tada_app::domain::facts::{FieldDefinition, FieldScope, FieldStatus as DomainFieldStatus};
-use tada_app::domain::ids::EventId;
+use tada_app::domain::ids::{EventId, FactId, SourceVersionId};
 use tada_app::domain::redaction::Redactable;
 use tada_app::facts::{
     self as app, EventProfile as AppProfile, OpenProposalRef, OpenQuestionRef, ProfileEntry,
@@ -19,6 +21,7 @@ use uuid::Uuid;
 use crate::ApiState;
 use crate::actors::Author;
 use crate::contract::{AUTHENTICATED, PATH, codes};
+use crate::dispute_notes::{DisputeNote, ShowsDisputeNotes, shown, with_notes};
 use crate::extract::{Caller, Path};
 use crate::problem::{ApiError, Problem};
 use crate::values::{FactState, Label, Passage, Value, ValueType, state_parts, stored_state_parts};
@@ -79,6 +82,11 @@ pub struct Fact {
     pub accepted_by: Author,
     /// The time of the acceptance of the current fact version.
     pub accepted_at: Timestamp,
+    /// The dispute notes about the current fact version (ADR 0073), oldest first.
+    /// It is absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schema(required = false)]
+    pub dispute_notes: Vec<DisputeNote>,
 }
 
 /// One evidence link: a passage of a source version.
@@ -91,6 +99,11 @@ pub struct FactEvidence {
     pub redacted: bool,
     /// The time when tada captured the source version.
     pub captured_at: Timestamp,
+    /// The dispute notes about the source of the passage (ADR 0073), oldest first.
+    /// It is absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schema(required = false)]
+    pub dispute_notes: Vec<DisputeNote>,
 }
 
 /// An open proposal that sets the fact of a field.
@@ -167,9 +180,47 @@ impl From<ProfileEntry> for Fact {
                     passage: (&dated.evidence.passage).into(),
                     redacted: dated.evidence.passage.quote == Redactable::Redacted,
                     captured_at: dated.captured_at,
+                    dispute_notes: Vec::new(),
                 })
                 .collect(),
+            dispute_notes: Vec::new(),
         }
+    }
+}
+
+impl ShowsDisputeNotes for EventProfile {
+    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
+        for fact in &self.facts {
+            keys.extend(fact.note_key());
+            keys.extend(fact.evidence.iter().map(FactEvidence::note_key));
+        }
+    }
+
+    fn set_notes(&mut self, notes: &DisputeNotes) {
+        for fact in &mut self.facts {
+            if let Some(key) = fact.note_key() {
+                fact.dispute_notes = shown(notes, &key);
+            }
+            for evidence in &mut fact.evidence {
+                evidence.dispute_notes = shown(notes, &evidence.note_key());
+            }
+        }
+    }
+}
+
+impl Fact {
+    /// The current fact version: the profile names it by its number.
+    fn note_key(&self) -> Option<NoteKey> {
+        RecordVersion::new(self.version).map(|number| NoteKey::FactVersion {
+            fact: FactId::from_uuid(self.id),
+            number,
+        })
+    }
+}
+
+impl FactEvidence {
+    fn note_key(&self) -> NoteKey {
+        NoteKey::SourceVersion(SourceVersionId::from_uuid(self.source_version_id))
     }
 }
 
@@ -287,7 +338,9 @@ async fn get_event_profile(
         state.facts.as_ref(),
     )
     .await?;
-    Ok(axum::Json(profile.into()))
+    Ok(axum::Json(
+        with_notes(&state, &caller, EventProfile::from(profile)).await?,
+    ))
 }
 
 /// Lists the field catalog of an event: the shipped fields and the fields of the event, in the order of their keys.
