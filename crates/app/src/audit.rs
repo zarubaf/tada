@@ -6,6 +6,7 @@ use tada_domain::redaction::{RedactionReason, RedactionTargetKind};
 use uuid::Uuid;
 
 use crate::caller::{Actor, Bootstrap, Channel, OrgScope, ServiceCaller};
+use crate::retention::RetentionPeriods;
 
 /// What an audit event records. The set is closed, so each action has one spelling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -243,6 +244,8 @@ pub struct AuditEvent {
     roles: Option<RoleChange>,
     /// Why a legal redaction ran. The only value besides role names that the detail can hold.
     reason: Option<RedactionReason>,
+    /// The retention periods that an owner set (ADR 0071). Numbers only.
+    retention: Option<RetentionPeriods>,
 }
 
 impl AuditEvent {
@@ -263,6 +266,7 @@ impl AuditEvent {
             subject: None,
             roles: None,
             reason: None,
+            retention: None,
         }
     }
 
@@ -308,6 +312,7 @@ impl AuditEvent {
             subject: None,
             roles: None,
             reason: None,
+            retention: None,
         }
         .about(user_id);
         if existing == Some(accepted) {
@@ -332,6 +337,7 @@ impl AuditEvent {
             subject: None,
             roles: None,
             reason: None,
+            retention: None,
         }
     }
 
@@ -359,6 +365,19 @@ impl AuditEvent {
             reason: Some(reason),
             ..self
         }
+    }
+
+    /// The two retention periods that an owner set (ADR 0071).
+    #[must_use]
+    pub fn with_retention(self, periods: RetentionPeriods) -> Self {
+        Self {
+            retention: Some(periods),
+            ..self
+        }
+    }
+
+    pub fn retention(&self) -> Option<RetentionPeriods> {
+        self.retention
     }
 
     pub fn reason(&self) -> Option<RedactionReason> {

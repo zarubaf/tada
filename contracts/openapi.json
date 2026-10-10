@@ -3010,6 +3010,99 @@
         ]
       }
     },
+    "/api/v1/organization/retention": {
+      "get": {
+        "tags": [
+          "organization"
+        ],
+        "summary": "Shows the retention periods. An owner or an admin can read them.",
+        "operationId": "get_retention",
+        "responses": {
+          "200": {
+            "description": "The retention periods.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Retention"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "record-version-conflict",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/organization/retention/set": {
+      "post": {
+        "tags": [
+          "organization"
+        ],
+        "summary": "Replaces both retention periods. Only an owner can do this.\nRetention is off for a period until an owner sets it.",
+        "operationId": "set_retention",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRetentionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new retention periods.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Retention"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/persons": {
       "get": {
         "tags": [
@@ -10734,6 +10827,42 @@
           }
         }
       },
+      "Retention": {
+        "type": "object",
+        "description": "The retention periods of the organization, in months.",
+        "required": [
+          "closed_event_months",
+          "source_months",
+          "version"
+        ],
+        "properties": {
+          "closed_event_months": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "A closed event is redacted this many months after it closed. Null means that retention is off.",
+            "maximum": 120,
+            "minimum": 1
+          },
+          "source_months": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "A source that belongs to no event is redacted this many months after its creation.\nNull means that retention is off.",
+            "maximum": 120,
+            "minimum": 1
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. `SetRetention` needs it."
+          }
+        }
+      },
       "ReviewResult": {
         "type": "object",
         "description": "The proposals that a review changed, with their new status.",
@@ -10882,6 +11011,42 @@
               "null"
             ],
             "description": "The new Markdown text, 1 to 20000 characters. Null gives the template back.\nThe field is required, so that a missing field cannot reset the text."
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "SetRetentionRequest": {
+        "type": "object",
+        "description": "The input of `SetRetention`.",
+        "required": [
+          "closed_event_months",
+          "source_months",
+          "expected_version"
+        ],
+        "properties": {
+          "closed_event_months": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The months from 1 to 120, or null to switch retention off.\nThe field is required, so that a missing field cannot switch a period off.",
+            "maximum": 120,
+            "minimum": 1
+          },
+          "source_months": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The months from 1 to 120, or null to switch retention off. The field is required.",
+            "maximum": 120,
+            "minimum": 1
           },
           "expected_version": {
             "type": "integer",

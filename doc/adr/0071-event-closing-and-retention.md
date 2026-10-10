@@ -33,6 +33,8 @@ Retention settings:
 - Each period is empty (off) or a whole number from 1 to 120.
 - Retention is off until an owner sets a period. tada has no default.
 - Only an owner changes the periods. An owner or an admin reads them. The audit log records `organization.set_retention`.
+- The audit detail of this event holds the two periods as numbers or null, and no other content.
+  A migration widens the `CHECK` constraint of the detail for these two keys.
 - The settings page names the accounting duty, so that the owner sets a period with this duty in mind.
 
 Retention job:
@@ -45,6 +47,8 @@ Retention job:
   A source of an event follows the period of the event.
 - Each event and each source item is one transaction. The job is idempotent and continues after a crash.
 - The job never touches an active event or a source of an active event.
+  A source of an active event belongs to the event, or the evidence of the event cites it: an evidence link, proposal evidence or record evidence.
+  A cited source becomes due when the event closes.
 - Persons and institutions have no automatic retention. They are the contact directory of the club, and an owner redacts them on request.
 
 Housekeeping:
