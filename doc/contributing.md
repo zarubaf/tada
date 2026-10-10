@@ -87,9 +87,13 @@ The product owner chose this way of work for LLM agents:
     Run it before a hand-off or a push.
 13. The controller sets a limit for heavy jobs that run at the same time.
     Lanes and full checks are heavy jobs; reviews are not.
-    The limit fits the cores of the machine.
-    Too many jobs make each check slow and cause timeouts in the browser tests.
+    At most four heavy jobs run at the same time on the development machine.
+    More jobs cause timeouts in the browser tests and make the container start of the database tests fail.
 14. A lane runs targeted tests while it works and `mise run check` before each commit.
+15. A lane or agent never stops a process that it did not start, for example with `pkill`.
+    Other lanes run tests on the same machine.
+    A stopped run leaves test containers behind.
+    At the end of a slice, the controller removes the leftover containers with the label `org.testcontainers.managed-by=testcontainers`.
 
 Private plans are private notes that stay out of the repository.
 Tool state stays outside the repository.
@@ -104,10 +108,12 @@ Use [Conventional Commits](https://www.conventionalcommits.org):
 
 - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
 - Mark a breaking change of a public contract with `!`, for example `feat(api)!: ...`.
-- Keep the subject at 72 characters or fewer, in the imperative mood.
+- Keep the subject at 72 characters or fewer, including type and scope, in the imperative mood.
 - Make each commit one logical change that builds and passes the checks.
 - Keep the message brief. The body explains why. The diff shows what.
 - Do not add `Co-Authored-By` or other AI attribution trailers.
+- Do not use words of the private agent workflow in a message: task numbers, lane names, rulings, review IDs.
+  The history is public.
 - Do not mix formatting changes with content changes.
 
 The `commit-msg` hook and CI check the subject.
@@ -117,6 +123,9 @@ The `commit-msg` hook and CI check the subject.
 - `main` has a linear history. Merge pull requests with rebase or squash.
 - Do not force-push to `main`.
 - Clean up a feature branch with `git rebase` before review, not after approval.
+- Before a pull request, curate the history: each commit builds and passes the checks.
+  Squash a commit that fails alone with the commit that completes it.
+  The final tree must stay identical to the reviewed tree.
 
 ## Session handoff
 
