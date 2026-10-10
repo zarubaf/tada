@@ -1,7 +1,7 @@
 # 0069. Persons and institutions
 
-- Status: Proposed
-- Date: 2026-10-09
+- Status: Accepted
+- Date: 2026-10-10
 - Amends: [0049](0049-entities-and-fact-model.md), [0050](0050-proposals-and-review.md)
 
 ## Context

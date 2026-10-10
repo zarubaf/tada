@@ -239,7 +239,7 @@ ADR 0039:
 
 ADR 0065:
 
-- ADR 0065 is still Proposed. This amends its proposed text, and the owner's acceptance of ADR 0065 includes this amendment.
+- ADR 0065 is Accepted with this amendment.
 - This replaces the meaning of "rate-limit window" in ADR 0065 with the hour of the client limit.
   The cleanup deletes all counters whose window started before the previous hour, also the counters of the 10-minute mail cooldown.
   The retention of two hours stays.

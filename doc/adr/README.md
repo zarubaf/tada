@@ -80,11 +80,11 @@ The ADRs are the authority for the decisions in this project.
 | [0062](0062-authenticators-in-app.md)                           | Authenticators in `app`                                  | Proposed                           |
 | [0063](0063-ownership-after-removal.md)                         | Ownership after removal                                  | Proposed                           |
 | [0064](0064-one-proposal-input-for-http-and-mcp.md)             | One proposal input for HTTP and MCP                      | Proposed                           |
-| [0065](0065-worker-deletes-ended-rate-limit-counters.md)        | The worker deletes ended rate-limit counters             | Proposed, amended by 0070          |
+| [0065](0065-worker-deletes-ended-rate-limit-counters.md)        | The worker deletes ended rate-limit counters             | Accepted, amended by 0070          |
 | [0066](0066-problem-status-in-app.md)                           | The HTTP status of a problem code lives in `app`         | Proposed                           |
-| [0067](0067-workstreams-and-review-routing.md)                  | Workstreams and review routing                           | Proposed                           |
-| [0068](0068-actions-and-commitments.md)                         | Actions and commitments                                  | Proposed                           |
-| [0069](0069-persons-and-institutions.md)                        | Persons and institutions                                 | Proposed                           |
+| [0067](0067-workstreams-and-review-routing.md)                  | Workstreams and review routing                           | Accepted                           |
+| [0068](0068-actions-and-commitments.md)                         | Actions and commitments                                  | Accepted                           |
+| [0069](0069-persons-and-institutions.md)                        | Persons and institutions                                 | Accepted                           |
 | [0070](0070-ai-security-review-replaces-the-external-review.md) | An AI security review replaces the external review       | Accepted                           |
 
 ## New ADR
