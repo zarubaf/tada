@@ -13,8 +13,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tada_app::domain::events::EventKey;
 use tada_app::domain::ids::{UserId, WorkstreamId};
-use tada_app::domain::parties::Party;
-use tada_app::domain::work::{ActionStatus, CommitmentStatus};
+use tada_app::domain::parties::{Party, PartyName};
+use tada_app::domain::redaction::Redactable;
+use tada_app::domain::work::{
+    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, WorkstreamName,
+};
 use tada_app::paging::PageLimit;
 use tada_app::parties::{self, InstitutionView, PersonView};
 use tada_app::problem::{FieldError, ProblemCode};
@@ -104,6 +107,14 @@ pub(crate) struct PartiesInput {
     q: String,
 }
 
+/// The text of a redactable value: empty after a legal redaction (ADR 0072).
+fn text<T>(value: &Redactable<T>, as_str: impl Fn(&T) -> &str) -> String {
+    value
+        .as_present()
+        .map(|value| as_str(value).to_owned())
+        .unwrap_or_default()
+}
+
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct WorkstreamList {
     workstreams: Vec<WorkstreamItem>,
@@ -112,7 +123,10 @@ pub(crate) struct WorkstreamList {
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct WorkstreamItem {
     id: Uuid,
+    /// Empty after a legal redaction (ADR 0072).
     name: String,
+    /// True after a legal redaction: the texts are empty (ADR 0072).
+    redacted: bool,
     /// The member who leads the workstream.
     lead_user_id: Uuid,
     /// `active` or `closed`. A closed workstream takes no new records.
@@ -125,7 +139,8 @@ impl From<&Workstream> for WorkstreamItem {
     fn from(workstream: &Workstream) -> Self {
         Self {
             id: workstream.id.as_uuid(),
-            name: workstream.name.as_str().to_owned(),
+            name: text(&workstream.name, WorkstreamName::as_str),
+            redacted: workstream.name.as_present().is_none(),
             lead_user_id: workstream.lead.as_uuid(),
             status: workstream.status.as_str(),
             version: workstream.version.get(),
@@ -171,7 +186,10 @@ pub(crate) struct ActionItem {
     id: Uuid,
     /// The readable ID, for example `ACT-001`.
     local_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     title: String,
+    /// True after a legal redaction: the texts are empty (ADR 0072).
+    redacted: bool,
     description: Option<String>,
     owner_user_id: Uuid,
     workstream_id: Option<Uuid>,
@@ -189,7 +207,8 @@ impl From<&Shown<ActionView>> for ActionItem {
         Self {
             id: action.id.as_uuid(),
             local_id: action.local_id(),
-            title: fields.title.as_str().to_owned(),
+            title: text(&fields.title, ActionTitle::as_str),
+            redacted: fields.title.as_present().is_none(),
             description: fields
                 .description
                 .as_ref()
@@ -218,7 +237,10 @@ pub(crate) struct PromisorItem {
     id: Uuid,
     /// The readable ID, for example `INS-001`.
     local_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     name: String,
+    /// True after a legal redaction: the texts are empty (ADR 0072).
+    redacted: bool,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -226,7 +248,10 @@ pub(crate) struct CommitmentItem {
     id: Uuid,
     /// The readable ID, for example `COM-001`.
     local_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     text: String,
+    /// True after a legal redaction: the texts are empty (ADR 0072).
+    redacted: bool,
     /// The condition of a conditional promise. It stays after the commitment becomes firm.
     /// A condition is met only when evidence says so.
     condition: Option<String>,
@@ -250,7 +275,8 @@ impl From<&Shown<CommitmentView>> for CommitmentItem {
         Self {
             id: commitment.id.as_uuid(),
             local_id: commitment.local_id(),
-            text: fields.text.as_str().to_owned(),
+            text: text(&fields.text, CommitmentText::as_str),
+            redacted: fields.text.as_present().is_none(),
             condition: commitment
                 .condition
                 .as_ref()
@@ -262,7 +288,8 @@ impl From<&Shown<CommitmentView>> for CommitmentItem {
                 },
                 id: promisor.party.as_uuid(),
                 local_id: promisor.local_id.clone(),
-                name: promisor.name.as_str().to_owned(),
+                name: text(&promisor.name, PartyName::as_str),
+                redacted: promisor.name.as_present().is_none(),
             },
             owner_user_id: fields.owner.as_uuid(),
             workstream_id: fields.workstream_id.map(WorkstreamId::as_uuid),
@@ -291,7 +318,10 @@ pub(crate) struct PersonItem {
     id: Uuid,
     /// The readable ID, for example `PER-001`.
     local_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     name: String,
+    /// True after a legal redaction: the texts are empty (ADR 0072).
+    redacted: bool,
     email: Option<String>,
     phone: Option<String>,
     /// The account of the person, if the person is a member.
@@ -306,7 +336,8 @@ impl From<&Shown<PersonView>> for PersonItem {
         Self {
             id: person.id.as_uuid(),
             local_id: person.local_id(),
-            name: person.name.as_str().to_owned(),
+            name: text(&person.name, PartyName::as_str),
+            redacted: person.name.as_present().is_none(),
             email: person.email.as_ref().map(|email| email.as_str().to_owned()),
             phone: person.phone.as_ref().map(|phone| phone.as_str().to_owned()),
             user_id: person.user_id.map(UserId::as_uuid),
@@ -321,7 +352,10 @@ pub(crate) struct InstitutionItem {
     id: Uuid,
     /// The readable ID, for example `INS-001`.
     local_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     name: String,
+    /// True after a legal redaction: the texts are empty (ADR 0072).
+    redacted: bool,
     /// `authority`, `company`, `club` or `other`.
     kind: &'static str,
     email: Option<String>,
@@ -336,7 +370,8 @@ impl From<&Shown<InstitutionView>> for InstitutionItem {
         Self {
             id: institution.id.as_uuid(),
             local_id: institution.local_id(),
-            name: institution.name.as_str().to_owned(),
+            name: text(&institution.name, PartyName::as_str),
+            redacted: institution.name.as_present().is_none(),
             kind: institution.kind.as_str(),
             email: institution
                 .email

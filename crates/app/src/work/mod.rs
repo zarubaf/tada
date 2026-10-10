@@ -14,6 +14,7 @@ use tada_domain::RecordVersion;
 use tada_domain::events::EventKey;
 use tada_domain::ids::{ActionId, CommitmentId, EventId, LocalIdKind, UserId, WorkstreamId};
 use tada_domain::parties::Party;
+use tada_domain::redaction::Redactable;
 use tada_domain::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
     FirmReason, InvalidTransition,
@@ -63,7 +64,8 @@ impl ActionView {
 /// The values of an action that a change replaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionFields {
-    pub title: ActionTitle,
+    /// A legal redaction removes the title and the description (ADR 0072).
+    pub title: Redactable<ActionTitle>,
     pub description: Option<ActionDescription>,
     /// A member of the event with the contributor or manager role.
     pub owner: UserId,
@@ -96,7 +98,8 @@ impl CommitmentView {
 /// The values of a commitment that a change replaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitmentFields {
-    pub text: CommitmentText,
+    /// A legal redaction removes the text, the condition and the reason (ADR 0072).
+    pub text: Redactable<CommitmentText>,
     pub owner: UserId,
     pub workstream_id: Option<WorkstreamId>,
     pub due_date: Option<Date>,

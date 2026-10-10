@@ -15,6 +15,7 @@ use tada_domain::ids::{
     ProposalId, UserId,
 };
 use tada_domain::proposals::QuestionText;
+use tada_domain::redaction::Redactable;
 use tada_domain::sources::Evidence;
 
 use crate::access::{self, AccessError, Principal};
@@ -52,7 +53,8 @@ pub struct OpenProposalRef {
 pub struct OpenQuestionRef {
     pub id: OpenQuestionId,
     pub local_number: u64,
-    pub text: QuestionText,
+    /// A legal redaction removes the text (ADR 0072).
+    pub text: Redactable<QuestionText>,
     pub owner: UserId,
     pub version: RecordVersion,
 }
@@ -551,7 +553,7 @@ mod tests {
         let question = |local_number| OpenQuestionRef {
             id: OpenQuestionId::from_uuid(Uuid::from_u128(40)),
             local_number,
-            text: QuestionText::parse("Welcher Samstag?").unwrap(),
+            text: Redactable::Present(QuestionText::parse("Welcher Samstag?").unwrap()),
             owner: UserId::from_uuid(Uuid::from_u128(1)),
             version: RecordVersion::FIRST,
         };

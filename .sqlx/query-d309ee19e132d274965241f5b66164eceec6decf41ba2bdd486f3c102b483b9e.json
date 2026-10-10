@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE person\n             SET name = $4, email = $5, phone = $6, user_id = $7, version = version + 1,\n                 updated_at = $8\n             WHERE organization_id = $1 AND id = $2 AND version = $3\n             RETURNING id, local_number, name AS \"name!\", email, phone, user_id, version",
+  "query": "SELECT id, local_number, name, email, phone, user_id, version\n             FROM person WHERE organization_id = $1 AND local_number > $2\n             ORDER BY local_number",
   "describe": {
     "columns": [
       {
@@ -27,7 +27,7 @@
       },
       {
         "ordinal": 2,
-        "name": "name!",
+        "name": "name",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -84,13 +84,7 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid",
-        "Int8",
-        "Text",
-        "Text",
-        "Text",
-        "Uuid",
-        "Timestamptz"
+        "Int8"
       ]
     },
     "nullable": [
@@ -103,5 +97,5 @@
       false
     ]
   },
-  "hash": "a1bcd758bd8165abbaa1ff6b5fe00cbbf1e708fa798597ed5be2ce6fe3183717"
+  "hash": "d309ee19e132d274965241f5b66164eceec6decf41ba2bdd486f3c102b483b9e"
 }

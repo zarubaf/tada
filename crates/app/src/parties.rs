@@ -9,6 +9,7 @@ use tada_domain::RecordVersion;
 use tada_domain::identity::{Email, EmailError};
 use tada_domain::ids::{InstitutionId, LocalIdKind, PersonId, UserId};
 use tada_domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber, normalized_name};
+use tada_domain::redaction::Redactable;
 use uuid::Uuid;
 
 use crate::access::{self, Principal};
@@ -31,7 +32,8 @@ pub struct PersonView {
     pub id: PersonId,
     /// The number in `PER-001`, local to the organization (ADR 0038).
     pub local_number: u64,
-    pub name: PartyName,
+    /// A legal redaction removes the name, the email address, the phone number and the account link (ADR 0072).
+    pub name: Redactable<PartyName>,
     pub email: Option<Email>,
     pub phone: Option<PhoneNumber>,
     /// The account of the person, if the person is a member.
@@ -52,7 +54,8 @@ pub struct InstitutionView {
     pub id: InstitutionId,
     /// The number in `INS-001`, local to the organization (ADR 0038).
     pub local_number: u64,
-    pub name: PartyName,
+    /// A legal redaction removes the name, the email address and the phone number (ADR 0072).
+    pub name: Redactable<PartyName>,
     pub kind: InstitutionKind,
     pub email: Option<Email>,
     pub phone: Option<PhoneNumber>,
@@ -71,7 +74,8 @@ impl InstitutionView {
 pub struct PartyRef {
     pub party: Party,
     pub local_id: String,
-    pub name: PartyName,
+    /// A legal redaction removes the name (ADR 0072).
+    pub name: Redactable<PartyName>,
 }
 
 /// The values of a person that a create sets and a change replaces.
@@ -260,6 +264,9 @@ pub enum PartyError {
     NotFound,
     #[error("the record changed after the caller read it")]
     VersionConflict,
+    /// A legal redaction removed the content of the record, so it cannot change (ADR 0072).
+    #[error("the record is redacted")]
+    InvalidTransition,
     /// Invalid values. A change without a field has no field errors.
     #[error("invalid values")]
     Invalid(Vec<FieldError>),
@@ -273,6 +280,7 @@ impl PartyError {
         ProblemCode::Forbidden,
         ProblemCode::NotFound,
         ProblemCode::RecordVersionConflict,
+        ProblemCode::InvalidTransition,
         ProblemCode::ValidationFailed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
@@ -285,6 +293,7 @@ impl CommandError for PartyError {
             Self::Forbidden => ProblemCode::Forbidden,
             Self::NotFound => ProblemCode::NotFound,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
+            Self::InvalidTransition => ProblemCode::InvalidTransition,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
             Self::Store(error) => error.code(),
         }
@@ -504,6 +513,9 @@ pub async fn change_person(
     require_change(caller)?;
     let scope = caller.scope();
     let current = store.person(scope, id).await?.ok_or(PartyError::NotFound)?;
+    let Redactable::Present(current_name) = &current.name else {
+        return Err(PartyError::InvalidTransition);
+    };
     if change.name.is_none()
         && change.email.is_none()
         && change.phone.is_none()
@@ -517,7 +529,7 @@ pub async fn change_person(
     let mut check = Checker::default();
     let name = match &change.name {
         Some(name) => parse_name(&mut check, name),
-        None => Some(current.name.clone()),
+        None => Some(current_name.clone()),
     };
     let email = merged(
         &change.email,
@@ -663,6 +675,9 @@ pub async fn change_institution(
         .institution(scope, id)
         .await?
         .ok_or(PartyError::NotFound)?;
+    let Redactable::Present(current_name) = &current.name else {
+        return Err(PartyError::InvalidTransition);
+    };
     if change.name.is_none()
         && change.kind.is_none()
         && change.email.is_none()
@@ -676,7 +691,7 @@ pub async fn change_institution(
     let mut check = Checker::default();
     let name = match &change.name {
         Some(name) => parse_name(&mut check, name),
-        None => Some(current.name.clone()),
+        None => Some(current_name.clone()),
     };
     let kind = match &change.kind {
         Some(kind) => parse_kind(&mut check, kind),

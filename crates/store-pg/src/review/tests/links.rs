@@ -152,7 +152,13 @@ async fn the_detail_shows_similar_institutions_as_duplicates() {
         .as_ref()
         .unwrap()
         .iter()
-        .map(|party| (party.party, party.local_id.as_str(), party.name.as_str()))
+        .map(|party| {
+            (
+                party.party,
+                party.local_id.as_str(),
+                party.name.as_present().unwrap().as_str(),
+            )
+        })
         .collect();
     assert_eq!(
         duplicates,

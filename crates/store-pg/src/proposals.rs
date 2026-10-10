@@ -22,6 +22,7 @@ use tada_app::domain::ids::{
 };
 use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_app::domain::proposals::{DraftDocument, Operation, Proposal, QuestionText, Reason};
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::domain::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
@@ -931,7 +932,7 @@ pub(crate) async fn open_questions(
     event: EventId,
 ) -> Result<Vec<OpenQuestionRef>, StoreError> {
     let rows = sqlx::query!(
-        r#"SELECT id, local_number, text AS "text!", owner_user_id, version
+        r#"SELECT id, local_number, text, owner_user_id, version
          FROM open_question
          WHERE organization_id = $1 AND event_id = $2 AND status = 'open'
          ORDER BY local_number"#,
@@ -947,8 +948,13 @@ pub(crate) async fn open_questions(
                 id: OpenQuestionId::from_uuid(row.id),
                 local_number: u64::try_from(row.local_number)
                     .map_err(|_| InvalidRow("open_question.local_number"))?,
-                text: QuestionText::parse(&row.text)
-                    .map_err(|_| InvalidRow("open_question.text"))?,
+                // NULL only after a legal redaction (ADR 0072).
+                text: match row.text {
+                    Some(text) => Redactable::Present(
+                        QuestionText::parse(&text).map_err(|_| InvalidRow("open_question.text"))?,
+                    ),
+                    None => Redactable::Redacted,
+                },
                 owner: UserId::from_uuid(row.owner_user_id),
                 version: RecordVersion::new(row.version)
                     .ok_or(InvalidRow("open_question.version"))?,
@@ -1409,7 +1415,7 @@ mod tests {
             .map(|question| {
                 (
                     question.local_number,
-                    question.text.as_str(),
+                    question.text.as_present().unwrap().as_str(),
                     question.owner,
                 )
             })

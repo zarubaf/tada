@@ -4,7 +4,8 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use serde::{Deserialize, Deserializer, Serialize};
 use tada_app::domain::ids::{InstitutionId, PersonId, UserId};
-use tada_app::domain::parties::Party;
+use tada_app::domain::parties::{Party, PartyName};
+use tada_app::domain::redaction::Redactable;
 use tada_app::parties::{
     self as app, InstitutionChange, InstitutionView, NewInstitution, NewPerson, PartyError,
     PartyReadError, PartyRef as AppPartyRef, PersonChange, PersonView,
@@ -77,6 +78,13 @@ pub enum PartyKind {
     Institution,
 }
 
+/// The text of a name, empty after a legal redaction (ADR 0072).
+fn name_text(name: &Redactable<PartyName>) -> String {
+    name.as_present()
+        .map(|name| name.as_str().to_owned())
+        .unwrap_or_default()
+}
+
 /// A person or an institution of the organization, with its readable ID and its name.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct PartyRef {
@@ -84,7 +92,10 @@ pub struct PartyRef {
     pub id: Uuid,
     /// The readable ID, for example `INS-001`.
     pub local_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     pub name: String,
+    /// True after a legal redaction (ADR 0072): the texts are empty or absent.
+    pub redacted: bool,
 }
 
 impl From<AppPartyRef> for PartyRef {
@@ -97,7 +108,8 @@ impl From<AppPartyRef> for PartyRef {
             kind,
             id,
             local_id: party.local_id,
-            name: party.name.as_str().to_owned(),
+            redacted: party.name.as_present().is_none(),
+            name: name_text(&party.name),
         }
     }
 }
@@ -108,7 +120,10 @@ pub struct Person {
     pub id: Uuid,
     /// The readable ID, for example `PER-001`.
     pub local_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     pub name: String,
+    /// True after a legal redaction (ADR 0072): the texts are empty or absent.
+    pub redacted: bool,
     pub email: Option<String>,
     pub phone: Option<String>,
     /// The account of the person, if the person is a member.
@@ -132,13 +147,14 @@ impl From<Shown<PersonView>> for Person {
         Self {
             id: person.id.as_uuid(),
             local_id: person.local_id(),
-            name: person.name.as_str().to_owned(),
+            redacted: person.name.as_present().is_none(),
+            name: name_text(&person.name),
             email: person.email.map(|email| email.as_str().to_owned()),
             phone: person.phone.map(|phone| phone.as_str().to_owned()),
             user_id: person.user_id.map(UserId::as_uuid),
             version: person.version.get(),
             evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
-            can_change,
+            can_change: can_change && person.name.as_present().is_some(),
         }
     }
 }
@@ -149,7 +165,10 @@ pub struct Institution {
     pub id: Uuid,
     /// The readable ID, for example `INS-001`.
     pub local_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     pub name: String,
+    /// True after a legal redaction (ADR 0072): the texts are empty or absent.
+    pub redacted: bool,
     /// `authority`, `company`, `club` or `other`.
     pub kind: String,
     pub email: Option<String>,
@@ -173,13 +192,14 @@ impl From<Shown<InstitutionView>> for Institution {
         Self {
             id: institution.id.as_uuid(),
             local_id: institution.local_id(),
-            name: institution.name.as_str().to_owned(),
+            redacted: institution.name.as_present().is_none(),
+            name: name_text(&institution.name),
             kind: institution.kind.as_str().to_owned(),
             email: institution.email.map(|email| email.as_str().to_owned()),
             phone: institution.phone.map(|phone| phone.as_str().to_owned()),
             version: institution.version.get(),
             evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
-            can_change,
+            can_change: can_change && institution.name.as_present().is_some(),
         }
     }
 }

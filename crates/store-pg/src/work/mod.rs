@@ -16,6 +16,7 @@ use tada_app::domain::ids::{
     ActionId, CommitmentId, EventId, InstitutionId, LocalIdKind, PersonId, UserId, WorkstreamId,
 };
 use tada_app::domain::parties::{Party, PartyName};
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
     FirmReason,
@@ -37,7 +38,8 @@ struct ActionRow {
     id: Uuid,
     event_id: Uuid,
     local_number: i64,
-    title: String,
+    /// NULL only after a legal redaction (ADR 0072).
+    title: Option<String>,
     description: Option<String>,
     owner_user_id: Uuid,
     workstream_id: Option<Uuid>,
@@ -56,7 +58,12 @@ impl TryFrom<ActionRow> for ActionView {
                 .map_err(|_| InvalidRow("action.local_number"))?,
             event_id: EventId::from_uuid(row.event_id),
             fields: ActionFields {
-                title: ActionTitle::parse(&row.title).map_err(|_| InvalidRow("action.title"))?,
+                title: match row.title {
+                    Some(title) => Redactable::Present(
+                        ActionTitle::parse(&title).map_err(|_| InvalidRow("action.title"))?,
+                    ),
+                    None => Redactable::Redacted,
+                },
                 description: row
                     .description
                     .map(|text| ActionDescription::parse(&text))
@@ -76,7 +83,8 @@ struct CommitmentRow {
     id: Uuid,
     event_id: Uuid,
     local_number: i64,
-    text: String,
+    /// NULL only after a legal redaction (ADR 0072).
+    text: Option<String>,
     condition: Option<String>,
     person_id: Option<Uuid>,
     institution_id: Option<Uuid>,
@@ -104,11 +112,13 @@ impl CommitmentRow {
             .promisor_number
             .and_then(|number| u64::try_from(number).ok())
             .ok_or(InvalidRow("commitment.promisor"))?;
-        let name = self
-            .promisor_name
-            .as_deref()
-            .and_then(|name| PartyName::parse(name).ok())
-            .ok_or(InvalidRow("commitment.promisor"))?;
+        // The promisor exists, so a name without a value is the tombstone of a legal redaction (ADR 0072).
+        let name = match self.promisor_name.as_deref() {
+            Some(name) => Redactable::Present(
+                PartyName::parse(name).map_err(|_| InvalidRow("commitment.promisor"))?,
+            ),
+            None => Redactable::Redacted,
+        };
         Ok(PartyRef {
             party,
             local_id: kind.readable_id(number),
@@ -130,8 +140,12 @@ impl CommitmentRow {
                 .map_err(|_| InvalidRow("commitment.condition"))?,
             promisor: self.promisor()?,
             fields: CommitmentFields {
-                text: CommitmentText::parse(&self.text)
-                    .map_err(|_| InvalidRow("commitment.text"))?,
+                text: match &self.text {
+                    Some(text) => Redactable::Present(
+                        CommitmentText::parse(text).map_err(|_| InvalidRow("commitment.text"))?,
+                    ),
+                    None => Redactable::Redacted,
+                },
                 owner: UserId::from_uuid(self.owner_user_id),
                 workstream_id: self.workstream_id.map(WorkstreamId::from_uuid),
                 due_date: self.due_date.map(jiff_sqlx::Date::to_jiff),
@@ -208,7 +222,7 @@ async fn select_actions(
 ) -> Result<Vec<ActionView>, sqlx::Error> {
     let rows = sqlx::query_as!(
         ActionRow,
-        r#"SELECT id, event_id, local_number, title AS "title!", description, owner_user_id, workstream_id,
+        r#"SELECT id, event_id, local_number, title, description, owner_user_id, workstream_id,
                   due_date AS "due_date: jiff_sqlx::Date", status, version
            FROM action
            WHERE organization_id = $1
@@ -250,7 +264,7 @@ async fn select_commitments(
     let organization = scope.organization_id().as_uuid();
     let rows = sqlx::query_as!(
         CommitmentRow,
-        r#"SELECT c.id, c.event_id, c.local_number, c.text AS "text!", c.condition, c.person_id, c.institution_id,
+        r#"SELECT c.id, c.event_id, c.local_number, c.text, c.condition, c.person_id, c.institution_id,
                   COALESCE(p.local_number, i.local_number) AS "promisor_number?",
                   COALESCE(p.name, i.name) AS "promisor_name?",
                   c.owner_user_id, c.workstream_id, c.due_date AS "due_date: jiff_sqlx::Date",
@@ -342,7 +356,7 @@ pub(crate) async fn insert_action(
         scope.organization_id().as_uuid(),
         action.event_id.as_uuid(),
         number,
-        fields.title.as_str(),
+        fields.title.as_present().map(ActionTitle::as_str),
         fields.description.as_ref().map(ActionDescription::as_str),
         fields.owner.as_uuid(),
         fields.workstream_id.map(WorkstreamId::as_uuid),
@@ -378,7 +392,7 @@ pub(crate) async fn update_action(
         event.as_uuid(),
         id.as_uuid(),
         expected.get(),
-        fields.title.as_str(),
+        fields.title.as_present().map(ActionTitle::as_str),
         fields.description.as_ref().map(ActionDescription::as_str),
         fields.owner.as_uuid(),
         fields.workstream_id.map(WorkstreamId::as_uuid),
@@ -420,7 +434,7 @@ pub(crate) async fn insert_commitment(
         scope.organization_id().as_uuid(),
         commitment.event_id.as_uuid(),
         number,
-        fields.text.as_str(),
+        fields.text.as_present().map(CommitmentText::as_str),
         commitment.condition.as_ref().map(ConditionText::as_str),
         person,
         institution,
@@ -456,7 +470,7 @@ pub(crate) async fn update_commitment(
         event.as_uuid(),
         id.as_uuid(),
         expected.get(),
-        fields.text.as_str(),
+        fields.text.as_present().map(CommitmentText::as_str),
         fields.owner.as_uuid(),
         fields.workstream_id.map(WorkstreamId::as_uuid),
         fields.due_date.map(|date| date.to_sqlx()) as _,

@@ -116,7 +116,9 @@ impl PartyStore for Memory {
         Ok(found.then(|| PersonView {
             id,
             local_number: 1,
-            name: PartyName::parse("Moritz Muster").unwrap(),
+            name: tada_domain::redaction::Redactable::Present(
+                PartyName::parse("Moritz Muster").unwrap(),
+            ),
             email: None,
             phone: None,
             user_id: None,
@@ -323,7 +325,9 @@ fn workstream(memory: &Memory, event: EventId, status: WorkstreamStatus) -> Work
     memory.workstreams.lock().unwrap().push(Workstream {
         id,
         event_id: event,
-        name: WorkstreamName::parse("Bodenbetrieb").unwrap(),
+        name: tada_domain::redaction::Redactable::Present(
+            WorkstreamName::parse("Bodenbetrieb").unwrap(),
+        ),
         lead: anna(),
         status,
         version: RecordVersion::FIRST,
@@ -513,7 +517,9 @@ fn existing_action(memory: &Memory, status: ActionStatus) -> ActionId {
         local_number: 1,
         event_id: open_day(),
         fields: ActionFields {
-            title: ActionTitle::parse("Bewilligung klären").unwrap(),
+            title: tada_domain::redaction::Redactable::Present(
+                ActionTitle::parse("Bewilligung klären").unwrap(),
+            ),
             description: None,
             owner: anna(),
             workstream_id: None,
@@ -536,10 +542,14 @@ fn existing_commitment(memory: &Memory, status: CommitmentStatus) -> CommitmentI
         promisor: PartyRef {
             party: Party::Person(person),
             local_id: LocalIdKind::Person.readable_id(1),
-            name: PartyName::parse("Moritz Muster").unwrap(),
+            name: tada_domain::redaction::Redactable::Present(
+                PartyName::parse("Moritz Muster").unwrap(),
+            ),
         },
         fields: CommitmentFields {
-            text: CommitmentText::parse("Liefert das Zelt").unwrap(),
+            text: tada_domain::redaction::Redactable::Present(
+                CommitmentText::parse("Liefert das Zelt").unwrap(),
+            ),
             owner: anna(),
             workstream_id: None,
             due_date: None,

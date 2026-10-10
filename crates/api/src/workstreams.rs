@@ -74,7 +74,10 @@ impl From<DomainStatus> for WorkstreamStatus {
 pub struct Workstream {
     pub id: Uuid,
     pub event_id: Uuid,
+    /// Empty after a legal redaction (ADR 0072).
     pub name: String,
+    /// True after a legal redaction (ADR 0072): the texts are empty or absent.
+    pub redacted: bool,
     /// The member who leads the workstream: a contributor or manager of the event.
     pub lead_user_id: Uuid,
     pub status: WorkstreamStatus,
@@ -87,7 +90,12 @@ impl From<DomainWorkstream> for Workstream {
         Self {
             id: workstream.id.as_uuid(),
             event_id: workstream.event_id.as_uuid(),
-            name: workstream.name.as_str().to_owned(),
+            redacted: workstream.name.as_present().is_none(),
+            name: workstream
+                .name
+                .as_present()
+                .map(|name| name.as_str().to_owned())
+                .unwrap_or_default(),
             lead_user_id: workstream.lead.as_uuid(),
             status: workstream.status.into(),
             version: workstream.version.get(),

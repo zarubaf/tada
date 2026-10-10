@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use jiff::Timestamp;
 use tada_domain::RecordVersion;
 use tada_domain::ids::{EventId, UserId, WorkstreamId};
+use tada_domain::redaction::Redactable;
 use tada_domain::work::{WorkstreamName, WorkstreamStatus};
 use uuid::Uuid;
 
@@ -24,7 +25,8 @@ use crate::store::StoreError;
 pub struct Workstream {
     pub id: WorkstreamId,
     pub event_id: EventId,
-    pub name: WorkstreamName,
+    /// A legal redaction removes the name (ADR 0072).
+    pub name: Redactable<WorkstreamName>,
     /// A member of the event with the contributor or manager role.
     pub lead: UserId,
     pub status: WorkstreamStatus,
@@ -130,6 +132,9 @@ pub enum WorkstreamError {
     Invalid(Vec<FieldError>),
     #[error("the workstream changed after the caller read it")]
     VersionConflict,
+    /// A legal redaction removed the name of the workstream, so it cannot change (ADR 0072).
+    #[error("the workstream is redacted")]
+    InvalidTransition,
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -141,6 +146,7 @@ impl WorkstreamError {
         ProblemCode::Forbidden,
         ProblemCode::ValidationFailed,
         ProblemCode::RecordVersionConflict,
+        ProblemCode::InvalidTransition,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -153,6 +159,7 @@ impl CommandError for WorkstreamError {
             Self::Forbidden => ProblemCode::Forbidden,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
+            Self::InvalidTransition => ProblemCode::InvalidTransition,
             Self::Store(error) => error.code(),
         }
     }
@@ -232,7 +239,7 @@ pub async fn create_workstream(
     let workstream = Workstream {
         id,
         event_id: event,
-        name,
+        name: Redactable::Present(name),
         lead: input.lead,
         status: WorkstreamStatus::Active,
         version: RecordVersion::FIRST,
@@ -263,6 +270,10 @@ pub async fn change_workstream(
         .get(caller.scope(), event, id)
         .await?
         .ok_or(WorkstreamError::NotFound)?;
+    // A redacted workstream has no content to change (ADR 0072).
+    if current.name == Redactable::Redacted {
+        return Err(WorkstreamError::InvalidTransition);
+    }
     if change.name.is_none() && change.lead.is_none() && change.status.is_none() {
         return Err(WorkstreamError::Invalid(Vec::new()));
     }
@@ -429,8 +440,9 @@ mod tests {
         }
     }
 
-    fn same_name(a: &WorkstreamName, b: &WorkstreamName) -> bool {
-        a.as_str().to_lowercase() == b.as_str().to_lowercase()
+    fn same_name(a: &Redactable<WorkstreamName>, b: &WorkstreamName) -> bool {
+        a.as_present()
+            .is_some_and(|a| a.as_str().to_lowercase() == b.as_str().to_lowercase())
     }
 
     #[async_trait]
@@ -447,7 +459,11 @@ mod tests {
                 return Ok(Created::IdTaken);
             }
             if all.iter().any(|known| {
-                known.event_id == workstream.event_id && same_name(&known.name, &workstream.name)
+                known.event_id == workstream.event_id
+                    && workstream
+                        .name
+                        .as_present()
+                        .is_some_and(|name| same_name(&known.name, name))
             }) {
                 return Ok(Created::NameTaken);
             }
@@ -484,7 +500,7 @@ mod tests {
             }
             let known = &mut all[position];
             if let Some(name) = &update.name {
-                known.name = name.clone();
+                known.name = Redactable::Present(name.clone());
             }
             if let Some(lead) = update.lead {
                 known.lead = lead;
@@ -736,7 +752,7 @@ mod tests {
             )
         };
         let changed = run(change(RecordVersion::FIRST)).await.unwrap();
-        assert_eq!(changed.name.as_str(), "Aussengelände");
+        assert_eq!(changed.name.as_present().unwrap().as_str(), "Aussengelände");
         assert_eq!(changed.version.get(), 2);
         let stale = run(change(RecordVersion::FIRST)).await;
         assert!(matches!(stale, Err(WorkstreamError::VersionConflict)));

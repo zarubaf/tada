@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, event_id, name AS \"name!\", lead_user_id, status, version FROM workstream\n             WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+  "query": "SELECT id, local_number, name, email, phone, user_id, version\n             FROM person WHERE organization_id = $1 AND id = $2",
   "describe": {
     "columns": [
       {
@@ -9,62 +9,73 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "workstream",
+            "table": "person",
             "name": "id"
           }
         }
       },
       {
         "ordinal": 1,
-        "name": "event_id",
-        "type_info": "Uuid",
+        "name": "local_number",
+        "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "workstream",
-            "name": "event_id"
+            "table": "person",
+            "name": "local_number"
           }
         }
       },
       {
         "ordinal": 2,
-        "name": "name!",
+        "name": "name",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "workstream",
+            "table": "person",
             "name": "name"
           }
         }
       },
       {
         "ordinal": 3,
-        "name": "lead_user_id",
-        "type_info": "Uuid",
+        "name": "email",
+        "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "workstream",
-            "name": "lead_user_id"
+            "table": "person",
+            "name": "email"
           }
         }
       },
       {
         "ordinal": 4,
-        "name": "status",
+        "name": "phone",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "workstream",
-            "name": "status"
+            "table": "person",
+            "name": "phone"
           }
         }
       },
       {
         "ordinal": 5,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "person",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
         "name": "version",
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "workstream",
+            "table": "person",
             "name": "version"
           }
         }
@@ -73,7 +84,6 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid",
         "Uuid"
       ]
     },
@@ -81,10 +91,11 @@
       false,
       false,
       true,
-      false,
-      false,
+      true,
+      true,
+      true,
       false
     ]
   },
-  "hash": "118ec9e7529cedc0f0df9ae243caffaf0a29747d954f7eeb3403782ca74c08c0"
+  "hash": "f1578f4b89ac9634fb759f3d218a9ebd38a90e7f35846f3ffcf01ecce262ec86"
 }

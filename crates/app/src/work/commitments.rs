@@ -4,6 +4,7 @@ use jiff::civil::Date;
 use tada_domain::RecordVersion;
 use tada_domain::ids::{CommitmentId, EventId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
+use tada_domain::redaction::Redactable;
 use tada_domain::work::{CommitmentStatus, ConditionText, FirmReason};
 use uuid::Uuid;
 
@@ -91,7 +92,7 @@ pub async fn create_commitment(
         condition,
         promisor: input.promisor,
         fields: CommitmentFields {
-            text,
+            text: Redactable::Present(text),
             owner: input.owner,
             workstream_id: input.workstream,
             due_date: input.due_date,
@@ -131,6 +132,10 @@ async fn changeable_commitment(
         .commitment(caller.scope(), event, id)
         .await?
         .ok_or(WorkError::NotFound)?;
+    // A redacted commitment has no content to change (ADR 0072).
+    if current.fields.text == Redactable::Redacted {
+        return Err(WorkError::InvalidTransition);
+    }
     require_change(
         caller,
         access,
@@ -203,7 +208,7 @@ pub async fn change_commitment(
     let mut check = Checker::default();
     let text = match &text {
         Some(text) => parse_text(&mut check, text),
-        None => Some(old.text.clone()),
+        None => old.text.as_present().cloned(),
     };
     let owner = owner.unwrap_or(old.owner);
     if owner != old.owner {
@@ -221,7 +226,7 @@ pub async fn change_commitment(
         None => old.status,
     };
     let fields = CommitmentFields {
-        text,
+        text: Redactable::Present(text),
         owner,
         workstream_id,
         due_date: due_date.unwrap_or(old.due_date),

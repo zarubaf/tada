@@ -8,6 +8,7 @@ use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{EventId, UserId, WorkstreamId};
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{WorkstreamName, WorkstreamStatus};
 use tada_app::store::StoreError;
 use tada_app::workstreams::{Changed, Created, Workstream, WorkstreamStore, WorkstreamUpdate};
@@ -19,7 +20,8 @@ use crate::error::{InvalidRow, store_error, violates};
 struct WorkstreamRow {
     id: Uuid,
     event_id: Uuid,
-    name: String,
+    /// NULL only after a legal redaction (ADR 0072).
+    name: Option<String>,
     lead_user_id: Uuid,
     status: String,
     version: i64,
@@ -32,7 +34,12 @@ impl TryFrom<WorkstreamRow> for Workstream {
         Ok(Workstream {
             id: WorkstreamId::from_uuid(row.id),
             event_id: EventId::from_uuid(row.event_id),
-            name: WorkstreamName::parse(&row.name).map_err(|_| InvalidRow("workstream.name"))?,
+            name: match row.name {
+                Some(name) => Redactable::Present(
+                    WorkstreamName::parse(&name).map_err(|_| InvalidRow("workstream.name"))?,
+                ),
+                None => Redactable::Redacted,
+            },
             lead: UserId::from_uuid(row.lead_user_id),
             status: WorkstreamStatus::parse(&row.status).ok_or(InvalidRow("workstream.status"))?,
             version: RecordVersion::new(row.version).ok_or(InvalidRow("workstream.version"))?,
@@ -57,7 +64,7 @@ impl WorkstreamStore for Database {
             workstream.id.as_uuid(),
             scope.organization_id().as_uuid(),
             workstream.event_id.as_uuid(),
-            workstream.name.as_str(),
+            workstream.name.as_present().map(WorkstreamName::as_str),
             workstream.lead.as_uuid(),
             workstream.status.as_str(),
             workstream.version.get(),
@@ -114,7 +121,7 @@ impl WorkstreamStore for Database {
                  version = version + 1,
                  updated_at = $7
              WHERE organization_id = $1 AND event_id = $2 AND id = $3
-             RETURNING id, event_id, name AS "name!", lead_user_id, status, version"#,
+             RETURNING id, event_id, name, lead_user_id, status, version"#,
             scope.organization_id().as_uuid(),
             event.as_uuid(),
             id.as_uuid(),
@@ -143,7 +150,7 @@ impl WorkstreamStore for Database {
     ) -> Result<Option<Workstream>, StoreError> {
         let row = sqlx::query_as!(
             WorkstreamRow,
-            r#"SELECT id, event_id, name AS "name!", lead_user_id, status, version FROM workstream
+            r#"SELECT id, event_id, name, lead_user_id, status, version FROM workstream
              WHERE organization_id = $1 AND event_id = $2 AND id = $3"#,
             scope.organization_id().as_uuid(),
             event.as_uuid(),
@@ -158,7 +165,7 @@ impl WorkstreamStore for Database {
     async fn list(&self, scope: OrgScope, event: EventId) -> Result<Vec<Workstream>, StoreError> {
         let rows = sqlx::query_as!(
             WorkstreamRow,
-            r#"SELECT id, event_id, name AS "name!", lead_user_id, status, version FROM workstream
+            r#"SELECT id, event_id, name, lead_user_id, status, version FROM workstream
              WHERE organization_id = $1 AND event_id = $2
              ORDER BY lower(name), id"#,
             scope.organization_id().as_uuid(),
@@ -216,7 +223,7 @@ mod tests {
             Workstream {
                 id: WorkstreamId::from_uuid(Uuid::now_v7()),
                 event_id: self.event,
-                name: WorkstreamName::parse(name).unwrap(),
+                name: Redactable::Present(WorkstreamName::parse(name).unwrap()),
                 lead: self.lead,
                 status: WorkstreamStatus::Active,
                 version: RecordVersion::FIRST,
@@ -299,7 +306,7 @@ mod tests {
             .await
             .unwrap()
             .into_iter()
-            .map(|w| w.name.as_str().to_owned())
+            .map(|w| w.name.as_present().unwrap().as_str().to_owned())
             .collect();
         assert_eq!(names, ["Aufbau", "Gelände"]);
 
@@ -314,7 +321,7 @@ mod tests {
         else {
             panic!("not changed");
         };
-        assert_eq!(changed.name.as_str(), "Aussengelände");
+        assert_eq!(changed.name.as_present().unwrap().as_str(), "Aussengelände");
         assert_eq!(changed.status, WorkstreamStatus::Closed);
         assert_eq!(changed.lead, f.lead);
         assert_eq!(changed.version.get(), 2);
