@@ -9,9 +9,11 @@ use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region, RequestChecksumCa
 use aws_sdk_s3::primitives::ByteStream as S3Body;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use bytes::{Bytes, BytesMut};
-use futures::StreamExt;
+use futures::stream::BoxStream;
+use futures::{StreamExt, TryStreamExt};
+use jiff::Timestamp;
 use secrecy::{ExposeSecret, SecretString};
-use tada_app::blobs::{BlobError, BlobKey, BlobStore, ByteStream};
+use tada_app::blobs::{BlobError, BlobKey, BlobStore, ByteStream, ObjectInfo, UploadInfo};
 use tada_app::health::{DependencyCheck, DependencyUnavailable};
 
 #[cfg(any(test, feature = "testing"))]
@@ -85,6 +87,12 @@ impl DependencyCheck for S3Storage {
             .map(|_| ())
             .map_err(|error| DependencyUnavailable(Box::new(error)))
     }
+}
+
+/// The time of the S3 API as a timestamp.
+fn timestamp(time: &aws_sdk_s3::primitives::DateTime) -> Result<Timestamp, BlobError> {
+    Timestamp::new(time.secs(), i32::try_from(time.subsec_nanos()).unwrap_or(0))
+        .map_err(storage_error)
 }
 
 fn storage_error(error: impl std::error::Error + Send + Sync + 'static) -> BlobError {
@@ -276,6 +284,84 @@ impl BlobStore for S3Storage {
             .map(|_| ())
             .map_err(storage_error)
     }
+
+    fn list(&self, prefix: &str) -> BoxStream<'static, Result<ObjectInfo, BlobError>> {
+        let pages = self
+            .client
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .prefix(prefix)
+            .into_paginator()
+            .send();
+        futures::stream::try_unfold(pages, |mut pages| async move {
+            let Some(page) = pages.next().await else {
+                return Ok(None);
+            };
+            let page = page.map_err(storage_error)?;
+            let objects = page
+                .contents()
+                .iter()
+                .filter_map(|object| Some((object.key()?, object.last_modified()?)))
+                .map(|(key, time)| {
+                    Ok(ObjectInfo {
+                        key: key.to_owned(),
+                        last_modified: timestamp(time)?,
+                    })
+                })
+                .collect::<Vec<_>>();
+            Ok(Some((futures::stream::iter(objects), pages)))
+        })
+        .try_flatten()
+        .boxed()
+    }
+
+    async fn list_incomplete_uploads(&self, prefix: &str) -> Result<Vec<UploadInfo>, BlobError> {
+        let mut uploads = Vec::new();
+        let mut markers: Option<(Option<String>, Option<String>)> = None;
+        loop {
+            let (key_marker, upload_id_marker) = markers.take().unwrap_or_default();
+            let page = self
+                .client
+                .list_multipart_uploads()
+                .bucket(&self.bucket)
+                .prefix(prefix)
+                .set_key_marker(key_marker)
+                .set_upload_id_marker(upload_id_marker)
+                .send()
+                .await
+                .map_err(storage_error)?;
+            for upload in page.uploads() {
+                if let (Some(key), Some(upload_id), Some(initiated)) =
+                    (upload.key(), upload.upload_id(), upload.initiated())
+                {
+                    uploads.push(UploadInfo {
+                        key: key.to_owned(),
+                        upload_id: upload_id.to_owned(),
+                        initiated: timestamp(initiated)?,
+                    });
+                }
+            }
+            if page.is_truncated() != Some(true) {
+                return Ok(uploads);
+            }
+            markers = Some((
+                page.next_key_marker().map(str::to_owned),
+                page.next_upload_id_marker().map(str::to_owned),
+            ));
+        }
+    }
+
+    async fn abort_upload(&self, key: &str, upload_id: &str) -> Result<(), BlobError> {
+        self.client
+            .abort_multipart_upload()
+            .bucket(&self.bucket)
+            .key(key)
+            .upload_id(upload_id)
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(storage_error)
+    }
 }
 
 #[cfg(test)]
@@ -369,5 +455,94 @@ mod tests {
         assert!(matches!(result, Err(BlobError::Upload(_))));
         assert_eq!(storage.head(&key).await.unwrap(), None);
         assert_eq!(garage.open_uploads().await, 0);
+    }
+
+    #[tokio::test]
+    async fn list_returns_keys_with_time() {
+        let garage = TestGarage::start().await;
+        let storage = &garage.storage;
+        let first = key();
+        let second = key();
+        let journal = "redaction-journal/2030-05-18.json";
+        for name in [first.as_str(), second.as_str(), journal] {
+            let key = BlobKey::restore(name.to_owned());
+            storage.put(&key, body(b"x"), u64::MAX).await.unwrap();
+        }
+        let listed: Vec<ObjectInfo> = storage.list("").try_collect().await.unwrap();
+        let mut names: Vec<&str> = listed.iter().map(|object| object.key.as_str()).collect();
+        names.sort_unstable();
+        let mut expected = [first.as_str(), second.as_str(), journal];
+        expected.sort_unstable();
+        assert_eq!(names, expected);
+        let now = Timestamp::now();
+        for object in &listed {
+            let age = now.duration_since(object.last_modified);
+            assert!(
+                age.abs() < jiff::SignedDuration::from_mins(5),
+                "{object:?} at {now}"
+            );
+        }
+        let journal_only: Vec<ObjectInfo> = storage
+            .list("redaction-journal/")
+            .try_collect()
+            .await
+            .unwrap();
+        assert_eq!(journal_only.len(), 1);
+        assert_eq!(journal_only[0].key, journal);
+    }
+
+    #[tokio::test]
+    async fn incomplete_upload_listed_and_aborted() {
+        let garage = TestGarage::start().await;
+        let storage = &garage.storage;
+        let key = key();
+        let started = storage
+            .client
+            .create_multipart_upload()
+            .bucket(&storage.bucket)
+            .key(key.as_str())
+            .send()
+            .await
+            .unwrap();
+        let upload_id = started.upload_id().unwrap().to_owned();
+        storage
+            .client
+            .upload_part()
+            .bucket(&storage.bucket)
+            .key(key.as_str())
+            .upload_id(&upload_id)
+            .part_number(1)
+            .body(S3Body::from(Bytes::from_static(b"part")))
+            .send()
+            .await
+            .unwrap();
+        assert!(
+            storage
+                .list_incomplete_uploads("other/")
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let uploads = storage.list_incomplete_uploads("").await.unwrap();
+        assert_eq!(uploads.len(), 1);
+        assert_eq!(uploads[0].key, key.as_str());
+        assert_eq!(uploads[0].upload_id, upload_id);
+        assert!(
+            Timestamp::now().duration_since(uploads[0].initiated).abs()
+                < jiff::SignedDuration::from_mins(5)
+        );
+
+        storage
+            .abort_upload(&uploads[0].key, &upload_id)
+            .await
+            .unwrap();
+        assert_eq!(garage.open_uploads().await, 0);
+        assert!(
+            storage
+                .list_incomplete_uploads("")
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 }

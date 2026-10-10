@@ -1,5 +1,7 @@
 //! The `DocumentStore` adapter (ADR 0009, ADR 0051): documents, their versions and the storage quota.
 
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
@@ -19,6 +21,7 @@ use tada_app::domain::ids::{
 };
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::drafts::{CitedFact, ProvenanceManifest};
+use tada_app::orphans::BlobReferences;
 use tada_app::store::StoreError;
 use tada_app::uploads::detect::FileType;
 
@@ -475,6 +478,22 @@ async fn insert_version(
     .execute(&mut *conn)
     .await?;
     Ok(())
+}
+
+/// The keys among `$1` that a live document version refers to. The sweep of orphan objects deletes the others.
+const LIVE_BLOB_KEYS: &str =
+    "SELECT DISTINCT blob_key FROM document_version WHERE blob_key = ANY($1)";
+
+#[async_trait]
+impl BlobReferences for Database {
+    async fn live_blob_keys(&self, keys: &[String]) -> Result<HashSet<String>, StoreError> {
+        let live: Vec<String> = sqlx::query_scalar(LIVE_BLOB_KEYS)
+            .bind(keys)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(store_error)?;
+        Ok(live.into_iter().collect())
+    }
 }
 
 #[async_trait]

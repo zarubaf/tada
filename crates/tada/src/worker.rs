@@ -9,6 +9,7 @@ use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
 use tada_app::clock::Clock;
 use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::mail::{MailTexts, Mailer};
+use tada_app::orphans;
 use tada_app::outbound::SendOutbound;
 use tada_app::public_url::PublicUrl;
 use tada_app::rate_limit::WINDOW;
@@ -41,7 +42,9 @@ pub fn handlers(
     Handlers::default().with(Arc::new(send))
 }
 
-pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::Result<()> {
+pub async fn run(
+    (database, public_url, mail, smtp, storage): WorkerSettings,
+) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
     let mailer = SmtpMailer::new(SmtpConfig {
@@ -61,6 +64,7 @@ pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::
         Arc::new(SystemClock),
         public_url,
     );
+    let blobs = storage.open();
     let worker_id = Uuid::now_v7();
     tracing::info!(%worker_id, "worker started");
 
@@ -69,6 +73,7 @@ pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::
     let mut ticks = tokio::time::interval(POLL_INTERVAL);
     // The counters that a sweep can delete change only when a new window starts (ADR 0065).
     let mut counter_sweep = Sweep::every(WINDOW);
+    let mut orphan_sweep = Sweep::daily();
     'outer: loop {
         tokio::select! {
             () = &mut stop => break,
@@ -82,7 +87,27 @@ pub async fn run((database, public_url, mail, smtp): WorkerSettings) -> anyhow::
         if let Some(window) = counter_sweep.due(now) {
             match db.delete_ended_rate_limit_counters(now).await {
                 Ok(_) => counter_sweep.done(window),
-                Err(error) => tracing::warn!(%error, "cannot delete the ended rate-limit counters"),
+                Err(error) => {
+                    counter_sweep.failed(now);
+                    tracing::warn!(%error, "cannot delete the ended rate-limit counters");
+                }
+            }
+        }
+        if let Some(day) = orphan_sweep.due(now) {
+            match orphans::sweep(&blobs, &db, now).await {
+                Ok(report) => {
+                    tracing::info!(
+                        deleted = report.deleted,
+                        aborted = report.aborted,
+                        kept = report.kept,
+                        "the sweep of orphan objects completed"
+                    );
+                    orphan_sweep.done(day);
+                }
+                Err(error) => {
+                    orphan_sweep.failed(now);
+                    tracing::warn!(%error, "cannot sweep the orphan objects");
+                }
             }
         }
         // Run the due jobs one at a time. The stop signal ends the loop between two jobs.

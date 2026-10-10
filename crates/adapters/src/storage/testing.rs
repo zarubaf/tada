@@ -185,4 +185,33 @@ impl TestGarage {
             .unwrap();
         output.uploads().len()
     }
+
+    /// Starts a multipart upload of `key` with one part and leaves it open. Returns the upload ID.
+    ///
+    /// # Panics
+    ///
+    /// If a request fails.
+    #[allow(clippy::unwrap_used)]
+    pub async fn start_upload(&self, key: &str) -> String {
+        let client = &self.storage.client;
+        let started = client
+            .create_multipart_upload()
+            .bucket(BUCKET)
+            .key(key)
+            .send()
+            .await
+            .unwrap();
+        let upload_id = started.upload_id().unwrap().to_owned();
+        client
+            .upload_part()
+            .bucket(BUCKET)
+            .key(key)
+            .upload_id(&upload_id)
+            .part_number(1)
+            .body(aws_sdk_s3::primitives::ByteStream::from_static(b"part"))
+            .send()
+            .await
+            .unwrap();
+        upload_id
+    }
 }
