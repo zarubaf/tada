@@ -11,8 +11,8 @@ import type { Party, PartyApi, PartyKind } from "./partyApi";
 
 const KINDS = ["authority", "company", "club", "other"] as const;
 
-type Field = "name" | "email" | "phone" | "user_id";
-const FIELDS: readonly string[] = ["name", "email", "phone", "user_id"];
+const FIELDS = ["name", "email", "phone", "user_id"] as const;
+type Field = (typeof FIELDS)[number];
 const NO_ACCOUNT = "none";
 type FieldErrors = Partial<Record<Field, string>>;
 
@@ -30,7 +30,7 @@ function fieldErrors(problem: Problem): FieldErrors {
 }
 
 function isField(field: string): field is Field {
-  return FIELDS.includes(field);
+  return (FIELDS as readonly string[]).includes(field);
 }
 
 /** What the member typed; an empty optional field is no value. */
