@@ -257,6 +257,49 @@ async fn each_member_lists_the_members_and_only_owners_and_admins_see_the_addres
     assert_eq!(problem["code"], "malformed-request");
 }
 
+#[tokio::test]
+async fn the_list_of_members_searches_by_name_and_for_owners_and_admins_by_address() {
+    let app = App::start().await;
+    let owner = app.member("Olga Owner", OrganizationRole::Owner).await;
+    let anna = app.member("Anna Müller", OrganizationRole::Member).await;
+    app.member("Berta Beispiel", OrganizationRole::Admin).await;
+
+    // Case, accents and extra spaces do not matter.
+    let (status, page) = app.get(&anna, "/api/v1/members?q=%20MULLER%20").await;
+    assert_eq!(status, StatusCode::OK);
+    let names: Vec<_> = page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["display_name"].clone())
+        .collect();
+    assert_eq!(names, [json!("Anna Müller")]);
+
+    // The page keeps its size and its cursor among the matches.
+    let (_, page) = app.get(&owner, "/api/v1/members?q=e&limit=2").await;
+    assert_eq!(page["items"].as_array().unwrap().len(), 2);
+    assert_eq!(page["items"][1]["display_name"], "Berta Beispiel");
+    let cursor = page["next_cursor"].as_str().unwrap();
+    let (_, rest) = app
+        .get(
+            &owner,
+            &format!("/api/v1/members?q=e&limit=2&cursor={cursor}"),
+        )
+        .await;
+    assert_eq!(rest["items"][0]["display_name"], "Olga Owner");
+    assert!(rest.get("next_cursor").is_none());
+
+    // An owner finds a member by the address; a member, who does not see addresses, does not.
+    let (_, page) = app.get(&owner, "/api/v1/members?q=example.org").await;
+    assert_eq!(page["items"].as_array().unwrap().len(), 3);
+    let (_, page) = app.get(&anna, "/api/v1/members?q=example.org").await;
+    assert_eq!(page["items"], json!([]));
+
+    // A text without letters or digits is no search.
+    let (_, page) = app.get(&anna, "/api/v1/members?q=%20-%20").await;
+    assert_eq!(page["items"].as_array().unwrap().len(), 3);
+}
+
 /// A removal ends all sessions of the member, also a session in another organization: tada cannot
 /// tell a stolen session from the member's own one. The member signs in again with a magic link.
 #[tokio::test]

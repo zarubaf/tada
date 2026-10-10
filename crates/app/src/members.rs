@@ -16,6 +16,7 @@ use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
+use crate::parties::normalized_query;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
 
@@ -73,6 +74,14 @@ impl Debug for NewInvitation {
 /// the store reads the display name from it, so that no name goes into a URL.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MemberCursor(pub UserId);
+
+/// A search in the list of members: the member matches if the normalized text (ADR 0069) is part
+/// of the normalized display name, or of the normalized email address if `email` is set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemberSearch {
+    pub text: String,
+    pub email: bool,
+}
 
 /// The result of `MemberStore::invite`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -208,10 +217,11 @@ fn manages(manager: OrganizationRole, role: OrganizationRole) -> bool {
 #[async_trait]
 pub trait MemberStore: Debug + Send + Sync {
     /// At most `limit` members with their email addresses, in the order of the display names and
-    /// the user IDs, after `after` if it is given.
+    /// the user IDs, after `after` if it is given. With `search`, only the members that match it.
     async fn list(
         &self,
         scope: OrgScope,
+        search: Option<&MemberSearch>,
         after: Option<MemberCursor>,
         limit: u32,
     ) -> Result<Vec<OrganizationMember>, StoreError>;
@@ -520,15 +530,24 @@ impl CommandError for RemoveMemberError {
 /// Each member can read the list. Only owners and admins see the email addresses.
 pub async fn list_members(
     caller: &MemberCaller,
+    query: Option<&str>,
     after: Option<MemberCursor>,
     limit: PageLimit,
     store: &dyn MemberStore,
 ) -> Result<Page<OrganizationMember, MemberCursor>, ListMembersError> {
+    let sees_emails = caller.organization_role().is_owner_or_admin();
+    // Only who sees the addresses can search them: a search must not reveal what the list hides.
+    let search = normalized_query(query).map(|text| MemberSearch {
+        text,
+        email: sees_emails,
+    });
     // One more than the limit shows if a next page exists.
-    let mut items = store.list(caller.scope(), after, limit.get() + 1).await?;
+    let mut items = store
+        .list(caller.scope(), search.as_ref(), after, limit.get() + 1)
+        .await?;
     let more = items.len() > limit.get() as usize;
     items.truncate(limit.get() as usize);
-    if !caller.organization_role().is_owner_or_admin() {
+    if !sees_emails {
         for member in &mut items {
             member.email = None;
         }
@@ -942,6 +961,7 @@ mod tests {
         async fn list(
             &self,
             _: OrgScope,
+            _: Option<&MemberSearch>,
             _: Option<MemberCursor>,
             limit: u32,
         ) -> Result<Vec<OrganizationMember>, StoreError> {
@@ -1153,12 +1173,12 @@ mod tests {
             ..MemoryStore::answering(InvitationInsert::Inserted)
         };
         let limit = PageLimit::new(1).unwrap();
-        let page = list_members(&caller(Admin), None, limit, &store)
+        let page = list_members(&caller(Admin), None, None, limit, &store)
             .await
             .unwrap();
         assert!(page.items[0].email.is_some());
         assert_eq!(page.next, Some(MemberCursor(user(2))));
-        let page = list_members(&caller(Member), None, PageLimit::DEFAULT, &store)
+        let page = list_members(&caller(Member), None, None, PageLimit::DEFAULT, &store)
             .await
             .unwrap();
         assert!(page.items.iter().all(|m| m.email.is_none()));

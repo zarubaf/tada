@@ -776,7 +776,7 @@ pub async fn get_institution(
 }
 
 /// The normalized search text, or `None` if it has no characters.
-fn normalized_query(query: Option<&str>) -> Option<String> {
+pub(crate) fn normalized_query(query: Option<&str>) -> Option<String> {
     query.map(normalized_name).filter(|text| !text.is_empty())
 }
 
