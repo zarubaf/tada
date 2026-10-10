@@ -118,6 +118,36 @@ Use [Conventional Commits](https://www.conventionalcommits.org):
 
 The `commit-msg` hook and CI check the subject.
 
+## Labels
+
+Labels use the prefix scheme of the Rust project.
+Each family has one color from the GitHub Primer palette.
+Use these colors for new labels.
+
+| Family | Use                                                                                                                                                                                       | Color                                              |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `A-`   | The area of the code: `A-api`, `A-web`, `A-domain`, `A-store`, `A-adapters`, `A-mcp`, `A-telegram`, `A-auth`, `A-data-protection`, `A-accessibility`, `A-design-system`, `A-docs`, `A-ci` | blue `0969da`                                      |
+| `P-`   | The priority: `P-critical`, `P-high`, `P-medium`, `P-low`                                                                                                                                 | orange `bc4c00`, `fb8f44`, `ffb77c`, gray `d0d7de` |
+| `S-`   | The status: `S-blocked`, `S-needs-decision`, `S-waiting-on-review`                                                                                                                        | yellow `bf8700`                                    |
+| `E-`   | The effort: `E-easy`, `E-medium`, `E-hard`                                                                                                                                                | teal `7ee0cf`, `1ba8a0`, `0a6f6f`                  |
+
+The repository belongs to a user account, so GitHub issue types are not available.
+The kind of work uses these labels instead:
+
+- `bug` (red `cf222e`): something is not working.
+- `feature` (green `1f883d`): a new feature or request.
+- `documentation` (gray `6e7781`): a change to the docs.
+- `question` (purple `8250df`): the author needs information.
+- `good first issue` and `help wanted` (light green `6fdd8b`): a task for new contributors.
+- `duplicate` and `wontfix` (gray `d0d7de`): the reason to close an issue.
+
+Tools use `advisory` and `dependencies` (gray `afb8c1`).
+Do not rename them.
+The advisory check finds its issues with `advisory`.
+
+Give an issue one kind label and one or more `A-` labels.
+Add `P-`, `S-` and `E-` labels when they help to plan the work.
+
 ## History
 
 - `main` has a linear history. Merge pull requests with rebase or squash.
