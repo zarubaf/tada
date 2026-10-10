@@ -514,6 +514,25 @@ impl ServiceCaller<Exporter> {
     }
 }
 
+/// The service identity `redaction-replay`: the command `tada redactions replay` (ADR 0072).
+/// It applies the redactions of the deletion journal again after a restore of the database.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedactionReplay;
+
+impl ServiceIdentity for RedactionReplay {
+    const NAME: &'static str = "redaction-replay";
+    const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0005);
+    const CHANNEL: Channel = Channel::Cli;
+}
+
+impl ServiceCaller<RedactionReplay> {
+    /// The scope of the organization that a journal object names (ADR 0039).
+    /// Only this crate calls it, after it read the object.
+    pub(crate) fn scope(&self, organization_id: OrganizationId) -> OrgScope {
+        OrgScope(organization_id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -610,12 +629,15 @@ mod tests {
             TelegramGateway::ID,
             Bootstrap::ID,
             Exporter::ID,
+            RedactionReplay::ID,
         ];
         assert!(ids.iter().enumerate().all(|(i, id)| !ids[..i].contains(id)));
         assert_eq!(JobRunner::NAME, "job-runner");
         assert_eq!(Bootstrap::NAME, "bootstrap");
         assert_eq!(Exporter::NAME, "exporter");
         assert_eq!(Exporter::CHANNEL, Channel::Cli);
+        assert_eq!(RedactionReplay::NAME, "redaction-replay");
+        assert_eq!(RedactionReplay::CHANNEL, Channel::Cli);
     }
 
     #[test]

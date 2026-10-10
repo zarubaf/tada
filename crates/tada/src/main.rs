@@ -8,10 +8,10 @@ use clap::{Parser, Subcommand};
 use tada::bootstrap::BootstrapCommand;
 use tada::export::ExportCommand;
 use tada::settings::{
-    self, BootstrapSettings, ExportSettings, MigrateSettings, ServeSettings, TelegramSettings,
-    WorkerSettings,
+    self, BootstrapSettings, ExportSettings, MigrateSettings, RedactionsSettings, ServeSettings,
+    TelegramSettings, WorkerSettings,
 };
-use tada::{bootstrap, export, migrate, run, serve, telegram, worker};
+use tada::{bootstrap, export, migrate, redactions, run, serve, telegram, worker};
 use tada_app::domain::identity::{Email, OrganizationName, OrganizationSlug};
 
 #[derive(Debug, Parser)]
@@ -57,12 +57,24 @@ enum Command {
         #[arg(long)]
         output: PathBuf,
     },
+    /// Work with the legal redactions (ADR 0072).
+    Redactions {
+        #[command(subcommand)]
+        command: RedactionsCommand,
+    },
     /// Print the settings reference as Markdown.
     Settings,
     /// Print the OpenAPI document of the HTTP API.
     Openapi,
     /// Print the catalog of problem codes as Markdown.
     Problems,
+}
+
+#[derive(Debug, Subcommand)]
+enum RedactionsCommand {
+    /// Apply each redaction of the deletion journal that the database does not hold, in time order.
+    /// Run it after each restore of the database. It is idempotent.
+    Replay,
 }
 
 fn main() -> ExitCode {
@@ -99,6 +111,9 @@ fn main() -> ExitCode {
                 },
             )
         }),
+        Command::Redactions {
+            command: RedactionsCommand::Replay,
+        } => run::<RedactionsSettings, _>("redactions", redactions::run),
         Command::Settings => print(&settings::reference()),
         Command::Openapi => match tada_api::openapi().to_pretty_json() {
             Ok(json) => print(&format!("{json}\n")),
