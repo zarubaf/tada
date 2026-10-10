@@ -12,24 +12,15 @@ The Git history keeps the done slices.
 Goal: workstream leads own their work directly, and the AI PM follows up without the PM.
 
 Slice 2 splits into the sub-slices 2a to 2f.
-The open sub-slices are 2b to 2f.
+The open sub-slices are 2c to 2f.
 Each sub-slice has its own design, plan, reviews and merge.
 The owner wants tada usable for a first real club event as soon as possible, so the sub-slices come in this order.
 
 tada runs with invented data and public facts only until two gates close.
 The first gate, the review of the authentication code, is closed.
 [ADR 0070](adr/0070-ai-security-review-replaces-the-external-review.md) records the AI security review and its fixes.
-The second gate is the person features of [ADR 0045](adr/0045-data-protection.md), which sub-slice 2b delivers.
-
-### Slice 2b: Person features
-
-Scope: the person features of ADR 0045: the export of one person, correction, legal redaction and retention jobs.
-The sweep of orphan objects in the object storage comes here too ([ADR 0009](adr/0009-object-storage.md), [ADR 0045](adr/0045-data-protection.md)).
-An orphan is an object that no document version refers to, for example after a crash or an unknown commit outcome.
-The sweep also removes the parts of multipart uploads that a canceled request left incomplete.
-A lifecycle rule of the bucket in the deployment repository can do the second part (ADR 0033).
-
-Acceptance: the data-protection gate of ADR 0045 closes.
+The second gate, the person features of [ADR 0045](adr/0045-data-protection.md), is closed.
+The export of one person, the correction with dispute notes, the legal redaction with its journal, the retention jobs, the housekeeping and the orphan sweep deliver it.
 
 ### Slice 2c: Schedules and reminders
 

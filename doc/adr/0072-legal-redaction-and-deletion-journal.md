@@ -55,6 +55,8 @@ Redaction record and command:
 
 - The table `redaction` stores the ID, the organization, the target kind, the target ID, the reason (`request` or `retention`), the actor and the time. It stores no content and no hash.
 - The audit log records `<kind>.redact` with `detail.reason`.
+  A migration widens the `CHECK` constraint of the audit detail for the key `reason`.
+  Its value is `request` or `retention`.
 - `POST /api/v1/redactions` takes a list of targets and the reason `request`. Only an owner calls it. All targets change in one transaction.
 - The targets are `source-item` (all its versions), `fact-version`, `document-version`, `proposal`, `person` and `institution`. The target `event` exists for the retention job only.
 - A redaction of a redacted target does nothing.
@@ -74,7 +76,9 @@ Deletion journal:
 
 - A redaction cannot change evidence. The trigger allows tombstones and nothing else.
 - The journal lives outside the database, so a database restore does not lose it.
-- A job writes the journal, so a short delay is possible between the redaction and the object. The replay then misses a redaction only if the operator restores before the job runs.
+- A job writes the journal, so a short delay is possible between the redaction and the object.
+  The replay applies a redaction only if its journal object exists.
+  A restore of the database to a time before the job wrote the object cannot recover that redaction.
 - Every new table with personal content must join the redaction rules and the trigger in the same change.
 - The replay needs the journal prefix in the object storage. A storage restore that overwrites it loses the journal.
 
