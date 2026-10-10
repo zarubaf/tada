@@ -112,7 +112,10 @@ pub struct OpenQuestion {
     pub id: Uuid,
     /// The event-local ID, for example `QST-001` (ADR 0038).
     pub local_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     pub text: String,
+    /// True after a legal redaction (ADR 0072): the texts are empty or absent.
+    pub redacted: bool,
     /// The user ID of the member who owns the question.
     pub owner_id: Uuid,
     pub version: i64,
@@ -183,7 +186,12 @@ impl From<OpenQuestionRef> for OpenQuestion {
         Self {
             id: question.id.as_uuid(),
             local_id: question.readable_id(),
-            text: question.text.as_str().to_owned(),
+            redacted: question.text.as_present().is_none(),
+            text: question
+                .text
+                .as_present()
+                .map(|text| text.as_str().to_owned())
+                .unwrap_or_default(),
             owner_id: question.owner.as_uuid(),
             version: question.version.get(),
         }

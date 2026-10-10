@@ -77,7 +77,7 @@ impl Default for Memory {
         let workstream = |id, name, status| Workstream {
             id,
             event_id: open_day(),
-            name: WorkstreamName::parse(name).unwrap(),
+            name: tada_domain::redaction::Redactable::Present(WorkstreamName::parse(name).unwrap()),
             lead: user(LEAD),
             status,
             version: RecordVersion::FIRST,
@@ -229,7 +229,7 @@ fn person_view(id: PersonId) -> PersonView {
     PersonView {
         id,
         local_number: 1,
-        name: PartyName::parse("Beat Muster").unwrap(),
+        name: tada_domain::redaction::Redactable::Present(PartyName::parse("Beat Muster").unwrap()),
         email: None,
         phone: None,
         user_id: None,

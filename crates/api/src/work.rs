@@ -146,8 +146,12 @@ pub struct Action {
     /// The readable ID, for example `ACT-001`.
     pub local_id: String,
     pub event_id: Uuid,
+    /// Empty after a legal redaction (ADR 0072).
     pub title: String,
+    /// Absent after a legal redaction.
     pub description: Option<String>,
+    /// True after a legal redaction (ADR 0072): the texts are empty or absent.
+    pub redacted: bool,
     /// The member who owns the action: a contributor or manager of the event.
     pub owner_user_id: Uuid,
     pub workstream_id: Option<Uuid>,
@@ -173,11 +177,17 @@ impl From<Shown<ActionView>> for Action {
         } = shown;
         let local_id = action.local_id();
         let fields = action.fields;
+        let redacted = fields.title.as_present().is_none();
         Self {
             id: action.id.as_uuid(),
             local_id,
             event_id: action.event_id.as_uuid(),
-            title: fields.title.as_str().to_owned(),
+            redacted,
+            title: fields
+                .title
+                .as_present()
+                .map(|title| title.as_str().to_owned())
+                .unwrap_or_default(),
             description: fields.description.map(|text| text.as_str().to_owned()),
             owner_user_id: fields.owner.as_uuid(),
             workstream_id: fields.workstream_id.map(WorkstreamId::as_uuid),
@@ -185,8 +195,9 @@ impl From<Shown<ActionView>> for Action {
             status: fields.status.into(),
             version: action.version.get(),
             evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
-            can_change,
-            next_statuses,
+            // A redacted action cannot change (ADR 0072).
+            can_change: can_change && !redacted,
+            next_statuses: if redacted { Vec::new() } else { next_statuses },
         }
     }
 }
@@ -228,7 +239,10 @@ pub struct Commitment {
     /// The readable ID, for example `COM-001`.
     pub local_id: String,
     pub event_id: Uuid,
+    /// Empty after a legal redaction (ADR 0072).
     pub text: String,
+    /// True after a legal redaction (ADR 0072): the texts are empty or absent.
+    pub redacted: bool,
     /// The condition. It never changes, and it stays after the commitment becomes firm.
     pub condition: Option<String>,
     /// The person or institution that makes the commitment.
@@ -265,11 +279,17 @@ impl From<Shown<CommitmentView>> for Commitment {
         } = shown;
         let local_id = commitment.local_id();
         let fields = commitment.fields;
+        let redacted = fields.text.as_present().is_none();
         Self {
             id: commitment.id.as_uuid(),
             local_id,
             event_id: commitment.event_id.as_uuid(),
-            text: fields.text.as_str().to_owned(),
+            redacted,
+            text: fields
+                .text
+                .as_present()
+                .map(|text| text.as_str().to_owned())
+                .unwrap_or_default(),
             condition: commitment.condition.map(|text| text.as_str().to_owned()),
             promisor: commitment.promisor.into(),
             owner_user_id: fields.owner.as_uuid(),
@@ -279,9 +299,10 @@ impl From<Shown<CommitmentView>> for Commitment {
             firm_reason: fields.firm_reason.map(|text| text.as_str().to_owned()),
             version: commitment.version.get(),
             evidence: evidence.into_iter().map(RecordEvidence::from).collect(),
-            can_change,
-            next_statuses,
-            can_make_firm,
+            // A redacted commitment cannot change (ADR 0072).
+            can_change: can_change && !redacted,
+            next_statuses: if redacted { Vec::new() } else { next_statuses },
+            can_make_firm: can_make_firm && !redacted,
         }
     }
 }

@@ -882,7 +882,7 @@ mod links {
         assert_eq!(
             proposed["duplicates"],
             json!([{"kind": "institution", "id": existing_id, "local_id": "INS-001",
-                    "name": "Generatoren Testwil"}])
+                    "name": "Generatoren Testwil", "redacted": false}])
         );
         let promised = proposals
             .iter()

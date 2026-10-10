@@ -3,6 +3,7 @@
 use jiff::civil::Date;
 use tada_domain::RecordVersion;
 use tada_domain::ids::{ActionId, EventId, UserId, WorkstreamId};
+use tada_domain::redaction::Redactable;
 use tada_domain::work::ActionStatus;
 use uuid::Uuid;
 
@@ -66,7 +67,7 @@ pub async fn create_action(
         id,
         event_id: event,
         fields: ActionFields {
-            title,
+            title: Redactable::Present(title),
             description,
             owner: input.owner,
             workstream_id: input.workstream,
@@ -109,6 +110,10 @@ pub async fn change_action(
         .await?
         .ok_or(WorkError::NotFound)?;
     let old = &current.fields;
+    // A redacted action has no content to change (ADR 0072).
+    let Redactable::Present(old_title) = &old.title else {
+        return Err(WorkError::InvalidTransition);
+    };
     require_change(
         caller,
         access,
@@ -142,7 +147,7 @@ pub async fn change_action(
     let mut check = Checker::default();
     let title = match &title {
         Some(text) => parse_title(&mut check, text),
-        None => Some(old.title.clone()),
+        None => Some(old_title.clone()),
     };
     let description = match &description {
         Some(text) => parse_description(&mut check, text.as_deref()),
@@ -166,7 +171,7 @@ pub async fn change_action(
         None => old.status,
     };
     let fields = ActionFields {
-        title,
+        title: Redactable::Present(title),
         description,
         owner,
         workstream_id,

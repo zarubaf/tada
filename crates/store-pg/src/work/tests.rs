@@ -84,7 +84,7 @@ impl Fixture {
 
     fn action_fields(&self, title: &str, due: Option<jiff::civil::Date>) -> ActionFields {
         ActionFields {
-            title: ActionTitle::parse(title).unwrap(),
+            title: Redactable::Present(ActionTitle::parse(title).unwrap()),
             description: None,
             owner: self.owner,
             workstream_id: None,
@@ -119,7 +119,9 @@ impl Fixture {
             event_id: self.event,
             promisor: Party::Institution(self.supplier),
             fields: CommitmentFields {
-                text: CommitmentText::parse("Generator delivery Friday 15:00").unwrap(),
+                text: Redactable::Present(
+                    CommitmentText::parse("Generator delivery Friday 15:00").unwrap(),
+                ),
                 owner: self.owner,
                 workstream_id: None,
                 due_date: None,

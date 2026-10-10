@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, event_id, local_number, title AS \"title!\", description, owner_user_id, workstream_id,\n                  due_date AS \"due_date: jiff_sqlx::Date\", status, version\n           FROM action\n           WHERE organization_id = $1\n             AND ($2::uuid IS NULL OR event_id = $2)\n             AND ($3::uuid IS NULL OR id = $3)\n             AND ($4::uuid IS NULL OR owner_user_id = $4)\n             AND ($5::text IS NULL OR status = $5)\n             AND ($6::uuid IS NULL OR workstream_id = $6)\n             AND local_number > $7\n             AND (NOT $8 OR status IN ('open', 'in-progress', 'blocked'))\n             AND ($10::uuid[] IS NULL OR event_id = ANY($10))\n           ORDER BY event_id, local_number\n           LIMIT $9",
+  "query": "SELECT id, event_id, local_number, title, description, owner_user_id, workstream_id,\n                  due_date AS \"due_date: jiff_sqlx::Date\", status, version\n           FROM action\n           WHERE organization_id = $1\n             AND ($2::uuid IS NULL OR event_id = $2)\n             AND ($3::uuid IS NULL OR id = $3)\n             AND ($4::uuid IS NULL OR owner_user_id = $4)\n             AND ($5::text IS NULL OR status = $5)\n             AND ($6::uuid IS NULL OR workstream_id = $6)\n             AND local_number > $7\n             AND (NOT $8 OR status IN ('open', 'in-progress', 'blocked'))\n             AND ($10::uuid[] IS NULL OR event_id = ANY($10))\n           ORDER BY event_id, local_number\n           LIMIT $9",
   "describe": {
     "columns": [
       {
@@ -38,7 +38,7 @@
       },
       {
         "ordinal": 3,
-        "name": "title!",
+        "name": "title",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -141,5 +141,5 @@
       false
     ]
   },
-  "hash": "f2f7edba99f05736e4013aa4e5bc6f8937f1bfaf9025ab13611c8e642c09ffb4"
+  "hash": "c2c14f0ad8ea53a30fd28ad78b472c11a921736303163351adc7508e69fe0a72"
 }

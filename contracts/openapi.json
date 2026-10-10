@@ -2985,6 +2985,7 @@
           "forbidden",
           "not-found",
           "record-version-conflict",
+          "invalid-transition",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -3101,6 +3102,7 @@
           "forbidden",
           "not-found",
           "record-version-conflict",
+          "invalid-transition",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -3225,6 +3227,7 @@
           "forbidden",
           "not-found",
           "record-version-conflict",
+          "invalid-transition",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -3341,6 +3344,7 @@
           "forbidden",
           "not-found",
           "record-version-conflict",
+          "invalid-transition",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -3397,6 +3401,7 @@
           "forbidden",
           "not-found",
           "record-version-conflict",
+          "invalid-transition",
           "validation-failed",
           "unavailable",
           "internal"
@@ -3459,6 +3464,7 @@
           "forbidden",
           "not-found",
           "record-version-conflict",
+          "invalid-transition",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -3535,6 +3541,7 @@
           "forbidden",
           "not-found",
           "record-version-conflict",
+          "invalid-transition",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -4269,6 +4276,7 @@
           "local_id",
           "event_id",
           "title",
+          "redacted",
           "owner_user_id",
           "status",
           "version",
@@ -4290,13 +4298,19 @@
             "format": "uuid"
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction (ADR 0072)."
           },
           "description": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Absent after a legal redaction."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
           },
           "owner_user_id": {
             "type": "string",
@@ -5435,6 +5449,7 @@
           "local_id",
           "event_id",
           "text",
+          "redacted",
           "promisor",
           "owner_user_id",
           "status",
@@ -5458,7 +5473,12 @@
             "format": "uuid"
           },
           "text": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction (ADR 0072)."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
           },
           "condition": {
             "type": [
@@ -8071,6 +8091,7 @@
           "id",
           "local_id",
           "name",
+          "redacted",
           "kind",
           "version",
           "evidence",
@@ -8086,7 +8107,12 @@
             "description": "The readable ID, for example `INS-001`."
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction (ADR 0072)."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
           },
           "kind": {
             "type": "string",
@@ -8781,6 +8807,7 @@
           "id",
           "local_id",
           "text",
+          "redacted",
           "owner_id",
           "version"
         ],
@@ -8794,7 +8821,12 @@
             "description": "The event-local ID, for example `QST-001` (ADR 0038)."
           },
           "text": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction (ADR 0072)."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
           },
           "owner_id": {
             "type": "string",
@@ -9418,7 +9450,8 @@
           "kind",
           "id",
           "local_id",
-          "name"
+          "name",
+          "redacted"
         ],
         "properties": {
           "kind": {
@@ -9433,7 +9466,12 @@
             "description": "The readable ID, for example `INS-001`."
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction (ADR 0072)."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
           }
         }
       },
@@ -9479,6 +9517,7 @@
           "id",
           "local_id",
           "name",
+          "redacted",
           "version",
           "evidence",
           "can_change"
@@ -9493,7 +9532,12 @@
             "description": "The readable ID, for example `PER-001`."
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction (ADR 0072)."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
           },
           "email": {
             "type": [
@@ -10412,6 +10456,7 @@
           "id",
           "event_id",
           "name",
+          "redacted",
           "lead_user_id",
           "status",
           "version"
@@ -10426,7 +10471,12 @@
             "format": "uuid"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty after a legal redaction (ADR 0072)."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
           },
           "lead_user_id": {
             "type": "string",

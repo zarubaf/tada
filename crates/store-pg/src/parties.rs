@@ -11,6 +11,7 @@ use tada_app::domain::RecordVersion;
 use tada_app::domain::identity::Email;
 use tada_app::domain::ids::{InstitutionId, LocalIdKind, PersonId, UserId};
 use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber, normalized_name};
+use tada_app::domain::redaction::Redactable;
 use tada_app::parties::{
     InstitutionFields, InstitutionView, PartyRef, PartyStore, PersonFields, PersonView, names_match,
 };
@@ -25,7 +26,8 @@ use crate::local_ids::next_local_number;
 struct PersonRow {
     id: Uuid,
     local_number: i64,
-    name: String,
+    /// NULL only after a legal redaction (ADR 0072).
+    name: Option<String>,
     email: Option<String>,
     phone: Option<String>,
     user_id: Option<Uuid>,
@@ -40,7 +42,7 @@ impl TryFrom<PersonRow> for PersonView {
             id: PersonId::from_uuid(row.id),
             local_number: u64::try_from(row.local_number)
                 .map_err(|_| InvalidRow("person.local_number"))?,
-            name: PartyName::parse(&row.name).map_err(|_| InvalidRow("person.name"))?,
+            name: party_name(row.name, "person.name")?,
             email: parse_email(row.email, "person.email")?,
             phone: parse_phone(row.phone, "person.phone")?,
             user_id: row.user_id.map(UserId::from_uuid),
@@ -52,7 +54,8 @@ impl TryFrom<PersonRow> for PersonView {
 struct InstitutionRow {
     id: Uuid,
     local_number: i64,
-    name: String,
+    /// NULL only after a legal redaction (ADR 0072).
+    name: Option<String>,
     kind: String,
     email: Option<String>,
     phone: Option<String>,
@@ -67,13 +70,25 @@ impl TryFrom<InstitutionRow> for InstitutionView {
             id: InstitutionId::from_uuid(row.id),
             local_number: u64::try_from(row.local_number)
                 .map_err(|_| InvalidRow("institution.local_number"))?,
-            name: PartyName::parse(&row.name).map_err(|_| InvalidRow("institution.name"))?,
+            name: party_name(row.name, "institution.name")?,
             kind: InstitutionKind::parse(&row.kind).ok_or(InvalidRow("institution.kind"))?,
             email: parse_email(row.email, "institution.email")?,
             phone: parse_phone(row.phone, "institution.phone")?,
             version: RecordVersion::new(row.version).ok_or(InvalidRow("institution.version"))?,
         })
     }
+}
+
+/// A name that is NULL only after a legal redaction (ADR 0072).
+fn party_name(
+    name: Option<String>,
+    column: &'static str,
+) -> Result<Redactable<PartyName>, InvalidRow> {
+    name.map_or(Ok(Redactable::Redacted), |name| {
+        PartyName::parse(&name)
+            .map(Redactable::Present)
+            .map_err(|_| InvalidRow(column))
+    })
 }
 
 fn parse_email(text: Option<String>, column: &'static str) -> Result<Option<Email>, InvalidRow> {
@@ -192,7 +207,7 @@ impl PartyStore for Database {
         Ok(Created::Created(PersonView {
             id,
             local_number: u64::try_from(number).map_err(|_| InvalidRow("person.local_number"))?,
-            name: fields.name.clone(),
+            name: Redactable::Present(fields.name.clone()),
             email: fields.email.clone(),
             phone: fields.phone.clone(),
             user_id: fields.user_id,
@@ -217,7 +232,7 @@ impl PartyStore for Database {
              SET name = $4, email = $5, phone = $6, user_id = $7, version = version + 1,
                  updated_at = $8
              WHERE organization_id = $1 AND id = $2 AND version = $3
-             RETURNING id, local_number, name AS "name!", email, phone, user_id, version"#,
+             RETURNING id, local_number, name, email, phone, user_id, version"#,
             organization,
             id.as_uuid(),
             expected.get(),
@@ -257,7 +272,7 @@ impl PartyStore for Database {
     ) -> Result<Option<PersonView>, StoreError> {
         let row = sqlx::query_as!(
             PersonRow,
-            r#"SELECT id, local_number, name AS "name!", email, phone, user_id, version
+            r#"SELECT id, local_number, name, email, phone, user_id, version
              FROM person WHERE organization_id = $1 AND id = $2"#,
             scope.organization_id().as_uuid(),
             id.as_uuid(),
@@ -277,7 +292,7 @@ impl PartyStore for Database {
     ) -> Result<Vec<PersonView>, StoreError> {
         let rows = sqlx::query_as!(
             PersonRow,
-            r#"SELECT id, local_number, name AS "name!", email, phone, user_id, version
+            r#"SELECT id, local_number, name, email, phone, user_id, version
              FROM person WHERE organization_id = $1 AND local_number > $2
              ORDER BY local_number"#,
             scope.organization_id().as_uuid(),
@@ -286,7 +301,12 @@ impl PartyStore for Database {
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
-        let rows = filtered(rows, |row| row.name.as_str(), query, limit);
+        let rows = filtered(
+            rows,
+            |row| row.name.as_deref().unwrap_or_default(),
+            query,
+            limit,
+        );
         Ok(rows
             .into_iter()
             .map(PersonView::try_from)
@@ -313,7 +333,7 @@ impl PartyStore for Database {
             id,
             local_number: u64::try_from(number)
                 .map_err(|_| InvalidRow("institution.local_number"))?,
-            name: fields.name.clone(),
+            name: Redactable::Present(fields.name.clone()),
             kind: fields.kind,
             email: fields.email.clone(),
             phone: fields.phone.clone(),
@@ -338,7 +358,7 @@ impl PartyStore for Database {
              SET name = $4, kind = $5, email = $6, phone = $7, version = version + 1,
                  updated_at = $8
              WHERE organization_id = $1 AND id = $2 AND version = $3
-             RETURNING id, local_number, name AS "name!", kind, email, phone, version"#,
+             RETURNING id, local_number, name, kind, email, phone, version"#,
             organization,
             id.as_uuid(),
             expected.get(),
@@ -378,7 +398,7 @@ impl PartyStore for Database {
     ) -> Result<Option<InstitutionView>, StoreError> {
         let row = sqlx::query_as!(
             InstitutionRow,
-            r#"SELECT id, local_number, name AS "name!", kind, email, phone, version
+            r#"SELECT id, local_number, name, kind, email, phone, version
              FROM institution WHERE organization_id = $1 AND id = $2"#,
             scope.organization_id().as_uuid(),
             id.as_uuid(),
@@ -398,7 +418,7 @@ impl PartyStore for Database {
     ) -> Result<Vec<InstitutionView>, StoreError> {
         let rows = sqlx::query_as!(
             InstitutionRow,
-            r#"SELECT id, local_number, name AS "name!", kind, email, phone, version
+            r#"SELECT id, local_number, name, kind, email, phone, version
              FROM institution WHERE organization_id = $1 AND local_number > $2
              ORDER BY local_number"#,
             scope.organization_id().as_uuid(),
@@ -407,7 +427,12 @@ impl PartyStore for Database {
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
-        let rows = filtered(rows, |row| row.name.as_str(), query, limit);
+        let rows = filtered(
+            rows,
+            |row| row.name.as_deref().unwrap_or_default(),
+            query,
+            limit,
+        );
         Ok(rows
             .into_iter()
             .map(InstitutionView::try_from)
@@ -465,7 +490,7 @@ impl PartyStore for Database {
             found.push(PartyRef {
                 party,
                 local_id: kind.readable_id(number),
-                name: PartyName::parse(&name).map_err(|_| InvalidRow("name"))?,
+                name: Redactable::Present(PartyName::parse(&name).map_err(|_| InvalidRow("name"))?),
             });
         }
         Ok(found)

@@ -9,6 +9,7 @@ use tada_app::caller::OrgScope;
 use tada_app::domain::ids::{EventId, LocalIdKind, SourceVersionId, WorkstreamId};
 use tada_app::domain::parties::Party;
 use tada_app::domain::proposals::Operation;
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{ActionStatus, CommitmentStatus};
 use tada_app::parties::{InstitutionFields, PersonFields};
 use tada_app::records::RecordRef;
@@ -110,7 +111,7 @@ pub(super) async fn write_record(
                 id: *id,
                 event_id: *event_id,
                 fields: ActionFields {
-                    title: title.clone(),
+                    title: Redactable::Present(title.clone()),
                     description: description.clone(),
                     owner: *owner,
                     workstream_id: *workstream,
@@ -138,7 +139,7 @@ pub(super) async fn write_record(
                 condition: condition.clone(),
                 promisor: *promisor,
                 fields: CommitmentFields {
-                    text: text.clone(),
+                    text: Redactable::Present(text.clone()),
                     owner: *owner,
                     workstream_id: *workstream,
                     due_date: *due_date,

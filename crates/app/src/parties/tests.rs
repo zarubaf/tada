@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
+use tada_domain::redaction::Redactable;
 
 use tada_domain::identity::{EventRole, OrganizationRole};
 use tada_domain::ids::{EventId, OrganizationId};
@@ -136,7 +137,7 @@ impl PartyStore for Memory {
         let person = PersonView {
             id,
             local_number: next_number(&persons),
-            name: fields.name.clone(),
+            name: Redactable::Present(fields.name.clone()),
             email: fields.email.clone(),
             phone: fields.phone.clone(),
             user_id: fields.user_id,
@@ -163,7 +164,7 @@ impl PartyStore for Memory {
         if person.version != expected {
             return Ok(Changed::VersionConflict);
         }
-        person.name = fields.name.clone();
+        person.name = Redactable::Present(fields.name.clone());
         person.email = fields.email.clone();
         person.phone = fields.phone.clone();
         person.user_id = fields.user_id;
@@ -189,7 +190,9 @@ impl PartyStore for Memory {
             .iter()
             .filter(|person| after.is_none_or(|after| person.local_number > after.0))
             .filter(|person| {
-                query.is_none_or(|query| normalized_name(person.name.as_str()).contains(query))
+                query.is_none_or(|query| {
+                    normalized_name(person.name.as_present().unwrap().as_str()).contains(query)
+                })
             })
             .take(limit as usize)
             .cloned()
@@ -211,7 +214,7 @@ impl PartyStore for Memory {
         let institution = InstitutionView {
             id,
             local_number: next_number(&institutions),
-            name: fields.name.clone(),
+            name: Redactable::Present(fields.name.clone()),
             kind: fields.kind,
             email: fields.email.clone(),
             phone: fields.phone.clone(),
@@ -238,7 +241,7 @@ impl PartyStore for Memory {
         if found.version != expected {
             return Ok(Changed::VersionConflict);
         }
-        found.name = fields.name.clone();
+        found.name = Redactable::Present(fields.name.clone());
         found.kind = fields.kind;
         found.email = fields.email.clone();
         found.phone = fields.phone.clone();
@@ -326,7 +329,7 @@ async fn a_contributor_creates_a_person() {
         .await
         .unwrap()
         .record;
-    assert_eq!(created.name.as_str(), "Beat Muster");
+    assert_eq!(created.name.as_present().unwrap().as_str(), "Beat Muster");
     assert_eq!(created.email.unwrap().as_str(), "beat.muster@example.org");
     assert_eq!(created.user_id, Some(user(2)));
     assert_eq!(created.version, RecordVersion::FIRST);
@@ -501,7 +504,7 @@ async fn only_an_owner_or_admin_changes_a_person() {
         .await
         .unwrap()
         .record;
-    assert_eq!(changed.name.as_str(), "Beat Beispiel");
+    assert_eq!(changed.name.as_present().unwrap().as_str(), "Beat Beispiel");
     assert_eq!(changed.version.get(), 2);
     assert_eq!(
         memory.audit.lock().unwrap()[1].action(),
@@ -532,7 +535,7 @@ async fn a_change_keeps_what_it_does_not_name_and_clears_what_it_empties() {
         .await
         .unwrap()
         .record;
-    assert_eq!(changed.name.as_str(), "Beat Muster");
+    assert_eq!(changed.name.as_present().unwrap().as_str(), "Beat Muster");
     assert_eq!(changed.email, None);
     assert_eq!(changed.phone.unwrap().as_str(), "+41 00 000 00 00");
 }
@@ -753,7 +756,11 @@ async fn the_list_filters_by_name_and_pages_by_number() {
     )
     .await
     .unwrap();
-    let names: Vec<_> = found.items.iter().map(|p| p.record.name.as_str()).collect();
+    let names: Vec<_> = found
+        .items
+        .iter()
+        .map(|p| p.record.name.as_present().unwrap().as_str())
+        .collect();
     assert_eq!(names, ["Beat Müller", "Clara MÜLLER"]);
 }
 

@@ -12,6 +12,7 @@ use tada_domain::events::Event;
 use tada_domain::facts::{
     CORE_CATALOG_VERSION, FactState, FieldDefinition, FieldStatus, Label, Valued,
 };
+use tada_domain::redaction::Redactable;
 use tada_domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus};
 use uuid::Uuid;
 
@@ -299,7 +300,10 @@ pub struct OpenQuestionView {
     pub open_question_id: Uuid,
     /// The event-local ID, for example `QST-001` (ADR 0038).
     pub readable_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     pub text: String,
+    /// True after a legal redaction: the text is gone (ADR 0072).
+    pub redacted: bool,
     /// The user ID of the member who owns the question.
     pub owner_user_id: Uuid,
     pub version: i64,
@@ -401,7 +405,12 @@ fn question_view(question: &OpenQuestionRef) -> OpenQuestionView {
     OpenQuestionView {
         open_question_id: question.id.as_uuid(),
         readable_id: question.readable_id(),
-        text: question.text.as_str().to_owned(),
+        text: question
+            .text
+            .as_present()
+            .map(|text| text.as_str().to_owned())
+            .unwrap_or_default(),
+        redacted: question.text == Redactable::Redacted,
         owner_user_id: question.owner.as_uuid(),
         version: question.version.get(),
     }
@@ -823,7 +832,7 @@ mod tests {
             open_questions: vec![OpenQuestionRef {
                 id: OpenQuestionId::from_uuid(Uuid::from_u128(60)),
                 local_number: 1,
-                text: QuestionText::parse("Welcher Samstag?").unwrap(),
+                text: Redactable::Present(QuestionText::parse("Welcher Samstag?").unwrap()),
                 owner: UserId::from_uuid(Uuid::from_u128(1)),
                 version: RecordVersion::FIRST,
             }],
