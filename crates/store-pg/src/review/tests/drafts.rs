@@ -318,7 +318,7 @@ async fn an_accepted_draft_is_a_draft_version_with_its_manifest() {
         .unwrap()
         .unwrap();
     assert_eq!(view.readable_id(), "DOC-001");
-    assert_eq!(view.name, "Konzept Open Day");
+    assert_eq!(view.name.as_present().unwrap(), "Konzept Open Day");
     assert_eq!(view.owner, open_day.manager.user_id());
     assert_eq!(
         view.newest_version.content,

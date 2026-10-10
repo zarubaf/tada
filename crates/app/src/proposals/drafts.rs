@@ -171,7 +171,12 @@ fn cited_passage(
     source: &SourceVersionText,
     link: &drafts::SourceLink,
 ) -> Result<Evidence, &'static str> {
-    let text = source.text.as_ref().ok_or("no-text")?;
+    // A redacted source version has no text to cite either (ADR 0072).
+    let text = source
+        .text
+        .as_present()
+        .and_then(Option::as_ref)
+        .ok_or("no-text")?;
     let passage =
         Passage::of_range(text.as_str(), link.start, link.end).map_err(|_| "out-of-range")?;
     Ok(Evidence {

@@ -7,6 +7,7 @@ use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use tada_domain::ids::{EventId, SourceItemId, SourceVersionId};
+use tada_domain::redaction::Redactable;
 use tada_domain::sources::{self as passages, SourceText};
 use uuid::Uuid;
 
@@ -53,8 +54,8 @@ impl Debug for SourceHit {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceVersionText {
     pub id: SourceVersionId,
-    /// `None` for a file without text, for example a PDF.
-    pub text: Option<SourceText>,
+    /// `None` for a file without text, for example a PDF. `Redacted` after a legal redaction (ADR 0072).
+    pub text: Redactable<Option<SourceText>>,
 }
 
 /// The repository port for source items and source versions. Each method stays inside `scope`.
@@ -89,12 +90,13 @@ pub trait SourceStore: Debug + Send + Sync {
         ids: &[SourceVersionId],
     ) -> Result<Vec<SourceVersionText>, StoreError>;
     /// The normalized text of the source version `id`, if it is inside `reach` and has a text.
+    /// A redacted source version gives `Redacted` (ADR 0072).
     async fn readable_text(
         &self,
         scope: OrgScope,
         reach: &SourceReach,
         id: SourceVersionId,
-    ) -> Result<Option<String>, StoreError>;
+    ) -> Result<Option<Redactable<String>>, StoreError>;
 }
 
 /// The longest passage that `get_source_passage` returns, in characters.
@@ -143,6 +145,9 @@ pub enum PassageError {
     /// The source version does not exist, has no text, or the caller cannot read it.
     #[error("the source version does not exist or the caller cannot read it")]
     NotFound,
+    /// A legal redaction removed the text of the source version (ADR 0072).
+    #[error("the text of the source version is redacted")]
+    ContentRedacted,
     #[error("invalid values")]
     Invalid(Vec<FieldError>),
     #[error(transparent)]
@@ -153,6 +158,7 @@ impl PassageError {
     /// All codes of `get_source_passage`, for the contract of a driving adapter (ADR 0037).
     pub const CODES: &[ProblemCode] = &[
         ProblemCode::NotFound,
+        ProblemCode::ContentRedacted,
         ProblemCode::ValidationFailed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
@@ -163,6 +169,7 @@ impl CommandError for PassageError {
     fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
+            Self::ContentRedacted => ProblemCode::ContentRedacted,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
             Self::Store(error) => error.code(),
         }
@@ -207,6 +214,9 @@ pub async fn get_source_passage(
         .readable_text(caller.scope(), &reach, id)
         .await?
         .ok_or(PassageError::NotFound)?;
+    let Redactable::Present(text) = text else {
+        return Err(PassageError::ContentRedacted);
+    };
     let quote = passages::quote(&text, start, end).map_err(|error| {
         let code = match error {
             passages::PassageError::Empty => "empty",
@@ -288,13 +298,13 @@ mod tests {
             scope: OrgScope,
             reach: &SourceReach,
             id: SourceVersionId,
-        ) -> Result<Option<String>, StoreError> {
+        ) -> Result<Option<Redactable<String>>, StoreError> {
             let inside = match reach {
                 SourceReach::Organization => true,
                 SourceReach::Events(events) => events.contains(&open_day()),
             };
             let found = inside && scope.organization_id() == testwil() && id == source();
-            Ok(found.then(|| TEXT.to_owned()))
+            Ok(found.then(|| Redactable::Present(TEXT.to_owned())))
         }
 
         async fn texts(

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, local_number, name, kind, email, phone, version\n             FROM institution WHERE organization_id = $1 AND id = $2",
+  "query": "SELECT id, local_number, name AS \"name!\", email, phone, user_id, version\n             FROM person WHERE organization_id = $1 AND local_number > $2\n             ORDER BY local_number",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "id"
           }
         }
@@ -20,52 +20,52 @@
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "local_number"
           }
         }
       },
       {
         "ordinal": 2,
-        "name": "name",
+        "name": "name!",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "name"
           }
         }
       },
       {
         "ordinal": 3,
-        "name": "kind",
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "institution",
-            "name": "kind"
-          }
-        }
-      },
-      {
-        "ordinal": 4,
         "name": "email",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "email"
           }
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "phone",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "phone"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "person",
+            "name": "user_id"
           }
         }
       },
@@ -75,7 +75,7 @@
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "version"
           }
         }
@@ -84,18 +84,18 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid"
+        "Int8"
       ]
     },
     "nullable": [
       false,
       false,
-      false,
-      false,
+      true,
+      true,
       true,
       true,
       false
     ]
   },
-  "hash": "0cb978d1b844ba9eedd85db2c90aa2c7f29522ae27bfb73252b7bdd8ea406c53"
+  "hash": "67150973361676e12566f9147f0b6c9111fe7ac550a22c20a6178d061e2f6128"
 }

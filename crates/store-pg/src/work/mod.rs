@@ -208,7 +208,7 @@ async fn select_actions(
 ) -> Result<Vec<ActionView>, sqlx::Error> {
     let rows = sqlx::query_as!(
         ActionRow,
-        r#"SELECT id, event_id, local_number, title, description, owner_user_id, workstream_id,
+        r#"SELECT id, event_id, local_number, title AS "title!", description, owner_user_id, workstream_id,
                   due_date AS "due_date: jiff_sqlx::Date", status, version
            FROM action
            WHERE organization_id = $1
@@ -250,7 +250,7 @@ async fn select_commitments(
     let organization = scope.organization_id().as_uuid();
     let rows = sqlx::query_as!(
         CommitmentRow,
-        r#"SELECT c.id, c.event_id, c.local_number, c.text, c.condition, c.person_id, c.institution_id,
+        r#"SELECT c.id, c.event_id, c.local_number, c.text AS "text!", c.condition, c.person_id, c.institution_id,
                   COALESCE(p.local_number, i.local_number) AS "promisor_number?",
                   COALESCE(p.name, i.name) AS "promisor_name?",
                   c.owner_user_id, c.workstream_id, c.due_date AS "due_date: jiff_sqlx::Date",

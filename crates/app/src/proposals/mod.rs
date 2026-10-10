@@ -556,7 +556,11 @@ async fn check_cited_sources(
         }
         let reach = access::citable_reach(caller, event, stores.identity).await?;
         for source in stores.sources.texts(caller.scope(), &reach, &ids).await? {
-            texts.insert((event, source.id), source.text);
+            // A redacted source version has no text to cite either (ADR 0072).
+            texts.insert(
+                (event, source.id),
+                source.text.as_present().cloned().flatten(),
+            );
         }
     }
     let mut errors = Vec::new();

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT d.id, d.event_id, d.local_number, d.name, d.owner_user_id,\n                  d.created_at AS \"created_at: jiff_sqlx::Timestamp\", d.version,\n                  v.id AS \"version_id!\", v.number AS \"number!\", v.kind AS \"kind!\", v.blob_key,\n                  v.media_type, v.size_bytes, v.sha256 AS \"sha256!\", v.file_name,\n                  v.uploaded_by AS \"uploaded_by!\", v.source_version_id, v.status,\n                  v.created_at AS \"version_created_at!: jiff_sqlx::Timestamp\"\n           FROM document d\n           JOIN LATERAL (\n               SELECT * FROM document_version\n               WHERE organization_id = d.organization_id AND document_id = d.id\n               ORDER BY number DESC\n               LIMIT 1\n           ) v ON true\n           WHERE d.organization_id = $1\n             AND ($2::uuid IS NULL OR d.id = $2)\n             AND ($3::uuid IS NULL OR d.event_id = $3)\n             AND ($4::text IS NULL OR position(lower($4) IN lower(d.name)) > 0)\n             AND ($5::bigint IS NULL OR d.local_number < $5)\n           ORDER BY d.local_number DESC\n           LIMIT $6",
+  "query": "SELECT d.id, d.event_id, d.local_number, d.name, d.redacted_at IS NOT NULL AS \"redacted!\", d.owner_user_id,\n                  d.created_at AS \"created_at: jiff_sqlx::Timestamp\", d.version,\n                  v.id AS \"version_id!\", v.number AS \"number!\", v.kind AS \"kind!\", v.blob_key,\n                  v.media_type, v.size_bytes, v.sha256 AS \"sha256?\", v.file_name,\n                  v.uploaded_by AS \"uploaded_by!\", v.source_version_id, v.status,\n                  v.created_at AS \"version_created_at!: jiff_sqlx::Timestamp\",\n                  v.redacted_at IS NOT NULL AS \"version_redacted!\"\n           FROM document d\n           JOIN LATERAL (\n               SELECT * FROM document_version\n               WHERE organization_id = d.organization_id AND document_id = d.id\n               ORDER BY number DESC\n               LIMIT 1\n           ) v ON true\n           WHERE d.organization_id = $1\n             AND ($2::uuid IS NULL OR d.id = $2)\n             AND ($3::uuid IS NULL OR d.event_id = $3)\n             AND ($4::text IS NULL OR position(lower($4) IN lower(d.name)) > 0)\n             AND ($5::bigint IS NULL OR d.local_number < $5)\n           ORDER BY d.local_number DESC\n           LIMIT $6",
   "describe": {
     "columns": [
       {
@@ -49,6 +49,12 @@
       },
       {
         "ordinal": 4,
+        "name": "redacted!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
         "name": "owner_user_id",
         "type_info": "Uuid",
         "origin": {
@@ -59,7 +65,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "created_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz",
         "origin": {
@@ -70,7 +76,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "version",
         "type_info": "Int8",
         "origin": {
@@ -81,7 +87,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "version_id!",
         "type_info": "Uuid",
         "origin": {
@@ -92,7 +98,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "number!",
         "type_info": "Int4",
         "origin": {
@@ -103,7 +109,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "kind!",
         "type_info": "Text",
         "origin": {
@@ -114,7 +120,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "blob_key",
         "type_info": "Text",
         "origin": {
@@ -125,7 +131,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "media_type",
         "type_info": "Text",
         "origin": {
@@ -136,7 +142,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "size_bytes",
         "type_info": "Int8",
         "origin": {
@@ -147,8 +153,8 @@
         }
       },
       {
-        "ordinal": 13,
-        "name": "sha256!",
+        "ordinal": 14,
+        "name": "sha256?",
         "type_info": "Bytea",
         "origin": {
           "Table": {
@@ -158,7 +164,7 @@
         }
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "file_name",
         "type_info": "Text",
         "origin": {
@@ -169,7 +175,7 @@
         }
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "uploaded_by!",
         "type_info": "Uuid",
         "origin": {
@@ -180,7 +186,7 @@
         }
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "source_version_id",
         "type_info": "Uuid",
         "origin": {
@@ -191,7 +197,7 @@
         }
       },
       {
-        "ordinal": 17,
+        "ordinal": 18,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -202,7 +208,7 @@
         }
       },
       {
-        "ordinal": 18,
+        "ordinal": 19,
         "name": "version_created_at!: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz",
         "origin": {
@@ -211,6 +217,12 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 20,
+        "name": "version_redacted!",
+        "type_info": "Bool",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -227,7 +239,8 @@
       false,
       false,
       false,
-      false,
+      true,
+      null,
       false,
       false,
       false,
@@ -237,13 +250,14 @@
       true,
       true,
       true,
+      true,
+      true,
       false,
       true,
+      true,
       false,
-      true,
-      true,
-      false
+      null
     ]
   },
-  "hash": "fd224839309c3272fe118d191990f7daa85062a0cf80671e946ec7ef5e80f7b9"
+  "hash": "86a35088e93e4dfe4a879d5c02a50c03688bdc8667c49764f465824fc8463c06"
 }

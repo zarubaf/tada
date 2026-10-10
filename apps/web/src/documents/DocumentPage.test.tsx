@@ -30,6 +30,7 @@ function version(number: number, fileName: string, mediaType: string): DocumentV
     uploaded_by: "u2",
     source_version_id: `v${number}`,
     created_at: "2030-05-18T08:00:00Z",
+    redacted: false,
   };
 }
 
@@ -42,6 +43,7 @@ const draft: DocumentVersion = {
   sha256: sha,
   uploaded_by: "u2",
   created_at: "2030-05-19T08:00:00Z",
+  redacted: false,
 };
 
 /** The number of requests for the document that fail before one succeeds. */
@@ -73,6 +75,7 @@ function setup(versions: DocumentVersion[], options: Options = {}) {
     name: "Programm Flugtag.pdf",
     owner: "u1",
     created_at: "2030-05-18T08:00:00Z",
+    redacted: false,
     version: versions.length,
     newest_version: newest,
     ...(options.factsChanged !== undefined && { facts_changed: options.factsChanged }),
@@ -145,6 +148,7 @@ function setup(versions: DocumentVersion[], options: Options = {}) {
         time_zone: "Europe/Zurich",
         version: 1,
         created_at: "2030-05-18T08:00:00Z",
+        redacted: false,
       });
     }
     if (pathname.endsWith("/members")) {

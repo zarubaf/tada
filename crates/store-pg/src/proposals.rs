@@ -705,10 +705,10 @@ impl ProposalStore for Database {
             return Ok(None);
         };
         let rows = sqlx::query!(
-            "SELECT id, operation, operation_version, reason, manifest, lint_warnings
+            r#"SELECT id, operation AS "operation!", operation_version, reason AS "reason!", manifest, lint_warnings
              FROM proposal
              WHERE organization_id = $1 AND changeset_id = $2
-             ORDER BY id",
+             ORDER BY id"#,
             organization,
             id.as_uuid(),
         )
@@ -728,11 +728,11 @@ impl ProposalStore for Database {
         .map_err(store_error)?;
         // The evidence IDs are UUIDv7 in the order of the insert, so this keeps the order of the passages.
         let evidence = sqlx::query!(
-            "SELECT e.proposal_id, e.source_version_id, e.start_offset, e.end_offset, e.quote, e.page
+            r#"SELECT e.proposal_id, e.source_version_id, e.start_offset, e.end_offset, e.quote AS "quote!", e.page
              FROM proposal_evidence e
              JOIN proposal p ON p.organization_id = e.organization_id AND p.id = e.proposal_id
              WHERE e.organization_id = $1 AND p.changeset_id = $2
-             ORDER BY e.id",
+             ORDER BY e.id"#,
             organization,
             id.as_uuid(),
         )
@@ -886,7 +886,7 @@ pub(crate) async fn open_fact_proposals(
     event: EventId,
 ) -> Result<Vec<OpenProposalRef>, StoreError> {
     let rows = sqlx::query!(
-        r#"SELECT p.id, p.changeset_id, p.operation, p.operation_version,
+        r#"SELECT p.id, p.changeset_id, p.operation AS "operation!", p.operation_version,
                   p.created_at AS "created_at: jiff_sqlx::Timestamp"
            FROM proposal p
            WHERE p.organization_id = $1 AND p.event_id = $2 AND p.target_kind = 'fact'
@@ -931,10 +931,10 @@ pub(crate) async fn open_questions(
     event: EventId,
 ) -> Result<Vec<OpenQuestionRef>, StoreError> {
     let rows = sqlx::query!(
-        "SELECT id, local_number, text, owner_user_id, version
+        r#"SELECT id, local_number, text AS "text!", owner_user_id, version
          FROM open_question
          WHERE organization_id = $1 AND event_id = $2 AND status = 'open'
-         ORDER BY local_number",
+         ORDER BY local_number"#,
         scope.organization_id().as_uuid(),
         event.as_uuid(),
     )

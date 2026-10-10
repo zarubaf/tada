@@ -516,7 +516,10 @@ pub struct DocumentSummaryView {
     pub document_id: Uuid,
     /// The readable ID, for example `DOC-001`.
     pub readable_id: String,
+    /// Empty after a legal redaction (ADR 0072).
     pub name: String,
+    /// True after a legal redaction: the name is gone (ADR 0072).
+    pub redacted: bool,
     /// The record version of the document. A draft of this document expects it as `expected_version`.
     pub version: i64,
     pub newest_version: VersionSummaryView,
@@ -537,7 +540,8 @@ impl From<&DocumentView> for DocumentSummaryView {
         Self {
             document_id: document.id.as_uuid(),
             readable_id: document.readable_id(),
-            name: document.name.clone(),
+            name: document.name.as_present().cloned().unwrap_or_default(),
+            redacted: document.name.as_present().is_none(),
             version: document.version.get(),
             newest_version: VersionSummaryView::from(&document.newest_version),
         }
@@ -554,6 +558,8 @@ pub struct VersionSummaryView {
     /// The status of a draft: `draft`, `review`, `approved`, `superseded` or `archived`. Absent for an upload.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<&'static str>,
+    /// True after a legal redaction: the file or the Markdown is gone (ADR 0072).
+    pub redacted: bool,
 }
 
 impl From<&VersionView> for VersionSummaryView {
@@ -567,6 +573,7 @@ impl From<&VersionView> for VersionSummaryView {
             number: version.number,
             kind,
             status,
+            redacted: version.redacted,
         }
     }
 }
@@ -579,7 +586,10 @@ pub struct DraftVersionView {
     pub number: u32,
     /// `draft`, `review`, `approved`, `superseded` or `archived`. An approved version never changes.
     pub status: &'static str,
+    /// Empty after a legal redaction (ADR 0072).
     pub markdown: String,
+    /// True after a legal redaction: the Markdown is gone (ADR 0072).
+    pub redacted: bool,
     pub manifest: ManifestView,
 }
 
@@ -623,7 +633,12 @@ impl From<&StoredDraft> for DraftVersionView {
             document_id: draft.version.document_id.as_uuid(),
             number: draft.version.number,
             status: draft.status.as_str(),
-            markdown: draft.markdown.as_str().to_owned(),
+            markdown: draft
+                .markdown
+                .as_present()
+                .map(|markdown| markdown.as_str().to_owned())
+                .unwrap_or_default(),
+            redacted: draft.version.redacted,
             manifest: ManifestView {
                 facts: draft
                     .manifest

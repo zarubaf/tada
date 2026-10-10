@@ -19,6 +19,7 @@ use tada_app::domain::documents::DraftMarkdown;
 use tada_app::domain::ids::{
     DocumentId, DocumentVersionId, EventId, FactId, LocalIdKind, SourceVersionId, UserId,
 };
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::drafts::{CitedFact, ProvenanceManifest};
 use tada_app::orphans::BlobReferences;
@@ -48,22 +49,25 @@ struct VersionRow {
     blob_key: Option<String>,
     media_type: Option<String>,
     size_bytes: Option<i64>,
-    sha256: Vec<u8>,
+    sha256: Option<Vec<u8>>,
     file_name: Option<String>,
     uploaded_by: Uuid,
     source_version_id: Option<Uuid>,
     status: Option<String>,
     created_at: jiff_sqlx::Timestamp,
+    redacted: bool,
 }
 
 impl VersionRow {
-    /// The content of an upload row: its file.
+    /// The content of an upload row: its file. A legal redaction removes the file name (ADR 0072).
     fn uploaded_file(&self) -> Result<UploadedFile, InvalidRow> {
+        let file_name = match (&self.file_name, self.redacted) {
+            (_, true) => Redactable::Redacted,
+            (Some(name), false) => Redactable::Present(name.clone()),
+            (None, false) => return Err(InvalidRow("document_version.file_name")),
+        };
         Ok(UploadedFile {
-            file_name: self
-                .file_name
-                .clone()
-                .ok_or(InvalidRow("document_version.file_name"))?,
+            file_name,
             file_type: self
                 .media_type
                 .as_deref()
@@ -100,13 +104,18 @@ impl VersionRow {
             document_id: DocumentId::from_uuid(self.document_id),
             number: u32::try_from(self.number)
                 .map_err(|_| InvalidRow("document_version.number"))?,
-            sha256: self
-                .sha256
-                .clone()
-                .try_into()
-                .map_err(|_| InvalidRow("document_version.sha256"))?,
+            sha256: match (&self.sha256, self.redacted) {
+                (_, true) => Redactable::Redacted,
+                (Some(hash), false) => Redactable::Present(
+                    hash.clone()
+                        .try_into()
+                        .map_err(|_| InvalidRow("document_version.sha256"))?,
+                ),
+                (None, false) => return Err(InvalidRow("document_version.sha256")),
+            },
             uploaded_by: UserId::from_uuid(self.uploaded_by),
             created_at: self.created_at.to_jiff(),
+            redacted: self.redacted,
             content: self.content()?,
         })
     }
@@ -133,7 +142,8 @@ struct DocumentRow {
     id: Uuid,
     event_id: Uuid,
     local_number: i64,
-    name: String,
+    name: Option<String>,
+    redacted: bool,
     owner_user_id: Uuid,
     created_at: jiff_sqlx::Timestamp,
     version: i64,
@@ -143,12 +153,13 @@ struct DocumentRow {
     blob_key: Option<String>,
     media_type: Option<String>,
     size_bytes: Option<i64>,
-    sha256: Vec<u8>,
+    sha256: Option<Vec<u8>>,
     file_name: Option<String>,
     uploaded_by: Uuid,
     source_version_id: Option<Uuid>,
     status: Option<String>,
     version_created_at: jiff_sqlx::Timestamp,
+    version_redacted: bool,
 }
 
 impl TryFrom<DocumentRow> for DocumentView {
@@ -170,14 +181,20 @@ impl TryFrom<DocumentRow> for DocumentView {
             source_version_id: row.source_version_id,
             status: row.status,
             created_at: row.version_created_at,
+            redacted: row.version_redacted,
         }
         .view()?;
+        let name = match (row.name, row.redacted) {
+            (_, true) => Redactable::Redacted,
+            (Some(name), false) => Redactable::Present(name),
+            (None, false) => return Err(InvalidRow("document.name")),
+        };
         Ok(DocumentView {
             id: DocumentId::from_uuid(row.id),
             event_id: EventId::from_uuid(row.event_id),
             local_number: u64::try_from(row.local_number)
                 .map_err(|_| InvalidRow("document.local_number"))?,
-            name: row.name,
+            name,
             owner: UserId::from_uuid(row.owner_user_id),
             created_at: row.created_at.to_jiff(),
             version: RecordVersion::new(row.version).ok_or(InvalidRow("document.version"))?,
@@ -207,12 +224,13 @@ async fn documents(
         .map(|cursor| i64::try_from(cursor.0).unwrap_or(i64::MAX));
     let rows = sqlx::query_as!(
         DocumentRow,
-        r#"SELECT d.id, d.event_id, d.local_number, d.name, d.owner_user_id,
+        r#"SELECT d.id, d.event_id, d.local_number, d.name, d.redacted_at IS NOT NULL AS "redacted!", d.owner_user_id,
                   d.created_at AS "created_at: jiff_sqlx::Timestamp", d.version,
                   v.id AS "version_id!", v.number AS "number!", v.kind AS "kind!", v.blob_key,
-                  v.media_type, v.size_bytes, v.sha256 AS "sha256!", v.file_name,
+                  v.media_type, v.size_bytes, v.sha256 AS "sha256?", v.file_name,
                   v.uploaded_by AS "uploaded_by!", v.source_version_id, v.status,
-                  v.created_at AS "version_created_at!: jiff_sqlx::Timestamp"
+                  v.created_at AS "version_created_at!: jiff_sqlx::Timestamp",
+                  v.redacted_at IS NOT NULL AS "version_redacted!"
            FROM document d
            JOIN LATERAL (
                SELECT * FROM document_version
@@ -253,7 +271,7 @@ async fn versions(
         VersionRow,
         r#"SELECT v.id, v.document_id, d.event_id, v.number, v.kind, v.blob_key, v.media_type,
                   v.size_bytes, v.sha256, v.file_name, v.uploaded_by, v.source_version_id, v.status,
-                  v.created_at AS "created_at: jiff_sqlx::Timestamp"
+                  v.created_at AS "created_at: jiff_sqlx::Timestamp", v.redacted_at IS NOT NULL AS "redacted!"
            FROM document_version v
            JOIN document d ON d.organization_id = v.organization_id AND d.id = v.document_id
            WHERE v.organization_id = $1
@@ -604,14 +622,21 @@ impl DocumentStore for Database {
         }
         let organization = scope.organization_id().as_uuid();
         let markdown = sqlx::query_scalar!(
-            r#"SELECT markdown AS "markdown!" FROM document_version
-               WHERE organization_id = $1 AND id = $2 AND markdown IS NOT NULL"#,
+            "SELECT markdown FROM document_version WHERE organization_id = $1 AND id = $2",
             organization,
             id.as_uuid(),
         )
         .fetch_one(&mut *conn)
         .await
         .map_err(store_error)?;
+        let markdown = match (markdown, row.redacted) {
+            (_, true) => Redactable::Redacted,
+            (Some(markdown), false) => Redactable::Present(
+                DraftMarkdown::parse(&markdown)
+                    .map_err(|_| InvalidRow("document_version.markdown"))?,
+            ),
+            (None, false) => return Err(InvalidRow("document_version.markdown").into()),
+        };
         let facts = sqlx::query!(
             "SELECT fact_id, fact_version_number FROM document_manifest_fact
              WHERE organization_id = $1 AND document_version_id = $2
@@ -625,12 +650,14 @@ impl DocumentStore for Database {
         // The offsets count characters of the normalized text, and `substr` counts characters too.
         // A draft cites only source versions with text (ADR 0051), so a cited version without text is a broken
         // row: the read fails instead of a manifest that differs from the stored one.
+        // A redacted source version has no passage, so the manifest leaves it out and its link shows „entfernt“
+        // (ADR 0072).
         let sources = sqlx::query!(
             r#"SELECT m.source_version_id, m.start_offset, m.end_offset,
                       substr(s.text, m.start_offset + 1, m.end_offset - m.start_offset) AS quote
                FROM document_manifest_source m
                JOIN source_version s ON s.organization_id = m.organization_id AND s.id = m.source_version_id
-               WHERE m.organization_id = $1 AND m.document_version_id = $2
+               WHERE m.organization_id = $1 AND m.document_version_id = $2 AND s.redacted_at IS NULL
                ORDER BY m.source_version_id, m.start_offset, m.end_offset"#,
             organization,
             id.as_uuid(),
@@ -673,8 +700,7 @@ impl DocumentStore for Database {
         };
         Ok(Some(StoredDraft {
             event_id: EventId::from_uuid(row.event_id),
-            markdown: DraftMarkdown::parse(&markdown)
-                .map_err(|_| InvalidRow("document_version.markdown"))?,
+            markdown,
             status,
             version,
             manifest,
@@ -894,15 +920,15 @@ mod tests {
 
         assert_eq!(document.readable_id(), "DOC-001");
         assert_eq!(document.event_id, f.event);
-        assert_eq!(document.name, "Programm.txt");
+        assert_eq!(document.name.as_present().unwrap(), "Programm.txt");
         assert_eq!(document.owner, f.caller.user_id());
         assert_eq!(document.version, RecordVersion::FIRST);
         let version = &document.newest_version;
         assert_eq!(version.id, upload.version_id);
         assert_eq!(version.number, 1);
-        assert_eq!(version.sha256, upload.sha256);
+        assert_eq!(version.sha256, Redactable::Present(upload.sha256));
         let file = version.file().unwrap();
-        assert_eq!(file.file_name, "Programm.txt");
+        assert_eq!(file.file_name.as_present().unwrap(), "Programm.txt");
         assert_eq!(file.file_type, FileType::Text);
         assert_eq!(file.size_bytes, 18);
         assert_eq!(file.source_version_id, upload.source_version_id);
@@ -969,12 +995,19 @@ mod tests {
 
         assert_eq!(changed.version, RecordVersion::new(2).unwrap());
         assert_eq!(
-            changed.name, "Programm.txt",
+            changed.name.as_present().unwrap(),
+            "Programm.txt",
             "the name stays the name of the first upload"
         );
         assert_eq!(changed.newest_version.number, 2);
         assert_eq!(
-            changed.newest_version.file().unwrap().file_name,
+            changed
+                .newest_version
+                .file()
+                .unwrap()
+                .file_name
+                .as_present()
+                .unwrap(),
             "Programm-neu.txt"
         );
         let after = test
@@ -984,8 +1017,8 @@ mod tests {
             .unwrap();
         assert_eq!(after.len(), 2);
         assert_eq!(after[0], before[0]);
-        assert_eq!(after[0].sha256, first.sha256);
-        assert_eq!(after[1].sha256, second.sha256);
+        assert_eq!(after[0].sha256, Redactable::Present(first.sha256));
+        assert_eq!(after[1].sha256, Redactable::Present(second.sha256));
         // Both uploads are versions of one source item (ADR 0050).
         assert_eq!(count(&test, "source_item").await, 1);
         assert_eq!(count(&test, "source_version").await, 2);
@@ -1094,7 +1127,7 @@ mod tests {
         let names = |documents: Vec<DocumentView>| -> Vec<String> {
             documents
                 .into_iter()
-                .map(|document| document.name)
+                .filter_map(|document| document.name.as_present().cloned())
                 .collect()
         };
         let all = test
@@ -1159,7 +1192,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(stored.blob_key, first.blob_key);
-        assert_eq!(stored.version.sha256, first.sha256);
+        assert_eq!(stored.version.sha256, Redactable::Present(first.sha256));
     }
 
     #[tokio::test]
@@ -1198,7 +1231,10 @@ mod tests {
         let upload = upload(&f, new_document(&f), "Inventar.csv", text.as_bytes());
         let document = published(&test, &f, &upload).await;
 
-        assert_eq!(document.newest_version.sha256, upload.sha256);
+        assert_eq!(
+            document.newest_version.sha256,
+            Redactable::Present(upload.sha256)
+        );
         let without_text: bool = test
             .scalar(&format!(
                 "SELECT text IS NULL FROM source_version WHERE id = '{}'",

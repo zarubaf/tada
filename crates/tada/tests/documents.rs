@@ -247,6 +247,61 @@ async fn a_new_version_keeps_the_first_one() {
     assert_eq!(first, pdf("Version 1"));
 }
 
+/// A redacted version keeps its structure, shows `redacted` without a file name, and its download answers 410
+/// `content-redacted` (ADR 0072).
+#[tokio::test]
+async fn download_of_redacted_version_is_410() {
+    let api = Api::start().await;
+    let (_, document) = api
+        .upload(&api.owner_cookie, "Max Muster.pdf", &pdf("Max Muster"))
+        .await;
+    let id = document["id"].as_str().unwrap();
+    let version = document["newest_version"]["id"].as_str().unwrap();
+    assert_eq!(document["redacted"], false);
+    assert_eq!(document["newest_version"]["redacted"], false);
+
+    api.test
+        .redact(&[
+            &format!(
+                "UPDATE document_version SET file_name = NULL, sha256 = NULL, redacted_at = now() WHERE id = '{version}'"
+            ),
+            &format!("UPDATE document SET name = NULL, redacted_at = now() WHERE id = '{id}'"),
+        ])
+        .await;
+
+    let (status, problem) = api.get(&api.owner_cookie, &content_path(&document)).await;
+    assert_eq!(status, StatusCode::GONE, "{problem}");
+    assert_eq!(problem["code"], "content-redacted");
+
+    let (status, read) = api
+        .get(&api.owner_cookie, &format!("/api/v1/documents/{id}"))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{read}");
+    assert_eq!(read["redacted"], true);
+    assert_eq!(read["name"], "");
+    assert_eq!(read["newest_version"]["redacted"], true);
+    assert_eq!(read["newest_version"]["sha256"], "");
+    assert!(read["newest_version"].get("file_name").is_none(), "{read}");
+    assert_eq!(read["newest_version"]["number"], 1);
+
+    let (status, list) = api
+        .get(
+            &api.owner_cookie,
+            &format!("/api/v1/documents/{id}/versions"),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{list}");
+    assert_eq!(list["items"][0]["redacted"], true);
+    let (status, page) = api
+        .get(
+            &api.owner_cookie,
+            &format!("/api/v1/events/{}/documents", api.event),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(page["items"][0]["redacted"], true);
+}
+
 #[tokio::test]
 async fn rejects_a_renamed_executable_with_415() {
     let api = Api::start().await;

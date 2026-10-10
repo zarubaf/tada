@@ -150,9 +150,9 @@ async fn uploads_a_pdf_as_the_first_version_of_doc_001() {
     assert_eq!(document.readable_id(), "DOC-001");
     let version = &document.newest_version;
     assert_eq!(version.number, 1);
-    assert_eq!(version.sha256, sha256(&content));
+    assert_eq!(version.sha256.as_present(), Some(&sha256(&content)));
     let file = version.file().unwrap();
-    assert_eq!(file.file_name, "Programm.pdf");
+    assert_eq!(file.file_name.as_present().unwrap(), "Programm.pdf");
     assert_eq!(file.file_type.media_type(), "application/pdf");
     assert_eq!(file.size_bytes, content.len() as u64);
     assert_eq!(f.read(&f.owner, &document).await, content);
@@ -198,8 +198,8 @@ async fn a_second_version_keeps_the_first_version_readable_and_unchanged() {
     assert_eq!(versions[0], document.newest_version);
     assert_eq!(f.read(&f.owner, &document).await, first);
     assert_eq!(
-        sha256(&f.read(&f.owner, &document).await),
-        versions[0].sha256
+        Some(&sha256(&f.read(&f.owner, &document).await)),
+        versions[0].sha256.as_present()
     );
     assert_eq!(f.read(&f.owner, &changed).await, second);
     assert_eq!(f.garage.keys().await.len(), 2);
@@ -389,7 +389,8 @@ async fn finds_documents_by_name_and_stores_the_text_of_a_text_file() {
         .unwrap();
     assert_eq!(notes.readable_id(), "DOC-002");
     assert_eq!(
-        notes.name, "Notizen.md",
+        notes.name.as_present().unwrap(),
+        "Notizen.md",
         "the name has no bidirectional control"
     );
 

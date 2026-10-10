@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE institution\n             SET name = $4, kind = $5, email = $6, phone = $7, version = version + 1,\n                 updated_at = $8\n             WHERE organization_id = $1 AND id = $2 AND version = $3\n             RETURNING id, local_number, name, kind, email, phone, version",
+  "query": "UPDATE person\n             SET name = $4, email = $5, phone = $6, user_id = $7, version = version + 1,\n                 updated_at = $8\n             WHERE organization_id = $1 AND id = $2 AND version = $3\n             RETURNING id, local_number, name AS \"name!\", email, phone, user_id, version",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "id"
           }
         }
@@ -20,52 +20,52 @@
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "local_number"
           }
         }
       },
       {
         "ordinal": 2,
-        "name": "name",
+        "name": "name!",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "name"
           }
         }
       },
       {
         "ordinal": 3,
-        "name": "kind",
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "institution",
-            "name": "kind"
-          }
-        }
-      },
-      {
-        "ordinal": 4,
         "name": "email",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "email"
           }
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "phone",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "phone"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "person",
+            "name": "user_id"
           }
         }
       },
@@ -75,7 +75,7 @@
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "institution",
+            "table": "person",
             "name": "version"
           }
         }
@@ -89,19 +89,19 @@
         "Text",
         "Text",
         "Text",
-        "Text",
+        "Uuid",
         "Timestamptz"
       ]
     },
     "nullable": [
       false,
       false,
-      false,
-      false,
+      true,
+      true,
       true,
       true,
       false
     ]
   },
-  "hash": "18e9251f08a742b4e81ab3324b46431bc27b4ed4aebc9d9140e9efe32f869ffc"
+  "hash": "a1bcd758bd8165abbaa1ff6b5fe00cbbf1e708fa798597ed5be2ce6fe3183717"
 }

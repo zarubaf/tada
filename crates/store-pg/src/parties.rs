@@ -213,11 +213,11 @@ impl PartyStore for Database {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         let row = sqlx::query_as!(
             PersonRow,
-            "UPDATE person
+            r#"UPDATE person
              SET name = $4, email = $5, phone = $6, user_id = $7, version = version + 1,
                  updated_at = $8
              WHERE organization_id = $1 AND id = $2 AND version = $3
-             RETURNING id, local_number, name, email, phone, user_id, version",
+             RETURNING id, local_number, name AS "name!", email, phone, user_id, version"#,
             organization,
             id.as_uuid(),
             expected.get(),
@@ -257,8 +257,8 @@ impl PartyStore for Database {
     ) -> Result<Option<PersonView>, StoreError> {
         let row = sqlx::query_as!(
             PersonRow,
-            "SELECT id, local_number, name, email, phone, user_id, version
-             FROM person WHERE organization_id = $1 AND id = $2",
+            r#"SELECT id, local_number, name AS "name!", email, phone, user_id, version
+             FROM person WHERE organization_id = $1 AND id = $2"#,
             scope.organization_id().as_uuid(),
             id.as_uuid(),
         )
@@ -277,9 +277,9 @@ impl PartyStore for Database {
     ) -> Result<Vec<PersonView>, StoreError> {
         let rows = sqlx::query_as!(
             PersonRow,
-            "SELECT id, local_number, name, email, phone, user_id, version
+            r#"SELECT id, local_number, name AS "name!", email, phone, user_id, version
              FROM person WHERE organization_id = $1 AND local_number > $2
-             ORDER BY local_number",
+             ORDER BY local_number"#,
             scope.organization_id().as_uuid(),
             after_number(after),
         )
@@ -334,11 +334,11 @@ impl PartyStore for Database {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         let row = sqlx::query_as!(
             InstitutionRow,
-            "UPDATE institution
+            r#"UPDATE institution
              SET name = $4, kind = $5, email = $6, phone = $7, version = version + 1,
                  updated_at = $8
              WHERE organization_id = $1 AND id = $2 AND version = $3
-             RETURNING id, local_number, name, kind, email, phone, version",
+             RETURNING id, local_number, name AS "name!", kind, email, phone, version"#,
             organization,
             id.as_uuid(),
             expected.get(),
@@ -378,8 +378,8 @@ impl PartyStore for Database {
     ) -> Result<Option<InstitutionView>, StoreError> {
         let row = sqlx::query_as!(
             InstitutionRow,
-            "SELECT id, local_number, name, kind, email, phone, version
-             FROM institution WHERE organization_id = $1 AND id = $2",
+            r#"SELECT id, local_number, name AS "name!", kind, email, phone, version
+             FROM institution WHERE organization_id = $1 AND id = $2"#,
             scope.organization_id().as_uuid(),
             id.as_uuid(),
         )
@@ -398,9 +398,9 @@ impl PartyStore for Database {
     ) -> Result<Vec<InstitutionView>, StoreError> {
         let rows = sqlx::query_as!(
             InstitutionRow,
-            "SELECT id, local_number, name, kind, email, phone, version
+            r#"SELECT id, local_number, name AS "name!", kind, email, phone, version
              FROM institution WHERE organization_id = $1 AND local_number > $2
-             ORDER BY local_number",
+             ORDER BY local_number"#,
             scope.organization_id().as_uuid(),
             after_number(after),
         )
@@ -421,16 +421,18 @@ impl PartyStore for Database {
     ) -> Result<Vec<PartyRef>, StoreError> {
         let organization = scope.organization_id().as_uuid();
         let persons = sqlx::query!(
-            "SELECT id, local_number, name FROM person
-             WHERE organization_id = $1 ORDER BY local_number",
+            // A redacted party has no name to match (ADR 0072).
+            r#"SELECT id, local_number, name AS "name!" FROM person
+               WHERE organization_id = $1 AND redacted_at IS NULL ORDER BY local_number"#,
             organization,
         )
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
         let institutions = sqlx::query!(
-            "SELECT id, local_number, name FROM institution
-             WHERE organization_id = $1 ORDER BY local_number",
+            // A redacted party has no name to match (ADR 0072).
+            r#"SELECT id, local_number, name AS "name!" FROM institution
+               WHERE organization_id = $1 AND redacted_at IS NULL ORDER BY local_number"#,
             organization,
         )
         .fetch_all(&self.pool)

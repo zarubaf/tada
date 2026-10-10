@@ -21,6 +21,7 @@ use tada_domain::documents::DraftMarkdown;
 use tada_domain::ids::{
     DocumentId, DocumentVersionId, EventId, LocalIdKind, SourceVersionId, UserId,
 };
+use tada_domain::redaction::Redactable;
 use tada_domain::sources::SourceText;
 use uuid::Uuid;
 
@@ -59,7 +60,8 @@ pub struct DocumentView {
     /// The number of the readable ID `DOC-<n>`, unique in the organization.
     pub local_number: u64,
     /// The file name of the first upload, or the name that the draft proposal of a new document gave.
-    pub name: String,
+    /// A legal redaction removes it (ADR 0072).
+    pub name: Redactable<String>,
     /// The member who created the document.
     pub owner: UserId,
     pub created_at: Timestamp,
@@ -97,11 +99,13 @@ pub struct VersionView {
     pub document_id: DocumentId,
     /// 1 for the first version of the document, then 2, 3 and so on.
     pub number: u32,
-    /// The SHA-256 hash of the content.
-    pub sha256: [u8; 32],
+    /// The SHA-256 hash of the content. A legal redaction removes it (ADR 0072).
+    pub sha256: Redactable<[u8; 32]>,
     /// The member who added the version.
     pub uploaded_by: UserId,
     pub created_at: Timestamp,
+    /// True after a legal redaction (ADR 0072): the version keeps its structure, but its file or Markdown is gone.
+    pub redacted: bool,
     pub content: VersionContent,
 }
 
@@ -162,8 +166,8 @@ impl DraftStatus {
 /// The file of an upload version.
 #[derive(Clone, PartialEq, Eq)]
 pub struct UploadedFile {
-    /// The original file name, after `sanitize_file_name`.
-    pub file_name: String,
+    /// The original file name, after `sanitize_file_name`. A legal redaction removes it (ADR 0072).
+    pub file_name: Redactable<String>,
     pub file_type: FileType,
     pub size_bytes: u64,
     /// The source version of the kind `upload` that holds the same file (ADR 0050).
@@ -196,7 +200,8 @@ pub struct StoredDraft {
     pub version: VersionView,
     /// The status of the draft, so that a reader of a draft never meets an upload.
     pub status: DraftStatus,
-    pub markdown: DraftMarkdown,
+    /// A legal redaction removes the Markdown (ADR 0072).
+    pub markdown: Redactable<DraftMarkdown>,
     /// The fact versions and source passages that the draft cites, fixed with its proposal.
     pub manifest: ProvenanceManifest,
 }
@@ -671,6 +676,9 @@ pub enum ReadDocumentError {
     /// The event, the document or the version is not in the caller's organization, or the caller has no event role in its event.
     #[error("the record does not exist or the caller cannot see it")]
     NotFound,
+    /// A legal redaction removed the content of the version (ADR 0072).
+    #[error("the content of the document version is redacted")]
+    ContentRedacted,
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -679,6 +687,7 @@ impl ReadDocumentError {
     /// All codes that the document queries can return, for the API contract (ADR 0037).
     pub const CODES: &[ProblemCode] = &[
         ProblemCode::NotFound,
+        ProblemCode::ContentRedacted,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -688,6 +697,7 @@ impl CommandError for ReadDocumentError {
     fn code(&self) -> ProblemCode {
         match self {
             Self::NotFound => ProblemCode::NotFound,
+            Self::ContentRedacted => ProblemCode::ContentRedacted,
             Self::Store(error) => error.code(),
         }
     }
@@ -695,7 +705,7 @@ impl CommandError for ReadDocumentError {
     fn store_error(&self) -> Option<&StoreError> {
         match self {
             Self::Store(error) => Some(error),
-            Self::NotFound => None,
+            Self::NotFound | Self::ContentRedacted => None,
         }
     }
 }
@@ -782,6 +792,7 @@ pub async fn list_versions(
 }
 
 /// The upload version `id` and the stream of its file. A draft version has no file: it is not found here.
+/// A redacted version has no file either: it answers `content-redacted` (ADR 0072).
 pub async fn download(
     caller: &impl Principal,
     id: DocumentVersionId,
@@ -793,6 +804,9 @@ pub async fn download(
         .await?
         .ok_or(ReadDocumentError::NotFound)?;
     check_may_read(caller, stored.event_id, stores.identity).await?;
+    if stored.version.redacted {
+        return Err(ReadDocumentError::ContentRedacted);
+    }
     let body = stores
         .blobs
         .get(&stored.blob_key)
@@ -817,7 +831,7 @@ mod tests {
             id,
             event_id: EventId::from_uuid(Uuid::from_u128(2)),
             local_number,
-            name: "Programm.pdf".to_owned(),
+            name: Redactable::Present("Programm.pdf".to_owned()),
             owner: UserId::from_uuid(Uuid::from_u128(3)),
             created_at: Timestamp::UNIX_EPOCH,
             version: RecordVersion::FIRST,
@@ -825,11 +839,12 @@ mod tests {
                 id: DocumentVersionId::from_uuid(Uuid::from_u128(4)),
                 document_id: id,
                 number: 1,
-                sha256: [0; 32],
+                sha256: Redactable::Present([0; 32]),
                 uploaded_by: UserId::from_uuid(Uuid::from_u128(3)),
                 created_at: Timestamp::UNIX_EPOCH,
+                redacted: false,
                 content: VersionContent::Upload(UploadedFile {
-                    file_name: "Programm.pdf".to_owned(),
+                    file_name: Redactable::Present("Programm.pdf".to_owned()),
                     file_type: FileType::Pdf,
                     size_bytes: 10,
                     source_version_id: SourceVersionId::from_uuid(Uuid::from_u128(5)),

@@ -923,7 +923,10 @@ mod tests {
             _: tada_app::caller::OrgScope,
             _: &tada_app::access::SourceReach,
             _: tada_app::domain::ids::SourceVersionId,
-        ) -> Result<Option<String>, tada_app::store::StoreError> {
+        ) -> Result<
+            Option<tada_app::domain::redaction::Redactable<String>>,
+            tada_app::store::StoreError,
+        > {
             unreachable!()
         }
 

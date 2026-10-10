@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, local_number, name FROM person\n             WHERE organization_id = $1 ORDER BY local_number",
+  "query": "SELECT id, local_number, name AS \"name!\" FROM person\n               WHERE organization_id = $1 AND redacted_at IS NULL ORDER BY local_number",
   "describe": {
     "columns": [
       {
@@ -27,7 +27,7 @@
       },
       {
         "ordinal": 2,
-        "name": "name",
+        "name": "name!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -45,8 +45,8 @@
     "nullable": [
       false,
       false,
-      false
+      true
     ]
   },
-  "hash": "454b46815b6543b99b21e517c8fdaddcfaac56a049a25aea842d056b899d8d25"
+  "hash": "f3e87c14f531ad486f66fcdac66905b232e695dc84a1ca336b12ea8599e38e17"
 }

@@ -1,21 +1,10 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT p.id, p.changeset_id, p.operation, p.operation_version,\n                  p.created_at AS \"created_at: jiff_sqlx::Timestamp\"\n           FROM proposal p\n           WHERE p.organization_id = $1 AND p.event_id = $2 AND p.target_kind = 'fact'\n             AND NOT EXISTS (\n                 SELECT 1 FROM review_result r\n                 WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id\n             )\n           ORDER BY p.created_at, p.id",
+  "query": "SELECT p.changeset_id, p.id, p.operation AS \"operation!\", p.operation_version\n               FROM proposal p\n               JOIN changeset c ON c.organization_id = p.organization_id AND c.id = p.changeset_id\n               WHERE p.organization_id = $1 AND ($2::uuid IS NULL OR c.event_id = $2)\n                 AND NOT EXISTS (\n                     SELECT 1 FROM review_result r\n                     WHERE r.organization_id = p.organization_id AND r.proposal_id = p.id\n                 )\n               ORDER BY p.id",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
-        "type_info": "Uuid",
-        "origin": {
-          "Table": {
-            "table": "proposal",
-            "name": "id"
-          }
-        }
-      },
-      {
-        "ordinal": 1,
         "name": "changeset_id",
         "type_info": "Uuid",
         "origin": {
@@ -26,8 +15,19 @@
         }
       },
       {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "proposal",
+            "name": "id"
+          }
+        }
+      },
+      {
         "ordinal": 2,
-        "name": "operation",
+        "name": "operation!",
         "type_info": "Jsonb",
         "origin": {
           "Table": {
@@ -46,17 +46,6 @@
             "name": "operation_version"
           }
         }
-      },
-      {
-        "ordinal": 4,
-        "name": "created_at: jiff_sqlx::Timestamp",
-        "type_info": "Timestamptz",
-        "origin": {
-          "Table": {
-            "table": "proposal",
-            "name": "created_at"
-          }
-        }
       }
     ],
     "parameters": {
@@ -69,9 +58,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "42dc303bd5e35bfb2f053b505d9c45aba0845b5c1adbaaa80c3387b11e7352a0"
+  "hash": "875175fbbb34411658d0e46de97ce556b5aaf05e372829bb6a28a6e19b9297b9"
 }

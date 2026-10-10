@@ -11,6 +11,7 @@ use sqlx::{PgConnection, PgPool};
 use tada_app::access::SourceReach;
 use tada_app::caller::{Actor, OrgScope};
 use tada_app::domain::ids::{EventId, SourceItemId, SourceVersionId};
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::SourceText;
 use tada_app::sources::{SourceHit, SourceStore, SourceVersionRef, SourceVersionText};
 use tada_app::store::StoreError;
@@ -107,7 +108,7 @@ impl SourceStore for Database {
         scope: OrgScope,
         reach: &SourceReach,
         id: SourceVersionId,
-    ) -> Result<Option<String>, StoreError> {
+    ) -> Result<Option<Redactable<String>>, StoreError> {
         let rows = readable_versions(
             &self.pool,
             scope,
@@ -118,7 +119,13 @@ impl SourceStore for Database {
             true,
         )
         .await?;
-        Ok(rows.into_iter().find_map(|row| row.text))
+        Ok(rows.into_iter().next().and_then(|row| {
+            if row.redacted {
+                Some(Redactable::Redacted)
+            } else {
+                row.text.map(Redactable::Present)
+            }
+        }))
     }
 
     async fn texts(
@@ -135,18 +142,24 @@ impl SourceStore for Database {
             .into_iter()
             .map(|row| SourceVersionText {
                 id: SourceVersionId::from_uuid(row.id),
-                // The stored text is normalized already; normalizing it again keeps it unchanged.
-                text: row.text.as_deref().map(SourceText::normalize),
+                text: if row.redacted {
+                    Redactable::Redacted
+                } else {
+                    // The stored text is normalized already; normalizing it again keeps it unchanged.
+                    Redactable::Present(row.text.as_deref().map(SourceText::normalize))
+                },
             })
             .collect())
     }
 }
 
-/// A source version that a caller can read. A file without text, for example a PDF, has no text.
+/// A source version that a caller can read. A file without text, for example a PDF, has no text,
+/// and a redacted source version has none either (ADR 0072).
 struct ReadableVersion {
     id: Uuid,
     captured_at: jiff_sqlx::Timestamp,
     text: Option<String>,
+    redacted: bool,
 }
 
 /// The source versions of `ids` that `reach` can read, without their texts.
@@ -185,7 +198,7 @@ async fn readable_versions(
     sqlx::query_as!(
         ReadableVersion,
         r#"SELECT v.id, v.captured_at AS "captured_at: jiff_sqlx::Timestamp",
-                  CASE WHEN $7 THEN v.text END AS text
+                  CASE WHEN $7 THEN v.text END AS text, v.redacted_at IS NOT NULL AS "redacted!"
            FROM source_version v
            JOIN source_item i ON i.organization_id = v.organization_id AND i.id = v.source_item_id
            WHERE v.organization_id = $1
@@ -531,7 +544,10 @@ mod tests {
         assert_eq!(found(SourceReach::Organization).await.len(), 3);
 
         let text = |reach: SourceReach, id| async move {
-            db.readable_text(scope, &reach, id).await.unwrap()
+            db.readable_text(scope, &reach, id)
+                .await
+                .unwrap()
+                .and_then(|text| text.as_present().cloned())
         };
         assert_eq!(
             text(events(&[open_day]), by_fact).await.as_deref(),
@@ -565,7 +581,7 @@ mod tests {
             .readable_text(anna.scope(), &events(&[open_day]), source)
             .await
             .unwrap();
-        assert_eq!(text.as_deref(), Some("Das Flugfeld."));
+        assert_eq!(text, Some(Redactable::Present("Das Flugfeld.".to_owned())));
         for (scope, reach) in [
             (anna.scope(), events(&[workshop])),
             (anna.scope(), events(&[])),
@@ -585,6 +601,70 @@ mod tests {
                 .unwrap(),
             None
         );
+    }
+
+    /// A redacted source version reads as redacted: no text, no passage and no search hit (ADR 0072).
+    #[tokio::test]
+    async fn redacted_source_reads_as_redacted() {
+        let test = TestDatabase::start().await;
+        let db = &test.database;
+        let testwil = test.create_organization("testwil").await;
+        let open_day = test.create_event(testwil, "TEST30").await;
+        let anna = member(testwil);
+        let kept = add(&test, &anna, open_day, "Das Flugfeld bleibt.").await.id;
+        let removed = add(&test, &anna, open_day, "Das Flugfeld von Max Muster.")
+            .await
+            .id;
+
+        let mut tx = db.pool.begin().await.unwrap();
+        sqlx::query("SET LOCAL tada.redaction = 'on'")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE source_version
+             SET text = NULL, url = NULL, sha256 = NULL, redacted_at = now(),
+                 author_actor = jsonb_build_object('kind', author_actor -> 'kind', 'id', author_actor -> 'id')
+             WHERE id = $1",
+        )
+        .bind(removed.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        let reach = events(&[open_day]);
+        assert_eq!(
+            db.readable_text(anna.scope(), &reach, removed)
+                .await
+                .unwrap(),
+            Some(Redactable::Redacted)
+        );
+        let texts = db
+            .texts(anna.scope(), &reach, &[kept, removed])
+            .await
+            .unwrap();
+        let text_of = |id| {
+            texts
+                .iter()
+                .find(|text| text.id == id)
+                .map(|text| &text.text)
+        };
+        assert_eq!(
+            text_of(kept),
+            Some(&Redactable::Present(Some(SourceText::normalize(
+                "Das Flugfeld bleibt."
+            ))))
+        );
+        assert_eq!(text_of(removed), Some(&Redactable::Redacted));
+        let hits: Vec<_> = db
+            .search(anna.scope(), &reach, "Flugfeld", 10)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|hit| hit.source_version_id)
+            .collect();
+        assert_eq!(hits, [kept]);
     }
 
     /// A search finds only source versions of its organization and of the given events (ADR 0006).

@@ -169,7 +169,7 @@ impl ReviewStore for Database {
         let organization = scope.organization_id().as_uuid();
         let event = event.map(EventId::as_uuid);
         let proposals = sqlx::query!(
-            r#"SELECT p.changeset_id, p.id, p.operation, p.operation_version
+            r#"SELECT p.changeset_id, p.id, p.operation AS "operation!", p.operation_version
                FROM proposal p
                JOIN changeset c ON c.organization_id = p.organization_id AND c.id = p.changeset_id
                WHERE p.organization_id = $1 AND ($2::uuid IS NULL OR c.event_id = $2)

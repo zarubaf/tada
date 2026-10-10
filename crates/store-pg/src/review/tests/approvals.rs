@@ -2,13 +2,14 @@
 
 use tada_app::audit::{AuditAction, AuditEvent};
 use tada_app::documents::{
-    ApproveError, DocumentReads, DocumentStore, DraftStatus, LineKind, Resolution, VersionContent,
-    approve_version, diff_versions, facts_changed, render_context,
+    ApproveError, DocumentReads, DocumentStore, DraftStatus, LineKind, ReadDocumentError,
+    Resolution, VersionContent, approve_version, diff_versions, facts_changed, render_context,
 };
 use tada_app::domain::RecordVersion;
 use tada_app::domain::documents::DraftMarkdown;
 use tada_app::domain::ids::{ChangesetId, DocumentId, DocumentVersionId, SourceVersionId};
 use tada_app::domain::proposals::Operation;
+use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::drafts::source_uri;
 use tada_app::proposals::Inserted;
@@ -97,6 +98,66 @@ async fn status_of_version(test: &TestDatabase, version: DocumentVersionId) -> S
         "SELECT status FROM document_version WHERE id = '{version}'"
     ))
     .await
+}
+
+/// A redacted draft has no content: its approval is an invalid transition, and its rendering and difference
+/// answer `content-redacted` (ADR 0072).
+#[tokio::test]
+async fn a_redacted_draft_cannot_be_approved_or_rendered() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let document = Uuid::now_v7();
+    let first = add_draft(
+        &test,
+        &open_day,
+        new_document(document),
+        document,
+        "Erste Fassung.\n",
+    )
+    .await;
+    let second = add_draft(
+        &test,
+        &open_day,
+        existing(document, 1),
+        document,
+        "Zweite Fassung.\n",
+    )
+    .await;
+    test.redact(&[&format!(
+        "UPDATE document_version SET markdown = NULL, sha256 = NULL, redacted_at = now() WHERE id = '{second}'"
+    )])
+    .await;
+
+    let result = approve(&test, &open_day.manager, second, 2).await;
+    assert!(
+        matches!(result, Err(ApproveError::InvalidTransition)),
+        "{result:?}"
+    );
+    assert_eq!(status_of_version(&test, second).await, "draft");
+    let rendering = render_context(&open_day.manager, second, reads(&test)).await;
+    assert!(
+        matches!(rendering, Err(ReadDocumentError::ContentRedacted)),
+        "{rendering:?}"
+    );
+    let diff = diff_versions(
+        &open_day.manager,
+        DocumentId::from_uuid(document),
+        first,
+        second,
+        reads(&test),
+    )
+    .await;
+    assert!(
+        matches!(diff, Err(ReadDocumentError::ContentRedacted)),
+        "{diff:?}"
+    );
+    let draft = DocumentStore::draft(&test.database, open_day.manager.scope(), second)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(draft.version.redacted);
+    assert_eq!(draft.version.sha256, Redactable::Redacted);
+    assert_eq!(draft.markdown, Redactable::Redacted);
 }
 
 /// Acceptance (7): nobody can overwrite an approved version. A new draft is a new version, and the approved

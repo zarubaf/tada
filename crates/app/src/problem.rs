@@ -20,6 +20,8 @@ pub enum ProblemCode {
     NotFound,
     RecordVersionConflict,
     InvalidTransition,
+    EventClosed,
+    ContentRedacted,
     PayloadTooLarge,
     UnsupportedMediaType,
     ValidationFailed,
@@ -29,7 +31,7 @@ pub enum ProblemCode {
 }
 
 impl ProblemCode {
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 16] = [
         Self::MalformedRequest,
         Self::Unauthenticated,
         Self::OrganizationRequired,
@@ -38,6 +40,8 @@ impl ProblemCode {
         Self::NotFound,
         Self::RecordVersionConflict,
         Self::InvalidTransition,
+        Self::EventClosed,
+        Self::ContentRedacted,
         Self::PayloadTooLarge,
         Self::UnsupportedMediaType,
         Self::ValidationFailed,
@@ -56,6 +60,8 @@ impl ProblemCode {
             Self::NotFound => "not-found",
             Self::RecordVersionConflict => "record-version-conflict",
             Self::InvalidTransition => "invalid-transition",
+            Self::EventClosed => "event-closed",
+            Self::ContentRedacted => "content-redacted",
             Self::PayloadTooLarge => "payload-too-large",
             Self::UnsupportedMediaType => "unsupported-media-type",
             Self::ValidationFailed => "validation-failed",
@@ -80,7 +86,8 @@ impl ProblemCode {
             // The member is signed in but must sign in again for this action.
             Self::Forbidden | Self::OrganizationRequired | Self::RecentSignInRequired => 403,
             Self::NotFound => 404,
-            Self::RecordVersionConflict | Self::InvalidTransition => 409,
+            Self::RecordVersionConflict | Self::InvalidTransition | Self::EventClosed => 409,
+            Self::ContentRedacted => 410,
             Self::PayloadTooLarge => 413,
             Self::UnsupportedMediaType => 415,
             Self::ValidationFailed => 422,
@@ -109,6 +116,10 @@ impl ProblemCode {
             }
             Self::RecordVersionConflict => "The record changed after the caller read it.",
             Self::InvalidTransition => "The current state does not allow this change.",
+            Self::EventClosed => {
+                "The event is closed, so it is read-only. An owner or admin can reopen it."
+            }
+            Self::ContentRedacted => "A legal redaction removed the content of the record.",
             Self::PayloadTooLarge => "The body is larger than the limit.",
             Self::UnsupportedMediaType => "The media type is not supported.",
             Self::ValidationFailed => "Values break a domain rule. The `errors` list names them.",

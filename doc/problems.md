@@ -16,6 +16,8 @@ A code never changes its meaning. A code that is no longer used stays reserved.
 | <a id="not-found"></a>`not-found`                             | 404    | The record does not exist, or it is in a scope the caller cannot see.                              |
 | <a id="record-version-conflict"></a>`record-version-conflict` | 409    | The record changed after the caller read it.                                                       |
 | <a id="invalid-transition"></a>`invalid-transition`           | 409    | The current state does not allow this change.                                                      |
+| <a id="event-closed"></a>`event-closed`                       | 409    | The event is closed, so it is read-only. An owner or admin can reopen it.                          |
+| <a id="content-redacted"></a>`content-redacted`               | 410    | A legal redaction removed the content of the record.                                               |
 | <a id="payload-too-large"></a>`payload-too-large`             | 413    | The body is larger than the limit.                                                                 |
 | <a id="unsupported-media-type"></a>`unsupported-media-type`   | 415    | The media type is not supported.                                                                   |
 | <a id="validation-failed"></a>`validation-failed`             | 422    | Values break a domain rule. The `errors` list names them.                                          |

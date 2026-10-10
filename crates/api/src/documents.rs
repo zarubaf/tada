@@ -113,8 +113,10 @@ pub struct Document {
     pub event_id: Uuid,
     /// The readable ID, unique in the organization, for example `DOC-001`.
     pub readable_id: String,
-    /// The file name of the first upload.
+    /// The file name of the first upload. It is empty after a legal redaction (ADR 0072).
     pub name: String,
+    /// True after a legal redaction: the name is gone (ADR 0072).
+    pub redacted: bool,
     /// The user ID of the member who created the document.
     pub owner: Uuid,
     pub created_at: Timestamp,
@@ -133,7 +135,8 @@ impl From<DocumentView> for Document {
             id: document.id.as_uuid(),
             event_id: document.event_id.as_uuid(),
             readable_id: document.readable_id(),
-            name: document.name,
+            redacted: document.name.as_present().is_none(),
+            name: document.name.as_present().cloned().unwrap_or_default(),
             owner: document.owner.as_uuid(),
             created_at: document.created_at,
             version: document.version.get(),
@@ -191,7 +194,8 @@ pub struct DocumentVersion {
     /// The status of a draft. It is absent for an upload.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<DraftVersionStatus>,
-    /// The file name of the upload, without control characters and path separators. It is absent for a draft.
+    /// The file name of the upload, without control characters and path separators. It is absent for a draft
+    /// and after a legal redaction.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_name: Option<String>,
     /// The media type that tada detected from the content (ADR 0055). It is absent for a draft.
@@ -200,7 +204,7 @@ pub struct DocumentVersion {
     /// It is absent for a draft.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size_bytes: Option<u64>,
-    /// The SHA-256 hash of the content, as lowercase hexadecimal digits.
+    /// The SHA-256 hash of the content, as lowercase hexadecimal digits. It is empty after a legal redaction.
     pub sha256: String,
     /// The user ID of the member who added the version: the member who uploaded the file, or for a draft,
     /// the member who accepted its proposal.
@@ -209,6 +213,9 @@ pub struct DocumentVersion {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_version_id: Option<Uuid>,
     pub created_at: Timestamp,
+    /// True after a legal redaction (ADR 0072): the file or the Markdown is gone, and a download or a rendering
+    /// answers `content-redacted`.
+    pub redacted: bool,
 }
 
 impl From<VersionView> for DocumentVersion {
@@ -225,17 +232,19 @@ impl From<VersionView> for DocumentVersion {
             number: version.number,
             kind,
             status,
-            file_name: file.map(|file| file.file_name.clone()),
+            file_name: file.and_then(|file| file.file_name.as_present().cloned()),
             media_type: file.map(|file| file.file_type.media_type().to_owned()),
             size_bytes: file.map(|file| file.size_bytes),
+            // Empty after a legal redaction (ADR 0072).
             sha256: version
                 .sha256
-                .iter()
-                .map(|byte| format!("{byte:02x}"))
-                .collect(),
+                .as_present()
+                .map(|hash| hash.iter().map(|byte| format!("{byte:02x}")).collect())
+                .unwrap_or_default(),
             uploaded_by: version.uploaded_by.as_uuid(),
             source_version_id: file.map(|file| file.source_version_id.as_uuid()),
             created_at: version.created_at,
+            redacted: version.redacted,
         }
     }
 }
@@ -563,16 +572,18 @@ async fn download_document_version(
         state.document_stores(),
     )
     .await?;
-    // `download` answers `not-found` for a draft, so the version has a file.
+    // `download` answers `not-found` for a draft and `content-redacted` for a redacted version,
+    // so the version has a file with a name.
     let file = version
         .file()
         .ok_or_else(|| ApiError::new(ProblemCode::NotFound))?;
+    let file_name = file
+        .file_name
+        .as_present()
+        .ok_or_else(|| ApiError::new(ProblemCode::ContentRedacted))?;
     let inline = query.disposition.unwrap_or_default() == Disposition::Inline
         && file.file_type.inline_preview();
-    let disposition = content_disposition(
-        if inline { "inline" } else { "attachment" },
-        &file.file_name,
-    )?;
+    let disposition = content_disposition(if inline { "inline" } else { "attachment" }, file_name)?;
     let headers = [
         (
             header::CONTENT_TYPE,
@@ -1062,9 +1073,10 @@ mod tests {
             id: DocumentVersionId::from_uuid(Uuid::from_u128(1)),
             document_id: DocumentId::from_uuid(Uuid::from_u128(2)),
             number: 2,
-            sha256: [0; 32],
+            sha256: tada_app::domain::redaction::Redactable::Present([0; 32]),
             uploaded_by: UserId::from_uuid(Uuid::from_u128(3)),
             created_at: Timestamp::UNIX_EPOCH,
+            redacted: false,
             content: VersionContent::Draft {
                 status: DraftStatus::Review,
             },
