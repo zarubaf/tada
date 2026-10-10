@@ -289,7 +289,8 @@ document-diff-unchanged = unverändert
 
 ## Drafts: the rendered text, its sources and the lint (ADR 0051, ADR 0058)
 
-draft-removed = entfernt
+# The tombstone of a redacted value (ADR 0072).
+redacted = entfernt
 # $value: the value as the member sees it, with its state of knowledge. $label: the field.
 draft-fact-evidence = { $value }, Beleg zu { $label }
 # $version: the fact version that the draft cites.

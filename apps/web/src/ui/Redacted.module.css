@@ -1,0 +1,6 @@
+@layer components {
+  .redacted {
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+}

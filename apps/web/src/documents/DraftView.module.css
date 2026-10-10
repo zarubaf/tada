@@ -4,14 +4,9 @@
     gap: var(--space-4);
   }
 
-  .removed,
   .note {
     color: var(--color-text-muted);
     font-size: var(--font-size-sm);
-  }
-
-  .removed {
-    font-style: italic;
   }
 
   .cited {

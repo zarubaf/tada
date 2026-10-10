@@ -9,6 +9,7 @@ import { Button } from "../ui/Button";
 import { useFocusAfterCommit } from "../ui/focus";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { LazyMarkdown } from "../ui/LazyMarkdown";
+import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./DraftView.module.css";
 import { sourceNumbers } from "./draftLinks";
@@ -52,10 +53,6 @@ function lookup(profile: ProfileState, factId: string): { fact?: Fact; field?: F
   const fact = profile.profile.facts.find((candidate) => candidate.id === factId);
   const field = fact && profile.fields.find((candidate) => candidate.id === fact.field_id);
   return { ...(fact && { fact }), ...(field && { field }) };
-}
-
-function Removed() {
-  return <span className={styles.removed}>{t("draft-removed")}</span>;
 }
 
 /**
@@ -140,7 +137,7 @@ export function DraftView({
       switch (target?.kind) {
         case undefined:
         case "hidden":
-          return <Removed />;
+          return <Redacted />;
         case "fact":
           return (
             <FactLink
