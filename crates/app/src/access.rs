@@ -1,5 +1,6 @@
 //! Event access (ADR 0052): the only place that decides what a caller can do in an event.
 
+use tada_domain::events::EventStatus;
 use tada_domain::identity::{EventRole, OrganizationRole};
 use tada_domain::ids::{EventId, UserId};
 
@@ -76,11 +77,27 @@ impl EventLevel {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EventAccess {
     level: EventLevel,
+    /// False if the event is closed: a closed event is read-only for every role (ADR 0071).
+    writable: bool,
 }
 
 impl EventAccess {
     pub fn level(self) -> EventLevel {
         self.level
+    }
+
+    /// The access in the organization outside any event, for example to a new event that a changeset creates:
+    /// there, owners and admins act as event manager and nothing is closed.
+    pub(crate) fn organization_wide() -> Self {
+        Self {
+            level: EventLevel::Manager,
+            writable: true,
+        }
+    }
+
+    /// False if the event is closed. A closed event shows no right to change a record.
+    pub fn is_writable(self) -> bool {
+        self.writable
     }
 
     pub fn can_read(self) -> bool {
@@ -101,6 +118,21 @@ impl EventAccess {
 
     pub fn can_approve_documents(self) -> bool {
         self.level.can_approve_documents()
+    }
+}
+
+/// The refusal of a write to a closed event. Each command error that a write can return has a variant for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("the event is closed")]
+pub struct EventClosed;
+
+/// The one check of the read-only rule (ADR 0071): each command that writes in an event calls it once,
+/// right after `event_access`.
+pub fn require_writable(access: &EventAccess) -> Result<(), EventClosed> {
+    if access.writable {
+        Ok(())
+    } else {
+        Err(EventClosed)
     }
 }
 
@@ -192,9 +224,10 @@ pub async fn event_access(
     identity: &dyn IdentityStore,
 ) -> Result<EventAccess, AccessError> {
     let scope = caller.scope();
-    if sees_all_events(caller) && !identity.event_exists(scope, event_id).await? {
-        return Err(AccessError::NotFound);
-    }
+    let status = identity
+        .event_status(scope, event_id)
+        .await?
+        .ok_or(AccessError::NotFound)?;
     let level = role_access(
         scope,
         event_id,
@@ -204,7 +237,10 @@ pub async fn event_access(
     )
     .await?
     .ok_or(AccessError::NotFound)?;
-    Ok(EventAccess { level })
+    Ok(EventAccess {
+        level,
+        writable: status == EventStatus::Active,
+    })
 }
 
 /// True if `caller` can propose in at least one event of its organization (ADR 0052):
@@ -347,6 +383,8 @@ mod tests {
     #[derive(Debug, Default)]
     struct MemoryIdentity {
         events: Vec<(OrganizationId, EventId)>,
+        /// True if each event is closed.
+        closed: Mutex<bool>,
         roles: Mutex<HashMap<(EventId, UserId), EventRole>>,
         /// The organization role of each member of Testwil.
         members: Mutex<HashMap<UserId, OrganizationRole>>,
@@ -373,8 +411,19 @@ mod tests {
             Ok(self.members.lock().unwrap().get(&user).copied())
         }
 
-        async fn event_exists(&self, scope: OrgScope, event: EventId) -> Result<bool, StoreError> {
-            Ok(self.events.contains(&(scope.organization_id(), event)))
+        async fn event_status(
+            &self,
+            scope: OrgScope,
+            event: EventId,
+        ) -> Result<Option<EventStatus>, StoreError> {
+            if !self.events.contains(&(scope.organization_id(), event)) {
+                return Ok(None);
+            }
+            Ok(Some(if *self.closed.lock().unwrap() {
+                EventStatus::Closed
+            } else {
+                EventStatus::Active
+            }))
         }
 
         async fn event_role(
@@ -423,6 +472,7 @@ mod tests {
     fn identity() -> MemoryIdentity {
         MemoryIdentity {
             events: vec![(testwil(), open_day())],
+            closed: Mutex::default(),
             roles: Mutex::default(),
             members: Mutex::default(),
         }
@@ -442,6 +492,34 @@ mod tests {
         for (role, expected) in roles {
             assert_eq!(is_owner(&caller(testwil(), role)), expected);
         }
+    }
+
+    #[tokio::test]
+    async fn a_closed_event_is_read_only_for_every_role() {
+        let identity = identity();
+        let owner = caller(testwil(), OrganizationRole::Owner);
+        let access = event_access(&owner, open_day(), &identity).await.unwrap();
+        assert_eq!(require_writable(&access), Ok(()));
+
+        *identity.closed.lock().unwrap() = true;
+        let access = event_access(&owner, open_day(), &identity).await.unwrap();
+        assert_eq!(access.level(), EventLevel::Manager);
+        assert!(access.can_read());
+        assert_eq!(require_writable(&access), Err(EventClosed));
+
+        let member = caller(testwil(), OrganizationRole::Member);
+        identity
+            .members
+            .lock()
+            .unwrap()
+            .insert(anna(), OrganizationRole::Member);
+        identity
+            .roles
+            .lock()
+            .unwrap()
+            .insert((open_day(), anna()), EventRole::EventContributor);
+        let access = event_access(&member, open_day(), &identity).await.unwrap();
+        assert_eq!(require_writable(&access), Err(EventClosed));
     }
 
     #[tokio::test]

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, organization_id, key, name, time_zone, version,\n                      created_at AS \"created_at: jiff_sqlx::Timestamp\"\n               FROM event\n               WHERE organization_id = $1 AND key = $2",
+  "query": "SELECT id, organization_id, key, name, time_zone, version, status,\n                      created_at AS \"created_at: jiff_sqlx::Timestamp\",\n                      closed_at AS \"closed_at: jiff_sqlx::Timestamp\",\n                      redacted_at AS \"redacted_at: jiff_sqlx::Timestamp\"\n               FROM event\n               WHERE organization_id = $1\n                 AND ($2::text IS NULL OR (key, id) > ($2, $3))\n               ORDER BY key, id\n               LIMIT $4",
   "describe": {
     "columns": [
       {
@@ -71,6 +71,17 @@
       },
       {
         "ordinal": 6,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
         "name": "created_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz",
         "origin": {
@@ -79,12 +90,36 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 8,
+        "name": "closed_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "closed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "redacted_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "redacted_at"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "Text"
+        "Text",
+        "Uuid",
+        "Int8"
       ]
     },
     "nullable": [
@@ -94,8 +129,11 @@
       false,
       false,
       false,
-      false
+      false,
+      false,
+      true,
+      true
     ]
   },
-  "hash": "f10b8c41968b7401013663443c15eb37ebfb307fb6702b3f3582e6328cd8841d"
+  "hash": "6570d955f69b81ff9c01924fd8f781fc123d8fd31f96d4e1ecc0ce2fc9d5cf6f"
 }

@@ -25,7 +25,7 @@ use tada_domain::redaction::Redactable;
 use tada_domain::sources::SourceText;
 use uuid::Uuid;
 
-use crate::access::{self, AccessError, Principal};
+use crate::access::{self, AccessError, EventClosed, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::blobs::{BlobError, BlobKey, BlobStore, ByteStream};
 use crate::caller::{Actor, MemberCaller, OrgScope};
@@ -453,6 +453,9 @@ pub enum UploadError {
     /// The stream of the upload failed, for example because the client disconnected.
     #[error("the upload stream failed")]
     Interrupted(#[source] io::Error),
+    /// The event is closed and takes no writes (ADR 0071).
+    #[error(transparent)]
+    Closed(#[from] EventClosed),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -466,6 +469,7 @@ impl UploadError {
         ProblemCode::PayloadTooLarge,
         ProblemCode::UnsupportedMediaType,
         ProblemCode::ValidationFailed,
+        ProblemCode::EventClosed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -486,6 +490,7 @@ impl CommandError for UploadError {
             Self::UnsupportedType => ProblemCode::UnsupportedMediaType,
             Self::QuotaExceeded => ProblemCode::ValidationFailed,
             Self::Interrupted(_) => ProblemCode::MalformedRequest,
+            Self::Closed(_) => ProblemCode::EventClosed,
             Self::Store(error) => error.code(),
         }
     }
@@ -577,10 +582,9 @@ async fn check_may_upload(
     event_id: EventId,
     identity: &dyn IdentityStore,
 ) -> Result<(), UploadError> {
-    if access::event_access(caller, event_id, identity)
-        .await?
-        .can_propose()
-    {
+    let access = access::event_access(caller, event_id, identity).await?;
+    access::require_writable(&access)?;
+    if access.can_propose() {
         Ok(())
     } else {
         Err(UploadError::Forbidden)

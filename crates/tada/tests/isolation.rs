@@ -283,6 +283,18 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
             get(api(format!("/events/{}", t.b_event)), Expect::NotFound),
             get(api(format!("/events/{}", t.a_event)), reads(&t.a_event)),
         ],
+        "close_event" | "reopen_event" => {
+            let action = if operation == "close_event" {
+                "close"
+            } else {
+                "reopen"
+            };
+            vec![post(
+                api(format!("/events/{}/{action}", t.b_event)),
+                json!({"expected_version": 1}),
+                Expect::NotFound,
+            )]
+        }
         // Telegram link requests.
         "create_telegram_link_code" => {
             vec![command(api("/telegram/link-codes".into()), Expect::Writes)]

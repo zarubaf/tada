@@ -14,7 +14,7 @@ use sqlx::types::Uuid;
 use tada_app::caller::{Actor, OrgScope};
 use tada_app::domain::RecordVersion;
 use tada_app::domain::documents::DraftMarkdown;
-use tada_app::domain::events::Event;
+use tada_app::domain::events::{Event, EventStatus};
 use tada_app::domain::facts::{ChoiceValue, FactState, FieldStatus, Label, ValueType, Valued};
 use tada_app::domain::ids::{
     ChangesetId, DocumentId, EventId, FieldDefinitionId, LocalIdKind, OpenQuestionId, ProposalId,
@@ -695,6 +695,9 @@ async fn write_step(
                 time_zone: time_zone.clone(),
                 version: RecordVersion::FIRST,
                 created_at: plan.now,
+                status: EventStatus::Active,
+                closed_at: None,
+                redacted_at: None,
             };
             // The reviewer who accepts the new event is its first event manager (ADR 0052).
             events::insert_event(conn, scope, &event, plan.manager).await?;

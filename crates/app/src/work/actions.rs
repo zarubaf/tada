@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use super::checks::{
     changed, check_owner, check_workstream, created, may_change, parse_description, parse_title,
-    require_change, require_create, show, show_one,
+    require_change, require_create, show, show_one, writable_access,
 };
 use super::{ActionFields, ActionView, NewActionRecord, WorkError, WorkPorts, WorkQuery};
 use crate::access::{self, Principal};
@@ -102,7 +102,7 @@ pub async fn change_action(
     change: ActionChange,
     ports: WorkPorts<'_>,
 ) -> Result<Shown<ActionView>, WorkError> {
-    let access = access::event_access(caller, event, ports.identity).await?;
+    let access = writable_access(caller, event, ports.identity).await?;
     let scope = caller.scope();
     let current = ports
         .work

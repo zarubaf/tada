@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use tada_app::caller::OrgScope;
+use tada_app::domain::events::EventStatus;
 use tada_app::domain::identity::{DisplayName, EventRole, OrganizationRole};
 use tada_app::domain::ids::{EventId, OrganizationId, UserId};
 use tada_app::identity::{IdentityStore, Membership, UserRef};
@@ -73,15 +74,22 @@ impl IdentityStore for Database {
         Ok(role.as_deref().map(organization_role).transpose()?)
     }
 
-    async fn event_exists(&self, scope: OrgScope, event: EventId) -> Result<bool, StoreError> {
-        sqlx::query_scalar!(
-            r#"SELECT EXISTS (SELECT 1 FROM event WHERE organization_id = $1 AND id = $2) AS "exists!""#,
+    async fn event_status(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+    ) -> Result<Option<EventStatus>, StoreError> {
+        let status = sqlx::query_scalar!(
+            "SELECT status FROM event WHERE organization_id = $1 AND id = $2",
             scope.organization_id().as_uuid(),
             event.as_uuid(),
         )
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
-        .map_err(store_error)
+        .map_err(store_error)?;
+        Ok(status
+            .map(|status| status.parse().map_err(|_| InvalidRow("event.status")))
+            .transpose()?)
     }
 
     async fn event_role(
@@ -306,32 +314,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_event_exists_only_in_its_organization() {
+    async fn an_event_has_a_status_only_in_its_organization() {
         let test = TestDatabase::start().await;
         let testwil = test.create_organization("testwil").await;
         let musterhausen = test.create_organization("musterhausen").await;
         let event = create_event(&test, testwil).await;
-        assert!(
-            test.database
-                .event_exists(scope(testwil), event)
-                .await
-                .unwrap()
-        );
-        assert!(
-            !test
-                .database
-                .event_exists(scope(musterhausen), event)
-                .await
-                .unwrap()
-        );
+        let db = &test.database;
+        let status = |organization, event| async move {
+            db.event_status(scope(organization), event).await.unwrap()
+        };
+        assert_eq!(status(testwil, event).await, Some(EventStatus::Active));
+        assert_eq!(status(musterhausen, event).await, None);
         let unknown = EventId::from_uuid(Uuid::now_v7());
-        assert!(
-            !test
-                .database
-                .event_exists(scope(testwil), unknown)
-                .await
-                .unwrap()
-        );
+        assert_eq!(status(testwil, unknown).await, None);
+
+        sqlx::query("UPDATE event SET status = 'closed', closed_at = now()")
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(status(testwil, event).await, Some(EventStatus::Closed));
     }
 
     #[tokio::test]

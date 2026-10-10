@@ -1,6 +1,7 @@
 //! The `EventStore` adapter.
 
 use async_trait::async_trait;
+use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
@@ -24,6 +25,9 @@ struct EventRow {
     time_zone: String,
     version: i64,
     created_at: jiff_sqlx::Timestamp,
+    status: String,
+    closed_at: Option<jiff_sqlx::Timestamp>,
+    redacted_at: Option<jiff_sqlx::Timestamp>,
 }
 
 impl TryFrom<EventRow> for Event {
@@ -39,6 +43,9 @@ impl TryFrom<EventRow> for Event {
                 .map_err(|_| InvalidRow("event.time_zone"))?,
             version: RecordVersion::new(row.version).ok_or(InvalidRow("event.version"))?,
             created_at: row.created_at.to_jiff(),
+            status: row.status.parse().map_err(|_| InvalidRow("event.status"))?,
+            closed_at: row.closed_at.map(|at| at.to_jiff()),
+            redacted_at: row.redacted_at.map(|at| at.to_jiff()),
         })
     }
 }
@@ -110,8 +117,10 @@ impl EventStore for Database {
     async fn get(&self, scope: OrgScope, id: EventId) -> Result<Option<Event>, StoreError> {
         let row = sqlx::query_as!(
             EventRow,
-            r#"SELECT id, organization_id, key, name, time_zone, version,
-                      created_at AS "created_at: jiff_sqlx::Timestamp"
+            r#"SELECT id, organization_id, key, name, time_zone, version, status,
+                      created_at AS "created_at: jiff_sqlx::Timestamp",
+                      closed_at AS "closed_at: jiff_sqlx::Timestamp",
+                      redacted_at AS "redacted_at: jiff_sqlx::Timestamp"
                FROM event
                WHERE organization_id = $1 AND id = $2"#,
             scope.organization_id().as_uuid(),
@@ -130,8 +139,10 @@ impl EventStore for Database {
     ) -> Result<Option<Event>, StoreError> {
         let row = sqlx::query_as!(
             EventRow,
-            r#"SELECT id, organization_id, key, name, time_zone, version,
-                      created_at AS "created_at: jiff_sqlx::Timestamp"
+            r#"SELECT id, organization_id, key, name, time_zone, version, status,
+                      created_at AS "created_at: jiff_sqlx::Timestamp",
+                      closed_at AS "closed_at: jiff_sqlx::Timestamp",
+                      redacted_at AS "redacted_at: jiff_sqlx::Timestamp"
                FROM event
                WHERE organization_id = $1 AND key = $2"#,
             scope.organization_id().as_uuid(),
@@ -151,8 +162,10 @@ impl EventStore for Database {
     ) -> Result<Vec<Event>, StoreError> {
         let rows = sqlx::query_as!(
             EventRow,
-            r#"SELECT id, organization_id, key, name, time_zone, version,
-                      created_at AS "created_at: jiff_sqlx::Timestamp"
+            r#"SELECT id, organization_id, key, name, time_zone, version, status,
+                      created_at AS "created_at: jiff_sqlx::Timestamp",
+                      closed_at AS "closed_at: jiff_sqlx::Timestamp",
+                      redacted_at AS "redacted_at: jiff_sqlx::Timestamp"
                FROM event
                WHERE organization_id = $1
                  AND ($2::text IS NULL OR (key, id) > ($2, $3))
@@ -181,8 +194,10 @@ impl EventStore for Database {
     ) -> Result<Vec<Event>, StoreError> {
         let rows = sqlx::query_as!(
             EventRow,
-            r#"SELECT e.id, e.organization_id, e.key, e.name, e.time_zone, e.version,
-                      e.created_at AS "created_at: jiff_sqlx::Timestamp"
+            r#"SELECT e.id, e.organization_id, e.key, e.name, e.time_zone, e.version, e.status,
+                      e.created_at AS "created_at: jiff_sqlx::Timestamp",
+                      e.closed_at AS "closed_at: jiff_sqlx::Timestamp",
+                      e.redacted_at AS "redacted_at: jiff_sqlx::Timestamp"
                FROM event e
                JOIN event_membership m ON m.organization_id = e.organization_id AND m.event_id = e.id
                WHERE e.organization_id = $1
@@ -204,6 +219,77 @@ impl EventStore for Database {
             .map(Event::try_from)
             .collect::<Result<_, _>>()?)
     }
+
+    async fn close(
+        &self,
+        scope: OrgScope,
+        id: EventId,
+        expected_version: RecordVersion,
+        at: Timestamp,
+        audit: &AuditEvent,
+    ) -> Result<Option<Event>, StoreError> {
+        let mut tx = self.pool.begin().await.map_err(store_error)?;
+        let row = sqlx::query_as!(
+            EventRow,
+            r#"UPDATE event
+               SET status = 'closed', closed_at = $4, version = version + 1
+               WHERE organization_id = $1 AND id = $2 AND version = $3 AND status = 'active'
+               RETURNING id, organization_id, key, name, time_zone, version, status,
+                         created_at AS "created_at: jiff_sqlx::Timestamp",
+                         closed_at AS "closed_at: jiff_sqlx::Timestamp",
+                         redacted_at AS "redacted_at: jiff_sqlx::Timestamp""#,
+            scope.organization_id().as_uuid(),
+            id.as_uuid(),
+            expected_version.get(),
+            at.to_sqlx() as _,
+        )
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        finish(tx, row, audit).await
+    }
+
+    async fn reopen(
+        &self,
+        scope: OrgScope,
+        id: EventId,
+        expected_version: RecordVersion,
+        audit: &AuditEvent,
+    ) -> Result<Option<Event>, StoreError> {
+        let mut tx = self.pool.begin().await.map_err(store_error)?;
+        let row = sqlx::query_as!(
+            EventRow,
+            r#"UPDATE event
+               SET status = 'active', closed_at = NULL, version = version + 1
+               WHERE organization_id = $1 AND id = $2 AND version = $3
+                 AND status = 'closed' AND redacted_at IS NULL
+               RETURNING id, organization_id, key, name, time_zone, version, status,
+                         created_at AS "created_at: jiff_sqlx::Timestamp",
+                         closed_at AS "closed_at: jiff_sqlx::Timestamp",
+                         redacted_at AS "redacted_at: jiff_sqlx::Timestamp""#,
+            scope.organization_id().as_uuid(),
+            id.as_uuid(),
+            expected_version.get(),
+        )
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(store_error)?;
+        finish(tx, row, audit).await
+    }
+}
+
+/// Records the audit event and commits if the update changed a row.
+async fn finish(
+    mut tx: sqlx::Transaction<'_, sqlx::Postgres>,
+    row: Option<EventRow>,
+    audit: &AuditEvent,
+) -> Result<Option<Event>, StoreError> {
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    audit::record(&mut tx, audit).await.map_err(store_error)?;
+    tx.commit().await.map_err(store_error)?;
+    Ok(Some(Event::try_from(row)?))
 }
 
 #[cfg(test)]
@@ -216,6 +302,7 @@ mod tests {
 
     use super::*;
     use crate::testing::TestDatabase;
+    use tada_app::domain::events::EventStatus;
 
     fn scope(organization: OrganizationId) -> OrgScope {
         MemberCaller::new(UserId::from_uuid(Uuid::now_v7()), organization, Owner).scope()
@@ -251,6 +338,9 @@ mod tests {
             time_zone: EventTimeZone::default_zone(),
             version: RecordVersion::FIRST,
             created_at: "2030-05-18T08:00:00.123456Z".parse::<Timestamp>().unwrap(),
+            status: EventStatus::Active,
+            closed_at: None,
+            redacted_at: None,
         }
     }
 

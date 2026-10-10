@@ -10,7 +10,7 @@ use tada_domain::redaction::Redactable;
 use tada_domain::work::{WorkstreamName, WorkstreamStatus};
 use uuid::Uuid;
 
-use crate::access::{self, AccessError, EventLevel, Principal};
+use crate::access::{self, AccessError, EventClosed, EventLevel, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -135,6 +135,9 @@ pub enum WorkstreamError {
     /// A legal redaction removed the name of the workstream, so it cannot change (ADR 0072).
     #[error("the workstream is redacted")]
     InvalidTransition,
+    /// The event is closed and takes no writes (ADR 0071).
+    #[error(transparent)]
+    Closed(#[from] EventClosed),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -147,6 +150,7 @@ impl WorkstreamError {
         ProblemCode::ValidationFailed,
         ProblemCode::RecordVersionConflict,
         ProblemCode::InvalidTransition,
+        ProblemCode::EventClosed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -160,6 +164,7 @@ impl CommandError for WorkstreamError {
             Self::Invalid(_) => ProblemCode::ValidationFailed,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
             Self::InvalidTransition => ProblemCode::InvalidTransition,
+            Self::Closed(_) => ProblemCode::EventClosed,
             Self::Store(error) => error.code(),
         }
     }
@@ -198,7 +203,9 @@ async fn require_manager(
     event: EventId,
     identity: &dyn IdentityStore,
 ) -> Result<(), WorkstreamError> {
-    match access::event_access(caller, event, identity).await?.level() {
+    let access = access::event_access(caller, event, identity).await?;
+    access::require_writable(&access)?;
+    match access.level() {
         EventLevel::Manager => Ok(()),
         _ => Err(WorkstreamError::Forbidden),
     }
@@ -416,8 +423,13 @@ mod tests {
                 .then_some(OrganizationRole::Member))
         }
 
-        async fn event_exists(&self, _: OrgScope, event: EventId) -> Result<bool, StoreError> {
-            Ok(event == open_day() || event == other_event())
+        async fn event_status(
+            &self,
+            _: OrgScope,
+            event: EventId,
+        ) -> Result<Option<tada_domain::events::EventStatus>, StoreError> {
+            Ok((event == open_day() || event == other_event())
+                .then_some(tada_domain::events::EventStatus::Active))
         }
 
         async fn event_role(

@@ -102,8 +102,15 @@ impl IdentityStore for Memory {
         })
     }
 
-    async fn event_exists(&self, scope: OrgScope, event: EventId) -> Result<bool, StoreError> {
-        Ok(scope.organization_id() == testwil() && event == open_day())
+    async fn event_status(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+    ) -> Result<Option<tada_domain::events::EventStatus>, StoreError> {
+        Ok(
+            (scope.organization_id() == testwil() && event == open_day())
+                .then_some(tada_domain::events::EventStatus::Active),
+        )
     }
 
     async fn event_role(
@@ -112,7 +119,7 @@ impl IdentityStore for Memory {
         event: EventId,
         user: UserId,
     ) -> Result<Option<EventRole>, StoreError> {
-        let found = self.event_exists(scope, event).await? && user == anna();
+        let found = self.event_status(scope, event).await?.is_some() && user == anna();
         Ok(found.then(|| *self.role.lock().unwrap()).flatten())
     }
 

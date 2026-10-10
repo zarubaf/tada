@@ -12,6 +12,8 @@ const event: Event = {
   time_zone: "Europe/Zurich",
   version: 1,
   created_at: "2028-03-01T13:12:00Z",
+  status: "active",
+  redacted: false,
 };
 
 function json(status: number, body: unknown, contentType = "application/json") {

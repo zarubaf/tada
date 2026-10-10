@@ -22,6 +22,7 @@ use tada_app::domain::ids::{EventId, InstitutionId, OrganizationId, ProposalId, 
 use tada_app::domain::parties::Party;
 use tada_app::domain::sources::SourceText;
 use tada_app::event_members::{add_event_member, change_event_role};
+use tada_app::events::{close_event, reopen_event};
 use tada_app::parties::{NewInstitution, NewPerson, create_institution, create_person};
 use tada_app::proposals::{Changeset, Created, NewChangeset, ProposeStores, create_changeset};
 use tada_app::review::{ApplyInput, ReviewStores, apply_changeset};
@@ -1152,6 +1153,44 @@ async fn only_a_propose_token_of_a_member_who_can_propose_in_the_event_proposes(
     let again = changeset(mcp.secret, SOURCE, proposals(mcp.secret));
     let body = mcp.propose_with(&token, again).await;
     assert_eq!(problem(&body)["code"], "forbidden", "{body}");
+}
+
+/// A closed event takes no proposal, also through MCP (ADR 0071). Reopening lifts the refusal.
+#[tokio::test]
+async fn a_closed_event_refuses_an_mcp_proposal() {
+    let mcp = Mcp::start().await;
+    let (_, token) = mcp.contributor_token().await;
+    let propose = || {
+        let proposals = json!([proposal(
+            Uuid::now_v7(),
+            set_fact(mcp.secret, "date_window", may_2030()),
+            &[],
+            SOURCE,
+            "im Mai 2030"
+        )]);
+        changeset(mcp.secret, SOURCE, proposals)
+    };
+    let database = &mcp.test.database;
+    close_event(
+        &mcp.owner,
+        mcp.secret,
+        RecordVersion::FIRST,
+        database,
+        database,
+        &*mcp.clock,
+    )
+    .await
+    .unwrap();
+
+    let body = mcp.propose_with(&token, propose()).await;
+    assert_eq!(problem(&body)["code"], "event-closed", "{body}");
+
+    let version = RecordVersion::new(2).unwrap();
+    reopen_event(&mcp.owner, mcp.secret, version, database, database)
+        .await
+        .unwrap();
+    let body = mcp.propose_with(&token, propose()).await;
+    assert_eq!(body["result"]["isError"], false, "{body}");
 }
 
 /// The tool takes each operation of the `app` input, also a document draft (ADR 0051).

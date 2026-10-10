@@ -8,7 +8,7 @@ use tada_domain::RecordVersion;
 use tada_domain::identity::{DisplayName, EventRole};
 use tada_domain::ids::{EventId, UserId};
 
-use crate::access::{self, AccessError};
+use crate::access::{self, AccessError, EventClosed};
 use crate::audit::{AuditAction, AuditEvent, AuditRole};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -126,6 +126,9 @@ pub enum AddEventMemberError {
     Forbidden,
     #[error("invalid values")]
     Invalid(Vec<FieldError>),
+    /// The event is closed and takes no writes (ADR 0071).
+    #[error(transparent)]
+    Closed(#[from] EventClosed),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -136,6 +139,7 @@ impl AddEventMemberError {
         ProblemCode::NotFound,
         ProblemCode::Forbidden,
         ProblemCode::ValidationFailed,
+        ProblemCode::EventClosed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -147,6 +151,7 @@ impl CommandError for AddEventMemberError {
             Self::NotFound => ProblemCode::NotFound,
             Self::Forbidden => ProblemCode::Forbidden,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
+            Self::Closed(_) => ProblemCode::EventClosed,
             Self::Store(error) => error.code(),
         }
     }
@@ -179,6 +184,9 @@ pub enum ChangeEventMemberError {
     /// An event has at least one event manager (ADR 0052).
     #[error("the event needs another event manager first")]
     LastManager,
+    /// The event is closed and takes no writes (ADR 0071).
+    #[error(transparent)]
+    Closed(#[from] EventClosed),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -190,6 +198,7 @@ impl ChangeEventMemberError {
         ProblemCode::Forbidden,
         ProblemCode::RecordVersionConflict,
         ProblemCode::InvalidTransition,
+        ProblemCode::EventClosed,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -202,6 +211,7 @@ impl CommandError for ChangeEventMemberError {
             Self::Forbidden => ProblemCode::Forbidden,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
             Self::LastManager => ProblemCode::InvalidTransition,
+            Self::Closed(_) => ProblemCode::EventClosed,
             Self::Store(error) => error.code(),
         }
     }
@@ -214,17 +224,58 @@ impl CommandError for ChangeEventMemberError {
     }
 }
 
-/// The access check of each command here: the caller must manage the event memberships.
-/// The result is `None` if the event is not found, and `Some(false)` if the caller cannot manage it.
-async fn can_manage_members(
+/// The access check of each command here: the caller must manage the event memberships, and the event must take writes.
+async fn require_manager(
     caller: &MemberCaller,
     event: EventId,
     identity: &dyn IdentityStore,
-) -> Result<Option<bool>, StoreError> {
-    match access::event_access(caller, event, identity).await {
-        Ok(access) => Ok(Some(access.can_manage_members())),
-        Err(AccessError::NotFound) => Ok(None),
-        Err(AccessError::Store(error)) => Err(error),
+) -> Result<(), ManagerError> {
+    let access = match access::event_access(caller, event, identity).await {
+        Ok(access) => access,
+        Err(AccessError::NotFound) => return Err(ManagerError::NotFound),
+        Err(AccessError::Store(error)) => return Err(ManagerError::Store(error)),
+    };
+    access::require_writable(&access)?;
+    if access.can_manage_members() {
+        Ok(())
+    } else {
+        Err(ManagerError::Forbidden)
+    }
+}
+
+/// Why a caller cannot manage the event memberships. Each command maps it to its own error.
+enum ManagerError {
+    NotFound,
+    Forbidden,
+    Closed(EventClosed),
+    Store(StoreError),
+}
+
+impl From<EventClosed> for ManagerError {
+    fn from(closed: EventClosed) -> Self {
+        Self::Closed(closed)
+    }
+}
+
+impl From<ManagerError> for AddEventMemberError {
+    fn from(error: ManagerError) -> Self {
+        match error {
+            ManagerError::NotFound => Self::NotFound,
+            ManagerError::Forbidden => Self::Forbidden,
+            ManagerError::Closed(closed) => Self::Closed(closed),
+            ManagerError::Store(error) => Self::Store(error),
+        }
+    }
+}
+
+impl From<ManagerError> for ChangeEventMemberError {
+    fn from(error: ManagerError) -> Self {
+        match error {
+            ManagerError::NotFound => Self::NotFound,
+            ManagerError::Forbidden => Self::Forbidden,
+            ManagerError::Closed(closed) => Self::Closed(closed),
+            ManagerError::Store(error) => Self::Store(error),
+        }
     }
 }
 
@@ -274,11 +325,7 @@ pub async fn add_event_member(
     store: &dyn EventMemberStore,
     clock: &dyn Clock,
 ) -> Result<EventMember, AddEventMemberError> {
-    match can_manage_members(caller, event, identity).await? {
-        None => return Err(AddEventMemberError::NotFound),
-        Some(false) => return Err(AddEventMemberError::Forbidden),
-        Some(true) => {}
-    }
+    require_manager(caller, event, identity).await?;
     let audit = audit(caller, AuditAction::EventMembershipAdd, event, user)
         .with_roles(None, Some(AuditRole::Event(role)));
     let invalid = |code| AddEventMemberError::Invalid(vec![FieldError::new("user_id", code)]);
@@ -302,7 +349,7 @@ pub async fn change_event_role(
     identity: &dyn IdentityStore,
     store: &dyn EventMemberStore,
 ) -> Result<EventMember, ChangeEventMemberError> {
-    check_change(caller, event, identity).await?;
+    require_manager(caller, event, identity).await?;
     let audit = audit(caller, AuditAction::EventMembershipChangeRole, event, user);
     let changed = store
         .change_role(caller.scope(), event, user, role, expected_version, &audit)
@@ -319,24 +366,12 @@ pub async fn remove_event_member(
     identity: &dyn IdentityStore,
     store: &dyn EventMemberStore,
 ) -> Result<(), ChangeEventMemberError> {
-    check_change(caller, event, identity).await?;
+    require_manager(caller, event, identity).await?;
     let audit = audit(caller, AuditAction::EventMembershipRemove, event, user);
     let removed = store
         .remove(caller.scope(), event, user, expected_version, &audit)
         .await?;
     changed_or_error(removed)
-}
-
-async fn check_change(
-    caller: &MemberCaller,
-    event: EventId,
-    identity: &dyn IdentityStore,
-) -> Result<(), ChangeEventMemberError> {
-    match can_manage_members(caller, event, identity).await? {
-        None => Err(ChangeEventMemberError::NotFound),
-        Some(false) => Err(ChangeEventMemberError::Forbidden),
-        Some(true) => Ok(()),
-    }
 }
 
 fn changed_or_error<T>(changed: Changed<T>) -> Result<T, ChangeEventMemberError> {

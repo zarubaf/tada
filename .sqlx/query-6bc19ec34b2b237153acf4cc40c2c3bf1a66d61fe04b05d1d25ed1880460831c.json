@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, organization_id, key, name, time_zone, version,\n                      created_at AS \"created_at: jiff_sqlx::Timestamp\"\n               FROM event\n               WHERE organization_id = $1\n                 AND ($2::text IS NULL OR (key, id) > ($2, $3))\n               ORDER BY key, id\n               LIMIT $4",
+  "query": "UPDATE event\n               SET status = 'active', closed_at = NULL, version = version + 1\n               WHERE organization_id = $1 AND id = $2 AND version = $3\n                 AND status = 'closed' AND redacted_at IS NULL\n               RETURNING id, organization_id, key, name, time_zone, version, status,\n                         created_at AS \"created_at: jiff_sqlx::Timestamp\",\n                         closed_at AS \"closed_at: jiff_sqlx::Timestamp\",\n                         redacted_at AS \"redacted_at: jiff_sqlx::Timestamp\"",
   "describe": {
     "columns": [
       {
@@ -71,6 +71,17 @@
       },
       {
         "ordinal": 6,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
         "name": "created_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz",
         "origin": {
@@ -79,12 +90,33 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 8,
+        "name": "closed_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "closed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "redacted_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "redacted_at"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "Text",
         "Uuid",
         "Int8"
       ]
@@ -96,8 +128,11 @@
       false,
       false,
       false,
-      false
+      false,
+      false,
+      true,
+      true
     ]
   },
-  "hash": "4cbe0d11fefe045219e7d6473a7419c1636c7c7660fa1431224f1b28a0aae2bb"
+  "hash": "6bc19ec34b2b237153acf4cc40c2c3bf1a66d61fe04b05d1d25ed1880460831c"
 }

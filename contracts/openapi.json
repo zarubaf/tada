@@ -182,6 +182,138 @@
         ]
       }
     },
+    "/api/v1/events/{event_id}/close": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Closes an event. A closed event is read-only for every role, and its retention period starts.\nAn event manager, an owner or an admin can do this. An AI client cannot.",
+        "operationId": "close_event",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeEventStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The closed event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/reopen": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Reopens a closed event. Only an owner or an admin can do this, and not after retention redacted the event.",
+        "operationId": "reopen_event",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeEventStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The reopened event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "payload-too-large",
+          "unsupported-media-type",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/telegram/link-codes": {
       "post": {
         "tags": [
@@ -878,6 +1010,7 @@
           "organization-required",
           "forbidden",
           "not-found",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -955,6 +1088,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "unavailable",
@@ -1024,6 +1158,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "unavailable",
@@ -1504,6 +1639,7 @@
           "organization-required",
           "forbidden",
           "not-found",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -1687,6 +1823,7 @@
           "organization-required",
           "forbidden",
           "not-found",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -1879,6 +2016,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "unavailable",
@@ -2212,6 +2350,7 @@
           "organization-required",
           "forbidden",
           "not-found",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -2407,6 +2546,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -2474,6 +2614,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -3402,6 +3543,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "validation-failed",
           "unavailable",
           "internal"
@@ -3465,6 +3607,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -3542,6 +3685,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -3706,6 +3850,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -3842,6 +3987,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -4006,6 +4152,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -4142,6 +4289,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -4219,6 +4367,7 @@
           "not-found",
           "record-version-conflict",
           "invalid-transition",
+          "event-closed",
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
@@ -5221,6 +5370,21 @@
           "expected_version": {
             "type": "integer",
             "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "ChangeEventStatusRequest": {
+        "type": "object",
+        "description": "The input of `CloseEvent` and `ReopenEvent`.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The `version` of the event that the client read.",
             "minimum": 1
           }
         }
@@ -7653,7 +7817,9 @@
           "name",
           "time_zone",
           "version",
-          "created_at"
+          "created_at",
+          "status",
+          "redacted"
         ],
         "properties": {
           "id": {
@@ -7679,6 +7845,22 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus",
+            "description": "`active`, or `closed`. A closed event is read-only for every role."
+          },
+          "closed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the event was closed. It is absent while the event is active."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True if retention removed the content of the event. A redacted event cannot reopen."
           }
         }
       },
@@ -7790,6 +7972,14 @@
           "event-manager",
           "event-contributor",
           "event-viewer"
+        ]
+      },
+      "EventStatus": {
+        "type": "string",
+        "description": "The status of an event.",
+        "enum": [
+          "active",
+          "closed"
         ]
       },
       "Excerpt": {

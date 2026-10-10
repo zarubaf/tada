@@ -22,9 +22,11 @@ use tada_app::documents::{
     NewUpload, Published, ReadDocumentError, StoredDraft, StoredVersion, UploadError, VersionView,
     download, get_document, list_documents, list_versions, upload_document, upload_version,
 };
+use tada_app::domain::RecordVersion;
 use tada_app::domain::identity::EventRole;
 use tada_app::domain::ids::{DocumentId, DocumentVersionId, EventId, OrganizationId};
 use tada_app::event_members::add_event_member;
+use tada_app::events::close_event;
 use tada_app::paging::PageLimit;
 use tada_app::problem::CommandError;
 use tada_app::store::StoreError;
@@ -266,6 +268,45 @@ async fn rejects_an_upload_over_the_quota_with_quota_exceeded() {
             .unwrap(),
         document
     );
+}
+
+/// A closed event takes no new document and no new version, but its files stay readable (ADR 0071).
+#[tokio::test]
+async fn a_closed_event_refuses_an_upload_but_keeps_its_files_readable() {
+    let f = Fixture::start().await;
+    let document = f
+        .upload(&f.owner, "Programm.pdf", &pdf("Programm"))
+        .await
+        .unwrap();
+    close_event(
+        &f.owner,
+        f.event,
+        RecordVersion::FIRST,
+        &f.test.database,
+        &f.test.database,
+        &SystemClock,
+    )
+    .await
+    .unwrap();
+
+    let error = f
+        .upload(&f.owner, "Plan.pdf", &pdf("Plan"))
+        .await
+        .unwrap_err();
+    assert!(matches!(error, UploadError::Closed(_)), "{error:?}");
+    let error = upload_version(
+        &f.owner,
+        document.id,
+        "Programm.pdf",
+        body(&pdf("Neu")),
+        LIMIT,
+        f.stores(),
+        &SystemClock,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(error, UploadError::Closed(_)), "{error:?}");
+    assert_eq!(f.read(&f.owner, &document).await, pdf("Programm"));
 }
 
 #[tokio::test]

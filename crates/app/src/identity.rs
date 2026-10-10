@@ -3,6 +3,7 @@
 use std::fmt::Debug;
 
 use async_trait::async_trait;
+use tada_domain::events::EventStatus;
 use tada_domain::identity::{DisplayName, EventRole, OrganizationRole};
 use tada_domain::ids::{EventId, OrganizationId, UserId};
 
@@ -41,8 +42,12 @@ pub trait IdentityStore: Debug + Send + Sync {
         user: UserId,
     ) -> Result<Option<OrganizationRole>, StoreError>;
 
-    /// True if the event `event` is in the organization of `scope`.
-    async fn event_exists(&self, scope: OrgScope, event: EventId) -> Result<bool, StoreError>;
+    /// The status of the event `event`, or `None` if the event is not in the organization of `scope`.
+    async fn event_status(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+    ) -> Result<Option<EventStatus>, StoreError>;
 
     /// The event role of a user in one event, or `None` if the user has none.
     async fn event_role(

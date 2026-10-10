@@ -1,4 +1,4 @@
-//! `/api/v1/events`: the `CreateEvent` command and the `ListEvents` and `GetEvent` queries.
+//! `/api/v1/events`: the `CreateEvent`, `CloseEvent` and `ReopenEvent` commands and the `ListEvents` and `GetEvent` queries.
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -8,7 +8,8 @@ use tada_app::access::AccessError;
 use tada_app::domain::events::{self as domain, EventKey};
 use tada_app::domain::ids::EventId;
 use tada_app::events::{
-    self as app, CreateEventError, Created, EventCursor, ListEventsError, NewEvent,
+    self as app, ChangeEventStatusError, CreateEventError, Created, EventCursor, ListEventsError,
+    NewEvent,
 };
 use tada_app::problem::ProblemCode;
 use utoipa::{IntoParams, ToSchema};
@@ -19,13 +20,15 @@ use uuid::Uuid;
 use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::cursor;
-use crate::extract::{Caller, Json, Path, Query, page_limit};
+use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
         .routes(routes!(list_events, create_event))
         .routes(routes!(get_event))
+        .routes(routes!(close_event))
+        .routes(routes!(reopen_event))
 }
 
 /// The problem codes of each operation (ADR 0037). They come from the error types of the `app` crate
@@ -44,6 +47,24 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
             "get_event",
             codes(&[AUTHENTICATED, PATH, AccessError::CODES]),
         ),
+        (
+            "close_event",
+            codes(&[
+                AUTHENTICATED,
+                PATH,
+                JSON_BODY,
+                ChangeEventStatusError::CODES,
+            ]),
+        ),
+        (
+            "reopen_event",
+            codes(&[
+                AUTHENTICATED,
+                PATH,
+                JSON_BODY,
+                ChangeEventStatusError::CODES,
+            ]),
+        ),
     ]
 }
 
@@ -59,6 +80,30 @@ pub struct Event {
     /// The record version. A command that changes the event needs it.
     pub version: i64,
     pub created_at: Timestamp,
+    /// `active`, or `closed`. A closed event is read-only for every role.
+    pub status: EventStatus,
+    /// When the event was closed. It is absent while the event is active.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closed_at: Option<Timestamp>,
+    /// True if retention removed the content of the event. A redacted event cannot reopen.
+    pub redacted: bool,
+}
+
+/// The status of an event.
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum EventStatus {
+    Active,
+    Closed,
+}
+
+impl From<domain::EventStatus> for EventStatus {
+    fn from(status: domain::EventStatus) -> Self {
+        match status {
+            domain::EventStatus::Active => Self::Active,
+            domain::EventStatus::Closed => Self::Closed,
+        }
+    }
 }
 
 impl From<domain::Event> for Event {
@@ -70,6 +115,9 @@ impl From<domain::Event> for Event {
             time_zone: event.time_zone.as_str().to_owned(),
             version: event.version.get(),
             created_at: event.created_at,
+            status: event.status.into(),
+            closed_at: event.closed_at,
+            redacted: event.redacted_at.is_some(),
         }
     }
 }
@@ -188,6 +236,76 @@ async fn get_event(
     let event = app::get_event(
         &caller,
         EventId::from_uuid(event_id),
+        state.events.as_ref(),
+        state.identity.as_ref(),
+    )
+    .await?;
+    Ok(axum::Json(event.into()))
+}
+
+/// The input of `CloseEvent` and `ReopenEvent`.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ChangeEventStatusRequest {
+    /// The `version` of the event that the client read.
+    #[schema(minimum = 1)]
+    pub expected_version: i64,
+}
+
+/// Closes an event. A closed event is read-only for every role, and its retention period starts.
+/// An event manager, an owner or an admin can do this. An AI client cannot.
+#[utoipa::path(
+    post,
+    path = "/events/{event_id}/close",
+    operation_id = "close_event",
+    tag = "events",
+    params(("event_id" = Uuid, Path, description = "The ID of the event.")),
+    request_body = ChangeEventStatusRequest,
+    responses(
+        (status = OK, description = "The closed event.", body = Event),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn close_event(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+    Path(event_id): Path<Uuid>,
+    Json(request): Json<ChangeEventStatusRequest>,
+) -> Result<axum::Json<Event>, ApiError> {
+    let event = app::close_event(
+        &caller,
+        EventId::from_uuid(event_id),
+        record_version(request.expected_version)?,
+        state.events.as_ref(),
+        state.identity.as_ref(),
+        state.clock.as_ref(),
+    )
+    .await?;
+    Ok(axum::Json(event.into()))
+}
+
+/// Reopens a closed event. Only an owner or an admin can do this, and not after retention redacted the event.
+#[utoipa::path(
+    post,
+    path = "/events/{event_id}/reopen",
+    operation_id = "reopen_event",
+    tag = "events",
+    params(("event_id" = Uuid, Path, description = "The ID of the event.")),
+    request_body = ChangeEventStatusRequest,
+    responses(
+        (status = OK, description = "The reopened event.", body = Event),
+        (status = "default", description = "A problem (ADR 0037).", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
+async fn reopen_event(
+    State(state): State<ApiState>,
+    Caller(caller): Caller,
+    Path(event_id): Path<Uuid>,
+    Json(request): Json<ChangeEventStatusRequest>,
+) -> Result<axum::Json<Event>, ApiError> {
+    let event = app::reopen_event(
+        &caller,
+        EventId::from_uuid(event_id),
+        record_version(request.expected_version)?,
         state.events.as_ref(),
         state.identity.as_ref(),
     )

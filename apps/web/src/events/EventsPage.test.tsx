@@ -15,6 +15,8 @@ function event(key: string, name: string): Event {
     time_zone: "Europe/Zurich",
     version: 1,
     created_at: "2030-05-18T08:00:00Z",
+    status: "active",
+    redacted: false,
   };
 }
 

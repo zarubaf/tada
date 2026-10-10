@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use super::checks::{
     changed, check_owner, check_promisor, check_workstream, created, may_change, parse_text,
-    require_change, require_create, show, show_one,
+    require_change, require_create, show, show_one, writable_access,
 };
 use super::{
     CommitmentFields, CommitmentView, NewCommitmentRecord, WorkError, WorkPorts, WorkQuery,
@@ -126,7 +126,7 @@ async fn changeable_commitment(
     id: CommitmentId,
     ports: WorkPorts<'_>,
 ) -> Result<(EventAccess, CommitmentView), WorkError> {
-    let access = access::event_access(caller, event, ports.identity).await?;
+    let access = writable_access(caller, event, ports.identity).await?;
     let current = ports
         .work
         .commitment(caller.scope(), event, id)

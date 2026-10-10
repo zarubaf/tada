@@ -14,6 +14,8 @@ export const EVENT: Event = {
   time_zone: "Europe/Zurich",
   version: 1,
   created_at: "2028-03-01T13:12:00Z",
+  status: "active",
+  redacted: false,
 };
 
 export const ME = "0199b8e0-0000-7000-8000-0000000000b1";

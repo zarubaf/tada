@@ -149,8 +149,12 @@ impl IdentityStore for Memory {
             .then_some(OrganizationRole::Member))
     }
 
-    async fn event_exists(&self, _: OrgScope, event: EventId) -> Result<bool, StoreError> {
-        Ok(event == open_day())
+    async fn event_status(
+        &self,
+        _: OrgScope,
+        event: EventId,
+    ) -> Result<Option<tada_domain::events::EventStatus>, StoreError> {
+        Ok((event == open_day()).then_some(tada_domain::events::EventStatus::Active))
     }
 
     async fn event_role(

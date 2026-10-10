@@ -1,16 +1,19 @@
-//! The `CreateEvent` command and the `ListEvents` and `GetEvent` queries.
+//! The `CreateEvent`, `CloseEvent` and `ReopenEvent` commands and the `ListEvents` and `GetEvent` queries.
 
 use std::fmt::Debug;
 
 use async_trait::async_trait;
+use jiff::Timestamp;
 use tada_domain::RecordVersion;
-use tada_domain::events::{Event, EventKey, EventKeyError, EventName, EventTimeZone};
+use tada_domain::events::{
+    self, Event, EventKey, EventKeyError, EventName, EventStatus, EventTimeZone,
+};
 use tada_domain::identity::EventRole;
 use tada_domain::ids::{self, EventId, UserId};
 use tada_domain::name::NameError;
 use uuid::Uuid;
 
-use crate::access::{self, AccessError, Principal};
+use crate::access::{self, AccessError, EventLevel, Principal};
 use crate::audit::{AuditAction, AuditEvent, AuditRole};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -58,6 +61,27 @@ pub trait EventStore: Debug + Send + Sync {
         after: Option<&EventCursor>,
         limit: u32,
     ) -> Result<Vec<Event>, StoreError>;
+
+    /// Closes the event at `at` and records `audit`, in one transaction.
+    /// It returns the closed event, or `None` if no active event has the version `expected_version`.
+    async fn close(
+        &self,
+        scope: OrgScope,
+        id: EventId,
+        expected_version: RecordVersion,
+        at: Timestamp,
+        audit: &AuditEvent,
+    ) -> Result<Option<Event>, StoreError>;
+
+    /// Reopens the event and records `audit`, in one transaction.
+    /// It returns the reopened event, or `None` if no closed and unredacted event has the version `expected_version`.
+    async fn reopen(
+        &self,
+        scope: OrgScope,
+        id: EventId,
+        expected_version: RecordVersion,
+        audit: &AuditEvent,
+    ) -> Result<Option<Event>, StoreError>;
 }
 
 /// The result of `EventStore::insert`.
@@ -230,6 +254,9 @@ fn validate(
             time_zone,
             version: RecordVersion::FIRST,
             created_at: clock.now(),
+            status: EventStatus::Active,
+            closed_at: None,
+            redacted_at: None,
         }),
         _ => Err(CreateEventError::Invalid(errors)),
     }
@@ -258,6 +285,140 @@ pub(crate) fn name_error_code(error: NameError) -> &'static str {
 
 fn invalid(field: &'static str, code: &'static str) -> CreateEventError {
     CreateEventError::Invalid(vec![FieldError::new(field, code)])
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ChangeEventStatusError {
+    /// The event does not exist, or the caller cannot see it.
+    #[error("the event does not exist or the caller cannot see it")]
+    NotFound,
+    #[error("the caller cannot change the status of this event")]
+    Forbidden,
+    #[error("the event changed after the caller read it")]
+    VersionConflict,
+    /// The event is not in the status that the command needs, or a redaction removed content from it.
+    #[error("the event cannot change to this status")]
+    InvalidTransition,
+    #[error(transparent)]
+    Store(#[from] StoreError),
+}
+
+impl ChangeEventStatusError {
+    /// All codes that these commands can return, for the API contract (ADR 0037).
+    pub const CODES: &[ProblemCode] = &[
+        ProblemCode::NotFound,
+        ProblemCode::Forbidden,
+        ProblemCode::RecordVersionConflict,
+        ProblemCode::InvalidTransition,
+        ProblemCode::Unavailable,
+        ProblemCode::Internal,
+    ];
+}
+
+impl From<AccessError> for ChangeEventStatusError {
+    fn from(error: AccessError) -> Self {
+        match error {
+            AccessError::NotFound => Self::NotFound,
+            AccessError::Store(error) => Self::Store(error),
+        }
+    }
+}
+
+impl CommandError for ChangeEventStatusError {
+    fn code(&self) -> ProblemCode {
+        match self {
+            Self::NotFound => ProblemCode::NotFound,
+            Self::Forbidden => ProblemCode::Forbidden,
+            Self::VersionConflict => ProblemCode::RecordVersionConflict,
+            Self::InvalidTransition => ProblemCode::InvalidTransition,
+            Self::Store(error) => error.code(),
+        }
+    }
+
+    fn store_error(&self) -> Option<&StoreError> {
+        match self {
+            Self::Store(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+fn status_audit(caller: &MemberCaller, action: AuditAction, event: EventId) -> AuditEvent {
+    AuditEvent::new(
+        caller.actor(),
+        action,
+        Some(event.as_uuid()),
+        Some(caller.scope()),
+    )
+}
+
+/// Closes an event: it becomes read-only for every role, and its retention period starts (ADR 0071).
+/// An event manager, an owner or an admin does this. The version is the one that the caller read.
+pub async fn close_event(
+    caller: &MemberCaller,
+    id: EventId,
+    expected_version: RecordVersion,
+    store: &dyn EventStore,
+    identity: &dyn IdentityStore,
+    clock: &dyn Clock,
+) -> Result<Event, ChangeEventStatusError> {
+    let access = access::event_access(caller, id, identity).await?;
+    if access.level() != EventLevel::Manager {
+        return Err(ChangeEventStatusError::Forbidden);
+    }
+    let event = read_event(caller, id, store).await?;
+    events::can_close(event.status).map_err(|_| ChangeEventStatusError::InvalidTransition)?;
+    require_version(&event, expected_version)?;
+    let audit = status_audit(caller, AuditAction::EventClose, id);
+    store
+        .close(caller.scope(), id, expected_version, clock.now(), &audit)
+        .await?
+        .ok_or(ChangeEventStatusError::VersionConflict)
+}
+
+/// Reopens a closed event. Only an owner or an admin does this, and not after a redaction (ADR 0071).
+pub async fn reopen_event(
+    caller: &MemberCaller,
+    id: EventId,
+    expected_version: RecordVersion,
+    store: &dyn EventStore,
+    identity: &dyn IdentityStore,
+) -> Result<Event, ChangeEventStatusError> {
+    access::event_access(caller, id, identity).await?;
+    if !caller.organization_role().is_owner_or_admin() {
+        return Err(ChangeEventStatusError::Forbidden);
+    }
+    let event = read_event(caller, id, store).await?;
+    events::can_reopen(event.status, event.redacted_at.is_some())
+        .map_err(|_| ChangeEventStatusError::InvalidTransition)?;
+    require_version(&event, expected_version)?;
+    let audit = status_audit(caller, AuditAction::EventReopen, id);
+    store
+        .reopen(caller.scope(), id, expected_version, &audit)
+        .await?
+        .ok_or(ChangeEventStatusError::VersionConflict)
+}
+
+async fn read_event(
+    caller: &MemberCaller,
+    id: EventId,
+    store: &dyn EventStore,
+) -> Result<Event, ChangeEventStatusError> {
+    store
+        .get(caller.scope(), id)
+        .await?
+        .ok_or(ChangeEventStatusError::NotFound)
+}
+
+fn require_version(
+    event: &Event,
+    expected_version: RecordVersion,
+) -> Result<(), ChangeEventStatusError> {
+    if event.version == expected_version {
+        Ok(())
+    } else {
+        Err(ChangeEventStatusError::VersionConflict)
+    }
 }
 
 /// The position after the last event of a page: the sort key and the ID (ADR 0044).
@@ -458,6 +619,27 @@ mod tests {
             events.retain(|event| memberships.contains(&(event.id, member)));
             events.truncate(limit as usize);
             Ok(events)
+        }
+
+        async fn close(
+            &self,
+            _: OrgScope,
+            _: EventId,
+            _: RecordVersion,
+            _: Timestamp,
+            _: &AuditEvent,
+        ) -> Result<Option<Event>, StoreError> {
+            unreachable!()
+        }
+
+        async fn reopen(
+            &self,
+            _: OrgScope,
+            _: EventId,
+            _: RecordVersion,
+            _: &AuditEvent,
+        ) -> Result<Option<Event>, StoreError> {
+            unreachable!()
         }
     }
 

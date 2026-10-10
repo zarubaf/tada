@@ -694,7 +694,7 @@ mod tests {
     use jiff::civil::date;
     use serde_json::json;
     use tada_domain::RecordVersion;
-    use tada_domain::events::{EventKey, EventName, EventTimeZone};
+    use tada_domain::events::{EventKey, EventName, EventStatus, EventTimeZone};
     use tada_domain::facts::{
         DateWindow, FactValue, Granularity, ReferenceTarget, ShortText, ValueType, Valued,
         core_catalog,
@@ -783,6 +783,9 @@ mod tests {
             time_zone: EventTimeZone::default_zone(),
             version: RecordVersion::FIRST,
             created_at: Timestamp::UNIX_EPOCH,
+            status: EventStatus::Active,
+            closed_at: None,
+            redacted_at: None,
         }
     }
 

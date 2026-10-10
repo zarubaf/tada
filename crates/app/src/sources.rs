@@ -335,7 +335,11 @@ mod tests {
             unreachable!()
         }
 
-        async fn event_exists(&self, _: OrgScope, _: EventId) -> Result<bool, StoreError> {
+        async fn event_status(
+            &self,
+            _: OrgScope,
+            _: EventId,
+        ) -> Result<Option<tada_domain::events::EventStatus>, StoreError> {
             unreachable!()
         }
 
