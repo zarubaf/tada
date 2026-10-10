@@ -101,15 +101,16 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 ## Documents
 
-| Term             | Meaning                                                                                                                                                    | Avoid          |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| document         | A file with a stable tada ID. The ID does not change with its name or folder.                                                                              | file (in code) |
-| document version | One immutable upload or generated draft of a document.                                                                                                     |                |
-| draft            | A document version in Markdown that tada adds when a member accepts a draft proposal. It has a status.                                                     |                |
-| approved version | A draft version with the status `approved`. Nobody can overwrite it.                                                                                       | final          |
-| storage quota    | The largest total size of the uploaded files of one organization (ADR 0043).                                                                               |                |
-| export           | All data of one organization as files (ADR 0059): JSON Lines, CSV, the original files and a manifest with hashes. An operator makes it with `tada export`. | dump, backup   |
-| backup           | A copy of the database and the object storage of one installation. The operator makes and restores it outside tada (ADR 0033).                             |                |
+| Term             | Meaning                                                                                                                                                                                   | Avoid          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| document         | A file with a stable tada ID. The ID does not change with its name or folder.                                                                                                             | file (in code) |
+| document version | One immutable upload or generated draft of a document.                                                                                                                                    |                |
+| draft            | A document version in Markdown that tada adds when a member accepts a draft proposal. It has a status.                                                                                    |                |
+| approved version | A draft version with the status `approved`. Nobody can overwrite it.                                                                                                                      | final          |
+| storage quota    | The largest total size of the uploaded files of one organization (ADR 0043).                                                                                                              |                |
+| export           | All data of one organization as files (ADR 0059): JSON Lines, CSV, the original files and a manifest with hashes. An operator makes it with `tada export`.                                | dump, backup   |
+| person export    | All data about one person record as one JSON document: the mentions with their full text and, for a linked account, the account data. An owner downloads it in the web client (ADR 0073). |                |
+| backup           | A copy of the database and the object storage of one installation. The operator makes and restores it outside tada (ADR 0033).                                                            |                |
 
 ## AI and automation
 

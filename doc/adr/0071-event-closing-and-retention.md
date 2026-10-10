@@ -32,7 +32,12 @@ Retention settings:
 - An organization has two periods in months: `retention_closed_event_months` and `retention_source_months`.
 - Each period is empty (off) or a whole number from 1 to 120.
 - Retention is off until an owner sets a period. tada has no default.
-- Only an owner changes the periods. An owner or an admin reads them. The audit log records `organization.set_retention`.
+- Only an owner changes the periods.
+- An owner or an admin reads them.
+- The audit log records `organization.set_retention`.
+- `GET /api/v1/organization/retention` reads the periods and the version.
+  `POST /api/v1/organization/retention/set` changes them and takes `expected_version`.
+  The version is the column `organization.retention_version`. A change with an old version fails with a conflict.
 - The audit detail of this event holds the two periods as numbers or null, and no other content.
   A migration widens the `CHECK` constraint of the detail for these two keys.
 - The settings page names the accounting duty, so that the owner sets a period with this duty in mind.
@@ -49,6 +54,8 @@ Retention job:
 - The job never touches an active event or a source of an active event.
   A source of an active event belongs to the event, or the evidence of the event cites it: an evidence link, proposal evidence or record evidence.
   A cited source becomes due when the event closes.
+- The job checks each target again before it redacts it.
+  It skips a source that an active event holds since the job listed it, and an event that an owner or admin reopened since then.
 - Persons and institutions have no automatic retention. They are the contact directory of the club, and an owner redacts them on request.
 
 Housekeeping:
@@ -66,7 +73,7 @@ Housekeeping:
 - A club decides its periods. A new installation deletes nothing until an owner sets them.
 - A closed event cannot change, so a club that finds an error must reopen it first.
 - Every write path must call `event_writable`. A test covers each entry.
-- The periods are constants in code. A change needs a new commit, not a setting.
+- The housekeeping periods are constants in code. A change needs a new commit, not a setting.
 - The member list of a redacted event stays, because IDs and roles carry no content.
 
 ## Alternatives

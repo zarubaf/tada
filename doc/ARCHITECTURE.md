@@ -84,7 +84,9 @@ pgvector comes only if an evaluation shows a benefit.
 
 ### Daily sweeps
 
-The worker runs three sweeps once in 24 hours, each in the pattern of the counter sweep ([ADR 0065](adr/0065-worker-deletes-ended-rate-limit-counters.md)):
+The worker runs three sweeps once in 24 hours, each in the pattern of the counter sweep ([ADR 0065](adr/0065-worker-deletes-ended-rate-limit-counters.md)).
+The counter sweep itself runs once in each window of the rate limit.
+The three daily sweeps are:
 
 - Retention: redacts closed events and sources whose period ended ([ADR 0071](adr/0071-event-closing-and-retention.md)).
 - Housekeeping: deletes technical rows after their periods ([ADR 0071](adr/0071-event-closing-and-retention.md)).

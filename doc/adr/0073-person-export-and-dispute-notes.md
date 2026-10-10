@@ -23,7 +23,7 @@ Permissions:
 
 - Only an organization owner exports, lists mentions, redacts and adds dispute notes.
 - A member and an admin get `forbidden`.
-- An AI caller (MCP or API token) cannot call these operations: the REST API takes no API token, and the MCP server has no tool for them.
+- An AI caller (MCP or API token) cannot call these operations: the REST API answers a request with an API token with `401`, and the MCP server has no tool for them.
 - An owner or an admin of another organization gets `not-found`.
 
 Mentions:
@@ -54,7 +54,8 @@ Correction and dispute notes:
 - `POST /api/v1/dispute-notes` creates a note. The audit log records `dispute_note.create`.
 - A note is also possible in a closed event: it changes no evidence.
 - A redacted target gets no note (`invalid-transition`).
-- Each reader of the target sees its notes: the API responses that show evidence or facts have the field `dispute_notes`.
+- Each reader of the target sees its notes, also through MCP: the API responses and the MCP tools that show evidence or facts have the field `dispute_notes`.
+  The draft rendering of a document carries the notes of the facts and sources that its links cite in `link_dispute_notes`, keyed by link.
 - A redaction of an event redacts its notes ([ADR 0072](0072-legal-redaction-and-deletion-journal.md)).
 
 Web client:

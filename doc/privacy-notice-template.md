@@ -43,6 +43,19 @@ This file does not repeat it.
 - No scan of uploaded files for malware.
 - The retention of backups, logs and exports.
   The operator keeps an export like a backup (ADR 0059).
+- The retention periods of the club.
+  An owner sets a period for closed events and a period for sources, or none.
+  tada has no default period (ADR 0071).
+  After a period, tada replaces the content with a tombstone and keeps the structure.
+- The legal redaction on request.
+  An owner removes the content of a source, a fact, a document version, a proposal or a person.
+  tada keeps a record of each redaction with IDs and no content, in the database and in a journal in the object storage (ADR 0072).
+  A restored backup can bring removed content back until the operator replays the journal.
+- The access request.
+  An owner exports all data about one person as a JSON document and lists the places that name the person (ADR 0073).
+- The dispute note.
+  When evidence must stay, an owner adds a note that the data is disputed.
+  Each reader of the evidence sees the note, also in the AI clients of members.
 - The rights to access, correction and deletion, and the right to receive the data in a common format, with a contact.
 
 ## Placeholders
