@@ -19,6 +19,7 @@ import { LiveRegion } from "../ui/LiveRegion";
 import { Select } from "../ui/Select";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./EventMembersPage.module.css";
+import { useEventWritable } from "./eventContext";
 import {
   addableMembers,
   EVENT_ROLES,
@@ -53,10 +54,12 @@ function actionMessage(result: { error?: Problem | undefined; response?: Respons
 /**
  * „Mitglieder“ of an event: the event memberships. The server lists them only for a member who
  * manages them, so a loaded list always has the actions; the server decides each action anyway.
+ * A closed event is read-only (ADR 0071): the page then shows the list without the actions.
  */
 export function EventMembersPage({ api }: { api: Api }) {
   const { eventId = "" } = useParams();
   const session = useSession();
+  const writable = useEventWritable();
   const [state, setState] = useState<State>({ kind: "loading" });
   // The message of the last failed action, for example the refusal to remove the last event manager.
   const [failure, setFailure] = useState<string>();
@@ -116,10 +119,10 @@ export function EventMembersPage({ api }: { api: Api }) {
   }, [api]);
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && writable) {
       void loadOrganization();
     }
-  }, [loaded, loadOrganization]);
+  }, [loaded, writable, loadOrganization]);
 
   const replace = (items: EventMembership[], changed: EventMembership) =>
     items.map((item) => (item.user_id === changed.user_id ? changed : item));
@@ -199,17 +202,22 @@ export function EventMembersPage({ api }: { api: Api }) {
     {
       id: "role",
       header: t("event-members-column-role"),
-      cell: (item) => (
-        <Select
-          label={t("event-members-role-of", { name: item.display_name })}
-          labelHidden
-          options={roleOptions}
-          value={item.event_role}
-          onChange={(role) => void changeRole(item, role as EventRole)}
-        />
-      ),
+      cell: (item) =>
+        writable ? (
+          <Select
+            label={t("event-members-role-of", { name: item.display_name })}
+            labelHidden
+            options={roleOptions}
+            value={item.event_role}
+            onChange={(role) => void changeRole(item, role as EventRole)}
+          />
+        ) : (
+          t(`role-${item.event_role}`)
+        ),
     },
-    {
+  ];
+  if (writable) {
+    columns.push({
       id: "actions",
       header: t("event-members-column-actions"),
       cell: (item) => (
@@ -221,8 +229,8 @@ export function EventMembersPage({ api }: { api: Api }) {
           {t("event-members-remove")}
         </Button>
       ),
-    },
-  ];
+    });
+  }
 
   if (state.kind === "loading") {
     return (
@@ -262,29 +270,31 @@ export function EventMembersPage({ api }: { api: Api }) {
         rows={items}
         rowKey={(item) => item.user_id}
       />
-      <AddMember
-        api={api}
-        eventId={eventId}
-        candidates={organization && addableMembers(organization, items)}
-        organizationFailure={organizationFailure}
-        onRetry={() => {
-          setOrganizationFailure(undefined);
-          return loadOrganization();
-        }}
-        onAdded={(added) => {
-          setConfirmation(t("event-members-added", { name: added.display_name }));
-          setState((current) =>
-            current.kind === "loaded"
-              ? { kind: "loaded", items: [...current.items, added] }
-              : current,
-          );
-        }}
-        onFailed={fail}
-        onStart={() => {
-          setFailure(undefined);
-          setConfirmation(undefined);
-        }}
-      />
+      {writable && (
+        <AddMember
+          api={api}
+          eventId={eventId}
+          candidates={organization && addableMembers(organization, items)}
+          organizationFailure={organizationFailure}
+          onRetry={() => {
+            setOrganizationFailure(undefined);
+            return loadOrganization();
+          }}
+          onAdded={(added) => {
+            setConfirmation(t("event-members-added", { name: added.display_name }));
+            setState((current) =>
+              current.kind === "loaded"
+                ? { kind: "loaded", items: [...current.items, added] }
+                : current,
+            );
+          }}
+          onFailed={fail}
+          onStart={() => {
+            setFailure(undefined);
+            setConfirmation(undefined);
+          }}
+        />
+      )}
       <ConfirmDialog
         isOpen={removing !== undefined}
         title={t("event-members-remove-title", { name: removing?.display_name ?? "" })}

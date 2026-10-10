@@ -56,6 +56,8 @@ export interface ProposalCardProps {
   eventId: string | null | undefined;
   recordErrors: FieldErrors;
   onRecordEditSubmit: (fields: Fields) => void;
+  /** False when the event is closed: the card shows the proposal without the actions. */
+  writable: boolean;
   /** False when a proposal that needs this one goes to another reviewer. */
   canLink: boolean;
   onEditCancel: () => void;
@@ -111,7 +113,7 @@ export function ProposalCard(props: ProposalCardProps) {
   const unavailableId = useId();
   const title = operationTitle(proposal.operation, fields);
   // The member reviews an open proposal only when the server says so (ADR 0067): routed to them, or overdue.
-  const isOpen = proposal.status === "open" && proposal.can_review;
+  const isOpen = proposal.status === "open" && proposal.can_review && props.writable;
   const elsewhere = proposal.status === "open" && !proposal.can_review;
   const field = editableField(proposal, fields);
   const isFact = proposal.operation.kind === "set-fact";

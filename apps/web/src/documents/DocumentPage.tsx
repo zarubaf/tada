@@ -8,7 +8,7 @@ import {
   problemMessage,
 } from "../api/client";
 import { EventPage } from "../events/EventPage";
-import { useEventContext } from "../events/eventContext";
+import { useEventContext, useEventWritable } from "../events/eventContext";
 import { loadOrganizationMembers } from "../events/eventMembers";
 import { useManagesEvent } from "../events/useManagesEvent";
 import { LOCALE, t } from "../i18n";
@@ -326,6 +326,7 @@ function DocumentBody({
   const rendering = useRendering(api, newest?.kind === "draft" ? newest.id : undefined);
   const previewHeading = useRef<HTMLHeadingElement>(null);
   const { retried, retry } = useRetry(() => previewHeading.current);
+  const writable = useEventWritable();
   const canApprove = useManagesEvent(api, document.event_id);
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState<string>();
@@ -417,7 +418,7 @@ function DocumentBody({
         >
           {t("document-preview-title")}
         </h3>
-        {newest && isApprovable(newest) && canApprove && shownDraft === newest.id && (
+        {writable && newest && isApprovable(newest) && canApprove && shownDraft === newest.id && (
           <div>
             <Button variant="primary" isPending={approving} onPress={() => void approve()}>
               {t("document-approve")}

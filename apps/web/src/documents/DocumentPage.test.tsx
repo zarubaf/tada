@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApi, type DocumentVersion } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
+import { SessionProvider } from "../session/SessionProvider";
 import { DocumentPage } from "./DocumentPage";
 
 const DOCUMENT_ID = "d1";
@@ -56,6 +57,8 @@ interface Options {
   factsChanged?: boolean;
   /** The caller is an event manager: the list of the event memberships answers. */
   manager?: boolean;
+  /** The event is closed. */
+  closed?: boolean;
   /** The answer of the approval. */
   approve?: () => Response;
   /** The rendering of the draft fails. */
@@ -148,6 +151,7 @@ function setup(versions: DocumentVersion[], options: Options = {}) {
         time_zone: "Europe/Zurich",
         version: 1,
         created_at: "2030-05-18T08:00:00Z",
+        status: options.closed ? "closed" : "active",
         redacted: false,
       });
     }
@@ -169,11 +173,13 @@ function setup(versions: DocumentVersion[], options: Options = {}) {
   window.history.replaceState(null, "", `/documents/${DOCUMENT_ID}`);
   render(
     <Router>
-      <Routes>
-        <Route path="/documents/:documentId">
-          <DocumentPage api={api} />
-        </Route>
-      </Routes>
+      <SessionProvider api={api}>
+        <Routes>
+          <Route path="/documents/:documentId">
+            <DocumentPage api={api} />
+          </Route>
+        </Routes>
+      </SessionProvider>
     </Router>,
   );
   return { calls };
@@ -332,6 +338,16 @@ describe("DocumentPage", () => {
     setup([version(1, "Programm.pdf", "application/pdf"), draft], { manager: true });
 
     expect(await screen.findByRole("button", { name: "Version freigeben" })).toBeInTheDocument();
+  });
+
+  it("offers no approval for the draft of a closed event", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft], { manager: true, closed: true });
+
+    await screen.findByRole("table", { name: "Versionen" });
+    await within(
+      await screen.findByRole("region", { name: "Vorschau der neuesten Version" }),
+    ).findByText("Flugplatz Testwil");
+    expect(screen.queryByRole("button", { name: "Version freigeben" })).not.toBeInTheDocument();
   });
 
   it("offers no approval to a member who is no event manager", async () => {

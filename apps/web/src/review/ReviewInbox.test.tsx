@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../App";
@@ -340,6 +340,7 @@ function fakeServer(overrides: Record<string, Handler> = {}) {
   const routes: Record<string, Handler> = {
     "GET /api/v1/session": () => json(200, SESSION),
     "GET /api/v1/events": () => json(200, { items: [EVENT] }),
+    "GET /api/v1/events/:id": () => json(200, EVENT),
     "GET /api/v1/changesets": () => json(200, { items: openItems }),
     "GET /api/v1/events/:id/fields": () => json(200, { items: [venueField] }),
     "GET /api/v1/events/:id/profile": () =>
@@ -364,7 +365,7 @@ function fakeServer(overrides: Record<string, Handler> = {}) {
     const detail = /^\/api\/v1\/changesets\/([^/]+)$/.exec(url.pathname);
     const generic = url.pathname
       .replace(/^\/api\/v1\/changesets\/[^/]+\//, "/api/v1/changesets/:id/")
-      .replace(/^\/api\/v1\/events\/[^/]+\//, "/api/v1/events/:id/");
+      .replace(/^\/api\/v1\/events\/[^/]+(\/|$)/, "/api/v1/events/:id$1");
     calls.push({ method: request.method, path: url.pathname, body });
     if (detail?.[1] && request.method === "GET") {
       const changeset = CHANGESETS.get(detail[1]);
@@ -452,6 +453,42 @@ describe("the detail", () => {
     ).toBeInTheDocument();
     expect(within(card).getByText("Die Mail nennt den Ort.")).toBeInTheDocument();
     expect(within(card).getByText(/Quellversion 0199b8e0/)).toBeInTheDocument();
+  });
+
+  const closedEvent = { ...EVENT, status: "closed", closed_at: "2028-04-01T09:00:00Z" };
+
+  it("hides the review actions of a closed event that is not in the list of events", async () => {
+    renderAt(
+      `/inbox/${CS_NEW}`,
+      fakeServer({
+        "GET /api/v1/events": () => json(200, { items: [] }),
+        "GET /api/v1/events/:id": () => json(200, closedEvent),
+      }),
+    );
+
+    expect(await screen.findByText(/Dieser Anlass ist abgeschlossen/)).toBeInTheDocument();
+    const card = await screen.findByRole("article", { name: "Feld „Hangar“ hinzufügen" });
+    expect(within(card).queryByRole("button", { name: /^Annehmen/ })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: /^Ablehnen/ })).not.toBeInTheDocument();
+  });
+
+  it("offers no review and runs no shortcut while the event loads", async () => {
+    let finish: (response: Response) => void = () => {};
+    const server = renderAt(
+      `/inbox/${CS_NEW}`,
+      fakeServer({
+        "GET /api/v1/events/:id": () => new Promise<Response>((resolve) => (finish = resolve)),
+      }),
+    );
+
+    expect(await screen.findByRole("status", { name: "Vorschläge werden geladen" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^Annehmen/ })).not.toBeInTheDocument();
+    await userEvent.keyboard("a");
+    expect(applyCalls(server)).toHaveLength(0);
+
+    await act(async () => finish(json(200, EVENT)));
+    const card = await screen.findByRole("article", { name: "Feld „Hangar“ hinzufügen" });
+    expect(within(card).getByRole("button", { name: /^Annehmen/ })).toBeInTheDocument();
   });
 
   it("shows an organization changeset without an event", async () => {

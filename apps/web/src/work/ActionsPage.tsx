@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { Action, Api } from "../api/client";
-import { useEventContext } from "../events/eventContext";
+import { useEventContext, useEventWritable } from "../events/eventContext";
 import { formatDate } from "../facts/formatValue";
 import { t } from "../i18n";
 import { RegisterView } from "../registers/RegisterView";
@@ -33,6 +33,7 @@ export function ActionsPage({ api }: { api: Api }) {
 
 function Actions({ api, eventId, directory }: { api: Api; eventId: string; directory: Directory }) {
   const session = useSession();
+  const writable = useEventWritable();
   const fetchPage = useCallback(
     (cursor: string | undefined) =>
       api.GET("/api/v1/events/{event_id}/actions", {
@@ -89,6 +90,7 @@ function Actions({ api, eventId, directory }: { api: Api; eventId: string; direc
       id: "actions",
       header: t("work-column-actions"),
       cell: (row) =>
+        writable &&
         row.can_change &&
         !row.redacted && (
           <Button
@@ -116,23 +118,32 @@ function Actions({ api, eventId, directory }: { api: Api; eventId: string; direc
         loadingLabel={t("actions-loading")}
         empty={{ title: t("actions-empty-title"), text: t("actions-empty-text") }}
       />
-      <section className={styles.section} aria-labelledby="action-form-title">
-        <h2 id="action-form-title" ref={page.formHeading} tabIndex={-1} className={styles.heading}>
-          {editing ? t("action-change-title", { id: editing.local_id }) : t("action-create-title")}
-        </h2>
-        <ActionForm
-          key={editing ? `${editing.id}:${editing.version}` : "new"}
-          api={api}
-          eventId={eventId}
-          directory={directory}
-          userId={session.user.id}
-          {...(editing && { record: editing })}
-          onStart={page.start}
-          onSaved={saved}
-          onFailed={page.fail}
-          {...(editing && { onCancel: () => page.closeForm() })}
-        />
-      </section>
+      {writable && (
+        <section className={styles.section} aria-labelledby="action-form-title">
+          <h2
+            id="action-form-title"
+            ref={page.formHeading}
+            tabIndex={-1}
+            className={styles.heading}
+          >
+            {editing
+              ? t("action-change-title", { id: editing.local_id })
+              : t("action-create-title")}
+          </h2>
+          <ActionForm
+            key={editing ? `${editing.id}:${editing.version}` : "new"}
+            api={api}
+            eventId={eventId}
+            directory={directory}
+            userId={session.user.id}
+            {...(editing && { record: editing })}
+            onStart={page.start}
+            onSaved={saved}
+            onFailed={page.fail}
+            {...(editing && { onCancel: () => page.closeForm() })}
+          />
+        </section>
+      )}
     </div>
   );
 }

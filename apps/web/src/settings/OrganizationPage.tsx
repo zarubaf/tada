@@ -12,6 +12,7 @@ import { Skeleton } from "../ui/Skeleton";
 import { Switch } from "../ui/Switch";
 import { loadMcpSwitch } from "./mcpSwitch";
 import styles from "./OrganizationPage.module.css";
+import { RetentionSettings } from "./RetentionSettings";
 
 type State =
   | { kind: "loading" }
@@ -19,7 +20,8 @@ type State =
   | { kind: "loaded"; feature: OrganizationFeature };
 
 /**
- * The settings of the organization: the switch for MCP tokens and the privacy notice (ADR 0045).
+ * The settings of the organization: the switch for MCP tokens, the privacy notice (ADR 0045) and the
+ * retention periods (ADR 0071).
  * Only an owner changes them. The server decides; the controls of a member are disabled or absent
  * so that they do not fail.
  */
@@ -112,6 +114,12 @@ export function OrganizationPage({ api }: { api: Api }) {
       <PrivacyNoticeSettings
         api={api}
         isOwner={isOwner}
+        onStatus={setConfirmation}
+        onFailure={setFailure}
+      />
+      <RetentionSettings
+        api={api}
+        role={session.organization?.role}
         onStatus={setConfirmation}
         onFailure={setFailure}
       />

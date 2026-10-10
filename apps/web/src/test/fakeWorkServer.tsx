@@ -65,6 +65,8 @@ export interface Setup {
   role?: string;
   /** Whether the signed-in member is an event manager. Otherwise the member is a contributor. */
   eventManager?: boolean;
+  /** The event of the page. The default is an active event. */
+  event?: Event;
   workstreams?: unknown[];
   /** Answers by `METHOD /path-suffix`; the first match wins. */
   answers?: Record<string, () => Response>;
@@ -78,6 +80,7 @@ export function renderWork(
   {
     role = "member",
     eventManager = false,
+    event = EVENT,
     workstreams = [ground],
     answers = {},
     lists = {},
@@ -131,7 +134,7 @@ export function renderWork(
     <Router>
       <SessionProvider api={api}>
         <EventContext
-          value={{ event: EVENT, profile: { kind: "loading" }, reloadProfile: async () => true }}
+          value={{ event, profile: { kind: "loading" }, reloadProfile: async () => true }}
         >
           {page(api)}
         </EventContext>

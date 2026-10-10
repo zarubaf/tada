@@ -189,6 +189,20 @@ export function formatLabel(label: Label): string {
   return label.kind === "message" ? t(label.id) : label.text;
 }
 
+/** The day of a time as 03.10.2026 in `timeZone`, the IANA zone of the event. */
+export function formatDay(iso: string, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat(LOCALE, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone,
+    }).format(new Date(iso));
+  } catch {
+    return t("value-unsupported");
+  }
+}
+
 /** A time as 03.10.2026, 14:12 in `timeZone`, the IANA zone of the event. */
 export function formatDateTime(iso: string, timeZone: string): string {
   try {

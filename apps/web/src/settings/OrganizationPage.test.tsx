@@ -34,6 +34,9 @@ function setup({ role = "owner", answers = {} as Record<string, () => Response> 
     if (key === "GET /api/v1/organization/privacy-notice") {
       return json(200, { markdown: null, version: 1 });
     }
+    if (key === "GET /api/v1/organization/retention") {
+      return json(200, { closed_event_months: null, source_months: null, version: 1 });
+    }
     if (key === "GET /api/v1/organization/features") {
       return json(200, { items: [{ feature: "mcp-tokens", enabled: true, version: 2 }] });
     }

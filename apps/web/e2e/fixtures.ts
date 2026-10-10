@@ -9,6 +9,8 @@ export const events = [
     time_zone: "Europe/Zurich",
     version: 1,
     created_at: "2028-03-01T13:12:00Z",
+    status: "active",
+    redacted: false,
   },
   {
     id: "0199b8e0-0000-7000-8000-000000000002",
@@ -17,6 +19,8 @@ export const events = [
     time_zone: "Europe/Zurich",
     version: 1,
     created_at: "2030-05-18T08:00:00Z",
+    status: "active",
+    redacted: false,
   },
 ];
 

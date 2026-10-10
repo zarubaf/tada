@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Document, problemMessage } from "../api/client";
 import { uploadDocument, uploadMessage } from "../api/upload";
+import { useEventWritable } from "../events/eventContext";
 import { LOCALE, t } from "../i18n";
 import { useParams } from "../router/Router";
 import { Button } from "../ui/Button";
@@ -71,6 +72,7 @@ const columns: Column<Document>[] = [
 /** „Dokumente“ of an event: a flat list with a search field and the upload (Documents template). */
 export function DocumentsPage({ api }: { api: Api }) {
   const { eventId = "" } = useParams();
+  const writable = useEventWritable();
   const [state, setState] = useState<State>({ kind: "loading" });
   // The text in the field, and the text of the search that the list shows.
   const [text, setText] = useState("");
@@ -173,11 +175,13 @@ export function DocumentsPage({ api }: { api: Api }) {
         <h2 id="documents-title" ref={heading} tabIndex={-1} className={styles.heading}>
           {t("documents-title")}
         </h2>
-        <FileButton isPending={uploading} onSelect={(file) => void upload(file)}>
-          {t("documents-upload")}
-        </FileButton>
+        {writable && (
+          <FileButton isPending={uploading} onSelect={(file) => void upload(file)}>
+            {t("documents-upload")}
+          </FileButton>
+        )}
       </div>
-      <p className={styles.help}>{t("documents-upload-limits")}</p>
+      {writable && <p className={styles.help}>{t("documents-upload-limits")}</p>}
       <LiveRegion kind="status">{uploading ? t("documents-uploading") : uploaded}</LiveRegion>
       <LiveRegion kind="alert" visuallyHidden>
         {uploadFailure}

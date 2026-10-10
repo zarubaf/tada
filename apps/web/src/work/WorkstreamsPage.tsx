@@ -1,5 +1,5 @@
 import type { Api, Workstream } from "../api/client";
-import { useEventContext } from "../events/eventContext";
+import { useEventContext, useEventWritable } from "../events/eventContext";
 import { t } from "../i18n";
 import { useRegisterPage } from "../registers/useRegisterPage";
 import { useSession } from "../session/SessionProvider";
@@ -41,6 +41,9 @@ function Workstreams({
   reloadDirectory: () => Promise<boolean>;
 }) {
   const session = useSession();
+  // Only a manager changes workstreams, and not in a closed event.
+  const writable = useEventWritable();
+  const canChange = directory.isManager && writable;
   // The directory holds the workstreams of the event; a save loads it again.
   const page = useRegisterPage<Workstream>(reloadDirectory);
   const { editing } = page;
@@ -69,7 +72,7 @@ function Workstreams({
       header: t("work-column-status"),
       cell: (row) => t(`workstream-status-${row.status}`),
     },
-    ...(directory.isManager
+    ...(canChange
       ? [
           {
             id: "actions",
@@ -105,7 +108,7 @@ function Workstreams({
           rowKey={(row) => row.id}
         />
       )}
-      {directory.isManager && (
+      {canChange && (
         <section className={styles.section} aria-labelledby="workstream-form-title">
           <h2
             id="workstream-form-title"

@@ -1,7 +1,8 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { createApi, type Document } from "../api/client";
+import { createApi, type Document, type Event } from "../api/client";
+import { EventContext } from "../events/eventContext";
 import { Route, Router, Routes } from "../router/Router";
 import { DocumentsPage } from "./DocumentsPage";
 
@@ -50,7 +51,21 @@ const programm = makeDocument("d1", "DOC-001", "Programm Flugtag.pdf");
 const budget = makeDocument("d2", "DOC-002", "Budget Übersicht.pdf");
 
 /** A fake server for the list. It records the `q` of each call. */
-function setup(lists: Record<string, Document[]> = { "": [programm, budget] }) {
+const ACTIVE_EVENT: Event = {
+  id: EVENT_ID,
+  key: "FLY28",
+  name: "Fly-in Testwil",
+  time_zone: "Europe/Zurich",
+  version: 1,
+  created_at: "2028-03-01T13:12:00Z",
+  status: "active",
+  redacted: false,
+};
+
+function setup(
+  lists: Record<string, Document[]> = { "": [programm, budget] },
+  event: Event = ACTIVE_EVENT,
+) {
   const queries: (string | null)[] = [];
   const hooks: {
     upload?: () => Response;
@@ -83,7 +98,11 @@ function setup(lists: Record<string, Document[]> = { "": [programm, budget] }) {
     <Router>
       <Routes>
         <Route path="/events/:eventId/documents">
-          <DocumentsPage api={api} />
+          <EventContext
+            value={{ event, profile: { kind: "loading" }, reloadProfile: async () => true }}
+          >
+            <DocumentsPage api={api} />
+          </EventContext>
         </Route>
       </Routes>
     </Router>,
@@ -114,6 +133,15 @@ describe("DocumentsPage", () => {
       "/documents/d2",
     );
     expect(within(table).getAllByText("2.5 MB")).toHaveLength(2);
+  });
+
+  it("offers no upload for a closed event, and still lists the documents", async () => {
+    setup(undefined, { ...ACTIVE_EVENT, status: "closed", closed_at: "2030-07-01T10:00:00Z" });
+
+    const table = await screen.findByRole("table", { name: "Dokumente" });
+    expect(within(table).getByText("DOC-001")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Datei hochladen" })).not.toBeInTheDocument();
+    expect(document.querySelector("input[type=file]")).toBeNull();
   });
 
   it("shows a label for the file type, not the media type", async () => {

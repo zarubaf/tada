@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi, type Event } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
+import { SessionProvider } from "../session/SessionProvider";
 import { EventPage } from "./EventPage";
 
 const event: Event = {
@@ -46,6 +47,13 @@ const fields = [
   },
 ];
 
+const session = {
+  user_id: "u1",
+  display_name: "Anna Muster",
+  organization: { organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" },
+  memberships: [{ organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" }],
+};
+
 /** The answer to the profile: the date window is accepted. */
 const profile = { facts: [dateWindowFact], proposals: [], open_questions: [] };
 
@@ -58,6 +66,13 @@ function fakeApiWithProfile(answerProfile: () => Response, ...responses: Respons
   const urls: string[] = [];
   const fetch = vi.fn(async (request: Request) => {
     const { pathname } = new URL(request.url);
+    if (pathname.endsWith("/session")) {
+      return json(200, session);
+    }
+    if (pathname.endsWith("/memberships")) {
+      // The member is no event manager: no control to close the event shows.
+      return json(403, { type: "", code: "forbidden", title: "", status: 403, instance: "" });
+    }
     if (pathname.endsWith("/profile")) {
       return answerProfile();
     }
@@ -78,43 +93,45 @@ function renderAt(path: string, api: ReturnType<typeof createApi>) {
   window.history.replaceState(null, "", path);
   return render(
     <Router>
-      <Routes>
-        <Route path="/events/:eventId">
-          <EventPage api={api}>
-            <p>Platzhalter</p>
-          </EventPage>
-        </Route>
-        <Route path="/events/:eventId/documents">
-          <EventPage api={api}>
-            <p>Dokumentenliste</p>
-          </EventPage>
-        </Route>
-        <Route path="/documents/:documentId">
-          <EventPage api={api} eventId={event.id}>
-            <p>Dokumentseite</p>
-          </EventPage>
-        </Route>
-        <Route path="/events/:eventId/members">
-          <EventPage api={api}>
-            <p>Mitgliederliste</p>
-          </EventPage>
-        </Route>
-        <Route path="/events/:eventId/actions">
-          <EventPage api={api}>
-            <p>Aufgabenliste</p>
-          </EventPage>
-        </Route>
-        <Route path="/events/:eventId/commitments">
-          <EventPage api={api}>
-            <p>Zusagenliste</p>
-          </EventPage>
-        </Route>
-        <Route path="/events/:eventId/workstreams">
-          <EventPage api={api}>
-            <p>Arbeitsbereichsliste</p>
-          </EventPage>
-        </Route>
-      </Routes>
+      <SessionProvider api={api}>
+        <Routes>
+          <Route path="/events/:eventId">
+            <EventPage api={api}>
+              <p>Platzhalter</p>
+            </EventPage>
+          </Route>
+          <Route path="/events/:eventId/documents">
+            <EventPage api={api}>
+              <p>Dokumentenliste</p>
+            </EventPage>
+          </Route>
+          <Route path="/documents/:documentId">
+            <EventPage api={api} eventId={event.id}>
+              <p>Dokumentseite</p>
+            </EventPage>
+          </Route>
+          <Route path="/events/:eventId/members">
+            <EventPage api={api}>
+              <p>Mitgliederliste</p>
+            </EventPage>
+          </Route>
+          <Route path="/events/:eventId/actions">
+            <EventPage api={api}>
+              <p>Aufgabenliste</p>
+            </EventPage>
+          </Route>
+          <Route path="/events/:eventId/commitments">
+            <EventPage api={api}>
+              <p>Zusagenliste</p>
+            </EventPage>
+          </Route>
+          <Route path="/events/:eventId/workstreams">
+            <EventPage api={api}>
+              <p>Arbeitsbereichsliste</p>
+            </EventPage>
+          </Route>
+        </Routes>
+      </SessionProvider>
     </Router>,
   );
 }
