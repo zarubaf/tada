@@ -943,3 +943,9 @@ my-work-review =
         [one] 1 Vorschlag wartet auf Ihre Prüfung
        *[other] { $count } Vorschläge warten auf Ihre Prüfung
     }
+
+## Legal redaction, dispute notes and the Datenschutz section of a person (ADRs 0072 and 0073).
+
+# $text: the objection of an owner about the shown evidence.
+dispute-note = Einwand: { $text }
+problem-content-redacted = Dieser Inhalt wurde entfernt.

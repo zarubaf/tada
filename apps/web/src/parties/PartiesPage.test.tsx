@@ -333,4 +333,21 @@ describe("PartiesPage", () => {
       }),
     );
   });
+
+  it("owner sees the Datenschutz section of a person, others do not", async () => {
+    setup({
+      role: "owner",
+      answers: { "GET /persons/p1/mentions": () => json(200, { items: [] }) },
+    });
+    await user.click(await screen.findByRole("button", { name: "Beat Muster bearbeiten" }));
+    expect(await screen.findByRole("heading", { name: "Datenschutz" })).toBeVisible();
+    expect(await screen.findByRole("link", { name: "Export herunterladen" })).toBeVisible();
+  });
+
+  it("non-owner sees no Datenschutz section", async () => {
+    setup({ role: "admin" });
+    await user.click(await screen.findByRole("button", { name: "Beat Muster bearbeiten" }));
+    await screen.findByRole("heading", { name: /bearbeiten/ });
+    expect(screen.queryByRole("heading", { name: "Datenschutz" })).toBeNull();
+  });
 });

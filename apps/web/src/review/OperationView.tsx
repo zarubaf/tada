@@ -16,7 +16,9 @@ import { LintWarnings } from "../documents/LintWarnings";
 import { formatDate, formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { Link } from "../router/Router";
+import { DisputeNotes } from "../ui/DisputeNotes";
 import { KnowledgeState } from "../ui/KnowledgeState";
+import { Redacted } from "../ui/Redacted";
 import { ActionStatusLabel, CommitmentStatusLabel } from "../work/WorkStatus";
 import styles from "./OperationView.module.css";
 import { NO_NAMES, type RecordNames } from "./recordNames";
@@ -247,9 +249,16 @@ function FactComparison({
         <dt>{t("inbox-current")}</dt>
         <dd>
           {current ? (
-            <KnowledgeState state={current.state}>
-              {current.state === "unknown" ? undefined : formatValue(current, valueType)}
-            </KnowledgeState>
+            <>
+              <KnowledgeState state={current.state}>
+                {current.state === "unknown" ? undefined : current.redacted ? (
+                  <Redacted />
+                ) : (
+                  formatValue(current, valueType)
+                )}
+              </KnowledgeState>
+              <DisputeNotes notes={current.dispute_notes} />
+            </>
           ) : (
             <KnowledgeState state="unknown" />
           )}

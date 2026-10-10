@@ -1,11 +1,12 @@
 import { type ReactNode, useCallback, useId, useMemo, useRef, useState } from "react";
-import type { Api, DraftRendering, Fact, Field, LinkTarget } from "../api/client";
+import type { Api, DisputeNote, DraftRendering, Fact, Field, LinkTarget } from "../api/client";
 import { type ProfileState, useEventProfile } from "../events/eventContext";
 import { EvidencePanel } from "../evidence/EvidencePanel";
 import { Excerpt } from "../evidence/Excerpt";
 import { formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
+import { DisputeNotes } from "../ui/DisputeNotes";
 import { useFocusAfterCommit } from "../ui/focus";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { LazyMarkdown } from "../ui/LazyMarkdown";
@@ -64,18 +65,25 @@ function FactLink({
   href,
   target,
   profile,
+  notes,
   onOpen,
   buttons,
 }: {
   href: string;
   target: FactTarget;
   profile: ProfileState;
+  notes: DisputeNote[] | undefined;
   onOpen: (shown: Shown) => void;
   buttons: React.RefObject<Map<string, HTMLButtonElement>>;
 }) {
   const { fact, field } = lookup(profile, target.fact_id);
   const valueText = target.state === "unknown" ? undefined : formatValue(target, field?.value_type);
-  const mark = <KnowledgeState state={target.state}>{valueText}</KnowledgeState>;
+  const mark = (
+    <>
+      <KnowledgeState state={target.state}>{valueText}</KnowledgeState>
+      <DisputeNotes notes={notes} />
+    </>
+  );
   if (!fact) {
     return mark;
   }
@@ -144,6 +152,7 @@ export function DraftView({
               href={href}
               target={target}
               profile={profile}
+              notes={draft.link_dispute_notes?.[href]}
               onOpen={setShown}
               buttons={buttons}
             />
@@ -167,7 +176,7 @@ export function DraftView({
           return <span className={styles.note}>{t("value-unsupported")}</span>;
       }
     },
-    [draft.links, numbers, profile],
+    [draft.links, draft.link_dispute_notes, numbers, profile],
   );
 
   if (profile.kind === "loading") {
@@ -189,7 +198,7 @@ export function DraftView({
               const target = draft.links[href];
               return target?.kind === "source" ? (
                 <li key={href} value={number}>
-                  <Excerpt quote={target.passage.quote} />
+                  <Excerpt quote={target.passage.quote} notes={draft.link_dispute_notes?.[href]} />
                   <p className={styles.note}>
                     {t("draft-source-version", { id: target.source_version_id.slice(0, 8) })}
                     {typeof target.passage.page === "number" &&

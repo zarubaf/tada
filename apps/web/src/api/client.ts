@@ -36,6 +36,7 @@ export type CommitmentStatus = components["schemas"]["CommitmentStatus"];
 export type RecordEvidence = components["schemas"]["RecordEvidence"];
 export type Document = components["schemas"]["Document"];
 export type DocumentVersion = components["schemas"]["DocumentVersion"];
+export type DisputeNote = components["schemas"]["DisputeNote"];
 export type DraftRendering = components["schemas"]["DraftRendering"];
 export type LinkTarget = components["schemas"]["LinkTarget"];
 export type LintWarning = components["schemas"]["LintWarning"];

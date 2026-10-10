@@ -3,7 +3,9 @@ import type { Api, Author, Fact, FactEvidence } from "../api/client";
 import { loadOrganizationMembers } from "../events/eventMembers";
 import { formatDateTime } from "../facts/formatValue";
 import { t } from "../i18n";
+import { DisputeNotes } from "../ui/DisputeNotes";
 import { KnowledgeState } from "../ui/KnowledgeState";
+import { Redacted } from "../ui/Redacted";
 import { Sheet } from "../ui/Sheet";
 import { authorKindName } from "./authorKind";
 import styles from "./EvidencePanel.module.css";
@@ -89,7 +91,7 @@ function Source({
   const source = lookups.sources.get(evidence.source_version_id);
   return (
     <li className={styles.source}>
-      <Excerpt quote={passage.quote} />
+      <Excerpt quote={passage.quote} redacted={evidence.redacted} notes={evidence.dispute_notes} />
       <p className={styles.meta}>
         {source
           ? t("evidence-document-version", { name: source.name, number: source.number })
@@ -126,9 +128,10 @@ export function EvidencePanel({
     <Sheet title={title} onClose={onClose}>
       <p className={styles.value}>
         <KnowledgeState state={fact.state} showLabel>
-          {fact.state === "unknown" ? undefined : valueText}
+          {fact.state === "unknown" ? undefined : fact.redacted ? <Redacted /> : valueText}
         </KnowledgeState>
       </p>
+      <DisputeNotes notes={fact.dispute_notes} />
       <dl className={styles.accepted}>
         <div>
           <dt>{t("evidence-accepted-by")}</dt>
