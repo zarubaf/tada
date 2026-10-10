@@ -13,7 +13,7 @@ use tada_domain::parties::Party;
 use tada_domain::proposals::{NewRecord, Operation};
 
 use super::selection::closure;
-use crate::access::EventAccess;
+use crate::access::EventLevel;
 use crate::caller::OrgScope;
 use crate::identity::IdentityStore;
 use crate::store::StoreError;
@@ -86,7 +86,7 @@ pub fn reviewers(
 /// A member reviewer must still have the contributor or manager role (rule 8).
 pub fn routed_to(
     caller: UserId,
-    access: EventAccess,
+    access: EventLevel,
     own: &Reviewers,
     dependents: &[&Reviewers],
 ) -> bool {
@@ -101,7 +101,7 @@ pub fn routed_to(
 /// or the caller is an event manager, who keeps the right to review each proposal of the event (rule 6).
 pub fn may_review(
     caller: UserId,
-    access: EventAccess,
+    access: EventLevel,
     own: &Reviewers,
     dependents: &[&Reviewers],
 ) -> bool {
@@ -112,7 +112,7 @@ pub fn may_review(
 /// manager and the proposal is overdue (rule 6).
 pub fn in_inbox_of(
     caller: UserId,
-    access: EventAccess,
+    access: EventLevel,
     own: &Reviewers,
     dependents: &[&Reviewers],
     overdue: bool,
@@ -208,12 +208,12 @@ impl ChangesetRoutes {
         Some((own, dependents))
     }
 
-    pub fn routed_to(&self, caller: UserId, access: EventAccess, id: ProposalId) -> bool {
+    pub fn routed_to(&self, caller: UserId, access: EventLevel, id: ProposalId) -> bool {
         self.of(id)
             .is_some_and(|(own, dependents)| routed_to(caller, access, own, &dependents))
     }
 
-    pub fn may_review(&self, caller: UserId, access: EventAccess, id: ProposalId) -> bool {
+    pub fn may_review(&self, caller: UserId, access: EventLevel, id: ProposalId) -> bool {
         self.of(id)
             .is_some_and(|(own, dependents)| may_review(caller, access, own, &dependents))
     }
@@ -221,7 +221,7 @@ impl ChangesetRoutes {
     pub fn in_inbox_of(
         &self,
         caller: UserId,
-        access: EventAccess,
+        access: EventLevel,
         id: ProposalId,
         overdue: bool,
     ) -> bool {
@@ -480,23 +480,18 @@ mod tests {
     #[test]
     fn a_member_reviewer_needs_the_contributor_or_manager_role() {
         let owner = Reviewers::user(user(OWNER));
-        assert!(routed_to(
-            user(OWNER),
-            EventAccess::Contributor,
-            &owner,
-            &[]
-        ));
+        assert!(routed_to(user(OWNER), EventLevel::Contributor, &owner, &[]));
         assert!(may_review(
             user(OWNER),
-            EventAccess::Contributor,
+            EventLevel::Contributor,
             &owner,
             &[]
         ));
-        assert!(!routed_to(user(OWNER), EventAccess::Viewer, &owner, &[]));
-        assert!(!may_review(user(OWNER), EventAccess::Viewer, &owner, &[]));
+        assert!(!routed_to(user(OWNER), EventLevel::Viewer, &owner, &[]));
+        assert!(!may_review(user(OWNER), EventLevel::Viewer, &owner, &[]));
         assert!(!may_review(
             user(OTHER),
-            EventAccess::Contributor,
+            EventLevel::Contributor,
             &owner,
             &[]
         ));
@@ -505,7 +500,7 @@ mod tests {
     #[test]
     fn a_manager_reviews_each_proposal_but_sees_only_unrouted_or_overdue_ones() {
         let lead = Reviewers::user(user(LEAD));
-        let manager = (user(MANAGER), EventAccess::Manager);
+        let manager = (user(MANAGER), EventLevel::Manager);
         assert!(may_review(manager.0, manager.1, &lead, &[]));
         assert!(!routed_to(manager.0, manager.1, &lead, &[]));
         assert!(!in_inbox_of(manager.0, manager.1, &lead, &[], false));
@@ -514,14 +509,14 @@ mod tests {
             assert!(in_inbox_of(manager.0, manager.1, &reviewers, &[], false));
             assert!(!in_inbox_of(
                 user(OTHER),
-                EventAccess::Contributor,
+                EventLevel::Contributor,
                 &reviewers,
                 &[],
                 true
             ));
         }
         // A manager who is the lead gets the proposal as the lead.
-        assert!(routed_to(user(LEAD), EventAccess::Manager, &lead, &[]));
+        assert!(routed_to(user(LEAD), EventLevel::Manager, &lead, &[]));
     }
 
     #[test]
@@ -574,20 +569,20 @@ mod tests {
             )
         };
         let open = routes(true);
-        let lead = (user(LEAD), EventAccess::Contributor);
+        let lead = (user(LEAD), EventLevel::Contributor);
         assert!(open.routed_to(lead.0, lead.1, s));
         assert!(open.may_review(lead.0, lead.1, p));
         assert!(!open.may_review(lead.0, lead.1, f));
         // The supplier has a member reviewer now, so it leaves the inbox of the managers.
-        assert!(!open.in_inbox_of(user(MANAGER), EventAccess::Manager, s, false));
+        assert!(!open.in_inbox_of(user(MANAGER), EventLevel::Manager, s, false));
         // The new action goes to the managers, and the commitment that it depends on stays with the lead.
-        assert!(open.routed_to(user(MANAGER), EventAccess::Manager, f));
-        assert!(!open.routed_to(user(MANAGER), EventAccess::Manager, p));
+        assert!(open.routed_to(user(MANAGER), EventLevel::Manager, f));
+        assert!(!open.routed_to(user(MANAGER), EventLevel::Manager, p));
 
         // A closed dependent passes nothing on.
         let closed = routes(false);
         assert!(!closed.may_review(lead.0, lead.1, s));
-        assert!(closed.in_inbox_of(user(MANAGER), EventAccess::Manager, s, false));
+        assert!(closed.in_inbox_of(user(MANAGER), EventLevel::Manager, s, false));
         assert!(!closed.may_review(lead.0, lead.1, proposal_id(9)));
     }
 
@@ -615,10 +610,10 @@ mod tests {
             Some(event()),
             &facts(),
         );
-        let owner = (user(OWNER), EventAccess::Contributor);
+        let owner = (user(OWNER), EventLevel::Contributor);
         assert!(routes.may_review(owner.0, owner.1, c));
         assert!(!routes.may_review(owner.0, owner.1, d));
         assert!(!routes.routed_to(owner.0, owner.1, d));
-        assert!(routes.in_inbox_of(user(MANAGER), EventAccess::Manager, d, false));
+        assert!(routes.in_inbox_of(user(MANAGER), EventLevel::Manager, d, false));
     }
 }

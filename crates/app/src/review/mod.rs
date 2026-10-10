@@ -33,7 +33,7 @@ pub use self::read::{
     ChangesetReview, ConflictReason, EXCERPT_CONTEXT, ProposalReview, RedactedProposalReview,
     get_changeset,
 };
-use crate::access::{self, AccessError, EventAccess, Principal};
+use crate::access::{self, AccessError, EventLevel, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{Actor, MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -832,7 +832,7 @@ async fn inbox(
     let mut events: Vec<Option<EventId>> = changesets.iter().map(|c| c.event_id).collect();
     events.sort();
     events.dedup();
-    let mut routing: HashMap<Option<EventId>, (EventAccess, RoutingFacts)> = HashMap::new();
+    let mut routing: HashMap<Option<EventId>, (EventLevel, RoutingFacts)> = HashMap::new();
     for event in events {
         let access = match changeset_access(caller, event, ports.identity).await {
             Ok(access) if access.can_propose() => access,
@@ -910,10 +910,10 @@ async fn changeset_access(
     caller: &impl Principal,
     event: Option<EventId>,
     identity: &dyn IdentityStore,
-) -> Result<EventAccess, ReviewQueryError> {
+) -> Result<EventLevel, ReviewQueryError> {
     match event {
-        Some(event) => Ok(access::event_access(caller, event, identity).await?),
-        None if access::sees_all_events(caller) => Ok(EventAccess::Manager),
+        Some(event) => Ok(access::event_access(caller, event, identity).await?.level()),
+        None if access::sees_all_events(caller) => Ok(EventLevel::Manager),
         None => Err(ReviewQueryError::NotFound),
     }
 }
@@ -924,7 +924,7 @@ struct Reviewable {
     /// A legal redaction removes the text (ADR 0072).
     source: Redactable<SourceText>,
     results: Vec<ReviewRecord>,
-    access: EventAccess,
+    access: EventLevel,
     routes: ChangesetRoutes,
 }
 
@@ -1017,7 +1017,7 @@ async fn reviewable(
         // A legal redaction can empty each proposal (ADR 0072); an event manager still sees the tombstones.
         || (reviewable.changeset.proposals.is_empty()
             && !reviewable.changeset.redacted.is_empty()
-            && reviewable.access == EventAccess::Manager);
+            && reviewable.access == EventLevel::Manager);
     if reviews_some {
         Ok(reviewable)
     } else {
