@@ -38,6 +38,7 @@ mod actor;
 mod audit;
 mod bootstrap;
 mod database;
+mod dispute_notes;
 mod documents;
 mod drafts;
 mod error;

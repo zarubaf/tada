@@ -5,12 +5,13 @@ use axum::http::StatusCode;
 use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tada_app::domain::ids::{ChangesetId, EventId, LocalIdKind, ProposalId};
+use tada_app::dispute_notes::{DisputeNotes, NoteKey};
+use tada_app::domain::ids::{ChangesetId, EventId, LocalIdKind, ProposalId, SourceVersionId};
 use tada_app::domain::parties::Party as DomainParty;
 use tada_app::domain::proposals::{
     DraftDocument as DomainDraftDocument, Operation as DomainOperation,
 };
-use tada_app::domain::redaction::Redactable;
+use tada_app::domain::redaction::{DisputeTarget, DisputeTargetKind, Redactable};
 use tada_app::domain::sources::Excerpt as DomainExcerpt;
 use tada_app::facts::FactVersionRef;
 use tada_app::problem::ProblemCode;
@@ -35,6 +36,7 @@ use crate::ApiState;
 use crate::actors::Author;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::cursor;
+use crate::dispute_notes::{DisputeNote, ShowsDisputeNotes, shown, with_notes};
 use crate::documents::DraftRendering;
 use crate::extract::{Caller, Json, Path, Query, page_limit};
 use crate::json_schema;
@@ -262,6 +264,11 @@ pub struct Proposal {
     /// other proposal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duplicates: Option<Vec<PartyRef>>,
+    /// The dispute notes about the proposal (ADR 0073), oldest first.
+    /// It is absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schema(required = false)]
+    pub dispute_notes: Vec<DisputeNote>,
 }
 
 /// One passage of a source version, with the text around it.
@@ -272,6 +279,11 @@ pub struct ProposalEvidence {
     pub source_version_id: Uuid,
     pub passage: Passage,
     pub excerpt: Excerpt,
+    /// The dispute notes about the source of the passage (ADR 0073), oldest first.
+    /// It is absent if there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schema(required = false)]
+    pub dispute_notes: Vec<DisputeNote>,
 }
 
 /// A passage with the text around it: at most 100 characters before and after it.
@@ -801,6 +813,7 @@ impl From<AppProposalReview> for Proposal {
                     source_version_id: evidence.source_version_id.as_uuid(),
                     passage: (&evidence.passage).into(),
                     excerpt: excerpt.into(),
+                    dispute_notes: Vec::new(),
                 })
                 .collect(),
             status: review.status.into(),
@@ -814,7 +827,41 @@ impl From<AppProposalReview> for Proposal {
             duplicates: review
                 .duplicates
                 .map(|parties| parties.into_iter().map(PartyRef::from).collect()),
+            dispute_notes: Vec::new(),
         }
+    }
+}
+
+impl ShowsDisputeNotes for Changeset {
+    fn note_keys(&self, keys: &mut Vec<NoteKey>) {
+        for proposal in &self.proposals {
+            keys.push(proposal.note_key());
+            keys.extend(proposal.evidence.iter().map(ProposalEvidence::note_key));
+        }
+    }
+
+    fn set_notes(&mut self, notes: &DisputeNotes) {
+        for proposal in &mut self.proposals {
+            proposal.dispute_notes = shown(notes, &proposal.note_key());
+            for evidence in &mut proposal.evidence {
+                evidence.dispute_notes = shown(notes, &evidence.note_key());
+            }
+        }
+    }
+}
+
+impl Proposal {
+    fn note_key(&self) -> NoteKey {
+        NoteKey::Target(DisputeTarget {
+            kind: DisputeTargetKind::Proposal,
+            id: self.id,
+        })
+    }
+}
+
+impl ProposalEvidence {
+    fn note_key(&self) -> NoteKey {
+        NoteKey::SourceVersion(SourceVersionId::from_uuid(self.source_version_id))
     }
 }
 
@@ -1185,7 +1232,9 @@ async fn get_changeset(
         state.clock.as_ref(),
     )
     .await?;
-    Ok(axum::Json(review.into()))
+    Ok(axum::Json(
+        with_notes(&state, &caller, Changeset::from(review)).await?,
+    ))
 }
 
 /// Accepts the selected proposals and their dependencies, all or nothing (ADR 0050).

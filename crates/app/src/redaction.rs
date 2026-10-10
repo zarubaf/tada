@@ -242,7 +242,7 @@ pub async fn redact(
     blobs: &dyn BlobStore,
 ) -> Result<Redacted, RedactionError> {
     if !access::is_owner(caller) {
-        return Err(RedactionError::Forbidden);
+        return Err(refused_to(caller, targets, store).await?);
     }
     let targets = checked(targets)?;
     let outcome = store
@@ -255,6 +255,21 @@ pub async fn redact(
         .await?
         .map_err(refused)?;
     Ok(finish(outcome, blobs).await)
+}
+
+/// The refusal of a caller who is not an owner: `NotFound` if a target is not in its organization, so that the
+/// caller learns nothing about another organization, and `Forbidden` otherwise.
+async fn refused_to(
+    caller: &MemberCaller,
+    targets: &[RedactionTarget],
+    store: &dyn RedactionStore,
+) -> Result<RedactionError, StoreError> {
+    for target in targets {
+        if store.redacted(caller.scope(), *target).await?.is_none() {
+            return Ok(RedactionError::NotFound);
+        }
+    }
+    Ok(RedactionError::Forbidden)
 }
 
 /// Redacts one target at the end of its retention period (ADR 0071), as the service `job-runner`.

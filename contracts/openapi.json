@@ -4413,6 +4413,114 @@
           "internal"
         ]
       }
+    },
+    "/api/v1/dispute-notes": {
+      "post": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Adds a dispute note to immutable evidence: a source item, a fact version, a document version or a proposal.\nEach reader of the target sees the note. Only an owner can do this, and the audit log records\n`dispute_note.create`. A redacted target gets `invalid-transition`.",
+        "operationId": "create_dispute_note",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDisputeNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new note.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedDisputeNote"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "invalid-transition",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/redactions": {
+      "post": {
+        "tags": [
+          "parties"
+        ],
+        "summary": "Redacts records on the request of a person (ADR 0072): their content becomes a tombstone, their IDs stay.\nIt cannot be undone. A redacted target stays as it is and counts in `already`.\nOnly an owner can do this; a caller of another organization does not find the targets.",
+        "operationId": "create_redaction",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRedactionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What the redaction did.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedactionResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "invalid-transition",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
     }
   },
   "components": {
@@ -7216,6 +7324,31 @@
           }
         }
       },
+      "CreateDisputeNoteRequest": {
+        "type": "object",
+        "description": "The input of `CreateDisputeNote`.",
+        "required": [
+          "target_kind",
+          "target_id",
+          "text"
+        ],
+        "properties": {
+          "target_kind": {
+            "type": "string",
+            "description": "`source-item`, `fact-version`, `document-version` or `proposal`.",
+            "example": "source-item"
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string",
+            "description": "The objection, 1 to 1000 characters.",
+            "example": "Die Person bestreitet diese Aussage."
+          }
+        }
+      },
       "CreateEventRequest": {
         "type": "object",
         "description": "The input of `CreateEvent`.",
@@ -7332,6 +7465,28 @@
             ],
             "format": "uuid",
             "description": "A member of the caller's organization. Only an owner or an admin can set it;\nfor any other caller the request gets `forbidden`."
+          }
+        }
+      },
+      "CreateRedactionRequest": {
+        "type": "object",
+        "description": "The input of `CreateRedaction`.",
+        "required": [
+          "targets",
+          "reason"
+        ],
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RedactionTargetInput"
+            },
+            "description": "At least one target. All targets change in one transaction."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Always `request`: the redaction answers the request of a person.",
+            "example": "request"
           }
         }
       },
@@ -7458,6 +7613,37 @@
           }
         }
       },
+      "CreatedDisputeNote": {
+        "type": "object",
+        "description": "A new dispute note.",
+        "required": [
+          "id",
+          "target_kind",
+          "target_id",
+          "text",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_kind": {
+            "type": "string"
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "CurrentFact": {
         "type": "object",
         "description": "The current version of a fact.",
@@ -7492,6 +7678,24 @@
           "redacted": {
             "type": "boolean",
             "description": "True after a legal redaction (ADR 0072): the state stays, the value and `approximate` are absent."
+          }
+        }
+      },
+      "DisputeNote": {
+        "type": "object",
+        "description": "A dispute note as a reader of its target sees it (ADR 0073).",
+        "required": [
+          "text",
+          "created_at"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The objection, 1 to 1000 characters."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -7667,6 +7871,13 @@
           "redacted": {
             "type": "boolean",
             "description": "True after a legal redaction (ADR 0072): the file or the Markdown is gone, and a download or a rendering\nanswers `content-redacted`."
+          },
+          "dispute_notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisputeNote"
+            },
+            "description": "The dispute notes about the version (ADR 0073), oldest first.\nIt is absent if there is none."
           }
         }
       },
@@ -8072,6 +8283,13 @@
             "type": "string",
             "format": "date-time",
             "description": "The time of the acceptance of the current fact version."
+          },
+          "dispute_notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisputeNote"
+            },
+            "description": "The dispute notes about the current fact version (ADR 0073), oldest first.\nIt is absent if there is none."
           }
         }
       },
@@ -8157,6 +8375,13 @@
             "type": "string",
             "format": "date-time",
             "description": "The time when tada captured the source version."
+          },
+          "dispute_notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisputeNote"
+            },
+            "description": "The dispute notes about the source of the passage (ADR 0073), oldest first.\nIt is absent if there is none."
           }
         }
       },
@@ -10033,6 +10258,13 @@
               "$ref": "#/components/schemas/PartyRef"
             },
             "description": "For an open `create-person` or `create-institution` proposal: at most 5 existing records of the same kind\nwith a similar name (ADR 0069). The reviewer can link the proposal to one of them. It is absent for each\nother proposal."
+          },
+          "dispute_notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisputeNote"
+            },
+            "description": "The dispute notes about the proposal (ADR 0073), oldest first.\nIt is absent if there is none."
           }
         }
       },
@@ -10055,6 +10287,13 @@
           },
           "excerpt": {
             "$ref": "#/components/schemas/Excerpt"
+          },
+          "dispute_notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisputeNote"
+            },
+            "description": "The dispute notes about the source of the passage (ADR 0073), oldest first.\nIt is absent if there is none."
           }
         }
       },
@@ -10156,6 +10395,13 @@
             ],
             "format": "int32",
             "minimum": 0
+          },
+          "dispute_notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisputeNote"
+            },
+            "description": "The dispute notes about the source of the passage (ADR 0073), oldest first.\nIt is absent if there is none."
           }
         }
       },
@@ -10192,6 +10438,48 @@
           "redacted": {
             "type": "boolean",
             "description": "Always true."
+          }
+        }
+      },
+      "RedactionResult": {
+        "type": "object",
+        "description": "What a redaction did.",
+        "required": [
+          "applied",
+          "already"
+        ],
+        "properties": {
+          "applied": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The IDs of the new redactions: one for each target that had content."
+          },
+          "already": {
+            "type": "integer",
+            "description": "The number of targets that were redacted already.",
+            "minimum": 0
+          }
+        }
+      },
+      "RedactionTargetInput": {
+        "type": "object",
+        "description": "One record to redact.",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "`source-item` (all its versions), `fact-version`, `document-version`, `proposal`, `person` or `institution`.\nThe kind `event` is for the retention job only and gets `validation-failed`.",
+            "example": "source-item"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },

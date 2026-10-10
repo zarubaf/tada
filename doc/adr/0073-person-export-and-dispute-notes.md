@@ -22,8 +22,9 @@ Subject:
 Permissions:
 
 - Only an organization owner exports, lists mentions, redacts and adds dispute notes.
-- A member, an admin and an AI caller (MCP or API token) get `forbidden`.
-- An owner of another organization gets `not-found`.
+- A member and an admin get `forbidden`.
+- An AI caller (MCP or API token) cannot call these operations: the REST API takes no API token, and the MCP server has no tool for them.
+- An owner or an admin of another organization gets `not-found`.
 
 Mentions:
 
@@ -50,7 +51,9 @@ Correction and dispute notes:
 - Evidence is immutable, so a correction cannot change it. An owner adds a dispute note instead (Art. 32(3)).
 - A dispute note has an ID, an organization, a target kind (`source-item`, `fact-version`, `document-version` or `proposal`), a target ID, a text of 1 to 1000 characters, an author and a time.
 - `POST /api/v1/dispute-notes` creates a note. The audit log records `dispute_note.create`.
-- Each reader of the target sees its notes.
+- A note is also possible in a closed event: it changes no evidence.
+- A redacted target gets no note (`invalid-transition`).
+- Each reader of the target sees its notes: the API responses that show evidence or facts have the field `dispute_notes`.
 - A redaction of an event redacts its notes ([ADR 0072](0072-legal-redaction-and-deletion-journal.md)).
 
 Web client:
