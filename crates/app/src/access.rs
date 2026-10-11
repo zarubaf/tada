@@ -320,11 +320,28 @@ pub async fn readable_events(
     caller: &impl Principal,
     identity: &dyn IdentityStore,
 ) -> Result<EventReach, StoreError> {
-    if sees_all_events(caller) {
+    readable_events_of(
+        caller.scope(),
+        caller.user_id(),
+        caller.organization_role(),
+        identity,
+    )
+    .await
+}
+
+/// The events that the member `user` with the organization role `role` can read now, for a job that acts
+/// without a caller, for example the daily check of the AI-PM. It is the rule of `readable_events`.
+pub(crate) async fn readable_events_of(
+    scope: OrgScope,
+    user: UserId,
+    role: OrganizationRole,
+    identity: &dyn IdentityStore,
+) -> Result<EventReach, StoreError> {
+    if manages_all_events(role) {
         return Ok(EventReach::Organization);
     }
     let events = identity
-        .event_roles_of(caller.scope(), caller.user_id())
+        .event_roles_of(scope, user)
         .await?
         .into_iter()
         .filter(|(_, role)| EventLevel::from(*role).can_read())
