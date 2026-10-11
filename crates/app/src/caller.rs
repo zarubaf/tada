@@ -364,15 +364,12 @@ impl AiCaller {
 
     /// For the agent runner (ADR 0010): an agent run for `principal` with the rights of the `read` scope.
     /// The run reads what its member reads and proposes nothing.
-    /// When `app::agent` exists, it becomes `pub(in crate::agent)`, so no other module creates an agent caller.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the agent runner is the only caller and comes next"
-        )
-    )]
-    pub(crate) fn for_agent(principal: MemberCaller, task: &'static str) -> Self {
+    /// Only the module `agent` can create an `AgentGrant`, so no other module creates an agent caller.
+    pub(crate) fn for_agent(
+        _: crate::agent::AgentGrant,
+        principal: MemberCaller,
+        task: &'static str,
+    ) -> Self {
         Self {
             principal,
             origin: AiOrigin::Agent { task },
@@ -664,24 +661,6 @@ mod tests {
             }
         );
         assert_eq!(ai.token_scope(), TokenScope::Propose);
-    }
-
-    #[test]
-    fn an_agent_run_reads_for_its_member_as_the_ai_pm() {
-        use crate::access::Principal;
-        use crate::proposals::MayPropose;
-
-        let agent = AiCaller::for_agent(member(), "pm-digest");
-        assert_eq!(agent.origin(), AiOrigin::Agent { task: "pm-digest" });
-        assert_eq!(Principal::user_id(&agent), member().user_id());
-        assert_eq!(sealed::Sealed::scope(&agent), member().scope());
-        assert_eq!(agent.token_scope(), TokenScope::Read);
-        assert!(!agent.credential_allows_proposals());
-        let actor = agent.actor();
-        assert_eq!(actor.kind(), ActorKind::Ai);
-        assert_eq!(actor.id(), AiPm::ID);
-        assert_eq!(actor.principal(), Some(Uuid::from_u128(1)));
-        assert_eq!(actor.channel(), Channel::Job);
     }
 
     #[test]

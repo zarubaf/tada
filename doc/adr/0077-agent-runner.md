@@ -38,22 +38,28 @@ Model port and client:
 
 Tool catalog:
 
-- The tool definitions move from the MCP server into an `app::ai_tools` catalog.
+- The tool definitions move from the MCP server into the `ai-tools` crate.
+  The `app` crate holds the tool contract and the catalog type in `app::ai_tools`.
   A tool has a name, a description, an input schema and a run function that takes `&AiCaller`.
 - The MCP server and the agent runner both use the catalog.
   A tool outside `AiCaller` does not compile.
 - A tool gets only an `AiCaller` and the opaque `AiToolPorts`.
   Code outside `app` cannot read the scope from a caller, and the AI tools hold no store, so they reach data only through the read and propose functions of `app::ai_queries`.
 - `AiCaller` gets an origin: a token for MCP, or an agent run with a task name.
-- For `pm-digest`, the worker builds the `AiCaller` from the member caller of the recipient with the read scope.
+- Only `app` builds the `AiCaller` of an agent run: `AiCaller::for_agent` in `app::agent`, with the read scope.
+  For `pm-digest`, the worker gives the member caller of the recipient to the runner.
 
 Runner:
 
 - `app::agent` loops from model call to tool calls to tool results until the model ends.
 - The limits per run are 6 model turns, CHF 0.05 and 60 seconds in total.
   Each run stops at the first limit.
-- Each step is recorded with the task, the prompt version, the model ID, the tool name and the usage.
-  The audit log holds no free text ([ADR 0039](0039-actors-and-identities.md)).
+  The runner checks the limits before and after each model call, so a run can go above its cost or time limit by at most one call.
+- The usage of each model call goes to `ai_usage` with the task, the prompt version and the model ID.
+- Each tool call writes a structured log event with the task, the prompt version, the model ID, the tool name and the outcome.
+  It holds no free text and no tool input ([ADR 0039](0039-actors-and-identities.md)).
+- The runner offers only the read tools of its catalog.
+  A task can also limit the tool input, and a call outside the limit does not run.
 - Tool results are data.
   The runner never treats text in a result as an instruction.
 
@@ -92,7 +98,8 @@ Task `pm-digest`:
 
 - The input is the item list (opaque reference, kind, title, event name, due date, status, reason), the locale and today's date.
   It holds no person names.
-- The tools are read-only and limited to the records of the digest.
+- The tools are the read tools `list_actions`, `list_commitments` and `get_event_profile`.
+  A tool call runs only for an event of the digest items.
 - The output is an intro and one line for each reference.
 - The runner checks that each reference appears exactly once, no unknown reference appears, and the lengths are in range.
 - The buttons always come from the rules and never from the model.
