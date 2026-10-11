@@ -16,11 +16,11 @@ The open sub-slices are 2d to 2f.
 Each sub-slice has its own design, plan, reviews and merge.
 The owner wants tada usable for a first real club event as soon as possible, so the sub-slices come in this order.
 
-tada runs with invented data and public facts only until two gates close.
-The first gate, the review of the authentication code, is closed.
+tada runs with invented data and public facts only until the passkeys and the external review of the sign-in are done ([Sign-in before real data](#sign-in-before-real-data)).
+The review of the authentication code is closed.
 [ADR 0070](adr/0070-ai-security-review-replaces-the-external-review.md) records the AI security review and its fixes.
-The second gate, the person features of [ADR 0045](adr/0045-data-protection.md), is closed.
-The export of one person, the correction with dispute notes, the legal redaction with its journal, the retention jobs, the housekeeping and the orphan sweep deliver it.
+The person features of [ADR 0045](adr/0045-data-protection.md) are closed.
+The export of one person, the correction with dispute notes, the legal redaction with its journal, the retention jobs, the housekeeping and the orphan sweep deliver them.
 
 ### Slice 2d: AI intake
 
@@ -95,8 +95,23 @@ Acceptance:
 
 - (8) A canceled job or retried outbound command cannot send duplicate mail.
 
+## Sign-in before real data
+
+The owner set this order for the sign-in work:
+
+1. Passkeys ([#45](https://github.com/zarubaf/tada/issues/45)).
+   Owners and admins must use a passkey.
+   The magic link stays as recovery.
+2. An external review of the whole sign-in ([#46](https://github.com/zarubaf/tada/issues/46)).
+   It comes after the passkeys, so one review covers all sign-in methods.
+3. OAuth for MCP clients through a mature OAuth server ([#47](https://github.com/zarubaf/tada/issues/47)).
+
+Steps 1 and 2 come before the first real data.
+Single sign-on with Google and Microsoft comes later ([#48](https://github.com/zarubaf/tada/issues/48)).
+Steps 1 and 3 keep a general model of sign-in methods, so that single sign-on adds one method without a redesign.
+
 ## Later
 
 Ticketing integration, richer volunteer scheduling, the aviation planning module, readiness snapshots and selected operations features.
-Passkeys (ADR 0008), OAuth for MCP clients (ADR 0040), API tokens with a `write` scope (ADR 0039) and the processing of bounces (ADR 0042).
+API tokens with a `write` scope (ADR 0039) and the processing of bounces (ADR 0042).
 Commercial packaging follows validation with other clubs and organizers.
