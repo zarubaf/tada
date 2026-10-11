@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use tada_app::auth::AuthenticationError;
+use tada_app::build_info::BuildInfo;
 use tada_app::problem::ProblemCode;
 use utoipa::openapi::extensions::Extensions;
 use utoipa::openapi::{Info, License, OpenApi};
@@ -44,7 +45,7 @@ pub(crate) fn complete(
     mut document: OpenApi,
     problem_codes: &BTreeMap<&str, Vec<ProblemCode>>,
 ) -> OpenApi {
-    let mut info = Info::new("tada", "1");
+    let mut info = Info::new("tada", BuildInfo::CURRENT.version);
     info.description =
         Some("The tada HTTP API. The list of problem codes of each operation is open.".to_owned());
     info.license = Some(License::new("Apache-2.0"));

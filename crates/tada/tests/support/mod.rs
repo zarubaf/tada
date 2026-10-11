@@ -100,6 +100,7 @@ pub fn api_state_on(
         person_data: database.clone(),
         dispute_notes: database.clone(),
         redaction: database.clone(),
+        versions: database.clone(),
     }
 }
 

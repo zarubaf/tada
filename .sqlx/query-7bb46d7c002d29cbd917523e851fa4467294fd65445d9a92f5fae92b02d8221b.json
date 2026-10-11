@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT role, version, commit, last_loop_at AS \"last_loop_at: jiff_sqlx::Timestamp\"\n               FROM worker_heartbeat\n               WHERE last_loop_at > now() - make_interval(secs => $1)\n               ORDER BY started_at, worker_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "worker_heartbeat",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "worker_heartbeat",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "commit",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "worker_heartbeat",
+            "name": "commit"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "last_loop_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "worker_heartbeat",
+            "name": "last_loop_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "7bb46d7c002d29cbd917523e851fa4467294fd65445d9a92f5fae92b02d8221b"
+}

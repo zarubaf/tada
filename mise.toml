@@ -54,13 +54,17 @@ run = "uv run --quiet scripts/check_data_inventory.py"
 description = "Run all documentation checks"
 depends = ["check:docs-format", "check:docs-style", "check:data-inventory"]
 
+[tasks."check:versions"]
+description = "Fail if the web client has another version than the workspace"
+run = "uv run --quiet scripts/check_versions.py"
+
 [tasks."check:secrets"]
 description = "Scan the full Git history for secrets"
 run = "gitleaks git --redact --no-banner ."
 
 [tasks."check:scripts"]
 description = "Lint and format-check Python scripts"
-run = ["ruff check .", "ruff format --check .", "uv run --quiet scripts/test_check_data_inventory.py", "uv run --quiet scripts/test_check_css_layers.py"]
+run = ["ruff check .", "ruff format --check .", "uv run --quiet scripts/test_check_data_inventory.py", "uv run --quiet scripts/test_check_css_layers.py", "uv run --quiet scripts/test_check_versions.py"]
 
 [tasks."check:rust-format"]
 description = "Check Rust formatting"
@@ -134,7 +138,7 @@ depends = ["check:rust-format", "check:rust-lint", "check:rust-test", "check:dep
 
 [tasks.check]
 description = "Run every check that CI runs; skips the web and browser checks when no web file changed"
-depends = ["check:docs", "check:secrets", "check:scripts", "check:rust", "check:browser"]
+depends = ["check:docs", "check:secrets", "check:scripts", "check:versions", "check:rust", "check:browser"]
 
 [tasks."check:all"]
 description = "Run every check, including the web and browser checks, whatever changed"

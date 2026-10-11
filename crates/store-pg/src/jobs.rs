@@ -107,6 +107,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use serde_json::json;
+    use tada_app::build_info::{BuildInfo, Role};
     use tada_app::jobs::{Handlers, JobFailed, JobHandler, JobWarning, Ran, run_next};
 
     use super::*;
@@ -319,7 +320,10 @@ mod tests {
         add(&test, &job("ping")).await;
         add(&test, &job("ping")).await;
         let worker = Uuid::now_v7();
-        test.database.record_heartbeat(worker).await.unwrap();
+        test.database
+            .record_heartbeat(worker, Role::Worker, &BuildInfo::CURRENT)
+            .await
+            .unwrap();
         let row = sqlx::query!(
             "SELECT queue_depth, oldest_due_seconds FROM worker_heartbeat WHERE worker_id = $1",
             worker
@@ -329,5 +333,28 @@ mod tests {
         .unwrap();
         assert_eq!(row.queue_depth, 2);
         assert!(row.oldest_due_seconds.is_some());
+    }
+
+    #[tokio::test]
+    async fn a_serve_heartbeat_leaves_the_queue_fields_empty() {
+        let test = TestDatabase::start().await;
+        add(&test, &job("ping")).await;
+        let serve = Uuid::now_v7();
+        for _ in 0..2 {
+            test.database
+                .record_heartbeat(serve, Role::Serve, &BuildInfo::CURRENT)
+                .await
+                .unwrap();
+        }
+        let row = sqlx::query!(
+            "SELECT queue_depth, oldest_due_seconds, role FROM worker_heartbeat WHERE worker_id = $1",
+            serve
+        )
+        .fetch_one(&test.database.pool)
+        .await
+        .unwrap();
+        assert_eq!(row.queue_depth, 0);
+        assert_eq!(row.oldest_due_seconds, None);
+        assert_eq!(row.role.as_deref(), Some("serve"));
     }
 }

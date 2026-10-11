@@ -3,6 +3,7 @@
 
 pub mod bootstrap;
 pub mod export;
+pub mod heartbeat;
 pub mod logging;
 pub mod redactions;
 pub mod serve;

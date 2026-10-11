@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT queue_depth, oldest_due_seconds, role FROM worker_heartbeat WHERE worker_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "queue_depth",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "worker_heartbeat",
+            "name": "queue_depth"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "oldest_due_seconds",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "worker_heartbeat",
+            "name": "oldest_due_seconds"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "worker_heartbeat",
+            "name": "role"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "416b0614466e24712bc729ef00d8b7a45caa33f097c9e475d5b62f139ab33bc4"
+}
