@@ -195,3 +195,52 @@ export async function textOverflows(page: Page): Promise<string[]> {
     return found;
   });
 }
+
+/** The build identity of the e2e build (`vite.config.ts`). */
+export const e2eBuild = { version: "0.0.0", commit: "1a2b3c4" } as const;
+
+/**
+ * The fake API of the versions: the answer of `GET /api/v1/system/version`. By default the server
+ * runs the build of the client, and the worker still runs the previous release.
+ */
+export async function fakeVersion(
+  page: Page,
+  server: { version: string; commit: string } = e2eBuild,
+): Promise<void> {
+  const body = {
+    product: server.version,
+    commit: server.commit,
+    schema: 27,
+    api: "v1",
+    mcp: server.version,
+    roles: [
+      {
+        role: "serve",
+        version: server.version,
+        commit: server.commit,
+        last_seen: "2030-05-18T08:00:00Z",
+      },
+      {
+        role: "telegram",
+        version: server.version,
+        commit: server.commit,
+        last_seen: "2030-05-18T07:59:40Z",
+      },
+      { role: "worker", version: "unknown", commit: "unknown", last_seen: "2030-05-18T07:58:10Z" },
+    ],
+    mismatch: true,
+  };
+  await page.route("**/api/v1/system/version", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) }),
+  );
+}
+
+/** The fake API of the reminders: the answer of `GET /api/v1/account/reminders`. */
+export async function fakeReminders(
+  page: Page,
+  settings: { opted_in_at: string | null; time_zone: string; telegram_linked: boolean },
+): Promise<void> {
+  await page.route("**/api/v1/account/reminders", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(settings) }),
+  );
+}

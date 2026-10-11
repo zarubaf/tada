@@ -1,0 +1,33 @@
+@layer components {
+  .list {
+    display: grid;
+    gap: var(--space-6);
+    outline: none;
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lg);
+    text-wrap: balance;
+  }
+
+  .help {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    text-wrap: pretty;
+  }
+
+  /* The version and its mark wrap as one group in a narrow row. */
+  .version {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+  }
+}

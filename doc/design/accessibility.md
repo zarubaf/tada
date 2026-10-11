@@ -111,6 +111,9 @@ The page must name the next focus target in the same event that removes the elem
   `LiveRegion` (`ui/LiveRegion.tsx`) is the only component for them.
 - The app shell has its own assertive region for a failed sign-out from the member menu.
   It is the only second assertive region on a page.
+- The app shell also has its own polite region for the prompt to load the page again (ADR 0075).
+  The prompt can appear without an action of the member, when the shell loads or when the tab comes back to the front.
+  It is the only second polite region on a page.
 - Two exceptions mount with their text.
   A skeleton with `role="status"` and a label announces that content loads.
   `InlineError` has `role="alert"`, and with `announce="focus"` it takes focus, so the focus move announces it.

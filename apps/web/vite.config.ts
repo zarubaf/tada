@@ -73,15 +73,25 @@ const { version } = JSON.parse(
   version: string;
 };
 
+// The build identity in the client. The browser checks build in the mode `e2e`; their screenshots
+// show the footer, so that build has a fixed identity that does not change with each commit.
+function defines(mode: string) {
+  const identity =
+    mode === "e2e"
+      ? { version: "0.0.0", commit: "1a2b3c4", builtAt: "2030-01-01T00:00:00Z" }
+      : { version, commit: buildCommit(), builtAt: builtAt() };
+  return {
+    __TADA_VERSION__: JSON.stringify(identity.version),
+    __TADA_COMMIT__: JSON.stringify(identity.commit),
+    __TADA_BUILT_AT__: JSON.stringify(identity.builtAt),
+  };
+}
+
 // The API and the MCP server run on `tada serve` (TADA_PORT 8080). In production, serve delivers the built files itself (ADR 0005).
 // An MCP client in development uses `http://localhost:5173/mcp`, the URL that the token page shows (ADR 0040).
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), layerOrderFirst()],
-  define: {
-    __TADA_VERSION__: JSON.stringify(version),
-    __TADA_COMMIT__: JSON.stringify(buildCommit()),
-    __TADA_BUILT_AT__: JSON.stringify(builtAt()),
-  },
+  define: defines(mode),
   // One CSS file for all chunks: the settings pages load on demand, and the order of the CSS layers
   // must stay the same as without the split.
   build: { cssCodeSplit: false },
@@ -100,4 +110,4 @@ export default defineConfig({
     // The timeout guards against a hang, not against slow code: parallel checks load the machine.
     testTimeout: 15_000,
   },
-});
+}));

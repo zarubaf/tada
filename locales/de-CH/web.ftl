@@ -110,8 +110,31 @@ nav-inbox = Eingang
 nav-inbox-count = { $count } offen
 organization-switcher = Organisation
 member-menu = Mitgliedermenü
+member-menu-versions = Versionen ({ $build })
 sign-out = Abmelden
 nav-privacy = Datenschutz
+
+# The versions of tada (ADR 0075): the footer, the list of the components and the prompt to reload.
+version-outdated-title = Eine neue Version von tada ist installiert.
+version-outdated-text = Diese Seite läuft noch mit der alten Version. Laden Sie die Seite neu, damit alles richtig funktioniert.
+version-reload = Seite neu laden
+versions-title = Versionen
+versions-loading = Versionen werden geladen
+versions-components = Bestandteile
+versions-component = Bestandteil
+versions-version = Version
+versions-web = Web-Client (diese Seite)
+versions-server = Server
+versions-schema = Datenbankschema
+versions-api = API
+versions-mcp = MCP-Server
+versions-roles = Laufende Prozesse
+versions-roles-help = Jeder Prozess meldet sich regelmässig. Die Zeit zeigt seine letzte Meldung.
+versions-role = Prozess
+versions-last-seen = Letzte Meldung
+versions-differs = Andere Version
+versions-unknown = unbekannt
+versions-no-roles = Kein Prozess hat sich gemeldet.
 
 ## Sign-in, magic link and invitation (ADR 0008, ADR 0056)
 
@@ -419,6 +442,23 @@ account-sessions-text = Haben Sie ein Gerät verloren, oder meldet sich jemand a
 account-sign-out-everywhere = Überall abmelden
 account-sign-out-everywhere-title = Überall abmelden?
 account-sign-out-everywhere-text = tada beendet alle Ihre Sitzungen, in jeder Organisation und auf jedem Gerät, auch diese hier. Ihre Mitgliedschaften bleiben.
+
+# Reminders of the own account (ADR 0076): the opt-in and the time zone.
+reminders-title = Erinnerungen
+reminders-intro = tada schickt Ihnen in Telegram eine Übersicht der Aufgaben, für die Sie verantwortlich sind. Die Einstellung gilt in jeder Ihrer Organisationen.
+reminders-loading = Erinnerungen werden geladen
+reminders-opt-in = Erinnerungen in Telegram erhalten
+reminders-not-linked = Für Erinnerungen braucht tada ein verknüpftes Telegram-Konto.
+reminders-link-telegram = Telegram verknüpfen
+reminders-link-lost = Ihr Telegram-Konto ist nicht mehr verknüpft. tada schickt keine Erinnerungen, bis Sie es wieder verknüpfen.
+reminders-time-zone = Zeitzone
+reminders-time-zone-help = Die Ruhezeit Ihrer Organisation gilt in dieser Zeitzone. In der Ruhezeit schickt tada keine Erinnerungen.
+reminders-on = Erinnerungen sind eingeschaltet.
+reminders-off = Erinnerungen sind ausgeschaltet.
+reminders-time-zone-saved = Zeitzone { $zone } gespeichert.
+reminders-error-telegram-not-linked = Ihr Telegram-Konto ist nicht mehr verknüpft. Verknüpfen Sie es zuerst, dann schalten Sie die Erinnerungen ein.
+reminders-error-invalid-time-zone = tada kennt diese Zeitzone nicht. Wählen Sie eine Zeitzone aus der Liste.
+reminders-error-zone-needs-link = Ihr Telegram-Konto ist nicht mehr verknüpft. Verknüpfen Sie es wieder, oder schalten Sie die Erinnerungen aus. Dann können Sie die Zeitzone ändern.
 telegram-title = Telegram verknüpfen
 telegram-intro = Verknüpfen Sie Ihr Telegram-Konto mit tada, um tada im Chat zu nutzen.
 telegram-steps-title = So geht es

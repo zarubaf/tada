@@ -1,0 +1,14 @@
+@layer components {
+  /* The build is reference, not navigation: smaller and calmer than the privacy link above it. */
+  .text {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-sm);
+  }
+
+  .commit {
+    font-family: var(--font-family-mono);
+  }
+}

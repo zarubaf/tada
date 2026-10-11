@@ -1,5 +1,6 @@
 // The app shell (doc/design/layout-and-responsiveness.md): a sidebar on medium and wide layouts, a
 // top bar and a bottom bar on narrow layouts. It shows only the items that exist.
+import { IconRefresh } from "@tabler/icons-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
@@ -7,11 +8,15 @@ import { InboxCount } from "../review/InboxCount";
 import { useNavigate, usePathname } from "../router/Router";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath } from "../session/paths";
 import { useOptionalSession } from "../session/SessionProvider";
+import { Banner } from "../ui/Banner";
+import { Button } from "../ui/Button";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Menu } from "../ui/Menu";
 import { NavLink } from "../ui/NavLink";
 import { Select } from "../ui/Select";
 import styles from "./Shell.module.css";
+import { VersionButton, VersionSheet } from "./VersionFooter";
+import { footerText, useOutdatedClient } from "./version";
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const session = useOptionalSession();
@@ -19,6 +24,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const pathname = usePathname();
   const navigate = useNavigate();
   const frameless = isPublicPath(pathname) || pathname === CHOOSE_ORGANIZATION_PATH;
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const outdated = useOutdatedClient(api, !frameless && session?.organization !== undefined);
 
   // Without a session or an organization, and on the pages of the sign-in, there is no frame.
   if (frameless || !session?.organization) {
@@ -80,6 +87,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
         <div className={styles.member}>
           <footer className={styles.footer}>
             <NavLink to="/privacy">{t("nav-privacy")}</NavLink>
+            <VersionButton onPress={() => setVersionsOpen(true)} />
           </footer>
           <Menu
             trigger={user.displayName}
@@ -88,18 +96,43 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
               { id: "persons", label: t("nav-persons") },
               { id: "institutions", label: t("nav-institutions") },
               { id: "privacy", label: t("nav-privacy") },
+              { id: "versions", label: t("member-menu-versions", { build: footerText() }) },
               { id: "sign-out", label: t("sign-out") },
             ]}
-            onAction={(id) =>
-              id === "sign-out" ? void signOut().then(setFailure) : navigate(`/${id}`)
-            }
+            onAction={(id) => {
+              if (id === "sign-out") {
+                void signOut().then(setFailure);
+              } else if (id === "versions") {
+                setVersionsOpen(true);
+              } else {
+                navigate(`/${id}`);
+              }
+            }}
             placement="top end"
           />
         </div>
+        {/* The prompt to load again appears without an action of the member: this region announces it. */}
+        <LiveRegion kind="status" visuallyHidden>
+          {outdated ? `${t("version-outdated-title")} ${t("version-outdated-text")}` : undefined}
+        </LiveRegion>
         <LiveRegion kind="alert" className={styles.failure}>
           {failure}
         </LiveRegion>
       </header>
+      <VersionSheet api={api} isOpen={versionsOpen} onClose={() => setVersionsOpen(false)} />
+      {outdated && (
+        <div className={styles.outdated}>
+          <Banner
+            icon={IconRefresh}
+            action={<Button onPress={() => window.location.reload()}>{t("version-reload")}</Button>}
+          >
+            <p>
+              <strong>{t("version-outdated-title")}</strong>
+            </p>
+            <p>{t("version-outdated-text")}</p>
+          </Banner>
+        </div>
+      )}
       <Fragment key={organization.organization_id}>{children}</Fragment>
     </div>
   );

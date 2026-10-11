@@ -120,7 +120,7 @@ for (const viewport of viewports) {
     // first button in the table stand for „Code erstellen“ and „Bestätigen“.
     await page.locator("main button").first().click();
     await expect(page.getByText("K7M3-QX92")).toBeVisible();
-    await expect(page.getByRole("status")).toHaveCount(1);
+    await expect(page.getByRole("main").getByRole("status")).toHaveCount(1);
     expect(await textOverflows(page)).toEqual([]);
 
     await page.locator("table button").first().click();
