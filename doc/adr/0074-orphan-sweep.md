@@ -27,6 +27,8 @@ Sweep:
 - For each organization, the sweep deletes each object with a key `{organization_id}/{uuid}` that is older than the grace and that no document version with content refers to.
 - It aborts each incomplete multipart upload that began before the grace.
 - Other prefixes stay untouched. This protects the deletion journal under `redaction-journal/`.
+- `BlobReferences::live_blob_keys` takes no organization scope, as an infrastructure query of [ADR 0039](0039-actors-and-identities.md).
+  Each key starts with its organization ID, so the sweep still keeps the objects of each organization apart.
 - The grace covers an upload whose version row is not yet committed when the listing starts.
 
 Configuration:

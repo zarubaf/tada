@@ -23,7 +23,7 @@ Event closing:
 - An event with `redacted_at` set cannot be reopened. The command returns `invalid-transition`.
 - A closed event is read-only for every role. This covers direct commands, proposals into the event, the apply of its open proposals, uploads and drafts.
 - Each of these refuses with the problem code `event-closed` (409).
-- The check lives in one place. `access::event_access` returns read-only rights for a closed event, and each command that writes calls `event_writable` once.
+- The check lives in one place. `access::event_access` returns read-only rights for a closed event, and each command that writes calls `access::require_writable` once.
 - The audit log records `event.close` and `event.reopen`.
 - The web client shows the banner „Abgeschlossen am …“ and hides the write controls of a closed event.
 
@@ -72,7 +72,7 @@ Housekeeping:
 
 - A club decides its periods. A new installation deletes nothing until an owner sets them.
 - A closed event cannot change, so a club that finds an error must reopen it first.
-- Every write path must call `event_writable`. A test covers each entry.
+- Every write path must call `access::require_writable`. A test covers each entry.
 - The housekeeping periods are constants in code. A change needs a new commit, not a setting.
 - The member list of a redacted event stays, because IDs and roles carry no content.
 
