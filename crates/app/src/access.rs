@@ -17,7 +17,7 @@ use crate::store::StoreError;
 ///
 /// ```compile_fail,E0277
 /// use tada_app::access::Principal;
-/// use tada_app::caller::{AiCaller, OrgScope, OrganizationRole};
+/// use tada_app::caller::{AiCaller, OrganizationRole};
 /// use tada_app::domain::ids::UserId;
 ///
 /// struct Wrapper(AiCaller);
@@ -26,19 +26,48 @@ use crate::store::StoreError;
 ///     fn user_id(&self) -> UserId {
 ///         self.0.user_id()
 ///     }
-///     fn scope(&self) -> OrgScope {
-///         self.0.scope()
-///     }
 ///     fn organization_role(&self) -> OrganizationRole {
 ///         OrganizationRole::Owner
 ///     }
 /// }
 /// ```
+///
+/// The scope of the caller stays inside this crate (ADR 0010): no other crate gets it,
+/// so no other crate can call a port with it.
+///
+/// ```compile_fail,E0624
+/// use tada_app::access::Principal;
+/// use tada_app::caller::OrgScope;
+///
+/// fn scope_of(caller: &impl Principal) -> OrgScope {
+///     caller.scope()
+/// }
+/// ```
+///
+/// ```compile_fail,E0624
+/// use tada_app::access::Principal;
+/// use tada_app::caller::{AiCaller, OrgScope};
+///
+/// fn scope_of(caller: &AiCaller) -> OrgScope {
+///     caller.scope()
+/// }
+/// ```
+///
+/// ```compile_fail,E0624
+/// use tada_app::access::Principal;
+/// use tada_app::caller::{MemberCaller, OrgScope};
+///
+/// fn scope_of(caller: &MemberCaller) -> OrgScope {
+///     caller.scope()
+/// }
+/// ```
+#[expect(
+    private_bounds,
+    reason = "the crate-private supertrait seals the trait and keeps the scope inside this crate"
+)]
 pub trait Principal: crate::caller::sealed::Sealed {
     /// The member for whom the caller acts.
     fn user_id(&self) -> UserId;
-    /// The organization that all reads and writes of the caller stay in.
-    fn scope(&self) -> OrgScope;
     /// The organization role of the member.
     fn organization_role(&self) -> OrganizationRole;
 }

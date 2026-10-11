@@ -1,6 +1,7 @@
 //! The approval of draft versions, „Fakten geändert“, the difference of two versions and the rendering (ADR 0051).
 
 use tada_app::audit::{AuditAction, AuditEvent};
+use tada_app::caller::TestScope;
 use tada_app::documents::{
     ApproveError, DocumentReads, DocumentStore, DraftStatus, LineKind, ReadDocumentError,
     Resolution, VersionContent, approve_version, diff_versions, facts_changed, render_context,

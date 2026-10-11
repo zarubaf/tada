@@ -1031,6 +1031,7 @@ pub(crate) async fn open_questions(
 mod tests {
     use jiff::Timestamp;
     use serde_json::json;
+    use tada_app::caller::TestScope;
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::clock::Clock;
     use tada_app::domain::facts::{

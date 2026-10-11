@@ -5,6 +5,7 @@
 use async_trait::async_trait;
 use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
+use tada_app::caller::TestScope;
 use tada_app::domain::ids::SourceVersionId;
 use tada_app::domain::redaction::{
     Redactable, RedactionReason, RedactionTarget, RedactionTargetKind,

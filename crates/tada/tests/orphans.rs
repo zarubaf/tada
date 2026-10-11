@@ -6,6 +6,7 @@
 mod support;
 
 use std::io;
+use tada_app::caller::TestScope;
 
 use bytes::Bytes;
 use jiff::{SignedDuration, Timestamp};

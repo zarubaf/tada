@@ -929,6 +929,7 @@ async fn table_rows(
 
 #[cfg(test)]
 mod tests {
+    use tada_app::caller::TestScope;
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::domain::ids::UserId;
 

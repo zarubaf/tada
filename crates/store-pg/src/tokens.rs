@@ -268,6 +268,7 @@ impl TokenStore for Database {
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
+    use tada_app::caller::TestScope;
 
     use jiff::SignedDuration;
     use secrecy::ExposeSecret;

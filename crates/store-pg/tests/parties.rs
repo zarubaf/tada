@@ -3,6 +3,7 @@
 #![allow(clippy::unwrap_used)]
 
 use jiff::Timestamp;
+use tada_app::caller::TestScope;
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::clock::Clock;
 use tada_app::domain::ids::UserId;

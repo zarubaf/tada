@@ -1,6 +1,7 @@
 use jiff::Timestamp;
 use serde_json::{Value, json};
 use sqlx::types::Uuid;
+use tada_app::caller::TestScope;
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::clock::Clock;
 use tada_app::domain::facts::core_catalog;

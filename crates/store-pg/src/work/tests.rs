@@ -1,5 +1,6 @@
 use jiff::civil::date;
 use tada_app::audit::AuditAction;
+use tada_app::caller::TestScope;
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::domain::parties::InstitutionKind;

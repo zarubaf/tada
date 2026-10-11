@@ -12,6 +12,7 @@ use jiff::Timestamp;
 use serde_json::{Value, json};
 use support::{MailApp, NoObjectStorage, SESSION_COOKIE};
 use tada_app::audit::AuditEvent;
+use tada_app::caller::TestScope;
 use tada_app::caller::{JobRunner, MemberCaller, OrgScope, ServiceCaller};
 use tada_app::clock::Clock;
 use tada_app::domain::RecordVersion;

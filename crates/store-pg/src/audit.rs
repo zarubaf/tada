@@ -62,6 +62,7 @@ pub(crate) async fn record(conn: &mut PgConnection, event: &AuditEvent) -> Resul
 #[cfg(test)]
 mod tests {
     use tada_app::audit::{AuditAction, AuditRole};
+    use tada_app::caller::TestScope;
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::domain::identity::EventRole;
     use tada_app::domain::ids::UserId;

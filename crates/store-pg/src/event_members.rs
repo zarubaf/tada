@@ -260,6 +260,7 @@ impl EventMemberStore for Database {
 mod tests {
     use serde_json::json;
     use tada_app::audit::{AuditAction, AuditRole};
+    use tada_app::caller::TestScope;
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::domain::identity::Email;
 
