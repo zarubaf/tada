@@ -557,7 +557,12 @@ mod tests {
         let Authenticated::Ai(caller) = fixture.authenticate(&created).await.unwrap() else {
             panic!("a token gives an AI caller");
         };
-        assert_eq!(caller.token_id(), created.token.id);
+        assert_eq!(
+            caller.origin(),
+            tada_app::caller::AiOrigin::Token {
+                token_id: created.token.id
+            }
+        );
         assert_eq!(caller.actor().principal(), Some(anna.user_id().as_uuid()));
         let listed = list_tokens(&anna, &fixture.test.database).await.unwrap();
         assert_eq!(listed[0].last_used_at, Some(start() + DAY));
