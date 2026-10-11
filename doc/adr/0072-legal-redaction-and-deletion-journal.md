@@ -27,6 +27,8 @@ Tombstone:
   - Person and institution: name, email address, phone number and account link.
     The proposals that created the person or institution lose their text values and their reason too, as a proposal target does.
   - Event (by retention only): all source items, fact versions and proposals of the event, the texts of open questions, actions, commitments and workstreams, the quotes of record evidence, the document names and versions, and the dispute notes.
+- A redaction of a source item does not redact the proposals and fact versions that come from it.
+  They are separate targets, and the owner selects them from the mention list ([ADR 0073](0073-person-export-and-dispute-notes.md)).
 - The name of an event, the field labels, statuses, dates, numbers and IDs stay after an event redaction. They should not name a person.
 - A redacted fact version, proposal, action, commitment, person or institution also loses the quotes of its evidence.
 - The dispute notes about a redacted source item, fact version, document version or proposal are redacted too.
