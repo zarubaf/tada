@@ -188,10 +188,6 @@ impl AiCostStore for EvalCost {
     ) -> Result<Option<RecordVersion>, StoreError> {
         Ok(None)
     }
-
-    async fn ai_enabled(&self, _: OrgScope) -> Result<bool, StoreError> {
-        Ok(true)
-    }
 }
 
 const LIMITS: AiLimits = AiLimits {

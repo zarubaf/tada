@@ -19,6 +19,7 @@ use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::model::Usage;
+use crate::pm::policy::PmPolicyStore;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
 
@@ -180,9 +181,6 @@ pub trait AiCostStore: Debug + Send + Sync {
         expected: RecordVersion,
         audit: &AuditEvent,
     ) -> Result<Option<RecordVersion>, StoreError>;
-
-    /// True if the organization switched the AI work on in its reminder policy.
-    async fn ai_enabled(&self, scope: OrgScope) -> Result<bool, StoreError>;
 }
 
 /// The settings of the installation that the AI work depends on.
@@ -300,9 +298,11 @@ async fn cap_of(
 }
 
 /// The AI state of the caller's organization. An owner or an admin can read it.
+/// The policy is the one authority on whether AI is on.
 pub async fn get_ai_status(
     caller: &MemberCaller,
     store: &dyn AiCostStore,
+    policies: &dyn PmPolicyStore,
     setup: AiSetup,
     clock: &dyn Clock,
 ) -> Result<AiStatus, AiCapError> {
@@ -312,7 +312,7 @@ pub async fn get_ai_status(
     let scope = caller.scope();
     let (cap, version) = cap_of(store, scope, setup).await?;
     Ok(AiStatus {
-        enabled: store.ai_enabled(scope).await?,
+        enabled: policies.get(scope).await?.0.ai_enabled,
         configured: setup.configured,
         cap,
         used: store
@@ -330,6 +330,7 @@ pub async fn set_ai_cap(
     monthly_chf: &str,
     expected_version: RecordVersion,
     store: &dyn AiCostStore,
+    policies: &dyn PmPolicyStore,
     setup: AiSetup,
     clock: &dyn Clock,
 ) -> Result<AiStatus, AiCapError> {
@@ -371,7 +372,7 @@ pub async fn set_ai_cap(
         .set_cap(scope, monthly, expected_version, &audit)
         .await?
         .ok_or(AiCapError::VersionConflict)?;
-    get_ai_status(caller, store, setup, clock).await
+    get_ai_status(caller, store, policies, setup, clock).await
 }
 
 #[cfg(test)]
@@ -499,9 +500,30 @@ mod tests {
             self.audit.lock().unwrap().push(audit.clone());
             Ok(Some(next))
         }
+    }
 
-        async fn ai_enabled(&self, _: OrgScope) -> Result<bool, StoreError> {
-            Ok(true)
+    /// A policy store with AI switched on.
+    #[derive(Debug)]
+    struct AiOn;
+
+    #[async_trait]
+    impl PmPolicyStore for AiOn {
+        async fn get(&self, _: OrgScope) -> Result<(PmPolicy, RecordVersion), StoreError> {
+            let policy = PmPolicy {
+                ai_enabled: true,
+                ..PmPolicy::default()
+            };
+            Ok((policy, RecordVersion::FIRST))
+        }
+
+        async fn set(
+            &self,
+            _: OrgScope,
+            _: &PmPolicy,
+            _: RecordVersion,
+            _: &AuditEvent,
+        ) -> Result<Option<RecordVersion>, StoreError> {
+            unreachable!()
         }
     }
 
@@ -545,6 +567,7 @@ mod tests {
             "100",
             RecordVersion::FIRST,
             &store,
+            &AiOn,
             SETUP,
             &FixedClock,
         )
@@ -556,7 +579,7 @@ mod tests {
         assert_eq!(*store.cap.lock().unwrap(), None);
         // Reading the cap needs no recent sign-in.
         assert!(
-            get_ai_status(&owner, &store, SETUP, &FixedClock)
+            get_ai_status(&owner, &store, &AiOn, SETUP, &FixedClock)
                 .await
                 .is_ok()
         );
@@ -571,13 +594,14 @@ mod tests {
             "100",
             RecordVersion::FIRST,
             &store,
+            &AiOn,
             SETUP,
             &FixedClock,
         )
         .await;
         assert!(matches!(result, Err(AiCapError::Forbidden)), "{result:?}");
         assert!(matches!(
-            get_ai_status(&member, &store, SETUP, &FixedClock).await,
+            get_ai_status(&member, &store, &AiOn, SETUP, &FixedClock).await,
             Err(AiCapError::Forbidden)
         ));
         assert_eq!(*store.cap.lock().unwrap(), None);
@@ -588,7 +612,7 @@ mod tests {
     async fn an_admin_sets_the_cap_over_the_default() {
         let store = FakeStore::default();
         let admin = caller(OrganizationRole::Admin);
-        let status = get_ai_status(&admin, &store, SETUP, &FixedClock)
+        let status = get_ai_status(&admin, &store, &AiOn, SETUP, &FixedClock)
             .await
             .unwrap();
         assert_eq!(
@@ -607,6 +631,7 @@ mod tests {
             "40.50",
             RecordVersion::FIRST,
             &store,
+            &AiOn,
             SETUP,
             &FixedClock,
         )
@@ -622,6 +647,7 @@ mod tests {
             "10",
             RecordVersion::FIRST,
             &store,
+            &AiOn,
             SETUP,
             &FixedClock,
         )
@@ -639,6 +665,7 @@ mod tests {
                 value,
                 RecordVersion::FIRST,
                 &store,
+                &AiOn,
                 SETUP,
                 &FixedClock,
             )
