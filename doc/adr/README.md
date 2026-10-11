@@ -62,7 +62,7 @@ The ADRs are the authority for the decisions in this project.
 | [0044](0044-api-conventions.md)                                 | API conventions                                          | Accepted                           |
 | [0045](0045-data-protection.md)                                 | Data protection under the revDSG                         | Accepted                           |
 | [0046](0046-inbound-email.md)                                   | Inbound email                                            | Accepted, amended by 0057          |
-| [0047](0047-model-adapter.md)                                   | Model adapter details                                    | Accepted                           |
+| [0047](0047-model-adapter.md)                                   | Model adapter details                                    | Accepted, amended by 0077          |
 | [0048](0048-ai-evaluation-set.md)                               | AI evaluation set                                        | Accepted                           |
 | [0049](0049-entities-and-fact-model.md)                         | Typed entities and a field catalog for facts             | Accepted                           |
 | [0050](0050-proposals-and-review.md)                            | Proposals and review                                     | Accepted                           |
@@ -91,6 +91,8 @@ The ADRs are the authority for the decisions in this project.
 | [0073](0073-person-export-and-dispute-notes.md)                 | Person export and dispute notes                          | Accepted                           |
 | [0074](0074-orphan-sweep.md)                                    | Orphan sweep of the object storage                       | Accepted                           |
 | [0075](0075-versions-of-tada-and-its-components.md)             | Versions of tada and its components                      | Accepted                           |
+| [0076](0076-schedules-and-reminders.md)                         | Schedules and reminders                                  | Proposed                           |
+| [0077](0077-agent-runner.md)                                    | Agent runner in Rust                                     | Proposed                           |
 
 ## New ADR
 
