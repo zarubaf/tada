@@ -61,4 +61,10 @@
     border-radius: var(--radius-lg);
     background: var(--color-bg-surface);
   }
+
+  /* A frame takes focus by click or script, where :focus-visible may not match. */
+  .frame:focus {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
 }

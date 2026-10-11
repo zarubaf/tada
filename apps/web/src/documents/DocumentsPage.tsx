@@ -31,7 +31,9 @@ const columns: Column<Document>[] = [
     id: "name",
     header: t("documents-column-name"),
     cell: (d) => (
-      <StandaloneLink to={`/documents/${encodeURIComponent(d.id)}`}>{d.name}</StandaloneLink>
+      <StandaloneLink inRow to={`/documents/${encodeURIComponent(d.id)}`}>
+        {d.name}
+      </StandaloneLink>
     ),
   },
   {
