@@ -24,6 +24,7 @@ pub mod identity;
 pub mod jobs;
 pub mod mail;
 pub mod members;
+pub mod messenger;
 pub mod my_work;
 pub mod orphans;
 pub mod outbound;

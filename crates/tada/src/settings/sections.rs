@@ -1,5 +1,6 @@
 //! The settings sections and the sections of each command.
 
+use std::net::SocketAddr;
 use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -10,6 +11,7 @@ use tada_adapters::mail::SmtpTls;
 use tada_adapters::storage::{S3Config, S3Storage};
 use tada_app::domain::identity::Email;
 use tada_app::public_url::PublicUrl;
+use tada_telegram::UpdateSource;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -22,7 +24,7 @@ pub type ServeSettings = (Database, Http, Storage, PublicUrl, SignIn, Uploads);
 /// The settings of `tada worker`.
 pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp, Storage);
 /// The settings of `tada telegram`.
-pub type TelegramSettings = (Database, Telegram);
+pub type TelegramSettings = (Database, Telegram, Storage);
 /// The settings of `tada bootstrap`.
 pub type BootstrapSettings = (Database, PublicUrl);
 /// The settings of `tada export` (ADR 0059).
@@ -274,11 +276,13 @@ impl Section for Storage {
     }
 }
 
-/// The Telegram gateway (ADR 0011).
+/// The Telegram gateway (ADRs 0011 and 0076).
 #[derive(Debug)]
 pub struct Telegram {
     pub bot_token: SecretString,
     pub api_url: Url,
+    pub listen: SocketAddr,
+    pub source: UpdateSource,
 }
 
 const TELEGRAM_BOT_TOKEN: Setting = Setting {
@@ -297,17 +301,97 @@ const TELEGRAM_API_URL: Setting = Setting {
     description: "The base URL of the Telegram Bot API. Tests set a local fake.",
 };
 
+const TELEGRAM_MODE: Setting = Setting {
+    name: "TADA_TELEGRAM_MODE",
+    kind: "`polling` or `webhook`",
+    default: Some("polling"),
+    secret: false,
+    description: "How the bot gets its updates. `polling` asks Telegram for them. `webhook` registers `TADA_PUBLIC_URL` with the path `/telegram/webhook` at start, and Telegram sends the updates there. Webhook mode also needs `TADA_TELEGRAM_WEBHOOK_SECRET_FILE` and `TADA_PUBLIC_URL`. Polling mode does not delete a webhook that webhook mode set: call the Bot API method `deleteWebhook` before a switch back to polling, or Telegram refuses each poll.",
+};
+
+const TELEGRAM_WEBHOOK_SECRET: Setting = Setting {
+    name: "TADA_TELEGRAM_WEBHOOK_SECRET_FILE",
+    kind: "file path",
+    default: None,
+    secret: true,
+    description: "The file that contains the secret of the webhook: 1 to 256 characters of `A-Z`, `a-z`, `0-9`, `_` and `-`. Telegram sends it with each update. Only webhook mode reads it.",
+};
+
+const TELEGRAM_LISTEN: Setting = Setting {
+    name: "TADA_TELEGRAM_LISTEN",
+    kind: "socket address",
+    default: Some("0.0.0.0:8081"),
+    secret: false,
+    description: "The address of the HTTP listener of `tada telegram`: `/healthz`, `/readyz` and, in webhook mode, `/telegram/webhook`. The listener does not handle TLS.",
+};
+
+/// The value of `TADA_TELEGRAM_MODE`.
+enum TelegramMode {
+    Polling,
+    Webhook,
+}
+
+impl FromStr for TelegramMode {
+    type Err = &'static str;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "polling" => Ok(Self::Polling),
+            "webhook" => Ok(Self::Webhook),
+            _ => Err("use `polling` or `webhook`"),
+        }
+    }
+}
+
+/// True for a secret that Telegram accepts as `secret_token` of `setWebhook`.
+fn is_webhook_secret(secret: &str) -> bool {
+    (1..=256).contains(&secret.len())
+        && secret
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+}
+
 impl Section for Telegram {
     fn settings() -> Vec<&'static Setting> {
-        vec![&TELEGRAM_BOT_TOKEN, &TELEGRAM_API_URL]
+        vec![
+            &TELEGRAM_BOT_TOKEN,
+            &TELEGRAM_API_URL,
+            &TELEGRAM_MODE,
+            &TELEGRAM_WEBHOOK_SECRET,
+            &PUBLIC_URL,
+            &TELEGRAM_LISTEN,
+        ]
     }
 
     fn read(source: &mut Source<'_>) -> Option<Self> {
         let bot_token = source.secret(&TELEGRAM_BOT_TOKEN);
         let api_url = source.value(&TELEGRAM_API_URL);
+        let listen = source.value(&TELEGRAM_LISTEN);
+        let mode: Option<TelegramMode> = source.value(&TELEGRAM_MODE);
+        let update_source = match mode? {
+            TelegramMode::Polling => Some(UpdateSource::Polling),
+            TelegramMode::Webhook => {
+                let secret = source.secret(&TELEGRAM_WEBHOOK_SECRET);
+                let public_url = PublicUrl::read(source);
+                let secret = secret?;
+                if !is_webhook_secret(secret.expose_secret()) {
+                    source.error(
+                        &TELEGRAM_WEBHOOK_SECRET,
+                        "names a file that does not hold 1 to 256 characters of A-Z, a-z, 0-9, _ and -",
+                    );
+                    return None;
+                }
+                Some(UpdateSource::Webhook {
+                    secret,
+                    public_url: public_url?,
+                })
+            }
+        };
         Some(Self {
             bot_token: bot_token?,
             api_url: api_url?,
+            listen: listen?,
+            source: update_source?,
         })
     }
 }
@@ -317,7 +401,7 @@ const PUBLIC_URL: Setting = Setting {
     kind: "URL",
     default: None,
     secret: false,
-    description: "The URL that members use, without a path, for example `https://tada.example.org`. All links in mails start with it.",
+    description: "The URL that members use, without a path, for example `https://tada.example.org`. All links in mails and the URL of the Telegram webhook start with it.",
 };
 
 /// The public URL of this installation (ADRs 0025 and 0042).

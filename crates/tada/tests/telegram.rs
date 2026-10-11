@@ -14,19 +14,21 @@ use axum::extract::State;
 use axum::http::{Method, StatusCode, header};
 use axum::routing::post;
 use axum::{Json, Router};
+use secrecy::SecretString;
 use serde_json::{Value, json};
 use tada_adapters::clock::SystemClock;
 use tada_app::auth::{Authenticated, Authenticator, Credential};
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::caller::{ServiceCaller, TelegramGateway};
 use tada_app::domain::ids::UserId;
+use tada_app::messenger::{Button, Messenger, SendOutcome};
 use tada_app::session::SessionAuthenticator;
 use tada_app::telegram::{
     TelegramName, TelegramUserId, accept_link_claim, claim_link_code, confirm_link,
     create_link_code, list_link_requests,
 };
 use tada_store_pg::testing::TestDatabase;
-use tada_telegram::Gateway;
+use tada_telegram::{Gateway, TelegramMessenger, UpdateSource};
 use tokio::sync::Notify;
 use tower::ServiceExt;
 
@@ -102,9 +104,12 @@ async fn converse(test: &TestDatabase, updates: Vec<Value>, replies: usize) -> V
         // Time for a reply too many, which must not come.
         tokio::time::sleep(Duration::from_millis(300)).await;
     };
-    tokio::time::timeout(Duration::from_secs(20), gateway.run(stop))
-        .await
-        .unwrap();
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        gateway.run(stop, &UpdateSource::Polling),
+    )
+    .await
+    .unwrap();
     api.replies.lock().unwrap().clone()
 }
 
@@ -150,9 +155,12 @@ async fn a_code_sent_to_the_bot_becomes_a_request_that_the_member_sees() {
         // Time for a third reply, which must not come.
         tokio::time::sleep(Duration::from_millis(300)).await;
     };
-    tokio::time::timeout(Duration::from_secs(10), gateway.run(stop))
-        .await
-        .unwrap();
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        gateway.run(stop, &UpdateSource::Polling),
+    )
+    .await
+    .unwrap();
 
     let replies = api.replies.lock().unwrap().clone();
     assert_eq!(
@@ -874,9 +882,12 @@ async fn an_update_that_does_not_decode_is_skipped_alone_and_stays_out_of_the_lo
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
     };
-    tokio::time::timeout(Duration::from_secs(20), gateway.run(stop))
-        .await
-        .unwrap();
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        gateway.run(stop, &UpdateSource::Polling),
+    )
+    .await
+    .unwrap();
 
     support::logs::assert_clean(&[
         "Geheimnis",
@@ -895,4 +906,574 @@ async fn an_update_that_does_not_decode_is_skipped_alone_and_stays_out_of_the_lo
         json!(7),
         "the next request must ask for the updates after the batch: {offsets:?}"
     );
+}
+
+/// A fake Bot API that records each call and answers each method with `answer`.
+#[derive(Clone)]
+struct RecordingBotApi {
+    /// The method and the JSON body of each call, in order.
+    calls: Arc<Mutex<Vec<(String, Value)>>>,
+    answer: Arc<dyn Fn(&str) -> Answer + Send + Sync>,
+}
+
+/// The answer of the fake to one call.
+enum Answer {
+    Json(StatusCode, Value),
+    /// No answer before the client gives up.
+    Hang,
+}
+
+/// A successful answer with `result`.
+fn ok(result: Value) -> Answer {
+    Answer::Json(StatusCode::OK, json!({"ok": true, "result": result}))
+}
+
+/// A refusal of the Bot API with the HTTP status `code`.
+fn refusal(code: u16) -> Answer {
+    Answer::Json(
+        StatusCode::from_u16(code).unwrap(),
+        json!({"ok": false, "error_code": code, "description": "refused"}),
+    )
+}
+
+/// The answer of a working Bot API to each method that the gateway calls.
+fn working(method: &str) -> Answer {
+    match method {
+        "sendMessage" => ok(json!({
+            "message_id": 99, "date": 0, "chat": {"id": ACCOUNT, "type": "private"}, "text": "x"
+        })),
+        "getUpdates" => ok(json!([])),
+        "getWebhookInfo" => {
+            ok(json!({"url": "", "has_custom_certificate": false, "pending_update_count": 0}))
+        }
+        _ => ok(json!(true)),
+    }
+}
+
+async fn record(
+    State(api): State<RecordingBotApi>,
+    axum::extract::Path((_, method)): axum::extract::Path<(String, String)>,
+    body: axum::body::Bytes,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    let body = serde_json::from_slice(&body).unwrap_or(Value::Null);
+    api.calls.lock().unwrap().push((method.clone(), body));
+    if method == "getUpdates" {
+        // A long poll without updates does not answer at once.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    match (api.answer)(&method) {
+        Answer::Json(status, body) => (status, Json(body)).into_response(),
+        Answer::Hang => {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            StatusCode::GATEWAY_TIMEOUT.into_response()
+        }
+    }
+}
+
+impl RecordingBotApi {
+    /// Starts the fake. Returns it and its base URL.
+    async fn start(answer: impl Fn(&str) -> Answer + Send + Sync + 'static) -> (Self, String) {
+        let api = Self {
+            calls: Arc::default(),
+            answer: Arc::new(answer),
+        };
+        let server = Router::new()
+            .route("/{bot}/{method}", post(record))
+            .with_state(api.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, server).await.unwrap() });
+        (api, format!("http://{address}"))
+    }
+
+    /// The bodies of the calls of `method`.
+    fn calls_of(&self, method: &str) -> Vec<Value> {
+        self.calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(called, _)| called == method)
+            .map(|(_, body)| body.clone())
+            .collect()
+    }
+}
+
+/// The invented webhook secret of the tests.
+const WEBHOOK_SECRET: &str = "test-webhook-secret-4f1c";
+
+fn webhook_source() -> UpdateSource {
+    UpdateSource::Webhook {
+        secret: SecretString::from(WEBHOOK_SECRET),
+        public_url: support::public_url(),
+    }
+}
+
+/// The listener of the `telegram` role for `gateway`, with the database as its only store.
+fn role_router(test: &TestDatabase, gateway: &Arc<Gateway>, source: &UpdateSource) -> Router {
+    tada::telegram::routes(
+        gateway.clone(),
+        source,
+        vec![Arc::new(test.database.clone())],
+    )
+}
+
+/// A `POST /telegram/webhook` with `secret` in the secret header, if any.
+async fn deliver(router: &Router, secret: Option<&str>, body: Vec<u8>) -> StatusCode {
+    let mut request = axum::http::Request::post("/telegram/webhook")
+        .header(header::CONTENT_TYPE, "application/json");
+    if let Some(secret) = secret {
+        request = request.header("X-Telegram-Bot-Api-Secret-Token", secret);
+    }
+    let response = router
+        .clone()
+        .oneshot(request.body(Body::from(body)).unwrap())
+        .await
+        .unwrap();
+    response.status()
+}
+
+async fn get_status(router: &Router, path: &str) -> StatusCode {
+    let request = axum::http::Request::get(path).body(Body::empty()).unwrap();
+    router.clone().oneshot(request).await.unwrap().status()
+}
+
+#[tokio::test]
+async fn webhook_rejects_bad_secret_and_replay() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+    let (api, url) = RecordingBotApi::start(working).await;
+    let gateway = Arc::new(Gateway::new(
+        &url,
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    ));
+    let router = role_router(&test, &gateway, &webhook_source());
+    let body = serde_json::to_vec(&update(41, "not-a-code")).unwrap();
+
+    assert_eq!(
+        deliver(&router, None, body.clone()).await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        deliver(&router, Some("test-webhook-secret-4f1d"), body.clone()).await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        deliver(&router, Some(""), body.clone()).await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert!(
+        api.calls_of("sendMessage").is_empty(),
+        "a request with a bad secret got a reply"
+    );
+
+    // The rejected requests did not record the update, so the first good delivery gets its reply.
+    assert_eq!(
+        deliver(&router, Some(WEBHOOK_SECRET), body.clone()).await,
+        StatusCode::OK
+    );
+    assert_eq!(api.calls_of("sendMessage").len(), 1);
+    // Telegram delivers an update again if it saw no answer; the replay changes nothing.
+    assert_eq!(
+        deliver(&router, Some(WEBHOOK_SECRET), body).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        api.calls_of("sendMessage").len(),
+        1,
+        "the replay got a reply"
+    );
+
+    // A button press is not served yet: no reply and no error.
+    let press = json!({"update_id": 42, "callback_query": {
+        "id": "4382", "chat_instance": "1",
+        "from": {"id": ACCOUNT, "is_bot": false, "first_name": "Testperson"},
+        "data": "x"
+    }});
+    let press = serde_json::to_vec(&press).unwrap();
+    assert_eq!(
+        deliver(&router, Some(WEBHOOK_SECRET), press).await,
+        StatusCode::OK
+    );
+    assert_eq!(api.calls_of("sendMessage").len(), 1);
+    // A body that is not an update gets no retry from Telegram and no reply.
+    assert_eq!(
+        deliver(
+            &router,
+            Some(WEBHOOK_SECRET),
+            b"{\"update_id\":\"Geheimnis\"}".to_vec()
+        )
+        .await,
+        StatusCode::OK
+    );
+
+    support::logs::assert_clean(&[
+        WEBHOOK_SECRET,
+        "test-token",
+        "Testperson",
+        "7130429",
+        "Geheimnis",
+    ]);
+}
+
+#[tokio::test]
+async fn oversized_body_is_rejected() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+    let (api, url) = RecordingBotApi::start(working).await;
+    let gateway = Arc::new(Gateway::new(
+        &url,
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    ));
+    let router = role_router(&test, &gateway, &webhook_source());
+    let mut big = update(43, "not-a-code");
+    big["message"]["caption"] = json!("x".repeat(1024 * 1024));
+
+    assert_eq!(
+        deliver(
+            &router,
+            Some(WEBHOOK_SECRET),
+            serde_json::to_vec(&big).unwrap()
+        )
+        .await,
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
+    assert!(api.calls_of("sendMessage").is_empty());
+    // The update is not recorded: a smaller delivery of the same ID still gets its reply.
+    let small = serde_json::to_vec(&update(43, "not-a-code")).unwrap();
+    assert_eq!(
+        deliver(&router, Some(WEBHOOK_SECRET), small).await,
+        StatusCode::OK
+    );
+    assert_eq!(api.calls_of("sendMessage").len(), 1);
+}
+
+#[tokio::test]
+async fn readyz_fails_with_revoked_token() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+
+    // A working Bot API: the first long poll makes the role ready.
+    let (api, url) = RecordingBotApi::start(working).await;
+    let gateway = Arc::new(Gateway::new(
+        &url,
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    ));
+    let router = role_router(&test, &gateway, &UpdateSource::Polling);
+    let polled = {
+        let api = api.clone();
+        async move {
+            while api.calls_of("getUpdates").len() < 2 {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }
+    };
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        gateway.run(polled, &UpdateSource::Polling),
+    )
+    .await
+    .unwrap();
+    assert_eq!(get_status(&router, "/readyz").await, StatusCode::OK);
+
+    // A revoked token: each call gets 401, so no Bot API call succeeds.
+    let (api, url) = RecordingBotApi::start(|_| refusal(401)).await;
+    let gateway = Arc::new(Gateway::new(
+        &url,
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    ));
+    let router = role_router(&test, &gateway, &UpdateSource::Polling);
+    let refused = {
+        let api = api.clone();
+        async move {
+            while api.calls_of("getUpdates").is_empty() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }
+    };
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        gateway.run(refused, &UpdateSource::Polling),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        get_status(&router, "/readyz").await,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    assert_eq!(get_status(&router, "/healthz").await, StatusCode::OK);
+    support::logs::assert_clean(&["test-token"]);
+}
+
+#[tokio::test]
+async fn healthz_in_both_modes() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+    let (api, url) = RecordingBotApi::start(working).await;
+    let gateway = Arc::new(Gateway::new(
+        &url,
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    ));
+
+    // Polling: the health routes, and no webhook route.
+    let router = role_router(&test, &gateway, &UpdateSource::Polling);
+    assert_eq!(get_status(&router, "/healthz").await, StatusCode::OK);
+    let body = serde_json::to_vec(&update(44, "not-a-code")).unwrap();
+    assert_eq!(
+        deliver(&router, Some(WEBHOOK_SECRET), body).await,
+        StatusCode::NOT_FOUND
+    );
+    let polled = {
+        let api = api.clone();
+        async move {
+            while api.calls_of("getUpdates").is_empty() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }
+    };
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        gateway.run(polled, &UpdateSource::Polling),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        api.calls_of("getUpdates")[0]["allowed_updates"],
+        json!(["message", "callback_query"])
+    );
+
+    // Webhook: the role registers the webhook with its secret at start.
+    let source = webhook_source();
+    let router = role_router(&test, &gateway, &source);
+    assert_eq!(get_status(&router, "/healthz").await, StatusCode::OK);
+    let registered = {
+        let api = api.clone();
+        async move {
+            while api.calls_of("setWebhook").is_empty() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(20), gateway.run(registered, &source))
+        .await
+        .unwrap();
+    let webhook = &api.calls_of("setWebhook")[0];
+    assert_eq!(webhook["url"], "https://tada.example.org/telegram/webhook");
+    assert_eq!(webhook["secret_token"], WEBHOOK_SECRET);
+    assert_eq!(
+        webhook["allowed_updates"],
+        json!(["message", "callback_query"])
+    );
+    assert_eq!(get_status(&router, "/readyz").await, StatusCode::OK);
+    support::logs::assert_clean(&[WEBHOOK_SECRET, "test-token"]);
+}
+
+/// A recipient of the send tests, invented.
+const RECIPIENT: TelegramUserId = TelegramUserId(7130429);
+
+#[tokio::test]
+async fn send_maps_403_to_blocked() {
+    support::logs::install();
+    for (answer, expected) in [
+        (200, SendOutcome::Sent),
+        (403, SendOutcome::Blocked),
+        (400, SendOutcome::Failed),
+        (429, SendOutcome::Failed),
+        (500, SendOutcome::Unknown),
+        (502, SendOutcome::Unknown),
+    ] {
+        let (_, url) = RecordingBotApi::start(move |method| {
+            if answer == 200 {
+                working(method)
+            } else {
+                refusal(answer)
+            }
+        })
+        .await;
+        let messenger = TelegramMessenger::new(&url, "test-token");
+        assert_eq!(
+            messenger.send(RECIPIENT, "Hallo", &[]).await,
+            expected,
+            "status {answer}"
+        );
+    }
+    // No Bot API at the address: the request did not leave, so nothing was sent.
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let closed = format!("http://{}", listener.local_addr().unwrap());
+    drop(listener);
+    let messenger = TelegramMessenger::new(&closed, "test-token");
+    assert_eq!(
+        messenger.send(RECIPIENT, "Hallo", &[]).await,
+        SendOutcome::Failed
+    );
+    support::logs::assert_clean(&["test-token", "7130429"]);
+}
+
+#[tokio::test]
+async fn send_timeout_is_unknown() {
+    support::logs::install();
+    let (api, url) = RecordingBotApi::start(|_| Answer::Hang).await;
+    let messenger =
+        TelegramMessenger::new(&url, "test-token").with_timeout(Duration::from_millis(300));
+    let outcome = tokio::time::timeout(
+        Duration::from_secs(10),
+        messenger.send(RECIPIENT, "Hallo", &[]),
+    )
+    .await
+    .unwrap();
+    assert_eq!(outcome, SendOutcome::Unknown);
+    assert_eq!(api.calls_of("sendMessage").len(), 1, "the request left");
+}
+
+#[tokio::test]
+async fn messages_are_plain_text() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+    let (api, url) = RecordingBotApi::start(working).await;
+    let messenger = TelegramMessenger::new(&url, "test-token");
+    let title = "<b>Zelt</b> [mark all done](https://example.org) *jetzt*";
+    let rows = vec![vec![
+        Button::Callback {
+            label: "Erledigt".to_owned(),
+            data: "d:AAEC".to_owned(),
+        },
+        Button::Url {
+            label: "Öffnen".to_owned(),
+            url: "https://tada.example.org/events".to_owned(),
+        },
+    ]];
+    assert_eq!(
+        messenger.send(RECIPIENT, title, &rows).await,
+        SendOutcome::Sent
+    );
+
+    let sent = &api.calls_of("sendMessage")[0];
+    assert_eq!(sent["chat_id"], json!(7130429));
+    assert_eq!(sent["text"], title);
+    assert!(sent.get("parse_mode").is_none(), "{sent}");
+    assert!(sent.get("entities").is_none(), "{sent}");
+    assert_eq!(
+        sent["reply_markup"]["inline_keyboard"],
+        json!([[
+            {"text": "Erledigt", "callback_data": "d:AAEC"},
+            {"text": "Öffnen", "url": "https://tada.example.org/events"}
+        ]])
+    );
+
+    // The replies of the gateway are plain text too.
+    let gateway = Arc::new(Gateway::new(
+        &url,
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    ));
+    let router = role_router(&test, &gateway, &webhook_source());
+    let body = serde_json::to_vec(&update(45, "not-a-code")).unwrap();
+    assert_eq!(
+        deliver(&router, Some(WEBHOOK_SECRET), body).await,
+        StatusCode::OK
+    );
+    let reply = &api.calls_of("sendMessage")[1];
+    assert!(reply.get("parse_mode").is_none(), "{reply}");
+    // A message without buttons has no keyboard.
+    messenger.send(RECIPIENT, "Hallo", &[]).await;
+    assert!(api.calls_of("sendMessage")[2].get("reply_markup").is_none());
+}
+
+/// The platform stops the role within 25 seconds (ADR 0025): a hung Bot API call must not hold it.
+#[tokio::test]
+async fn stop_ends_the_run_while_a_bot_api_call_hangs() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+
+    // Webhook mode: the call that keeps `/readyz` current hangs.
+    let (api, url) = RecordingBotApi::start(|method| match method {
+        "getWebhookInfo" => Answer::Hang,
+        _ => working(method),
+    })
+    .await;
+    let gateway = Gateway::new(
+        &url,
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    );
+    let hung = {
+        let api = api.clone();
+        async move {
+            while api.calls_of("getWebhookInfo").is_empty() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }
+    };
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        gateway.run(hung, &webhook_source()),
+    )
+    .await
+    .expect("the hung heartbeat held the stop");
+
+    // Polling mode: the reply to an update hangs.
+    let delivered = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let (api, url) = RecordingBotApi::start(move |method| match method {
+        "sendMessage" => Answer::Hang,
+        "getUpdates" if !delivered.swap(true, std::sync::atomic::Ordering::SeqCst) => {
+            ok(json!([update(51, "not-a-code")]))
+        }
+        _ => working(method),
+    })
+    .await;
+    let gateway = Gateway::new(
+        &url,
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    );
+    let hung = {
+        let api = api.clone();
+        async move {
+            while api.calls_of("sendMessage").is_empty() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }
+    };
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        gateway.run(hung, &UpdateSource::Polling),
+    )
+    .await
+    .expect("the hung reply held the stop");
+}
+
+/// Telegram delivers an update again after an error. The dedupe makes that safe, so an update that
+/// the database cannot record gets an error, not a silent loss.
+#[tokio::test]
+async fn a_webhook_update_that_cannot_be_recorded_gets_an_error() {
+    support::logs::install();
+    let test = TestDatabase::start().await;
+    let (api, url) = RecordingBotApi::start(working).await;
+    let gateway = Arc::new(Gateway::new(
+        &url,
+        "test-token",
+        Arc::new(test.database.clone()),
+        Arc::new(SystemClock),
+    ));
+    let router = role_router(&test, &gateway, &webhook_source());
+    test.database.close().await;
+    let body = serde_json::to_vec(&update(52, "not-a-code")).unwrap();
+    assert_eq!(
+        deliver(&router, Some(WEBHOOK_SECRET), body).await,
+        StatusCode::INTERNAL_SERVER_ERROR
+    );
+    assert!(api.calls_of("sendMessage").is_empty());
 }

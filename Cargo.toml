@@ -54,6 +54,8 @@ sha2 = "0.11.0"
 # The text difference by line of two draft versions (ADR 0058).
 similar = { version = "2.7.0", default-features = false, features = ["text"] }
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-native-roots", "postgres", "migrate", "macros", "uuid"] }
+# The constant-time comparison of the Telegram webhook secret (ADR 0076).
+subtle = "2.6.1"
 tempfile = "3.27.0"
 testcontainers-modules = { version = "0.15.0", features = ["postgres"] }
 thiserror = "2.0.21"
