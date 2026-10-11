@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-06
+- Amended by: [0077](0077-agent-runner.md)
 
 ## Context
 

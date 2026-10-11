@@ -114,13 +114,18 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 
 ## AI and automation
 
-| Term       | Meaning                                                                                                                                   | Avoid        |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| AI PM      | The scheduled service that checks progress, sends reminders and escalates exceptions. It is not a person and has no authority of its own. | bot, agent   |
-| bot        | The Telegram bot: one channel of tada.                                                                                                    |              |
-| reminder   | A message from the AI PM to an owner about an action.                                                                                     | notification |
-| escalation | A message to a workstream lead or the PM about an unresolved item.                                                                        |              |
-| policy     | A configured rule that permits an automatic action.                                                                                       |              |
+| Term         | Meaning                                                                                                                                              | Avoid           |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| AI PM        | The scheduled service that checks progress, sends reminders and escalates exceptions. It is not a person and has no authority of its own.            | bot, agent      |
+| bot          | The Telegram bot: one channel of tada.                                                                                                               |                 |
+| reminder     | A message from the AI PM to an owner about an action.                                                                                                | notification    |
+| escalation   | A message to a workstream lead or the PM about an unresolved item.                                                                                   |                 |
+| policy       | A configured rule that permits an automatic action.                                                                                                  |                 |
+| digest       | One private Telegram message to a member with their due, overdue and blocked work of one organization.                                               | summary         |
+| quiet hours  | The hours in the local time of the recipient when tada sends no automatic message. A digest planned inside them waits for the end.                   |                 |
+| cooldown     | The minimum time between two digests for the same person.                                                                                            |                 |
+| schedule     | A durable row with a local time, a time zone and the weekdays that starts a job. It survives a restart.                                              | cron job        |
+| agent runner | The loop in tada that calls a model, runs the tools of the shared AI tool catalog ([ADR 0077](adr/0077-agent-runner.md)) and ends within set limits. | agent framework |
 
 ## Data protection
 

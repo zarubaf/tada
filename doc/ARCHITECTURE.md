@@ -68,19 +68,23 @@ pgvector comes only if an evaluation shows a benefit.
 
 1. A connector captures a source item once and stores an immutable source version.
 2. The AI extracts a proposal: a patch, source spans, the model and prompt version, assumptions and the target record version.
-3. tada routes the proposal to its reviewers: the owner of the target record, the lead of the workstream, or the event managers. A dependency also goes to the reviewers of the proposals that depend on it.
+3. tada routes the proposal to its reviewers: the owner of the target record, the lead of the workstream, or the event managers.
+   A dependency also goes to the reviewers of the proposals that depend on it.
    It computes the reviewers from the current state at each read and each apply, and a member without a current event role is no reviewer ([ADR 0067](adr/0067-workstreams-and-review-routing.md)).
-4. The owner accepts, edits or rejects it. Silence is never acceptance.
+4. The owner accepts, edits or rejects it.
+   Silence is never acceptance.
 5. If the target record changed, the proposal goes into conflict and needs a new evaluation.
 
 ### A redaction
 
 1. An owner chooses the targets, or the retention job of the worker finds a closed event whose period ended ([ADR 0071](adr/0071-event-closing-and-retention.md)).
 2. `app::redaction` applies the rules and calls the `RedactionStore` port.
-   `store-pg` sets `tada.redaction` for the transaction. The immutability triggers then accept the tombstone update and nothing else.
+   `store-pg` sets `tada.redaction` for the transaction.
+   The immutability triggers then accept the tombstone update and nothing else.
 3. The same transaction writes the `redaction` row, the audit event and the job `write-redaction-journal`.
 4. After the commit, the stored object of a redacted document version is deleted, if any.
-5. The job writes the journal object. After a restore, `tada redactions replay` applies the journal again ([ADR 0072](adr/0072-legal-redaction-and-deletion-journal.md)).
+5. The job writes the journal object.
+   After a restore, `tada redactions replay` applies the journal again ([ADR 0072](adr/0072-legal-redaction-and-deletion-journal.md)).
 
 ### Daily sweeps
 
@@ -94,11 +98,30 @@ The three daily sweeps are:
 
 ### A scheduled reminder
 
-1. The worker finds due checks from accepted state and the configured policy.
-2. It stores an outbound intent before the send.
-3. The Telegram gateway sends one digest for each person and records the result as sent, failed or unknown.
-4. A changed deadline or a completed action cancels obsolete reminders.
-5. After a restart, the worker does not send missed reminders in a flood.
+1. A step of the worker loop claims a due `schedule` row and starts a `pm-check` job ([ADR 0076](adr/0076-schedules-and-reminders.md)).
+   After downtime it starts at most one job for each row.
+2. The job selects the due items of each eligible person from accepted state and the policy.
+   It stores one outbound intent with its items and a send job in one transaction.
+   Inside the quiet hours, the send waits for their end.
+3. The send job reads each item again and drops an item whose deadline, status or owner changed.
+   A changed deadline or a completed action cancels an obsolete reminder here.
+   If no item stays, the intent is `canceled`.
+4. The worker sends the digest through the `Messenger` port, which the `telegram` crate implements, and records the result as sent, failed or unknown.
+   It marks the intent `unknown` before the call, so a crash cannot send the digest twice.
+5. The `telegram` role only receives updates, in polling or webhook mode.
+   A button press changes a record only if the user, the membership, the record version and the age of the digest still match.
+
+### The agent runner
+
+1. A task such as `pm-digest` gives the runner its model, prompt, tools and limits ([ADR 0077](adr/0077-agent-runner.md)).
+2. The runner calls the `Model` port and runs each tool call from the `app::ai_tools` catalog with an `AiCaller` ([ADR 0010](adr/0010-model-provider.md)).
+3. It stops at the first limit of turns, cost or time.
+   It records each step and the usage without free text.
+4. The caller checks the output.
+   If the check fails or the AI is off or at its cap, the caller uses the template text.
+
+The `telegram` role runs an HTTP listener with `/healthz` and `/readyz` in both modes ([ADR 0076](adr/0076-schedules-and-reminders.md)).
+In webhook mode it also receives `POST /telegram/webhook` after a check of the secret header ([ADR 0076](adr/0076-schedules-and-reminders.md)).
 
 ## Rules for all parts
 
@@ -122,7 +145,8 @@ tada does not copy every tool into PostgreSQL.
 ### Records and provenance
 
 - Each record has a UUID, an organization ID, an event scope where it applies, an event-local ID, an owner, a status, timestamps and a record version.
-- Shared people and resources have organization scope. Event notes and assignments have event scope.
+- Shared people and resources have organization scope.
+  Event notes and assignments have event scope.
 - Source items, source versions, evidence links, proposals and accepted records are separate tables.
 - The table `record_evidence` keeps the evidence of each accepted change of an action, a commitment, a person or an institution ([ADR 0068](adr/0068-actions-and-commitments.md)).
   A reader sees this evidence through `app::access::source_reach`, so evidence from an organization changeset is visible only to owners and admins.
@@ -148,13 +172,17 @@ tada does not copy every tool into PostgreSQL.
 - Owners and admins read each source version of their organization.
   Another member reads the source versions of the events in which the member has an event role, and the source versions that the facts and proposals of these events cite as evidence.
   For example, the text of an organization changeset has no event, and the members of the event that it creates read it through the evidence.
-  `app::access::source_reach` holds this rule. Search and the reads of citations use it.
+  `app::access::source_reach` holds this rule.
+  Search and the reads of citations use it.
   A new citation in a proposal or a draft uses the reach of its own event (`app::access::event_source_reach`).
 - Each member with an event role reads the persons and institutions of the organization, and the membership list of the event with names and roles.
-  Only the owner, the workstream lead or an event manager changes an action or a commitment ([ADR 0067](adr/0067-workstreams-and-review-routing.md)). Only owners and admins change persons and institutions ([ADR 0069](adr/0069-persons-and-institutions.md)).
+  Only the owner, the workstream lead or an event manager changes an action or a commitment ([ADR 0067](adr/0067-workstreams-and-review-routing.md)).
+  Only owners and admins change persons and institutions ([ADR 0069](adr/0069-persons-and-institutions.md)).
   The API tells each client `can_change` and `next_statuses` for each record, so a client does not repeat these rules.
-- A document copied into an event does not widen access. Both the source access and the event membership must allow disclosure.
-- Unknown event attribution goes to a triage queue. AI can suggest an event, but it never shows a message to more than one event team on its own.
+- A document copied into an event does not widen access.
+  Both the source access and the event membership must allow disclosure.
+- Unknown event attribution goes to a triage queue.
+  AI can suggest an event, but it never shows a message to more than one event team on its own.
 
 ### AI authority
 
@@ -172,43 +200,58 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 | Supplier or public communication, spend or calendar invitation            | Explicit authority and the applicable approval policy                  |
 | Aviation safety, emergency command and operating approval                 | An accountable, qualified person                                       |
 
-- Documents and emails are untrusted input. Extraction cannot run tool instructions.
+- Documents and emails are untrusted input.
+  Extraction cannot run tool instructions.
 - New suppliers, changed bank details or changed recipients never become accepted because an email says so.
-- Confidence scores sort the review work. They never grant permission.
+- Confidence scores sort the review work.
+  They never grant permission.
 - AI answers separate accepted state, proposals, historical state and inference, and show the freshness of each source.
-- Approved aviation packs come from deterministic rendering of approved fields. AI can draft text before approval, but it never writes published routes or instructions.
+- Approved aviation packs come from deterministic rendering of approved fields.
+  AI can draft text before approval, but it never writes published routes or instructions.
 - The evaluation set includes contradictory dates, conditional promises, German and English messages, duplicate emails, wrong-event routing, malicious instructions, private sources and missing evidence.
 
 ### Integrations
 
 - Every adapter has scoped authentication, capability metadata, checkpoints, source IDs and versions, deterministic mappings, incremental retrieval, reconciliation, revocation handling and diagnostics.
-- A webhook only signals that something can have changed. A worker then fetches and reconciles the authoritative data.
-- Delivery is at least once, and processing is idempotent. Deduplication uses the organization, the connection, the resource and the version.
+- A webhook only signals that something can have changed.
+  A worker then fetches and reconciles the authoritative data.
+- Delivery is at least once, and processing is idempotent.
+  Deduplication uses the organization, the connection, the resource and the version.
 - A checkpoint moves only after durable capture.
-- Most data flows into tada. If two systems change the same field, tada shows a conflict; it never uses blind last-write-wins.
+- Most data flows into tada.
+  If two systems change the same field, tada shows a conflict; it never uses blind last-write-wins.
 - Integration health is a product feature: last sync, permission expiry, backlog and stale sources are visible. "No new mail" must never hide "the connector is disconnected".
 - A failure goes to the named integration owner, not to the PM.
-- Microsoft Graph: test the real permission model in the club tenant before any promise. A folder selected in the UI does not limit a broad API token.
+- Microsoft Graph: test the real permission model in the club tenant before any promise.
+  A folder selected in the UI does not limit a broad API token.
 
 ### Documents
 
 - A document has a stable tada ID. Its name, folder and provider can change.
 - Each version records its hash, provider reference, uploader, timestamps, classification and processing status.
-- States: draft, review, approved, superseded and archived. Approval applies to one exact version. An edit creates a new draft.
-- A change of accepted facts marks dependent documents for review. It never rewrites an approved document.
+- States: draft, review, approved, superseded and archived.
+  Approval applies to one exact version.
+  An edit creates a new draft.
+- A change of accepted facts marks dependent documents for review.
+  It never rewrites an approved document.
 - Generated drafts store the exact fact versions and source versions that they used.
-- tada shows unsupported pages and formats explicitly. OCR text alone cannot check traffic capacity, evacuation geometry or aviation safety.
-- The first formats: Markdown concepts, PDF preview and export, text PDFs and selected office files. Specialist formats stay downloadable originals.
+- tada shows unsupported pages and formats explicitly.
+  OCR text alone cannot check traffic capacity, evacuation geometry or aviation safety.
+- The first formats: Markdown concepts, PDF preview and export, text PDFs and selected office files.
+  Specialist formats stay downloadable originals.
 - A move to another storage provider keeps document IDs, version IDs, hashes and approvals, with a tested mapping manifest.
 - In Slice 1, each document belongs to exactly one event, and access follows the event role ([ADR 0052](adr/0052-event-roles-and-ownership.md)).
   The `DOC` numbers stay unique in the organization ([ADR 0038](adr/0038-ids-and-time.md)).
   Documents of the whole organization need a later ADR, because no access rule for them exists yet.
 - Each organization has a storage quota: the column `organization.storage_quota_bytes`, 5 GiB by default ([ADR 0043](adr/0043-upload-policy.md)).
-  It is a value in the database, not an environment setting. An operator changes it for one organization with SQL.
+  It is a value in the database, not an environment setting.
+  An operator changes it for one organization with SQL.
 - The text of an uploaded plain text, Markdown or CSV file is the text of its source version: members can search and cite it ([ADR 0050](adr/0050-proposals-and-review.md)).
   A proposal can cite a passage of such a file as its evidence.
-  PDF and office files have no extracted text yet. An agent cites its own source text for facts from such files.
-- tada keeps the text of a text file up to 1 MiB only. This cap limits the memory of each upload. tada stores a larger text file without its text: members cannot search or cite it, and the file stays downloadable.
+  PDF and office files have no extracted text yet.
+  An agent cites its own source text for facts from such files.
+- tada keeps the text of a text file up to 1 MiB only.
+  This cap limits the memory of each upload. tada stores a larger text file without its text: members cannot search or cite it, and the file stays downloadable.
   The PostgreSQL search index of one text is limited to 1 MB, and the index of a text with many unique words can be larger than the text.
   If the index of a text under the cap is too large, tada stores the version without searchable text.
 - The source text of a changeset has at most 100,000 characters after the normalization, else the request fails with `validation-failed`.
@@ -228,19 +271,26 @@ Rules and database queries do counting, deadlines, permissions, reservation over
   Thus an owner or admin can remove a member during a long upload, and tada still publishes the version of that upload.
   This is a known limit of Slice 1: a removed member loses access with the next request, and one upload is one long request.
 - A download sends `Content-Disposition` with the RFC 6266 file name, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'self'; sandbox`, `Cross-Origin-Resource-Policy: same-origin` and `Cache-Control: private, no-store` ([ADR 0009](adr/0009-object-storage.md)).
-  Only PDF and plain text can be inline. Each other type is an attachment, also if the client asks for inline.
+  Only PDF and plain text can be inline.
+  Each other type is an attachment, also if the client asks for inline.
 - A draft has at most 200,000 characters of Markdown ([ADR 0051](adr/0051-document-drafts-and-provenance.md)).
-  A concept of an event has some ten thousand characters. The limit bounds the size of one proposal.
+  A concept of an event has some ten thousand characters.
+  The limit bounds the size of one proposal.
 
 ### Safe evolution
 
-- Schema changes follow expand and contract ([ADR 0006](adr/0006-persistence.md)). A migration never turns an assumption into a decision.
+- Schema changes follow expand and contract ([ADR 0006](adr/0006-persistence.md)).
+  A migration never turns an assumption into a decision.
 - API contracts, document schemas, extraction output, templates, automation policies and job payloads have versions.
-- Operators rehearse a release on restored data before production. Their deployment repository defines how ([ADR 0033](adr/0033-deployment-outside-this-repository.md)).
+- Operators rehearse a release on restored data before production.
+  Their deployment repository defines how ([ADR 0033](adr/0033-deployment-outside-this-repository.md)).
 - Regression fixtures cover small events, the large-event concept, cross-channel changes, document approvals, isolation and old job payloads.
-- Exports contain versioned JSON and CSV, originals, retained versions, hashes and relationship manifests. A test rebuilds the data from an export.
-- The production AI PM changes records only through approved tools. It cannot change its own code or the database schema.
-- Embeddings can be rebuilt. Accepted decisions never come from chat history.
+- Exports contain versioned JSON and CSV, originals, retained versions, hashes and relationship manifests.
+  A test rebuilds the data from an export.
+- The production AI PM changes records only through approved tools.
+  It cannot change its own code or the database schema.
+- Embeddings can be rebuilt.
+  Accepted decisions never come from chat history.
 - A release gate checks existing events, files, concept regeneration, access isolation and old jobs.
 
 ## Options not used now
