@@ -267,3 +267,89 @@ async fn a_member_opts_in_with_a_confirmed_telegram_link_only() {
         .await;
     assert_eq!(scoped, 0);
 }
+
+const DIGESTS: &str = "/api/v1/organization/digests";
+
+#[tokio::test]
+async fn an_owner_or_admin_lists_the_last_digests() {
+    let app = App::start().await;
+    let (_, owner) = app.member("Olga Owner", OrganizationRole::Owner).await;
+    let (_, member) = app.member("Mia Member", OrganizationRole::Member).await;
+    let (anna, _) = app.member("Anna Beispiel", OrganizationRole::Member).await;
+    let other = app.app.test.create_organization("musterhausen").await;
+    app.app
+        .test
+        .add_membership(other, anna, OrganizationRole::Member)
+        .await;
+    let testwil = app.testwil;
+    let digest = |organization: OrganizationId, status: &str, created: &str, finished: &str| {
+        let id = uuid::Uuid::now_v7();
+        [
+            format!(
+                "INSERT INTO outbound_intent (id, organization_id, user_id, purpose, status, message_id, created_at,
+                                              finished_at)
+                 VALUES ('{id}', '{organization}', '{anna}', 'telegram-digest', '{status}', '{id}', '{created}',
+                         {finished})"
+            ),
+            format!(
+                "INSERT INTO digest_item (id, intent_id, organization_id, record_kind, record_id, record_version,
+                                          reason, position)
+                 VALUES (gen_random_uuid(), '{id}', '{organization}', 'action', gen_random_uuid(), 1, 'overdue', 0),
+                        (gen_random_uuid(), '{id}', '{organization}', 'action', gen_random_uuid(), 1, 'due-soon', 1)"
+            ),
+        ]
+    };
+    let statements: Vec<String> = [
+        digest(
+            testwil,
+            "sent",
+            "2030-05-15T06:30:00Z",
+            "'2030-05-15T06:31:00Z'",
+        ),
+        digest(
+            testwil,
+            "canceled",
+            "2030-05-16T06:30:00Z",
+            "'2030-05-16T06:31:00Z'",
+        ),
+        digest(testwil, "pending", "2030-05-17T06:30:00Z", "NULL"),
+        digest(
+            other,
+            "sent",
+            "2030-05-17T06:30:00Z",
+            "'2030-05-17T06:31:00Z'",
+        ),
+    ]
+    .concat();
+    let statements: Vec<&str> = statements.iter().map(String::as_str).collect();
+    app.app.test.execute(&statements).await;
+
+    let (status, list) = app.call(&owner, DIGESTS, None).await;
+    assert_eq!(status, StatusCode::OK, "{list}");
+    let digests = list["items"].as_array().unwrap();
+    assert_eq!(
+        digests.len(),
+        3,
+        "the digests of the own organization only: {list}"
+    );
+    let statuses: Vec<&str> = digests
+        .iter()
+        .map(|d| d["status"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        statuses,
+        ["pending", "canceled", "sent"],
+        "the newest first"
+    );
+    assert_eq!(digests[2]["user_display_name"], "Anna Beispiel");
+    assert_eq!(digests[2]["item_count"], 2);
+    assert_eq!(digests[2]["sent_at"], "2030-05-15T06:31:00Z");
+    assert_eq!(
+        digests[1]["sent_at"],
+        Value::Null,
+        "a canceled digest was not sent"
+    );
+
+    let (status, problem) = app.call(&member, DIGESTS, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+}

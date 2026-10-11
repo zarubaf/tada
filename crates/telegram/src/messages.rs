@@ -37,6 +37,11 @@ impl Messages {
         self.format(id, Some(&args))
     }
 
+    /// The text of the message `id` with arguments of any type, for example a number for a plural.
+    pub(crate) fn get_args(&self, id: &str, args: &FluentArgs) -> String {
+        self.format(id, Some(args))
+    }
+
     /// The message for a problem code (ADR 0037): `problem-<code>`.
     pub(crate) fn problem(&self, code: ProblemCode) -> String {
         self.get(&format!("problem-{}", code.as_str()))

@@ -73,7 +73,12 @@ Selection:
 - An item with a response for its current version is skipped, unless it became overdue after the response.
 - A person with a digest inside the cooldown gets no new digest.
 - The tables `reminder_state` and `digest_item` hold no free text.
-  The housekeeping of [ADR 0071](0071-event-closing-and-retention.md) deletes them with their intent after 90 days.
+  The housekeeping of [ADR 0071](0071-event-closing-and-retention.md) deletes them after 90 days.
+  A digest goes 90 days after its outcome or its cancel, with its items.
+  A digest with an unknown outcome goes too, because it holds IDs only.
+  A digest that is still pending 90 days after its plan lost its send job and goes too.
+  A notice in `reminder_state` goes 90 days after its last notification, with its response.
+  A record that is still due after that counts as new, so its owner gets one more reminder.
 
 Digest intent and send:
 
@@ -82,17 +87,33 @@ Digest intent and send:
   The send time is the end of the quiet hours of the recipient when the check falls inside them.
 - A digest has at most 10 items.
   The rest is "and N more" with a link to My Work.
+  Only the items that the message shows get a notice, so the rest comes in a later digest.
 - Each item has an opaque reference of 16 random bytes.
   The reason is `overdue`, `due-soon`, `blocked` or `follow-up`.
 - The send job locks the intent and stops if it is not `pending`.
-- It reads each item again and removes it if its version changed, the record is closed, the owner changed or the recipient is no longer eligible.
-  If no item stays, the intent becomes `canceled`.
+- The quiet hours hold at the send too.
+  A send job that starts inside the quiet hours of the recipient, for example a retry or the job of a worker that comes back in the night, sends nothing.
+  It queues a new send job at the end of the quiet hours and completes, before the claim and before the AI run.
+- It reads each item again and removes it if its version changed, the record is closed, the owner changed or the event left the reach of the recipient ([ADR 0052](0052-event-roles-and-ownership.md)).
+  The check and the send use one rule for an eligible recipient.
+  If the recipient is no longer eligible, the policy is paused or no item stays, the intent becomes `canceled`.
+- The template gives the text unless AI is allowed ([ADR 0077](0077-agent-runner.md)).
+  If the agent run fails, takes longer than its time limit or gives an answer that fails its checks, the template gives the text.
+  The template shows a title as inert text: a control character becomes a space, and an `@`, a web address, a domain or a bot command gets a look-alike character that Telegram does not make clickable.
 - The intent goes from `pending` to `unknown` before the Bot API call, as the mail send does ([ADR 0011](0011-telegram.md)).
   A crash between the call and `finish` cannot send the digest twice.
 - After a send, the result updates `reminder_state` for each item.
   An `unknown` result updates it too and is not retried.
   A 403 sets `blocked_at` on the Telegram link.
-  Another failure changes no state.
+  A failed send changes no other state.
+- A refused connection or an error answer of the Bot API with 429 or 5xx is temporary: nothing went out.
+  The send returns the intent to `pending`, and the queue retries the job with its backoff, as for a mail ([ADR 0042](0042-transactional-email.md)).
+  After the last attempt the intent becomes `failed`.
+  Another refusal, for example a bad request, is `failed` at once and is not retried.
+  The next daily check plans a new digest, because a failed digest starts no cooldown.
+- A send that gets no answer within 15 seconds is `unknown`.
+- A worker that stops between the claim and the outcome leaves the intent `unknown` without notices.
+  The rules then plan its items again after the cooldown, in a new digest.
 - The text is plain text without a parse mode.
   A title cannot become a link or markup.
 - The worker sends through a `Messenger` port that the `telegram` crate implements.

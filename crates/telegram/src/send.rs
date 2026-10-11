@@ -98,18 +98,20 @@ fn button(button: &Button) -> InlineKeyboardButton {
     }
 }
 
-/// The outcome of a failed send. Only an error before the request left is a sure `Failed`.
+/// The outcome of a failed send. Only an error answer of the Bot API or an error before the request left says
+/// that nothing was sent.
 fn outcome_of(error: &Error) -> SendOutcome {
     match error {
+        // The Bot API answered with an error, so it did not take the message.
         Error::Api(response) => match response.error_code {
             403 => SendOutcome::Blocked,
+            429 => SendOutcome::Temporary,
             400..=499 => SendOutcome::Failed,
-            _ => SendOutcome::Unknown,
+            _ => SendOutcome::Temporary,
         },
         Error::JsonEncode { .. } => SendOutcome::Failed,
-        Error::HttpReqwest(error) if error.is_connect() || error.is_builder() => {
-            SendOutcome::Failed
-        }
+        Error::HttpReqwest(error) if error.is_builder() => SendOutcome::Failed,
+        Error::HttpReqwest(error) if error.is_connect() => SendOutcome::Temporary,
         // A timeout, a broken connection or an answer that does not decode, for example the HTML
         // page of a proxy after a server error.
         _ => SendOutcome::Unknown,

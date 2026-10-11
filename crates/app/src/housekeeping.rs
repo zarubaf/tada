@@ -2,7 +2,8 @@
 //!
 //! Sign-in links, sessions, Telegram claims, invitations, mail intents and failed jobs hold personal data
 //! (an email address, a user agent, a Telegram name) that has no use after its end. A daily job deletes them
-//! after a period. The same job anonymizes an account that no organization membership holds any more.
+//! after a period. The same job deletes the digests of the AI PM with their items, and the notices of the
+//! reminders, and it anonymizes an account that no organization membership holds any more.
 
 use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
@@ -12,8 +13,8 @@ use crate::store::StoreError;
 
 /// Sign-in links, sessions and Telegram claims go this long after their end.
 pub const SHORT_KEEP: SignedDuration = SignedDuration::from_hours(30 * 24);
-/// Finished invitations, sent or failed mail intents, failed jobs and accounts without membership go this long
-/// after their end.
+/// Finished invitations, sent or failed mail intents, finished digests, reminder notices, failed jobs and accounts
+/// without membership go this long after their end.
 pub const LONG_KEEP: SignedDuration = SignedDuration::from_hours(90 * 24);
 
 /// The display name of an anonymized account. The interface shows it as it shows any redacted text.
@@ -27,6 +28,10 @@ pub struct HousekeepingReport {
     pub telegram_claims: u64,
     pub invitations: u64,
     pub outbound_intents: u64,
+    /// Digests of the AI PM in a final state, with their items.
+    pub digests: u64,
+    /// Notices of a reminder in `reminder_state`.
+    pub reminder_states: u64,
     pub failed_jobs: u64,
     pub anonymized_accounts: u64,
 }

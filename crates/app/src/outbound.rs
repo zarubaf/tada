@@ -230,7 +230,7 @@ impl SendOutbound {
 }
 
 /// The intent ID of a version 1 payload.
-fn intent_id(job: &Job) -> Result<Uuid, JobFailed> {
+pub(crate) fn intent_id(job: &Job) -> Result<Uuid, JobFailed> {
     if job.version != 1 {
         return Err(JobFailed(format!(
             "the payload version {} is unknown",

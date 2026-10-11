@@ -515,6 +515,18 @@ impl ServiceCaller<JobRunner> {
     pub(crate) fn scope(&self, organization_id: OrganizationId) -> OrgScope {
         OrgScope(organization_id)
     }
+
+    /// The member for whom a job acts, through the channel `job`: the recipient of a digest, whose agent run
+    /// reads with the rights of the member (ADR 0010). Only the digest send calls it, after it read that the user
+    /// is still an eligible member.
+    pub(crate) fn member(
+        &self,
+        user_id: UserId,
+        organization_id: OrganizationId,
+        role: OrganizationRole,
+    ) -> MemberCaller {
+        MemberCaller::build(user_id, organization_id, role, JobRunner::CHANNEL)
+    }
 }
 
 /// The service identity `ai-pm`: the agent runs of tada (ADR 0039).

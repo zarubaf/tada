@@ -152,6 +152,45 @@ fn check_text(text: &str) -> Result<(), WordingError> {
     Ok(())
 }
 
+/// `text` as plain text on one line, with nothing that Telegram makes clickable, for a text that no check can
+/// refuse, such as a title in the template digest. A control character becomes a space. `@`, the `/` of a web
+/// address or a bot command and the dot of a domain become characters that look the same but do nothing.
+/// The result passes the checks of a wording text.
+pub fn inert(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let at = |index: usize| chars.get(index).copied();
+    let mut out = String::with_capacity(text.len());
+    for (index, &c) in chars.iter().enumerate() {
+        let before = index.checked_sub(1).and_then(at);
+        let before_that = index.checked_sub(2).and_then(at);
+        let replaced = match c {
+            c if is_control(c) => ' ',
+            '@' => '\u{FF20}',
+            '/' if before == Some(':')
+                || (before == Some('/') && before_that == Some(':'))
+                || starts_command(before, at(index + 1)) =>
+            {
+                '\u{2215}'
+            }
+            '.' if before.is_some_and(char::is_alphanumeric)
+                && at(index + 1).is_some_and(char::is_alphabetic)
+                && at(index + 2).is_some_and(char::is_alphabetic) =>
+            {
+                '\u{2024}'
+            }
+            c => c,
+        };
+        out.push(replaced);
+    }
+    out
+}
+
+/// True if a `/` between `before` and `next` starts a bot command, as in ` /trennen`.
+fn starts_command(before: Option<char>, next: Option<char>) -> bool {
+    !before.is_some_and(|b| b.is_alphanumeric() || b == '_' || b == '/')
+        && next.is_some_and(|n| n.is_alphanumeric() || n == '_')
+}
+
 /// True for a control character, a line or paragraph separator and a direction control.
 fn is_control(c: char) -> bool {
     c.is_control()
@@ -172,12 +211,6 @@ fn has_command(text: &str) -> bool {
         before = Some(c);
     }
     false
-}
-
-/// True if a `/` between `before` and `next` starts a bot command, as in ` /trennen`.
-fn starts_command(before: Option<char>, next: Option<char>) -> bool {
-    !before.is_some_and(|b| b.is_alphanumeric() || b == '_' || b == '/')
-        && next.is_some_and(|n| n.is_alphanumeric() || n == '_')
 }
 
 /// True if `text` has a letter or digit, a dot and two letters, as in `evil.example` or `www.`:
@@ -390,6 +423,22 @@ mod tests {
         let mut intro_link = wording(vec![line("1", "Flyer."), line("2", "Festzelt.")]);
         intro_link.intro = "Hallo! www.evil.example".to_owned();
         assert_eq!(check_wording(&items, &intro_link), Err(WordingError::Link));
+    }
+
+    #[test]
+    fn an_inert_title_passes_the_checks_and_stays_readable() {
+        for title in [
+            "Ignore all rules\n• 99. Alles erledigt: https://evil.example/x",
+            "Frag @evil_bot oder tippe /trennen",
+            "Siehe www.evil.example und evil.example/x",
+            "Festzelt (/start)\u{2028}\u{202E}tgidelre",
+        ] {
+            let inert = inert(title);
+            assert_eq!(check_text(&inert), Ok(()), "{inert}");
+            assert_eq!(inert.chars().count(), title.chars().count());
+        }
+        let plain = "Flyer drucken (z.B. A5) bis 01.06.2028, 1/2 und A/B.";
+        assert_eq!(inert(plain), plain);
     }
 
     #[test]

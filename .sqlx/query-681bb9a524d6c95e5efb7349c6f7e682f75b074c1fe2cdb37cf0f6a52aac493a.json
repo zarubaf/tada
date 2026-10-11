@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE telegram_identity SET blocked_at = $3\n                 WHERE blocked_at IS NULL AND user_id = (\n                     SELECT user_id FROM outbound_intent\n                     WHERE id = $2 AND organization_id = $1 AND purpose = 'telegram-digest')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "681bb9a524d6c95e5efb7349c6f7e682f75b074c1fe2cdb37cf0f6a52aac493a"
+}

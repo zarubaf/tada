@@ -23,11 +23,11 @@ use crate::error::{InvalidRow, store_error};
 use crate::identity::organization_role;
 use crate::jobs::enqueue;
 
-fn version(value: i64, column: &'static str) -> Result<RecordVersion, InvalidRow> {
+pub(crate) fn version(value: i64, column: &'static str) -> Result<RecordVersion, InvalidRow> {
     RecordVersion::new(value).ok_or(InvalidRow(column))
 }
 
-fn kind(code: &str, column: &'static str) -> Result<RecordKind, InvalidRow> {
+pub(crate) fn kind(code: &str, column: &'static str) -> Result<RecordKind, InvalidRow> {
     RecordKind::parse(code).ok_or(InvalidRow(column))
 }
 

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM digest_item WHERE intent_id = $2 AND organization_id = $1 AND NOT (id = ANY($3))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cd8d56520035875ba54271e5a39f03266b324c55360770eac6a1b123d3da651c"
+}

@@ -26,7 +26,15 @@ use super::{Section, Setting, Source};
 /// The settings of `tada serve`.
 pub type ServeSettings = (Database, Http, Storage, PublicUrl, SignIn, Uploads, AiSetup);
 /// The settings of `tada worker`.
-pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp, Storage, Ai);
+pub type WorkerSettings = (
+    Database,
+    PublicUrl,
+    Mail,
+    MailSmtp,
+    Storage,
+    Ai,
+    TelegramBot,
+);
 /// The settings of `tada telegram`.
 pub type TelegramSettings = (Database, TelegramBot, TelegramGateway, Storage);
 /// The settings of `tada bootstrap`.
