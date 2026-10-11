@@ -1,41 +1,40 @@
 //! The read tools for the work records of an event and for the persons and institutions (ADR 0064, ADR 0069).
 //!
-//! They call the `app` queries with the `AiCaller`, so the agent reads what its member reads and no more.
+//! They call the queries with the `AiCaller`, so the agent reads what its member reads and no more.
 //! The views leave out `can_change`, `next_statuses` and `can_make_firm`: they describe what the member can do
 //! in tada, and an agent changes no record directly. It proposes, and a reviewer decides.
 //! The email and phone of a party are the ones that the API shows to the same member.
 
-use axum::http::request::Parts;
-use rmcp::handler::server::tool::Extension;
-use rmcp::handler::server::wrapper::{Json, Parameters};
-use rmcp::{tool, tool_router};
+use std::sync::LazyLock;
+
+use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tada_app::dispute_notes::{DisputeNotes, NoteKey};
-use tada_app::domain::events::EventKey;
-use tada_app::domain::ids::{UserId, WorkstreamId};
-use tada_app::domain::parties::{Party, PartyName};
-use tada_app::domain::redaction::Redactable;
-use tada_app::domain::work::{
-    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, WorkstreamName,
-};
-use tada_app::paging::PageLimit;
-use tada_app::parties::{self, InstitutionView, PersonView};
-use tada_app::problem::{FieldError, ProblemCode};
-use tada_app::records::{RecordEvidenceView, Shown};
-use tada_app::search::MAX_QUERY_CHARS;
-use tada_app::views::{DisputeNoteView, note_views};
-use tada_app::work::{self, ActionView, CommitmentView, WorkPorts, WorkQuery};
-use tada_app::workstreams::{self, Workstream};
 use uuid::Uuid;
 
-use crate::errors::{ToolError, caller};
-use crate::tools::{EventInput, Tools};
+use super::events::EventInput;
+use super::{AiToolError, AiToolPorts, TypedTool, find_event};
+use crate::caller::AiCaller;
+use crate::dispute_notes::{DisputeNotes, NoteKey};
+use crate::domain::events::EventKey;
+use crate::domain::ids::{UserId, WorkstreamId};
+use crate::domain::parties::{Party, PartyName};
+use crate::domain::redaction::Redactable;
+use crate::domain::work::{
+    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, WorkstreamName,
+};
+use crate::paging::PageLimit;
+use crate::parties::{self, InstitutionView, PersonView};
+use crate::records::{RecordEvidenceView, Shown};
+use crate::search::MAX_QUERY_CHARS;
+use crate::views::{DisputeNoteView, note_views};
+use crate::work::{self, ActionView, CommitmentView, WorkPorts, WorkQuery};
+use crate::workstreams::{self, Workstream};
 
 /// The input of the tools that list the actions of an event.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ActionsInput {
+pub(super) struct ActionsInput {
     /// The key of the event, for example `FLY28`, from `list_events`.
     #[schemars(regex(pattern = EventKey::PATTERN))]
     event_key: String,
@@ -46,7 +45,7 @@ pub(crate) struct ActionsInput {
 /// The input of the tools that list the commitments of an event.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct CommitmentsInput {
+pub(super) struct CommitmentsInput {
     /// The key of the event, for example `FLY28`, from `list_events`.
     #[schemars(regex(pattern = EventKey::PATTERN))]
     event_key: String,
@@ -101,7 +100,7 @@ impl From<CommitmentStatusInput> for CommitmentStatus {
 /// The input of `search_parties`.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct PartiesInput {
+pub(super) struct PartiesInput {
     /// A part of a name. The search ignores case and punctuation.
     #[schemars(length(min = 1, max = MAX_QUERY_CHARS))]
     q: String,
@@ -116,12 +115,12 @@ fn text<T>(value: &Redactable<T>, as_str: impl Fn(&T) -> &str) -> String {
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct WorkstreamList {
+pub(super) struct WorkstreamList {
     workstreams: Vec<WorkstreamItem>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct WorkstreamItem {
+pub(super) struct WorkstreamItem {
     id: Uuid,
     /// Empty after a legal redaction (ADR 0072).
     name: String,
@@ -150,7 +149,7 @@ impl From<&Workstream> for WorkstreamItem {
 
 /// A passage that supports one version of a record, from a source that the member can read.
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct EvidenceItem {
+pub(super) struct EvidenceItem {
     record_version: i64,
     source_version_id: Uuid,
     start: u32,
@@ -187,14 +186,14 @@ fn evidence<T>(shown: &Shown<T>) -> Vec<EvidenceItem> {
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct ActionList {
+pub(super) struct ActionList {
     actions: Vec<ActionItem>,
     /// True if the event has more actions than the list shows.
     more: bool,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct ActionItem {
+pub(super) struct ActionItem {
     id: Uuid,
     /// The readable ID, for example `ACT-001`.
     local_id: String,
@@ -236,14 +235,14 @@ impl From<&Shown<ActionView>> for ActionItem {
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct CommitmentList {
+pub(super) struct CommitmentList {
     commitments: Vec<CommitmentItem>,
     /// True if the event has more commitments than the list shows.
     more: bool,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct PromisorItem {
+pub(super) struct PromisorItem {
     /// `person` or `institution`.
     kind: &'static str,
     id: Uuid,
@@ -256,7 +255,7 @@ pub(crate) struct PromisorItem {
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct CommitmentItem {
+pub(super) struct CommitmentItem {
     id: Uuid,
     /// The readable ID, for example `COM-001`.
     local_id: String,
@@ -318,7 +317,7 @@ impl From<&Shown<CommitmentView>> for CommitmentItem {
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct PartyList {
+pub(super) struct PartyList {
     persons: Vec<PersonItem>,
     institutions: Vec<InstitutionItem>,
     /// True if more persons or institutions match than the lists show: use a longer search text.
@@ -326,7 +325,7 @@ pub(crate) struct PartyList {
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct PersonItem {
+pub(super) struct PersonItem {
     id: Uuid,
     /// The readable ID, for example `PER-001`.
     local_id: String,
@@ -360,7 +359,7 @@ impl From<&Shown<PersonView>> for PersonItem {
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct InstitutionItem {
+pub(super) struct InstitutionItem {
     id: Uuid,
     /// The readable ID, for example `INS-001`.
     local_id: String,
@@ -408,133 +407,29 @@ If more is true, {more}: tell the member.",
     )
 }
 
-fn list_workstreams_description() -> String {
-    "List the workstreams of an event: its areas of work, each with its lead. \
-A work record names a workstream by its ID. Propose a record in an active workstream only; a closed workstream takes no new records."
-        .to_owned()
-}
-
-fn list_actions_description() -> String {
+static LIST_ACTIONS: LazyLock<String> = LazyLock::new(|| {
     list_description(
         "List the actions of an event, each with its owner, status and the evidence of the accepted proposals that made it.",
         "the event has more actions than this tool can show",
     )
-}
+});
 
-fn list_commitments_description() -> String {
+static LIST_COMMITMENTS: LazyLock<String> = LazyLock::new(|| {
     list_description(
         "List the commitments of an event: what a person or institution promised. \
 A conditional commitment has a condition and stays conditional until a reviewer makes it firm. Never treat a condition as met without evidence.",
         "the event has more commitments than this tool can show",
     )
-}
+});
 
-#[tool_router(router = work_tools, vis = "pub(crate)")]
-impl Tools {
-    #[tool(
-        name = "list_workstreams",
-        description = list_workstreams_description(),
-        annotations(read_only_hint = true)
-    )]
-    async fn list_workstreams(
-        &self,
-        Extension(parts): Extension<Parts>,
-        Parameters(input): Parameters<EventInput>,
-    ) -> Result<Json<WorkstreamList>, ToolError> {
-        let caller = caller(&parts)?;
-        let event = self.event(caller, &input.event_key).await?;
-        let workstreams =
-            workstreams::list_workstreams(caller, event.id, &*self.identity, &*self.workstreams)
-                .await?;
-        Ok(Json(WorkstreamList {
-            workstreams: workstreams.iter().map(WorkstreamItem::from).collect(),
-        }))
+fn work_ports(ports: &AiToolPorts) -> WorkPorts<'_> {
+    WorkPorts {
+        identity: &*ports.identity,
+        work: &*ports.work,
+        workstreams: &*ports.workstreams,
+        parties: &*ports.parties,
+        clock: &*ports.clock,
     }
-
-    #[tool(
-        name = "list_actions",
-        description = list_actions_description(),
-        annotations(read_only_hint = true)
-    )]
-    async fn list_actions(
-        &self,
-        Extension(parts): Extension<Parts>,
-        Parameters(input): Parameters<ActionsInput>,
-    ) -> Result<Json<ActionList>, ToolError> {
-        let caller = caller(&parts)?;
-        let event = self.event(caller, &input.event_key).await?;
-        let query = query(input.status.map(ActionStatus::from));
-        let page = work::list_actions(caller, event.id, query, self.work_ports()).await?;
-        Ok(Json(ActionList {
-            actions: page.items.iter().map(ActionItem::from).collect(),
-            more: page.next.is_some(),
-        }))
-    }
-
-    #[tool(
-        name = "list_commitments",
-        description = list_commitments_description(),
-        annotations(read_only_hint = true)
-    )]
-    async fn list_commitments(
-        &self,
-        Extension(parts): Extension<Parts>,
-        Parameters(input): Parameters<CommitmentsInput>,
-    ) -> Result<Json<CommitmentList>, ToolError> {
-        let caller = caller(&parts)?;
-        let event = self.event(caller, &input.event_key).await?;
-        let query = query(input.status.map(CommitmentStatus::from));
-        let page = work::list_commitments(caller, event.id, query, self.work_ports()).await?;
-        Ok(Json(CommitmentList {
-            commitments: page.items.iter().map(CommitmentItem::from).collect(),
-            more: page.next.is_some(),
-        }))
-    }
-
-    #[tool(
-        name = "search_parties",
-        description = "Search the persons and institutions of the organization by a part of their name. \
-Search here before you propose a new person or institution: use the ID of an existing one as a promisor instead of a duplicate. \
-Each list holds the first matches in the order of their numbers; if more is true, use a longer search text.",
-        annotations(read_only_hint = true)
-    )]
-    async fn search_parties(
-        &self,
-        Extension(parts): Extension<Parts>,
-        Parameters(input): Parameters<PartiesInput>,
-    ) -> Result<Json<PartyList>, ToolError> {
-        let caller = caller(&parts)?;
-        check_query(&input.q)?;
-        let (identity, store) = (&*self.identity, &*self.parties);
-        let limit = PageLimit::LARGEST;
-        let persons =
-            parties::list_persons(caller, Some(&input.q), None, limit, identity, store).await?;
-        let institutions =
-            parties::list_institutions(caller, Some(&input.q), None, limit, identity, store)
-                .await?;
-        Ok(Json(PartyList {
-            persons: persons.items.iter().map(PersonItem::from).collect(),
-            institutions: institutions
-                .items
-                .iter()
-                .map(InstitutionItem::from)
-                .collect(),
-            more: persons.next.is_some() || institutions.next.is_some(),
-        }))
-    }
-}
-
-/// The search text has the same bounds as the `q` of the HTTP endpoint: 1 to `MAX_QUERY_CHARS` characters.
-fn check_query(q: &str) -> Result<(), ToolError> {
-    let code = match q.chars().count() {
-        0 => "empty",
-        n if n > MAX_QUERY_CHARS => "too-long",
-        _ => return Ok(()),
-    };
-    Err(ToolError::problem(
-        ProblemCode::ValidationFailed,
-        &[FieldError::new("q", code)],
-    ))
 }
 
 /// The first page of the largest size, without a filter but the status.
@@ -548,14 +443,141 @@ fn query<S>(status: Option<S>) -> WorkQuery<S> {
     }
 }
 
-impl Tools {
-    fn work_ports(&self) -> WorkPorts<'_> {
-        WorkPorts {
-            identity: &*self.identity,
-            work: &*self.work,
-            workstreams: &*self.workstreams,
-            parties: &*self.parties,
-            clock: &*self.clock,
-        }
+/// The search text has the same bounds as the `q` of the HTTP endpoint: 1 to `MAX_QUERY_CHARS` characters.
+fn check_query(q: &str) -> Result<(), AiToolError> {
+    let code = match q.chars().count() {
+        0 => "empty",
+        n if n > MAX_QUERY_CHARS => "too-long",
+        _ => return Ok(()),
+    };
+    Err(AiToolError::invalid("q", code))
+}
+
+pub(super) struct ListWorkstreams;
+
+#[async_trait]
+impl TypedTool for ListWorkstreams {
+    type Input = EventInput;
+    type Output = WorkstreamList;
+    const NAME: &'static str = "list_workstreams";
+    const READ_ONLY: bool = true;
+
+    fn description() -> &'static str {
+        "List the workstreams of an event: its areas of work, each with its lead. \
+A work record names a workstream by its ID. Propose a record in an active workstream only; a closed workstream takes no new records."
+    }
+
+    async fn run(
+        &self,
+        caller: &AiCaller,
+        input: EventInput,
+        ports: &AiToolPorts,
+    ) -> Result<WorkstreamList, AiToolError> {
+        let event = find_event(caller, &input.event_key, ports).await?;
+        let workstreams =
+            workstreams::list_workstreams(caller, event.id, &*ports.identity, &*ports.workstreams)
+                .await?;
+        Ok(WorkstreamList {
+            workstreams: workstreams.iter().map(WorkstreamItem::from).collect(),
+        })
+    }
+}
+
+pub(super) struct ListActions;
+
+#[async_trait]
+impl TypedTool for ListActions {
+    type Input = ActionsInput;
+    type Output = ActionList;
+    const NAME: &'static str = "list_actions";
+    const READ_ONLY: bool = true;
+
+    fn description() -> &'static str {
+        &LIST_ACTIONS
+    }
+
+    async fn run(
+        &self,
+        caller: &AiCaller,
+        input: ActionsInput,
+        ports: &AiToolPorts,
+    ) -> Result<ActionList, AiToolError> {
+        let event = find_event(caller, &input.event_key, ports).await?;
+        let query = query(input.status.map(ActionStatus::from));
+        let page = work::list_actions(caller, event.id, query, work_ports(ports)).await?;
+        Ok(ActionList {
+            actions: page.items.iter().map(ActionItem::from).collect(),
+            more: page.next.is_some(),
+        })
+    }
+}
+
+pub(super) struct ListCommitments;
+
+#[async_trait]
+impl TypedTool for ListCommitments {
+    type Input = CommitmentsInput;
+    type Output = CommitmentList;
+    const NAME: &'static str = "list_commitments";
+    const READ_ONLY: bool = true;
+
+    fn description() -> &'static str {
+        &LIST_COMMITMENTS
+    }
+
+    async fn run(
+        &self,
+        caller: &AiCaller,
+        input: CommitmentsInput,
+        ports: &AiToolPorts,
+    ) -> Result<CommitmentList, AiToolError> {
+        let event = find_event(caller, &input.event_key, ports).await?;
+        let query = query(input.status.map(CommitmentStatus::from));
+        let page = work::list_commitments(caller, event.id, query, work_ports(ports)).await?;
+        Ok(CommitmentList {
+            commitments: page.items.iter().map(CommitmentItem::from).collect(),
+            more: page.next.is_some(),
+        })
+    }
+}
+
+pub(super) struct SearchParties;
+
+#[async_trait]
+impl TypedTool for SearchParties {
+    type Input = PartiesInput;
+    type Output = PartyList;
+    const NAME: &'static str = "search_parties";
+    const READ_ONLY: bool = true;
+
+    fn description() -> &'static str {
+        "Search the persons and institutions of the organization by a part of their name. \
+Search here before you propose a new person or institution: use the ID of an existing one as a promisor instead of a duplicate. \
+Each list holds the first matches in the order of their numbers; if more is true, use a longer search text."
+    }
+
+    async fn run(
+        &self,
+        caller: &AiCaller,
+        input: PartiesInput,
+        ports: &AiToolPorts,
+    ) -> Result<PartyList, AiToolError> {
+        check_query(&input.q)?;
+        let (identity, store) = (&*ports.identity, &*ports.parties);
+        let limit = PageLimit::LARGEST;
+        let persons =
+            parties::list_persons(caller, Some(&input.q), None, limit, identity, store).await?;
+        let institutions =
+            parties::list_institutions(caller, Some(&input.q), None, limit, identity, store)
+                .await?;
+        Ok(PartyList {
+            persons: persons.items.iter().map(PersonItem::from).collect(),
+            institutions: institutions
+                .items
+                .iter()
+                .map(InstitutionItem::from)
+                .collect(),
+            more: persons.next.is_some() || institutions.next.is_some(),
+        })
     }
 }

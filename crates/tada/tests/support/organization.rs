@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 use tada_adapters::clock::SystemClock;
 use tada_adapters::storage::testing::TestGarage;
 use tada_api::ApiState;
+use tada_app::ai_tools::AiToolPorts;
 use tada_app::caller::{OrganizationRole, ServiceCaller, TelegramGateway};
 use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::domain::ids::{OrganizationId, UserId};
@@ -48,17 +49,19 @@ pub fn router(test: &TestDatabase, garage: &TestGarage) -> Router {
             database.clone(),
             clock.clone(),
         )),
-        events: database.clone(),
-        identity: database.clone(),
-        facts: database.clone(),
-        sources: database.clone(),
-        proposals: database.clone(),
-        documents: database.clone(),
-        clock,
         public_url: super::public_url(),
-        workstreams: database.clone(),
-        parties: database.clone(),
-        work: database,
+        ports: AiToolPorts {
+            events: database.clone(),
+            identity: database.clone(),
+            facts: database.clone(),
+            sources: database.clone(),
+            proposals: database.clone(),
+            documents: database.clone(),
+            clock,
+            workstreams: database.clone(),
+            parties: database.clone(),
+            work: database,
+        },
     };
     tada::serve::routes(api, mcp, None)
 }

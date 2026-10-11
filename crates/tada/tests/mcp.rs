@@ -13,6 +13,7 @@ use axum::http::{Method, Request, StatusCode, header};
 use jiff::SignedDuration;
 use secrecy::ExposeSecret;
 use serde_json::{Value, json};
+use tada_app::ai_tools::AiToolPorts;
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::clock::Clock;
 use tada_app::domain::RecordVersion;
@@ -146,17 +147,19 @@ impl Mcp {
                 database.clone(),
                 clock.clone(),
             )),
-            events: database.clone(),
-            identity: database.clone(),
-            facts: database.clone(),
-            sources: database.clone(),
-            proposals: database.clone(),
-            documents: database.clone(),
-            clock: clock.clone(),
             public_url: support::public_url(),
-            workstreams: database.clone(),
-            parties: database.clone(),
-            work: database,
+            ports: AiToolPorts {
+                events: database.clone(),
+                identity: database.clone(),
+                facts: database.clone(),
+                sources: database.clone(),
+                proposals: database.clone(),
+                documents: database.clone(),
+                clock: clock.clone(),
+                workstreams: database.clone(),
+                parties: database.clone(),
+                work: database,
+            },
         };
         let router = tada::serve::routes(api, mcp, None);
         let mcp = Self {

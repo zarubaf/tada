@@ -8,6 +8,7 @@ use anyhow::Context;
 use axum::Router;
 use tada_adapters::clock::SystemClock;
 use tada_api::ApiState;
+use tada_app::ai_tools::AiToolPorts;
 use tada_app::session::SessionAuthenticator;
 use tada_app::tokens::TokenAuthenticator;
 use tada_mcp::McpState;
@@ -77,17 +78,19 @@ pub async fn run(
             Arc::new(db.clone()),
             Arc::new(SystemClock),
         )),
-        events: Arc::new(db.clone()),
-        identity: Arc::new(db.clone()),
-        facts: Arc::new(db.clone()),
-        sources: Arc::new(db.clone()),
-        proposals: Arc::new(db.clone()),
-        documents: Arc::new(db.clone()),
-        clock: Arc::new(SystemClock),
         public_url,
-        workstreams: Arc::new(db.clone()),
-        parties: Arc::new(db.clone()),
-        work: Arc::new(db.clone()),
+        ports: AiToolPorts {
+            events: Arc::new(db.clone()),
+            identity: Arc::new(db.clone()),
+            facts: Arc::new(db.clone()),
+            sources: Arc::new(db.clone()),
+            proposals: Arc::new(db.clone()),
+            documents: Arc::new(db.clone()),
+            clock: Arc::new(SystemClock),
+            workstreams: Arc::new(db.clone()),
+            parties: Arc::new(db.clone()),
+            work: Arc::new(db.clone()),
+        },
     };
 
     let router = routes(api, mcp, http.web_root.as_deref());

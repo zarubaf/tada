@@ -17,6 +17,7 @@ use axum::http::{Method, StatusCode, header};
 use jiff::{SignedDuration, Timestamp};
 use serde_json::{Value, json};
 use support::{SESSION_COOKIE, TestClock};
+use tada_app::ai_tools::AiToolPorts;
 use tada_app::caller::OrganizationRole;
 use tada_app::clock::Clock;
 use tada_app::domain::ids::UserId;
@@ -59,17 +60,19 @@ impl App {
                 database.clone(),
                 clock.clone(),
             )),
-            events: database.clone(),
-            identity: database.clone(),
-            facts: database.clone(),
-            sources: database.clone(),
-            proposals: database.clone(),
-            documents: database.clone(),
-            clock: clock.clone(),
             public_url: support::public_url(),
-            workstreams: database.clone(),
-            parties: database.clone(),
-            work: database,
+            ports: AiToolPorts {
+                events: database.clone(),
+                identity: database.clone(),
+                facts: database.clone(),
+                sources: database.clone(),
+                proposals: database.clone(),
+                documents: database.clone(),
+                clock: clock.clone(),
+                workstreams: database.clone(),
+                parties: database.clone(),
+                work: database,
+            },
         };
         let router = tada::serve::routes(api, mcp, None);
         Self {
