@@ -157,6 +157,8 @@ Telegram webhook and health:
   The URL comes from `TADA_PUBLIC_URL`.
 - `POST /telegram/webhook` compares `X-Telegram-Bot-Api-Secret-Token` with `subtle` in constant time, limits the body size and keeps the update dedupe.
   The secret comes from `TADA_TELEGRAM_WEBHOOK_SECRET_FILE`.
+  It holds at least 32 characters, because it is the only proof that an update comes from Telegram.
+  A shorter secret stops the role at start.
   It is never logged.
 - Both modes start an axum listener on `TADA_TELEGRAM_LISTEN` (default `0.0.0.0:8081`) with `/healthz` and `/readyz`.
 - `/readyz` checks the database, the object storage and the last successful Bot API call.

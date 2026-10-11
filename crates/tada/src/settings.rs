@@ -544,7 +544,37 @@ mod tests {
         assert!(errors.0[0].starts_with("TADA_TELEGRAM_WEBHOOK_SECRET_FILE "));
         assert!(!errors.0[0].contains("spaces"), "{errors}");
 
-        let good = secret_file("test-webhook_Secret-42\n");
+        // Valid characters, but too short to resist a brute force.
+        let short = secret_file("test-webhook_Secret-42\n");
+        let errors = telegram_with(&[
+            ("TADA_TELEGRAM_MODE", "webhook"),
+            (
+                "TADA_TELEGRAM_WEBHOOK_SECRET_FILE",
+                short.path().to_str().unwrap(),
+            ),
+            ("TADA_PUBLIC_URL", "https://tada.example.org"),
+        ])
+        .unwrap_err();
+        assert_eq!(errors.0.len(), 1, "{errors}");
+        assert!(errors.0[0].starts_with("TADA_TELEGRAM_WEBHOOK_SECRET_FILE "));
+        assert!(errors.0[0].contains("32 to 256"), "{errors}");
+        assert!(!errors.0[0].contains("Secret-42"), "{errors}");
+
+        // The edge: 31 characters fail, 32 pass.
+        for (secret, valid) in [("a".repeat(31), false), ("a".repeat(32), true)] {
+            let file = secret_file(&format!("{secret}\n"));
+            let result = telegram_with(&[
+                ("TADA_TELEGRAM_MODE", "webhook"),
+                (
+                    "TADA_TELEGRAM_WEBHOOK_SECRET_FILE",
+                    file.path().to_str().unwrap(),
+                ),
+                ("TADA_PUBLIC_URL", "https://tada.example.org"),
+            ]);
+            assert_eq!(result.is_ok(), valid, "{} characters", secret.len());
+        }
+
+        let good = secret_file("test-webhook_Secret-42_0123456789ab\n");
         let telegram = telegram_with(&[
             ("TADA_TELEGRAM_MODE", "webhook"),
             (
@@ -557,7 +587,10 @@ mod tests {
         let UpdateSource::Webhook { secret, public_url } = telegram.source else {
             panic!("webhook mode gives a webhook source");
         };
-        assert_eq!(secret.expose_secret(), "test-webhook_Secret-42");
+        assert_eq!(
+            secret.expose_secret(),
+            "test-webhook_Secret-42_0123456789ab"
+        );
         assert_eq!(public_url.origin(), "https://tada.example.org");
 
         let errors = telegram_with(&[("TADA_TELEGRAM_MODE", "push")]).unwrap_err();
