@@ -232,6 +232,22 @@ async fn owner_sets_retention_admin_reads_member_forbidden() {
     assert_eq!(read, off);
 }
 
+/// A short period redacts data for good on the next run, so a stolen session older than 15 minutes cannot set it.
+#[tokio::test]
+async fn setting_the_periods_needs_a_recent_sign_in() {
+    let app = App::start().await;
+    let owner = app.member("Olga Owner", OrganizationRole::Owner).await;
+    app.app.clock.advance(jiff::SignedDuration::from_mins(16));
+
+    let (status, problem) = app.put(&owner, &change(json!(1), json!(1), 1)).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    assert_eq!(problem["code"], "recent-sign-in-required");
+    // The owner still reads the periods, and nothing changed.
+    let (status, read) = app.get(&owner).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(read, periods(Value::Null, Value::Null, 1));
+}
+
 #[tokio::test]
 async fn a_stale_version_conflicts() {
     let app = App::start().await;

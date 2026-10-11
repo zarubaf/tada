@@ -45,6 +45,8 @@ Export:
 - For a linked account it adds: the display name, the email address, the organization role, the event memberships and roles, the Telegram link, the sessions (created, last used, user agent), the API tokens (name and dates), the invitations to the email address, and the audit events where the user is actor or subject (IDs and actions).
 - It holds no secret and no token hash.
 - The audit log records `person.export`.
+- The export needs a sign-in of at most 15 minutes ago, as the redaction does ([ADR 0072](0072-legal-redaction-and-deletion-journal.md)).
+  The web client loads the file with a call, so that it can offer „Neu anmelden“ instead of a saved problem.
 
 Correction and dispute notes:
 

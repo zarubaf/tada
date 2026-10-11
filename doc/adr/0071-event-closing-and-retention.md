@@ -33,6 +33,9 @@ Retention settings:
 - Each period is empty (off) or a whole number from 1 to 120.
 - Retention is off until an owner sets a period. tada has no default.
 - Only an owner changes the periods.
+  The change needs a sign-in of at most 15 minutes ago, as an API token does ([ADR 0070](0070-ai-security-review-replaces-the-external-review.md)).
+  A short period redacts data for good on the next run, so a stolen older session must not set it.
+  The server answers `recent-sign-in-required`, and the web client offers „Neu anmelden“.
 - An owner or an admin reads them.
 - The audit log records `organization.set_retention`.
 - `GET /api/v1/organization/retention` reads the periods and the version.

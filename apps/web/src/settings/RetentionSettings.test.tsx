@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { type Api, createApi, type OrganizationRole } from "../api/client";
+import { Router } from "../router/Router";
+import { SessionProvider } from "../session/SessionProvider";
 import { LiveRegion } from "../ui/LiveRegion";
 import { RetentionSettings } from "./RetentionSettings";
 
@@ -34,6 +36,15 @@ function Harness({ api, role }: { api: Api; role: OrganizationRole }) {
 function setup(role: OrganizationRole, ...responses: (() => Response)[]) {
   const calls: { call: string; body: unknown }[] = [];
   const fetch = async (request: Request) => {
+    if (new URL(request.url).pathname === "/api/v1/session") {
+      // The session of the page, for the way to a new sign-in.
+      return json(200, {
+        user_id: "u1",
+        display_name: "Olga Owner",
+        organization: { organization_id: "o1", name: "Fliegergruppe Testwil", role },
+        memberships: [{ organization_id: "o1", name: "Fliegergruppe Testwil", role }],
+      });
+    }
     const text = request.method === "POST" ? await request.clone().text() : "";
     calls.push({
       call: `${request.method} ${new URL(request.url).pathname}`,
@@ -46,7 +57,13 @@ function setup(role: OrganizationRole, ...responses: (() => Response)[]) {
     return answer();
   };
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
-  render(<Harness api={api} role={role} />);
+  render(
+    <Router>
+      <SessionProvider api={api}>
+        <Harness api={api} role={role} />
+      </SessionProvider>
+    </Router>,
+  );
   return calls;
 }
 
@@ -141,6 +158,23 @@ describe("RetentionSettings", () => {
       source_months: 12,
       expected_version: 2,
     });
+  });
+
+  it("offers a new sign-in when the change needs a recent one", async () => {
+    const calls = setup(
+      "owner",
+      () => json(200, off),
+      () => problem(403, "recent-sign-in-required"),
+    );
+    await user.type(await closedField(), "1");
+
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Melden Sie sich für diesen Schritt neu an",
+    );
+    expect(screen.getByRole("button", { name: "Neu anmelden" })).toBeVisible();
+    expect(calls[1]?.call).toBe("POST /api/v1/organization/retention/set");
   });
 
   it("owner only: an admin reads the periods and cannot change them", async () => {

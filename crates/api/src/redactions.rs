@@ -111,6 +111,7 @@ async fn create_redaction(
         &targets,
         state.redaction.as_ref(),
         state.blobs.as_ref(),
+        state.clock.as_ref(),
     )
     .await?;
     if redacted.undeleted_objects > 0 {

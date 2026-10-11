@@ -24,6 +24,8 @@ const STATE_CHANGE: &[ProblemCode] = &[ProblemCode::Forbidden];
 pub(crate) const QUERY: &[ProblemCode] = &[ProblemCode::MalformedRequest];
 /// The codes of each operation with path parameters.
 pub(crate) const PATH: &[ProblemCode] = &[ProblemCode::MalformedRequest];
+/// An action that needs a sign-in of at most 15 minutes ago (ADR 0070).
+pub(crate) const RECENT_SIGN_IN: &[ProblemCode] = &[ProblemCode::RecentSignInRequired];
 
 /// The sorted union of code lists.
 pub(crate) fn codes(lists: &[&[ProblemCode]]) -> Vec<ProblemCode> {

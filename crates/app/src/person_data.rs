@@ -269,12 +269,17 @@ pub enum PersonDataError {
     Forbidden,
     #[error("the person does not exist")]
     NotFound,
+    /// The session of the caller is older than `session::RECENT_SIGN_IN`. The export holds all data about a
+    /// person, so a stolen session must not take it (ADR 0070).
+    #[error("the action needs a recent sign-in")]
+    RecentSignInRequired,
     #[error(transparent)]
     Store(#[from] StoreError),
 }
 
 impl PersonDataError {
-    /// All codes of the queries, for the API contract (ADR 0037).
+    /// All codes of the queries, for the API contract (ADR 0037). The export also answers
+    /// `recent-sign-in-required`.
     pub const CODES: &[ProblemCode] = &[
         ProblemCode::Forbidden,
         ProblemCode::NotFound,
@@ -288,6 +293,7 @@ impl CommandError for PersonDataError {
         match self {
             Self::Forbidden => ProblemCode::Forbidden,
             Self::NotFound => ProblemCode::NotFound,
+            Self::RecentSignInRequired => ProblemCode::RecentSignInRequired,
             Self::Store(error) => error.code(),
         }
     }
@@ -517,6 +523,9 @@ pub async fn export_person(
     clock: &dyn Clock,
 ) -> Result<PersonExport, PersonDataError> {
     let person = owned_person(caller, id, parties).await?;
+    if !caller.signed_in_recently(clock.now()) {
+        return Err(PersonDataError::RecentSignInRequired);
+    }
     let scope = caller.scope();
     let terms = mention_terms(&person);
     let audit = AuditEvent::new(

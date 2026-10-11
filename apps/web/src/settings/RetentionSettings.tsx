@@ -3,6 +3,7 @@ import { type Api, type OrganizationRole, problemMessage, type Retention } from 
 import { failureOf } from "../api/failure";
 import { hasMessage, t } from "../i18n";
 import { canManage } from "../members/roles";
+import { SignInAgain } from "../session/SignInAgain";
 import { Button } from "../ui/Button";
 import { firstInvalidField, useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
@@ -75,6 +76,8 @@ function Periods({
   const [texts, setTexts] = useState<Texts>({ closed_event_months: "", source_months: "" });
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
+  // A change of the periods needs a recent sign-in (ADR 0071): the form then offers a new one.
+  const [signInAgain, setSignInAgain] = useState(false);
   const form = useRef<HTMLFormElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const { retried, retry } = useRetry(() => document.getElementById("org-retention-title"));
@@ -121,6 +124,7 @@ function Periods({
       return;
     }
     setBusy(true);
+    setSignInAgain(false);
     try {
       const result = await api.POST("/api/v1/organization/retention/set", {
         body: { ...months, expected_version: state.retention.version },
@@ -145,6 +149,9 @@ function Periods({
         // Someone else changed the periods: the form shows the truth and the new version.
         await load();
         onFailure(t("org-retention-conflict"));
+      } else if (result.error?.code === "recent-sign-in-required") {
+        setSignInAgain(true);
+        onFailure(problemMessage(result.error));
       } else {
         onFailure(failureOf(result).message);
       }
@@ -211,6 +218,7 @@ function Periods({
           <p className={styles.help}>{t("org-retention-owner-only")}</p>
         )}
       </form>
+      {signInAgain && <SignInAgain />}
     </>
   );
 }

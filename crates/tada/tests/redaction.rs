@@ -65,7 +65,9 @@ impl World {
             .await;
         Self {
             event: event.parse().unwrap(),
-            owner: MemberCaller::new(user, organization, OrganizationRole::Owner),
+            // A session of a moment ago: a redaction needs a recent sign-in.
+            owner: MemberCaller::new(user, organization, OrganizationRole::Owner)
+                .with_sign_in(jiff::Timestamp::now()),
             test,
             garage,
             organization,
@@ -144,6 +146,7 @@ async fn member_and_admin_and_ai_cannot_redact() {
             &world.targets(),
             &world.test.database,
             &world.garage.storage,
+            &SystemClock,
         )
         .await;
         assert!(
@@ -157,12 +160,14 @@ async fn member_and_admin_and_ai_cannot_redact() {
         UserId::from_uuid(Uuid::now_v7()),
         other,
         OrganizationRole::Owner,
-    );
+    )
+    .with_sign_in(jiff::Timestamp::now());
     let result = redact(
         &stranger,
         &world.targets(),
         &world.test.database,
         &world.garage.storage,
+        &SystemClock,
     )
     .await;
     assert!(
@@ -187,6 +192,7 @@ async fn redaction_deletes_blob_after_commit() {
         &world.targets()[1..],
         &world.test.database,
         &world.garage.storage,
+        &SystemClock,
     )
     .await
     .unwrap();
@@ -213,6 +219,7 @@ async fn journal_object_written_by_worker() {
         &world.targets(),
         &world.test.database,
         &world.garage.storage,
+        &SystemClock,
     )
     .await
     .unwrap();
@@ -277,6 +284,7 @@ async fn replay_after_restore_redacts_again() {
         &world.targets(),
         &world.test.database,
         &world.garage.storage,
+        &SystemClock,
     )
     .await
     .unwrap();
@@ -500,6 +508,7 @@ async fn a_redacted_proposal_reads_through_the_api() {
         }],
         &world.test.database,
         &world.garage.storage,
+        &SystemClock,
     )
     .await
     .unwrap();
