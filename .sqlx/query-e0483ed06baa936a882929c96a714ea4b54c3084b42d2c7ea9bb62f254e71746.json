@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO digest_item\n                     (id, intent_id, organization_id, record_kind, record_id, record_version, reason, position)\n                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Int8",
+        "Text",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e0483ed06baa936a882929c96a714ea4b54c3084b42d2c7ea9bb62f254e71746"
+}

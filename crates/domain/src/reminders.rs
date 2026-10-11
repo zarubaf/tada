@@ -186,15 +186,31 @@ pub struct Rules {
     pub follow_up: u8,
 }
 
+impl Rules {
+    /// The rules of `policy` for a recipient in `zone` at `now`. Today is the date of `now` in `zone`, so both
+    /// agree.
+    pub fn new(policy: &PmPolicy, now: Timestamp, zone: EventTimeZone) -> Self {
+        Self {
+            today: now.to_zoned(tz_of(&zone)).date(),
+            now,
+            zone,
+            look_ahead: policy.look_ahead_working_days,
+            follow_up: policy.follow_up_working_days,
+        }
+    }
+
+    /// The last due date inside the look-ahead. A record due later is not due yet, unless it is blocked.
+    pub fn until(&self) -> Date {
+        add_working_days(self.today, self.look_ahead, WORKING_DAYS)
+    }
+}
+
 /// The reason to put a record in a digest, or `None` to leave it out.
 pub fn select(c: &Candidate, m: Option<&Memory>, r: &Rules) -> Option<Reason> {
     let overdue = c.due_date.is_some_and(|due| due < r.today);
     let base = if overdue {
         Reason::Overdue
-    } else if c
-        .due_date
-        .is_some_and(|due| due <= add_working_days(r.today, r.look_ahead, WORKING_DAYS))
-    {
+    } else if c.due_date.is_some_and(|due| due <= r.until()) {
         Reason::DueSoon
     } else if c.blocked {
         Reason::Blocked
@@ -340,6 +356,23 @@ mod tests {
             response_version: None,
             response_at: None,
         }
+    }
+
+    #[test]
+    fn rules_take_today_in_the_zone_of_the_recipient() {
+        let policy = PmPolicy::default();
+        // Wednesday 01:30 in Zurich is still Tuesday in New York.
+        let now = ts("2026-10-13T23:30:00Z");
+        let zurich = Rules::new(&policy, now, EventTimeZone::default_zone());
+        assert_eq!(zurich.today, date(2026, 10, 14));
+        assert_eq!(zurich.until(), date(2026, 10, 16));
+        let new_york = Rules::new(
+            &policy,
+            now,
+            EventTimeZone::parse("America/New_York").expect("test zone"),
+        );
+        assert_eq!(new_york.today, date(2026, 10, 13));
+        assert_eq!(new_york.until(), date(2026, 10, 15));
     }
 
     #[test]

@@ -63,6 +63,7 @@ mod members;
 mod outbound;
 mod parties;
 mod person_data;
+mod pm;
 mod pm_policy;
 mod privacy;
 mod proposals;

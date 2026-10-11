@@ -15,6 +15,7 @@ use tada_app::jobs::{Handlers, Ran, ScheduleRunner, run_next};
 use tada_app::mail::{MailTexts, Mailer};
 use tada_app::orphans;
 use tada_app::outbound::SendOutbound;
+use tada_app::pm::check::PmCheck;
 use tada_app::public_url::PublicUrl;
 use tada_app::rate_limit::WINDOW;
 use tada_app::redaction::WriteRedactionJournal;
@@ -46,11 +47,13 @@ pub fn handlers(
     public_url: PublicUrl,
     blobs: Arc<dyn BlobStore>,
 ) -> Handlers {
+    let pm_check = PmCheck::new(Arc::new(db.clone()), Arc::new(db.clone()), clock.clone());
     let send = SendOutbound::new(Arc::new(db.clone()), mailer, texts, clock, public_url);
     let journal = WriteRedactionJournal::new(Arc::new(db.clone()), blobs);
     Handlers::default()
         .with(Arc::new(send))
         .with(Arc::new(journal))
+        .with(Arc::new(pm_check))
 }
 
 pub async fn run(
