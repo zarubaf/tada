@@ -17,7 +17,7 @@ use axum::http::{Method, StatusCode, header};
 use jiff::{SignedDuration, Timestamp};
 use serde_json::{Value, json};
 use support::{SESSION_COOKIE, TestClock};
-use tada_app::ai_tools::AiToolPorts;
+use tada_ai_tools::AiToolPorts;
 use tada_app::caller::OrganizationRole;
 use tada_app::clock::Clock;
 use tada_app::domain::ids::UserId;

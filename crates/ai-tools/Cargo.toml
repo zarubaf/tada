@@ -1,0 +1,20 @@
+[package]
+name = "tada-ai-tools"
+description = "The tools of AI: the read tools and the proposal tool for MCP clients and agent runs (ADR 0010, ADR 0040)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tada-app.workspace = true
+async-trait.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true

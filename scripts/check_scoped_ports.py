@@ -35,7 +35,7 @@ TEST_MODULE = re.compile(r"#\[cfg\(test\)\]\s*(?:#\[[^\]]*\]\s*)*(?:pub\s+)?mod\
 # A port is a trait that a store or adapter implements to read or write data.
 # Every other `pub trait` in the app is listed here with its reason; all others are checked.
 NON_PORTS = {
-    "AiTool": "one tool of AI; it reaches data only through the ports, with an AiCaller",
+    "AiTool": "one tool of AI; the crate ai-tools implements it with the public ports and an AiCaller",
     "Authenticator": "turns a credential into a caller; it delegates the reads to the stores",
     "Clock": "reads the time, no data",
     "CommandError": "maps a command error to a problem code, no data access",

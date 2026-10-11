@@ -14,22 +14,22 @@ use uuid::Uuid;
 
 use super::events::EventInput;
 use super::{AiToolError, AiToolPorts, TypedTool, find_event};
-use crate::caller::AiCaller;
-use crate::dispute_notes::{DisputeNotes, NoteKey};
-use crate::domain::events::EventKey;
-use crate::domain::ids::{UserId, WorkstreamId};
-use crate::domain::parties::{Party, PartyName};
-use crate::domain::redaction::Redactable;
-use crate::domain::work::{
+use tada_app::caller::AiCaller;
+use tada_app::dispute_notes::{DisputeNotes, NoteKey};
+use tada_app::domain::events::EventKey;
+use tada_app::domain::ids::{UserId, WorkstreamId};
+use tada_app::domain::parties::{Party, PartyName};
+use tada_app::domain::redaction::Redactable;
+use tada_app::domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, WorkstreamName,
 };
-use crate::paging::PageLimit;
-use crate::parties::{self, InstitutionView, PersonView};
-use crate::records::{RecordEvidenceView, Shown};
-use crate::search::MAX_QUERY_CHARS;
-use crate::views::{DisputeNoteView, note_views};
-use crate::work::{self, ActionView, CommitmentView, WorkPorts, WorkQuery};
-use crate::workstreams::{self, Workstream};
+use tada_app::paging::PageLimit;
+use tada_app::parties::{self, InstitutionView, PersonView};
+use tada_app::records::{RecordEvidenceView, Shown};
+use tada_app::search::MAX_QUERY_CHARS;
+use tada_app::views::{DisputeNoteView, note_views};
+use tada_app::work::{self, ActionView, CommitmentView, WorkPorts, WorkQuery};
+use tada_app::workstreams::{self, Workstream};
 
 /// The input of the tools that list the actions of an event.
 #[derive(Deserialize, JsonSchema)]
@@ -450,7 +450,7 @@ fn check_query(q: &str) -> Result<(), AiToolError> {
         n if n > MAX_QUERY_CHARS => "too-long",
         _ => return Ok(()),
     };
-    Err(AiToolError::invalid("q", code))
+    Err(super::invalid("q", code))
 }
 
 pub(super) struct ListWorkstreams;

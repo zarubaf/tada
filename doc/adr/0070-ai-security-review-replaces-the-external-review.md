@@ -45,6 +45,7 @@ Paths are relative to the repository root.
 | Log redaction                  | `crates/tada/src/logging.rs`, `crates/api/src/request_id.rs`, `crates/tada/tests/support/logs.rs`                                                                               |
 | Wiring                         | `crates/tada/src/serve.rs`, the router in `crates/api/src/lib.rs`, `scripts/check_no_dev_auth.py`                                                                               |
 
+The tool files of the MCP row moved to `crates/ai-tools/src/` later; the review read them in `crates/mcp/src/`.
 The review also read the ADRs 0008, 0039, 0040, 0053, 0056, 0062 and 0065 and [asvs-coverage.md](../asvs-coverage.md).
 The review did not cover the passkeys (they do not exist yet), OAuth for MCP clients, the deployment, the event roles inside an event, or the web client except the sign-in pages.
 

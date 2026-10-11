@@ -51,7 +51,9 @@ allow-wildcard-paths = true
 # - The domain crate depends on no other tada crate.
 # - I/O crates are dependencies of adapter crates only.
 deny = [
-  { crate = "tada-app", wrappers = ["tada-store-pg", "tada-adapters", "tada-api", "tada-telegram", "tada-mcp", "tada"] },
+  { crate = "tada-app", wrappers = ["tada-store-pg", "tada-adapters", "tada-api", "tada-telegram", "tada-mcp", "tada-ai-tools", "tada"] },
+  # The AI tools use only the public interface of tada-app, so the compiler limits them to queries and proposals (ADR 0010).
+  { crate = "tada-ai-tools", wrappers = ["tada-mcp", "tada"] },
   # The integration tests of tada-store-pg use its own test database, through a dev-dependency on itself.
   { crate = "tada-store-pg", wrappers = ["tada", "tada-store-pg"] },
   { crate = "tada-adapters", wrappers = ["tada"] },

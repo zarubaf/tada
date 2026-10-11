@@ -7,8 +7,8 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use super::{AiToolError, AiToolPorts, TypedTool};
-use crate::caller::AiCaller;
-use crate::proposals::{self, Created, NewChangeset, ProposeStores};
+use tada_app::caller::AiCaller;
+use tada_app::proposals::{self, Created, NewChangeset, ProposeStores};
 
 /// The changeset that the member reviews.
 #[derive(Debug, Serialize, JsonSchema)]

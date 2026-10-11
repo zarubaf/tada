@@ -338,6 +338,7 @@ impl AiCaller {
 
     /// For the agent runner (ADR 0010): an agent run for `principal` with the rights of the `read` scope.
     /// The run reads what its member reads and proposes nothing.
+    /// When `app::agent` exists, it becomes `pub(in crate::agent)`, so no other module creates an agent caller.
     #[cfg_attr(
         not(test),
         expect(
