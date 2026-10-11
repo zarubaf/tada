@@ -234,7 +234,7 @@ async fn an_upgrade_keeps_the_concept_the_sources_the_relationships_and_the_old_
     );
 }
 
-/// The work records and parties of Slice 2a keep their values, and the new columns of migration 0026 start
+/// The work records and parties of Slice 2a keep their values, and the new columns of migrations 0026 and 0027 start
 /// with an active event, no retention and no redaction.
 #[tokio::test]
 async fn upgrade_from_0025_keeps_rows() {
@@ -271,6 +271,15 @@ async fn upgrade_from_0025_keeps_rows() {
         )
         .await,
         ["Anna Muster false true", "Berta Beispiel true true"]
+    );
+    // The columns of migration 0027 start with the zone of the club and no opt-in, and no digest is blocked.
+    assert_eq!(
+        text(
+            pool,
+            "SELECT u.time_zone || ' ' || (u.reminders_opt_in_at IS NULL) FROM app_user u ORDER BY u.display_name"
+        )
+        .await,
+        ["Europe/Zurich true", "Europe/Zurich true"]
     );
     let redacted: i64 = sqlx::query_scalar(
         "SELECT (SELECT count(*) FROM source_item WHERE redacted_at IS NOT NULL)
