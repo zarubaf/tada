@@ -46,8 +46,10 @@ pub struct AnthropicModel {
 
 impl AnthropicModel {
     pub fn new(config: AnthropicConfig) -> Result<Self, ModelError> {
+        // No redirects: `reqwest` would send the custom header `x-api-key` to the new host too.
         let client = reqwest::Client::builder()
             .timeout(config.call_timeout)
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|_| ModelError::Invalid("cannot build the HTTP client".to_owned()))?;
         Ok(Self {
@@ -76,6 +78,12 @@ impl AnthropicModel {
         // 529 is the overload answer of the API. Its body is not always JSON.
         if status.as_u16() == 429 || status.is_server_error() {
             return Err(ModelError::Temporary);
+        }
+        if status.is_redirection() {
+            return Err(ModelError::Invalid(format!(
+                "the API answered {} with a redirect, which the adapter does not follow",
+                status.as_u16()
+            )));
         }
         if !status.is_success() {
             // Only the error type: the message of the API can repeat the input.
@@ -550,6 +558,30 @@ mod tests {
             "{response:?}"
         );
         assert_eq!(fake.requests.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_redirect_is_an_error_and_the_key_stays_with_the_api() {
+        // The other host records each request that reaches it.
+        let (other, other_url) = fake_api(vec![ok(end_answer())]).await;
+        let location = format!("{other_url}/v1/messages");
+        let router = Router::new().route(
+            "/v1/messages",
+            post(move || {
+                let location = location.clone();
+                async move { (StatusCode::TEMPORARY_REDIRECT, [("location", location)]) }
+            }),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, router).await });
+
+        let response = model(&url, Duration::from_secs(5)).call(&request()).await;
+        assert!(
+            matches!(&response, Err(ModelError::Invalid(text)) if text.contains("307")),
+            "{response:?}"
+        );
+        assert!(other.requests.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
