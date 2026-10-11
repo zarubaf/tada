@@ -330,7 +330,7 @@ pub async fn readable_events(
 }
 
 /// The events that the member `user` with the organization role `role` can read now, for a job that acts
-/// without a caller, for example the daily check of the AI-PM. It is the rule of `readable_events`.
+/// without a caller, for example the daily check of the AI PM. It is the rule of `readable_events`.
 pub(crate) async fn readable_events_of(
     scope: OrgScope,
     user: UserId,

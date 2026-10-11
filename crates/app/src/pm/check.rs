@@ -1,4 +1,4 @@
-//! The daily check of the AI-PM (ADR 0076). It plans one digest for each eligible recipient of an organization,
+//! The daily check of the AI PM (ADR 0076). It plans one digest for each eligible recipient of an organization,
 //! with the due, overdue and blocked work of the recipient in all events, and queues its send.
 //!
 //! The check reads the state again in each run. A new worker process continues where the last one stopped:

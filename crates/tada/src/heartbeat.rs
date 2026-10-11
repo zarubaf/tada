@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use tada_app::build_info::Role;
+use tada_app::build_info::ProcessRole;
 use tada_store_pg::{Database, SchemaCheckError};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
@@ -36,7 +36,7 @@ pub struct Heartbeat {
 
 impl Heartbeat {
     /// Writes the heartbeat of `role` now and then every ten seconds.
-    pub fn start(db: &Database, role: Role) -> Self {
+    pub fn start(db: &Database, role: ProcessRole) -> Self {
         let id = Uuid::now_v7();
         let writer = db.clone();
         let task = tokio::spawn(async move {

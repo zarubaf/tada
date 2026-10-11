@@ -7,7 +7,7 @@ use anyhow::Context;
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
 use tada_app::blobs::BlobStore;
-use tada_app::build_info::Role;
+use tada_app::build_info::ProcessRole;
 use tada_app::caller::{JobRunner, ServiceCaller};
 use tada_app::clock::Clock;
 use tada_app::housekeeping::HousekeepingStore;
@@ -62,7 +62,7 @@ pub fn handlers(
 }
 
 pub async fn run(
-    // The AI settings are read and checked at start; the AI-PM digest uses them (ADR 0077).
+    // The AI settings are read and checked at start; the AI PM digest uses them (ADR 0077).
     (database, public_url, mail, smtp, storage, _ai): WorkerSettings,
 ) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
@@ -104,7 +104,7 @@ pub async fn run(
             _ = ticks.tick() => {}
         }
         if let Err(error) = db
-            .record_heartbeat(worker_id, Role::Worker, &crate::BUILD)
+            .record_heartbeat(worker_id, ProcessRole::Worker, &crate::BUILD)
             .await
         {
             tracing::warn!(%error, "the heartbeat failed");

@@ -5203,7 +5203,7 @@
         "properties": {
           "enabled": {
             "type": "boolean",
-            "description": "True if the organization switched the AI work on in its AI-PM policy."
+            "description": "True if the organization switched the AI work on in its AI PM policy."
           },
           "configured": {
             "type": "boolean",

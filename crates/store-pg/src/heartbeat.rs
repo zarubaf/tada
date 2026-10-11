@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use jiff::SignedDuration;
 use sqlx::types::Uuid;
-use tada_app::build_info::{BuildInfo, Role};
+use tada_app::build_info::{BuildInfo, ProcessRole};
 use tada_app::caller::MemberCaller;
 use tada_app::store::StoreError;
 use tada_app::system::{Heartbeat, VersionStore};
@@ -20,11 +20,11 @@ impl Database {
     pub async fn record_heartbeat(
         &self,
         worker_id: Uuid,
-        role: Role,
+        role: ProcessRole,
         build: &BuildInfo,
     ) -> Result<(), sqlx::Error> {
         let query = match role {
-            Role::Worker => sqlx::query!(
+            ProcessRole::Worker => sqlx::query!(
                 "INSERT INTO worker_heartbeat
                      (worker_id, started_at, last_loop_at, queue_depth, oldest_due_seconds, role, version, commit)
                  SELECT $1, now(), now(), count(*), extract(epoch FROM now() - min(run_at))::bigint, $2, $3, $4
@@ -39,7 +39,7 @@ impl Database {
                 build.version,
                 build.commit,
             ),
-            Role::Serve | Role::Telegram => sqlx::query!(
+            ProcessRole::Serve | ProcessRole::Telegram => sqlx::query!(
                 "INSERT INTO worker_heartbeat (worker_id, started_at, last_loop_at, role, version, commit)
                  VALUES ($1, now(), now(), $2, $3, $4)
                  ON CONFLICT (worker_id) DO UPDATE
@@ -136,8 +136,10 @@ mod tests {
         let test = TestDatabase::start().await;
         let (serve, worker) = (Uuid::now_v7(), Uuid::now_v7());
         let db = &test.database;
-        db.record_heartbeat(serve, Role::Serve, &NEW).await.unwrap();
-        db.record_heartbeat(worker, Role::Worker, &OLD)
+        db.record_heartbeat(serve, ProcessRole::Serve, &NEW)
+            .await
+            .unwrap();
+        db.record_heartbeat(worker, ProcessRole::Worker, &OLD)
             .await
             .unwrap();
 

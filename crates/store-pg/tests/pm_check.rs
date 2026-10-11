@@ -1,4 +1,4 @@
-//! The daily check of the AI-PM (ADR 0076): it plans one digest for each eligible owner, with the items of all
+//! The daily check of the AI PM (ADR 0076): it plans one digest for each eligible owner, with the items of all
 //! events of the organization, and queues its send at the end of the quiet hours of the recipient.
 
 #![allow(clippy::unwrap_used)]

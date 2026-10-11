@@ -33,7 +33,7 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
 /// The AI state of the organization.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AiStatus {
-    /// True if the organization switched the AI work on in its AI-PM policy.
+    /// True if the organization switched the AI work on in its AI PM policy.
     pub enabled: bool,
     /// True if the operator set up the model provider. Without it, no AI work runs.
     pub configured: bool,

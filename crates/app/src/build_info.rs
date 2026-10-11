@@ -14,13 +14,13 @@ pub struct BuildInfo {
 
 /// A process role of the binary. Each role writes a heartbeat with its name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Role {
+pub enum ProcessRole {
     Serve,
     Worker,
     Telegram,
 }
 
-impl Role {
+impl ProcessRole {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Serve => "serve",
@@ -36,7 +36,12 @@ mod tests {
 
     #[test]
     fn a_role_has_a_stable_name() {
-        let names = [Role::Serve, Role::Worker, Role::Telegram].map(Role::as_str);
+        let names = [
+            ProcessRole::Serve,
+            ProcessRole::Worker,
+            ProcessRole::Telegram,
+        ]
+        .map(ProcessRole::as_str);
         assert_eq!(names, ["serve", "worker", "telegram"]);
     }
 }

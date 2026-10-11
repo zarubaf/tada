@@ -107,7 +107,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use serde_json::json;
-    use tada_app::build_info::{BuildInfo, Role};
+    use tada_app::build_info::{BuildInfo, ProcessRole};
     use tada_app::jobs::{Handlers, JobFailed, JobHandler, JobWarning, Ran, run_next};
 
     use super::*;
@@ -327,7 +327,7 @@ mod tests {
         add(&test, &job("ping")).await;
         let worker = Uuid::now_v7();
         test.database
-            .record_heartbeat(worker, Role::Worker, &BUILD)
+            .record_heartbeat(worker, ProcessRole::Worker, &BUILD)
             .await
             .unwrap();
         let row = sqlx::query!(
@@ -348,7 +348,7 @@ mod tests {
         let serve = Uuid::now_v7();
         for _ in 0..2 {
             test.database
-                .record_heartbeat(serve, Role::Serve, &BUILD)
+                .record_heartbeat(serve, ProcessRole::Serve, &BUILD)
                 .await
                 .unwrap();
         }

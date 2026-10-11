@@ -1,4 +1,4 @@
-//! Rules for the reminders of the AI-PM: the policy, which records to remind and the answer buttons.
+//! Rules for the reminders of the AI PM: the policy, which records to remind and the answer buttons.
 //! Pure functions; the caller supplies the clock and the stored state.
 
 use jiff::Timestamp;
