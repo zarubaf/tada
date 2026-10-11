@@ -13,7 +13,7 @@ use axum::http::{Method, Request, StatusCode, header};
 use jiff::SignedDuration;
 use secrecy::ExposeSecret;
 use serde_json::{Value, json};
-use tada_app::ai_tools::AiToolPorts;
+use tada_ai_tools::AiToolPorts;
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::clock::Clock;
 use tada_app::domain::RecordVersion;

@@ -9,11 +9,11 @@ use uuid::Uuid;
 
 use super::events::EventInput;
 use super::{AiToolError, AiToolPorts, TypedTool, find_event};
-use crate::caller::AiCaller;
-use crate::documents::{self, DocumentReads};
-use crate::domain::ids::DocumentVersionId;
-use crate::paging::PageLimit;
-use crate::views::{DocumentList, DocumentSummaryView, DraftVersionView};
+use tada_app::caller::AiCaller;
+use tada_app::documents::{self, DocumentReads};
+use tada_app::domain::ids::DocumentVersionId;
+use tada_app::paging::PageLimit;
+use tada_app::views::{DocumentList, DocumentSummaryView, DraftVersionView};
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

@@ -8,14 +8,14 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::{AiToolError, AiToolPorts, TypedTool, find_event, no_input_schema};
-use crate::caller::AiCaller;
-use crate::domain::events::EventKey;
-use crate::events;
-use crate::facts;
-use crate::paging::PageLimit;
-use crate::search::{self, SearchRequest};
-use crate::sources::{self, PassageRequest};
-use crate::views::{
+use tada_app::caller::AiCaller;
+use tada_app::domain::events::EventKey;
+use tada_app::events;
+use tada_app::facts;
+use tada_app::paging::PageLimit;
+use tada_app::search::{self, SearchRequest};
+use tada_app::sources::{self, PassageRequest};
+use tada_app::views::{
     EventList, EventSchema, EventView, PassageView, ProfileView, SearchHitView, SearchResult,
 };
 

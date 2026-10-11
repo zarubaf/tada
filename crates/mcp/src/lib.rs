@@ -14,7 +14,7 @@ use axum::Router;
 use axum::middleware;
 use rmcp::transport::streamable_http_server::session::never::NeverSessionManager;
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
-use tada_app::ai_tools::AiToolPorts;
+use tada_ai_tools::AiToolPorts;
 use tada_app::public_url::PublicUrl;
 use tada_app::tokens::TokenAuthenticator;
 
