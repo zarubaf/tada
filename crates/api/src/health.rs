@@ -1,22 +1,24 @@
 //! `GET /healthz` and `GET /readyz` (ADR 0025). They are not part of the versioned API.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::get;
+use tada_app::health::DependencyCheck;
 use tokio::task::JoinSet;
-
-use crate::ApiState;
 
 /// A check that takes longer than this counts as a failure.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(2);
 
-pub(crate) fn routes() -> Router<ApiState> {
+/// The two routes over `dependencies`. Each process role with a listener serves them (ADR 0025).
+pub fn routes(dependencies: Vec<Arc<dyn DependencyCheck>>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
+        .with_state(Arc::from(dependencies))
 }
 
 /// The process runs.
@@ -25,9 +27,10 @@ async fn healthz() -> StatusCode {
 }
 
 /// Each dependency responds. The response names no dependency; the log does.
-async fn readyz(State(state): State<ApiState>) -> StatusCode {
+async fn readyz(State(dependencies): State<Arc<[Arc<dyn DependencyCheck>]>>) -> StatusCode {
     let mut checks = JoinSet::new();
-    for dependency in state.dependencies {
+    for dependency in dependencies.iter() {
+        let dependency = Arc::clone(dependency);
         checks.spawn(async move {
             match tokio::time::timeout(CHECK_TIMEOUT, dependency.check()).await {
                 Ok(Ok(())) => true,

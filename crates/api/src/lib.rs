@@ -11,7 +11,7 @@ mod event_members;
 mod events;
 mod extract;
 mod facts;
-mod health;
+pub mod health;
 mod json_schema;
 mod members;
 mod origin;
@@ -232,7 +232,7 @@ pub fn router_with(state: ApiState, web_root: Option<&Path>, adapters: Router) -
             state.clone(),
             request_id::track,
         ))
-        .merge(health::routes().with_state(state))
+        .merge(health::routes(state.dependencies))
         .layer(middleware::map_response(no_referrer))
 }
 
