@@ -6,6 +6,7 @@ import {
   ListBox,
   ListBoxItem,
   Popover,
+  Text,
 } from "react-aria-components";
 import { t } from "../i18n";
 import styles from "./ComboBox.module.css";
@@ -22,6 +23,8 @@ export interface ComboBoxProps {
   selectedKey: string | undefined;
   onSelectionChange: (id: string | undefined) => void;
   placeholder?: string;
+  /** Help below the input. */
+  help?: string;
   /** The options load: the list says so instead of „no result“. */
   isLoading?: boolean;
   /** The error below the input. It marks the input as invalid. */
@@ -40,6 +43,7 @@ export function ComboBox({
   selectedKey,
   onSelectionChange,
   placeholder,
+  help,
   isLoading,
   error,
 }: ComboBoxProps) {
@@ -64,6 +68,11 @@ export function ComboBox({
     >
       <Label className={styles.label}>{label}</Label>
       <Input className={styles.input} {...(placeholder === undefined ? {} : { placeholder })} />
+      {help && (
+        <Text slot="description" className={styles.help}>
+          {help}
+        </Text>
+      )}
       {error && <FieldError className={styles.error}>{error}</FieldError>}
       <Popover className={popover.popover}>
         <ListBox
