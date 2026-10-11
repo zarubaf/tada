@@ -455,6 +455,16 @@ impl MemberStore for Database {
         audit: &AuditEvent,
     ) -> Result<Option<Refusal>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
+        // The account first, then the membership: the order of an invitation acceptance, so the two
+        // cannot deadlock. A second removal of the same account in another organization waits here,
+        // and then its check for the last membership sees the first removal (ADR 0071).
+        // `FOR NO KEY UPDATE` lets the inserts of a foreign key to the account pass, for example the
+        // Telegram link of a confirmation that holds a row which the removal deletes later.
+        sqlx::query("SELECT 1 FROM app_user WHERE id = $1 FOR NO KEY UPDATE")
+            .bind(member.as_uuid())
+            .execute(&mut *tx)
+            .await
+            .map_err(store_error)?;
         let Some(locked) = lock_membership(&mut tx, scope, member, remover).await? else {
             return Ok(Some(Refusal::NotFound));
         };
@@ -1022,8 +1032,141 @@ mod tests {
         assert_eq!(ben_ended, None, "Ben is still a member of Musterhausen");
     }
 
+    /// Two owners of two organizations remove the same account at the same moment. The second removal
+    /// waits for the first, so the account still gets the end of its last membership (ADR 0071).
+    #[tokio::test]
+    async fn two_removals_of_one_account_at_once_mark_the_end_of_its_last_membership() {
+        let f = Fixture::start().await;
+        let anna = f.member("Anna Muster", OrganizationRole::Member).await;
+        let musterhausen = f.test.create_organization("musterhausen").await;
+        f.test
+            .add_membership(musterhausen, anna, OrganizationRole::Member)
+            .await;
+        let otto = f
+            .test
+            .create_user(
+                &DisplayName::parse("Otto Owner").unwrap(),
+                &Email::parse("otto@example.org").unwrap(),
+            )
+            .await;
+        f.test
+            .add_membership(musterhausen, otto, OrganizationRole::Owner)
+            .await;
+        let other = MemberCaller::new(otto, musterhausen, OrganizationRole::Owner);
+        let remove_in_musterhausen = async {
+            let audit = AuditEvent::new(
+                other.actor(),
+                AuditAction::OrganizationMembershipRemove,
+                Some(musterhausen.as_uuid()),
+                Some(other.scope()),
+            )
+            .about(anna);
+            f.db()
+                .remove(
+                    other.scope(),
+                    Remover::of(&other),
+                    anna,
+                    RecordVersion::FIRST,
+                    NOW.parse().unwrap(),
+                    &audit,
+                )
+                .await
+                .unwrap()
+        };
+        // Both removals start while another transaction holds the account, and wait for it.
+        let mut holder = f.db().pool.begin().await.unwrap();
+        sqlx::query("SELECT 1 FROM app_user WHERE id = $1 FOR UPDATE")
+            .bind(anna.as_uuid())
+            .execute(&mut *holder)
+            .await
+            .unwrap();
+        let release = async {
+            let waiting = "SELECT count(DISTINCT pid) FROM pg_locks WHERE NOT granted";
+            let wait_for_both = async {
+                while f.test.scalar::<i64>(waiting).await < 2 {
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                }
+            };
+            tokio::time::timeout(std::time::Duration::from_secs(30), wait_for_both)
+                .await
+                .expect("both removals wait for the account");
+            holder.commit().await.unwrap();
+        };
+        let (first, second, ()) = tokio::join!(f.remove(anna), remove_in_musterhausen, release);
+        assert_eq!((first, second), (None, None));
+        let ended = f
+            .test
+            .scalar::<bool>(&format!(
+                "SELECT membership_ended_at IS NOT NULL FROM app_user WHERE id = '{}'",
+                anna.as_uuid()
+            ))
+            .await;
+        assert!(ended, "the account has no membership left");
+    }
+
     /// A Telegram confirmation that runs at the same time as the removal cannot keep its link: the
     /// removal waits for the code row, and then the delete of the link sees the new link.
+    /// A confirmation that holds its code row and inserts the Telegram link while the removal waits for that row:
+    /// the insert takes a key share lock on the account, which the lock of the removal lets pass.
+    #[tokio::test]
+    async fn a_confirmation_inserts_its_link_while_a_removal_holds_the_account() {
+        let f = Fixture::start().await;
+        let anna = f.member("Anna Muster", OrganizationRole::Member).await;
+        let code = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO telegram_link_code
+                 (id, organization_id, user_id, code_hash, expires_at, claimed_by, claimed_name,
+                  claimed_at, accepted_at, created_at)
+             VALUES ($1, $2, $3, $4, now() + interval '10 minutes', 43, 'Anna', now(), now(), now())",
+        )
+        .bind(code)
+        .bind(f.scope().organization_id().as_uuid())
+        .bind(anna.as_uuid())
+        .bind(vec![8_u8; 32])
+        .execute(&f.db().pool)
+        .await
+        .unwrap();
+        let mut confirmation = f.db().pool.begin().await.unwrap();
+        sqlx::query("UPDATE telegram_link_code SET confirmed_at = now() WHERE id = $1")
+            .bind(code)
+            .execute(&mut *confirmation)
+            .await
+            .unwrap();
+
+        let removal = f.remove(anna);
+        let confirm = async {
+            // The removal holds the account and waits for the code row of the confirmation.
+            let waiting = "SELECT count(DISTINCT pid) FROM pg_locks WHERE NOT granted";
+            let wait_for_removal = async {
+                while f.test.scalar::<i64>(waiting).await < 1 {
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                }
+            };
+            tokio::time::timeout(std::time::Duration::from_secs(30), wait_for_removal)
+                .await
+                .expect("the removal waits for the code row");
+            let inserted = tokio::time::timeout(
+                std::time::Duration::from_secs(10),
+                sqlx::query(
+                    "INSERT INTO telegram_identity (telegram_user_id, user_id, linked_at) VALUES (43, $1, now())",
+                )
+                .bind(anna.as_uuid())
+                .execute(&mut *confirmation),
+            )
+            .await
+            .expect("the insert does not wait for the removal");
+            inserted.unwrap();
+            confirmation.commit().await.unwrap();
+        };
+        let (removed, ()) = tokio::join!(removal, confirm);
+        assert_eq!(removed, None);
+        assert_eq!(
+            f.count("SELECT count(*) FROM telegram_identity").await,
+            0,
+            "the link of the confirmation ends too"
+        );
+    }
+
     #[tokio::test]
     async fn a_removal_ends_a_telegram_link_that_a_confirmation_makes_at_the_same_time() {
         let f = Fixture::start().await;
