@@ -344,12 +344,30 @@ mod tests {
         );
     }
 
+    /// The tools that `tools/list` shows, in the order of their names.
+    fn listed() -> Vec<rmcp::model::Tool> {
+        Tools::all_tools().list_all()
+    }
+
     fn tool(name: &str) -> rmcp::model::Tool {
-        Tools::all_tools()
-            .list_all()
-            .into_iter()
-            .find(|tool| tool.name == name)
-            .unwrap()
+        listed().into_iter().find(|tool| tool.name == name).unwrap()
+    }
+
+    /// The tools that MCP clients see: the names, descriptions, schemas and hints.
+    /// A change of this list changes what each agent sees, so it must be a decision, not a side effect.
+    /// To accept a change, run the test with `TADA_UPDATE_SNAPSHOTS=1` and review the diff of the file.
+    #[test]
+    fn the_listed_tools_match_the_snapshot() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/tools.snapshot.json");
+        let listed = serde_json::to_string_pretty(&listed()).unwrap() + "\n";
+        if std::env::var_os("TADA_UPDATE_SNAPSHOTS").is_some() {
+            std::fs::write(path, &listed).unwrap();
+        }
+        let snapshot = std::fs::read_to_string(path).unwrap();
+        assert!(
+            listed == snapshot,
+            "the listed tools differ from {path}:\n{listed}"
+        );
     }
 
     fn property(tool_name: &str, name: &str) -> Value {
