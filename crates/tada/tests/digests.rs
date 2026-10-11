@@ -11,7 +11,6 @@ use std::sync::Arc;
 use jiff::Timestamp;
 use serde_json::{Value, json};
 use tada_adapters::fake_model::FakeModel;
-use tada_app::ai_cost::{AiSetup, Chf};
 use tada_app::caller::OrganizationRole;
 use tada_app::clock::Clock;
 use tada_app::domain::identity::{DisplayName, Email};
@@ -19,14 +18,14 @@ use tada_app::domain::ids::{EventId, OrganizationId, UserId};
 use tada_app::domain::reminders::CallbackData;
 use tada_app::jobs::Ran;
 use tada_app::messenger::{Button, SendOutcome};
-use tada_app::model::{AiLimits, Block, ModelError, ModelResponse, Stop, Usage};
+use tada_app::model::{Block, ModelError, ModelResponse, Stop, Usage};
 use tada_app::pm::send::DigestAi;
 use tada_app::pm::{PM_CHECK_JOB, SEND_DIGEST_JOB};
 use tada_store_pg::Database;
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
-use support::messenger::{FakeMessenger, Sent, digest_worker, run_one};
+use support::messenger::{FakeMessenger, Sent, digest_ai, digest_worker, run_all, run_one};
 
 /// Wednesday 16 September 2026, 10:30 in Zurich: a working day, outside the quiet hours, and in the past of the
 /// database clock, so the send job is due at once.
@@ -44,14 +43,6 @@ impl Clock for At {
 fn wednesday() -> Arc<dyn Clock> {
     Arc::new(At(WEDNESDAY.parse().unwrap()))
 }
-
-const LIMITS: AiLimits = AiLimits {
-    max_turns: 6,
-    max_cost: Chf::from_millirappen(5_000),
-    run_timeout: jiff::SignedDuration::from_secs(60),
-    call_timeout: jiff::SignedDuration::from_secs(20),
-    call_retries: 2,
-};
 
 /// One organization with one event and one recipient, Anna.
 struct World {
@@ -212,14 +203,7 @@ async fn run_jobs(
     ai: Option<DigestAi>,
     clock: Arc<dyn Clock>,
 ) -> Vec<Ran> {
-    let handlers = digest_worker(database, messenger, ai, clock);
-    let mut ran = Vec::new();
-    loop {
-        match run_one(database, &handlers).await {
-            Ran::Idle => return ran,
-            other => ran.push(other),
-        }
-    }
+    run_all(database, &digest_worker(database, messenger, ai, clock)).await
 }
 
 /// Plans the digest with the daily check and sends it with `messenger`.
@@ -231,19 +215,6 @@ async fn check_and_send(world: &World, messenger: Arc<FakeMessenger>, ai: Option
             .all(|ran| matches!(ran, Ran::Completed(_) | Ran::CompletedWithWarning(..))),
         "{ran:?}"
     );
-}
-
-/// The AI of a worker with the model `model`.
-fn ai(world: &World, model: Arc<FakeModel>) -> DigestAi {
-    DigestAi {
-        model,
-        cost: Arc::new(world.test.database.clone()),
-        setup: AiSetup {
-            configured: true,
-            default_cap: Chf::from_millirappen(2_500_000),
-        },
-        limits: LIMITS,
-    }
 }
 
 /// A final answer of the model with this wording.
@@ -691,7 +662,12 @@ async fn ai_off_sends_template() {
     }))]));
     let messenger = FakeMessenger::new(SendOutcome::Sent);
 
-    check_and_send(&world, messenger.clone(), Some(ai(&world, model.clone()))).await;
+    check_and_send(
+        &world,
+        messenger.clone(),
+        Some(digest_ai(&world.test.database, model.clone())),
+    )
+    .await;
 
     assert!(model.requests().is_empty(), "AI is off");
     let text = &messenger.sent()[0].text;
@@ -707,7 +683,12 @@ async fn model_error_sends_template() {
     let model = Arc::new(FakeModel::new([Err(ModelError::Temporary)]));
     let messenger = FakeMessenger::new(SendOutcome::Sent);
 
-    check_and_send(&world, messenger.clone(), Some(ai(&world, model.clone()))).await;
+    check_and_send(
+        &world,
+        messenger.clone(),
+        Some(digest_ai(&world.test.database, model.clone())),
+    )
+    .await;
 
     assert_eq!(model.requests().len(), 1);
     let sent = messenger.sent();
@@ -730,7 +711,12 @@ async fn ai_wording_is_sent_with_the_rule_buttons_and_no_person_data() {
     }))]));
     let messenger = FakeMessenger::new(SendOutcome::Sent);
 
-    check_and_send(&world, messenger.clone(), Some(ai(&world, model.clone()))).await;
+    check_and_send(
+        &world,
+        messenger.clone(),
+        Some(digest_ai(&world.test.database, model.clone())),
+    )
+    .await;
 
     let sent = messenger.sent();
     let text = &sent[0].text;
@@ -781,7 +767,12 @@ async fn digest_is_plain_text() {
     }))]));
     let messenger = FakeMessenger::new(SendOutcome::Sent);
 
-    check_and_send(&world, messenger.clone(), Some(ai(&world, model.clone()))).await;
+    check_and_send(
+        &world,
+        messenger.clone(),
+        Some(digest_ai(&world.test.database, model.clone())),
+    )
+    .await;
 
     let sent = messenger.sent();
     let text = &sent[0].text;

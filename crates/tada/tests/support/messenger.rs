@@ -112,3 +112,42 @@ pub async fn run_one(
     .await
     .unwrap()
 }
+
+/// Runs the due jobs with `handlers` until none is due, and returns what each run did.
+pub async fn run_all(
+    database: &tada_store_pg::Database,
+    handlers: &tada_app::jobs::Handlers,
+) -> Vec<tada_app::jobs::Ran> {
+    let mut ran = Vec::new();
+    loop {
+        match run_one(database, handlers).await {
+            tada_app::jobs::Ran::Idle => return ran,
+            other => ran.push(other),
+        }
+    }
+}
+
+/// The run limits of the `pm-digest` task with their defaults.
+pub const AI_LIMITS: tada_app::model::AiLimits = tada_app::model::AiLimits {
+    max_turns: 6,
+    max_cost: tada_app::ai_cost::Chf::from_millirappen(5_000),
+    run_timeout: jiff::SignedDuration::from_secs(60),
+    call_timeout: jiff::SignedDuration::from_secs(20),
+    call_retries: 2,
+};
+
+/// The AI of a worker on `database` with the model `model` and a cap of CHF 25 a month.
+pub fn digest_ai(
+    database: &tada_store_pg::Database,
+    model: Arc<tada_adapters::fake_model::FakeModel>,
+) -> tada_app::pm::send::DigestAi {
+    tada_app::pm::send::DigestAi {
+        model,
+        cost: Arc::new(database.clone()),
+        setup: tada_app::ai_cost::AiSetup {
+            configured: true,
+            default_cap: tada_app::ai_cost::Chf::from_millirappen(2_500_000),
+        },
+        limits: AI_LIMITS,
+    }
+}
