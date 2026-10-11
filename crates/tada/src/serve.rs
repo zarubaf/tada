@@ -7,8 +7,8 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::Router;
 use tada_adapters::clock::SystemClock;
-use tada_ai_tools::AiToolPorts;
 use tada_api::ApiState;
+use tada_app::ai_queries::{AiToolPorts, AiToolStores};
 use tada_app::session::SessionAuthenticator;
 use tada_app::tokens::TokenAuthenticator;
 use tada_mcp::McpState;
@@ -79,7 +79,7 @@ pub async fn run(
             Arc::new(SystemClock),
         )),
         public_url,
-        ports: AiToolPorts {
+        ports: AiToolPorts::new(AiToolStores {
             events: Arc::new(db.clone()),
             identity: Arc::new(db.clone()),
             facts: Arc::new(db.clone()),
@@ -90,7 +90,7 @@ pub async fn run(
             workstreams: Arc::new(db.clone()),
             parties: Arc::new(db.clone()),
             work: Arc::new(db.clone()),
-        },
+        }),
     };
 
     let router = routes(api, mcp, http.web_root.as_deref());

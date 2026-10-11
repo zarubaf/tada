@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use super::events::EventInput;
 use super::{AiToolError, AiToolPorts, TypedTool, find_event};
+use tada_app::ai_queries;
 use tada_app::caller::AiCaller;
-use tada_app::documents::{self, DocumentReads};
 use tada_app::domain::ids::DocumentVersionId;
 use tada_app::paging::PageLimit;
 use tada_app::views::{DocumentList, DocumentSummaryView, DraftVersionView};
@@ -20,15 +20,6 @@ use tada_app::views::{DocumentList, DocumentSummaryView, DraftVersionView};
 pub(super) struct DocumentVersionInput {
     /// The ID of a draft version, from `list_documents`.
     version_id: Uuid,
-}
-
-fn document_reads(ports: &AiToolPorts) -> DocumentReads<'_> {
-    DocumentReads {
-        identity: &*ports.identity,
-        documents: &*ports.documents,
-        facts: &*ports.facts,
-        sources: &*ports.sources,
-    }
 }
 
 /// The description of `list_documents`, with the page size of `app`.
@@ -61,15 +52,9 @@ impl TypedTool for ListDocuments {
         ports: &AiToolPorts,
     ) -> Result<DocumentList, AiToolError> {
         let event = find_event(caller, &input.event_key, ports).await?;
-        let page = documents::list_documents(
-            caller,
-            event.id,
-            None,
-            None,
-            PageLimit::LARGEST,
-            document_reads(ports),
-        )
-        .await?;
+        let page =
+            ai_queries::list_documents(caller, event.id, None, None, PageLimit::LARGEST, ports)
+                .await?;
         Ok(DocumentList {
             documents: page.items.iter().map(DocumentSummaryView::from).collect(),
             more: page.next.is_some(),
@@ -98,12 +83,8 @@ An upload version has no Markdown and is not found here."
         input: DocumentVersionInput,
         ports: &AiToolPorts,
     ) -> Result<DraftVersionView, AiToolError> {
-        let draft = documents::get_draft(
-            caller,
-            DocumentVersionId::from_uuid(input.version_id),
-            document_reads(ports),
-        )
-        .await?;
+        let id = DocumentVersionId::from_uuid(input.version_id);
+        let draft = ai_queries::get_draft(caller, id, ports).await?;
         Ok(DraftVersionView::from(&draft))
     }
 }

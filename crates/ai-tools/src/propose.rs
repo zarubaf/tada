@@ -7,8 +7,9 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use super::{AiToolError, AiToolPorts, TypedTool};
+use tada_app::ai_queries;
 use tada_app::caller::AiCaller;
-use tada_app::proposals::{self, Created, NewChangeset, ProposeStores};
+use tada_app::proposals::{Created, NewChangeset};
 
 /// The changeset that the member reviews.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -49,17 +50,7 @@ If a check fails, tada stores nothing: the result has isError, the problem code 
         input: NewChangeset,
         ports: &AiToolPorts,
     ) -> Result<ProposedChangeset, AiToolError> {
-        let stores = ProposeStores {
-            identity: &*ports.identity,
-            facts: &*ports.facts,
-            proposals: &*ports.proposals,
-            sources: &*ports.sources,
-            documents: &*ports.documents,
-            workstreams: &*ports.workstreams,
-            parties: &*ports.parties,
-            work: &*ports.work,
-        };
-        let created = proposals::create_changeset(caller, input, stores, &*ports.clock).await?;
+        let created = ai_queries::create_changeset(caller, input, ports).await?;
         let (changeset, existing) = match created {
             Created::New(changeset) => (changeset, false),
             Created::Existing(changeset) => (changeset, true),

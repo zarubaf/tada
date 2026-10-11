@@ -1,8 +1,10 @@
 //! The tools of AI (ADR 0010, ADR 0040): the read tools and the proposal tool of the `app` catalog.
 //! The MCP server shows them to the AI clients of members, and an agent run gives them to a model.
 //!
-//! This crate uses only the public interface of `app`. Each tool gets an `AiCaller`, and the compiler
-//! rejects a call of a command that does not take one, so a tool can only read and propose (ADR 0039).
+//! This crate uses only the public interface of `app`. Each tool gets an `AiCaller` and the opaque `AiToolPorts`.
+//! Code outside `app` cannot read the scope from a caller or a store from `AiToolPorts`, and `deny.toml` keeps
+//! the store and adapter crates out of this crate. So a tool holds no store, and it reaches data only through
+//! the functions of `app::ai_queries`, which read or propose (ADR 0010).
 //! The names are stable; the descriptions tell the agent the rules.
 
 mod documents;
@@ -18,37 +20,12 @@ use schemars::generate::SchemaSettings;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value, json};
+use tada_app::ai_queries::{self, AiToolPorts};
 use tada_app::ai_tools::{AiTool, AiToolError, ToolCatalog};
 use tada_app::caller::AiCaller;
-use tada_app::clock::Clock;
-use tada_app::documents::DocumentStore;
 use tada_app::domain::events::{Event, EventKey};
-use tada_app::events::{self as event_queries, EventStore};
-use tada_app::facts::FactStore;
-use tada_app::identity::IdentityStore;
-use tada_app::parties::PartyStore;
+use tada_app::events as event_queries;
 use tada_app::problem::{FieldError, ProblemCode};
-use tada_app::proposals::ProposalStore;
-use tada_app::sources::SourceStore;
-use tada_app::work::WorkStore;
-use tada_app::workstreams::WorkstreamStore;
-
-/// The ports that the tools read and propose through.
-#[derive(Debug, Clone)]
-pub struct AiToolPorts {
-    pub events: Arc<dyn EventStore>,
-    pub identity: Arc<dyn IdentityStore>,
-    pub facts: Arc<dyn FactStore>,
-    pub sources: Arc<dyn SourceStore>,
-    pub proposals: Arc<dyn ProposalStore>,
-    /// The documents that the document tools read and that draft proposals target.
-    pub documents: Arc<dyn DocumentStore>,
-    pub clock: Arc<dyn Clock>,
-    /// The workstreams, promisors and work records that proposals name.
-    pub workstreams: Arc<dyn WorkstreamStore>,
-    pub parties: Arc<dyn PartyStore>,
-    pub work: Arc<dyn WorkStore>,
-}
 
 /// All tools.
 pub fn standard_catalog() -> ToolCatalog<AiToolPorts> {
@@ -167,7 +144,7 @@ async fn find_event(
 ) -> Result<Event, AiToolError> {
     let key = EventKey::parse(key)
         .map_err(|error| invalid("event_key", event_queries::key_error_code(error)))?;
-    Ok(event_queries::find_event(caller, &key, &*ports.events, &*ports.identity).await?)
+    Ok(ai_queries::find_event(caller, &key, ports).await?)
 }
 
 #[cfg(test)]
