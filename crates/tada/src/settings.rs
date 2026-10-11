@@ -225,7 +225,7 @@ mod tests {
     use super::*;
     use tada_adapters::mail::SmtpTls;
 
-    use crate::settings::sections::{Ai, Database, Telegram, Uploads};
+    use crate::settings::sections::{Ai, Database, TelegramBot, TelegramGateway, Uploads};
     use tada_app::ai_cost::AiSetup;
     use tada_telegram::UpdateSource;
 
@@ -483,13 +483,29 @@ mod tests {
         );
     }
 
-    /// The `Telegram` section with a token file, and `extra`.
-    fn telegram_with(extra: &[(&str, &str)]) -> Result<Telegram, SettingsErrors> {
+    /// The Telegram sections with a token file, and `extra`. Returns the gateway section.
+    fn telegram_with(extra: &[(&str, &str)]) -> Result<TelegramGateway, SettingsErrors> {
         let token = secret_file("123:test-token\n");
         let path = token.path().to_str().unwrap().to_owned();
         let mut variables = vec![("TADA_TELEGRAM_BOT_TOKEN_FILE", path.as_str())];
         variables.extend_from_slice(extra);
-        load_from::<(Telegram,)>(&variables).map(|loaded| loaded.settings.0)
+        load_from::<(TelegramBot, TelegramGateway)>(&variables).map(|loaded| loaded.settings.1)
+    }
+
+    #[test]
+    fn the_bot_needs_only_its_token() {
+        let token = secret_file("123:test-token\n");
+        let path = token.path().to_str().unwrap();
+        // A webhook mode without its secret does not stop a role that only sends.
+        let bot = load_from::<(TelegramBot,)>(&[
+            ("TADA_TELEGRAM_BOT_TOKEN_FILE", path),
+            ("TADA_TELEGRAM_MODE", "webhook"),
+        ])
+        .unwrap()
+        .settings
+        .0;
+        assert_eq!(bot.bot_token.expose_secret(), "123:test-token");
+        assert_eq!(bot.api_url.as_str(), "https://api.telegram.org/");
     }
 
     #[test]
