@@ -317,7 +317,7 @@ const TELEGRAM_API_URL: Setting = Setting {
     kind: "URL",
     default: Some("https://api.telegram.org"),
     secret: false,
-    description: "The base URL of the Telegram Bot API. Tests set a local fake.",
+    description: "The base URL of the Telegram Bot API. Release builds accept only `https`, because each call carries the bot token. Tests set a local fake.",
 };
 
 const TELEGRAM_MODE: Setting = Setting {
@@ -382,7 +382,7 @@ impl Section for TelegramBot {
 
     fn read(source: &mut Source<'_>) -> Option<Self> {
         let bot_token = source.secret(&TELEGRAM_BOT_TOKEN);
-        let api_url = source.value(&TELEGRAM_API_URL);
+        let api_url = https_url(source, &TELEGRAM_API_URL);
         Some(Self {
             bot_token: bot_token?,
             api_url: api_url?,
@@ -784,7 +784,7 @@ impl Section for Ai {
 
     fn read(source: &mut Source<'_>) -> Option<Self> {
         let api_key = source.optional_secret(&MODEL_API_KEY);
-        let api_url = read_api_url(source);
+        let api_url = https_url(source, &MODEL_API_URL);
         let checked_on = read_checked_on(source);
         let default_cap = positive(source, &AI_DEFAULT_MONTHLY_CAP);
         let max_turns = positive(source, &AI_RUN_MAX_TURNS);
@@ -848,14 +848,11 @@ impl Section for AiSetup {
     }
 }
 
-/// The base URL of the model API. A release build sends the key only over TLS.
-fn read_api_url(source: &mut Source<'_>) -> Option<Url> {
-    let url: Url = source.value(&MODEL_API_URL)?;
+/// The base URL of an API whose calls carry a secret. A release build sends the secret only over TLS.
+fn https_url(source: &mut Source<'_>, setting: &'static Setting) -> Option<Url> {
+    let url: Url = source.value(setting)?;
     if cfg!(not(debug_assertions)) && url.scheme() != "https" {
-        source.error(
-            &MODEL_API_URL,
-            "must start with https:// in a release build",
-        );
+        source.error(setting, "must start with https:// in a release build");
         return None;
     }
     Some(url)
