@@ -520,6 +520,7 @@ mod tests {
             &self,
             _: OrgScope,
             _: &PmPolicy,
+            _: crate::jobs::ScheduleSpec,
             _: RecordVersion,
             _: &AuditEvent,
         ) -> Result<Option<RecordVersion>, StoreError> {

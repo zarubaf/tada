@@ -11,7 +11,7 @@ use tada_app::build_info::{BuildInfo, Role};
 use tada_app::caller::{JobRunner, ServiceCaller};
 use tada_app::clock::Clock;
 use tada_app::housekeeping::HousekeepingStore;
-use tada_app::jobs::{Handlers, Ran, ScheduleRunner, run_next};
+use tada_app::jobs::{Handlers, Ran, SCHEDULED_KINDS, ScheduleRunner, run_next};
 use tada_app::mail::{MailTexts, Mailer};
 use tada_app::orphans;
 use tada_app::outbound::SendOutbound;
@@ -186,10 +186,10 @@ pub async fn run(
         }
         // Durable schedules add their jobs before the drain, so a due run starts in this tick (ADR 0076).
         // An organization with the default policy gets its schedule first.
-        if let Err(error) = db.ensure_default_schedules().await {
+        if let Err(error) = tada_app::pm::ensure_default_check_schedules(&db).await {
             tracing::warn!(%error, "cannot add the default schedules");
         }
-        match db.start_due().await {
+        match db.start_due(SCHEDULED_KINDS).await {
             Ok(step) => {
                 if step.started > 0 {
                     tracing::info!(started = step.started, "the schedules started jobs");

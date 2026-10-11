@@ -11,9 +11,9 @@ use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::domain::reminders::PmPolicy;
-use tada_app::jobs::{ScheduleRunner, ScheduleStep};
-use tada_app::pm::PM_CHECK_JOB;
+use tada_app::jobs::{SCHEDULED_KINDS, ScheduleRunner, ScheduleStep};
 use tada_app::pm::policy::PmPolicyStore;
+use tada_app::pm::{PM_CHECK_JOB, PM_CHECK_SCHEDULE};
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
@@ -61,6 +61,7 @@ async fn organization_with_schedule(test: &TestDatabase, slug: &str) -> Organiza
         .set(
             caller.scope(),
             &PmPolicy::default(),
+            PM_CHECK_SCHEDULE,
             RecordVersion::FIRST,
             &audit(&caller),
         )
@@ -122,7 +123,10 @@ async fn two_runners_never_start_the_same_run() {
     }
     make_due(&test, "1 minute").await;
     let (first, second) = (test.connect(), test.connect());
-    let (a, b) = tokio::join!(first.start_due(), second.start_due());
+    let (a, b) = tokio::join!(
+        first.start_due(SCHEDULED_KINDS),
+        second.start_due(SCHEDULED_KINDS)
+    );
     assert_eq!(a.unwrap().started + b.unwrap().started, 12);
     // Each organization got one job, and the job names it.
     let per_organization: Vec<(Option<Uuid>, i64)> = sqlx::query_as(
@@ -138,7 +142,10 @@ async fn two_runners_never_start_the_same_run() {
         assert!(organizations.contains(&OrganizationId::from_uuid(organization.unwrap())));
     }
     // The runs moved on, so another step starts nothing.
-    assert_eq!(first.start_due().await.unwrap(), ScheduleStep::default());
+    assert_eq!(
+        first.start_due(SCHEDULED_KINDS).await.unwrap(),
+        ScheduleStep::default()
+    );
     assert_eq!(jobs(&test).await, 12);
 }
 
@@ -151,13 +158,27 @@ async fn missed_runs_start_once() {
     assert_eq!(last, None);
     // The worker was down for three weeks.
     make_due(&test, "21 days").await;
-    assert_eq!(test.database.start_due().await.unwrap().started, 1);
+    assert_eq!(
+        test.database
+            .start_due(SCHEDULED_KINDS)
+            .await
+            .unwrap()
+            .started,
+        1
+    );
     let now = Timestamp::now();
     assert_eq!(jobs(&test).await, 1);
     let (_, _, _, next, last) = schedule(&test, organization).await;
     assert!(next > now, "{next} must be after {now}");
     assert!(last.is_some_and(|last| last <= now));
-    assert_eq!(test.database.start_due().await.unwrap().started, 0);
+    assert_eq!(
+        test.database
+            .start_due(SCHEDULED_KINDS)
+            .await
+            .unwrap()
+            .started,
+        0
+    );
     assert_eq!(jobs(&test).await, 1);
 }
 
@@ -177,6 +198,7 @@ async fn policy_change_moves_the_schedule() {
         .set(
             caller.scope(),
             &saturday_evening(),
+            PM_CHECK_SCHEDULE,
             RecordVersion::new(2).unwrap(),
             &audit(&caller),
         )
@@ -217,6 +239,7 @@ async fn rolled_back_policy_leaves_schedule() {
         .set(
             caller.scope(),
             &saturday_evening(),
+            PM_CHECK_SCHEDULE,
             RecordVersion::FIRST,
             &audit(&caller),
         )
@@ -232,6 +255,7 @@ async fn rolled_back_policy_leaves_schedule() {
         .set(
             caller.scope(),
             &saturday_evening(),
+            PM_CHECK_SCHEDULE,
             RecordVersion::new(2).unwrap(),
             &audit(&elsewhere),
         )
@@ -254,6 +278,7 @@ async fn an_organization_without_a_policy_gets_the_default_schedule() {
         .set(
             caller.scope(),
             &saturday_evening(),
+            PM_CHECK_SCHEDULE,
             RecordVersion::new(2).unwrap(),
             &audit(&caller),
         )
@@ -268,7 +293,13 @@ async fn an_organization_without_a_policy_gets_the_default_schedule() {
         (PmPolicy::default(), RecordVersion::FIRST)
     );
 
-    assert_eq!(test.database.ensure_default_schedules().await.unwrap(), 1);
+    assert_eq!(
+        test.database
+            .ensure_default_schedules(PM_CHECK_SCHEDULE, &PmPolicy::default().schedule)
+            .await
+            .unwrap(),
+        1
+    );
     let (time, zone, weekdays, next, last) = schedule(&test, fresh).await;
     assert_eq!(
         (time, zone.as_str(), weekdays, last),
@@ -288,7 +319,13 @@ async fn an_organization_without_a_policy_gets_the_default_schedule() {
     assert_eq!(limit, 1);
     // The saved policy keeps its schedule, and a second call adds nothing.
     assert_eq!(schedule(&test, saved).await, saved_schedule);
-    assert_eq!(test.database.ensure_default_schedules().await.unwrap(), 0);
+    assert_eq!(
+        test.database
+            .ensure_default_schedules(PM_CHECK_SCHEDULE, &PmPolicy::default().schedule)
+            .await
+            .unwrap(),
+        0
+    );
 }
 
 #[tokio::test]
@@ -312,7 +349,7 @@ async fn a_bad_row_does_not_block_the_others() {
             "SELECT id FROM schedule WHERE organization_id = '{bad}'"
         ))
         .await;
-    let step = test.database.start_due().await.unwrap();
+    let step = test.database.start_due(SCHEDULED_KINDS).await.unwrap();
     assert_eq!(step.started, 1);
     assert_eq!(step.skipped, [(bad_id, "later-kind".to_owned())]);
     let job_organization: Uuid = test
@@ -330,7 +367,7 @@ async fn a_bad_row_does_not_block_the_others() {
         .await;
     assert!(moved);
     assert_eq!(
-        test.database.start_due().await.unwrap(),
+        test.database.start_due(SCHEDULED_KINDS).await.unwrap(),
         ScheduleStep::default()
     );
 }
@@ -350,6 +387,7 @@ async fn a_save_with_the_same_time_keeps_the_next_run() {
         .set(
             caller.scope(),
             &paused,
+            PM_CHECK_SCHEDULE,
             RecordVersion::new(2).unwrap(),
             &audit(&caller),
         )

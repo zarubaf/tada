@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use jiff::Timestamp;
 use serde_json::Value;
 use tada_domain::ids::OrganizationId;
+use tada_domain::schedule::LocalSchedule;
 use uuid::Uuid;
 
 use crate::store::StoreError;
@@ -69,6 +70,16 @@ pub trait JobQueue: Debug + Send + Sync {
     async fn fail(&self, job: &Job, worker_id: Uuid, reason: &str) -> Result<bool, StoreError>;
 }
 
+/// What a schedule row starts: the job kind and the most missed runs that one step starts (ADR 0076).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScheduleSpec {
+    pub kind: &'static str,
+    pub missed_run_limit: u8,
+}
+
+/// The job kinds that a schedule can start. A row of another kind cannot be read.
+pub const SCHEDULED_KINDS: &[&str] = &[crate::pm::PM_CHECK_JOB];
+
 /// What one scheduler step did.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ScheduleStep {
@@ -83,16 +94,21 @@ pub struct ScheduleStep {
 /// The database clock gives the current time (ADR 0054).
 #[async_trait]
 pub trait ScheduleRunner: Debug + Send + Sync {
-    /// Adds the default schedule of the daily check for each organization that has none, so that an
-    /// organization with the default policy gets its check too. Returns the number of new schedules.
+    /// Adds a schedule of `spec` at `schedule` for each organization that has no schedule of the kind and
+    /// no saved reminder policy. Returns the number of new schedules.
     /// Infrastructure query (ADR 0039): each organization without a schedule gets its own row.
-    async fn ensure_default_schedules(&self) -> Result<u32, StoreError>;
+    async fn ensure_default_schedules(
+        &self,
+        spec: ScheduleSpec,
+        schedule: &LocalSchedule,
+    ) -> Result<u32, StoreError>;
 
     /// Starts the jobs of each schedule whose next run has passed, and moves the schedule to its first
     /// run after now. One transaction for each schedule; another runner skips a schedule that this one
     /// holds, so no run starts twice. A schedule starts at most its limit of missed runs.
+    /// A schedule of a kind outside `kinds` cannot be read, and it moves one day forward.
     /// Infrastructure query (ADR 0039): starts due schedules of all organizations, and each job names its own.
-    async fn start_due(&self) -> Result<ScheduleStep, StoreError>;
+    async fn start_due(&self, kinds: &[&'static str]) -> Result<ScheduleStep, StoreError>;
 }
 
 /// The code that runs one kind of job. It calls `app` commands with a service caller (ADR 0039).
