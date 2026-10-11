@@ -15,7 +15,7 @@ use tada_app::domain::reminders::PmPolicy;
 use tada_app::jobs::{Job, JobHandler};
 use tada_app::pm::check::PmCheck;
 use tada_app::pm::policy::PmPolicyStore;
-use tada_app::pm::{PM_CHECK_JOB, SEND_DIGEST_JOB};
+use tada_app::pm::{PM_CHECK_JOB, PM_CHECK_SCHEDULE, SEND_DIGEST_JOB};
 use tada_store_pg::Database;
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
@@ -470,6 +470,7 @@ async fn paused_policy_plans_nothing() {
         .set(
             admin.scope(),
             &paused,
+            PM_CHECK_SCHEDULE,
             RecordVersion::FIRST,
             &AuditEvent::new(
                 admin.actor(),

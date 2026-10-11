@@ -10,16 +10,14 @@ use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::reminders::PmPolicy;
-use tada_app::pm::PM_CHECK_JOB;
+use tada_app::domain::schedule::LocalSchedule;
+use tada_app::jobs::ScheduleSpec;
 use tada_app::pm::policy::PmPolicyStore;
 use tada_app::store::StoreError;
 
 use crate::error::{InvalidRow, store_error};
 use crate::{Database, audit, schedules};
 use sqlx::PgPool;
-
-/// A missed daily check starts once: a worker that was down sends no burst of checks.
-const PM_CHECK_MISSED_RUN_LIMIT: u8 = 1;
 
 /// The columns of a row, in the order of `COLUMNS`.
 type Row = (
@@ -36,11 +34,14 @@ type Row = (
     i64,
 );
 
-/// Adds the schedule of the default policy for each organization without a policy and without a schedule.
-/// Returns the number of new schedules. A policy that an owner or admin saved keeps its own schedule.
-pub(crate) async fn ensure_default_schedules(pool: &PgPool) -> Result<u32, sqlx::Error> {
+/// Adds a schedule of `spec` at `schedule` for each organization without a policy and without a schedule of
+/// the kind. Returns the number of new schedules. A policy that an owner or admin saved keeps its own schedule.
+pub(crate) async fn ensure_default_schedules(
+    pool: &PgPool,
+    spec: ScheduleSpec,
+    schedule: &LocalSchedule,
+) -> Result<u32, sqlx::Error> {
     let mut tx = pool.begin().await?;
-    let schedule = PmPolicy::default().schedule;
     let next_run_at = schedule.next_after(schedules::database_now(&mut tx).await?);
     let added = sqlx::query(
         "INSERT INTO schedule
@@ -52,12 +53,12 @@ pub(crate) async fn ensure_default_schedules(pool: &PgPool) -> Result<u32, sqlx:
            AND NOT EXISTS (SELECT 1 FROM pm_policy p WHERE p.organization_id = o.id)
          ON CONFLICT (organization_id, kind) DO NOTHING",
     )
-    .bind(PM_CHECK_JOB)
+    .bind(spec.kind)
     .bind(schedule.time.to_sqlx())
     .bind(schedule.zone.as_str())
     .bind(i16::from(schedule.weekdays.bits()))
     .bind(next_run_at.to_sqlx())
-    .bind(i16::from(PM_CHECK_MISSED_RUN_LIMIT))
+    .bind(i16::from(spec.missed_run_limit))
     .execute(&mut *tx)
     .await?
     .rows_affected();
@@ -109,6 +110,7 @@ impl PmPolicyStore for Database {
         &self,
         scope: OrgScope,
         policy: &PmPolicy,
+        check: ScheduleSpec,
         expected: RecordVersion,
         event: &AuditEvent,
     ) -> Result<Option<RecordVersion>, StoreError> {
@@ -153,9 +155,9 @@ impl PmPolicyStore for Database {
         schedules::put(
             &mut tx,
             organization,
-            PM_CHECK_JOB,
+            check.kind,
             &policy.schedule,
-            PM_CHECK_MISSED_RUN_LIMIT,
+            check.missed_run_limit,
         )
         .await
         .map_err(store_error)?;

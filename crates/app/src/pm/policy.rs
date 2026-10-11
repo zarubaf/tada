@@ -13,6 +13,8 @@ use tada_domain::reminders::PmPolicy;
 use crate::access::Principal;
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
+use crate::jobs::ScheduleSpec;
+use crate::pm::PM_CHECK_SCHEDULE;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
 
@@ -22,13 +24,14 @@ pub trait PmPolicyStore: Debug + Send + Sync {
     /// The policy and its version. An organization without a stored policy has the defaults with version 1.
     async fn get(&self, scope: OrgScope) -> Result<(PmPolicy, RecordVersion), StoreError>;
 
-    /// Replaces the policy if it has the version `expected`, records `audit` and writes the schedule of the
-    /// daily check, all in one transaction. The schedule starts at the first slot after the database time.
-    /// Returns the new version, or `None` on a version conflict.
+    /// Replaces the policy if it has the version `expected`, records `audit` and writes the schedule `check`
+    /// of the daily check at the time of the policy, all in one transaction. The schedule starts at the first
+    /// slot after the database time. Returns the new version, or `None` on a version conflict.
     async fn set(
         &self,
         scope: OrgScope,
         policy: &PmPolicy,
+        check: ScheduleSpec,
         expected: RecordVersion,
         audit: &AuditEvent,
     ) -> Result<Option<RecordVersion>, StoreError>;
@@ -154,7 +157,7 @@ pub async fn set_pm_policy(
         Some(scope),
     );
     let version = store
-        .set(scope, &policy, expected_version, &audit)
+        .set(scope, &policy, PM_CHECK_SCHEDULE, expected_version, &audit)
         .await?
         .ok_or(PmPolicyError::VersionConflict)?;
     Ok((policy, version))
@@ -192,6 +195,7 @@ mod tests {
             &self,
             scope: OrgScope,
             policy: &PmPolicy,
+            _: ScheduleSpec,
             expected: RecordVersion,
             _: &AuditEvent,
         ) -> Result<Option<RecordVersion>, StoreError> {

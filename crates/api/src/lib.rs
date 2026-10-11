@@ -1671,6 +1671,7 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: &tada_app::domain::reminders::PmPolicy,
+            _: tada_app::jobs::ScheduleSpec,
             _: tada_app::domain::RecordVersion,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<Option<tada_app::domain::RecordVersion>, tada_app::store::StoreError> {

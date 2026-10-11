@@ -13,16 +13,12 @@ use sqlx::types::Uuid;
 use tada_app::domain::events::EventTimeZone;
 use tada_app::domain::ids::OrganizationId;
 use tada_app::domain::schedule::{Due, LocalSchedule, Weekdays};
-use tada_app::jobs::{NewJob, ScheduleRunner, ScheduleStep};
-use tada_app::pm::PM_CHECK_JOB;
+use tada_app::jobs::{NewJob, ScheduleRunner, ScheduleSpec, ScheduleStep};
 use tada_app::store::StoreError;
 
 use crate::error::{InvalidRow, store_error};
 use crate::jobs::enqueue;
 use crate::{Database, pm_policy};
-
-/// The job kinds that a schedule can start.
-const SCHEDULED_KINDS: &[&str] = &[PM_CHECK_JOB];
 
 /// One due schedule: ID, organization, kind, local time, time zone, weekdays, next run, missed-run limit.
 type DueRow = (
@@ -98,21 +94,24 @@ fn local_schedule(
     })
 }
 
-/// The kind of job and the runs of a due row, or the reason why the row cannot be read.
+/// The kind of `kinds` that a row names, or the reason why the row cannot be read.
+fn known_kind(kinds: &[&'static str], kind: &str) -> Result<&'static str, InvalidRow> {
+    kinds
+        .iter()
+        .copied()
+        .find(|known| *known == kind)
+        .ok_or(InvalidRow("schedule.kind"))
+}
+
+/// The runs of a due row, or the reason why the row cannot be read.
 fn plan(
-    kind: &str,
     time: jiff_sqlx::Time,
     zone: &str,
     weekdays: i16,
     next_run_at: Timestamp,
     limit: i16,
     now: Timestamp,
-) -> Result<(&'static str, Due), InvalidRow> {
-    let kind = SCHEDULED_KINDS
-        .iter()
-        .copied()
-        .find(|known| *known == kind)
-        .ok_or(InvalidRow("schedule.kind"))?;
+) -> Result<Due, InvalidRow> {
     let schedule = local_schedule(time, zone, weekdays)?;
     let limit = u16::try_from(limit).map_err(|_| InvalidRow("schedule.missed_run_limit"))?;
     let due = schedule.due(next_run_at, now, limit);
@@ -120,7 +119,7 @@ fn plan(
     if due.next_run_at <= now {
         return Err(InvalidRow("schedule.next_run_at"));
     }
-    Ok((kind, due))
+    Ok(due)
 }
 
 /// What `start_one` did with one row.
@@ -133,7 +132,7 @@ enum Started {
 impl Database {
     /// Starts the runs of one due schedule in one transaction. Returns `None` if no schedule is due.
     /// A row that cannot be read moves one day forward, so it does not block the rows after it.
-    async fn start_one(&self) -> Result<Option<Started>, StoreError> {
+    async fn start_one(&self, kinds: &[&'static str]) -> Result<Option<Started>, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         let now = database_now(&mut tx).await.map_err(store_error)?;
         let row: Option<DueRow> = sqlx::query_as(
@@ -150,15 +149,11 @@ impl Database {
         let Some((id, organization, kind, time, zone, weekdays, next_run_at, limit)) = row else {
             return Ok(None);
         };
-        let started = match plan(
-            &kind,
-            time,
-            &zone,
-            weekdays,
-            next_run_at.to_jiff(),
-            limit,
-            now,
-        ) {
+        let planned = known_kind(kinds, &kind).and_then(|known| {
+            let due = plan(time, &zone, weekdays, next_run_at.to_jiff(), limit, now)?;
+            Ok((known, due))
+        });
+        let started = match planned {
             Ok((kind, due)) => {
                 for _ in 0..due.runs {
                     let job = NewJob {
@@ -202,15 +197,19 @@ impl Database {
 
 #[async_trait]
 impl ScheduleRunner for Database {
-    async fn ensure_default_schedules(&self) -> Result<u32, StoreError> {
-        pm_policy::ensure_default_schedules(&self.pool)
+    async fn ensure_default_schedules(
+        &self,
+        spec: ScheduleSpec,
+        schedule: &LocalSchedule,
+    ) -> Result<u32, StoreError> {
+        pm_policy::ensure_default_schedules(&self.pool, spec, schedule)
             .await
             .map_err(store_error)
     }
 
-    async fn start_due(&self) -> Result<ScheduleStep, StoreError> {
+    async fn start_due(&self, kinds: &[&'static str]) -> Result<ScheduleStep, StoreError> {
         let mut step = ScheduleStep::default();
-        while let Some(started) = self.start_one().await? {
+        while let Some(started) = self.start_one(kinds).await? {
             match started {
                 Started::Jobs(jobs) => step.started += jobs,
                 Started::Skipped(id, kind) => step.skipped.push((id, kind)),
