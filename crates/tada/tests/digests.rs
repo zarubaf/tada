@@ -329,6 +329,26 @@ async fn sent_digest_has_the_items_their_buttons_and_records_the_notice() {
 }
 
 #[tokio::test]
+async fn blocked_action_has_no_blocked_button() {
+    let world = World::start().await;
+    world
+        .action("Festzelt aufstellen", "2026-09-14", "blocked")
+        .await;
+    let messenger = FakeMessenger::new(SendOutcome::Sent);
+
+    check_and_send(&world, messenger.clone(), None).await;
+
+    let sent = messenger.sent();
+    // A press of Blocked could not change a blocked action, so the row has On track, Done and Open.
+    let pressed: Vec<&str> = answers(&sent[0])
+        .iter()
+        .map(|data| data.answer.as_str())
+        .collect();
+    assert_eq!(pressed, vec!["on-track", "done"]);
+    assert_eq!(sent[0].rows[0].len(), 3);
+}
+
+#[tokio::test]
 async fn changed_due_date_removes_the_item() {
     let world = World::start().await;
     let moved = world.action("Flyer drucken", "2026-09-14", "open").await;

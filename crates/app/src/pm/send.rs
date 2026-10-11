@@ -19,6 +19,7 @@ use jiff::civil::Date;
 use tada_domain::RecordVersion;
 use tada_domain::ids::{DigestItemId, EventId, UserId};
 use tada_domain::reminders::{Answer, CallbackData, PmPolicy, Reason, RecordKind, Rules};
+use tada_domain::work::ActionStatus;
 use uuid::Uuid;
 
 use crate::access::readable_events_of;
@@ -471,6 +472,10 @@ impl SendDigest {
             .iter()
             .map(|kept| {
                 let answers: &[Answer] = match kept.item.kind {
+                    // A blocked action cannot change to blocked again, so it gets no such button.
+                    RecordKind::Action if kept.now.status == ActionStatus::Blocked.as_str() => {
+                        &[Answer::OnTrack, Answer::Done]
+                    }
                     RecordKind::Action => &[Answer::OnTrack, Answer::Blocked, Answer::Done],
                     RecordKind::Commitment => &[Answer::OnTrack, Answer::Fulfilled],
                 };

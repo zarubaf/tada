@@ -425,7 +425,8 @@ async fn stale_or_foreign_press_changes_nothing() {
 #[tokio::test]
 async fn invalid_transition_is_outdated() {
     let world = World::start().await;
-    let action = world.action("blocked").await;
+    // A done action cannot change to blocked.
+    let action = world.action("done").await;
     let item = world.digest("action", action, "sent", "1 hour").await;
 
     let text = world
@@ -434,7 +435,7 @@ async fn invalid_transition_is_outdated() {
         .await;
 
     assert!(text.contains(OUTDATED), "{text}");
-    assert_eq!(world.record("action", action).await, ("blocked".into(), 1));
+    assert_eq!(world.record("action", action).await, ("done".into(), 1));
     assert_eq!(world.response(action).await, (String::new(), String::new()));
 }
 
