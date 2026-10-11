@@ -602,7 +602,12 @@ async fn a_token_gives_an_ai_caller_for_its_member() {
     else {
         panic!("a token gives an AI caller");
     };
-    assert_eq!(caller.token_id(), created.token.id);
+    assert_eq!(
+        caller.origin(),
+        crate::caller::AiOrigin::Token {
+            token_id: created.token.id
+        }
+    );
     assert_eq!(caller.token_scope(), TokenScope::Propose);
     assert_eq!(crate::access::Principal::user_id(&caller), anna());
     assert_eq!(caller.organization_role(), Member);

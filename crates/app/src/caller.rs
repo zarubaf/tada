@@ -277,8 +277,17 @@ impl crate::access::Principal for MemberCaller {
     }
 }
 
-/// An AI client that acts for a member through a personal API token (ADR 0039).
-/// Only an `Authenticator` creates it.
+/// Where an AI caller comes from (ADR 0039).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AiOrigin {
+    /// An AI client that showed a personal API token, for example an MCP client.
+    Token { token_id: ApiTokenId },
+    /// An agent run of tada for one task, for example `pm-digest`, as the service identity `ai-pm`.
+    Agent { task: &'static str },
+}
+
+/// AI that acts for a member (ADR 0039): an AI client through a personal API token,
+/// or an agent run of tada. Only the token authenticator and the agent runner create it.
 ///
 /// It never gives its member back: code that has an `AiCaller` cannot call a command that takes
 /// a `MemberCaller`, for example the review of proposals. It has the rights of its member,
@@ -286,7 +295,7 @@ impl crate::access::Principal for MemberCaller {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AiCaller {
     principal: MemberCaller,
-    token_id: ApiTokenId,
+    origin: AiOrigin,
     scope: TokenScope,
 }
 
@@ -322,13 +331,29 @@ impl AiCaller {
                 request_id: None,
                 signed_in_at: None,
             },
-            token_id,
+            origin: AiOrigin::Token { token_id },
             scope,
         }
     }
 
+    /// For the agent runner (ADR 0010): an agent run for `principal` with the rights of the `read` scope.
+    /// The run reads what its member reads and proposes nothing.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the agent runner is the only caller and comes next"
+        )
+    )]
+    pub(crate) fn for_agent(principal: MemberCaller, task: &'static str) -> Self {
+        Self {
+            principal,
+            origin: AiOrigin::Agent { task },
+            scope: TokenScope::Read,
+        }
+    }
+
     /// Names the request of this caller, for the actor of audit records.
-    /// The channel is always `api-token`.
     #[must_use]
     pub fn with_request(self, request_id: Option<Uuid>) -> Self {
         Self {
@@ -337,23 +362,27 @@ impl AiCaller {
         }
     }
 
-    /// The AI client, for the member that it acts for, through the channel `api-token`.
+    /// The AI, for the member that it acts for: the token through the channel `api-token`,
+    /// or the service identity `ai-pm` through the channel `job`.
     pub fn actor(&self) -> Actor {
+        let (id, channel) = match self.origin {
+            AiOrigin::Token { token_id } => (token_id.as_uuid(), Channel::ApiToken),
+            AiOrigin::Agent { .. } => (AiPm::ID, AiPm::CHANNEL),
+        };
         Actor {
             kind: ActorKind::Ai,
-            id: self.token_id.as_uuid(),
+            id,
             principal: Some(self.principal.user_id.as_uuid()),
-            channel: Channel::ApiToken,
+            channel,
             request_id: self.principal.request_id,
         }
     }
 
-    /// The token that the client showed.
-    pub fn token_id(&self) -> ApiTokenId {
-        self.token_id
+    pub fn origin(&self) -> AiOrigin {
+        self.origin
     }
 
-    /// The scope of the token that the client showed.
+    /// The scope of the token that the client showed, or `read` for an agent run.
     pub fn token_scope(&self) -> TokenScope {
         self.scope
     }
@@ -466,6 +495,17 @@ impl ServiceCaller<JobRunner> {
     pub(crate) fn scope(&self, organization_id: OrganizationId) -> OrgScope {
         OrgScope(organization_id)
     }
+}
+
+/// The service identity `ai-pm`: the agent runs of tada (ADR 0039).
+/// It acts only as the origin of an `AiCaller`, for a member, never by itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AiPm;
+
+impl ServiceIdentity for AiPm {
+    const NAME: &'static str = "ai-pm";
+    const ID: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0006);
+    const CHANNEL: Channel = Channel::Job;
 }
 
 /// The service identity `bootstrap`: the command `tada bootstrap` (ADR 0036).
@@ -594,8 +634,31 @@ mod tests {
         assert_eq!(Principal::user_id(&ai), member().user_id());
         assert_eq!(Principal::scope(&ai), member().scope());
         assert_eq!(ai.organization_role(), OrganizationRole::Member);
-        assert_eq!(ai.token_id(), ApiTokenId::from_uuid(Uuid::from_u128(4)));
+        assert_eq!(
+            ai.origin(),
+            AiOrigin::Token {
+                token_id: ApiTokenId::from_uuid(Uuid::from_u128(4))
+            }
+        );
         assert_eq!(ai.token_scope(), TokenScope::Propose);
+    }
+
+    #[test]
+    fn an_agent_run_reads_for_its_member_as_the_ai_pm() {
+        use crate::access::Principal;
+        use crate::proposals::MayPropose;
+
+        let agent = AiCaller::for_agent(member(), "pm-digest");
+        assert_eq!(agent.origin(), AiOrigin::Agent { task: "pm-digest" });
+        assert_eq!(Principal::user_id(&agent), member().user_id());
+        assert_eq!(Principal::scope(&agent), member().scope());
+        assert_eq!(agent.token_scope(), TokenScope::Read);
+        assert!(!agent.credential_allows_proposals());
+        let actor = agent.actor();
+        assert_eq!(actor.kind(), ActorKind::Ai);
+        assert_eq!(actor.id(), AiPm::ID);
+        assert_eq!(actor.principal(), Some(Uuid::from_u128(1)));
+        assert_eq!(actor.channel(), Channel::Job);
     }
 
     #[test]
@@ -630,6 +693,7 @@ mod tests {
             Bootstrap::ID,
             Exporter::ID,
             RedactionReplay::ID,
+            AiPm::ID,
         ];
         assert!(ids.iter().enumerate().all(|(i, id)| !ids[..i].contains(id)));
         assert_eq!(JobRunner::NAME, "job-runner");
@@ -638,6 +702,7 @@ mod tests {
         assert_eq!(Exporter::CHANNEL, Channel::Cli);
         assert_eq!(RedactionReplay::NAME, "redaction-replay");
         assert_eq!(RedactionReplay::CHANNEL, Channel::Cli);
+        assert_eq!(AiPm::NAME, "ai-pm");
     }
 
     #[test]
