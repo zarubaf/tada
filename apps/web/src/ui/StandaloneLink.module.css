@@ -12,6 +12,11 @@
     text-underline-offset: var(--space-0-5);
   }
 
+  /* In a table row the cell gives the row height, so the link keeps only the 24 px target. */
+  .inRow {
+    min-height: var(--control-height-sm);
+  }
+
   .standalone:hover {
     text-decoration-thickness: 2px;
   }
