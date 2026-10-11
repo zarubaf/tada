@@ -119,6 +119,14 @@ id_type!(
     /// The ID of a dispute note (ADR 0073).
     DisputeNoteId
 );
+id_type!(
+    /// The ID of a PM schedule row.
+    ScheduleId
+);
+id_type!(
+    /// The opaque reference of one item in a digest. A button carries it (ADR 0038).
+    DigestItemId
+);
 
 /// Returns true if `uuid` can be the ID of a new record: a UUIDv7 (ADR 0038).
 pub fn is_record_id(uuid: Uuid) -> bool {

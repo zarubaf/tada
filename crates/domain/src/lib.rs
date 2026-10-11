@@ -11,6 +11,8 @@ pub mod name;
 pub mod parties;
 pub mod proposals;
 pub mod redaction;
+pub mod reminders;
+pub mod schedule;
 pub mod sources;
 pub mod work;
 
