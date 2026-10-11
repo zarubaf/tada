@@ -1,12 +1,11 @@
 -- Schedules, the AI-PM reminders and the use of the model API (Slice 2c).
 -- The migration only adds: the previous image still starts on the new schema (ADR 0006).
 
--- One recurring job of the worker. An organization has its own schedule; an empty organization is a schedule of
--- the installation. The worker runs a schedule when `next_run_at` has passed, and skips runs that are older
--- than `missed_run_limit` periods.
+-- One recurring job of the worker for one organization. The worker runs a schedule when `next_run_at` has
+-- passed, and skips runs that are older than `missed_run_limit` periods.
 CREATE TABLE schedule (
     id uuid PRIMARY KEY,
-    organization_id uuid REFERENCES organization (id),
+    organization_id uuid NOT NULL REFERENCES organization (id),
     kind text NOT NULL,
     local_time time NOT NULL,
     time_zone text NOT NULL,
@@ -17,7 +16,7 @@ CREATE TABLE schedule (
     missed_run_limit smallint NOT NULL CHECK (missed_run_limit >= 1),
     created_at timestamptz NOT NULL,
     updated_at timestamptz NOT NULL,
-    UNIQUE NULLS NOT DISTINCT (organization_id, kind)
+    UNIQUE (organization_id, kind)
 );
 CREATE INDEX schedule_next_run_at ON schedule (next_run_at);
 
