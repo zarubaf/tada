@@ -6,6 +6,7 @@ use jiff::Timestamp;
 use jiff::civil::Date;
 use jiff_sqlx::ToSqlx;
 use serde_json::json;
+use tada_app::access::EventReach;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::events::EventTimeZone;
@@ -19,6 +20,7 @@ use uuid::Uuid;
 
 use crate::Database;
 use crate::error::{InvalidRow, store_error};
+use crate::identity::organization_role;
 use crate::jobs::enqueue;
 
 fn version(value: i64, column: &'static str) -> Result<RecordVersion, InvalidRow> {
@@ -44,10 +46,11 @@ impl PmStore for Database {
     async fn recipients(&self, scope: OrgScope) -> Result<Vec<Recipient>, StoreError> {
         // A confirmed Telegram link is a `telegram_identity` row, as for the opt-in (`account_reminders`).
         // A canceled or failed digest does not count for the cooldown; a pending one does, so a retry of the
-        // check plans no second digest.
+        // check plans no second digest. The cooldown starts at the planning time: a send that waits for the end
+        // of the quiet hours must not push the digest of the next day out.
         let rows = sqlx::query!(
-            r#"SELECT u.id, u.time_zone,
-                      (SELECT max(coalesce(i.finished_at, i.created_at)) FROM outbound_intent i
+            r#"SELECT u.id, m.role, u.time_zone,
+                      (SELECT max(i.created_at) FROM outbound_intent i
                        WHERE i.organization_id = m.organization_id AND i.user_id = u.id
                          AND i.purpose = 'telegram-digest' AND i.status IN ('pending', 'sent', 'unknown'))
                           AS "last_digest_at: jiff_sqlx::Timestamp"
@@ -65,6 +68,7 @@ impl PmStore for Database {
             .map(|row| {
                 Ok(Recipient {
                     user_id: UserId::from_uuid(row.id),
+                    role: organization_role(&row.role)?,
                     zone: EventTimeZone::parse(&row.time_zone)
                         .map_err(|_| InvalidRow("app_user.time_zone"))?,
                     last_digest_at: row.last_digest_at.map(|at| at.to_jiff()),
@@ -77,8 +81,14 @@ impl PmStore for Database {
         &self,
         scope: OrgScope,
         user: UserId,
+        events: &EventReach,
         until: Date,
     ) -> Result<Vec<Candidate>, StoreError> {
+        // `None` is each event of the organization.
+        let events: Option<Vec<Uuid>> = match events {
+            EventReach::Organization => None,
+            EventReach::Events(events) => Some(events.iter().map(|id| id.as_uuid()).collect()),
+        };
         let rows = sqlx::query!(
             r#"SELECT kind AS "kind!", id AS "id!", version AS "version!",
                       due_date AS "due_date: jiff_sqlx::Date", blocked AS "blocked!"
@@ -87,6 +97,7 @@ impl PmStore for Database {
                    FROM action a
                    JOIN event e ON e.organization_id = a.organization_id AND e.id = a.event_id
                    WHERE a.organization_id = $1 AND a.owner_user_id = $2 AND e.status = 'active'
+                     AND ($4::uuid[] IS NULL OR a.event_id = ANY($4))
                      AND a.status IN ('open', 'in-progress', 'blocked')
                      AND (a.status = 'blocked' OR a.due_date <= $3)
                    UNION ALL
@@ -94,12 +105,14 @@ impl PmStore for Database {
                    FROM commitment c
                    JOIN event e ON e.organization_id = c.organization_id AND e.id = c.event_id
                    WHERE c.organization_id = $1 AND c.owner_user_id = $2 AND e.status = 'active'
+                     AND ($4::uuid[] IS NULL OR c.event_id = ANY($4))
                      AND c.status IN ('conditional', 'firm') AND c.due_date <= $3
                ) AS work
                ORDER BY due_date NULLS LAST, kind, id"#,
             scope.organization_id().as_uuid(),
             user.as_uuid(),
             until.to_sqlx() as _,
+            events.as_deref(),
         )
         .fetch_all(&self.pool)
         .await

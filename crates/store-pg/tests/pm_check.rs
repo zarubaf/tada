@@ -41,6 +41,7 @@ fn check(database: &Database, now: Timestamp) -> PmCheck {
     PmCheck::new(
         Arc::new(database.clone()),
         Arc::new(database.clone()),
+        Arc::new(database.clone()),
         Arc::new(At(now)),
     )
 }
@@ -93,7 +94,16 @@ async fn member(test: &TestDatabase, organization: OrganizationId) -> UserId {
     user
 }
 
-/// Adds an action of `owner` and returns its ID.
+/// Gives `user` the role event viewer in `event`, so the event is in the reach of a plain member (ADR 0052).
+async fn view(test: &TestDatabase, organization: OrganizationId, event: EventId, user: UserId) {
+    test.execute(&[&format!(
+        "INSERT INTO event_membership (organization_id, event_id, user_id, event_role, created_at)
+         VALUES ('{organization}', '{event}', '{user}', 'event-viewer', now()) ON CONFLICT DO NOTHING"
+    )])
+    .await;
+}
+
+/// Adds an action of `owner`, who can read the event, and returns its ID.
 async fn action(
     test: &TestDatabase,
     organization: OrganizationId,
@@ -102,6 +112,7 @@ async fn action(
     due: Option<&str>,
     status: &str,
 ) -> Uuid {
+    view(test, organization, event, owner).await;
     let id = Uuid::now_v7();
     let due = due.map_or("NULL".to_owned(), |due| format!("'{due}'"));
     test.execute(&[&format!(
@@ -115,7 +126,7 @@ async fn action(
     id
 }
 
-/// Adds a firm commitment of `owner` with a new promisor and returns its ID.
+/// Adds a firm commitment of `owner`, who can read the event, with a new promisor and returns its ID.
 async fn commitment(
     test: &TestDatabase,
     organization: OrganizationId,
@@ -123,6 +134,7 @@ async fn commitment(
     owner: UserId,
     due: &str,
 ) -> Uuid {
+    view(test, organization, event, owner).await;
     let id = Uuid::now_v7();
     let person = Uuid::now_v7();
     test.execute(&[
@@ -337,6 +349,79 @@ async fn check_respects_cooldown_after_restart() {
     assert_eq!(
         items(&test, second[0]).await,
         vec![("action".to_owned(), overdue, 2, "overdue".to_owned())]
+    );
+}
+
+#[tokio::test]
+async fn cooldown_starts_at_the_planning_time_not_at_the_send() {
+    let test = TestDatabase::start().await;
+    let organization = test.create_organization("testwil").await;
+    let event = test.create_event(organization, "FEST").await;
+    let new_york = recipient(&test, organization, "America/New_York").await;
+    action(
+        &test,
+        organization,
+        event,
+        new_york,
+        Some("2026-10-13"),
+        "open",
+    )
+    .await;
+    // 02:30 in New York: the send waits for 08:00 there, 12:00Z.
+    let wednesday = ts("2026-10-14T06:30:00Z");
+    run(&test.database, wednesday, organization).await;
+    let first = digests(&test, organization, new_york).await;
+    test.execute(&[&format!(
+        "UPDATE outbound_intent SET status = 'sent', finished_at = '2026-10-14T12:00:00Z' WHERE id = '{}'",
+        first[0]
+    )])
+    .await;
+
+    // The check of the next day is 18.5 hours after the send, but 24 hours after the planning.
+    run(&test.database, ts("2026-10-15T06:30:00Z"), organization).await;
+
+    assert_eq!(
+        digests(&test, organization, new_york).await.len(),
+        1,
+        "the recipient gets the digest of each working day"
+    );
+}
+
+#[tokio::test]
+async fn owner_without_access_to_the_event_gets_no_item_of_it() {
+    let test = TestDatabase::start().await;
+    let organization = test.create_organization("testwil").await;
+    let fest = test.create_event(organization, "FEST").await;
+    let markt = test.create_event(organization, "MARKT").await;
+    let anna = recipient(&test, organization, "Europe/Zurich").await;
+    action(&test, organization, fest, anna, Some("2026-10-12"), "open").await;
+    let kept = action(&test, organization, markt, anna, Some("2026-10-12"), "open").await;
+    // Anna left FEST but is still a member of the organization; she keeps the ownership (ADR 0063).
+    test.execute(&[&format!(
+        "DELETE FROM event_membership WHERE event_id = '{fest}' AND user_id = '{anna}'"
+    )])
+    .await;
+    // An admin reads each event without an event role.
+    let admin = recipient(&test, organization, "Europe/Zurich").await;
+    let admins = action(&test, organization, fest, admin, Some("2026-10-12"), "open").await;
+    test.execute(&[
+        &format!("UPDATE organization_membership SET role = 'admin' WHERE user_id = '{admin}'"),
+        &format!("DELETE FROM event_membership WHERE user_id = '{admin}'"),
+    ])
+    .await;
+
+    run(&test.database, ts(WEDNESDAY), organization).await;
+
+    let planned = digests(&test, organization, anna).await;
+    assert_eq!(
+        items(&test, planned[0]).await,
+        vec![("action".to_owned(), kept, 1, "overdue".to_owned())],
+        "no item of an event that the owner cannot read"
+    );
+    let planned = digests(&test, organization, admin).await;
+    assert_eq!(
+        items(&test, planned[0]).await,
+        vec![("action".to_owned(), admins, 1, "overdue".to_owned())]
     );
 }
 
