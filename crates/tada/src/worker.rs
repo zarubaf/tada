@@ -11,7 +11,7 @@ use tada_app::build_info::{BuildInfo, Role};
 use tada_app::caller::{JobRunner, ServiceCaller};
 use tada_app::clock::Clock;
 use tada_app::housekeeping::HousekeepingStore;
-use tada_app::jobs::{Handlers, Ran, run_next};
+use tada_app::jobs::{Handlers, Ran, ScheduleRunner, run_next};
 use tada_app::mail::{MailTexts, Mailer};
 use tada_app::orphans;
 use tada_app::outbound::SendOutbound;
@@ -174,6 +174,22 @@ pub async fn run(
                     tracing::warn!(%error, "cannot find the targets of the retention job");
                 }
             }
+        }
+        // Durable schedules add their jobs before the drain, so a due run starts in this tick (ADR 0076).
+        // An organization with the default policy gets its schedule first.
+        if let Err(error) = db.ensure_default_schedules().await {
+            tracing::warn!(%error, "cannot add the default schedules");
+        }
+        match db.start_due().await {
+            Ok(step) => {
+                if step.started > 0 {
+                    tracing::info!(started = step.started, "the schedules started jobs");
+                }
+                for (schedule_id, kind) in &step.skipped {
+                    tracing::warn!(%schedule_id, kind, "cannot read a schedule; it moved one day forward");
+                }
+            }
+            Err(error) => tracing::warn!(%error, "cannot start the due schedules"),
         }
         // Run the due jobs one at a time. The stop signal ends the loop between two jobs.
         loop {

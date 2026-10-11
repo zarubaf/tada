@@ -66,6 +66,8 @@ pub async fn run(
         tokens: Arc::new(db.clone()),
         privacy: Arc::new(db.clone()),
         retention: Arc::new(db.clone()),
+        pm_policy: Arc::new(db.clone()),
+        reminder_settings: Arc::new(db.clone()),
         parties: Arc::new(db.clone()),
         workstreams: Arc::new(db.clone()),
         work: Arc::new(db.clone()),

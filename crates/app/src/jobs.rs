@@ -69,6 +69,32 @@ pub trait JobQueue: Debug + Send + Sync {
     async fn fail(&self, job: &Job, worker_id: Uuid, reason: &str) -> Result<bool, StoreError>;
 }
 
+/// What one scheduler step did.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ScheduleStep {
+    /// The number of jobs that the step added.
+    pub started: u32,
+    /// The schedules that the step could not read, with their ID and kind. The step moved each one day
+    /// forward, so it does not block the others.
+    pub skipped: Vec<(Uuid, String)>,
+}
+
+/// The step of the worker loop that starts the jobs of due schedules (ADR 0076).
+/// The database clock gives the current time (ADR 0054).
+#[async_trait]
+pub trait ScheduleRunner: Debug + Send + Sync {
+    /// Adds the default schedule of the daily check for each organization that has none, so that an
+    /// organization with the default policy gets its check too. Returns the number of new schedules.
+    /// Infrastructure query (ADR 0039): each organization without a schedule gets its own row.
+    async fn ensure_default_schedules(&self) -> Result<u32, StoreError>;
+
+    /// Starts the jobs of each schedule whose next run has passed, and moves the schedule to its first
+    /// run after now. One transaction for each schedule; another runner skips a schedule that this one
+    /// holds, so no run starts twice. A schedule starts at most its limit of missed runs.
+    /// Infrastructure query (ADR 0039): starts due schedules of all organizations, and each job names its own.
+    async fn start_due(&self) -> Result<ScheduleStep, StoreError>;
+}
+
 /// The code that runs one kind of job. It calls `app` commands with a service caller (ADR 0039).
 #[async_trait]
 pub trait JobHandler: Debug + Send + Sync {

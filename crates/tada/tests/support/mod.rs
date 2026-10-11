@@ -94,6 +94,8 @@ pub fn api_state_on(
         tokens: database.clone(),
         privacy: database.clone(),
         retention: database.clone(),
+        pm_policy: database.clone(),
+        reminder_settings: database.clone(),
         parties: database.clone(),
         workstreams: database.clone(),
         work: database.clone(),

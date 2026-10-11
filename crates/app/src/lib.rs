@@ -1,6 +1,7 @@
 //! Domain commands, queries and ports. The only way to change accepted state.
 
 pub mod access;
+pub mod account_reminders;
 pub mod ai_queries;
 pub mod ai_tools;
 pub mod audit;
@@ -29,6 +30,7 @@ pub mod outbound;
 pub mod paging;
 pub mod parties;
 pub mod person_data;
+pub mod pm;
 pub mod privacy;
 pub mod problem;
 pub mod proposals;

@@ -62,6 +62,14 @@ const NOT_ORGANIZATION_SCOPED: &[(&str, &str)] = &[
         "A Telegram link belongs to the user, not to an organization, and the member removes only the own link.",
     ),
     (
+        "get_reminder_settings",
+        "The reminder settings belong to the user, not to an organization, and show only the own account.",
+    ),
+    (
+        "set_reminder_settings",
+        "The reminder settings belong to the user, not to an organization, and the member changes only the own account.",
+    ),
+    (
         "request_sign_in",
         "It names an email address before any session, and each address gets the same answer.",
     ),
@@ -722,6 +730,16 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
         "set_retention" => vec![post(
             api("/organization/retention/set".into()),
             json!({"closed_event_months": 24, "source_months": null, "expected_version": 1}),
+            Expect::Writes,
+        )],
+        // The reminder policy.
+        "get_pm_policy" => vec![get(api("/organization/pm-policy".into()), READS)],
+        "set_pm_policy" => vec![post(
+            api("/organization/pm-policy/set".into()),
+            json!({"local_time": "07:45", "time_zone": "Europe/Zurich", "weekdays": 31,
+                   "quiet_start": "20:00", "quiet_end": "08:00", "cooldown_hours": 20,
+                   "follow_up_working_days": 2, "look_ahead_working_days": 2,
+                   "paused": false, "ai_enabled": false, "expected_version": 1}),
             Expect::Writes,
         )],
         _ => return None,

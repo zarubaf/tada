@@ -32,6 +32,10 @@ Schedules:
   Older missed runs only move `last_run_at`.
   The `pm-check` schedule has the limit 1.
 - The command that creates or changes the policy writes the `pm-check` row in its own transaction.
+- Each tick, the worker adds the `pm-check` row of the default policy for each organization without a saved policy.
+  A saved policy keeps its own row.
+- A row that the step cannot read moves one day forward, and the worker logs its ID and kind.
+  It does not block the other rows.
 - The four existing sweeps stay on in-memory timers.
   A follow-up moves them to schedule rows.
 
@@ -53,6 +57,7 @@ Policy:
 - A pause stops new checks and cancels pending sends at send time.
 - A member opts in and sets a time zone on the own account.
   Both belong to the user, not to the membership.
+  The command has no `expected_version`, because only the member writes these settings (an exception to [ADR 0044](0044-api-conventions.md)).
   A user in two organizations gets two digests.
 - An eligible recipient is a current member who opted in, has a confirmed Telegram link that is not marked blocked, in an organization whose policy is not paused.
 

@@ -89,6 +89,10 @@ pub enum AuditAction {
     AppUserAnonymize,
     /// An owner added a dispute note to immutable evidence (ADR 0073). The event holds no text.
     DisputeNoteCreate,
+    /// An owner or admin changed the reminder policy of the organization (ADR 0076). The event holds no values.
+    OrganizationSetPmPolicy,
+    /// A user changed the own reminder settings: the opt-in and the time zone (ADR 0076). The event holds no values.
+    AccountSetReminders,
 }
 
 impl AuditAction {
@@ -141,6 +145,8 @@ impl AuditAction {
             Self::PersonExport => "person.export",
             Self::AppUserAnonymize => "app_user.anonymize",
             Self::DisputeNoteCreate => "dispute_note.create",
+            Self::OrganizationSetPmPolicy => "organization.set_pm_policy",
+            Self::AccountSetReminders => "account.set_reminders",
         }
     }
 
@@ -162,7 +168,8 @@ impl AuditAction {
         match self {
             Self::OrganizationCreate
             | Self::OrganizationSetPrivacyNotice
-            | Self::OrganizationSetRetention => "organization",
+            | Self::OrganizationSetRetention
+            | Self::OrganizationSetPmPolicy => "organization",
             Self::InvitationCreate
             | Self::InvitationRevoke
             | Self::InvitationAccept
@@ -198,7 +205,7 @@ impl AuditAction {
             Self::InstitutionCreate | Self::InstitutionChange | Self::InstitutionRedact => {
                 "institution"
             }
-            Self::AppUserAnonymize => "app_user",
+            Self::AppUserAnonymize | Self::AccountSetReminders => "app_user",
             Self::SourceItemRedact => "source_item",
             Self::FactVersionRedact => "fact_version",
             Self::DisputeNoteCreate => "dispute_note",
