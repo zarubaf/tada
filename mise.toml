@@ -64,7 +64,7 @@ run = "gitleaks git --redact --no-banner ."
 
 [tasks."check:scripts"]
 description = "Lint and format-check Python scripts"
-run = ["ruff check .", "ruff format --check .", "uv run --quiet scripts/test_check_data_inventory.py", "uv run --quiet scripts/test_check_css_layers.py", "uv run --quiet scripts/test_check_versions.py"]
+run = ["ruff check .", "ruff format --check .", "uv run --quiet scripts/test_check_data_inventory.py", "uv run --quiet scripts/test_check_css_layers.py", "uv run --quiet scripts/test_check_versions.py", "uv run --quiet scripts/test_eval_live.py"]
 
 [tasks."check:rust-format"]
 description = "Check Rust formatting"
