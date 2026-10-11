@@ -25,10 +25,24 @@
     color: var(--color-text-muted);
   }
 
-  /* A warning keeps the text color: its contrast is not enough for text on every background. */
-  .label[data-tone="warning"] {
+  /* A warning and a danger label have a box. */
+  .label[data-tone="warning"],
+  .label[data-tone="danger"] {
     padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
+  }
+
+  /*
+   * In a column, the box hangs to the left by its padding: its icon and its text start at the same
+   * left edge as those of a label without a box. Only the paint moves, not the layout.
+   */
+  .label[data-tone="warning"][data-column],
+  .label[data-tone="danger"][data-column] {
+    translate: calc(-1 * var(--space-1)) 0;
+  }
+
+  /* A warning keeps the text color: its contrast is not enough for text on every background. */
+  .label[data-tone="warning"] {
     background: var(--color-warning-subtle);
   }
 
@@ -37,8 +51,6 @@
   }
 
   .label[data-tone="danger"] {
-    padding: 0 var(--space-1);
-    border-radius: var(--radius-sm);
     background: var(--color-danger-subtle);
   }
 

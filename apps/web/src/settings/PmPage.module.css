@@ -1,0 +1,168 @@
+@layer components {
+  .page {
+    display: grid;
+    align-content: start;
+    gap: var(--space-8);
+  }
+
+  .header {
+    display: grid;
+    gap: var(--space-2);
+    max-width: 40rem;
+  }
+
+  .intro {
+    text-wrap: pretty;
+  }
+
+  /* The pause is the first control: it stops every message at once. While it is on, a banner says so. */
+  .pauseArea {
+    display: grid;
+    gap: var(--space-4);
+    max-width: 40rem;
+  }
+
+  /* The no-access state has the width of the header above it. */
+  .noAccess {
+    max-width: 40rem;
+  }
+
+  .pause,
+  .switchGroup {
+    display: grid;
+    gap: var(--space-1);
+    max-width: 40rem;
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-4);
+    max-width: 40rem;
+  }
+
+  /* The table of the digests uses the full content width (doc/design/layout-and-responsiveness.md). */
+  .digests {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lg);
+    text-wrap: balance;
+  }
+
+  .subheading {
+    font-size: var(--font-size-ui);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .form {
+    display: grid;
+    gap: var(--space-8);
+  }
+
+  .group {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  /* A time or a count needs no full row; its help keeps the width of the form. */
+  .short input {
+    max-width: 12rem;
+  }
+
+  .quiet {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 12rem));
+    gap: var(--space-4);
+  }
+
+  /* An input keeps its intrinsic width; in a narrow cell it must shrink with the cell. */
+  .quiet input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .days {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .legend {
+    margin-block-end: var(--space-1);
+    padding: 0;
+    font-weight: var(--font-weight-medium);
+  }
+
+  .dayList {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--space-4);
+  }
+
+  .error {
+    color: var(--color-danger);
+    font-size: var(--font-size-sm);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .facts {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: center;
+  }
+
+  .fact dt {
+    color: var(--color-text-muted);
+  }
+
+  .fact dd {
+    margin: 0;
+  }
+
+  .amount {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .capForm {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .help {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    text-wrap: pretty;
+  }
+
+  /* The help next to the table of the digests keeps the width of prose. */
+  .digests > .help {
+    max-width: 40rem;
+  }
+
+  /* Narrow (below the token --bp-medium): the label of a fact stands above its value. */
+  @media (width < 40rem) {
+    .fact {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-0-5);
+    }
+  }
+}

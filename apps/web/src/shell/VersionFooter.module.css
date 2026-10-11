@@ -6,9 +6,18 @@
     font-variant-numeric: tabular-nums;
     font-weight: var(--font-weight-regular);
     line-height: var(--line-height-sm);
+
+    /*
+     * The button has a border of 1 px (`border` in ui/Button.module.css) that the privacy link above
+     * has not: the text moves back by it, so that both texts start at the same left edge. No token
+     * holds the border width, so the value follows that border.
+     */
+    translate: -1px 0;
   }
 
+  /* The mono font has a taller line box: with the smallest line height it fits the line of 20 px. */
   .commit {
     font-family: var(--font-family-mono);
+    line-height: var(--line-height-xs);
   }
 }

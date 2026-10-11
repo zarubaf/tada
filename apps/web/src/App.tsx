@@ -59,6 +59,9 @@ const EventMembersPage = lazy(() =>
 const DocumentDiffPage = lazy(() =>
   import("./documents/DocumentDiffPage").then((module) => ({ default: module.DocumentDiffPage })),
 );
+const PmPage = lazy(() =>
+  import("./settings/PmPage").then((module) => ({ default: module.PmPage })),
+);
 const AccountPage = lazy(() =>
   import("./settings/AccountPage").then((module) => ({ default: module.AccountPage })),
 );
@@ -195,6 +198,11 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   <Route path="/settings/organization">
                     <SettingsRoute>
                       <OrganizationPage api={api} />
+                    </SettingsRoute>
+                  </Route>
+                  <Route path="/settings/ai-pm">
+                    <SettingsRoute>
+                      <PmPage api={api} />
                     </SettingsRoute>
                   </Route>
                   <Route path="/settings/account">
