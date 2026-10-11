@@ -372,6 +372,26 @@ impl CommandError for TelegramActError {
     }
 }
 
+/// The linked user of the Telegram account as a member of each organization of the user (ADR 0039).
+/// It reads the memberships at the time of the call, so a removed member gets none.
+pub async fn linked_members(
+    gateway: &ServiceCaller<TelegramGateway>,
+    account: TelegramUserId,
+    links: &dyn TelegramLinks,
+    identity: &dyn IdentityStore,
+) -> Result<Vec<MemberCaller>, TelegramActError> {
+    let user = links
+        .user_of(account)
+        .await?
+        .ok_or(TelegramActError::NotLinked)?;
+    Ok(identity
+        .memberships_of(user)
+        .await?
+        .into_iter()
+        .map(|membership| gateway.member(user, membership.organization_id, membership.role))
+        .collect())
+}
+
 /// The member for whom the gateway acts in the event `event_key` (ADR 0038, ADR 0039):
 /// the event of the linked user among the events with this key in the organizations of the user.
 /// The user needs an event role in the event, or an owner or admin role in its organization.
@@ -384,14 +404,10 @@ pub async fn member_for(
     identity: &dyn IdentityStore,
     events: &dyn EventStore,
 ) -> Result<MemberEvent, TelegramActError> {
-    let user = links
-        .user_of(account)
-        .await?
-        .ok_or(TelegramActError::NotLinked)?;
+    let callers = linked_members(gateway, account, links, identity).await?;
     let key = EventKey::parse(&event_key.to_uppercase()).map_err(|_| TelegramActError::NotFound)?;
     let mut found = Vec::new();
-    for membership in identity.memberships_of(user).await? {
-        let caller = gateway.member(user, membership.organization_id, membership.role);
+    for caller in callers {
         let Some(event) = events.find_by_key(caller.scope(), &key).await? else {
             continue;
         };
