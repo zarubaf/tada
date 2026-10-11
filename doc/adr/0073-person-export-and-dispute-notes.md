@@ -1,6 +1,6 @@
 # 0073. Person export and dispute notes
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-10
 
 ## Context

@@ -1,6 +1,6 @@
 # 0072. Legal redaction and deletion journal
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-10
 
 ## Context

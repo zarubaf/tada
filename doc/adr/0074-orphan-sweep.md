@@ -1,6 +1,6 @@
 # 0074. Orphan sweep of the object storage
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-10
 - Amends: [0009](0009-object-storage.md)
 
