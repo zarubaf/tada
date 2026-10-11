@@ -3703,6 +3703,7 @@ dependencies = [
  "tada-domain",
  "thiserror",
  "tokio",
+ "tracing",
  "url",
  "uuid",
 ]

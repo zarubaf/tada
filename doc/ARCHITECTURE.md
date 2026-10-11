@@ -115,9 +115,10 @@ The three daily sweeps are:
 ### The agent runner
 
 1. A task such as `pm-digest` gives the runner its model, prompt, tools and limits ([ADR 0077](adr/0077-agent-runner.md)).
-2. The runner calls the `Model` port and runs each tool call from the `app::ai_tools` catalog with an `AiCaller` ([ADR 0010](adr/0010-model-provider.md)).
+2. The runner calls the `Model` port and runs each tool call with an `AiCaller` that only `app::agent` builds ([ADR 0010](adr/0010-model-provider.md)).
+   The tools come from the `ai-tools` crate; the runner offers only the read tools that the task names.
 3. It stops at the first limit of turns, cost or time.
-   It records each step and the usage without free text.
+   It records the usage of each model call in `ai_usage` and writes a log event for each tool call, without free text.
 4. The caller checks the output.
    If the check fails or the AI is off or at its cap, the caller uses the template text.
 

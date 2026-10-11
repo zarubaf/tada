@@ -2,6 +2,7 @@
 
 pub mod access;
 pub mod account_reminders;
+pub mod agent;
 pub mod ai_cost;
 pub mod ai_queries;
 pub mod ai_tools;
