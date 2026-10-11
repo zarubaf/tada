@@ -77,6 +77,8 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "created_at",
             "membership_ended_at",
             "anonymized_at",
+            "time_zone",
+            "reminders_opt_in_at",
         ],
     ),
     exported(
@@ -87,7 +89,7 @@ pub(crate) const EXPORTED: &[Exported] = &[
     exported(
         "telegram_identity",
         Rows::OfUsers("user_id"),
-        &["telegram_user_id", "user_id", "linked_at"],
+        &["telegram_user_id", "user_id", "linked_at", "blocked_at"],
     ),
     exported(
         "organization_membership",
@@ -163,6 +165,60 @@ pub(crate) const EXPORTED: &[Exported] = &[
             "request_id",
             "created_at",
             "finished_at",
+        ],
+    ),
+    exported(
+        "pm_policy",
+        Rows::OfOrganization,
+        &[
+            "organization_id",
+            "local_time",
+            "time_zone",
+            "weekdays",
+            "quiet_start",
+            "quiet_end",
+            "cooldown_hours",
+            "follow_up_working_days",
+            "look_ahead_working_days",
+            "paused",
+            "ai_enabled",
+            "version",
+        ],
+    ),
+    exported(
+        "reminder_state",
+        Rows::OfOrganization,
+        &[
+            "organization_id",
+            "record_kind",
+            "record_id",
+            "user_id",
+            "notified_version",
+            "notified_at",
+            "response",
+            "response_version",
+            "response_at",
+        ],
+    ),
+    exported(
+        "ai_cap",
+        Rows::OfOrganization,
+        &["organization_id", "monthly_chf", "version"],
+    ),
+    exported(
+        "ai_usage",
+        Rows::OfOrganization,
+        &[
+            "id",
+            "organization_id",
+            "event_id",
+            "task",
+            "prompt_version",
+            "model_id",
+            "input_tokens",
+            "output_tokens",
+            "cost_chf",
+            "at",
         ],
     ),
     exported(
@@ -601,6 +657,18 @@ pub(crate) const NOT_EXPORTED: &[(&str, &str)] = &[
     (
         "telegram_update",
         "state of the installation, no organization data",
+    ),
+    (
+        "schedule",
+        "state of the worker; the next run is derived from the policy",
+    ),
+    (
+        "digest_item",
+        "delivery detail of an outbound intent: opaque button references, deleted with the intent",
+    ),
+    (
+        "ai_price",
+        "prices of the installation, no organization data",
     ),
     (
         "_sqlx_migrations",

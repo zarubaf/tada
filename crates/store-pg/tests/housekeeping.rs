@@ -346,6 +346,13 @@ async fn end_membership(test: &TestDatabase, user: UserId, ended_at: Timestamp) 
 /// Gives the account a row in each table that the anonymization empties, and an audit row.
 async fn fill_account(test: &TestDatabase, organization: Uuid, user: UserId) {
     let id = user.as_uuid();
+    sqlx::query(
+        "UPDATE app_user SET reminders_opt_in_at = now(), time_zone = 'Asia/Tokyo' WHERE id = $1",
+    )
+    .bind(id)
+    .execute(test.pool())
+    .await
+    .unwrap();
     sqlx::query("INSERT INTO telegram_identity (telegram_user_id, user_id, linked_at) VALUES ($1, $2, now())")
         .bind(i64::from(id.as_bytes()[15]) + 1000)
         .bind(id)
@@ -443,6 +450,21 @@ async fn account_without_membership_anonymized_after_90_days() {
         ))
         .await;
     assert_eq!(name, "entfernt");
+    // The reminder settings go with the account; the member who stays keeps them.
+    let settings = |user: UserId| {
+        format!(
+            "SELECT (reminders_opt_in_at IS NULL)::text || ' ' || time_zone FROM app_user WHERE id = '{}'",
+            user.as_uuid()
+        )
+    };
+    assert_eq!(
+        test.scalar::<String>(&settings(gone)).await,
+        "true Europe/Zurich"
+    );
+    assert_eq!(
+        test.scalar::<String>(&settings(recent)).await,
+        "false Asia/Tokyo"
+    );
     let anonymized: bool = test
         .scalar(&format!(
             "SELECT anonymized_at = '{NOW}'::timestamptz FROM app_user WHERE id = '{}'",

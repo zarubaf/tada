@@ -37,6 +37,12 @@ ALLOWED = {
     "fact": "The field and the current version number of one fact. The values are in `fact_version`.",
     "proposal_dependency": "Pairs of proposal IDs of one changeset. No content.",
     "local_id_counter": "The next number of an event-local ID kind, for example `QST`. No content.",
+    "schedule": "The kind, time of day, zone and next run of a recurring job. No person.",
+    "pm_policy": "The reminder settings of an organization: times, limits and switches. No person.",
+    "digest_item": "An opaque button reference, a record ID and version, and the reason. No free text, no person.",
+    "ai_price": "The price of a model for a period. No person.",
+    "ai_cap": "The monthly limit of the model API use of an organization. No person.",
+    "ai_usage": "The task, model, token counts and cost of one model call. No text, no person.",
     "organization_feature": "One switch of an organization and its version, for example `mcp-tokens`. No person.",
 }
 
@@ -45,6 +51,9 @@ ALLOWED = {
 ALLOWED_COLUMNS = {
     "worker_heartbeat.queue_depth": "The number of due jobs. No data about a person.",
     "worker_heartbeat.oldest_due_seconds": "The age of the oldest due job. No data about a person.",
+    "worker_heartbeat.role": "The role of the binary, for example worker. No data about a person.",
+    "worker_heartbeat.version": "The version of the binary. No data about a person.",
+    "worker_heartbeat.commit": "The commit of the binary. No data about a person.",
     "source_item.redacted_at": "The time of a legal redaction of the item (ADR 0072). No data about a person.",
 }
 
