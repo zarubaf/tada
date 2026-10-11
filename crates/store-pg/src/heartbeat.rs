@@ -9,6 +9,7 @@ use tada_app::store::StoreError;
 use tada_app::system::{Heartbeat, VersionStore};
 
 use crate::Database;
+use crate::database::applied_schema;
 use crate::error::store_error;
 
 impl Database {
@@ -68,13 +69,10 @@ impl Database {
 #[async_trait]
 impl VersionStore for Database {
     async fn schema_version(&self, _caller: &MemberCaller) -> Result<i64, StoreError> {
-        sqlx::query_scalar!(
-            r#"SELECT max(version) AS "version?" FROM _sqlx_migrations WHERE success"#
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map(|version| version.unwrap_or(0))
-        .map_err(store_error)
+        applied_schema(&self.pool)
+            .await
+            .map(|version| version.unwrap_or(0))
+            .map_err(store_error)
     }
 
     async fn running_heartbeats(

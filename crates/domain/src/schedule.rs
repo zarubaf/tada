@@ -44,7 +44,7 @@ pub(crate) fn tz_of(zone: &EventTimeZone) -> TimeZone {
 
 /// The instant of a civil time on a date. A gap moves the time forward and a fold takes the first
 /// occurrence (ADR 0038).
-fn instant(date: Date, time: Time, tz: &TimeZone) -> Option<Timestamp> {
+pub(crate) fn instant(date: Date, time: Time, tz: &TimeZone) -> Option<Timestamp> {
     tz.to_ambiguous_zoned(date.to_datetime(time))
         .compatible()
         .ok()

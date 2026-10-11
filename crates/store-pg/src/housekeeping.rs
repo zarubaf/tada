@@ -51,7 +51,7 @@ const FINISHED_INVITATIONS: [&str; 3] = [
 /// An account without membership is anonymized once, 90 days after its last membership ended.
 /// The membership check repeats here, so an account that joined again in the meantime stays.
 const ANONYMIZE: &str = "UPDATE app_user
-     SET display_name = $2, anonymized_at = $3, reminders_opt_in_at = NULL, time_zone = 'Europe/Zurich'
+     SET display_name = $2, anonymized_at = $3, reminders_opt_in_at = NULL, time_zone = DEFAULT
      WHERE anonymized_at IS NULL AND membership_ended_at < $1
        AND NOT EXISTS (SELECT 1 FROM organization_membership WHERE user_id = app_user.id)
      RETURNING id";
