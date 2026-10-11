@@ -30,13 +30,13 @@ pub fn routes(
     tada_api::health::routes(stores).merge(tada_telegram::routes(gateway, source))
 }
 
-pub async fn run((database, telegram, storage): TelegramSettings) -> anyhow::Result<()> {
+pub async fn run((database, bot, telegram, storage): TelegramSettings) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
     heartbeat::check_schema(&db).await?;
     let gateway = Arc::new(Gateway::new(
-        telegram.api_url.as_str(),
-        telegram.bot_token.expose_secret(),
+        bot.api_url.as_str(),
+        bot.bot_token.expose_secret(),
         Arc::new(db.clone()),
         Arc::new(SystemClock),
     ));

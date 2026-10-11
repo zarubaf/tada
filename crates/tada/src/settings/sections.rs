@@ -28,7 +28,7 @@ pub type ServeSettings = (Database, Http, Storage, PublicUrl, SignIn, Uploads, A
 /// The settings of `tada worker`.
 pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp, Storage, Ai);
 /// The settings of `tada telegram`.
-pub type TelegramSettings = (Database, Telegram, Storage);
+pub type TelegramSettings = (Database, TelegramBot, TelegramGateway, Storage);
 /// The settings of `tada bootstrap`.
 pub type BootstrapSettings = (Database, PublicUrl);
 /// The settings of `tada export` (ADR 0059).
@@ -280,11 +280,16 @@ impl Section for Storage {
     }
 }
 
-/// The Telegram gateway (ADRs 0011 and 0076).
+/// The Telegram bot client: what a role needs to call the Bot API (ADRs 0011 and 0076).
 #[derive(Debug)]
-pub struct Telegram {
+pub struct TelegramBot {
     pub bot_token: SecretString,
     pub api_url: Url,
+}
+
+/// The Telegram gateway: how the `telegram` role receives updates (ADRs 0011 and 0076).
+#[derive(Debug)]
+pub struct TelegramGateway {
     pub listen: SocketAddr,
     pub source: UpdateSource,
 }
@@ -355,11 +360,24 @@ fn is_webhook_secret(secret: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
 }
 
-impl Section for Telegram {
+impl Section for TelegramBot {
+    fn settings() -> Vec<&'static Setting> {
+        vec![&TELEGRAM_BOT_TOKEN, &TELEGRAM_API_URL]
+    }
+
+    fn read(source: &mut Source<'_>) -> Option<Self> {
+        let bot_token = source.secret(&TELEGRAM_BOT_TOKEN);
+        let api_url = source.value(&TELEGRAM_API_URL);
+        Some(Self {
+            bot_token: bot_token?,
+            api_url: api_url?,
+        })
+    }
+}
+
+impl Section for TelegramGateway {
     fn settings() -> Vec<&'static Setting> {
         vec![
-            &TELEGRAM_BOT_TOKEN,
-            &TELEGRAM_API_URL,
             &TELEGRAM_MODE,
             &TELEGRAM_WEBHOOK_SECRET,
             &PUBLIC_URL,
@@ -368,8 +386,6 @@ impl Section for Telegram {
     }
 
     fn read(source: &mut Source<'_>) -> Option<Self> {
-        let bot_token = source.secret(&TELEGRAM_BOT_TOKEN);
-        let api_url = source.value(&TELEGRAM_API_URL);
         let listen = source.value(&TELEGRAM_LISTEN);
         let mode: Option<TelegramMode> = source.value(&TELEGRAM_MODE);
         let update_source = match mode? {
@@ -392,8 +408,6 @@ impl Section for Telegram {
             }
         };
         Some(Self {
-            bot_token: bot_token?,
-            api_url: api_url?,
             listen: listen?,
             source: update_source?,
         })
