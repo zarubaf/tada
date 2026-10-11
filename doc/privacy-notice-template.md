@@ -23,9 +23,14 @@ This file does not repeat it.
 
 ## What the template covers
 
+The sections on the person features and the AI PM are a draft.
+The owner of the product approves the German text before it ships.
+It is not legal advice, and the club checks its own duties (ADR 0045).
+
 - The controller: the club.
 - The processors, as categories: operator, hosting, backups, mail and the model provider.
-  The template names no provider, except that the notice says Anthropic is the model provider.
+  The template names no hosting, backup or mail provider (ADR 0033).
+  It names Anthropic, because the model adapter supports only this provider (ADR 0077).
 - The purposes of the processing.
 - The categories of data, as in [the data inventory](data-inventory.md).
   They include the counters of sign-in attempts: keyed hashes of the email address and the IP address, kept for two hours at most.
@@ -67,9 +72,6 @@ This file does not repeat it.
 - The dispute note.
   When evidence must stay, an owner adds a note that the data is disputed.
   Each reader of the evidence sees the note, also in the AI clients of members.
-- The draft status of the person-feature and AI PM sections.
-  The owner of the product approves the German text.
-  It is not legal advice, and the club checks its own duties (ADR 0045).
 - The rights to access, correction and deletion, and the right to receive the data in a common format, with a contact.
 
 ## Placeholders

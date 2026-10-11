@@ -61,7 +61,7 @@ privacy-template =
 
     # Erinnerungen in Telegram
 
-    Der KI-Projektleiter von tada prüft zu festen Zeiten, welche Aufgaben und Zusagen fällig, überfällig oder blockiert sind.
+    Der AI-PM von tada prüft zu festen Zeiten, welche Aufgaben und Zusagen fällig, überfällig oder blockiert sind.
     Er sendet Erinnerungen nur an Mitglieder, die zugestimmt haben und ein bestätigtes Telegram-Konto verknüpft haben.
     Ohne Ihre Zustimmung sendet tada keine Erinnerungen.
     Sie können die Zustimmung jederzeit in tada zurücknehmen.
