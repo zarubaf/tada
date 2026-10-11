@@ -23,6 +23,7 @@ use tada_app::paging::PageLimit;
 use tada_app::parties::{self, InstitutionView, PersonView};
 use tada_app::problem::{FieldError, ProblemCode};
 use tada_app::records::{RecordEvidenceView, Shown};
+use tada_app::search::MAX_QUERY_CHARS;
 use tada_app::views::{DisputeNoteView, note_views};
 use tada_app::work::{self, ActionView, CommitmentView, WorkPorts, WorkQuery};
 use tada_app::workstreams::{self, Workstream};
@@ -30,9 +31,6 @@ use uuid::Uuid;
 
 use crate::errors::{ToolError, caller};
 use crate::tools::{EventInput, Tools};
-
-/// The longest search text: the limit of a name (ADR 0069).
-const MAX_QUERY_CHARS: usize = 200;
 
 /// The input of the tools that list the actions of an event.
 #[derive(Deserialize, JsonSchema)]
