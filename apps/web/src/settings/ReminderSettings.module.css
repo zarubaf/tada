@@ -1,0 +1,46 @@
+@layer components {
+  .section {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 40rem;
+  }
+
+  .title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lg);
+    text-wrap: balance;
+  }
+
+  .intro {
+    text-wrap: pretty;
+  }
+
+  /* The switch and the time zone are separate groups. */
+  .controls {
+    display: grid;
+    gap: var(--space-5);
+    margin-block-start: var(--space-1);
+  }
+
+  .optIn {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .help {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    text-wrap: pretty;
+  }
+
+  .link {
+    color: var(--color-accent-text);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .link:hover {
+    text-decoration-thickness: 2px;
+  }
+}

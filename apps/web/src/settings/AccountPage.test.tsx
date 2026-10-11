@@ -35,6 +35,9 @@ function setup(answer: () => Response) {
           })
         : json(200, session);
     }
+    if (key === "GET /api/v1/account/reminders") {
+      return json(200, { opted_in_at: null, time_zone: "Europe/Zurich", telegram_linked: false });
+    }
     if (key === "POST /api/v1/session/sign-out-everywhere") {
       const response = answer();
       signedOut = response.ok;

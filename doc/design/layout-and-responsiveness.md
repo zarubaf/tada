@@ -5,6 +5,7 @@ ADR 0023 defines the strategy. This document gives the layouts, the navigation a
 ## App shell
 
 The app shell has three layouts. The viewport width selects the layout.
+If the server runs another build than the web client, a Banner above the page asks the member to load the page again (ADR 0075).
 
 ### Narrow (below 40rem)
 
@@ -65,7 +66,9 @@ Sidebar, from top to bottom:
 3. „Portfolio“, „Meine Arbeit“ and „Eingang“.
 4. „Anlässe“: the events of the member, with the current event expanded:
    „Übersicht“, „Aufgaben“, „Register“, „Dokumente“ and „Personen“.
-5. At the bottom: „Einstellungen“ and the member menu.
+5. At the bottom: „Einstellungen“, „Datenschutz“, the build of the web client and the member menu.
+   The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
+   On narrow layouts, the member menu has the build.
 
 Rules:
 

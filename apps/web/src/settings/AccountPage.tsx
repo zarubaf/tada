@@ -10,9 +10,10 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { LiveRegion } from "../ui/LiveRegion";
 import { PageTitle } from "../ui/Page";
 import styles from "./OrganizationPage.module.css";
+import { ReminderSettings } from "./ReminderSettings";
 
 /**
- * „Konto“ in the settings: the own sessions of the member. „Überall abmelden“ ends all sessions of
+ * „Konto“ in the settings: the reminders and the own sessions of the member. „Überall abmelden“ ends all sessions of
  * the member, in each organization, the current one included: the remedy for a lost device or a
  * stolen session. The member then signs in again with a magic link.
  */
@@ -22,6 +23,7 @@ export function AccountPage({ api }: { api: Api }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string>();
+  const [confirmation, setConfirmation] = useState<string>();
 
   const signOutEverywhere = async () => {
     if (busy) {
@@ -48,9 +50,13 @@ export function AccountPage({ api }: { api: Api }) {
   return (
     <div className={styles.page}>
       <LiveRegion kind="alert">{failure}</LiveRegion>
-      <section className={styles.section} aria-labelledby="account-title">
-        <PageTitle id="account-title">{t("account-title")}</PageTitle>
-        <h2 className={styles.heading}>{t("account-sessions-title")}</h2>
+      <LiveRegion kind="status">{confirmation}</LiveRegion>
+      <PageTitle id="account-title">{t("account-title")}</PageTitle>
+      <ReminderSettings api={api} onStatus={setConfirmation} onFailure={setFailure} />
+      <section className={styles.section} aria-labelledby="account-sessions-title">
+        <h2 id="account-sessions-title" className={styles.heading}>
+          {t("account-sessions-title")}
+        </h2>
         <p>{t("account-sessions-text")}</p>
         <div>
           <Button variant="danger" onPress={() => setConfirming(true)}>

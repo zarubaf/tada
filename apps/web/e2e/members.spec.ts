@@ -177,7 +177,7 @@ for (const viewport of viewports) {
       if (role === "owner") {
         await expect(page.getByRole("table")).toHaveCount(2);
       }
-      await expect(page.getByRole("status")).toHaveCount(1);
+      await expect(page.getByRole("main").getByRole("status")).toHaveCount(1);
 
       expect(await textOverflows(page)).toEqual([]);
     });
