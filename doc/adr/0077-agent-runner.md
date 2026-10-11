@@ -97,7 +97,8 @@ Cost control:
 Task `pm-digest`:
 
 - The input is the item list (opaque reference, kind, title, event name, due date, status, reason), the locale and today's date.
-  It holds no person names.
+  It holds no name from the person records, no ID and no source text.
+  A title and an event name are free text that members write, so they can contain a name.
 - Prompt version 1 offers no tools.
   The read tools return person names, IDs, quotes and notes of all records of an event, and the digest needs none of them ([ADR 0045](0045-data-protection.md)).
   A later version can add a digest projection in `app::ai_queries` that returns only the records of the digest, without names, IDs or free text.

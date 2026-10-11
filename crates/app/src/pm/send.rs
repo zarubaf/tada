@@ -355,7 +355,8 @@ impl SendDigest {
     }
 
     /// The AI wording of `items`, or `None` for the template: AI is not allowed, or the run failed or its answer
-    /// failed the checks. The model gets the items only, without a person name, an ID or a description.
+    /// failed the checks. The model gets the items only, without a name from the person records, an ID or a
+    /// description. A title or an event name is free text and can still name a person.
     async fn wording(
         &self,
         scope: OrgScope,

@@ -1,10 +1,11 @@
 //! The AI wording of a digest (ADR 0077, task `pm-digest`).
 //!
 //! The model gets the items of the digest, the locale and the date, and writes an intro and one line for each
-//! item. The items hold no person names. Prompt version 1 offers no tools: the read tools return names, IDs and
-//! source quotes of the whole event, and the digest needs none of them (ADR 0045). The wording only replaces
-//! text: the items and their buttons always come from the rules. A wording that fails `check_wording` is not
-//! used, and the caller sends the template.
+//! item. The items hold no name from the person records and no ID; a title or an event name is free text that
+//! members write, so it can still name a person. Prompt version 1 offers no tools: the read tools return names,
+//! IDs and source quotes of the whole event, and the digest needs none of them (ADR 0045). The wording only
+//! replaces text: the items and their buttons always come from the rules. A wording that fails `check_wording` is
+//! not used, and the caller sends the template.
 
 use std::collections::BTreeSet;
 
@@ -33,7 +34,8 @@ pub const INTRO_MAX_CHARS: usize = 300;
 /// The most characters of one line.
 pub const LINE_MAX_CHARS: usize = 200;
 
-/// One item of a digest, as the model gets it. It holds no person names.
+/// One item of a digest, as the model gets it. It holds no name from the person records; the title and the event
+/// name are free text and can name a person.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DigestItemInput {
     /// The opaque reference of the item in this digest, for example `1`. The line of the item names it.
