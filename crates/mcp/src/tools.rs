@@ -41,13 +41,16 @@ type CatalogTool = Arc<dyn AiTool<AiToolPorts>>;
 #[derive(Debug, Clone)]
 pub(crate) struct Tools {
     ports: AiToolPorts,
+    /// The product version of the server info.
+    version: &'static str,
     router: ToolRouter<Self>,
 }
 
 impl Tools {
-    pub(crate) fn new(ports: AiToolPorts) -> Self {
+    pub(crate) fn new(ports: AiToolPorts, version: &'static str) -> Self {
         Self {
             ports,
+            version,
             router: router(&standard_catalog()),
         }
     }
@@ -134,10 +137,7 @@ impl ServerHandler for Tools {
 
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
-            .with_server_info(Implementation::new(
-                "tada",
-                tada_app::build_info::BuildInfo::CURRENT.version,
-            ))
+            .with_server_info(Implementation::new("tada", self.version))
             .with_instructions(INSTRUCTIONS)
     }
 }

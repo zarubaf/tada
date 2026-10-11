@@ -49,6 +49,7 @@ use tada_app::account_reminders::ReminderSettingsStore;
 use tada_app::ai_cost::{AiCostStore, AiSetup};
 use tada_app::auth::Authenticator;
 use tada_app::blobs::BlobStore;
+use tada_app::build_info::BuildInfo;
 use tada_app::clock::Clock;
 use tada_app::dispute_notes::DisputeNoteStore;
 use tada_app::documents::DocumentStore;
@@ -144,6 +145,8 @@ pub struct ApiState {
     pub ai: Arc<dyn AiCostStore>,
     /// The model provider settings and the default cap of the operator (ADR 0077).
     pub ai_setup: AiSetup,
+    /// The build of the binary (ADR 0075).
+    pub build: BuildInfo,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -1791,6 +1794,11 @@ mod tests {
             ai_setup: tada_app::ai_cost::AiSetup {
                 configured: false,
                 default_cap: tada_app::ai_cost::Chf::ZERO,
+            },
+            build: BuildInfo {
+                version: "0.0.0",
+                commit: "0000000",
+                built_at: "2026-01-01T00:00:00Z",
             },
         }
     }

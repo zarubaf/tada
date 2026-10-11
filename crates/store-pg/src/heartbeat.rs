@@ -113,6 +113,12 @@ mod tests {
     use super::*;
     use crate::testing::TestDatabase;
 
+    const NEW: BuildInfo = BuildInfo {
+        version: "0.1.0",
+        commit: "2222222",
+        built_at: "2026-10-01T00:00:00Z",
+    };
+
     const OLD: BuildInfo = BuildInfo {
         version: "0.0.9",
         commit: "1111111",
@@ -132,9 +138,7 @@ mod tests {
         let test = TestDatabase::start().await;
         let (serve, worker) = (Uuid::now_v7(), Uuid::now_v7());
         let db = &test.database;
-        db.record_heartbeat(serve, Role::Serve, &BuildInfo::CURRENT)
-            .await
-            .unwrap();
+        db.record_heartbeat(serve, Role::Serve, &NEW).await.unwrap();
         db.record_heartbeat(worker, Role::Worker, &OLD)
             .await
             .unwrap();
@@ -156,11 +160,7 @@ mod tests {
         assert_eq!(
             described,
             [
-                (
-                    Some("serve"),
-                    Some(BuildInfo::CURRENT.version),
-                    Some(BuildInfo::CURRENT.commit)
-                ),
+                (Some("serve"), Some("0.1.0"), Some("2222222")),
                 (Some("worker"), Some("0.0.9"), Some("1111111")),
             ]
         );

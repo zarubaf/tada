@@ -30,6 +30,8 @@ pub struct McpState {
     pub public_url: PublicUrl,
     /// The ports of the tools.
     pub ports: AiToolPorts,
+    /// The product version that the server info shows (ADR 0075).
+    pub version: &'static str,
 }
 
 /// The MCP server with the Streamable HTTP transport. Mount it at `PATH`.
@@ -37,7 +39,7 @@ pub struct McpState {
 /// The server keeps no session: each request carries its token and gets its answer as JSON.
 /// The guard checks the `Origin` and the token before the transport reads the body.
 pub fn router(state: McpState) -> Router {
-    let tools = tools::Tools::new(state.ports.clone());
+    let tools = tools::Tools::new(state.ports.clone(), state.version);
     // The guard checks the `Origin` against the public URL (DNS rebinding), and a browser never sends
     // the bearer token by itself. A reverse proxy can change the `Host`, so the transport does not check it.
     let config = StreamableHttpServerConfig::default()

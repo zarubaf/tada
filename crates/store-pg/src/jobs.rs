@@ -115,6 +115,12 @@ mod tests {
 
     const LEASE: Duration = Duration::from_secs(60);
 
+    const BUILD: BuildInfo = BuildInfo {
+        version: "0.1.0",
+        commit: "2222222",
+        built_at: "2026-10-01T00:00:00Z",
+    };
+
     fn job(kind: &'static str) -> NewJob {
         NewJob {
             kind,
@@ -321,7 +327,7 @@ mod tests {
         add(&test, &job("ping")).await;
         let worker = Uuid::now_v7();
         test.database
-            .record_heartbeat(worker, Role::Worker, &BuildInfo::CURRENT)
+            .record_heartbeat(worker, Role::Worker, &BUILD)
             .await
             .unwrap();
         let row = sqlx::query!(
@@ -342,7 +348,7 @@ mod tests {
         let serve = Uuid::now_v7();
         for _ in 0..2 {
             test.database
-                .record_heartbeat(serve, Role::Serve, &BuildInfo::CURRENT)
+                .record_heartbeat(serve, Role::Serve, &BUILD)
                 .await
                 .unwrap();
         }

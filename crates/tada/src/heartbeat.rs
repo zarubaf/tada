@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use tada_app::build_info::{BuildInfo, Role};
+use tada_app::build_info::Role;
 use tada_store_pg::{Database, SchemaCheckError};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
@@ -43,7 +43,7 @@ impl Heartbeat {
             let mut ticks = tokio::time::interval(INTERVAL);
             loop {
                 ticks.tick().await;
-                if let Err(error) = writer.record_heartbeat(id, role, &BuildInfo::CURRENT).await {
+                if let Err(error) = writer.record_heartbeat(id, role, &crate::BUILD).await {
                     tracing::warn!(%error, "the heartbeat failed");
                 }
             }

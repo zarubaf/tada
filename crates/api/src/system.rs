@@ -3,7 +3,6 @@
 use axum::extract::State;
 use jiff::Timestamp;
 use serde::Serialize;
-use tada_app::build_info::BuildInfo;
 use tada_app::problem::ProblemCode;
 use tada_app::store::StoreError;
 use tada_app::system::{self as app, SystemVersion as AppSystemVersion};
@@ -98,7 +97,6 @@ async fn get_system_version(
     State(state): State<ApiState>,
     Caller(caller): Caller,
 ) -> Result<axum::Json<SystemVersion>, ApiError> {
-    let version =
-        app::system_version(&caller, state.versions.as_ref(), &BuildInfo::CURRENT).await?;
+    let version = app::system_version(&caller, state.versions.as_ref(), &state.build).await?;
     Ok(axum::Json(version.into()))
 }

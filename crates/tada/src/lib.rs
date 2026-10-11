@@ -17,10 +17,19 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use anyhow::Context;
+use tada_app::build_info::BuildInfo;
 use tada_app::domain::facts::{CORE_CATALOG_VERSION, core_catalog};
 use tada_store_pg::Database;
 
 use crate::settings::{Loaded, Logging, MigrateSettings, Section};
+
+/// The build of this binary (ADR 0075). `build.rs` writes the commit and the build time.
+/// The stamp lives in the binary crate, so a new commit rebuilds only this crate.
+pub const BUILD: BuildInfo = BuildInfo {
+    version: env!("CARGO_PKG_VERSION"),
+    commit: env!("TADA_BUILD_COMMIT"),
+    built_at: env!("TADA_BUILT_AT"),
+};
 
 /// The exit code for invalid settings (ADR 0036).
 const INVALID_SETTINGS: u8 = 2;
@@ -71,4 +80,17 @@ pub async fn migrate((database,): MigrateSettings) -> anyhow::Result<()> {
     tracing::info!("the migrations are applied and the shipped field catalog is in sync");
     db.close().await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_build_knows_its_version_commit_and_time() {
+        assert_eq!(BUILD.version, env!("CARGO_PKG_VERSION"));
+        assert!(!BUILD.commit.is_empty());
+        let built_at: jiff::Timestamp = BUILD.built_at.parse().unwrap();
+        assert!(built_at.as_second() > 1_700_000_000);
+    }
 }
