@@ -18,7 +18,8 @@ use crate::access::Principal;
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
-use crate::model::Usage;
+use crate::model::{TaskModels, Usage};
+use crate::pm::digest_wording::DIGEST_TASK;
 use crate::pm::policy::PmPolicyStore;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
@@ -198,14 +199,14 @@ pub enum AiGate {
     Allowed,
     /// The organization did not switch AI on.
     Off,
-    /// The operator did not set the model provider.
+    /// The operator did not set the model provider, or the model of the task has no price.
     NotConfigured,
     /// The usage of the month reached the cap. Manual planning continues (ADR 0047).
     CapReached,
 }
 
-/// AI work runs only if the organization switched it on, the provider is configured and the usage of the month
-/// is below the cap (ADR 0077).
+/// AI work runs only if the organization switched it on, the provider and the price are configured
+/// (`configured_for`) and the usage of the month is below the cap (ADR 0077).
 pub fn ai_gate(policy: &PmPolicy, configured: bool, used: Chf, cap: Chf) -> AiGate {
     if !policy.ai_enabled {
         AiGate::Off
@@ -218,10 +219,31 @@ pub fn ai_gate(policy: &PmPolicy, configured: bool, used: Chf, cap: Chf) -> AiGa
     }
 }
 
+/// True if the operator set up the provider and the price table has a price for the model of `task` on the
+/// day of `now` in UTC. Without a price the runner cannot record the cost, so AI work cannot run (ADR 0077).
+pub(crate) async fn configured_for(
+    store: &dyn AiCostStore,
+    scope: OrgScope,
+    setup: AiSetup,
+    task: &str,
+    now: Timestamp,
+) -> Result<bool, StoreError> {
+    if !setup.configured {
+        return Ok(false);
+    }
+    let models = TaskModels::of_build();
+    let Some(model) = models.get(task) else {
+        return Ok(false);
+    };
+    let today = now.to_zoned(TimeZone::UTC).date();
+    Ok(store.price(scope, &model.model, today).await?.is_some())
+}
+
 /// The AI state of an organization, for the AI PM page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AiStatus {
     pub enabled: bool,
+    /// True if the provider is set up and the model of the digest has a price today.
     pub configured: bool,
     pub cap: Chf,
     /// The usage of the current month.
@@ -313,7 +335,7 @@ pub async fn get_ai_status(
     let (cap, version) = cap_of(store, scope, setup).await?;
     Ok(AiStatus {
         enabled: policies.get(scope).await?.0.ai_enabled,
-        configured: setup.configured,
+        configured: configured_for(store, scope, setup, DIGEST_TASK.name, clock.now()).await?,
         cap,
         used: store
             .month_usage(scope, Month::containing(clock.now()))
@@ -463,12 +485,24 @@ mod tests {
     struct FakeStore {
         cap: Mutex<Option<(Chf, RecordVersion)>>,
         audit: Mutex<Vec<AuditEvent>>,
+        /// True if the price table has no price.
+        no_price: bool,
     }
 
     #[async_trait]
     impl AiCostStore for FakeStore {
-        async fn price(&self, _: OrgScope, _: &str, _: Date) -> Result<Option<Price>, StoreError> {
-            Ok(None)
+        async fn price(
+            &self,
+            _: OrgScope,
+            model_id: &str,
+            on: Date,
+        ) -> Result<Option<Price>, StoreError> {
+            assert_eq!(model_id, "claude-haiku-5-5");
+            assert_eq!(on, "2026-10-11".parse().unwrap());
+            Ok((!self.no_price).then_some(Price {
+                input_per_mtok: chf("0.80"),
+                output_per_mtok: chf("4"),
+            }))
         }
 
         async fn month_usage(&self, _: OrgScope, _: Month) -> Result<Chf, StoreError> {
@@ -550,6 +584,35 @@ mod tests {
             role,
         )
         .with_sign_in(FixedClock.now())
+    }
+
+    #[tokio::test]
+    async fn a_model_without_a_price_is_not_configured() {
+        let admin = caller(OrganizationRole::Admin);
+        let unpriced = FakeStore {
+            no_price: true,
+            ..FakeStore::default()
+        };
+        let status = get_ai_status(&admin, &unpriced, &AiOn, SETUP, &FixedClock)
+            .await
+            .unwrap();
+        assert!(!status.configured);
+
+        let priced = FakeStore::default();
+        let status = get_ai_status(&admin, &priced, &AiOn, SETUP, &FixedClock)
+            .await
+            .unwrap();
+        assert!(status.configured);
+
+        // Without the key, a price does not help.
+        let no_key = AiSetup {
+            configured: false,
+            ..SETUP
+        };
+        let status = get_ai_status(&admin, &priced, &AiOn, no_key, &FixedClock)
+            .await
+            .unwrap();
+        assert!(!status.configured);
     }
 
     #[tokio::test]

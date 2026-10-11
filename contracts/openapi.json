@@ -5246,7 +5246,7 @@
           },
           "configured": {
             "type": "boolean",
-            "description": "True if the operator set up the model provider. Without it, no AI work runs."
+            "description": "True if the operator set up the model provider and the price of its model. Without both, no AI work runs."
           },
           "cap_chf": {
             "type": "string",

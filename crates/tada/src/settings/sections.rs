@@ -45,6 +45,8 @@ pub type ExportSettings = (Database, Storage);
 pub type RedactionsSettings = (Database, Storage);
 /// The settings of `tada migrate`.
 pub type MigrateSettings = (Database,);
+/// The settings of `tada ai-price` (ADR 0077).
+pub type AiPriceSettings = (Database,);
 
 /// The log filter (ADR 0035).
 #[derive(Debug)]
@@ -698,7 +700,7 @@ const MODEL_API_KEY: Setting = Setting {
     kind: "file path",
     default: None,
     secret: true,
-    description: "The file that contains the API key of the model provider. Optional: without it, tada does no AI work. Set it together with `TADA_MODEL_PROVIDER_CHECKED_ON`. `worker` reads the key. `serve` only checks that the file exists, to show whether AI is set up; it does not read the key.",
+    description: "The file that contains the API key of the model provider. Optional: without it, tada does no AI work. Set it together with `TADA_MODEL_PROVIDER_CHECKED_ON`. `worker` reads the key. `serve` only checks that the file exists, to show whether AI is set up; it does not read the key. AI work also needs a price for each model of `ai/models.json`: set it with `tada ai-price set`.",
 };
 
 const MODEL_API_URL: Setting = Setting {

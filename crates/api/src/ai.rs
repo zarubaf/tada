@@ -35,7 +35,7 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
 pub struct AiStatus {
     /// True if the organization switched the AI work on in its AI PM policy.
     pub enabled: bool,
-    /// True if the operator set up the model provider. Without it, no AI work runs.
+    /// True if the operator set up the model provider and the price of its model. Without both, no AI work runs.
     pub configured: bool,
     /// The monthly cap in Swiss francs, as a decimal number in text, for example `25.00`.
     #[schema(pattern = r"^[0-9]+(\.[0-9]{1,5})?$")]

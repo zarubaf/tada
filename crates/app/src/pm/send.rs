@@ -23,7 +23,7 @@ use uuid::Uuid;
 
 use crate::access::readable_events_of;
 use crate::agent::AgentPorts;
-use crate::ai_cost::{AiCostStore, AiGate, AiSetup, Month, ai_gate, cap_of};
+use crate::ai_cost::{AiCostStore, AiGate, AiSetup, Month, ai_gate, cap_of, configured_for};
 use crate::ai_tools::ToolCatalog;
 use crate::caller::{JobRunner, OrgScope, ServiceCaller};
 use crate::clock::Clock;
@@ -34,7 +34,9 @@ use crate::model::{AiLimits, Model};
 use crate::outbound::{Outcome, intent_id};
 use crate::pm::SEND_DIGEST_JOB;
 use crate::pm::check::{PmStore, Recipient};
-use crate::pm::digest_wording::{DigestItemInput, DigestRequest, WordedLine, inert, word_digest};
+use crate::pm::digest_wording::{
+    DIGEST_TASK, DigestItemInput, DigestRequest, WordedLine, inert, word_digest,
+};
 use crate::pm::policy::PmPolicyStore;
 use crate::public_url::PublicUrl;
 use crate::store::StoreError;
@@ -440,7 +442,9 @@ impl SendDigest {
     ) -> Result<bool, StoreError> {
         let (cap, _) = cap_of(ai.cost.as_ref(), scope, ai.setup).await?;
         let used = ai.cost.month_usage(scope, Month::containing(now)).await?;
-        Ok(ai_gate(policy, ai.setup.configured, used, cap) == AiGate::Allowed)
+        let configured =
+            configured_for(ai.cost.as_ref(), scope, ai.setup, DIGEST_TASK.name, now).await?;
+        Ok(ai_gate(policy, configured, used, cap) == AiGate::Allowed)
     }
 
     /// The template body of `items`.

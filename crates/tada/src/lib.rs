@@ -1,6 +1,7 @@
 //! The composition root: it connects the adapters to the `app` crate and runs the process roles (ADR 0025).
 //! `main.rs` only parses the command line.
 
+pub mod ai_price;
 pub mod bootstrap;
 pub mod export;
 pub mod heartbeat;

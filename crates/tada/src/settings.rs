@@ -15,8 +15,8 @@ use secrecy::SecretString;
 
 pub use reference::reference;
 pub use sections::{
-    Ai, BootstrapSettings, ExportSettings, Logging, MigrateSettings, RedactionsSettings,
-    ServeSettings, TelegramSettings, WorkerSettings,
+    Ai, AiPriceSettings, BootstrapSettings, ExportSettings, Logging, MigrateSettings,
+    RedactionsSettings, ServeSettings, TelegramSettings, WorkerSettings,
 };
 
 /// The description of one setting, for the loader and for the reference.

@@ -86,6 +86,7 @@ mod values;
 mod work;
 mod workstreams;
 
+pub use ai_cost::AiPriceRow;
 pub use database::{Database, MigrationFailed, SchemaCheckError};
 pub use facts::SyncCatalogError;
 pub use sign_in::PgSignInRequestStore;
