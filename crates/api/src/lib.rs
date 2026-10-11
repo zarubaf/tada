@@ -517,6 +517,13 @@ mod tests {
             unreachable!()
         }
 
+        async fn reached(
+            &self,
+            _: tada_app::telegram::TelegramUserId,
+        ) -> Result<(), tada_app::store::StoreError> {
+            unreachable!()
+        }
+
         async fn record_update(&self, _: i64) -> Result<bool, tada_app::store::StoreError> {
             unreachable!()
         }

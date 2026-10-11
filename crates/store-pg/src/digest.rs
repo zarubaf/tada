@@ -6,10 +6,13 @@ use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
 use serde_json::json;
 use tada_app::caller::OrgScope;
+use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{DigestItemId, EventId, UserId};
+use tada_app::domain::reminders::Answer;
 use tada_app::domain::reminders::{Reason, RecordKind};
 use tada_app::jobs::NewJob;
 use tada_app::pm::SEND_DIGEST_JOB;
+use tada_app::pm::answer::{DigestAnswers, PressedItem};
 use tada_app::pm::digests::{DigestLog, DigestStatus, DigestSummary};
 use tada_app::pm::send::{DigestItemRef, DigestOutcome, DigestStore, ItemNow, PendingDigest};
 use tada_app::store::StoreError;
@@ -270,6 +273,89 @@ impl DigestStore for Database {
         .await
         .map_err(store_error)?;
         Ok(())
+    }
+}
+
+#[async_trait]
+impl DigestAnswers for Database {
+    async fn pressed(
+        &self,
+        scope: OrgScope,
+        item: DigestItemId,
+        user: UserId,
+    ) -> Result<Option<PressedItem>, StoreError> {
+        // A failed or canceled digest showed no button, and a pending one is not sent yet.
+        let row = sqlx::query!(
+            r#"SELECT d.record_kind, d.record_id, d.record_version,
+                      coalesce(a.event_id, c.event_id) AS "event_id?",
+                      i.finished_at AS "sent_at: jiff_sqlx::Timestamp"
+               FROM digest_item d
+               JOIN outbound_intent i ON i.id = d.intent_id AND i.organization_id = d.organization_id
+               LEFT JOIN action a ON d.record_kind = 'action'
+                    AND a.organization_id = d.organization_id AND a.id = d.record_id
+               LEFT JOIN commitment c ON d.record_kind = 'commitment'
+                    AND c.organization_id = d.organization_id AND c.id = d.record_id
+               WHERE d.id = $2 AND d.organization_id = $1 AND i.user_id = $3
+                 AND i.purpose = 'telegram-digest' AND i.status IN ('sent', 'unknown')"#,
+            scope.organization_id().as_uuid(),
+            item.as_uuid(),
+            user.as_uuid(),
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(store_error)?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let (Some(event_id), Some(sent_at)) = (row.event_id, row.sent_at) else {
+            return Ok(None);
+        };
+        Ok(Some(PressedItem {
+            kind: kind(&row.record_kind, "digest_item.record_kind")?,
+            record_id: row.record_id,
+            event_id: EventId::from_uuid(event_id),
+            version: version(row.record_version, "digest_item.record_version")?,
+            sent_at: sent_at.to_jiff(),
+        }))
+    }
+
+    async fn respond(
+        &self,
+        scope: OrgScope,
+        item: DigestItemId,
+        user: UserId,
+        answer: Answer,
+        version: RecordVersion,
+        at: Timestamp,
+    ) -> Result<bool, StoreError> {
+        // One statement checks the record and writes, so no change between a check and the write slips through.
+        let result = sqlx::query!(
+            "INSERT INTO reminder_state (organization_id, record_kind, record_id, user_id, notified_version,
+                                         notified_at, response, response_version, response_at)
+             SELECT d.organization_id, d.record_kind, d.record_id, i.user_id, $5, i.finished_at, $4, $5, $6
+             FROM digest_item d
+             JOIN outbound_intent i ON i.id = d.intent_id AND i.organization_id = d.organization_id
+             WHERE d.id = $2 AND d.organization_id = $1 AND i.user_id = $3 AND i.finished_at IS NOT NULL
+               AND (EXISTS (SELECT 1 FROM action a
+                            WHERE d.record_kind = 'action' AND a.organization_id = d.organization_id
+                              AND a.id = d.record_id AND a.version = $5 AND a.owner_user_id = i.user_id)
+                    OR EXISTS (SELECT 1 FROM commitment c
+                               WHERE d.record_kind = 'commitment' AND c.organization_id = d.organization_id
+                                 AND c.id = d.record_id AND c.version = $5 AND c.owner_user_id = i.user_id))
+             ON CONFLICT (organization_id, record_kind, record_id, user_id) DO UPDATE
+                 SET notified_version = EXCLUDED.notified_version, response = EXCLUDED.response,
+                     response_version = EXCLUDED.response_version, response_at = EXCLUDED.response_at",
+            scope.organization_id().as_uuid(),
+            item.as_uuid(),
+            user.as_uuid(),
+            answer.as_str(),
+            version.get(),
+            at.to_sqlx() as _,
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(result.rows_affected() == 1)
     }
 }
 

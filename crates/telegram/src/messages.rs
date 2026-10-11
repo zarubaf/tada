@@ -81,6 +81,9 @@ mod tests {
             "telegram-unknown-field",
             "telegram-value-invalid",
             "telegram-value-web-only",
+            "telegram-answer-recorded",
+            "telegram-answer-changed",
+            "telegram-answer-outdated",
         ] {
             assert_ne!(messages.get(id), id, "the message {id} is missing");
         }
