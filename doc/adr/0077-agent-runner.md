@@ -105,6 +105,8 @@ Task `pm-digest`:
 - The runner checks that each reference appears exactly once, no unknown reference appears, and the lengths are in range.
   It also rejects a text with a control character, a link, an `@` name or a bot command, because Telegram makes these clickable.
 - The buttons always come from the rules and never from the model.
+- The message shows the lines in the order of the items, whatever order the model uses.
+  Each line carries the number of its item, and the buttons of the item carry the same number.
 - On any failure, the template digest is sent.
 - The evaluation set `eval/pm-digest/` holds invented cases: German and English, an injection in a title, a missing item, an extra item, an over-long text, a bot command and a tool call that the run does not offer.
   CI replays recorded responses.

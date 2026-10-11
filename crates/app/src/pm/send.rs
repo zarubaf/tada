@@ -34,7 +34,7 @@ use crate::model::{AiLimits, Model};
 use crate::outbound::{Outcome, intent_id};
 use crate::pm::SEND_DIGEST_JOB;
 use crate::pm::check::{PmStore, Recipient};
-use crate::pm::digest_wording::{DigestItemInput, DigestRequest, inert, word_digest};
+use crate::pm::digest_wording::{DigestItemInput, DigestRequest, WordedLine, inert, word_digest};
 use crate::pm::policy::PmPolicyStore;
 use crate::public_url::PublicUrl;
 use crate::store::StoreError;
@@ -186,7 +186,19 @@ pub enum DigestBody {
     /// The template: a fixed intro and one line for each item from its values.
     Template(Vec<TemplateItem>),
     /// The AI wording, after its check: the intro and one line for each item, in the order of the items.
-    Worded { intro: String, lines: Vec<String> },
+    Worded {
+        intro: String,
+        lines: Vec<WordedItem>,
+    },
+}
+
+/// One line of the AI wording, bound to its item by the number of the item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WordedItem {
+    /// The number of the item in the message, from 1. Its buttons show the same number.
+    pub number: usize,
+    /// The checked text of the model.
+    pub text: String,
 }
 
 /// The message of a digest.
@@ -368,7 +380,7 @@ impl SendDigest {
             items: items
                 .iter()
                 .map(|kept| DigestItemInput {
-                    reference: kept.number.to_string(),
+                    reference: reference(kept.number),
                     kind: kept.item.kind,
                     title: kept.now.title.clone(),
                     event_name: kept.now.event_name.clone(),
@@ -410,19 +422,10 @@ impl SendDigest {
                 return None;
             }
         };
-        let mut lines: HashMap<String, String> = wording
-            .lines
-            .into_iter()
-            .map(|line| (line.reference, line.text))
-            .collect();
-        let lines = request
-            .items
-            .iter()
-            .map(|item| lines.remove(&item.reference))
-            .collect::<Option<Vec<_>>>()?;
+        let numbers: Vec<usize> = items.iter().map(|kept| kept.number).collect();
         Some(DigestBody::Worded {
             intro: wording.intro,
-            lines,
+            lines: bind_lines(&numbers, wording.lines)?,
         })
     }
 
@@ -653,9 +656,65 @@ impl JobHandler for SendDigest {
     }
 }
 
+/// The reference of the item with `number` in the input of the model.
+fn reference(number: usize) -> String {
+    number.to_string()
+}
+
+/// The lines of the model in the order of the items with `numbers`, each bound to the number of its item, whatever
+/// order the model used. `None` if an item has no line.
+fn bind_lines(numbers: &[usize], lines: Vec<WordedLine>) -> Option<Vec<WordedItem>> {
+    let mut texts: HashMap<String, String> = lines
+        .into_iter()
+        .map(|line| (line.reference, line.text))
+        .collect();
+    numbers
+        .iter()
+        .map(|&number| {
+            texts
+                .remove(&reference(number))
+                .map(|text| WordedItem { number, text })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn line(reference: &str, text: &str) -> WordedLine {
+        WordedLine {
+            reference: reference.to_owned(),
+            text: text.to_owned(),
+        }
+    }
+
+    #[test]
+    fn each_line_is_bound_to_the_number_of_its_item_in_any_order() {
+        let shuffled = vec![
+            line("3", "Die Bänke."),
+            line("1", "Die Flyer."),
+            line("2", "Das Festzelt."),
+        ];
+        assert_eq!(
+            bind_lines(&[1, 2, 3], shuffled),
+            Some(vec![
+                WordedItem {
+                    number: 1,
+                    text: "Die Flyer.".to_owned()
+                },
+                WordedItem {
+                    number: 2,
+                    text: "Das Festzelt.".to_owned()
+                },
+                WordedItem {
+                    number: 3,
+                    text: "Die Bänke.".to_owned()
+                },
+            ])
+        );
+        assert_eq!(bind_lines(&[1, 2], vec![line("2", "Das Festzelt.")]), None);
+    }
 
     #[test]
     fn a_long_text_is_shortened_with_an_ellipsis() {

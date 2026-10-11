@@ -62,10 +62,11 @@ impl DigestTexts for FluentDigestTexts {
             }
             DigestBody::Worded { intro, lines } => {
                 paragraphs.push(intro.clone());
-                paragraphs.extend(lines.iter().enumerate().map(|(index, text)| {
+                // The number of the item, not the position of the line, so that the line names its buttons.
+                paragraphs.extend(lines.iter().map(|line| {
                     let mut args = FluentArgs::new();
-                    args.set("number", FluentValue::from(index + 1));
-                    args.set("text", text.as_str());
+                    args.set("number", FluentValue::from(line.number));
+                    args.set("text", line.text.as_str());
                     self.0.get_args("telegram-digest-worded-item", &args)
                 }));
             }
@@ -101,7 +102,7 @@ impl DigestTexts for FluentDigestTexts {
 #[cfg(test)]
 mod tests {
     use tada_app::domain::reminders::Reason;
-    use tada_app::pm::send::TemplateItem;
+    use tada_app::pm::send::{TemplateItem, WordedItem};
 
     use super::*;
 
@@ -151,7 +152,16 @@ mod tests {
         let message = DigestMessage {
             body: DigestBody::Worded {
                 intro: "Zwei Punkte für heute.".to_owned(),
-                lines: vec!["Das Festzelt.".to_owned(), "Die Bänke.".to_owned()],
+                lines: vec![
+                    WordedItem {
+                        number: 1,
+                        text: "Das Festzelt.".to_owned(),
+                    },
+                    WordedItem {
+                        number: 2,
+                        text: "Die Bänke.".to_owned(),
+                    },
+                ],
             },
             more: 3,
         };

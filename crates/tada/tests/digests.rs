@@ -721,12 +721,20 @@ async fn ai_wording_is_sent_with_the_rule_buttons_and_no_person_data() {
     let sent = messenger.sent();
     let text = &sent[0].text;
     assert!(text.starts_with("Zwei Punkte"), "{text}");
-    let flyer = text.find("Die Flyer").unwrap();
-    let benches = text.find("Die Bänke").unwrap();
+    // The model answered in another order: each line still carries the number of its item and its buttons.
+    let flyer = text.find("1. Die Flyer").unwrap();
+    let benches = text.find("2. Die Bänke").unwrap();
     assert!(
         flyer < benches,
         "the lines follow the order of the items: {text}"
     );
+    for (index, row) in sent[0].rows.iter().enumerate() {
+        let number = format!("{} ", index + 1);
+        for button in row {
+            let (Button::Callback { label, .. } | Button::Url { label, .. }) = button;
+            assert!(label.starts_with(&number), "{label} is in row {index}");
+        }
+    }
     assert_eq!(
         answers(&sent[0]).len(),
         5,
