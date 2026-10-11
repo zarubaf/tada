@@ -6,57 +6,30 @@
 
 mod support;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use axum::body::Body;
-use axum::extract::{Path, State};
-use axum::http::{StatusCode, header};
-use axum::routing::post;
-use axum::{Json, Router};
-use secrecy::SecretString;
-use serde_json::{Value, json};
+use axum::http::StatusCode;
+use serde_json::json;
 use tada_adapters::clock::SystemClock;
 use tada_app::caller::OrganizationRole;
 use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::domain::ids::{DigestItemId, EventId, OrganizationId, UserId};
-use tada_app::domain::reminders::{Answer, CallbackData};
+use tada_app::domain::reminders::Answer;
 use tada_store_pg::testing::TestDatabase;
-use tada_telegram::{Gateway, UpdateSource};
-use tower::ServiceExt;
 use uuid::Uuid;
+
+use support::telegram::{Webhook, private};
 
 /// The invented Telegram accounts: Anna owns the records, Bert is another linked member.
 const ANNA: i64 = 4711;
 const BERT: i64 = 4712;
-/// The invented webhook secret of the tests.
-const SECRET: &str = "test-webhook-secret-answers";
-
-/// A fake Bot API that records the body of each `answerCallbackQuery` call.
-#[derive(Clone, Default)]
-struct BotApi {
-    answers: Arc<Mutex<Vec<Value>>>,
-}
-
-async fn bot_method(
-    State(api): State<BotApi>,
-    Path((_, method)): Path<(String, String)>,
-    Json(body): Json<Value>,
-) -> Json<Value> {
-    if method == "answerCallbackQuery" {
-        api.answers.lock().unwrap().push(body);
-    }
-    Json(json!({"ok": true, "result": true}))
-}
-
 /// One organization with one event; Anna and Bert are members and contributors of the event, with a link.
 struct World {
     test: TestDatabase,
     organization: OrganizationId,
     event: EventId,
     anna: UserId,
-    api: BotApi,
-    router: Router,
-    next_update: Mutex<u32>,
+    webhook: Webhook,
 }
 
 impl World {
@@ -67,33 +40,13 @@ impl World {
         let event = test.create_event(organization, "FEST").await;
         let anna = Self::linked(&test, organization, event, "Anna Beispiel", ANNA).await;
         Self::linked(&test, organization, event, "Bert Muster", BERT).await;
-        let api = BotApi::default();
-        let server = Router::new()
-            .route("/{bot}/{method}", post(bot_method))
-            .with_state(api.clone());
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        tokio::spawn(async move { axum::serve(listener, server).await.unwrap() });
-        let gateway = Arc::new(Gateway::new(
-            &format!("http://{address}"),
-            "test-token",
-            Arc::new(test.database.clone()),
-            Arc::new(SystemClock),
-        ));
-        let source = UpdateSource::Webhook {
-            secret: SecretString::from(SECRET),
-            public_url: support::public_url(),
-        };
-        let router =
-            tada::telegram::routes(gateway, &source, vec![Arc::new(test.database.clone())]);
+        let webhook = Webhook::start(&test, Arc::new(SystemClock)).await;
         Self {
             test,
             organization,
             event,
             anna,
-            api,
-            router,
-            next_update: Mutex::new(1),
+            webhook,
         }
     }
 
@@ -197,58 +150,6 @@ impl World {
         DigestItemId::from_uuid(item)
     }
 
-    /// A press of the button `answer` of `item` by `from` on a message in the chat `chat`. Returns the text of
-    /// the answer to the callback query.
-    async fn press(&self, from: i64, chat: Value, answer: Answer, item: DigestItemId) -> String {
-        self.press_on(
-            from,
-            json!({"message_id": 5, "date": 1, "chat": chat, "text": "Digest"}),
-            answer,
-            item,
-        )
-        .await
-    }
-
-    async fn press_on(
-        &self,
-        from: i64,
-        message: Value,
-        answer: Answer,
-        item: DigestItemId,
-    ) -> String {
-        let data = CallbackData { answer, item }.encode();
-        self.deliver_callback(from, message, &data).await
-    }
-
-    async fn deliver_callback(&self, from: i64, message: Value, data: &str) -> String {
-        let id = {
-            let mut next = self.next_update.lock().unwrap();
-            *next += 1;
-            *next
-        };
-        let query = format!("query-{id}");
-        let update = json!({"update_id": id, "callback_query": {
-            "id": query, "chat_instance": "instance-1", "data": data, "message": message,
-            "from": {"id": from, "is_bot": false, "first_name": "Testperson"}
-        }});
-        assert_eq!(self.deliver(&update).await, StatusCode::OK);
-        let answers = self.api.answers.lock().unwrap().clone();
-        let answer = answers
-            .iter()
-            .find(|answer| answer["callback_query_id"] == query.as_str())
-            .unwrap_or_else(|| panic!("no answer to the callback query: {answers:?}"));
-        answer["text"].as_str().unwrap_or_default().to_owned()
-    }
-
-    async fn deliver(&self, update: &Value) -> StatusCode {
-        let request = axum::http::Request::post("/telegram/webhook")
-            .header(header::CONTENT_TYPE, "application/json")
-            .header("X-Telegram-Bot-Api-Secret-Token", SECRET)
-            .body(Body::from(update.to_string()))
-            .unwrap();
-        self.router.clone().oneshot(request).await.unwrap().status()
-    }
-
     /// The status and the version of a work record.
     async fn record(&self, table: &str, id: Uuid) -> (String, i64) {
         let status = self
@@ -277,11 +178,6 @@ impl World {
     }
 }
 
-/// The private chat of `account` with the bot.
-fn private(account: i64) -> Value {
-    json!({"id": account, "type": "private", "first_name": "Testperson"})
-}
-
 /// The answer to a press that changed nothing.
 const OUTDATED: &str = "veraltet";
 
@@ -294,12 +190,14 @@ async fn owner_marks_action_done() {
     let blocked_item = world.digest("action", blocked, "unknown", "6 days").await;
 
     let text = world
+        .webhook
         .press(ANNA, private(ANNA), Answer::Done, done_item)
         .await;
     assert!(!text.contains(OUTDATED), "{text}");
     // Telegram sends a message older than 48 hours as an inaccessible message: only the chat, and the date 0.
     let inaccessible = json!({"message_id": 5, "date": 0, "chat": private(ANNA)});
     let text = world
+        .webhook
         .press_on(ANNA, inaccessible, Answer::Blocked, blocked_item)
         .await;
     assert!(!text.contains(OUTDATED), "{text}");
@@ -340,6 +238,7 @@ async fn owner_marks_commitment_fulfilled() {
         .await;
 
     let text = world
+        .webhook
         .press(ANNA, private(ANNA), Answer::Fulfilled, item)
         .await;
 
@@ -366,6 +265,7 @@ async fn on_track_records_only() {
 
     for item in [action_item, commitment_item] {
         let text = world
+            .webhook
             .press(ANNA, private(ANNA), Answer::OnTrack, item)
             .await;
         assert!(!text.contains(OUTDATED), "{text}");
@@ -398,12 +298,15 @@ async fn stale_or_foreign_press_changes_nothing() {
 
     // Another linked member, in the own private chat and in the chat of Anna.
     for chat in [private(BERT), private(ANNA)] {
-        let text = world.press(BERT, chat, Answer::Done, item).await;
+        let text = world.webhook.press(BERT, chat, Answer::Done, item).await;
         assert!(text.contains(OUTDATED), "{text}");
         unchanged().await;
     }
     // A Telegram account without a link.
-    let text = world.press(4799, private(4799), Answer::Done, item).await;
+    let text = world
+        .webhook
+        .press(4799, private(4799), Answer::Done, item)
+        .await;
     assert!(text.contains(OUTDATED), "{text}");
     unchanged().await;
     // A forwarded message.
@@ -411,27 +314,37 @@ async fn stale_or_foreign_press_changes_nothing() {
         "message_id": 6, "date": 1, "chat": private(ANNA), "text": "Digest",
         "forward_origin": {"type": "hidden_user", "date": 1, "sender_user_name": "Testperson"}
     });
-    let text = world.press_on(ANNA, forwarded, Answer::Done, item).await;
+    let text = world
+        .webhook
+        .press_on(ANNA, forwarded, Answer::Done, item)
+        .await;
     assert!(text.contains(OUTDATED), "{text}");
     unchanged().await;
     // A group chat: the gateway answers the query, but says nothing.
     let group = json!({"id": -100_4711, "type": "group", "title": "Testgruppe"});
-    let text = world.press(ANNA, group, Answer::Done, item).await;
+    let text = world.webhook.press(ANNA, group, Answer::Done, item).await;
     assert!(!text.contains("Danke"), "{text}");
     unchanged().await;
     // An answer that the item does not have, and data that does not decode.
     let text = world
+        .webhook
         .press(ANNA, private(ANNA), Answer::Fulfilled, item)
         .await;
     assert!(text.contains(OUTDATED), "{text}");
     let message = json!({"message_id": 5, "date": 1, "chat": private(ANNA), "text": "Digest"});
-    let text = world.deliver_callback(ANNA, message, "done:kaputt").await;
+    let text = world
+        .webhook
+        .deliver_callback(ANNA, message, "done:kaputt")
+        .await;
     assert!(text.contains(OUTDATED), "{text}");
     unchanged().await;
     // A digest after 8 days, and a digest that failed.
     for (status, age) in [("sent", "8 days"), ("failed", "1 hour")] {
         let old = world.digest("action", action, status, age).await;
-        let text = world.press(ANNA, private(ANNA), Answer::Done, old).await;
+        let text = world
+            .webhook
+            .press(ANNA, private(ANNA), Answer::Done, old)
+            .await;
         assert!(text.contains(OUTDATED), "{status} {age}: {text}");
         unchanged().await;
     }
@@ -445,7 +358,7 @@ async fn stale_or_foreign_press_changes_nothing() {
         )])
         .await;
     for answer in [Answer::Done, Answer::OnTrack] {
-        let text = world.press(ANNA, private(ANNA), answer, item).await;
+        let text = world.webhook.press(ANNA, private(ANNA), answer, item).await;
         assert!(text.contains(OUTDATED), "{text}");
         unchanged().await;
     }
@@ -464,7 +377,7 @@ async fn stale_or_foreign_press_changes_nothing() {
         )])
         .await;
     for answer in [Answer::Done, Answer::OnTrack] {
-        let text = world.press(ANNA, private(ANNA), answer, item).await;
+        let text = world.webhook.press(ANNA, private(ANNA), answer, item).await;
         assert!(text.contains(OUTDATED), "{text}");
         assert_eq!(world.record("action", action).await, ("open".into(), 2));
         assert_eq!(world.response(action).await, (String::new(), String::new()));
@@ -483,7 +396,7 @@ async fn stale_or_foreign_press_changes_nothing() {
         )])
         .await;
     for answer in [Answer::Done, Answer::OnTrack] {
-        let text = world.press(ANNA, private(ANNA), answer, item).await;
+        let text = world.webhook.press(ANNA, private(ANNA), answer, item).await;
         assert!(text.contains(OUTDATED), "{text}");
         unchanged().await;
     }
@@ -502,7 +415,7 @@ async fn stale_or_foreign_press_changes_nothing() {
         ])
         .await;
     for answer in [Answer::Done, Answer::OnTrack] {
-        let text = world.press(ANNA, private(ANNA), answer, item).await;
+        let text = world.webhook.press(ANNA, private(ANNA), answer, item).await;
         assert!(text.contains(OUTDATED), "{text}");
         unchanged().await;
     }
@@ -516,6 +429,7 @@ async fn invalid_transition_is_outdated() {
     let item = world.digest("action", action, "sent", "1 hour").await;
 
     let text = world
+        .webhook
         .press(ANNA, private(ANNA), Answer::Blocked, item)
         .await;
 
@@ -549,12 +463,16 @@ async fn only_the_private_chat_clears_the_blocked_mark() {
     let message = json!({"update_id": 100, "message": {
         "message_id": 7, "date": 1, "text": "Hallo", "chat": group.clone(), "from": from.clone()
     }});
-    assert_eq!(world.deliver(&message).await, StatusCode::OK);
-    world.press(ANNA, group, Answer::OnTrack, item).await;
+    assert_eq!(world.webhook.deliver(&message).await, StatusCode::OK);
+    world
+        .webhook
+        .press(ANNA, group, Answer::OnTrack, item)
+        .await;
     assert_eq!(blocked().await, 1, "a group update keeps the mark");
 
     // A press in the private chat clears it.
     world
+        .webhook
         .press(ANNA, private(ANNA), Answer::OnTrack, item)
         .await;
     assert_eq!(blocked().await, 0, "Anna reached the bot again");
@@ -569,6 +487,6 @@ async fn only_the_private_chat_clears_the_blocked_mark() {
     let message = json!({"update_id": 101, "message": {
         "message_id": 8, "date": 1, "text": "Hallo", "chat": private(ANNA), "from": from
     }});
-    assert_eq!(world.deliver(&message).await, StatusCode::OK);
+    assert_eq!(world.webhook.deliver(&message).await, StatusCode::OK);
     assert_eq!(blocked().await, 0, "Anna wrote to the bot again");
 }

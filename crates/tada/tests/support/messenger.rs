@@ -79,3 +79,36 @@ pub fn digest_ports(messenger: Arc<FakeMessenger>) -> tada::worker::DigestSend {
         ai: None,
     }
 }
+
+/// The job handlers of a worker on `database` that sends digests into `messenger`, with the AI `ai`.
+pub fn digest_worker(
+    database: &tada_store_pg::Database,
+    messenger: Arc<FakeMessenger>,
+    ai: Option<tada_app::pm::send::DigestAi>,
+    clock: Arc<dyn tada_app::clock::Clock>,
+) -> tada_app::jobs::Handlers {
+    tada::worker::handlers(
+        database,
+        Arc::new(tada_adapters::mail::MemoryMailer::new()),
+        Arc::new(tada_adapters::mail::FluentMailTexts::new().unwrap()),
+        clock,
+        super::public_url(),
+        Arc::new(super::NoObjectStorage),
+        tada::worker::DigestSend { messenger, ai },
+    )
+}
+
+/// Runs the next due job with `handlers`.
+pub async fn run_one(
+    database: &tada_store_pg::Database,
+    handlers: &tada_app::jobs::Handlers,
+) -> tada_app::jobs::Ran {
+    tada_app::jobs::run_next(
+        database,
+        handlers,
+        uuid::Uuid::now_v7(),
+        std::time::Duration::from_secs(60),
+    )
+    .await
+    .unwrap()
+}
