@@ -12,7 +12,7 @@ The Git history keeps the done slices.
 Goal: workstream leads own their work directly, and the AI PM follows up without the PM.
 
 Slice 2 splits into the sub-slices 2a to 2f.
-The open sub-slices are 2c to 2f.
+The open sub-slices are 2d to 2f.
 Each sub-slice has its own design, plan, reviews and merge.
 The owner wants tada usable for a first real club event as soon as possible, so the sub-slices come in this order.
 
@@ -22,20 +22,10 @@ The first gate, the review of the authentication code, is closed.
 The second gate, the person features of [ADR 0045](adr/0045-data-protection.md), is closed.
 The export of one person, the correction with dispute notes, the legal redaction with its journal, the retention jobs, the housekeeping and the orphan sweep deliver it.
 
-### Slice 2c: Schedules and reminders
-
-Scope: durable scheduled checks, AI PM checks, internal Telegram reminders, the webhook mode and the health endpoints of the `telegram` process role (ADR 0011).
-The scheduled checks use the job queue of [ADR 0054](adr/0054-job-queue-implementation.md).
-The product version and the versions of the components in the footer of the web client come here too ([ADR 0075](adr/0075-versions-of-tada-and-its-components.md)).
-
-Acceptance:
-
-- Quiet hours and cooldowns survive restarts.
-- A changed deadline or a completed action cancels obsolete reminders.
-
 ### Slice 2d: AI intake
 
-Scope: AI intake inside tada (web and Telegram) through the model adapter, the AI cap and the usage totals of each event.
+Scope: AI intake inside tada (web and Telegram), the usage totals of each event and the AI cap per event.
+The intake uses the model adapter, the agent runner and the AI cap of the organization that Slice 2c delivered ([ADR 0047](adr/0047-model-adapter.md), [ADR 0077](adr/0077-agent-runner.md)).
 
 Acceptance:
 
@@ -71,6 +61,21 @@ A new ADR records the views and the custom fields of work records before the wor
 Acceptance:
 
 - (12) A simple club event can be organized without purchasing a separate task-management tool. Sub-slice 2f completes this criterion.
+
+### Follow-ups of Slice 2c
+
+Slice 2c delivered schedules, the AI PM digest, the model adapter and the agent runner, the Telegram webhook mode and the health endpoints.
+The first digest runs for members who opt in.
+These items are later work:
+
+- Escalation of exceptions.
+- The PM brief.
+- Meeting agendas.
+- Propose a new date and free-text replies to a reminder.
+- A holiday calendar for working days.
+- Event caps for AI cost.
+- A digest projection tool without person data.
+- Moving the four daily sweeps onto schedule rows.
 
 ### Owner-only items of Slice 2
 
