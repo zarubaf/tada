@@ -21,6 +21,10 @@ pub struct FieldError {
 
 const OUT_OF_RANGE: &str = "out-of-range";
 
+/// The working days of the follow-up and the look-ahead: Monday to Friday, without a holiday calendar
+/// (ADR 0076). They are not the days of the check, which the policy sets.
+pub const WORKING_DAYS: Weekdays = Weekdays::MON_FRI;
+
 /// The settings of the reminders of one organization.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PmPolicy {
@@ -178,7 +182,6 @@ pub struct Rules {
     pub today: Date,
     pub now: Timestamp,
     pub zone: EventTimeZone,
-    pub days: Weekdays,
     pub look_ahead: u8,
     pub follow_up: u8,
 }
@@ -190,7 +193,7 @@ pub fn select(c: &Candidate, m: Option<&Memory>, r: &Rules) -> Option<Reason> {
         Reason::Overdue
     } else if c
         .due_date
-        .is_some_and(|due| due <= add_working_days(r.today, r.look_ahead, r.days))
+        .is_some_and(|due| due <= add_working_days(r.today, r.look_ahead, WORKING_DAYS))
     {
         Reason::DueSoon
     } else if c.blocked {
@@ -208,7 +211,7 @@ pub fn select(c: &Candidate, m: Option<&Memory>, r: &Rules) -> Option<Reason> {
         let answered_before = m.response_at.is_some_and(|at| at < since);
         return (overdue && answered_before && m.notified_at < since).then_some(Reason::Overdue);
     }
-    (working_days_since(m.notified_at, r.now, &r.zone, r.days) >= u32::from(r.follow_up))
+    (working_days_since(m.notified_at, r.now, &r.zone, WORKING_DAYS) >= u32::from(r.follow_up))
         .then_some(Reason::FollowUp)
 }
 
@@ -300,7 +303,6 @@ mod tests {
     use super::*;
     use crate::RecordVersion;
     use crate::events::EventTimeZone;
-    use crate::schedule::Weekdays;
 
     fn ts(s: &str) -> Timestamp {
         s.parse().expect("test timestamp")
@@ -315,7 +317,6 @@ mod tests {
             today,
             now: ts(now),
             zone: EventTimeZone::default_zone(),
-            days: Weekdays::MON_FRI,
             look_ahead: 2,
             follow_up: 2,
         }
