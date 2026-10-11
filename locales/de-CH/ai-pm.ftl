@@ -1,0 +1,92 @@
+# The AI-PM page of the organization (ADR 0076): the policy, the AI cap and the last digests.
+# The web client loads it with that page only.
+
+pm-title = AI-PM
+pm-intro = Der AI-PM prüft jeden Tag die offenen Aufgaben und Zusagen. Jede verantwortliche Person erhält in Telegram eine Erinnerung, wenn sie Erinnerungen in ihrem Konto eingeschaltet hat.
+pm-loading = Einstellungen des AI-PM werden geladen
+pm-pause = Pause für alle Nachrichten
+pm-pause-help-off = Der AI-PM schickt Erinnerungen nach den Einstellungen unten.
+# While paused, the banner above says that nothing is sent.
+pm-pause-help-on = Geplante Erinnerungen fallen weg.
+pm-paused = Pause für alle Nachrichten ist eingeschaltet.
+pm-resumed = Pause für alle Nachrichten ist ausgeschaltet.
+pm-paused-title = Der AI-PM ist pausiert.
+pm-paused-text = tada schickt keine Erinnerungen, bis Sie die Pause für alle Nachrichten ausschalten.
+pm-reminders-title = Erinnerungen
+pm-check-title = Tägliche Prüfung
+pm-time-label = Uhrzeit
+pm-time-help = Im Format 08:30, in der Zeitzone der Prüfung.
+pm-weekdays-label = Wochentage
+pm-weekday-0 = Montag
+pm-weekday-1 = Dienstag
+pm-weekday-2 = Mittwoch
+pm-weekday-3 = Donnerstag
+pm-weekday-4 = Freitag
+pm-weekday-5 = Samstag
+pm-weekday-6 = Sonntag
+pm-zone-label = Zeitzone
+pm-zone-help = Die Zeitzone der täglichen Prüfung. Die Ruhezeit gilt in der Zeitzone jeder Person.
+pm-pace-title = Ruhezeit und Abstände
+pm-quiet-start-label = Ruhezeit von
+pm-quiet-end-label = Ruhezeit bis
+pm-quiet-help = In der Ruhezeit einer Person schickt tada ihr keine Erinnerung. Die Erinnerung wartet bis zum Ende der Ruhezeit.
+pm-cooldown-label = Abklingzeit (Stunden)
+pm-cooldown-help = So lange erhält eine Person nach einer Erinnerung keine weitere. 1 bis 168.
+pm-follow-up-label = Nachfassen nach (Arbeitstage)
+pm-follow-up-help = Ohne Antwort kommt ein Eintrag nach so vielen Arbeitstagen wieder. 1 bis 10.
+pm-look-ahead-label = Vorschau (Arbeitstage)
+pm-look-ahead-help = Ein Eintrag, der in so vielen Arbeitstagen fällig ist, kommt schon vorher. 0 bis 10.
+pm-save = Einstellungen speichern
+pm-saved = Einstellungen des AI-PM gespeichert.
+# A save of the form against an old version: the form shows the new values, the edits are gone.
+pm-conflict = Jemand hat die Einstellungen inzwischen geändert. Das Formular zeigt jetzt die neuen Werte. Ihre Änderungen im Formular sind nicht gespeichert. Geben Sie sie noch einmal ein.
+# A switch saved against an old version. The form keeps the unsaved edits of the member, so the text names the switches only.
+# If the other change also touched the form, the next save of the form gets the conflict above.
+pm-conflict-switch = Jemand hat die Einstellungen inzwischen geändert. Die Schalter zeigen jetzt die neuen Werte. Prüfen Sie, ob Ihre Änderung noch nötig ist.
+pm-conflict-reload-failed = Jemand hat die Einstellungen inzwischen geändert. tada konnte die neuen Werte nicht laden. Laden Sie die Seite neu.
+pm-error-local_time = Geben Sie eine Uhrzeit im Format 08:30 ein.
+pm-error-quiet_start = Geben Sie eine Uhrzeit im Format 20:00 ein.
+pm-error-quiet_end = Geben Sie eine Uhrzeit im Format 08:00 ein.
+pm-error-weekdays = Wählen Sie mindestens einen Wochentag.
+pm-error-time_zone = tada kennt diese Zeitzone nicht. Wählen Sie eine Zeitzone aus der Liste.
+pm-error-cooldown_hours = Geben Sie eine Zahl von 1 bis 168 ein.
+pm-error-follow_up_working_days = Geben Sie eine Zahl von 1 bis 10 ein.
+pm-error-look_ahead_working_days = Geben Sie eine Zahl von 0 bis 10 ein.
+pm-ai-title = KI
+pm-ai-switch = KI formuliert die Erinnerungen
+pm-ai-help = Die KI schreibt nur den Text. Die Einträge und die Knöpfe einer Erinnerung bestimmt tada. Ohne KI verwendet tada eine feste Vorlage.
+pm-ai-on = Die KI formuliert die Erinnerungen.
+pm-ai-off = Die Erinnerungen verwenden die feste Vorlage.
+pm-ai-provider = KI-Anbieter
+pm-ai-configured = eingerichtet
+pm-ai-not-configured = nicht eingerichtet
+pm-ai-not-configured-help = Der Betrieb von tada hat keinen KI-Anbieter eingerichtet. Bis dahin verwenden die Erinnerungen die feste Vorlage.
+pm-usage-label = Verbrauch in diesem Monat
+# $used and $cap: amounts, for example „CHF 3.20“.
+pm-usage = { $used } von { $cap }
+pm-cap-reached = Das Monatslimit ist erreicht. Bis zum nächsten Monat verwenden die Erinnerungen die feste Vorlage.
+pm-cap-label = Monatslimit (CHF)
+pm-cap-help = Beim Monatslimit pausiert die KI bis zum nächsten Monat. Die Erinnerungen kommen dann mit der festen Vorlage.
+pm-cap-save = Monatslimit speichern
+pm-cap-saved = Monatslimit gespeichert.
+pm-cap-error-out-of-range = Geben Sie einen Betrag über 0 ein.
+pm-cap-error-pattern = Geben Sie einen Betrag wie 25 oder 40.50 ein.
+pm-cap-conflict = Jemand hat das Monatslimit inzwischen geändert. Das Feld zeigt jetzt den neuen Wert.
+pm-cap-conflict-reload-failed = Jemand hat das Monatslimit inzwischen geändert. tada konnte den neuen Wert nicht laden. Laden Sie die Seite neu.
+pm-digests-title = Letzte Erinnerungen
+pm-digests-intro = Die letzten 50 Erinnerungen, die neusten zuerst. Die Zeiten gelten in der Zeitzone der Prüfung.
+pm-digests-loading = Erinnerungen werden geladen
+pm-digests-empty-title = Noch keine Erinnerungen
+pm-digests-empty-text = Nach der ersten täglichen Prüfung stehen die Erinnerungen hier.
+pm-digest-recipient = Person
+pm-digest-planned = Geplant
+pm-digest-sent = Gesendet
+pm-digest-items = Einträge
+pm-digest-status = Status
+pm-digest-not-sent = Nicht gesendet
+pm-digest-status-pending = ausstehend
+pm-digest-status-sent = gesendet
+pm-digest-status-failed = fehlgeschlagen
+pm-digest-status-unknown = unbekannt
+pm-digest-status-canceled = abgebrochen
+pm-digest-unknown-help = Unbekannt heisst: Telegram hat die Zustellung nicht bestätigt. tada schickt diese Erinnerung nicht noch einmal, damit keine Person sie doppelt erhält.

@@ -172,7 +172,7 @@
   /* Wide (--bp-wide): the gutter of the page. */
   @media (width >= 80rem) {
     .outdated {
-      padding-inline: var(--space-8);
+      padding: var(--space-8) var(--space-8) 0;
     }
   }
 }

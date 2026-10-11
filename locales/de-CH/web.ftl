@@ -26,6 +26,9 @@ problem-organization-required = Wählen Sie eine Organisation.
 problem-recent-sign-in-required = Melden Sie sich für diesen Schritt neu an. Aus Sicherheitsgründen geht er nur in den ersten 15 Minuten nach der Anmeldung.
 sign-in-again = Neu anmelden
 problem-forbidden = Sie haben keine Berechtigung für diese Aktion.
+# The no-access state of a settings area for a member without the role (doc/design/components.md).
+no-access-title = Sie haben keinen Zugriff auf diesen Bereich.
+no-access-text = Die Organisationsleitung oder die Administration kann Ihnen die Rolle dafür geben.
 problem-unavailable = Der Dienst ist im Moment nicht erreichbar. Versuchen Sie es in einigen Minuten erneut.
 problem-general-4xx = Die Anfrage ist ungültig.
 problem-general-5xx = Ein unerwarteter Fehler ist aufgetreten.
@@ -434,6 +437,7 @@ settings-nav-members = Mitglieder
 settings-nav-telegram = Telegram
 settings-nav-tokens = API-Token
 settings-nav-organization = Organisation
+settings-nav-ai-pm = AI-PM
 settings-nav-account = Konto
 settings-loading = Einstellungen werden geladen
 account-title = Konto
