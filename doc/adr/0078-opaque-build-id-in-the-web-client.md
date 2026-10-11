@@ -18,7 +18,7 @@ The web client still needs a build identity: it compares its build with the serv
 ## Decision
 
 - Each build has a random build ID of 128 bits, written as 32 hex digits.
-  The ID has no relation to the version or the commit, so it reveals nothing about them.
+  The ID has no relation to the version or the commit, so nobody can compute them from it.
 - The image build makes one ID and gives the same value as the build argument `TADA_BUILD_ID` to the web build and to the build of the binary.
 - A build without `TADA_BUILD_ID` makes its own random ID.
   The development tasks `dev:serve` and `dev:web` set the fixed ID `development`, and the unit tests and the browser checks use a fixed ID too.
@@ -34,7 +34,14 @@ The other parts of ADR 0075 stay in force.
 
 ## Consequences
 
-- A client that is not signed in cannot read the version or the commit from the files, and it cannot compute them from the ID.
+- The files of the web client carry no readable version, commit or build time.
+  A client that is not signed in cannot read them there or compute them from the ID.
+- A determined attacker can still find the release.
+  The images are public with the commit as their tag, so the ID of an image is easy to look up.
+  The names of the lazy chunks are hashes of their content, so a build of the public source can match them.
+  A build log can also show the ID.
+  The ID only stops a casual reading of the version.
+  It is a defense in depth for the rule of ADR 0075, not a secret.
 - The list of the components shows the version of the web client only if its ID is the one of the server.
   Otherwise it shows the ID and marks the web client as another version.
 - Two builds of the same commit have different IDs.
