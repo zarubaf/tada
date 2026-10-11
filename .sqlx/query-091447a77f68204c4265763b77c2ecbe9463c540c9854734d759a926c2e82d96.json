@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, record_kind, record_id, record_version, reason FROM digest_item\n             WHERE intent_id = $2 AND organization_id = $1\n             ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "digest_item",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "record_kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "digest_item",
+            "name": "record_kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "record_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "digest_item",
+            "name": "record_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "record_version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "digest_item",
+            "name": "record_version"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "digest_item",
+            "name": "reason"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "091447a77f68204c4265763b77c2ecbe9463c540c9854734d759a926c2e82d96"
+}

@@ -3197,6 +3197,44 @@
         ]
       }
     },
+    "/api/v1/organization/digests": {
+      "get": {
+        "tags": [
+          "organization"
+        ],
+        "summary": "Lists the last digests of the organization. An owner or an admin can read them.",
+        "operationId": "list_digests",
+        "responses": {
+          "200": {
+            "description": "The last digests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigestList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/account/reminders": {
       "get": {
         "tags": [
@@ -8237,6 +8275,75 @@
             "description": "The dispute notes about the current fact version (ADR 0073), oldest first.\nIt is absent if there is none."
           }
         }
+      },
+      "Digest": {
+        "type": "object",
+        "description": "One digest to one member.",
+        "required": [
+          "id",
+          "user_display_name",
+          "created_at",
+          "status",
+          "item_count"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_display_name": {
+            "type": "string",
+            "description": "The display name of the recipient."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time of the daily check that planned the digest."
+          },
+          "sent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The time of the send. It is absent for a digest that was not sent."
+          },
+          "status": {
+            "$ref": "#/components/schemas/DigestStatus"
+          },
+          "item_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The number of items. After the send, the items that the message showed.",
+            "minimum": 0
+          }
+        }
+      },
+      "DigestList": {
+        "type": "object",
+        "description": "The last 50 digests, the newest first.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Digest"
+            }
+          }
+        }
+      },
+      "DigestStatus": {
+        "type": "string",
+        "description": "The state of a digest.",
+        "enum": [
+          "pending",
+          "sent",
+          "failed",
+          "unknown",
+          "canceled"
+        ]
       },
       "DisputeNote": {
         "type": "object",

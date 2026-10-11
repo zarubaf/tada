@@ -2,7 +2,9 @@
 
 pub mod check;
 pub mod digest_wording;
+pub mod digests;
 pub mod policy;
+pub mod send;
 
 use tada_domain::reminders::PmPolicy;
 

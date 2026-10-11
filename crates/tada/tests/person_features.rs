@@ -106,6 +106,9 @@ impl World {
             Arc::new(SystemClock),
             support::public_url(),
             Arc::new(self.garage.storage.clone()),
+            support::messenger::digest_ports(support::messenger::FakeMessenger::new(
+                tada_app::messenger::SendOutcome::Sent,
+            )),
         );
         loop {
             let ran = run_next(

@@ -15,8 +15,8 @@ use secrecy::SecretString;
 
 pub use reference::reference;
 pub use sections::{
-    BootstrapSettings, ExportSettings, Logging, MigrateSettings, RedactionsSettings, ServeSettings,
-    TelegramSettings, WorkerSettings,
+    Ai, BootstrapSettings, ExportSettings, Logging, MigrateSettings, RedactionsSettings,
+    ServeSettings, TelegramSettings, WorkerSettings,
 };
 
 /// The description of one setting, for the loader and for the reference.
@@ -365,6 +365,7 @@ mod tests {
             ("TADA_S3_BUCKET", "tada"),
             ("TADA_S3_ACCESS_KEY_ID_FILE", key_path.as_str()),
             ("TADA_S3_SECRET_ACCESS_KEY_FILE", key_path.as_str()),
+            ("TADA_TELEGRAM_BOT_TOKEN_FILE", key_path.as_str()),
         ]);
         variables.extend_from_slice(extra);
         load_from::<WorkerSettings>(&variables)
@@ -372,7 +373,7 @@ mod tests {
 
     #[test]
     fn the_worker_reads_the_mail_settings_with_the_smtp_defaults() {
-        let (_, public_url, mail, smtp, storage, _) = worker_with(&[]).unwrap().settings;
+        let (_, public_url, mail, smtp, storage, _, _) = worker_with(&[]).unwrap().settings;
         assert_eq!(storage.bucket, "tada");
         assert_eq!(public_url.origin(), "https://tada.example.org");
         assert_eq!(mail.from.as_str(), "tada@example.org");
@@ -404,6 +405,7 @@ mod tests {
                 "TADA_S3_BUCKET",
                 "TADA_S3_ACCESS_KEY_ID_FILE",
                 "TADA_S3_SECRET_ACCESS_KEY_FILE",
+                "TADA_TELEGRAM_BOT_TOKEN_FILE",
             ]
         );
     }
@@ -433,7 +435,7 @@ mod tests {
     #[cfg(debug_assertions)]
     #[test]
     fn accepts_smtp_without_tls_in_a_debug_build() {
-        let (_, _, _, smtp, _, _) = worker_with(&[("TADA_MAIL_SMTP_TLS", "none")])
+        let (_, _, _, smtp, _, _, _) = worker_with(&[("TADA_MAIL_SMTP_TLS", "none")])
             .unwrap()
             .settings;
         assert_eq!(smtp.tls, SmtpTls::None);
@@ -448,7 +450,7 @@ mod tests {
 
     #[test]
     fn accepts_starttls_and_rejects_an_unknown_tls_mode() {
-        let (_, _, _, smtp, _, _) = worker_with(&[("TADA_MAIL_SMTP_TLS", "starttls")])
+        let (_, _, _, smtp, _, _, _) = worker_with(&[("TADA_MAIL_SMTP_TLS", "starttls")])
             .unwrap()
             .settings;
         assert_eq!(smtp.tls, SmtpTls::StartTls);
@@ -461,7 +463,7 @@ mod tests {
     fn reads_the_smtp_user_and_password_as_a_pair() {
         let password = secret_file("smtp-s3cr3t\n");
         let path = password.path().to_str().unwrap();
-        let (_, _, _, smtp, _, _) = worker_with(&[
+        let (_, _, _, smtp, _, _, _) = worker_with(&[
             ("TADA_MAIL_SMTP_USERNAME", "tada"),
             ("TADA_MAIL_SMTP_PASSWORD_FILE", path),
         ])

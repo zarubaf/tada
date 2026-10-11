@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT 'action' AS \"kind!\", a.id AS \"id!\", a.event_id AS \"event_id!\", a.version AS \"version!\",\n                      a.owner_user_id AS \"owner!\", a.title AS \"title!\", coalesce(e.name, '') AS \"event_name!\",\n                      a.due_date AS \"due_date: jiff_sqlx::Date\", a.status AS \"status!\",\n                      (a.status IN ('open', 'in-progress', 'blocked') AND e.status = 'active') AS \"open!\"\n               FROM action a\n               JOIN event e ON e.organization_id = a.organization_id AND e.id = a.event_id\n               WHERE a.organization_id = $1 AND a.id = ANY($2)\n               UNION ALL\n               SELECT 'commitment', c.id, c.event_id, c.version, c.owner_user_id, c.text, coalesce(e.name, ''),\n                      c.due_date, c.status,\n                      (c.status IN ('conditional', 'firm') AND e.status = 'active')\n               FROM commitment c\n               JOIN event e ON e.organization_id = c.organization_id AND e.id = c.event_id\n               WHERE c.organization_id = $1 AND c.id = ANY($3)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kind!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "event_id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "version!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "owner!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "title!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "event_name!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "due_date: jiff_sqlx::Date",
+        "type_info": "Date",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "status!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 9,
+        "name": "open!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "ae2956f65072a7b6ebbb20948b2b843a0574c660927282a3a0f69e8b9f6a2848"
+}

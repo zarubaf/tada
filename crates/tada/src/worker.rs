@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
+use secrecy::ExposeSecret;
+use tada_adapters::anthropic::{AnthropicConfig, AnthropicModel, BACKOFF};
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
 use tada_app::blobs::BlobStore;
@@ -13,14 +15,17 @@ use tada_app::clock::Clock;
 use tada_app::housekeeping::HousekeepingStore;
 use tada_app::jobs::{Handlers, Ran, SCHEDULED_KINDS, ScheduleRunner, run_next};
 use tada_app::mail::{MailTexts, Mailer};
+use tada_app::messenger::Messenger;
 use tada_app::orphans;
 use tada_app::outbound::SendOutbound;
 use tada_app::pm::check::PmCheck;
+use tada_app::pm::send::{DigestAi, SendDigest, SendDigestPorts};
 use tada_app::public_url::PublicUrl;
 use tada_app::rate_limit::WINDOW;
 use tada_app::redaction::WriteRedactionJournal;
 use tada_app::retention;
 use tada_store_pg::Database;
+use tada_telegram::{FluentDigestTexts, TelegramMessenger};
 use uuid::Uuid;
 
 use crate::heartbeat;
@@ -38,6 +43,22 @@ const LEASE: Duration = Duration::from_secs(300);
 /// The time limit of one SMTP send. A send that exceeds it has an unknown outcome (ADR 0042).
 const MAIL_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// What the send of a digest needs beyond the database: the Bot API and, if the operator set up the model
+/// provider, the AI (ADRs 0076 and 0077).
+pub struct DigestSend {
+    pub messenger: Arc<dyn Messenger>,
+    /// `None` sends each digest with the template.
+    pub ai: Option<DigestAi>,
+}
+
+impl std::fmt::Debug for DigestSend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DigestSend")
+            .field("ai", &self.ai)
+            .finish_non_exhaustive()
+    }
+}
+
 /// The handler of each job kind that the worker runs. Tests use the same registration.
 pub fn handlers(
     db: &Database,
@@ -46,6 +67,7 @@ pub fn handlers(
     clock: Arc<dyn Clock>,
     public_url: PublicUrl,
     blobs: Arc<dyn BlobStore>,
+    digest: DigestSend,
 ) -> Handlers {
     let database = Arc::new(db.clone());
     let pm_check = PmCheck::new(
@@ -54,17 +76,51 @@ pub fn handlers(
         database.clone(),
         clock.clone(),
     );
+    let send_digest = SendDigest::new(
+        SendDigestPorts {
+            store: database.clone(),
+            recipients: database.clone(),
+            policies: database.clone(),
+            identity: database.clone(),
+            messenger: digest.messenger,
+            texts: Arc::new(FluentDigestTexts::new()),
+            clock: clock.clone(),
+        },
+        digest.ai,
+        public_url.clone(),
+    );
     let send = SendOutbound::new(database.clone(), mailer, texts, clock, public_url);
     let journal = WriteRedactionJournal::new(database, blobs);
     Handlers::default()
         .with(Arc::new(send))
         .with(Arc::new(journal))
         .with(Arc::new(pm_check))
+        .with(Arc::new(send_digest))
+}
+
+/// The AI of the digest, if the operator set up the model provider (ADR 0045).
+fn digest_ai(db: &Database, ai: &crate::settings::Ai) -> anyhow::Result<Option<DigestAi>> {
+    let Some(provider) = &ai.provider else {
+        return Ok(None);
+    };
+    let model = AnthropicModel::new(AnthropicConfig {
+        api_url: provider.api_url.to_string(),
+        api_key: provider.api_key.clone(),
+        call_timeout: ai.limits.call_timeout.unsigned_abs(),
+        retries: ai.limits.call_retries,
+        backoff: BACKOFF,
+    })
+    .map_err(|error| anyhow::anyhow!("invalid model settings: {error}"))?;
+    Ok(Some(DigestAi {
+        model: Arc::new(model),
+        cost: Arc::new(db.clone()),
+        setup: ai.setup(),
+        limits: ai.limits,
+    }))
 }
 
 pub async fn run(
-    // The AI settings are read and checked at start; the AI PM digest uses them (ADR 0077).
-    (database, public_url, mail, smtp, storage, _ai): WorkerSettings,
+    (database, public_url, mail, smtp, storage, ai, bot): WorkerSettings,
 ) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
@@ -80,6 +136,13 @@ pub async fn run(
     .context("invalid mail settings")?;
     let texts = FluentMailTexts::new().context("invalid mail texts")?;
     let blobs = Arc::new(storage.open());
+    let digest = DigestSend {
+        messenger: Arc::new(TelegramMessenger::new(
+            bot.api_url.as_str(),
+            bot.bot_token.expose_secret(),
+        )),
+        ai: digest_ai(&db, &ai)?,
+    };
     let handlers = handlers(
         &db,
         Arc::new(mailer),
@@ -87,6 +150,7 @@ pub async fn run(
         Arc::new(SystemClock),
         public_url,
         blobs.clone(),
+        digest,
     );
     let worker_id = Uuid::now_v7();
     tracing::info!(%worker_id, "worker started");

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE outbound_intent SET status = 'unknown', finished_at = $3\n             WHERE id = $2 AND organization_id = $1 AND purpose = 'telegram-digest' AND status = 'pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb068087fe43890cc3249fc5b9dc2c9686eba250402c1fa653237b6e355a455d"
+}

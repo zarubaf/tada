@@ -6,6 +6,7 @@ mod ai;
 mod client_ip;
 mod contract;
 mod cursor;
+mod digests;
 mod dispute_notes;
 mod documents;
 mod event_members;
@@ -61,6 +62,7 @@ use tada_app::identity::IdentityStore;
 use tada_app::members::MemberStore;
 use tada_app::parties::PartyStore;
 use tada_app::person_data::PersonDataStore;
+use tada_app::pm::digests::DigestLog;
 use tada_app::pm::policy::PmPolicyStore;
 use tada_app::privacy::PrivacyStore;
 use tada_app::problem::ProblemCode;
@@ -125,6 +127,8 @@ pub struct ApiState {
     pub retention: Arc<dyn RetentionStore>,
     /// The reminder policy of the organization (ADR 0076).
     pub pm_policy: Arc<dyn PmPolicyStore>,
+    /// The last digests of the AI PM (ADR 0076).
+    pub digests: Arc<dyn DigestLog>,
     /// The reminder settings of the own account (ADR 0076).
     pub reminder_settings: Arc<dyn ReminderSettingsStore>,
     /// Persons and institutions (ADR 0069).
@@ -169,6 +173,7 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(privacy::routes())
                 .merge(retention::routes())
                 .merge(pm_policy::routes())
+                .merge(digests::routes())
                 .merge(account_reminders::routes())
                 .merge(ai::routes())
                 .merge(parties::routes())
@@ -199,6 +204,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(privacy::problem_codes())
         .chain(retention::problem_codes())
         .chain(pm_policy::problem_codes())
+        .chain(digests::problem_codes())
         .chain(account_reminders::problem_codes())
         .chain(ai::problem_codes())
         .chain(parties::problem_codes())
@@ -1513,6 +1519,18 @@ mod tests {
     struct NoVersions;
 
     #[async_trait::async_trait]
+    impl tada_app::pm::digests::DigestLog for NoVersions {
+        async fn recent(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: u32,
+        ) -> Result<Vec<tada_app::pm::digests::DigestSummary>, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
     impl tada_app::system::VersionStore for NoVersions {
         async fn schema_version(
             &self,
@@ -1782,6 +1800,7 @@ mod tests {
             privacy: Arc::new(NoPrivacy),
             retention: Arc::new(NoRetention),
             pm_policy: Arc::new(NoRetention),
+            digests: Arc::new(NoVersions),
             reminder_settings: Arc::new(NoRetention),
             parties: Arc::new(NoParties),
             workstreams: Arc::new(NoWorkstreams),

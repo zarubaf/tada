@@ -1282,15 +1282,16 @@ async fn healthz_in_both_modes() {
 const RECIPIENT: TelegramUserId = TelegramUserId(7130429);
 
 #[tokio::test]
-async fn send_maps_403_to_blocked() {
+async fn send_maps_the_answers_to_outcomes() {
     support::logs::install();
     for (answer, expected) in [
         (200, SendOutcome::Sent),
         (403, SendOutcome::Blocked),
         (400, SendOutcome::Failed),
-        (429, SendOutcome::Failed),
-        (500, SendOutcome::Unknown),
-        (502, SendOutcome::Unknown),
+        // An answer of the Bot API with an error code: Telegram did not take the message.
+        (429, SendOutcome::Temporary),
+        (500, SendOutcome::Temporary),
+        (502, SendOutcome::Temporary),
     ] {
         let (_, url) = RecordingBotApi::start(move |method| {
             if answer == 200 {
@@ -1307,14 +1308,14 @@ async fn send_maps_403_to_blocked() {
             "status {answer}"
         );
     }
-    // No Bot API at the address: the request did not leave, so nothing was sent.
+    // No Bot API at the address: the request did not leave, so nothing was sent, and a later try can work.
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let closed = format!("http://{}", listener.local_addr().unwrap());
     drop(listener);
     let messenger = TelegramMessenger::new(&closed, "test-token");
     assert_eq!(
         messenger.send(RECIPIENT, "Hallo", &[]).await,
-        SendOutcome::Failed
+        SendOutcome::Temporary
     );
     support::logs::assert_clean(&["test-token", "7130429"]);
 }

@@ -312,6 +312,85 @@ async fn sent_intents_go_after_90_days() {
     assert_eq!(count(&test, "outbound_intent").await, 4);
 }
 
+/// A digest goes 90 days after its outcome with its items, also with an unknown outcome: it holds IDs only, and
+/// no operator check needs it. A digest that is still pending 90 days after its plan goes too. A notice in `reminder_state` goes 90 days after the notification.
+#[tokio::test]
+async fn housekeeping_removes_old_digests() {
+    let test = TestDatabase::start().await;
+    let organization = test.create_organization("testwil").await;
+    let anna = user(&test, "Anna Muster", "anna@example.org").await;
+    // (status, finished, deleted)
+    let digests = [
+        ("sent", Some(older(LONG_KEEP)), true),
+        ("failed", Some(older(LONG_KEEP)), true),
+        ("unknown", Some(older(LONG_KEEP)), true),
+        ("canceled", Some(older(LONG_KEEP)), true),
+        ("sent", Some(younger(LONG_KEEP)), false),
+        ("unknown", Some(younger(LONG_KEEP)), false),
+        ("canceled", Some(younger(LONG_KEEP)), false),
+        // Planned long ago and never sent: its send job is gone.
+        ("pending", None, true),
+    ];
+    for (status, finished_at, _) in digests {
+        let id = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO outbound_intent (id, organization_id, user_id, purpose, status, message_id, created_at,
+                                          finished_at)
+             VALUES ($1, $2, $3, 'telegram-digest', $4, $1::text, $5, $6)",
+        )
+        .bind(id)
+        .bind(organization.as_uuid())
+        .bind(anna.as_uuid())
+        .bind(status)
+        .bind(sql(ago(LONG_KEEP * 2)))
+        .bind(finished_at.map(sql))
+        .execute(test.pool())
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO digest_item (id, intent_id, organization_id, record_kind, record_id, record_version,
+                                      reason, position)
+             VALUES ($1, $2, $3, 'action', $1, 1, 'overdue', 0)",
+        )
+        .bind(Uuid::now_v7())
+        .bind(id)
+        .bind(organization.as_uuid())
+        .execute(test.pool())
+        .await
+        .unwrap();
+    }
+    for notified_at in [older(LONG_KEEP), younger(LONG_KEEP)] {
+        sqlx::query(
+            "INSERT INTO reminder_state (organization_id, record_kind, record_id, user_id, notified_version,
+                                         notified_at, response, response_version, response_at)
+             VALUES ($1, 'action', $2, $3, 1, $4, 'on-track', 1, $4)",
+        )
+        .bind(organization.as_uuid())
+        .bind(Uuid::now_v7())
+        .bind(anna.as_uuid())
+        .bind(sql(notified_at))
+        .execute(test.pool())
+        .await
+        .unwrap();
+    }
+
+    let report = run(&test).await;
+
+    assert_eq!(report.digests, 5);
+    assert_eq!(report.reminder_states, 1);
+    assert_eq!(
+        report.outbound_intents, 0,
+        "the mail rule leaves the digests to their own rule"
+    );
+    assert_eq!(count(&test, "outbound_intent").await, 3);
+    assert_eq!(
+        count(&test, "digest_item").await,
+        3,
+        "the items go with their digest"
+    );
+    assert_eq!(count(&test, "reminder_state").await, 1);
+}
+
 #[tokio::test]
 async fn failed_jobs_go_after_90_days() {
     let test = TestDatabase::start().await;

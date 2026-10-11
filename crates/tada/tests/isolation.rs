@@ -27,6 +27,7 @@ use secrecy::SecretString;
 use serde_json::{Value, json};
 use support::export::{contains, export, files};
 use support::files::pdf;
+use support::messenger::FakeMessenger;
 use support::organization::{Client, SOURCE, fill, organization, router};
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
@@ -34,7 +35,9 @@ use tada_adapters::storage::testing::TestGarage;
 use tada_app::blobs::{BlobStore, JOURNAL_PREFIX};
 use tada_app::caller::{OrganizationRole, ServiceCaller, TelegramGateway};
 use tada_app::domain::ids::{OrganizationId, UserId};
+use tada_app::domain::reminders::CallbackData;
 use tada_app::jobs::{Handlers, Ran, run_next};
+use tada_app::messenger::{Button, SendOutcome};
 use tada_app::outbound::SEND_JOB;
 use tada_app::pm::{PM_CHECK_JOB, SEND_DIGEST_JOB};
 use tada_app::redaction::JOURNAL_JOB;
@@ -98,7 +101,7 @@ const NOT_ORGANIZATION_SCOPED: &[(&str, &str)] = &[
 ];
 
 /// The job kinds that the isolation test runs. Each kind of a handler of the worker needs a case.
-const JOB_KINDS: &[&str] = &[SEND_JOB, JOURNAL_JOB, PM_CHECK_JOB];
+const JOB_KINDS: &[&str] = &[SEND_JOB, JOURNAL_JOB, PM_CHECK_JOB, SEND_DIGEST_JOB];
 
 /// The slug and the name of organization B, and a word that only the texts of B hold.
 /// The checks ignore the case of letters.
@@ -743,6 +746,8 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
                    "paused": false, "ai_enabled": false, "expected_version": 1}),
             Expect::Writes,
         )],
+        // The last digests of the AI PM.
+        "list_digests" => vec![get(api("/organization/digests".into()), READS)],
         // The AI state and the monthly AI cap.
         "get_ai" => vec![get(api("/organization/ai".into()), READS)],
         "set_ai_cap" => vec![post(
@@ -804,10 +809,11 @@ fn each_operation_has_an_isolation_case_or_a_reason() {
     }
 }
 
-/// The handlers of the worker, with a mailer into memory.
+/// The handlers of the worker, with a mailer and a Bot API into memory.
 fn worker_handlers(
     database: &Database,
     mailer: Arc<MemoryMailer>,
+    messenger: Arc<FakeMessenger>,
     blobs: Arc<dyn BlobStore>,
 ) -> Handlers {
     tada::worker::handlers(
@@ -817,6 +823,7 @@ fn worker_handlers(
         Arc::new(SystemClock),
         support::public_url(),
         blobs,
+        support::messenger::digest_ports(messenger),
     )
 }
 
@@ -832,11 +839,28 @@ async fn each_job_kind_of_the_worker_has_an_isolation_case() {
     let kinds = worker_handlers(
         &database,
         Arc::new(MemoryMailer::new()),
+        FakeMessenger::new(SendOutcome::Sent),
         Arc::new(support::NoObjectStorage),
     )
     .kinds();
     let covered: BTreeSet<&str> = JOB_KINDS.iter().copied().collect();
     assert_eq!(kinds, covered, "each job kind needs an isolation case");
+}
+
+/// A zone in which `now` is about noon, outside the quiet hours of the default policy, so the send of a digest
+/// goes out at once.
+fn day_zone(now: Timestamp) -> String {
+    let hour = i32::from(now.to_zoned(jiff::tz::TimeZone::UTC).hour());
+    let mut offset = (12 - hour).rem_euclid(24);
+    if offset > 12 {
+        offset -= 24;
+    }
+    // The sign of the `Etc/GMT` zones is the inverse of the offset.
+    match offset {
+        0 => "Etc/GMT".to_owned(),
+        offset if offset > 0 => format!("Etc/GMT-{offset}"),
+        offset => format!("Etc/GMT+{}", -offset),
+    }
 }
 
 /// The UUIDs in `text`, in the hyphenated form.
@@ -1539,9 +1563,11 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
         .await;
     let b_rows = rows(&world.test, world.b).await;
     let mailer = Arc::new(MemoryMailer::new());
+    let messenger = FakeMessenger::new(SendOutcome::Sent);
     let handlers = worker_handlers(
         &world.test.database,
         mailer.clone(),
+        messenger.clone(),
         Arc::new(world.garage.storage.clone()),
     );
     let ran = run_next(
@@ -1617,7 +1643,8 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
         .test
         .execute(&[
             &format!(
-                "UPDATE app_user SET reminders_opt_in_at = now() WHERE id = '{}'",
+                "UPDATE app_user SET reminders_opt_in_at = now(), time_zone = '{}' WHERE id = '{}'",
+                day_zone(Timestamp::now()),
                 world.both
             ),
             &format!(
@@ -1660,11 +1687,65 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
         ))
         .await;
     let planned: i64 = world.test.scalar("SELECT count(*) FROM digest_item").await;
+    let a_items: String = world
+        .test
+        .scalar(&format!(
+            "SELECT coalesce(string_agg(id::text, ','), '') FROM digest_item WHERE organization_id = '{}'",
+            world.a
+        ))
+        .await;
+    let a_items: Vec<Uuid> = a_items
+        .split(',')
+        .filter(|id| !id.is_empty())
+        .map(|id| id.parse().unwrap())
+        .collect();
     assert!(planned >= 1, "the check of A planned no digest");
     assert_eq!(foreign, 0, "the check of A plans the work of A only");
     assert_eq!(
         rows(&world.test, world.b).await,
         b_rows,
         "the check of A changed the rows of B"
+    );
+
+    // The send of the digest of A runs in A only: it sends the work of A to the member and leaves B as it is.
+    // The jobs of B wait; the worker runs the due jobs of A, the send among them.
+    while run_next(
+        &world.test.database,
+        &handlers,
+        Uuid::now_v7(),
+        Duration::from_secs(60),
+    )
+    .await
+    .unwrap()
+        != Ran::Idle
+    {}
+    let sent = messenger.sent();
+    assert_eq!(
+        sent.len(),
+        1,
+        "one digest to the member of both organizations"
+    );
+    assert!(
+        !sent[0].text.to_lowercase().contains(B_MARKER),
+        "{}",
+        sent[0].text
+    );
+    let foreign_buttons = sent[0]
+        .rows
+        .iter()
+        .flatten()
+        .filter(|button| match button {
+            Button::Callback { data, .. } => {
+                let item = CallbackData::decode(data.as_str()).unwrap().item;
+                !a_items.contains(&item.as_uuid())
+            }
+            Button::Url { url, .. } => url.contains(&world.targets.b_event),
+        })
+        .count();
+    assert_eq!(foreign_buttons, 0, "the digest of A has a button of B");
+    assert_eq!(
+        rows(&world.test, world.b).await,
+        b_rows,
+        "the send of A changed the rows of B"
     );
 }

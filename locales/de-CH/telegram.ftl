@@ -26,6 +26,39 @@ telegram-unknown-field = Diesen Anlass gibt es, aber er hat kein offenes Feld mi
 telegram-value-invalid = Dieser Wert passt nicht zum Feld. Schreiben Sie Zahlen ohne Apostroph und ohne Leerzeichen. Beispiele: Text, ja oder nein, 20000, CHF 80000, 2030-05-18, 2030-05..2030-06.
 telegram-value-web-only = Dieses Feld verweist auf einen anderen Eintrag. Ändern Sie es in tada.
 
+## The digest of the AI-PM (ADR 0076). Plain text: Telegram shows no Markdown.
+
+telegram-digest-intro = Guten Tag. Diese Einträge brauchen Ihre Aufmerksamkeit:
+# $number: the number of the item. $kind: `action` or `commitment`. $title and $event: plain text.
+# $reason: `overdue`, `due-soon`, `blocked` or `follow-up`. $due: the due date, for example 14.09.2026, or `none`.
+telegram-digest-item =
+    { $number }. { $kind ->
+        [commitment] Zusage
+       *[action] Aufgabe
+    }: { $title } ({ $event }), { $reason ->
+        [overdue] überfällig, fällig am { $due }
+        [due-soon] fällig am { $due }
+        [blocked] blockiert
+       *[follow-up] { $due ->
+            [none] noch keine Antwort
+           *[other] noch keine Antwort, fällig am { $due }
+        }
+    }
+# $text: the line of the AI wording.
+telegram-digest-worded-item = { $number }. { $text }
+telegram-digest-more =
+    { $count ->
+        [one] … und 1 weiterer Eintrag in „Meine Arbeit“.
+       *[other] … und { $count } weitere Einträge in „Meine Arbeit“.
+    }
+# The buttons of item $number.
+telegram-digest-on-track = { $number } Auf Kurs
+telegram-digest-blocked = { $number } Blockiert
+telegram-digest-done = { $number } Erledigt
+telegram-digest-fulfilled = { $number } Erfüllt
+telegram-digest-open = { $number } Öffnen
+telegram-digest-my-work = Meine Arbeit öffnen
+
 ## Problem codes (ADR 0037): `problem-<code>`
 
 problem-malformed-request = Die Anfrage ist ungültig.

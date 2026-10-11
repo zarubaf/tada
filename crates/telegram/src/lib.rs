@@ -1,8 +1,10 @@
 //! The Telegram gateway (ADR 0011). It turns updates of the Bot API into `app` commands and contains
-//! no domain rules. It also implements the `Messenger` port that the worker sends through (ADR 0076).
+//! no domain rules. It also implements the `Messenger` port and the digest texts that the worker sends with
+//! (ADR 0076).
 
 mod bot_error;
 mod command;
+mod digest_texts;
 mod health;
 mod messages;
 mod send;
@@ -46,6 +48,7 @@ use crate::command::{Incomplete, LinkCommand, ProposeCommand, parse_link_command
 use crate::messages::Messages;
 use crate::webhook::WEBHOOK_PATH;
 
+pub use crate::digest_texts::FluentDigestTexts;
 pub use crate::health::BotApiCheck;
 pub use crate::send::TelegramMessenger;
 pub use crate::webhook::routes;

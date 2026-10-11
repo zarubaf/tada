@@ -45,6 +45,7 @@ mod ai_cost;
 mod audit;
 mod bootstrap;
 mod database;
+mod digest;
 mod dispute_notes;
 mod documents;
 mod drafts;

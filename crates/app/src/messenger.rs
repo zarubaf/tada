@@ -24,8 +24,11 @@ pub enum SendOutcome {
     Sent,
     /// The recipient blocked the bot (HTTP 403).
     Blocked,
-    /// Telegram refused the message, or the request did not leave. Nothing was sent.
+    /// Telegram refused the message for good, for example as a bad request. Nothing was sent.
     Failed,
+    /// Nothing was sent, and a later try can work: the connection failed before the request left, or the
+    /// Bot API answered 429 or a server error.
+    Temporary,
     /// The request left, but no clear answer came: a timeout or a server error.
     /// Telegram can have delivered the message.
     Unknown,

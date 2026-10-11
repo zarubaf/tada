@@ -286,7 +286,7 @@ impl CommandError for AiCapError {
 }
 
 /// The cap of the organization, or the default with version 1.
-async fn cap_of(
+pub(crate) async fn cap_of(
     store: &dyn AiCostStore,
     scope: OrgScope,
     setup: AiSetup,

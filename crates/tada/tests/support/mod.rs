@@ -8,6 +8,7 @@
 pub mod export;
 pub mod files;
 pub mod logs;
+pub mod messenger;
 pub mod organization;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -96,6 +97,7 @@ pub fn api_state_on(
         privacy: database.clone(),
         retention: database.clone(),
         pm_policy: database.clone(),
+        digests: database.clone(),
         reminder_settings: database.clone(),
         parties: database.clone(),
         workstreams: database.clone(),

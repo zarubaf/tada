@@ -34,7 +34,18 @@ const TELEGRAM_CLAIMS: &str =
 
 /// A mail intent ends with its outcome. An intent with an unknown outcome stays for the operator.
 const OUTBOUND_INTENTS: &str = "DELETE FROM outbound_intent
-     WHERE status IN ('sent', 'failed') AND finished_at < $1";
+     WHERE purpose <> 'telegram-digest' AND status IN ('sent', 'failed') AND finished_at < $1";
+
+/// A digest ends with its outcome or its cancel. It holds IDs only, so a digest with an unknown outcome goes too.
+/// A digest that is still pending long after its plan lost its send job; it goes after the same period from its
+/// plan. Its items go with it (`ON DELETE CASCADE`).
+const DIGESTS: &str = "DELETE FROM outbound_intent
+     WHERE purpose = 'telegram-digest'
+       AND ((status IN ('sent', 'failed', 'unknown', 'canceled') AND finished_at < $1)
+            OR (status = 'pending' AND created_at < $1))";
+
+/// A notice ends with the next notice of the record, which replaces it. A response belongs to its notice.
+const REMINDER_STATES: &str = "DELETE FROM reminder_state WHERE notified_at < $1";
 
 const FAILED_JOBS: &str = "DELETE FROM job WHERE failed_at < $1";
 
@@ -108,6 +119,8 @@ impl HousekeepingStore for Database {
         .await?;
         let telegram_claims = delete_before(&mut conn, TELEGRAM_CLAIMS, &[short]).await?;
         let outbound_intents = delete_before(&mut conn, OUTBOUND_INTENTS, &[long]).await?;
+        let digests = delete_before(&mut conn, DIGESTS, &[long]).await?;
+        let reminder_states = delete_before(&mut conn, REMINDER_STATES, &[long]).await?;
         let failed_jobs = delete_before(&mut conn, FAILED_JOBS, &[long]).await?;
         let invitations = delete_invitations(&mut conn, long).await?;
         let anonymized_accounts = anonymize_accounts(&mut conn, caller, now, long).await?;
@@ -117,6 +130,8 @@ impl HousekeepingStore for Database {
             telegram_claims,
             invitations,
             outbound_intents,
+            digests,
+            reminder_states,
             failed_jobs,
             anonymized_accounts,
         })

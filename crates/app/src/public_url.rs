@@ -3,6 +3,8 @@
 //! This module is the only place that knows the form of a link: its path and its token.
 
 use secrecy::{ExposeSecret, SecretString};
+use tada_domain::ids::EventId;
+use tada_domain::reminders::RecordKind;
 
 /// The path of the web page that signs in with the token of a magic link.
 pub const MAGIC_LINK_PATH: &str = "/sign-in/link";
@@ -75,6 +77,20 @@ impl PublicUrl {
         self.link(INVITATION_PATH, token)
     }
 
+    /// The web page of My Work, the start page.
+    pub fn my_work(&self) -> String {
+        format!("{}/", self.origin)
+    }
+
+    /// The web page of the actions or the commitments of `event`, where a member finds the record.
+    pub fn work_page(&self, event: EventId, kind: RecordKind) -> String {
+        let register = match kind {
+            RecordKind::Action => "actions",
+            RecordKind::Commitment => "commitments",
+        };
+        format!("{}/events/{event}/{register}", self.origin)
+    }
+
     /// The token goes into the fragment, so that the browser never sends it in a GET request
     /// (ADR 0008). The link holds the token, so it is a secret too.
     fn link(&self, path: &str, token: &SecretString) -> SecretString {
@@ -128,6 +144,21 @@ mod tests {
         assert_eq!(
             url.invitation_link(&token).expose_secret(),
             "https://tada.example.org/invitation#token=abc"
+        );
+    }
+
+    #[test]
+    fn a_page_link_has_the_path_of_the_web_page() {
+        let url = PublicUrl::parse("https://tada.example.org/").unwrap();
+        let event = EventId::from_uuid(uuid::Uuid::nil());
+        assert_eq!(url.my_work(), "https://tada.example.org/");
+        assert_eq!(
+            url.work_page(event, RecordKind::Commitment),
+            "https://tada.example.org/events/00000000-0000-0000-0000-000000000000/commitments"
+        );
+        assert_eq!(
+            url.work_page(event, RecordKind::Action),
+            "https://tada.example.org/events/00000000-0000-0000-0000-000000000000/actions"
         );
     }
 
