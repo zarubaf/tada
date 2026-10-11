@@ -298,6 +298,7 @@ mod tests {
     use tada_app::audit::{AuditAction, AuditRole};
     use tada_app::caller::MemberCaller;
     use tada_app::caller::OrganizationRole::{Member, Owner};
+    use tada_app::caller::TestScope;
     use tada_app::domain::identity::{DisplayName, Email, EventRole};
 
     use super::*;

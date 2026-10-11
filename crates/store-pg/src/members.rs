@@ -556,6 +556,7 @@ impl MemberStore for Database {
 mod tests {
     use serde_json::json;
     use tada_app::caller::MemberCaller;
+    use tada_app::caller::TestScope;
     use tada_app::domain::identity::OrganizationRole;
     use tada_app::event_members::{self, Added, Changed};
     use tada_app::outbound::OutboundStore;

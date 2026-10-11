@@ -391,6 +391,7 @@ impl FactStore for Database {
 #[cfg(test)]
 mod tests {
     use jiff::civil::date;
+    use tada_app::caller::TestScope;
     use tada_app::caller::{Actor, ActorKind, MemberCaller, OrganizationRole};
     use tada_app::domain::facts::{
         CORE_CATALOG_VERSION, DateWindow, FactState, FactValue, Granularity, Label, ShortText,

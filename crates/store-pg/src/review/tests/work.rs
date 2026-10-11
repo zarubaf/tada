@@ -1,6 +1,7 @@
 //! The apply of proposals that create or change work records and parties (ADR 0068, ADR 0069).
 
 use tada_app::access::SourceReach;
+use tada_app::caller::TestScope;
 use tada_app::domain::ids::{CommitmentId, LocalIdKind, PersonId};
 use tada_app::records::{EvidenceStore, RecordRef};
 use tada_app::review::{LocalRecord, RecordEditInput};

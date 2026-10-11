@@ -4,6 +4,7 @@
 
 #![allow(clippy::unwrap_used)]
 
+use tada_app::caller::TestScope;
 use tada_app::caller::{MemberCaller, OrgScope, OrganizationRole};
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::domain::redaction::{RedactionReason, RedactionTarget, RedactionTargetKind};

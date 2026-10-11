@@ -6,6 +6,7 @@
 
 use jiff::Timestamp;
 use tada_app::access::SourceReach;
+use tada_app::caller::TestScope;
 use tada_app::caller::{MemberCaller, OrgScope, OrganizationRole};
 use tada_app::clock::Clock;
 use tada_app::domain::RecordVersion;

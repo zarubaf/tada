@@ -48,7 +48,9 @@ NON_PORTS = {
     "MayPropose": "a marker on a caller type, no data access",
     "Principal": "describes a caller type, no data access",
     "RoutingLookup": "reads owners and leads that a port loaded before, no data access",
+    "Sealed": "seals the caller traits and gives the scope of a caller inside the app, no data access",
     "ServiceIdentity": "describes a service caller type, no data access",
+    "TestScope": "gives the scope of a caller to the tests of other crates, no data access",
     "WorkRecord": "reads the owner and the workstream of a work record view, no data access",
 }
 TRAIT = re.compile(r"\bpub(?:\([^)]*\))?\s+trait\s+(\w+)[^{;]*\{")

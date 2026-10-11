@@ -322,6 +322,7 @@ fn words(text: &str) -> impl Iterator<Item = (usize, String)> + '_ {
 #[cfg(test)]
 mod tests {
     use sha2::{Digest, Sha256};
+    use tada_app::caller::TestScope;
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::domain::ids::{OrganizationId, UserId};
     use tada_app::domain::sources::Passage;

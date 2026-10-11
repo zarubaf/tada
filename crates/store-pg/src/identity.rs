@@ -145,6 +145,7 @@ mod tests {
     use crate::testing::{TestDatabase, sqlstate};
     use sqlx::types::Uuid;
     use tada_app::caller::MemberCaller;
+    use tada_app::caller::TestScope;
     use tada_app::domain::identity::Email;
 
     fn name(text: &str) -> DisplayName {

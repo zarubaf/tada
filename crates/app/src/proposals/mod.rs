@@ -56,7 +56,7 @@ use crate::workstreams::WorkstreamStore;
 ///
 /// ```compile_fail,E0277
 /// use tada_app::access::Principal;
-/// use tada_app::caller::{Actor, AiCaller, OrgScope, OrganizationRole};
+/// use tada_app::caller::{Actor, AiCaller, OrganizationRole};
 /// use tada_app::domain::ids::UserId;
 /// use tada_app::proposals::MayPropose;
 ///
@@ -65,9 +65,6 @@ use crate::workstreams::WorkstreamStore;
 /// impl Principal for Wrapper {
 ///     fn user_id(&self) -> UserId {
 ///         self.0.user_id()
-///     }
-///     fn scope(&self) -> OrgScope {
-///         self.0.scope()
 ///     }
 ///     fn organization_role(&self) -> OrganizationRole {
 ///         self.0.organization_role()
@@ -83,6 +80,10 @@ use crate::workstreams::WorkstreamStore;
 ///     }
 /// }
 /// ```
+#[expect(
+    private_bounds,
+    reason = "the crate-private supertrait seals the trait (ADR 0039)"
+)]
 pub trait MayPropose: Principal + crate::caller::sealed::Sealed {
     /// The author of the changeset and of its audit event.
     fn actor(&self) -> Actor;

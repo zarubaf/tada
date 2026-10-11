@@ -184,6 +184,7 @@ impl WorkstreamStore for Database {
 #[cfg(test)]
 mod tests {
     use tada_app::audit::AuditAction;
+    use tada_app::caller::TestScope;
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::domain::identity::{DisplayName, Email};
 

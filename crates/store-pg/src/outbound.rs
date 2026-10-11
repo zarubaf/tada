@@ -209,6 +209,7 @@ mod tests {
     use secrecy::ExposeSecret;
     use sqlx::types::Uuid;
     use tada_app::caller::MemberCaller;
+    use tada_app::caller::TestScope;
     use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
     use tada_app::domain::ids::{InvitationId, OrganizationId, UserId};
     use tada_app::outbound::{OutboundStore, Outcome, Purpose, SEND_JOB};

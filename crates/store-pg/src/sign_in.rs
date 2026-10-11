@@ -454,6 +454,7 @@ mod tests {
     use jiff::SignedDuration;
     use secrecy::ExposeSecret;
     use tada_app::caller::MemberCaller;
+    use tada_app::caller::TestScope;
     use tada_app::domain::identity::{DisplayName, OrganizationRole};
     use tada_app::outbound::{OutboundStore, Purpose};
     use tada_app::rate_limit::{MAIL_COOLDOWN, SIGN_IN_PER_IP, sign_in_limits};

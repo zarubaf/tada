@@ -248,28 +248,54 @@ impl MemberCaller {
     }
 
     /// The organization that all reads and writes of this caller stay in.
-    pub fn scope(&self) -> OrgScope {
+    /// Only this crate reads it: code outside never holds the scope of a caller (ADR 0010).
+    pub(crate) fn scope(&self) -> OrgScope {
         OrgScope(self.organization_id)
     }
 }
 
-/// Seals the caller traits `Principal` and `MayPropose` (ADR 0039).
+/// Seals the caller traits `Principal` and `MayPropose` (ADR 0039) and holds the scope of a caller.
 /// Only the callers of this module implement `Sealed`, so no other crate can implement the traits.
+/// The trait is crate-private, so no other crate can call `scope`, also not through a bound `P: Principal`.
+/// Code outside this crate never holds the scope of a caller, so it cannot call a port with it.
 pub(crate) mod sealed {
-    pub trait Sealed {}
+    use super::OrgScope;
+
+    pub(crate) trait Sealed {
+        /// The organization that all reads and writes of the caller stay in.
+        fn scope(&self) -> OrgScope;
+    }
 }
 
-impl sealed::Sealed for MemberCaller {}
+impl sealed::Sealed for MemberCaller {
+    fn scope(&self) -> OrgScope {
+        MemberCaller::scope(self)
+    }
+}
 
-impl sealed::Sealed for AiCaller {}
+impl sealed::Sealed for AiCaller {
+    fn scope(&self) -> OrgScope {
+        self.principal.scope()
+    }
+}
+
+/// For tests of other crates only: the scope of a caller, to set up and read a store directly.
+/// Production code outside this crate never holds the scope of a caller (ADR 0010).
+#[cfg(feature = "testing")]
+pub trait TestScope {
+    fn scope(&self) -> OrgScope;
+}
+
+#[cfg(feature = "testing")]
+impl<P: crate::access::Principal> TestScope for P {
+    fn scope(&self) -> OrgScope {
+        sealed::Sealed::scope(self)
+    }
+}
 
 impl crate::access::Principal for MemberCaller {
     fn user_id(&self) -> UserId {
         self.user_id
-    }
-
-    fn scope(&self) -> OrgScope {
-        MemberCaller::scope(self)
     }
 
     fn organization_role(&self) -> OrganizationRole {
@@ -392,10 +418,6 @@ impl AiCaller {
 impl crate::access::Principal for AiCaller {
     fn user_id(&self) -> UserId {
         self.principal.user_id
-    }
-
-    fn scope(&self) -> OrgScope {
-        self.principal.scope()
     }
 
     fn organization_role(&self) -> OrganizationRole {
@@ -633,7 +655,7 @@ mod tests {
 
         let ai = ai(TokenScope::Propose);
         assert_eq!(Principal::user_id(&ai), member().user_id());
-        assert_eq!(Principal::scope(&ai), member().scope());
+        assert_eq!(sealed::Sealed::scope(&ai), member().scope());
         assert_eq!(ai.organization_role(), OrganizationRole::Member);
         assert_eq!(
             ai.origin(),
@@ -652,7 +674,7 @@ mod tests {
         let agent = AiCaller::for_agent(member(), "pm-digest");
         assert_eq!(agent.origin(), AiOrigin::Agent { task: "pm-digest" });
         assert_eq!(Principal::user_id(&agent), member().user_id());
-        assert_eq!(Principal::scope(&agent), member().scope());
+        assert_eq!(sealed::Sealed::scope(&agent), member().scope());
         assert_eq!(agent.token_scope(), TokenScope::Read);
         assert!(!agent.credential_allows_proposals());
         let actor = agent.actor();

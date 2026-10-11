@@ -249,6 +249,7 @@ mod tests {
     use jiff::SignedDuration;
     use tada_app::caller::MemberCaller;
     use tada_app::caller::OrganizationRole::Member;
+    use tada_app::caller::TestScope;
     use tada_app::domain::identity::{DisplayName, Email};
 
     use super::*;

@@ -1,5 +1,6 @@
 //! Draft proposals and their acceptance (ADR 0051).
 
+use tada_app::caller::TestScope;
 use tada_app::documents::{DocumentStore, DraftStatus, VersionContent};
 use tada_app::domain::ids::DocumentId;
 use tada_app::domain::sources::SourceText;

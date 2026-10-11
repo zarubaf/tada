@@ -9,6 +9,7 @@ mod support;
 use std::io;
 use std::sync::Arc;
 use std::time::Duration;
+use tada_app::caller::TestScope;
 
 use bytes::Bytes;
 use futures::TryStreamExt;

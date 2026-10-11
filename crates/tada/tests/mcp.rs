@@ -6,6 +6,7 @@
 mod support;
 
 use std::sync::Arc;
+use tada_app::caller::TestScope;
 
 use axum::Router;
 use axum::body::Body;

@@ -831,6 +831,7 @@ impl DocumentStore for Database {
 mod tests {
     use sha2::{Digest, Sha256};
     use tada_app::audit::AuditAction;
+    use tada_app::caller::TestScope;
     use tada_app::caller::{MemberCaller, OrganizationRole};
     use tada_app::domain::identity::{DisplayName, Email};
     use tada_app::domain::ids::OrganizationId;
