@@ -1,7 +1,7 @@
 //! The model port (ADRs 0010, 0047 and 0077): one call to a language model, with messages, tools and a
 //! structured result. An adapter implements it for one provider; the agent runner calls it.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 
 use async_trait::async_trait;
@@ -170,6 +170,11 @@ impl TaskModels {
     pub fn get(&self, task: &str) -> Option<&TaskModel> {
         self.0.get(task)
     }
+
+    /// The models of all tasks, each once.
+    pub fn model_ids(&self) -> BTreeSet<&str> {
+        self.0.values().map(|task| task.model.as_str()).collect()
+    }
 }
 
 #[cfg(test)]
@@ -187,5 +192,6 @@ mod tests {
             })
         );
         assert_eq!(models.get("no-such-task"), None);
+        assert_eq!(models.model_ids(), BTreeSet::from(["claude-haiku-5-5"]));
     }
 }

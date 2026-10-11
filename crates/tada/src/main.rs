@@ -5,13 +5,16 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
+use jiff::civil::Date;
+use tada::ai_price::SetPrice;
 use tada::bootstrap::BootstrapCommand;
 use tada::export::ExportCommand;
 use tada::settings::{
-    self, BootstrapSettings, ExportSettings, MigrateSettings, RedactionsSettings, ServeSettings,
-    TelegramSettings, WorkerSettings,
+    self, AiPriceSettings, BootstrapSettings, ExportSettings, MigrateSettings, RedactionsSettings,
+    ServeSettings, TelegramSettings, WorkerSettings,
 };
-use tada::{bootstrap, export, migrate, redactions, run, serve, telegram, worker};
+use tada::{ai_price, bootstrap, export, migrate, redactions, run, serve, telegram, worker};
+use tada_app::ai_cost::{Chf, Price};
 use tada_app::domain::identity::{Email, OrganizationName, OrganizationSlug};
 
 #[derive(Debug, Parser)]
@@ -62,6 +65,11 @@ enum Command {
         #[command(subcommand)]
         command: RedactionsCommand,
     },
+    /// Work with the price table of the AI models (ADR 0077). AI work runs only for a model with a price.
+    AiPrice {
+        #[command(subcommand)]
+        command: AiPriceCommand,
+    },
     /// Print the settings reference as Markdown.
     Settings,
     /// Print the OpenAPI document of the HTTP API.
@@ -75,6 +83,27 @@ enum RedactionsCommand {
     /// Apply each redaction of the deletion journal that the database does not hold, in time order.
     /// Run it after each restore of the database. It is idempotent.
     Replay,
+}
+
+#[derive(Debug, Subcommand)]
+enum AiPriceCommand {
+    /// Set the price of a model from a date. A price of the same model and date is replaced.
+    Set {
+        /// The model ID, as in `ai/models.json`, for example `claude-haiku-5-5`.
+        #[arg(long)]
+        model: String,
+        /// The price of one million input tokens in Swiss francs, for example `0.80`.
+        #[arg(long)]
+        input_chf_per_mtok: Chf,
+        /// The price of one million output tokens in Swiss francs, for example `4`.
+        #[arg(long)]
+        output_chf_per_mtok: Chf,
+        /// The first day of the price, for example `2026-10-01`. The days are in UTC.
+        #[arg(long)]
+        valid_from: Date,
+    },
+    /// Print the price table as tab-separated text.
+    List,
 }
 
 fn main() -> ExitCode {
@@ -114,6 +143,30 @@ fn main() -> ExitCode {
         Command::Redactions {
             command: RedactionsCommand::Replay,
         } => run::<RedactionsSettings, _>("redactions", redactions::run),
+        Command::AiPrice {
+            command:
+                AiPriceCommand::Set {
+                    model,
+                    input_chf_per_mtok,
+                    output_chf_per_mtok,
+                    valid_from,
+                },
+        } => run::<AiPriceSettings, _>("ai-price", |settings| {
+            ai_price::set(
+                settings,
+                SetPrice {
+                    model_id: model,
+                    valid_from,
+                    price: Price {
+                        input_per_mtok: input_chf_per_mtok,
+                        output_per_mtok: output_chf_per_mtok,
+                    },
+                },
+            )
+        }),
+        Command::AiPrice {
+            command: AiPriceCommand::List,
+        } => run::<AiPriceSettings, _>("ai-price", ai_price::list),
         Command::Settings => print(&settings::reference()),
         Command::Openapi => match tada_api::openapi().to_pretty_json() {
             Ok(json) => print(&format!("{json}\n")),

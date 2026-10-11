@@ -60,7 +60,7 @@ pm-ai-off = Die Erinnerungen verwenden die feste Vorlage.
 pm-ai-provider = KI-Anbieter
 pm-ai-configured = eingerichtet
 pm-ai-not-configured = nicht eingerichtet
-pm-ai-not-configured-help = Der Betrieb von tada hat keinen KI-Anbieter eingerichtet. Bis dahin verwenden die Erinnerungen die feste Vorlage.
+pm-ai-not-configured-help = Der Betrieb von tada hat den KI-Anbieter oder den Preis des KI-Modells noch nicht festgelegt. Bis dahin verwenden die Erinnerungen die feste Vorlage.
 pm-usage-label = Verbrauch in diesem Monat
 # $used and $cap: amounts, for example „CHF 3.20“.
 pm-usage = { $used } von { $cap }

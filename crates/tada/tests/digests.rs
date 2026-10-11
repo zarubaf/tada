@@ -676,6 +676,33 @@ async fn ai_off_sends_template() {
 }
 
 #[tokio::test]
+async fn ai_without_a_price_sends_template() {
+    let world = World::start().await;
+    world.set_ai(true).await;
+    world.test.execute(&["DELETE FROM ai_price"]).await;
+    world.action("Flyer drucken", "2026-09-14", "open").await;
+    let model = Arc::new(FakeModel::new([wording(&json!({
+        "intro": "Hallo.", "lines": [{"reference": "1", "text": "Flyer drucken."}],
+    }))]));
+    let messenger = FakeMessenger::new(SendOutcome::Sent);
+
+    check_and_send(
+        &world,
+        messenger.clone(),
+        Some(digest_ai(&world.test.database, model.clone())),
+    )
+    .await;
+
+    assert!(
+        model.requests().is_empty(),
+        "without a price, AI is not configured"
+    );
+    let text = &messenger.sent()[0].text;
+    assert!(text.contains("Flyer drucken"), "{text}");
+    assert!(!text.contains("Hallo."), "{text}");
+}
+
+#[tokio::test]
 async fn model_error_sends_template() {
     let world = World::start().await;
     world.set_ai(true).await;

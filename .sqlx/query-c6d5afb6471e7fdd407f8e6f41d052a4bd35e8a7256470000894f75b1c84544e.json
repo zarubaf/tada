@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT model_id, valid_from AS \"valid_from: jiff_sqlx::Date\",\n                      ceil(input_chf_per_mtok * 100000)::bigint AS \"input!\",\n                      ceil(output_chf_per_mtok * 100000)::bigint AS \"output!\"\n               FROM ai_price ORDER BY model_id, valid_from",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "model_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_price",
+            "name": "model_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "valid_from: jiff_sqlx::Date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "ai_price",
+            "name": "valid_from"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "input!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "output!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "c6d5afb6471e7fdd407f8e6f41d052a4bd35e8a7256470000894f75b1c84544e"
+}

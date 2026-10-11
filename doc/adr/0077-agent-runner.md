@@ -84,6 +84,11 @@ Cost control:
 
 - `ai_price` holds the price per million tokens in Swiss francs for each model and validity date.
   The operator converts from the provider currency.
+  The operator sets a price with `tada ai-price set --model <id> --input-chf-per-mtok <n> --output-chf-per-mtok <n> --valid-from <date>` and reads the table with `tada ai-price list`.
+  The command refuses a model that no task of `ai/models.json` uses.
+- Without a price for the model of the task on the current day (UTC), AI is not configured.
+  The runner cannot record the cost of a call without a price.
+  The AI PM page then shows that AI is not set up, and each digest uses the template.
 - `ai_usage` holds the organization, the optional event, the task, the prompt version, the model ID, the tokens, the cost and the time.
 - The cost of a digest goes to the organization.
 - `ai_cap` holds the monthly cap of an organization in Swiss francs.
@@ -91,7 +96,7 @@ Cost control:
   An owner or admin changes it ([ADR 0047](0047-model-adapter.md)).
 - A change of the cap or of the AI switch of the organization needs a sign-in in the last 15 minutes.
   The cap controls spending, and the switch starts or stops the transfer of titles and event names to the provider.
-- AI work runs only if the organization switched it on, the key and the check date are set, and the usage of the month is below the cap.
+- AI work runs only if the organization switched it on, the key, the check date and a price are set, and the usage of the month is below the cap.
   The check is before a run, so the usage can go above the cap by at most the cost limit of each run that started below it.
   The cap month is the calendar month in UTC.
 - No cache applies to `pm-digest`, because each input is new.

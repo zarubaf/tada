@@ -149,3 +149,62 @@ impl AiCostStore for Database {
         Ok(Some(version(changed, "ai_cap.version")?))
     }
 }
+
+/// One row of the price table, for `tada ai-price list`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AiPriceRow {
+    pub model_id: String,
+    pub valid_from: Date,
+    pub price: Price,
+}
+
+/// The price table of the installation. The operator changes it with `tada ai-price` (ADR 0077).
+impl Database {
+    /// Sets the price of `model_id` from `valid_from`, and replaces a price of the same day.
+    pub async fn set_ai_price(
+        &self,
+        model_id: &str,
+        valid_from: Date,
+        price: Price,
+    ) -> Result<(), StoreError> {
+        sqlx::query!(
+            "INSERT INTO ai_price (model_id, valid_from, input_chf_per_mtok, output_chf_per_mtok)
+             VALUES ($1, $2, round($3::bigint::numeric / 100000, 5), round($4::bigint::numeric / 100000, 5))
+             ON CONFLICT (model_id, valid_from) DO UPDATE
+             SET input_chf_per_mtok = EXCLUDED.input_chf_per_mtok,
+                 output_chf_per_mtok = EXCLUDED.output_chf_per_mtok",
+            model_id,
+            valid_from.to_sqlx() as _,
+            price.input_per_mtok.millirappen(),
+            price.output_per_mtok.millirappen(),
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(())
+    }
+
+    /// All prices, by model and date.
+    pub async fn ai_prices(&self) -> Result<Vec<AiPriceRow>, StoreError> {
+        let rows = sqlx::query!(
+            r#"SELECT model_id, valid_from AS "valid_from: jiff_sqlx::Date",
+                      ceil(input_chf_per_mtok * 100000)::bigint AS "input!",
+                      ceil(output_chf_per_mtok * 100000)::bigint AS "output!"
+               FROM ai_price ORDER BY model_id, valid_from"#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| AiPriceRow {
+                model_id: row.model_id,
+                valid_from: row.valid_from.to_jiff(),
+                price: Price {
+                    input_per_mtok: Chf::from_millirappen(row.input),
+                    output_per_mtok: Chf::from_millirappen(row.output),
+                },
+            })
+            .collect())
+    }
+}
