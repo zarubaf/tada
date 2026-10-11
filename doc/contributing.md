@@ -148,6 +148,20 @@ The advisory check finds its issues with `advisory`.
 Give an issue one kind label and one or more `A-` labels.
 Add `P-`, `S-` and `E-` labels when they help to plan the work.
 
+## Issues and pull requests
+
+Track the work in GitHub issues and pull requests.
+
+- Use the GitHub numbers of issues and pull requests as the only IDs.
+  Do not invent other IDs.
+- Do not put secrets or personal data into an issue or a pull request.
+  The repository is public.
+- Give each sub-slice of the roadmap a milestone.
+  Give each planned piece of work an issue in that milestone.
+- A pull request names the issues that it closes, for example `Closes #12`.
+- Open an issue for each finding that a review leaves open.
+  The issue states the effect on a person who uses tada.
+
 ## History
 
 - `main` has a linear history. Merge pull requests with rebase or squash.
