@@ -54,7 +54,8 @@ pub fn handlers(
 }
 
 pub async fn run(
-    (database, public_url, mail, smtp, storage): WorkerSettings,
+    // The AI settings are read and checked at start; the AI-PM digest uses them (ADR 0077).
+    (database, public_url, mail, smtp, storage, _ai): WorkerSettings,
 ) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;

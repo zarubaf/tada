@@ -47,6 +47,7 @@ NON_PORTS = {
     "Mailer": "sends a mail, no data access",
     "MayPropose": "a marker on a caller type, no data access",
     "Messenger": "sends a Telegram message, no data access",
+    "Model": "calls the model provider with the request that the caller built, no data access",
     "Principal": "describes a caller type, no data access",
     "RoutingLookup": "reads owners and leads that a port loaded before, no data access",
     "Sealed": "seals the caller traits and gives the scope of a caller inside the app, no data access",

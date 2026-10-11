@@ -41,6 +41,7 @@
 
 mod account_reminders;
 mod actor;
+mod ai_cost;
 mod audit;
 mod bootstrap;
 mod database;

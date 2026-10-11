@@ -742,6 +742,13 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
                    "paused": false, "ai_enabled": false, "expected_version": 1}),
             Expect::Writes,
         )],
+        // The AI state and the monthly AI cap.
+        "get_ai" => vec![get(api("/organization/ai".into()), READS)],
+        "set_ai_cap" => vec![post(
+            api("/organization/ai/set-cap".into()),
+            json!({"cap_chf": "40", "expected_version": 1}),
+            Expect::Writes,
+        )],
         _ => return None,
     };
     Some(attempts)

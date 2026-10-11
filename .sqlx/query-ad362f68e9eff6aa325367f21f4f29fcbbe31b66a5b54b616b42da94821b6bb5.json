@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ai_enabled FROM pm_policy WHERE organization_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ai_enabled",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "pm_policy",
+            "name": "ai_enabled"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ad362f68e9eff6aa325367f21f4f29fcbbe31b66a5b54b616b42da94821b6bb5"
+}
