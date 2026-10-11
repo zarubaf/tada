@@ -1,6 +1,7 @@
 //! The German texts of the bot, from the shared Fluent files (ADR 0005).
 
-use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};
+use fluent_bundle::concurrent::FluentBundle;
+use fluent_bundle::{FluentArgs, FluentResource};
 use tada_app::problem::ProblemCode;
 
 const DE_CH: &str = include_str!("../../../locales/de-CH/telegram.ftl");
@@ -11,7 +12,7 @@ impl Messages {
     pub(crate) fn new() -> Self {
         let resource =
             FluentResource::try_new(DE_CH.to_owned()).unwrap_or_else(|(resource, _)| resource);
-        let mut bundle = FluentBundle::new(vec!["de-CH".parse().unwrap_or_default()]);
+        let mut bundle = FluentBundle::new_concurrent(vec!["de-CH".parse().unwrap_or_default()]);
         bundle.set_use_isolating(false);
         let _ = bundle.add_resource(resource);
         Self(bundle)
