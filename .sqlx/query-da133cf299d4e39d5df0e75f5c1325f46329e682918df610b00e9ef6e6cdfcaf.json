@@ -1,0 +1,103 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.record_kind, s.record_id, s.notified_version,\n                      s.notified_at AS \"notified_at: jiff_sqlx::Timestamp\", s.response, s.response_version,\n                      s.response_at AS \"response_at: jiff_sqlx::Timestamp\"\n               FROM reminder_state s\n               JOIN unnest($3::text[], $4::uuid[]) AS r (kind, id)\n                 ON r.kind = s.record_kind AND r.id = s.record_id\n               WHERE s.organization_id = $1 AND s.user_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "record_kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reminder_state",
+            "name": "record_kind"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "record_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "reminder_state",
+            "name": "record_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "notified_version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "reminder_state",
+            "name": "notified_version"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "notified_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "reminder_state",
+            "name": "notified_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "response",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reminder_state",
+            "name": "response"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "response_version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "reminder_state",
+            "name": "response_version"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "response_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "reminder_state",
+            "name": "response_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "TextArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "da133cf299d4e39d5df0e75f5c1325f46329e682918df610b00e9ef6e6cdfcaf"
+}

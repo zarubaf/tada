@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO outbound_intent (id, organization_id, user_id, purpose, message_id, created_at)\n             VALUES ($1, $2, $3, 'telegram-digest', $4, $5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "04cc98718ef49258d51b3a2c1dbf262756211912b827ca1d59f5d229e0e4e3fe"
+}

@@ -36,6 +36,7 @@ use tada_app::caller::{OrganizationRole, ServiceCaller, TelegramGateway};
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::jobs::{Handlers, Ran, run_next};
 use tada_app::outbound::SEND_JOB;
+use tada_app::pm::{PM_CHECK_JOB, SEND_DIGEST_JOB};
 use tada_app::redaction::JOURNAL_JOB;
 use tada_app::telegram::{TelegramName, TelegramUserId, accept_link_claim, claim_link_code};
 use tada_store_pg::Database;
@@ -97,7 +98,7 @@ const NOT_ORGANIZATION_SCOPED: &[(&str, &str)] = &[
 ];
 
 /// The job kinds that the isolation test runs. Each kind of a handler of the worker needs a case.
-const JOB_KINDS: &[&str] = &[SEND_JOB, JOURNAL_JOB];
+const JOB_KINDS: &[&str] = &[SEND_JOB, JOURNAL_JOB, PM_CHECK_JOB];
 
 /// The slug and the name of organization B, and a word that only the texts of B hold.
 /// The checks ignore the case of letters.
@@ -1597,5 +1598,72 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
             .iter()
             .all(|key| !key.starts_with(JOURNAL_PREFIX)),
         "the journal job of A wrote the redaction of B"
+    );
+
+    // The daily check of A plans the digest of the member of both organizations with the work of A only, and
+    // leaves B as it is. The member opted in and has an overdue action in each organization.
+    let action = |organization: OrganizationId, event: &str| {
+        format!(
+            "INSERT INTO action (id, organization_id, event_id, local_number, title, owner_user_id, due_date,
+                                 status, version, created_at, updated_at)
+             VALUES ('{}', '{organization}', '{event}',
+                     (SELECT coalesce(max(local_number), 0) + 1 FROM action WHERE event_id = '{event}'),
+                     'Festzelt aufstellen', '{}', '2000-01-03', 'open', 1, now(), now())",
+            Uuid::now_v7(),
+            world.both,
+        )
+    };
+    world
+        .test
+        .execute(&[
+            &format!(
+                "UPDATE app_user SET reminders_opt_in_at = now() WHERE id = '{}'",
+                world.both
+            ),
+            &format!(
+                "INSERT INTO telegram_identity (telegram_user_id, user_id, linked_at)
+                 VALUES (1004, '{}', now()) ON CONFLICT (user_id) DO NOTHING",
+                world.both
+            ),
+            &action(world.a, &world.targets.a_event),
+            &action(world.b, &world.targets.b_event),
+            &format!(
+                "INSERT INTO job (id, organization_id, kind, version, payload, run_at, created_at)
+                 VALUES ('{}', '{}', '{PM_CHECK_JOB}', 1, '{{}}', now() - interval '1 day', now())",
+                Uuid::now_v7(),
+                world.a,
+            ),
+        ])
+        .await;
+    let b_rows = rows(&world.test, world.b).await;
+    let ran = run_next(
+        &world.test.database,
+        &handlers,
+        Uuid::now_v7(),
+        Duration::from_secs(60),
+    )
+    .await
+    .unwrap();
+    assert!(matches!(ran, Ran::Completed(_)), "{ran:?}");
+    let foreign: i64 = world
+        .test
+        .scalar(&format!(
+            "SELECT count(*) FROM digest_item d
+             WHERE d.organization_id <> '{a}'
+                OR NOT EXISTS (SELECT 1 FROM action r WHERE r.id = d.record_id AND r.organization_id = '{a}'
+                               UNION ALL
+                               SELECT 1 FROM commitment r WHERE r.id = d.record_id AND r.organization_id = '{a}')
+                OR NOT EXISTS (SELECT 1 FROM job j WHERE j.kind = '{SEND_DIGEST_JOB}'
+                               AND j.payload->>'intent_id' = d.intent_id::text AND j.organization_id = '{a}')",
+            a = world.a,
+        ))
+        .await;
+    let planned: i64 = world.test.scalar("SELECT count(*) FROM digest_item").await;
+    assert!(planned >= 1, "the check of A planned no digest");
+    assert_eq!(foreign, 0, "the check of A plans the work of A only");
+    assert_eq!(
+        rows(&world.test, world.b).await,
+        b_rows,
+        "the check of A changed the rows of B"
     );
 }
