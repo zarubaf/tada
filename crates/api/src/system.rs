@@ -34,6 +34,9 @@ pub struct SystemVersion {
     pub product: String,
     /// The short Git commit of the build.
     pub commit: String,
+    /// The opaque ID of the web client that the server delivers, a random value of each build (ADR 0078).
+    /// A client with another ID must load the page again.
+    pub web_build: String,
     /// The number of the last applied migration.
     pub schema: i64,
     /// The version of the HTTP API.
@@ -64,6 +67,7 @@ impl From<AppSystemVersion> for SystemVersion {
         Self {
             product: version.product,
             commit: version.commit,
+            web_build: version.web_build,
             schema: version.schema,
             api: version.api.to_owned(),
             mcp: version.mcp,

@@ -1,8 +1,12 @@
-//! Writes the commit and the build time into the build (ADR 0075).
+//! Writes the commit, the build time and the build ID into the build (ADRs 0075 and 0078).
 //!
 //! The commit comes from `TADA_BUILD_COMMIT`, else from `git rev-parse --short HEAD`, else it is `unknown`.
 //! `SOURCE_DATE_EPOCH` fixes the build time for a reproducible build.
+//! The build ID comes from `TADA_BUILD_ID`, which the image build also gives to the web build. Without it,
+//! each run of this script makes a new random ID of 128 bits.
 
+use std::collections::hash_map::RandomState;
+use std::hash::BuildHasher;
 use std::path::Path;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -13,9 +17,26 @@ const SHORT: usize = 7;
 fn main() {
     println!("cargo:rerun-if-env-changed=TADA_BUILD_COMMIT");
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
+    println!("cargo:rerun-if-env-changed=TADA_BUILD_ID");
     watch_git();
     println!("cargo:rustc-env=TADA_BUILD_COMMIT={}", commit());
     println!("cargo:rustc-env=TADA_BUILT_AT={}", built_at());
+    println!("cargo:rustc-env=TADA_BUILD_ID={}", build_id());
+}
+
+/// `TADA_BUILD_ID`, or else a random ID of 32 hex digits.
+fn build_id() -> String {
+    std::env::var("TADA_BUILD_ID")
+        .ok()
+        .map(|id| id.trim().to_owned())
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(random_id)
+}
+
+/// 128 random bits as hex. The keys of each `RandomState` come from the random source of the system.
+fn random_id() -> String {
+    let half = || RandomState::new().hash_one(0_u8);
+    format!("{:016x}{:016x}", half(), half())
 }
 
 /// Reruns the script when a commit, a checkout or a ref update changes `HEAD`.

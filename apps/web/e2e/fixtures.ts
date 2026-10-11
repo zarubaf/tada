@@ -78,6 +78,8 @@ export async function fakeSession(page: Page, info: unknown = sessionInfo): Prom
   await page.route("**/api/v1/session", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(info) }),
   );
+  // The footer of the signed-in shell shows the build of the server (ADR 0078).
+  await fakeVersion(page);
 }
 
 /** The fake API of the browser checks: the answer of `GET /api/v1/events`. */
@@ -196,20 +198,29 @@ export async function textOverflows(page: Page): Promise<string[]> {
   });
 }
 
-/** The build identity of the e2e build (`vite.config.ts`). */
-export const e2eBuild = { version: "0.0.0", commit: "1a2b3c4" } as const;
+/**
+ * The build identity of the e2e build. The client holds only the fixed build ID of `vite.config.ts`
+ * (ADR 0078); the fake server reports the version and the commit.
+ */
+export const e2eBuild = {
+  version: "0.0.0",
+  commit: "1a2b3c4",
+  webBuild: "0123456789abcdef0123456789abcdef",
+} as const;
 
 /**
  * The fake API of the versions: the answer of `GET /api/v1/system/version`. By default the server
- * runs the build of the client, and the worker still runs the previous release.
+ * runs the build of the client, and the worker still runs the previous release. A later call
+ * replaces the answer of an earlier one.
  */
 export async function fakeVersion(
   page: Page,
-  server: { version: string; commit: string } = e2eBuild,
+  server: { version: string; commit: string; webBuild: string } = e2eBuild,
 ): Promise<void> {
   const body = {
     product: server.version,
     commit: server.commit,
+    web_build: server.webBuild,
     schema: 27,
     api: "v1",
     mcp: server.version,

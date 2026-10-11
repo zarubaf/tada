@@ -19,6 +19,8 @@ COPY . .
 ENV SQLX_OFFLINE=true
 # The build context has no .git, so the commit comes from the build (ADR 0075).
 ARG TADA_BUILD_COMMIT
+# The random build ID; the web build gets the same value (ADR 0078).
+ARG TADA_BUILD_ID
 RUN cargo build --release --locked --package tada
 
 FROM node:24.21.0-trixie-slim@sha256:173f125896c3b47ddf056734c7ea789d04595a6a08769a8f78e0df642781fb66 AS web
@@ -30,6 +32,7 @@ COPY contracts /build/contracts
 COPY locales /build/locales
 COPY apps/web ./
 ARG TADA_BUILD_COMMIT
+ARG TADA_BUILD_ID
 RUN pnpm generate && pnpm build
 
 FROM gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2

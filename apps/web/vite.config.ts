@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vitest/config";
@@ -48,43 +48,19 @@ function layerOrderFirst(): Plugin {
   };
 }
 
-// The build identity (ADR 0075). The commit has seven characters, as the one of the binary.
-function buildCommit(): string {
-  const given = process.env.TADA_BUILD_COMMIT?.trim();
-  if (given) return given.slice(0, 7);
-  try {
-    return execFileSync("git", ["rev-parse", "--short=7", "HEAD"], { encoding: "utf8" }).trim();
-  } catch {
-    return "unknown";
-  }
-}
+/** The fixed build ID of the unit tests and the browser checks; their fake servers answer with it. */
+const TEST_BUILD_ID = "0123456789abcdef0123456789abcdef";
 
-// The build time as `YYYY-MM-DDTHH:MM:SSZ`; SOURCE_DATE_EPOCH fixes it, as it does for the binary.
-function builtAt(): string {
-  const epoch = Number(process.env.SOURCE_DATE_EPOCH);
-  const date =
-    Number.isFinite(epoch) && process.env.SOURCE_DATE_EPOCH ? new Date(epoch * 1000) : new Date();
-  return date.toISOString().replace(/\.\d{3}Z$/, "Z");
-}
-
-const { version } = JSON.parse(
-  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
-) as {
-  version: string;
-};
-
-// The build identity in the client. The browser checks build in the mode `e2e`; their screenshots
-// show the footer, so that build has a fixed identity that does not change with each commit.
+/**
+ * The build ID (ADR 0078): `TADA_BUILD_ID`, which the image build also gives to the binary, or else a
+ * random value of 128 bits for each build. The client holds only this ID, so its files do not show
+ * the version or the commit (ADR 0075). The unit tests and the browser checks use a fixed ID.
+ */
 function defines(mode: string) {
-  const identity =
-    mode === "e2e"
-      ? { version: "0.0.0", commit: "1a2b3c4", builtAt: "2030-01-01T00:00:00Z" }
-      : { version, commit: buildCommit(), builtAt: builtAt() };
-  return {
-    __TADA_VERSION__: JSON.stringify(identity.version),
-    __TADA_COMMIT__: JSON.stringify(identity.commit),
-    __TADA_BUILT_AT__: JSON.stringify(identity.builtAt),
-  };
+  const given = process.env.TADA_BUILD_ID?.trim();
+  const id =
+    mode === "e2e" || mode === "test" ? TEST_BUILD_ID : given || randomBytes(16).toString("hex");
+  return { __TADA_BUILD_ID__: JSON.stringify(id) };
 }
 
 // The API and the MCP server run on `tada serve` (TADA_PORT 8080). In production, serve delivers the built files itself (ADR 0005).

@@ -14,7 +14,8 @@ import {
   viewports,
 } from "./fixtures";
 
-const footer = `tada ${e2eBuild.version} · ${e2eBuild.commit}`;
+const ownFooter = `tada ${e2eBuild.version} · ${e2eBuild.commit}`;
+const other = { version: "0.0.1", commit: "9f8e7d6", webBuild: "fedcba9876543210fedcba9876543210" };
 
 async function noAxeViolation(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page })
@@ -23,8 +24,11 @@ async function noAxeViolation(page: Page): Promise<void> {
   expect(results.violations).toEqual([]);
 }
 
-/** Opens the list of the components: from the footer on wide layouts, from the member menu on narrow ones. */
-async function openComponentList(page: Page, narrow: boolean): Promise<void> {
+/**
+ * Opens the list of the components: from the footer on wide layouts, from the member menu on narrow
+ * ones. The footer shows the build of the server (ADR 0078).
+ */
+async function openComponentList(page: Page, narrow: boolean, footer = ownFooter): Promise<void> {
   if (narrow) {
     await page.getByRole("button", { name: "Anna Muster" }).click();
     await page.getByRole("menuitem", { name: `Versionen (${footer})` }).click();
@@ -58,14 +62,14 @@ test("footer_shows_version: the footer shows the build and opens the components"
 
   // Escape closes the sheet, and focus returns to the footer.
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: footer })).toBeFocused();
+  await expect(page.getByRole("button", { name: ownFooter })).toBeFocused();
 });
 
 test("mismatch_asks_reload: another server build asks to load the page again", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await fakeSession(page);
   await fakeEvents(page, 200, { items: events });
-  await fakeVersion(page, { version: "0.0.1", commit: "9f8e7d6" });
+  await fakeVersion(page, other);
   await page.goto("/events");
 
   await expect(
@@ -102,7 +106,11 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page);
       await fakeEvents(page, 200, { items: events });
-      await fakeVersion(page, { version: "0.0.1", commit: "9f8e7d6" });
+      await fakeVersion(page, {
+        version: "0.0.1",
+        commit: "9f8e7d6",
+        webBuild: "fedcba9876543210fedcba9876543210",
+      });
       await page.goto("/events");
       await setTheme(page, theme);
       await expect(
@@ -112,7 +120,13 @@ for (const viewport of viewports) {
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`reload-${theme}-${viewport.name}.png`);
 
-      await openComponentList(page, viewport.width < 640);
+      await openComponentList(
+        page,
+        viewport.width < 640,
+        `tada ${other.version} · ${other.commit}`,
+      );
+      // The client knows only its own build ID, so the list shows it.
+      await expect(page.getByRole("row", { name: /Web-Client/ })).toContainText(e2eBuild.webBuild);
       await expect(page.getByRole("table", { name: "Laufende Prozesse" })).toBeVisible();
       await noAxeViolation(page);
       expect(await textOverflows(page)).toEqual([]);

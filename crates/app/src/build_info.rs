@@ -10,6 +10,10 @@ pub struct BuildInfo {
     pub commit: &'static str,
     /// The build time as `YYYY-MM-DDTHH:MM:SSZ`.
     pub built_at: &'static str,
+    /// The random ID of this build (ADR 0078). The web client of the same build has the same ID, and the
+    /// client compares the two. Nobody can compute the version or the commit from the ID, but the ID of a public
+    /// image is easy to look up.
+    pub build_id: &'static str,
 }
 
 /// A process role of the binary. Each role writes a heartbeat with its name.

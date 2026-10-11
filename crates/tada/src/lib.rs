@@ -23,12 +23,13 @@ use tada_store_pg::Database;
 
 use crate::settings::{Loaded, Logging, MigrateSettings, Section};
 
-/// The build of this binary (ADR 0075). `build.rs` writes the commit and the build time.
+/// The build of this binary (ADR 0075). `build.rs` writes the commit, the build time and the build ID.
 /// The stamp lives in the binary crate, so a new commit rebuilds only this crate.
 pub const BUILD: BuildInfo = BuildInfo {
     version: env!("CARGO_PKG_VERSION"),
     commit: env!("TADA_BUILD_COMMIT"),
     built_at: env!("TADA_BUILT_AT"),
+    build_id: env!("TADA_BUILD_ID"),
 };
 
 /// The exit code for invalid settings (ADR 0036).

@@ -11782,6 +11782,7 @@
         "required": [
           "product",
           "commit",
+          "web_build",
           "schema",
           "api",
           "mcp",
@@ -11796,6 +11797,10 @@
           "commit": {
             "type": "string",
             "description": "The short Git commit of the build."
+          },
+          "web_build": {
+            "type": "string",
+            "description": "The opaque ID of the web client that the server delivers, a random value of each build (ADR 0078).\nA client with another ID must load the page again."
           },
           "schema": {
             "type": "integer",

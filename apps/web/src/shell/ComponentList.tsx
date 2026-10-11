@@ -9,7 +9,7 @@ import { Sheet } from "../ui/Sheet";
 import { SkeletonLines } from "../ui/Skeleton";
 import { StatusLabel } from "../ui/StatusLabel";
 import styles from "./ComponentList.module.css";
-import { type BuildIdentity, CLIENT, differs, serverIdentity } from "./version";
+import { CLIENT_BUILD_ID, outdated } from "./version";
 
 const seenFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "short", timeStyle: "short" });
 
@@ -26,19 +26,35 @@ interface Row {
   differs?: boolean;
 }
 
+interface BuildIdentity {
+  version: string;
+  commit: string;
+}
+
 /** `0.3.0 · 1a2b3c4`; „unbekannt“ for a role of a release before its heartbeat had a version. */
 function buildText({ version, commit }: BuildIdentity): string {
   return version === "unknown" ? t("versions-unknown") : `${version} · ${commit}`;
 }
 
+/**
+ * True if a role runs another build than the server. A build without Git gives the commit
+ * `unknown`; then only the versions count.
+ */
+function differs(server: BuildIdentity, role: BuildIdentity): boolean {
+  const commitsKnown = server.commit !== "unknown" && role.commit !== "unknown";
+  return server.version !== role.version || (commitsKnown && server.commit !== role.commit);
+}
+
 function componentsOf(version: SystemVersion): Row[] {
-  const server = serverIdentity(version);
+  const server = { version: version.product, commit: version.commit };
+  const old = outdated(version);
   return [
     {
       id: "web",
       name: t("versions-web"),
-      version: buildText(CLIENT),
-      differs: differs(CLIENT, server),
+      // The client knows only its opaque build ID (ADR 0078). It is the build of the server, or another one.
+      version: old ? CLIENT_BUILD_ID : buildText(server),
+      differs: old,
     },
     { id: "server", name: t("versions-server"), version: buildText(server) },
     { id: "schema", name: t("versions-schema"), version: String(version.schema) },
@@ -147,7 +163,10 @@ export function ComponentList({ api, onClose }: { api: Api; onClose: () => void 
                           id: role.role,
                           name: role.role,
                           version: buildText(role),
-                          differs: differs(role, serverIdentity(state.version)),
+                          differs: differs(
+                            { version: state.version.product, commit: state.version.commit },
+                            role,
+                          ),
                         }}
                       />
                     ),
