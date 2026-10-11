@@ -8,7 +8,7 @@ mod support;
 use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
 use support::{MailApp, SESSION_COOKIE};
-use tada_app::build_info::{BuildInfo, Role};
+use tada_app::build_info::{BuildInfo, ProcessRole};
 use tada_app::clock::Clock;
 use tada_app::domain::identity::{DisplayName, Email, OrganizationRole};
 use uuid::Uuid;
@@ -50,7 +50,7 @@ async fn get(app: &MailApp, cookie: Option<&str>) -> (StatusCode, Value) {
 }
 
 /// Records a heartbeat of the role.
-async fn beat(app: &MailApp, role: Role, build: &BuildInfo) {
+async fn beat(app: &MailApp, role: ProcessRole, build: &BuildInfo) {
     app.test
         .database
         .record_heartbeat(Uuid::now_v7(), role, build)
@@ -61,7 +61,7 @@ async fn beat(app: &MailApp, role: Role, build: &BuildInfo) {
 #[tokio::test]
 async fn system_version_needs_sign_in() {
     let app = MailApp::start().await;
-    beat(&app, Role::Worker, &tada::BUILD).await;
+    beat(&app, ProcessRole::Worker, &tada::BUILD).await;
     let (status, body) = get(&app, None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     // The problem names no version.
@@ -72,8 +72,8 @@ async fn system_version_needs_sign_in() {
 async fn system_version_lists_roles_and_marks_mismatch() {
     let app = MailApp::start().await;
     let cookie = member(&app).await;
-    beat(&app, Role::Serve, &tada::BUILD).await;
-    beat(&app, Role::Worker, &tada::BUILD).await;
+    beat(&app, ProcessRole::Serve, &tada::BUILD).await;
+    beat(&app, ProcessRole::Worker, &tada::BUILD).await;
 
     let (status, body) = get(&app, Some(&cookie)).await;
     assert_eq!(status, StatusCode::OK);
@@ -87,7 +87,7 @@ async fn system_version_lists_roles_and_marks_mismatch() {
     assert_eq!(roles.len(), 2);
     assert_eq!(roles[0]["role"], "serve");
 
-    beat(&app, Role::Telegram, &OLD).await;
+    beat(&app, ProcessRole::Telegram, &OLD).await;
     let (_, body) = get(&app, Some(&cookie)).await;
     assert_eq!(body["mismatch"], true);
     let telegram = body["roles"]
@@ -104,7 +104,7 @@ async fn system_version_lists_roles_and_marks_mismatch() {
 async fn a_stopped_role_is_not_listed() {
     let app = MailApp::start().await;
     let cookie = member(&app).await;
-    beat(&app, Role::Worker, &OLD).await;
+    beat(&app, ProcessRole::Worker, &OLD).await;
     app.test
         .execute(&[
             "UPDATE worker_heartbeat SET last_loop_at = last_loop_at - interval '10 minutes'",

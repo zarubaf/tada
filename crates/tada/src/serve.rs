@@ -9,7 +9,7 @@ use axum::Router;
 use tada_adapters::clock::SystemClock;
 use tada_api::ApiState;
 use tada_app::ai_queries::{AiToolPorts, AiToolStores};
-use tada_app::build_info::Role;
+use tada_app::build_info::ProcessRole;
 use tada_app::session::SessionAuthenticator;
 use tada_app::tokens::TokenAuthenticator;
 use tada_mcp::McpState;
@@ -110,7 +110,7 @@ pub async fn run(
         .await
         .context("cannot listen on TADA_PORT")?;
     tracing::info!(port = http.port, "serve started");
-    let heartbeat = Heartbeat::start(&db, Role::Serve);
+    let heartbeat = Heartbeat::start(&db, ProcessRole::Serve);
 
     let (stop, stopped) = oneshot::channel::<()>();
     let mut server = tokio::spawn(tada_api::serve(listener, router, async {

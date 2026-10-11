@@ -218,7 +218,7 @@ pub fn ai_gate(policy: &PmPolicy, configured: bool, used: Chf, cap: Chf) -> AiGa
     }
 }
 
-/// The AI state of an organization, for the AI-PM page.
+/// The AI state of an organization, for the AI PM page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AiStatus {
     pub enabled: bool,

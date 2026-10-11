@@ -8,7 +8,7 @@ use anyhow::Context;
 use axum::Router;
 use secrecy::ExposeSecret;
 use tada_adapters::clock::SystemClock;
-use tada_app::build_info::Role;
+use tada_app::build_info::ProcessRole;
 use tada_app::health::DependencyCheck;
 use tada_store_pg::Database;
 use tada_telegram::{Gateway, UpdateSource};
@@ -49,7 +49,7 @@ pub async fn run((database, bot, telegram, storage): TelegramSettings) -> anyhow
         .await
         .context("cannot listen on TADA_TELEGRAM_LISTEN")?;
     tracing::info!("telegram started");
-    let heartbeat = Heartbeat::start(&db, Role::Telegram);
+    let heartbeat = Heartbeat::start(&db, ProcessRole::Telegram);
 
     let (stop, stopped) = oneshot::channel::<()>();
     let mut server = tokio::spawn(tada_api::serve(listener, router, async {

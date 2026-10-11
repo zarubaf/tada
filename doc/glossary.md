@@ -118,7 +118,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
 | AI PM        | The scheduled service that checks progress, sends reminders and escalates exceptions. It is not a person and has no authority of its own.            | bot, agent      |
 | bot          | The Telegram bot: one channel of tada.                                                                                                               |                 |
-| reminder     | A message from the AI PM to an owner about an action.                                                                                                | notification    |
+| reminder     | A message from the AI PM to an owner about an action or a commitment.                                                                                | notification    |
 | escalation   | A message to a workstream lead or the PM about an unresolved item.                                                                                   |                 |
 | policy       | A configured rule that permits an automatic action.                                                                                                  |                 |
 | digest       | One private Telegram message to a member with their due, overdue and blocked work of one organization.                                               | summary         |
