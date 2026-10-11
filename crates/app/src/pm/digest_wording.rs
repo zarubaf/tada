@@ -255,11 +255,7 @@ pub fn digest_input(request: &DigestRequest) -> String {
 /// Words the digest of `principal`. The result is an error if the run failed or the wording failed its check;
 /// the caller then sends the template. The steps of the run are for the log of the caller.
 ///
-/// The model gets the tools `DIGEST_TOOLS` of `ports.tools`.
-///
-/// # Panics
-///
-/// If `ports.tools` has no tool of `DIGEST_TOOLS`: the names are fixed in code, so it is a defect.
+/// The model gets the tools `DIGEST_TOOLS` of `ports.tools`. Prompt version 1 offers no tool.
 pub async fn word_digest<P>(
     ports: &AgentPorts<'_, P>,
     principal: MemberCaller,

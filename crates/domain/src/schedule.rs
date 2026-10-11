@@ -290,7 +290,7 @@ mod tests {
         // Outside: 10:00 EDT (14:00Z).
         let day = ts("2027-03-14T14:00:00Z");
         assert_eq!(quiet.send_at(day, &ny), day);
-        // The same instant is 15:00 in Zurich, outside the window there.
+        // The same instant is 13:00 in Zurich, outside the window there.
         assert_eq!(
             quiet.send_at(ts("2027-03-14T12:00:00Z"), &zone("Europe/Zurich")),
             ts("2027-03-14T12:00:00Z")
