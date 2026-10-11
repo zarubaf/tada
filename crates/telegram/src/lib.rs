@@ -1,9 +1,12 @@
 //! The Telegram gateway (ADR 0011). It turns updates of the Bot API into `app` commands and contains
-//! no domain rules.
+//! no domain rules. It also implements the `Messenger` port that the worker sends through (ADR 0076).
 
 mod bot_error;
 mod command;
+mod health;
 mod messages;
+mod send;
+mod webhook;
 
 use std::fmt;
 use std::future::Future;
@@ -12,9 +15,10 @@ use std::time::Duration;
 
 use frankenstein::AsyncTelegramApi;
 use frankenstein::client_reqwest::Bot;
-use frankenstein::methods::{GetUpdatesParams, SendMessageParams};
+use frankenstein::methods::{GetUpdatesParams, SendMessageParams, SetWebhookParams};
 use frankenstein::types::{AllowedUpdate, ChatType, Message};
 use frankenstein::updates::{Update, UpdateContent};
+use secrecy::{ExposeSecret, SecretString};
 use tada_app::caller::{ServiceCaller, TelegramGateway};
 use tada_app::clock::Clock;
 use tada_app::documents::DocumentStore;
@@ -26,6 +30,7 @@ use tada_app::identity::IdentityStore;
 use tada_app::parties::PartyStore;
 use tada_app::problem::{CommandError, ProblemCode};
 use tada_app::proposals::{ProposalStore, ProposeError, ProposeStores};
+use tada_app::public_url::PublicUrl;
 use tada_app::sign_in::email_hint;
 use tada_app::sources::SourceStore;
 use tada_app::telegram::{
@@ -39,6 +44,11 @@ use tada_app::workstreams::WorkstreamStore;
 use crate::bot_error::{BotFailure, salvage};
 use crate::command::{Incomplete, LinkCommand, ProposeCommand, parse_link_command, parse_propose};
 use crate::messages::Messages;
+use crate::webhook::WEBHOOK_PATH;
+
+pub use crate::health::BotApiCheck;
+pub use crate::send::TelegramMessenger;
+pub use crate::webhook::routes;
 
 /// The ports that the gateway reads and writes. One database adapter implements all of them.
 pub trait Ports:
@@ -73,10 +83,36 @@ impl<T> Ports for T where
 const POLL_TIMEOUT_SECONDS: u32 = 20;
 /// The wait after a failed request to the Bot API.
 const RETRY_DELAY: Duration = Duration::from_secs(5);
+/// The time between two calls in webhook mode, which keep `/readyz` current (ADR 0076).
+const HEARTBEAT: Duration = Duration::from_secs(60);
+/// The updates that the gateway asks for in both modes. Telegram does not send the others.
+const ALLOWED_UPDATES: [AllowedUpdate; 2] = [AllowedUpdate::Message, AllowedUpdate::CallbackQuery];
 
-/// The gateway in long-polling mode, for development (ADR 0011).
+/// How the updates reach the gateway (ADR 0076). `Debug` hides the secret.
+#[derive(Debug, Clone)]
+pub enum UpdateSource {
+    /// The gateway asks for updates with long polling.
+    Polling,
+    /// Telegram posts the updates to `routes` below `public_url`, with `secret` in a header.
+    Webhook {
+        secret: SecretString,
+        public_url: PublicUrl,
+    },
+}
+
+/// The database could not record the update, so the gateway did not handle it.
+#[derive(Debug)]
+pub(crate) struct NotRecorded;
+
+/// The client of the Bot API at `api_url` for the bot with `token`.
+fn bot(api_url: &str, token: &str) -> Bot {
+    Bot::new_url(format!("{}/bot{token}", api_url.trim_end_matches('/')))
+}
+
+/// The gateway: it receives updates by long polling or by webhook (ADRs 0011 and 0076).
 pub struct Gateway {
     bot: Bot,
+    bot_api: BotApiCheck,
     ports: Arc<dyn Ports>,
     clock: Arc<dyn Clock>,
     caller: ServiceCaller<TelegramGateway>,
@@ -94,7 +130,8 @@ impl Gateway {
     /// `api_url` is the base URL of the Bot API, for example `https://api.telegram.org`.
     pub fn new(api_url: &str, token: &str, ports: Arc<dyn Ports>, clock: Arc<dyn Clock>) -> Self {
         Self {
-            bot: Bot::new_url(format!("{}/bot{token}", api_url.trim_end_matches('/'))),
+            bot: bot(api_url, token),
+            bot_api: BotApiCheck::default(),
             ports,
             clock,
             caller: ServiceCaller::new(),
@@ -102,24 +139,101 @@ impl Gateway {
         }
     }
 
+    /// The check for `/readyz`: it fails if no Bot API call of this gateway succeeded for 5 minutes.
+    pub fn bot_api_check(&self) -> BotApiCheck {
+        self.bot_api.clone()
+    }
+
+    /// Receives updates from `source` until `stop` completes. In webhook mode, `routes` delivers them.
+    pub async fn run(&self, stop: impl Future<Output = ()>, source: &UpdateSource) {
+        match source {
+            UpdateSource::Polling => self.poll(stop).await,
+            UpdateSource::Webhook { secret, public_url } => {
+                self.keep_webhook(stop, secret, public_url).await;
+            }
+        }
+    }
+
+    /// Sets the webhook, then calls the Bot API from time to time until `stop` completes.
+    async fn keep_webhook(
+        &self,
+        stop: impl Future<Output = ()>,
+        secret: &SecretString,
+        public_url: &PublicUrl,
+    ) {
+        tokio::pin!(stop);
+        let params = SetWebhookParams::builder()
+            .url(format!("{}{WEBHOOK_PATH}", public_url.origin()))
+            .secret_token(secret.expose_secret())
+            .allowed_updates(ALLOWED_UPDATES.to_vec())
+            .build();
+        loop {
+            let response = tokio::select! {
+                () = &mut stop => return,
+                response = self.bot.set_webhook(&params) => response,
+            };
+            match response {
+                Ok(_) => {
+                    self.bot_api.succeeded();
+                    tracing::info!("the webhook is set");
+                    break;
+                }
+                Err(error) => {
+                    tracing::warn!(error = %BotFailure(&error), "cannot set the webhook");
+                    tokio::select! {
+                        () = &mut stop => return,
+                        () = tokio::time::sleep(RETRY_DELAY) => {}
+                    }
+                }
+            }
+        }
+        loop {
+            let response = tokio::select! {
+                () = &mut stop => return,
+                response = self.bot.get_webhook_info() => response,
+            };
+            match response {
+                Ok(_) => self.bot_api.succeeded(),
+                Err(error) => {
+                    tracing::warn!(error = %BotFailure(&error), "the Bot API request failed");
+                }
+            }
+            tokio::select! {
+                () = &mut stop => return,
+                () = tokio::time::sleep(HEARTBEAT) => {}
+            }
+        }
+    }
+
     /// Polls for updates until `stop` completes.
-    pub async fn run(&self, stop: impl Future<Output = ()>) {
+    async fn poll(&self, stop: impl Future<Output = ()>) {
         tokio::pin!(stop);
         let mut offset: Option<i64> = None;
         loop {
             let params = GetUpdatesParams::builder()
                 .maybe_offset(offset)
                 .timeout(POLL_TIMEOUT_SECONDS)
-                .allowed_updates(vec![AllowedUpdate::Message])
+                .allowed_updates(ALLOWED_UPDATES.to_vec())
                 .build();
             let response = tokio::select! {
                 () = &mut stop => return,
                 response = self.bot.get_updates(&params) => response,
             };
             let updates = match response {
-                Ok(response) => response.result,
+                Ok(response) => {
+                    self.bot_api.succeeded();
+                    response.result
+                }
                 Err(error) => {
                     tracing::warn!(error = %BotFailure(&error), "the Bot API request failed");
+                    if matches!(&error, frankenstein::Error::Api(response) if response.error_code == 409)
+                    {
+                        // Polling never deletes a webhook: with a shared token that would take the
+                        // updates away from the installation in webhook mode.
+                        tracing::warn!(
+                            "a webhook is set for this bot; polling works after a `deleteWebhook` call"
+                        );
+                    }
                     match salvage(&error) {
                         // An answer that does not move the offset forward must not loop without a pause.
                         Some(batch) if offset.is_none_or(|current| batch.next_offset > current) => {
@@ -144,34 +258,47 @@ impl Gateway {
             };
             for update in updates {
                 offset = offset.max(Some(i64::from(update.update_id) + 1));
-                self.handle(update).await;
+                // A stop drops the current update; the dedupe keeps a later delivery from a second run.
+                tokio::select! {
+                    () = &mut stop => return,
+                    _ = self.handle(update) => {}
+                }
             }
         }
     }
 
-    async fn handle(&self, update: Update) {
+    /// Handles one update of either mode once: the database drops a repeated update ID.
+    async fn handle(&self, update: Update) -> Result<(), NotRecorded> {
         match self.ports.record_update(i64::from(update.update_id)).await {
             Ok(true) => {}
-            Ok(false) => return,
+            Ok(false) => return Ok(()),
             Err(error) => {
                 tracing::warn!(%error, "cannot record the update");
-                return;
+                return Err(NotRecorded);
             }
         }
-        let UpdateContent::Message(message) = update.content else {
-            return;
-        };
+        // A press of a digest button (ADR 0076) is not answered yet. The gateway asks for no other
+        // kind of update.
+        if let UpdateContent::Message(message) = update.content {
+            self.answer(&message).await;
+        }
+        Ok(())
+    }
+
+    /// Replies to a message in a private chat.
+    async fn answer(&self, message: &Message) {
         // A link code belongs into a private chat only. The bot ignores groups for now.
         if message.chat.type_field != ChatType::Private {
             return;
         }
-        let reply = self.reply(&message).await;
+        let reply = self.reply(message).await;
         let params = SendMessageParams::builder()
             .chat_id(message.chat.id)
             .text(reply)
             .build();
-        if let Err(error) = self.bot.send_message(&params).await {
-            tracing::warn!(error = %BotFailure(&error), "cannot send the reply");
+        match self.bot.send_message(&params).await {
+            Ok(_) => self.bot_api.succeeded(),
+            Err(error) => tracing::warn!(error = %BotFailure(&error), "cannot send the reply"),
         }
     }
 

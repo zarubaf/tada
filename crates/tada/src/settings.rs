@@ -209,7 +209,8 @@ mod tests {
     use super::*;
     use tada_adapters::mail::SmtpTls;
 
-    use crate::settings::sections::{Database, Uploads};
+    use crate::settings::sections::{Database, Telegram, Uploads};
+    use tada_telegram::UpdateSource;
 
     fn secret_file(content: &str) -> NamedTempFile {
         let mut file = NamedTempFile::new().unwrap();
@@ -463,5 +464,68 @@ mod tests {
             errors.0,
             ["TADA_MAIL_SMTP_USERNAME must be set together with TADA_MAIL_SMTP_PASSWORD_FILE"]
         );
+    }
+
+    /// The `Telegram` section with a token file, and `extra`.
+    fn telegram_with(extra: &[(&str, &str)]) -> Result<Telegram, SettingsErrors> {
+        let token = secret_file("123:test-token\n");
+        let path = token.path().to_str().unwrap().to_owned();
+        let mut variables = vec![("TADA_TELEGRAM_BOT_TOKEN_FILE", path.as_str())];
+        variables.extend_from_slice(extra);
+        load_from::<(Telegram,)>(&variables).map(|loaded| loaded.settings.0)
+    }
+
+    #[test]
+    fn telegram_polls_by_default_and_listens_on_8081() {
+        let telegram = telegram_with(&[]).unwrap();
+        assert!(matches!(telegram.source, UpdateSource::Polling));
+        assert_eq!(telegram.listen.to_string(), "0.0.0.0:8081");
+    }
+
+    #[test]
+    fn telegram_webhook_mode_needs_a_valid_secret_and_the_public_url() {
+        let errors = telegram_with(&[("TADA_TELEGRAM_MODE", "webhook")]).unwrap_err();
+        let names: Vec<&str> = errors
+            .0
+            .iter()
+            .map(|error| error.split(' ').next().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            ["TADA_TELEGRAM_WEBHOOK_SECRET_FILE", "TADA_PUBLIC_URL"]
+        );
+
+        let bad = secret_file("secret with spaces\n");
+        let errors = telegram_with(&[
+            ("TADA_TELEGRAM_MODE", "webhook"),
+            (
+                "TADA_TELEGRAM_WEBHOOK_SECRET_FILE",
+                bad.path().to_str().unwrap(),
+            ),
+            ("TADA_PUBLIC_URL", "https://tada.example.org"),
+        ])
+        .unwrap_err();
+        assert_eq!(errors.0.len(), 1, "{errors}");
+        assert!(errors.0[0].starts_with("TADA_TELEGRAM_WEBHOOK_SECRET_FILE "));
+        assert!(!errors.0[0].contains("spaces"), "{errors}");
+
+        let good = secret_file("test-webhook_Secret-42\n");
+        let telegram = telegram_with(&[
+            ("TADA_TELEGRAM_MODE", "webhook"),
+            (
+                "TADA_TELEGRAM_WEBHOOK_SECRET_FILE",
+                good.path().to_str().unwrap(),
+            ),
+            ("TADA_PUBLIC_URL", "https://tada.example.org"),
+        ])
+        .unwrap();
+        let UpdateSource::Webhook { secret, public_url } = telegram.source else {
+            panic!("webhook mode gives a webhook source");
+        };
+        assert_eq!(secret.expose_secret(), "test-webhook_Secret-42");
+        assert_eq!(public_url.origin(), "https://tada.example.org");
+
+        let errors = telegram_with(&[("TADA_TELEGRAM_MODE", "push")]).unwrap_err();
+        assert!(errors.0[0].starts_with("TADA_TELEGRAM_MODE "), "{errors}");
     }
 }

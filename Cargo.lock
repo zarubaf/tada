@@ -3754,9 +3754,14 @@ dependencies = [
 name = "tada-telegram"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "axum",
  "fluent-bundle",
  "frankenstein",
+ "secrecy",
  "serde_json",
+ "sha2 0.11.0",
+ "subtle",
  "tada-app",
  "tokio",
  "tracing",
