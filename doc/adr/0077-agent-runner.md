@@ -89,6 +89,8 @@ Cost control:
 - `ai_cap` holds the monthly cap of an organization in Swiss francs.
   A new organization gets the default from the setting.
   An owner or admin changes it ([ADR 0047](0047-model-adapter.md)).
+- A change of the cap or of the AI switch of the organization needs a sign-in in the last 15 minutes.
+  The cap controls spending, and the switch starts or stops the transfer of titles and event names to the provider.
 - AI work runs only if the organization switched it on, the key and the check date are set, and the usage of the month is below the cap.
   The check is before a run, so the usage can go above the cap by at most the cost limit of each run that started below it.
   The cap month is the calendar month in UTC.
@@ -108,6 +110,8 @@ Task `pm-digest`:
 - The buttons always come from the rules and never from the model.
 - The message shows the lines in the order of the items, whatever order the model uses.
   Each line carries the number of its item, and the buttons of the item carry the same number.
+  The text of a line still comes from the model: an injected title can make it describe another item or name another number.
+  The check does not find this, and the member sees only the line and its buttons.
 - On any failure, the template digest is sent.
 - The evaluation set `eval/pm-digest/` holds invented cases: German and English, an injection in a title, a missing item, an extra item, an over-long text, a bot command and a tool call that the run does not offer.
   CI replays recorded responses.
