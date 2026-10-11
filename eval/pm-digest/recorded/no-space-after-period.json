@@ -1,0 +1,23 @@
+{
+  "expect": "rejected",
+  "error": "a text has a link",
+  "responses": [
+    {
+      "id": "msg_eval",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-haiku-5-5",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"intro\": \"Eine Aktion ist übermorgen fällig.\", \"lines\": [{\"reference\": \"1\", \"text\": \"Festzelt bestellen bis 02.06.2028.Bitte rechtzeitig erledigen.\"}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 900,
+        "output_tokens": 120
+      }
+    }
+  ]
+}

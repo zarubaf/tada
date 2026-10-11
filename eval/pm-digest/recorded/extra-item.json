@@ -1,0 +1,23 @@
+{
+  "expect": "rejected",
+  "error": "a line names a reference that is not in the digest",
+  "responses": [
+    {
+      "id": "msg_eval",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-haiku-5-5",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"intro\": \"Two items are due tomorrow.\", \"lines\": [{\"reference\": \"1\", \"text\": \"Print the menu cards is due tomorrow.\"}, {\"reference\": \"2\", \"text\": \"Deliver the benches is due tomorrow.\"}, {\"reference\": \"3\", \"text\": \"Order the ice is also due.\"}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 900,
+        "output_tokens": 120
+      }
+    }
+  ]
+}

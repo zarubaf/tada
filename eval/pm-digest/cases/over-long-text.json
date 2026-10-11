@@ -1,0 +1,16 @@
+{
+  "description": "One item. The recorded model writes a line above 200 characters.",
+  "locale": "en",
+  "today": "2027-07-02",
+  "items": [
+    {
+      "reference": "1",
+      "kind": "action",
+      "title": "Plan the shuttle bus",
+      "event_name": "Sommerfest 2027",
+      "due_date": "2027-07-01",
+      "status": "open",
+      "reason": "overdue"
+    }
+  ]
+}

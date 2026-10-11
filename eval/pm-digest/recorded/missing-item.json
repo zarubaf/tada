@@ -1,0 +1,23 @@
+{
+  "expect": "rejected",
+  "error": "an item of the digest has no line",
+  "responses": [
+    {
+      "id": "msg_eval",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-haiku-5-5",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"intro\": \"Drei Punkte für den Flugtag 2028.\", \"lines\": [{\"reference\": \"1\", \"text\": \"Helferliste erstellen ist überfällig.\"}, {\"reference\": \"2\", \"text\": \"Funkgeräte reservieren ist morgen fällig.\"}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 900,
+        "output_tokens": 120
+      }
+    }
+  ]
+}

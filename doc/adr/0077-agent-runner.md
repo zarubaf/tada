@@ -54,7 +54,7 @@ Runner:
 - `app::agent` loops from model call to tool calls to tool results until the model ends.
 - The limits per run are 6 model turns, CHF 0.05 and 60 seconds in total.
   Each run stops at the first limit.
-  The runner checks the limits before and after each model call, so a run can go above its cost or time limit by at most one call.
+  The runner checks the limits before and after each model call, so a run can go above its cost or time limit by at most one call with its retries.
 - The usage of each model call goes to `ai_usage` with the task, the prompt version and the model ID.
 - Each tool call writes a structured log event with the task, the prompt version, the model ID, the tool name and the outcome.
   It holds no free text and no tool input ([ADR 0039](0039-actors-and-identities.md)).
@@ -98,13 +98,15 @@ Task `pm-digest`:
 
 - The input is the item list (opaque reference, kind, title, event name, due date, status, reason), the locale and today's date.
   It holds no person names.
-- The tools are the read tools `list_actions`, `list_commitments` and `get_event_profile`.
-  A tool call runs only for an event of the digest items.
+- Prompt version 1 offers no tools.
+  The read tools return person names, IDs, quotes and notes of all records of an event, and the digest needs none of them ([ADR 0045](0045-data-protection.md)).
+  A later version can add a digest projection in `app::ai_queries` that returns only the records of the digest, without names, IDs or free text.
 - The output is an intro and one line for each reference.
 - The runner checks that each reference appears exactly once, no unknown reference appears, and the lengths are in range.
+  It also rejects a text with a control character, a link, an `@` name or a bot command, because Telegram makes these clickable.
 - The buttons always come from the rules and never from the model.
 - On any failure, the template digest is sent.
-- The evaluation set `eval/pm-digest/` holds invented cases: German and English, an injection in a title, a missing item, an extra item, an over-long text and a tool call outside the limits.
+- The evaluation set `eval/pm-digest/` holds invented cases: German and English, an injection in a title, a missing item, an extra item, an over-long text, a bot command and a tool call that the run does not offer.
   CI replays recorded responses.
   A Python script does the live run with a fixed cost cap ([ADR 0034](0034-python-for-scripts.md)).
 

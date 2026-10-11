@@ -1,0 +1,23 @@
+{
+  "expect": "rejected",
+  "error": "a line is too long",
+  "responses": [
+    {
+      "id": "msg_eval",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-haiku-5-5",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"intro\": \"One item is overdue.\", \"lines\": [{\"reference\": \"1\", \"text\": \"Plan the shuttle bus was due yesterday. It matters for the arrival of the guests at the station and for the return trip in the evening. It matters for the arrival of the guests at the station and for the return trip in the evening. It matters for the arrival of the guests at the station and for the return trip in the evening. \"}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 900,
+        "output_tokens": 120
+      }
+    }
+  ]
+}

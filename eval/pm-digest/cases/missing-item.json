@@ -1,0 +1,34 @@
+{
+  "description": "Three items. The recorded model leaves out one item.",
+  "locale": "de-CH",
+  "today": "2028-05-31",
+  "items": [
+    {
+      "reference": "1",
+      "kind": "action",
+      "title": "Helferliste erstellen",
+      "event_name": "Flugtag 2028",
+      "due_date": "2028-05-30",
+      "status": "open",
+      "reason": "overdue"
+    },
+    {
+      "reference": "2",
+      "kind": "action",
+      "title": "Funkgeräte reservieren",
+      "event_name": "Flugtag 2028",
+      "due_date": "2028-06-01",
+      "status": "in-progress",
+      "reason": "due-soon"
+    },
+    {
+      "reference": "3",
+      "kind": "commitment",
+      "title": "Sanitätsdienst stellen",
+      "event_name": "Flugtag 2028",
+      "due_date": "2028-06-01",
+      "status": "conditional",
+      "reason": "follow-up"
+    }
+  ]
+}
