@@ -31,6 +31,13 @@ pub enum SchemaCheckError {
     Unavailable(#[source] sqlx::Error),
 }
 
+/// The newest migration that the database applied, or `None` on an empty database.
+pub(crate) async fn applied_schema(pool: &PgPool) -> Result<Option<i64>, sqlx::Error> {
+    sqlx::query_scalar!(r#"SELECT max(version) AS "version?" FROM _sqlx_migrations WHERE success"#)
+        .fetch_one(pool)
+        .await
+}
+
 /// The number of the last migration that this binary has.
 fn known_schema() -> i64 {
     sqlx::migrate!()
@@ -78,12 +85,9 @@ impl Database {
     /// Fails if the database has a migration that this binary does not know and that is newer than all
     /// migrations that it knows. The binary must not start on such a schema (ADR 0075).
     pub async fn check_schema(&self) -> Result<(), SchemaCheckError> {
-        let applied: Option<i64> = sqlx::query_scalar!(
-            r#"SELECT max(version) AS "version?" FROM _sqlx_migrations WHERE success"#
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(SchemaCheckError::Unavailable)?;
+        let applied = applied_schema(&self.pool)
+            .await
+            .map_err(SchemaCheckError::Unavailable)?;
         let known = known_schema();
         match applied {
             Some(applied) if applied > known => Err(SchemaCheckError::TooNew { applied, known }),

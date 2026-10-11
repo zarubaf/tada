@@ -9,7 +9,7 @@ use crate::RecordVersion;
 use crate::events::EventTimeZone;
 use crate::ids::DigestItemId;
 use crate::schedule::{
-    LocalSchedule, QuietHours, Weekdays, add_working_days, tz_of, working_days_since,
+    LocalSchedule, QuietHours, Weekdays, add_working_days, instant, tz_of, working_days_since,
 };
 
 /// A value of a command that the rules reject. `code` is a field code of `validation-failed`.
@@ -233,12 +233,7 @@ pub fn select(c: &Candidate, m: Option<&Memory>, r: &Rules) -> Option<Reason> {
 
 /// The start of the day after the due date: the first instant at which the record is overdue.
 fn overdue_since(due: Date, zone: &EventTimeZone) -> Option<Timestamp> {
-    let start = due.tomorrow().ok()?.to_datetime(Time::midnight());
-    tz_of(zone)
-        .to_ambiguous_zoned(start)
-        .compatible()
-        .ok()
-        .map(|z| z.timestamp())
+    instant(due.tomorrow().ok()?, Time::midnight(), &tz_of(zone))
 }
 
 pub use crate::schedule::in_cooldown;
