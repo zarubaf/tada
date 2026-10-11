@@ -109,6 +109,7 @@ pub fn api_state_on(
             configured: false,
             default_cap: Chf::from_millirappen(2_500_000),
         },
+        build: tada::BUILD,
     }
 }
 

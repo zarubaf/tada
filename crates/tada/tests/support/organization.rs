@@ -62,6 +62,7 @@ pub fn router(test: &TestDatabase, garage: &TestGarage) -> Router {
             parties: database.clone(),
             work: database,
         }),
+        version: tada::BUILD.version,
     };
     tada::serve::routes(api, mcp, None)
 }

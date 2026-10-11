@@ -77,6 +77,7 @@ pub async fn run(
         versions: Arc::new(db.clone()),
         ai: Arc::new(db.clone()),
         ai_setup,
+        build: crate::BUILD,
     };
 
     // The MCP server for the AI clients of members (ADR 0040). Only personal API tokens open it.
@@ -99,6 +100,7 @@ pub async fn run(
             parties: Arc::new(db.clone()),
             work: Arc::new(db.clone()),
         }),
+        version: crate::BUILD.version,
     };
 
     let router = routes(api, mcp, http.web_root.as_deref());

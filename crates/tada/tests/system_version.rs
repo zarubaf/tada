@@ -61,26 +61,26 @@ async fn beat(app: &MailApp, role: Role, build: &BuildInfo) {
 #[tokio::test]
 async fn system_version_needs_sign_in() {
     let app = MailApp::start().await;
-    beat(&app, Role::Worker, &BuildInfo::CURRENT).await;
+    beat(&app, Role::Worker, &tada::BUILD).await;
     let (status, body) = get(&app, None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     // The problem names no version.
-    assert!(!body.to_string().contains(BuildInfo::CURRENT.version));
+    assert!(!body.to_string().contains(tada::BUILD.version));
 }
 
 #[tokio::test]
 async fn system_version_lists_roles_and_marks_mismatch() {
     let app = MailApp::start().await;
     let cookie = member(&app).await;
-    beat(&app, Role::Serve, &BuildInfo::CURRENT).await;
-    beat(&app, Role::Worker, &BuildInfo::CURRENT).await;
+    beat(&app, Role::Serve, &tada::BUILD).await;
+    beat(&app, Role::Worker, &tada::BUILD).await;
 
     let (status, body) = get(&app, Some(&cookie)).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["product"], BuildInfo::CURRENT.version);
-    assert_eq!(body["commit"], BuildInfo::CURRENT.commit);
+    assert_eq!(body["product"], tada::BUILD.version);
+    assert_eq!(body["commit"], tada::BUILD.commit);
     assert_eq!(body["api"], "v1");
-    assert_eq!(body["mcp"], BuildInfo::CURRENT.version);
+    assert_eq!(body["mcp"], tada::BUILD.version);
     assert!(body["schema"].as_i64().unwrap() >= 27);
     assert_eq!(body["mismatch"], false);
     let roles: Vec<&Value> = body["roles"].as_array().unwrap().iter().collect();

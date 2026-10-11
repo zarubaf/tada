@@ -73,6 +73,7 @@ impl App {
                 parties: database.clone(),
                 work: database,
             }),
+            version: tada::BUILD.version,
         };
         let router = tada::serve::routes(api, mcp, None);
         Self {
