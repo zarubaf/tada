@@ -7,19 +7,17 @@
 mod support;
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use jiff::Timestamp;
 use serde_json::{Value, json};
 use tada_adapters::fake_model::FakeModel;
-use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
 use tada_app::ai_cost::{AiSetup, Chf};
 use tada_app::caller::OrganizationRole;
 use tada_app::clock::Clock;
 use tada_app::domain::identity::{DisplayName, Email};
 use tada_app::domain::ids::{EventId, OrganizationId, UserId};
 use tada_app::domain::reminders::CallbackData;
-use tada_app::jobs::{Ran, run_next};
+use tada_app::jobs::Ran;
 use tada_app::messenger::{Button, SendOutcome};
 use tada_app::model::{AiLimits, Block, ModelError, ModelResponse, Stop, Usage};
 use tada_app::pm::send::DigestAi;
@@ -28,7 +26,7 @@ use tada_store_pg::Database;
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
-use support::messenger::{FakeMessenger, Sent};
+use support::messenger::{FakeMessenger, Sent, digest_worker, run_one};
 
 /// Wednesday 16 September 2026, 10:30 in Zurich: a working day, outside the quiet hours, and in the past of the
 /// database clock, so the send job is due at once.
@@ -214,21 +212,10 @@ async fn run_jobs(
     ai: Option<DigestAi>,
     clock: Arc<dyn Clock>,
 ) -> Vec<Ran> {
-    let handlers = tada::worker::handlers(
-        database,
-        Arc::new(MemoryMailer::new()),
-        Arc::new(FluentMailTexts::new().unwrap()),
-        clock,
-        support::public_url(),
-        Arc::new(support::NoObjectStorage),
-        tada::worker::DigestSend { messenger, ai },
-    );
+    let handlers = digest_worker(database, messenger, ai, clock);
     let mut ran = Vec::new();
     loop {
-        match run_next(database, &handlers, Uuid::now_v7(), Duration::from_secs(60))
-            .await
-            .unwrap()
-        {
+        match run_one(database, &handlers).await {
             Ran::Idle => return ran,
             other => ran.push(other),
         }
@@ -411,26 +398,8 @@ async fn changed_due_date_removes_the_item() {
 
 /// Runs one job: the daily check of the test.
 async fn run_once(world: &World, messenger: Arc<FakeMessenger>) -> Ran {
-    let handlers = tada::worker::handlers(
-        &world.test.database,
-        Arc::new(MemoryMailer::new()),
-        Arc::new(FluentMailTexts::new().unwrap()),
-        wednesday(),
-        support::public_url(),
-        Arc::new(support::NoObjectStorage),
-        tada::worker::DigestSend {
-            messenger,
-            ai: None,
-        },
-    );
-    run_next(
-        &world.test.database,
-        &handlers,
-        Uuid::now_v7(),
-        Duration::from_secs(60),
-    )
-    .await
-    .unwrap()
+    let handlers = digest_worker(&world.test.database, messenger, None, wednesday());
+    run_one(&world.test.database, &handlers).await
 }
 
 #[tokio::test]
@@ -631,27 +600,9 @@ async fn temporary_failure_is_retried_and_sent_once() {
 }
 
 /// Runs one due job with the worker of the test.
-async fn run_one(world: &World, messenger: Arc<FakeMessenger>, clock: Arc<dyn Clock>) -> Ran {
-    let handlers = tada::worker::handlers(
-        &world.test.database,
-        Arc::new(MemoryMailer::new()),
-        Arc::new(FluentMailTexts::new().unwrap()),
-        clock,
-        support::public_url(),
-        Arc::new(support::NoObjectStorage),
-        tada::worker::DigestSend {
-            messenger,
-            ai: None,
-        },
-    );
-    run_next(
-        &world.test.database,
-        &handlers,
-        Uuid::now_v7(),
-        Duration::from_secs(60),
-    )
-    .await
-    .unwrap()
+async fn run_one_at(world: &World, messenger: Arc<FakeMessenger>, clock: Arc<dyn Clock>) -> Ran {
+    let handlers = digest_worker(&world.test.database, messenger, None, clock);
+    run_one(&world.test.database, &handlers).await
 }
 
 #[tokio::test]
@@ -665,11 +616,11 @@ async fn retry_waits_for_the_end_of_the_quiet_hours() {
     let messenger = FakeMessenger::answering(&[SendOutcome::Temporary, SendOutcome::Sent]);
     world.queue_check().await;
     assert!(matches!(
-        run_one(&world, messenger.clone(), clock.clone()).await,
+        run_one_at(&world, messenger.clone(), clock.clone()).await,
         Ran::Completed(_)
     ));
     assert!(matches!(
-        run_one(&world, messenger.clone(), clock.clone()).await,
+        run_one_at(&world, messenger.clone(), clock.clone()).await,
         Ran::Failed(_)
     ));
     assert_eq!(world.digest().await.1, "pending");
@@ -677,7 +628,7 @@ async fn retry_waits_for_the_end_of_the_quiet_hours() {
     // The retry after the backoff comes at 20:01, inside the quiet hours: it sends nothing and waits for 08:00.
     clock.advance(jiff::SignedDuration::from_mins(2));
     end_backoff(&world).await;
-    let ran = run_one(&world, messenger.clone(), clock.clone()).await;
+    let ran = run_one_at(&world, messenger.clone(), clock.clone()).await;
     assert!(matches!(ran, Ran::Completed(_)), "{ran:?}");
     assert_eq!(messenger.sent().len(), 1, "no send in the quiet hours");
     assert_eq!(world.digest().await.1, "pending");
@@ -694,7 +645,7 @@ async fn retry_waits_for_the_end_of_the_quiet_hours() {
 
     // At 08:00 the send goes out.
     clock.advance(jiff::SignedDuration::from_mins(11 * 60 + 59));
-    let ran = run_one(&world, messenger.clone(), clock).await;
+    let ran = run_one_at(&world, messenger.clone(), clock).await;
     assert!(matches!(ran, Ran::Completed(_)), "{ran:?}");
     assert_eq!(messenger.sent().len(), 2);
     assert_eq!(world.digest().await.1, "sent");

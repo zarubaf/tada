@@ -10,6 +10,7 @@ pub mod files;
 pub mod logs;
 pub mod messenger;
 pub mod organization;
+pub mod telegram;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::num::NonZeroU64;
