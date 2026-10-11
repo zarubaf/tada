@@ -47,7 +47,12 @@ pub fn handlers(
     public_url: PublicUrl,
     blobs: Arc<dyn BlobStore>,
 ) -> Handlers {
-    let pm_check = PmCheck::new(Arc::new(db.clone()), Arc::new(db.clone()), clock.clone());
+    let pm_check = PmCheck::new(
+        Arc::new(db.clone()),
+        Arc::new(db.clone()),
+        Arc::new(db.clone()),
+        clock.clone(),
+    );
     let send = SendOutbound::new(Arc::new(db.clone()), mailer, texts, clock, public_url);
     let journal = WriteRedactionJournal::new(Arc::new(db.clone()), blobs);
     Handlers::default()

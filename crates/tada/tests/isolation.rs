@@ -1622,7 +1622,8 @@ async fn each_operation_tool_job_and_export_keeps_the_isolation_of_organizations
             ),
             &format!(
                 "INSERT INTO telegram_identity (telegram_user_id, user_id, linked_at)
-                 VALUES (1004, '{}', now()) ON CONFLICT (user_id) DO NOTHING",
+                 VALUES ((SELECT coalesce(max(telegram_user_id), 0) + 1 FROM telegram_identity), '{}', now())
+                 ON CONFLICT (user_id) DO NOTHING",
                 world.both
             ),
             &action(world.a, &world.targets.a_event),

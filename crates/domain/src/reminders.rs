@@ -127,7 +127,7 @@ impl Default for PmPolicy {
 macro_rules! code_enum {
     ($(#[$doc:meta])* $name:ident { $($variant:ident => $code:literal),+ $(,)? }) => {
         $(#[$doc])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub enum $name { $($variant),+ }
 
         impl $name {
