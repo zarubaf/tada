@@ -3149,7 +3149,7 @@
         "tags": [
           "organization"
         ],
-        "summary": "Replaces the reminder policy. An owner or an admin can do this.\nThe daily check moves to the new time at once.",
+        "summary": "Replaces the reminder policy. An owner or an admin can do this.\nA change of `ai_enabled` also needs a recent sign-in.\nThe daily check moves to the new time at once.",
         "operationId": "set_pm_policy",
         "requestBody": {
           "content": {
@@ -3187,6 +3187,7 @@
           "malformed-request",
           "unauthenticated",
           "organization-required",
+          "recent-sign-in-required",
           "forbidden",
           "record-version-conflict",
           "payload-too-large",

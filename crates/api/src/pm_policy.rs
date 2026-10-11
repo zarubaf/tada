@@ -12,7 +12,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use crate::ApiState;
-use crate::contract::{AUTHENTICATED, JSON_BODY, codes};
+use crate::contract::{AUTHENTICATED, JSON_BODY, RECENT_SIGN_IN, codes};
 use crate::extract::{Caller, Json, record_version};
 use crate::problem::{ApiError, Problem};
 
@@ -31,7 +31,12 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         ),
         (
             "set_pm_policy",
-            codes(&[AUTHENTICATED, PmPolicyError::CODES, JSON_BODY]),
+            codes(&[
+                AUTHENTICATED,
+                PmPolicyError::CODES,
+                JSON_BODY,
+                RECENT_SIGN_IN,
+            ]),
         ),
     ]
 }
@@ -132,6 +137,7 @@ async fn get_pm_policy(
 }
 
 /// Replaces the reminder policy. An owner or an admin can do this.
+/// A change of `ai_enabled` also needs a recent sign-in.
 /// The daily check moves to the new time at once.
 #[utoipa::path(
     post,
@@ -162,7 +168,13 @@ async fn set_pm_policy(
         paused: request.paused,
         ai_enabled: request.ai_enabled,
     };
-    let (policy, version) =
-        app::set_pm_policy(&caller, input, expected, state.pm_policy.as_ref()).await?;
+    let (policy, version) = app::set_pm_policy(
+        &caller,
+        input,
+        expected,
+        state.pm_policy.as_ref(),
+        state.clock.as_ref(),
+    )
+    .await?;
     Ok(axum::Json(PmPolicy::new(&policy, version)))
 }

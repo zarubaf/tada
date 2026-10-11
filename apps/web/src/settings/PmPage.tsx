@@ -85,6 +85,8 @@ function PmSettings({ api }: { api: Api }) {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string>();
   const [confirmation, setConfirmation] = useState<string>();
+  // A change of the AI switch needs a recent sign-in (ADR 0077).
+  const [signInAgain, setSignInAgain] = useState(false);
   const title = useRef<HTMLHeadingElement>(null);
   const { retried, retry } = useRetry(() => title.current);
 
@@ -129,6 +131,7 @@ function PmSettings({ api }: { api: Api }) {
     async (values: PolicyValues, expectedVersion: number): Promise<PolicySave> => {
       setFailure(undefined);
       setConfirmation(undefined);
+      setSignInAgain(false);
       setBusy(true);
       try {
         const result = await api.POST("/api/v1/organization/pm-policy/set", {
@@ -145,6 +148,11 @@ function PmSettings({ api }: { api: Api }) {
         if (result.error?.code === "record-version-conflict") {
           // Someone else changed the policy: the page shows the truth and the new version.
           return { kind: "conflict", policy: await reloadPolicy() };
+        }
+        if (result.error?.code === "recent-sign-in-required") {
+          setSignInAgain(true);
+          setFailure(problemMessage(result.error));
+          return { kind: "failed" };
         }
         setFailure(failureOf(result).message);
       } catch {
@@ -235,6 +243,7 @@ function PmSettings({ api }: { api: Api }) {
             ai={state.ai}
             aiEnabled={state.policy.ai_enabled}
             busy={busy}
+            signInAgain={signInAgain}
             onToggle={(ai_enabled) => void toggle({ ai_enabled })}
             onAi={(ai) => setState((old) => (old.kind === "loaded" ? { ...old, ai } : old))}
             onStatus={setConfirmation}

@@ -27,6 +27,8 @@ export interface PmAiSettingsProps {
   /** The AI switch is part of the policy. */
   aiEnabled: boolean;
   busy: boolean;
+  /** The last change of the switch needs a recent sign-in. */
+  signInAgain: boolean;
   onToggle: (enabled: boolean) => void;
   onAi: (ai: AiStatus) => void;
   onStatus: (message: string | undefined) => void;
@@ -35,13 +37,15 @@ export interface PmAiSettingsProps {
 
 /**
  * The AI of the AI-PM: the switch, the state of the provider, the usage of the month and the monthly
- * cap (ADR 0047, ADR 0077). The cap is a record of the organization; a change needs a recent sign-in.
+ * cap (ADR 0047, ADR 0077). The cap is a record of the organization. A change of the cap or of the
+ * switch needs a recent sign-in.
  */
 export function PmAiSettings({
   api,
   ai,
   aiEnabled,
   busy,
+  signInAgain: switchNeedsSignIn,
   onToggle,
   onAi,
   onStatus,
@@ -178,7 +182,7 @@ export function PmAiSettings({
           </Button>
         </div>
       </form>
-      {signInAgain && <SignInAgain />}
+      {(signInAgain || switchNeedsSignIn) && <SignInAgain />}
     </section>
   );
 }
