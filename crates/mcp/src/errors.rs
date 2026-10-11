@@ -10,8 +10,9 @@ use rmcp::ErrorData;
 use rmcp::handler::server::tool::IntoCallToolResult;
 use rmcp::model::{CallToolResponse, CallToolResult};
 use serde_json::{Value, json};
+use tada_app::ai_tools::AiToolError;
 use tada_app::caller::AiCaller;
-use tada_app::problem::{CommandError, FieldError, ProblemCode};
+use tada_app::problem::{FieldError, ProblemCode};
 use uuid::Uuid;
 
 /// The error of a tool call.
@@ -49,9 +50,9 @@ impl ToolError {
     }
 }
 
-/// The error of an `app` command or query. A store failure goes to the log; the agent sees the code only.
-impl<E: CommandError> From<E> for ToolError {
-    fn from(error: E) -> Self {
+/// The error of a tool of `app`. A store failure goes to the log; the agent sees the code only.
+impl From<AiToolError> for ToolError {
+    fn from(error: AiToolError) -> Self {
         if let Some(store_error) = error.store_error() {
             tracing::error!(error = %crate::guard::error_chain(store_error), "the store failed");
         }

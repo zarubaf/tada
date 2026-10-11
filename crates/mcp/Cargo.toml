@@ -15,7 +15,6 @@ workspace = true
 tada-app.workspace = true
 axum.workspace = true
 rmcp.workspace = true
-schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
