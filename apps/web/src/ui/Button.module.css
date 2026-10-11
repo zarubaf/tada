@@ -32,6 +32,16 @@
     background: var(--color-accent-hover);
   }
 
+  /* No border and no background until hover: for a minor action in a list or a footer. */
+  .button[data-variant="quiet"] {
+    border-color: transparent;
+    background: none;
+  }
+
+  .button[data-variant="quiet"][data-hovered] {
+    background: var(--color-bg-hover);
+  }
+
   /* Secondary in style, with the danger color (doc/design/components.md). */
   .button[data-variant="danger"] {
     color: var(--color-danger);
