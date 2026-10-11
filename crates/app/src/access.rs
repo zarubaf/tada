@@ -314,6 +314,16 @@ pub enum EventReach {
     Events(Vec<EventId>),
 }
 
+impl EventReach {
+    /// True if the reach holds `event`.
+    pub fn includes(&self, event: EventId) -> bool {
+        match self {
+            Self::Organization => true,
+            Self::Events(events) => events.contains(&event),
+        }
+    }
+}
+
 /// The events that `caller` can read now: owners and admins read each event of their organization,
 /// and other members read the events in which they have an event role.
 pub async fn readable_events(

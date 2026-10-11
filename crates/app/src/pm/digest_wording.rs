@@ -166,17 +166,18 @@ fn has_command(text: &str) -> bool {
     let mut before = None;
     let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
-        if c == '/'
-            && !before.is_some_and(|b: char| b.is_alphanumeric() || b == '_' || b == '/')
-            && chars
-                .peek()
-                .is_some_and(|next| next.is_alphanumeric() || *next == '_')
-        {
+        if c == '/' && starts_command(before, chars.peek().copied()) {
             return true;
         }
         before = Some(c);
     }
     false
+}
+
+/// True if a `/` between `before` and `next` starts a bot command, as in ` /trennen`.
+fn starts_command(before: Option<char>, next: Option<char>) -> bool {
+    !before.is_some_and(|b| b.is_alphanumeric() || b == '_' || b == '/')
+        && next.is_some_and(|n| n.is_alphanumeric() || n == '_')
 }
 
 /// True if `text` has a letter or digit, a dot and two letters, as in `evil.example` or `www.`:
