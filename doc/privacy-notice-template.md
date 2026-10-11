@@ -24,8 +24,8 @@ This file does not repeat it.
 ## What the template covers
 
 - The controller: the club.
-- The processors, as categories: operator, hosting, backups and mail.
-  The template names no provider.
+- The processors, as categories: operator, hosting, backups, mail and the model provider.
+  The template names no provider, except that the notice says Anthropic is the model provider.
 - The purposes of the processing.
 - The categories of data, as in [the data inventory](data-inventory.md).
   They include the counters of sign-in attempts: keyed hashes of the email address and the IP address, kept for two hours at most.
@@ -34,6 +34,17 @@ This file does not repeat it.
   A message with the command `/vorschlag` becomes a source text that tada keeps with the event.
   Each reader of the event sees it, also through the AI clients of members.
   The message and the reply of the bot pass through Telegram.
+- The reminders of the AI PM in Telegram.
+  A member opts in and links a confirmed Telegram account first.
+  A digest lists at most ten items, with title, event name, due date, status and reason.
+  The member answers with buttons.
+  The notice states the quiet hours (20:00 to 08:00 in the local time of the member, by default), the stored time zone and the 90 days for the reminder state (ADR 0076).
+- The AI wording of the reminders.
+  It is off until an organization switches it on.
+  The model receives titles, event names, due dates, statuses and reasons, and no names of persons or source texts.
+  If the model fails, tada sends a fixed template.
+  The operator checks the provider before the first call, and the model does not run without this check (ADR 0045, ADR 0077).
+  The notice names the model provider as a processor of the operator.
 - The AI clients of members.
   They read the data of the member through the read tools of MCP.
   They can also create proposals, and tada keeps the text of each proposal as a source text.
@@ -56,6 +67,9 @@ This file does not repeat it.
 - The dispute note.
   When evidence must stay, an owner adds a note that the data is disputed.
   Each reader of the evidence sees the note, also in the AI clients of members.
+- The draft status of the person-feature and AI PM sections.
+  The owner of the product approves the German text.
+  It is not legal advice, and the club checks its own duties (ADR 0045).
 - The rights to access, correction and deletion, and the right to receive the data in a common format, with a contact.
 
 ## Placeholders
