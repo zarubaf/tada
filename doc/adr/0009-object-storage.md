@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-06
+- Amended by: [0074](0074-orphan-sweep.md)
 
 ## Context
 

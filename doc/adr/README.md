@@ -24,7 +24,7 @@ The ADRs are the authority for the decisions in this project.
 | [0006](0006-persistence.md)                                     | PostgreSQL, sqlx and reviewed SQL migrations             | Accepted                           |
 | [0007](0007-jobs-and-schedules.md)                              | Durable jobs and schedules in PostgreSQL                 | Accepted                           |
 | [0008](0008-authentication.md)                                  | Authentication separate from authorization               | Accepted, amended by 0070          |
-| [0009](0009-object-storage.md)                                  | Object storage through the S3 API                        | Accepted                           |
+| [0009](0009-object-storage.md)                                  | Object storage through the S3 API                        | Accepted, amended by 0074          |
 | [0010](0010-model-provider.md)                                  | One model provider port with limited AI authority        | Accepted                           |
 | [0011](0011-telegram.md)                                        | Telegram channel adapter                                 | Accepted, amended by 0070          |
 | [0012](0012-documentation.md)                                   | Documentation language, style and checks                 | Accepted                           |
@@ -86,11 +86,11 @@ The ADRs are the authority for the decisions in this project.
 | [0068](0068-actions-and-commitments.md)                         | Actions and commitments                                  | Accepted                           |
 | [0069](0069-persons-and-institutions.md)                        | Persons and institutions                                 | Accepted                           |
 | [0070](0070-ai-security-review-replaces-the-external-review.md) | An AI security review replaces the external review       | Accepted                           |
-| [0071](0071-event-closing-and-retention.md)                     | Event closing, retention and housekeeping                | Proposed                           |
-| [0072](0072-legal-redaction-and-deletion-journal.md)            | Legal redaction and deletion journal                     | Proposed                           |
-| [0073](0073-person-export-and-dispute-notes.md)                 | Person export and dispute notes                          | Proposed                           |
-| [0074](0074-orphan-sweep.md)                                    | Orphan sweep of the object storage                       | Proposed                           |
-| [0075](0075-versions-of-tada-and-its-components.md)             | Versions of tada and its components                      | Proposed                           |
+| [0071](0071-event-closing-and-retention.md)                     | Event closing, retention and housekeeping                | Accepted                           |
+| [0072](0072-legal-redaction-and-deletion-journal.md)            | Legal redaction and deletion journal                     | Accepted                           |
+| [0073](0073-person-export-and-dispute-notes.md)                 | Person export and dispute notes                          | Accepted                           |
+| [0074](0074-orphan-sweep.md)                                    | Orphan sweep of the object storage                       | Accepted                           |
+| [0075](0075-versions-of-tada-and-its-components.md)             | Versions of tada and its components                      | Accepted                           |
 
 ## New ADR
 
