@@ -23,7 +23,7 @@ Schedules:
 
 - The table `schedule` holds the job kind to start, a local time, an IANA time zone, the weekdays, `next_run_at`, `last_run_at` and `missed_run_limit`.
   The pair organization and kind is unique.
-  The organization is optional, for later system schedules.
+  Each schedule belongs to one organization; a schedule of the installation needs a new migration.
 - `next_run_at` follows [ADR 0038](0038-ids-and-time.md): a gap of a DST change moves the run forward, and a fold runs it one time.
 - A step of the worker loop claims due rows with `FOR UPDATE SKIP LOCKED`.
   In one transaction it adds the job, writes `next_run_at` and writes `last_run_at`.

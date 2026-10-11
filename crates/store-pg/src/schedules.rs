@@ -23,7 +23,7 @@ use crate::{Database, pm_policy};
 /// One due schedule: ID, organization, kind, local time, time zone, weekdays, next run, missed-run limit.
 type DueRow = (
     Uuid,
-    Option<Uuid>,
+    Uuid,
     String,
     jiff_sqlx::Time,
     String,
@@ -160,7 +160,7 @@ impl Database {
                         kind,
                         version: 1,
                         payload: json!({}),
-                        organization_id: organization.map(OrganizationId::from_uuid),
+                        organization_id: Some(OrganizationId::from_uuid(organization)),
                         request_id: None,
                         run_at: None,
                     };
