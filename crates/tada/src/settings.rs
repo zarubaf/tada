@@ -510,6 +510,36 @@ mod tests {
         assert_eq!(bot.api_url.as_str(), "https://api.telegram.org/");
     }
 
+    /// Loads the bot settings with a plain `http` API URL.
+    fn bot_with_http_api() -> Result<Loaded<(TelegramBot,)>, SettingsErrors> {
+        let token = secret_file("123:test-token\n");
+        load_from::<(TelegramBot,)>(&[
+            (
+                "TADA_TELEGRAM_BOT_TOKEN_FILE",
+                token.path().to_str().unwrap(),
+            ),
+            ("TADA_TELEGRAM_API_URL", "http://127.0.0.1:9999"),
+        ])
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn accepts_a_plain_bot_api_url_in_a_debug_build() {
+        let bot = bot_with_http_api().unwrap().settings.0;
+        assert_eq!(bot.api_url.as_str(), "http://127.0.0.1:9999/");
+    }
+
+    // Each call to the Bot API carries the token in its path.
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn rejects_a_plain_bot_api_url_in_a_release_build() {
+        let errors = bot_with_http_api().unwrap_err();
+        assert!(
+            errors.0[0].starts_with("TADA_TELEGRAM_API_URL "),
+            "{errors}"
+        );
+    }
+
     #[test]
     fn telegram_polls_by_default_and_listens_on_8081() {
         let telegram = telegram_with(&[]).unwrap();
