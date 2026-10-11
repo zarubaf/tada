@@ -331,7 +331,7 @@ const TELEGRAM_WEBHOOK_SECRET: Setting = Setting {
     kind: "file path",
     default: None,
     secret: true,
-    description: "The file that contains the secret of the webhook: 1 to 256 characters of `A-Z`, `a-z`, `0-9`, `_` and `-`. Telegram sends it with each update. Only webhook mode reads it.",
+    description: "The file that contains the secret of the webhook: 32 to 256 characters of `A-Z`, `a-z`, `0-9`, `_` and `-`. Make it with a cryptographically secure random generator. Telegram sends it with each update, and it is the only proof that an update comes from Telegram. Only webhook mode reads it.",
 };
 
 const TELEGRAM_LISTEN: Setting = Setting {
@@ -360,9 +360,14 @@ impl FromStr for TelegramMode {
     }
 }
 
-/// True for a secret that Telegram accepts as `secret_token` of `setWebhook`.
+/// The shortest webhook secret. The secret is the only proof that an update comes from Telegram,
+/// and the webhook answers each guess, so a shorter secret falls to a brute force.
+const WEBHOOK_SECRET_MIN_BYTES: usize = 32;
+
+/// True for a secret that is long enough and that Telegram accepts as `secret_token` of
+/// `setWebhook` (at most 256 characters).
 fn is_webhook_secret(secret: &str) -> bool {
-    (1..=256).contains(&secret.len())
+    (WEBHOOK_SECRET_MIN_BYTES..=256).contains(&secret.len())
         && secret
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
@@ -405,7 +410,9 @@ impl Section for TelegramGateway {
                 if !is_webhook_secret(secret.expose_secret()) {
                     source.error(
                         &TELEGRAM_WEBHOOK_SECRET,
-                        "names a file that does not hold 1 to 256 characters of A-Z, a-z, 0-9, _ and -",
+                        &format!(
+                            "names a file that does not hold {WEBHOOK_SECRET_MIN_BYTES} to 256 characters of A-Z, a-z, 0-9, _ and -"
+                        ),
                     );
                     return None;
                 }
