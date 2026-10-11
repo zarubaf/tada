@@ -341,7 +341,7 @@ describe("PartiesPage", () => {
     });
     await user.click(await screen.findByRole("button", { name: "Beat Muster bearbeiten" }));
     expect(await screen.findByRole("heading", { name: "Datenschutz" })).toBeVisible();
-    expect(await screen.findByRole("link", { name: "Export herunterladen" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Export herunterladen" })).toBeVisible();
   });
 
   it("non-owner sees no Datenschutz section", async () => {

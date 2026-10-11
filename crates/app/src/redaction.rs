@@ -23,6 +23,7 @@ use uuid::Uuid;
 use crate::access;
 use crate::blobs::{BlobError, BlobKey, BlobStore, ByteStream, JOURNAL_PREFIX};
 use crate::caller::{Actor, JobRunner, MemberCaller, OrgScope, RedactionReplay, ServiceCaller};
+use crate::clock::Clock;
 use crate::jobs::{Job, JobFailed, JobHandler, JobWarning};
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::store::StoreError;
@@ -169,6 +170,10 @@ pub enum RedactionError {
     /// The target is an event that is not closed, or a source that an event holds and retention would redact.
     #[error("the event is not closed")]
     InvalidTransition,
+    /// The session of the caller is older than `session::RECENT_SIGN_IN`. The action cannot be undone,
+    /// so a stolen session must not do it (ADR 0070).
+    #[error("the action needs a recent sign-in")]
+    RecentSignInRequired,
     #[error("invalid values")]
     Invalid(Vec<FieldError>),
     #[error(transparent)]
@@ -182,6 +187,7 @@ impl RedactionError {
         ProblemCode::NotFound,
         ProblemCode::InvalidTransition,
         ProblemCode::ValidationFailed,
+        ProblemCode::RecentSignInRequired,
         ProblemCode::Unavailable,
         ProblemCode::Internal,
     ];
@@ -194,6 +200,7 @@ impl CommandError for RedactionError {
             Self::NotFound => ProblemCode::NotFound,
             Self::InvalidTransition => ProblemCode::InvalidTransition,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
+            Self::RecentSignInRequired => ProblemCode::RecentSignInRequired,
             Self::Store(error) => error.code(),
         }
     }
@@ -229,23 +236,30 @@ pub struct Redacted {
 /// ```compile_fail
 /// use tada_app::blobs::BlobStore;
 /// use tada_app::caller::AiCaller;
+/// use tada_app::clock::Clock;
 /// use tada_app::redaction::{RedactionStore, redact};
 ///
-/// async fn by_ai(caller: &AiCaller, store: &dyn RedactionStore, blobs: &dyn BlobStore) {
-///     let _ = redact(caller, &[], store, blobs).await;
+/// async fn by_ai(caller: &AiCaller, store: &dyn RedactionStore, blobs: &dyn BlobStore, clock: &dyn Clock) {
+///     let _ = redact(caller, &[], store, blobs, clock).await;
 /// }
 /// ```
 ///
 /// The target `event` is for the retention job only. All targets change in one transaction, and a redacted
 /// target stays as it is. The objects of redacted upload versions go after the commit.
+/// A redaction cannot be undone, and the journal applies it again after a restore, so the session of the owner
+/// must be younger than `session::RECENT_SIGN_IN` (ADR 0072).
 pub async fn redact(
     caller: &MemberCaller,
     targets: &[RedactionTarget],
     store: &dyn RedactionStore,
     blobs: &dyn BlobStore,
+    clock: &dyn Clock,
 ) -> Result<Redacted, RedactionError> {
     if !access::is_owner(caller) {
         return Err(refused_to(caller, targets, store).await?);
+    }
+    if !caller.signed_in_recently(clock.now()) {
+        return Err(RedactionError::RecentSignInRequired);
     }
     let targets = checked(targets)?;
     let outcome = store

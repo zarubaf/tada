@@ -16,6 +16,7 @@ use crate::access::{self, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::blobs::BlobStore;
 use crate::caller::{JobRunner, MemberCaller, OrgScope, ServiceCaller};
+use crate::clock::Clock;
 use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::redaction::{RedactionError, RedactionStore, redact_for_retention};
 use crate::store::StoreError;
@@ -91,12 +92,17 @@ pub enum RetentionError {
     VersionConflict,
     #[error("invalid values")]
     Invalid(Vec<FieldError>),
+    /// The session of the caller is older than `session::RECENT_SIGN_IN`. The action cannot be undone,
+    /// so a stolen session must not do it (ADR 0070).
+    #[error("the action needs a recent sign-in")]
+    RecentSignInRequired,
     #[error(transparent)]
     Store(#[from] StoreError),
 }
 
 impl RetentionError {
     /// All codes of the retention commands and queries, for the API contract (ADR 0037).
+    /// A change of the periods also answers `recent-sign-in-required`.
     pub const CODES: &[ProblemCode] = &[
         ProblemCode::Forbidden,
         ProblemCode::RecordVersionConflict,
@@ -112,6 +118,7 @@ impl CommandError for RetentionError {
             Self::Forbidden => ProblemCode::Forbidden,
             Self::VersionConflict => ProblemCode::RecordVersionConflict,
             Self::Invalid(_) => ProblemCode::ValidationFailed,
+            Self::RecentSignInRequired => ProblemCode::RecentSignInRequired,
             Self::Store(error) => error.code(),
         }
     }
@@ -144,15 +151,21 @@ pub async fn get_retention(
 
 /// Replaces both periods of the caller's organization. Only an owner can do this.
 /// A value of `None` switches the period off. The audit event holds the two numbers and no content.
+/// A short period makes the next run of the job redact data for good, so the session of the owner must be
+/// younger than `session::RECENT_SIGN_IN` (ADR 0071).
 pub async fn set_retention(
     caller: &MemberCaller,
     closed_event_months: Option<i64>,
     source_months: Option<i64>,
     expected_version: RecordVersion,
     store: &dyn RetentionStore,
+    clock: &dyn Clock,
 ) -> Result<Retention, RetentionError> {
     if !access::is_owner(caller) {
         return Err(RetentionError::Forbidden);
+    }
+    if !caller.signed_in_recently(clock.now()) {
+        return Err(RetentionError::RecentSignInRequired);
     }
     let mut errors = Vec::new();
     let mut period = |field: &'static str, months: Option<i64>| match months.map(Months::new) {

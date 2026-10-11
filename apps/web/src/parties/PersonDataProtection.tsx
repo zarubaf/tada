@@ -2,17 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import personDataMessages from "../../../../locales/de-CH/person-data.ftl?raw";
 import { type Api, problemMessage } from "../api/client";
 import { addMessages, hasMessage, t } from "../i18n";
+import { SignInAgain } from "../session/SignInAgain";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { FileLink } from "../ui/FileLink";
 import { useFocusAfterCommit } from "../ui/focus";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Redacted } from "../ui/Redacted";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import { DisputeDialog } from "./DisputeDialog";
 import styles from "./PersonDataProtection.module.css";
-import { exportUrl, isTarget, type Mention, mentionKey, personDataApi } from "./personDataApi";
+import { exportFileName, isTarget, type Mention, mentionKey, personDataApi } from "./personDataApi";
 
 /** The page of the records that a mention of another kind belongs to, for the normal edit. */
 addMessages(personDataMessages);
@@ -86,6 +86,9 @@ export default function PersonDataProtection({ api, personId }: { api: Api; pers
   const [confirming, setConfirming] = useState(false);
   const [disputing, setDisputing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  // The export and the removal need a recent sign-in (ADR 0070): the page then offers a new one.
+  const [signInAgain, setSignInAgain] = useState(false);
   const [failure, setFailure] = useState<string>();
   const [done, setDone] = useState<string>();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -119,13 +122,41 @@ export default function PersonDataProtection({ api, personId }: { api: Api; pers
     setSelected(next);
   };
 
+  /** Shows the message of a refused call, and the way to a new sign-in if the server asks for it. */
+  const refused = (error: Parameters<typeof problemMessage>[0]) => {
+    setSignInAgain(error?.code === "recent-sign-in-required");
+    setFailure(problemMessage(error));
+  };
+
+  const exportData = async () => {
+    setExporting(true);
+    setFailure(undefined);
+    try {
+      const result = await data.exportFile(personId);
+      if (result.data && result.response.ok) {
+        const url = URL.createObjectURL(result.data);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = exportFileName(result.response);
+        link.click();
+        // Older WebKit versions stop the download if the URL goes in the same task as the click.
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      } else {
+        refused(result.error);
+      }
+    } catch {
+      setFailure(problemMessage(undefined));
+    }
+    setExporting(false);
+  };
+
   const redact = async () => {
     setBusy(true);
     setFailure(undefined);
     try {
       const result = await data.redact(chosen);
       if (result.error || !result.response.ok) {
-        setFailure(problemMessage(result.error));
+        refused(result.error);
       } else {
         setDone(t("person-data-redacted", { count: chosen.length }));
         setSelected(new Set());
@@ -173,10 +204,11 @@ export default function PersonDataProtection({ api, personId }: { api: Api; pers
       <LiveRegion kind="alert">{failure}</LiveRegion>
       <LiveRegion kind="status">{done}</LiveRegion>
       <p>
-        <FileLink download href={exportUrl(personId)}>
+        <Button isPending={exporting} onPress={() => void exportData()}>
           {t("person-data-export")}
-        </FileLink>
+        </Button>
       </p>
+      {signInAgain && <SignInAgain />}
 
       <h3 ref={heading} tabIndex={-1} className={styles.subheading}>
         {t("person-data-mentions")}

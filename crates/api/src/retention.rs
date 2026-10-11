@@ -9,7 +9,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use crate::ApiState;
-use crate::contract::{AUTHENTICATED, JSON_BODY, codes};
+use crate::contract::{AUTHENTICATED, JSON_BODY, RECENT_SIGN_IN, codes};
 use crate::extract::{Caller, Json, record_version};
 use crate::problem::{ApiError, Problem};
 
@@ -28,7 +28,7 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
     };
     vec![
         ("get_retention", retention(&[])),
-        ("set_retention", retention(&[JSON_BODY])),
+        ("set_retention", retention(&[JSON_BODY, RECENT_SIGN_IN])),
     ]
 }
 
@@ -121,6 +121,7 @@ async fn set_retention(
         request.source_months,
         record_version(request.expected_version)?,
         state.retention.as_ref(),
+        state.clock.as_ref(),
     )
     .await?;
     Ok(axum::Json(retention.into()))

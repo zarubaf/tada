@@ -1,8 +1,9 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "../api/client";
 import { Router } from "../router/Router";
+import { SessionProvider } from "../session/SessionProvider";
 import PersonDataProtection from "./PersonDataProtection";
 
 const mentions = [
@@ -45,6 +46,13 @@ function problem(status: number, code: string) {
   );
 }
 
+const session = {
+  user_id: "u1",
+  display_name: "Olga Owner",
+  organization: { organization_id: "o1", name: "Fliegergruppe Testwil", role: "owner" },
+  memberships: [{ organization_id: "o1", name: "Fliegergruppe Testwil", role: "owner" }],
+};
+
 function setup(answers: Record<string, () => Response> = {}) {
   const calls: { call: string; body: unknown }[] = [];
   const fetch = async (request: Request) => {
@@ -58,12 +66,17 @@ function setup(answers: Record<string, () => Response> = {}) {
     if (call === "GET /api/v1/persons/p1/mentions") {
       return json(200, { items: mentions });
     }
+    if (call === "GET /api/v1/session") {
+      return json(200, session);
+    }
     throw new Error(`unexpected ${call}`);
   };
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
   render(
     <Router>
-      <PersonDataProtection api={api} personId="p1" />
+      <SessionProvider api={api}>
+        <PersonDataProtection api={api} personId="p1" />
+      </SessionProvider>
     </Router>,
   );
   return { calls };
@@ -71,13 +84,60 @@ function setup(answers: Record<string, () => Response> = {}) {
 
 const user = userEvent.setup({ delay: null });
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("PersonDataProtection", () => {
   it("export button downloads json", async () => {
-    setup();
+    const createObjectURL = vi.fn(() => "blob:export");
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const saved: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      saved.push(`${this.download} ${this.href}`);
+    });
+    const { calls } = setup({
+      "GET /api/v1/persons/p1/export": () =>
+        new Response(JSON.stringify({ format_version: 1 }), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Disposition": 'attachment; filename="person-PER-001.json"',
+          },
+        }),
+    });
 
-    const link = await screen.findByRole("link", { name: "Export herunterladen" });
-    expect(link).toHaveAttribute("href", "/api/v1/persons/p1/export");
-    expect(link).toHaveAttribute("download");
+    await user.click(await screen.findByRole("button", { name: "Export herunterladen" }));
+
+    await waitFor(() => expect(saved).toEqual(["person-PER-001.json blob:export"]));
+    expect(calls.map((c) => c.call)).toContain("GET /api/v1/persons/p1/export");
+    // The URL goes in a later task, after the browser started the download.
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:export"));
+  });
+
+  it("offers a new sign-in when the export needs a recent one", async () => {
+    setup({
+      "GET /api/v1/persons/p1/export": () => problem(403, "recent-sign-in-required"),
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Export herunterladen" }));
+
+    expect(await screen.findByText(/Melden Sie sich für diesen Schritt neu an/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Neu anmelden" })).toBeVisible();
+  });
+
+  it("offers a new sign-in when a redaction needs a recent one", async () => {
+    setup({ "POST /api/v1/redactions": () => problem(403, "recent-sign-in-required") });
+    await user.click(await screen.findByRole("checkbox", { name: /Beat Muster fliegt mit/ }));
+    await user.click(screen.getByRole("button", { name: "Entfernen" }));
+    const dialog = await screen.findByRole("alertdialog");
+
+    await user.click(within(dialog).getByRole("button", { name: "Endgültig entfernen" }));
+
+    expect(await screen.findByText(/Melden Sie sich für diesen Schritt neu an/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Neu anmelden" })).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: /Beat Muster fliegt mit/ })).toBeChecked();
   });
 
   it("lists only the redaction targets as selectable and links the other kinds", async () => {
@@ -206,7 +266,7 @@ describe("PersonDataProtection", () => {
     expect(await screen.findByText("Ein unerwarteter Fehler ist aufgetreten.")).toBeVisible();
     expect(screen.queryByRole("checkbox")).toBeNull();
     // The export does not depend on the list.
-    expect(screen.getByRole("link", { name: "Export herunterladen" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Export herunterladen" })).toBeVisible();
   });
 
   it("moves focus to the list heading after a redaction and after a dispute", async () => {

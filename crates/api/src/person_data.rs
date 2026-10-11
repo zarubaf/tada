@@ -13,7 +13,7 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::ApiState;
-use crate::contract::{AUTHENTICATED, PATH, codes};
+use crate::contract::{AUTHENTICATED, PATH, RECENT_SIGN_IN, codes};
 use crate::extract::{Caller, Path};
 use crate::problem::{ApiError, Problem};
 
@@ -32,7 +32,7 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         ),
         (
             "export_person",
-            codes(&[AUTHENTICATED, PATH, PersonDataError::CODES]),
+            codes(&[AUTHENTICATED, PATH, PersonDataError::CODES, RECENT_SIGN_IN]),
         ),
     ]
 }

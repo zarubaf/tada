@@ -22,6 +22,12 @@ test("an owner finds the export, redacts a mention and sees it removed", async (
     if (path.endsWith("/mentions")) {
       return route.fulfill(json({ items: mentions }));
     }
+    if (path.endsWith("/export")) {
+      return route.fulfill({
+        ...json({ format_version: 1 }),
+        headers: { "Content-Disposition": 'attachment; filename="person-PER-001.json"' },
+      });
+    }
     return route.fulfill(
       json({
         items: [
@@ -65,10 +71,10 @@ test("an owner finds the export, redacts a mention and sees it removed", async (
   await page.getByRole("button", { name: /bearbeiten$/ }).click();
   await expect(page.getByRole("heading", { name: "Datenschutz" })).toBeVisible();
 
-  // The browser streams the file as an attachment; the Rust test checks the headers and the content.
-  const exportLink = page.getByRole("link", { name: "Export herunterladen" });
-  await expect(exportLink).toHaveAttribute("href", `/api/v1/persons/${PERSON}/export`);
-  await expect(exportLink).toHaveAttribute("download", "");
+  // The page loads the export and saves it under the name of the server; the Rust test checks the content.
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export herunterladen" }).click();
+  expect((await download).suggestedFilename()).toBe("person-PER-001.json");
 
   await page.locator("label", { hasText: "Beat Muster kommt im Mai 2030" }).click();
   await page.getByRole("button", { name: "Entfernen" }).click();

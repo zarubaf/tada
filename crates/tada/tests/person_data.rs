@@ -304,6 +304,66 @@ async fn mentions_find_the_file_name_and_the_document_name() {
     }
 }
 
+/// The export and a redaction cannot be undone, so a stolen session older than 15 minutes cannot make them.
+/// The mentions stay readable.
+#[tokio::test]
+async fn export_and_redaction_need_a_recent_sign_in() {
+    let world = World::start().await;
+    let person = world.person(json!({"name": "Beat Muster"})).await;
+    let changeset = world
+        .changeset("Beat Muster kommt im Mai 2030.", "im Mai 2030")
+        .await;
+    let source = world.source_item(&changeset).await;
+    let cookie = world
+        .test
+        .sign_in(
+            world.owner_id,
+            Some(world.organization),
+            jiff::Timestamp::now() - jiff::SignedDuration::from_mins(16),
+        )
+        .await;
+    let stale = Client {
+        router: router(&world.test, &world.garage),
+        cookie,
+    };
+
+    let (status, problem) = call(
+        &stale,
+        Method::GET,
+        &format!("/api/v1/persons/{person}/export"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    assert_eq!(problem["code"], "recent-sign-in-required");
+    let body = json!({"targets": [{"kind": "source-item", "id": source}], "reason": "request"});
+    let (status, problem) = call(&stale, Method::POST, "/api/v1/redactions", Some(&body)).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    assert_eq!(problem["code"], "recent-sign-in-required");
+    assert_eq!(
+        world
+            .test
+            .scalar::<i64>("SELECT count(*) FROM redaction")
+            .await,
+        0
+    );
+    assert_eq!(
+        world
+            .test
+            .scalar::<i64>("SELECT count(*) FROM audit_event WHERE action = 'person.export'")
+            .await,
+        0
+    );
+    let (status, _) = call(
+        &stale,
+        Method::GET,
+        &format!("/api/v1/persons/{person}/mentions"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+}
+
 #[tokio::test]
 async fn mentions_escape_like_wildcards() {
     let world = World::start().await;

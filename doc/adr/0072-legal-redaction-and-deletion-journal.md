@@ -60,6 +60,9 @@ Redaction record and command:
   A migration widens the `CHECK` constraint of the audit detail for the key `reason`.
   Its value is `request` or `retention`.
 - `POST /api/v1/redactions` takes a list of targets and the reason `request`. Only an owner calls it. All targets change in one transaction.
+- The command needs a sign-in of at most 15 minutes ago, as an API token does ([ADR 0070](0070-ai-security-review-replaces-the-external-review.md)).
+  A redaction cannot be undone, and the replay applies it again after a restore, so a stolen older session must not make it.
+  The server answers `recent-sign-in-required`, and the web client offers „Neu anmelden“.
 - The targets are `source-item` (all its versions), `fact-version`, `document-version`, `proposal`, `person` and `institution`. The target `event` exists for the retention job only.
 - A redaction of a redacted target does nothing.
 
