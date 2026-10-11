@@ -489,7 +489,7 @@ impl ServiceIdentity for TelegramGateway {
 
 impl ServiceCaller<TelegramGateway> {
     /// The linked member for whom the gateway acts, through the channel `telegram` (ADR 0039).
-    /// Only `telegram::member_for` calls it, after it read the membership of the user.
+    /// Only `telegram::linked_members` calls it, after it read the membership of the user.
     pub(crate) fn member(
         &self,
         user_id: UserId,
