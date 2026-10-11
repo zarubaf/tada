@@ -108,7 +108,8 @@ Digest intent and send:
   A message or a button press from the private chat of the account with the bot clears `blocked_at`.
   An update from a group does not clear it.
   A failed send changes no other state.
-- A refused connection or an error answer of the Bot API with 429 or 5xx is temporary: nothing went out.
+- A refused connection or an error answer of the Bot API with 429 or 5xx is temporary.
+  A 5xx after a delivery is rare; the retry can then send a second digest.
   The send returns the intent to `pending`, and the queue retries the job with its backoff, as for a mail ([ADR 0042](0042-transactional-email.md)).
   After the last attempt the intent becomes `failed`.
   Another refusal, for example a bad request, is `failed` at once and is not retried.
