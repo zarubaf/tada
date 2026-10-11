@@ -8,13 +8,12 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::{AiToolError, AiToolPorts, TypedTool, find_event, no_input_schema};
+use tada_app::ai_queries;
 use tada_app::caller::AiCaller;
 use tada_app::domain::events::EventKey;
-use tada_app::events;
-use tada_app::facts;
 use tada_app::paging::PageLimit;
-use tada_app::search::{self, SearchRequest};
-use tada_app::sources::{self, PassageRequest};
+use tada_app::search::SearchRequest;
+use tada_app::sources::PassageRequest;
 use tada_app::views::{
     EventList, EventSchema, EventView, PassageView, ProfileView, SearchHitView, SearchResult,
 };
@@ -64,7 +63,7 @@ impl TypedTool for ListEvents {
         _input: NoInput,
         ports: &AiToolPorts,
     ) -> Result<EventList, AiToolError> {
-        let page = events::list_events(caller, None, PageLimit::LARGEST, &*ports.events).await?;
+        let page = ai_queries::list_events(caller, None, PageLimit::LARGEST, ports).await?;
         Ok(EventList {
             events: page.items.iter().map(EventView::from).collect(),
             more: page.next.is_some(),
@@ -93,8 +92,7 @@ Use an existing field first; propose a new field only if no field has the meanin
         ports: &AiToolPorts,
     ) -> Result<EventSchema, AiToolError> {
         let event = find_event(caller, &input.event_key, ports).await?;
-        let catalog =
-            facts::get_field_catalog(caller, event.id, &*ports.identity, &*ports.facts).await?;
+        let catalog = ai_queries::get_field_catalog(caller, event.id, ports).await?;
         Ok(EventSchema::new(&event, &catalog))
     }
 }
@@ -122,9 +120,8 @@ Only accepted facts are confirmed. Never fill in an unknown, and never present a
         ports: &AiToolPorts,
     ) -> Result<ProfileView, AiToolError> {
         let event = find_event(caller, &input.event_key, ports).await?;
-        let (identity, facts) = (&*ports.identity, &*ports.facts);
-        let profile = facts::get_event_profile(caller, event.id, identity, facts).await?;
-        let catalog = facts::get_field_catalog(caller, event.id, identity, facts).await?;
+        let profile = ai_queries::get_event_profile(caller, event.id, ports).await?;
+        let catalog = ai_queries::get_field_catalog(caller, event.id, ports).await?;
         Ok(ProfileView::new(&event, &profile, &catalog))
     }
 }
@@ -149,14 +146,7 @@ Each hit names its source version and a snippet with its offsets. Cite a hit as 
         request: SearchRequest,
         ports: &AiToolPorts,
     ) -> Result<SearchResult, AiToolError> {
-        let hits = search::search_sources(
-            caller,
-            request,
-            &*ports.events,
-            &*ports.identity,
-            &*ports.sources,
-        )
-        .await?;
+        let hits = ai_queries::search_sources(caller, request, ports).await?;
         Ok(SearchResult {
             hits: hits.iter().map(SearchHitView::from).collect(),
         })
@@ -183,8 +173,7 @@ The offsets count characters, as in the evidence of a fact and in a search hit."
         request: PassageRequest,
         ports: &AiToolPorts,
     ) -> Result<PassageView, AiToolError> {
-        let passage =
-            sources::get_source_passage(caller, request, &*ports.identity, &*ports.sources).await?;
+        let passage = ai_queries::get_source_passage(caller, request, ports).await?;
         Ok(PassageView::from(&passage))
     }
 }

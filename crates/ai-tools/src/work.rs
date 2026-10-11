@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use super::events::EventInput;
 use super::{AiToolError, AiToolPorts, TypedTool, find_event};
+use tada_app::ai_queries;
 use tada_app::caller::AiCaller;
 use tada_app::dispute_notes::{DisputeNotes, NoteKey};
 use tada_app::domain::events::EventKey;
@@ -24,12 +25,12 @@ use tada_app::domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, WorkstreamName,
 };
 use tada_app::paging::PageLimit;
-use tada_app::parties::{self, InstitutionView, PersonView};
+use tada_app::parties::{InstitutionView, PersonView};
 use tada_app::records::{RecordEvidenceView, Shown};
 use tada_app::search::MAX_QUERY_CHARS;
 use tada_app::views::{DisputeNoteView, note_views};
-use tada_app::work::{self, ActionView, CommitmentView, WorkPorts, WorkQuery};
-use tada_app::workstreams::{self, Workstream};
+use tada_app::work::{ActionView, CommitmentView, WorkQuery};
+use tada_app::workstreams::Workstream;
 
 /// The input of the tools that list the actions of an event.
 #[derive(Deserialize, JsonSchema)]
@@ -422,16 +423,6 @@ A conditional commitment has a condition and stays conditional until a reviewer 
     )
 });
 
-fn work_ports(ports: &AiToolPorts) -> WorkPorts<'_> {
-    WorkPorts {
-        identity: &*ports.identity,
-        work: &*ports.work,
-        workstreams: &*ports.workstreams,
-        parties: &*ports.parties,
-        clock: &*ports.clock,
-    }
-}
-
 /// The first page of the largest size, without a filter but the status.
 fn query<S>(status: Option<S>) -> WorkQuery<S> {
     WorkQuery {
@@ -474,9 +465,7 @@ A work record names a workstream by its ID. Propose a record in an active workst
         ports: &AiToolPorts,
     ) -> Result<WorkstreamList, AiToolError> {
         let event = find_event(caller, &input.event_key, ports).await?;
-        let workstreams =
-            workstreams::list_workstreams(caller, event.id, &*ports.identity, &*ports.workstreams)
-                .await?;
+        let workstreams = ai_queries::list_workstreams(caller, event.id, ports).await?;
         Ok(WorkstreamList {
             workstreams: workstreams.iter().map(WorkstreamItem::from).collect(),
         })
@@ -504,7 +493,7 @@ impl TypedTool for ListActions {
     ) -> Result<ActionList, AiToolError> {
         let event = find_event(caller, &input.event_key, ports).await?;
         let query = query(input.status.map(ActionStatus::from));
-        let page = work::list_actions(caller, event.id, query, work_ports(ports)).await?;
+        let page = ai_queries::list_actions(caller, event.id, query, ports).await?;
         Ok(ActionList {
             actions: page.items.iter().map(ActionItem::from).collect(),
             more: page.next.is_some(),
@@ -533,7 +522,7 @@ impl TypedTool for ListCommitments {
     ) -> Result<CommitmentList, AiToolError> {
         let event = find_event(caller, &input.event_key, ports).await?;
         let query = query(input.status.map(CommitmentStatus::from));
-        let page = work::list_commitments(caller, event.id, query, work_ports(ports)).await?;
+        let page = ai_queries::list_commitments(caller, event.id, query, ports).await?;
         Ok(CommitmentList {
             commitments: page.items.iter().map(CommitmentItem::from).collect(),
             more: page.next.is_some(),
@@ -563,13 +552,10 @@ Each list holds the first matches in the order of their numbers; if more is true
         ports: &AiToolPorts,
     ) -> Result<PartyList, AiToolError> {
         check_query(&input.q)?;
-        let (identity, store) = (&*ports.identity, &*ports.parties);
         let limit = PageLimit::LARGEST;
-        let persons =
-            parties::list_persons(caller, Some(&input.q), None, limit, identity, store).await?;
+        let persons = ai_queries::list_persons(caller, Some(&input.q), None, limit, ports).await?;
         let institutions =
-            parties::list_institutions(caller, Some(&input.q), None, limit, identity, store)
-                .await?;
+            ai_queries::list_institutions(caller, Some(&input.q), None, limit, ports).await?;
         Ok(PartyList {
             persons: persons.items.iter().map(PersonItem::from).collect(),
             institutions: institutions

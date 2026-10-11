@@ -2,7 +2,7 @@
 //! The MCP server shows the tools to the AI clients of members, and an agent run gives them to a model.
 //!
 //! The tools themselves live in the crate `ai-tools`. It uses only the public interface of `app`,
-//! so the compiler keeps each tool to queries and proposals with an `AiCaller` (ADR 0039).
+//! and it reaches data only through `ai_queries`, so the compiler keeps each tool to queries and proposals (ADR 0010).
 
 use std::fmt;
 use std::sync::Arc;

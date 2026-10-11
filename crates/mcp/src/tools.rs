@@ -15,7 +15,8 @@ use rmcp::model::{
 use rmcp::service::RequestContext;
 use rmcp::{ErrorData, RoleServer, ServerHandler, tool_handler};
 use serde_json::Value;
-use tada_ai_tools::{AiToolPorts, standard_catalog};
+use tada_ai_tools::standard_catalog;
+use tada_app::ai_queries::AiToolPorts;
 use tada_app::ai_tools::{AiTool, ToolCatalog};
 
 use crate::errors::{ToolError, caller, name_request};

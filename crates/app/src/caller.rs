@@ -248,7 +248,7 @@ impl MemberCaller {
     }
 
     /// The organization that all reads and writes of this caller stay in.
-    /// Only this crate reads it: code outside never holds the scope of a caller (ADR 0010).
+    /// Only this crate reads it (ADR 0010).
     pub(crate) fn scope(&self) -> OrgScope {
         OrgScope(self.organization_id)
     }
@@ -257,7 +257,7 @@ impl MemberCaller {
 /// Seals the caller traits `Principal` and `MayPropose` (ADR 0039) and holds the scope of a caller.
 /// Only the callers of this module implement `Sealed`, so no other crate can implement the traits.
 /// The trait is crate-private, so no other crate can call `scope`, also not through a bound `P: Principal`.
-/// Code outside this crate never holds the scope of a caller, so it cannot call a port with it.
+/// Code outside this crate cannot read the scope from a caller; a port gets it only as an argument from this crate.
 pub(crate) mod sealed {
     use super::OrgScope;
 
@@ -280,7 +280,7 @@ impl sealed::Sealed for AiCaller {
 }
 
 /// For tests of other crates only: the scope of a caller, to set up and read a store directly.
-/// Production code outside this crate never holds the scope of a caller (ADR 0010).
+/// Production code outside this crate cannot read the scope from a caller (ADR 0010).
 #[cfg(feature = "testing")]
 pub trait TestScope {
     fn scope(&self) -> OrgScope;

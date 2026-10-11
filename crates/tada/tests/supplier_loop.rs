@@ -17,7 +17,7 @@ use axum::http::{Method, StatusCode, header};
 use jiff::{SignedDuration, Timestamp};
 use serde_json::{Value, json};
 use support::{SESSION_COOKIE, TestClock};
-use tada_ai_tools::AiToolPorts;
+use tada_app::ai_queries::{AiToolPorts, AiToolStores};
 use tada_app::caller::OrganizationRole;
 use tada_app::clock::Clock;
 use tada_app::domain::ids::UserId;
@@ -61,7 +61,7 @@ impl App {
                 clock.clone(),
             )),
             public_url: support::public_url(),
-            ports: AiToolPorts {
+            ports: AiToolPorts::new(AiToolStores {
                 events: database.clone(),
                 identity: database.clone(),
                 facts: database.clone(),
@@ -72,7 +72,7 @@ impl App {
                 workstreams: database.clone(),
                 parties: database.clone(),
                 work: database,
-            },
+            }),
         };
         let router = tada::serve::routes(api, mcp, None);
         Self {

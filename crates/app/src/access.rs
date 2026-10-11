@@ -32,8 +32,10 @@ use crate::store::StoreError;
 /// }
 /// ```
 ///
-/// The scope of the caller stays inside this crate (ADR 0010): no other crate gets it,
-/// so no other crate can call a port with it.
+/// Code outside this crate cannot read the organization scope from a caller (ADR 0010).
+/// A port gets the scope only as an argument from this crate.
+/// Stable rustdoc does not check the error code of a `compile_fail` test,
+/// so each test below has exactly one error, the private method `scope`.
 ///
 /// ```compile_fail,E0624
 /// use tada_app::access::Principal;
@@ -49,12 +51,14 @@ use crate::store::StoreError;
 /// use tada_app::caller::{AiCaller, OrgScope};
 ///
 /// fn scope_of(caller: &AiCaller) -> OrgScope {
-///     caller.scope()
+///     fn through_the_bound<P: Principal>(caller: &P) -> OrgScope {
+///         caller.scope()
+///     }
+///     through_the_bound(caller)
 /// }
 /// ```
 ///
 /// ```compile_fail,E0624
-/// use tada_app::access::Principal;
 /// use tada_app::caller::{MemberCaller, OrgScope};
 ///
 /// fn scope_of(caller: &MemberCaller) -> OrgScope {
@@ -63,7 +67,7 @@ use crate::store::StoreError;
 /// ```
 #[expect(
     private_bounds,
-    reason = "the crate-private supertrait seals the trait and keeps the scope inside this crate"
+    reason = "the crate-private supertrait seals the trait and hides the scope of a caller from other crates"
 )]
 pub trait Principal: crate::caller::sealed::Sealed {
     /// The member for whom the caller acts.

@@ -42,6 +42,8 @@ Tool catalog:
   A tool has a name, a description, an input schema and a run function that takes `&AiCaller`.
 - The MCP server and the agent runner both use the catalog.
   A tool outside `AiCaller` does not compile.
+- A tool gets only an `AiCaller` and the opaque `AiToolPorts`.
+  Code outside `app` cannot read the scope from a caller, and the AI tools hold no store, so they reach data only through the read and propose functions of `app::ai_queries`.
 - `AiCaller` gets an origin: a token for MCP, or an agent run with a task name.
 - For `pm-digest`, the worker builds the `AiCaller` from the member caller of the recipient with the read scope.
 
