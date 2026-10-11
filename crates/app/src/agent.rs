@@ -10,9 +10,10 @@
 //! the task, the prompt version, the model ID, the tool name and the outcome, and no free text. The run also
 //! returns these steps, for the evaluation and the log of the caller.
 //!
-//! The runner checks the time and the cost limits before and after each model call. The adapter stops a single
-//! call after `AiLimits::call_timeout`, so a run can end at most one call after its time limit, and its cost can
-//! go above `AiLimits::max_cost` by at most the cost of one call.
+//! The runner checks the time and the cost limits before and after each model call. The adapter stops each
+//! attempt of a call after `AiLimits::call_timeout` and retries it at most `AiLimits::call_retries` times, so a
+//! run can end at most one call with its retries after its time limit, and its cost can go above
+//! `AiLimits::max_cost` by at most the cost of one call.
 
 use std::fmt;
 
@@ -164,26 +165,34 @@ where
     T: DeserializeOwned + JsonSchema,
     P: ?Sized + Sync,
 {
-    let mut run = AgentRun {
+    let mut trace = Trace::default();
+    let result = run_loop(ports, principal, task, input, in_limits, &mut trace).await;
+    AgentRun {
         task: task.name,
         prompt_version: task.prompt_version,
-        model_id: String::new(),
-        steps: Vec::new(),
-        cost: Chf::ZERO,
-        result: Err(AgentError::Turns),
-    };
-    run.result = run_loop(ports, principal, task, input, in_limits, &mut run).await;
-    run
+        model_id: trace.model_id,
+        steps: trace.steps,
+        cost: trace.cost,
+        result,
+    }
 }
 
-/// The loop of `run_agent`. It writes the model ID, the steps and the cost into `run`.
+/// What `run_loop` writes while it runs: the model ID, the steps and the cost.
+#[derive(Default)]
+struct Trace {
+    model_id: String,
+    steps: Vec<AgentStep>,
+    cost: Chf,
+}
+
+/// The loop of `run_agent`.
 async fn run_loop<T, P>(
     ports: &AgentPorts<'_, P>,
     principal: MemberCaller,
     task: &AgentTask,
     input: String,
     in_limits: InLimits<'_>,
-    run: &mut AgentRun<T>,
+    run: &mut Trace,
 ) -> Result<T, AgentError>
 where
     T: DeserializeOwned + JsonSchema,
@@ -243,7 +252,6 @@ where
         if let Some(usage) = usage {
             let cost = price.cost(usage);
             run.steps.push(AgentStep::Model { usage, cost });
-            run.cost = run.cost.checked_add(cost).ok_or(AgentError::Cost)?;
             let record = UsageRecord {
                 event_id: None,
                 task: task.name,
@@ -254,12 +262,13 @@ where
                 at: ports.clock.now(),
             };
             ports.cost.record(scope, &record).await?;
+            run.cost = run.cost.checked_add(cost).ok_or(AgentError::Cost)?;
         }
         let response = response.map_err(AgentError::Model)?;
         if run.cost > ports.limits.max_cost {
             return Err(AgentError::Cost);
         }
-        if ports.clock.now() > deadline {
+        if ports.clock.now() >= deadline {
             return Err(AgentError::Timeout);
         }
         match response.stop {

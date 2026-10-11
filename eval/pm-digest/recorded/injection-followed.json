@@ -1,0 +1,23 @@
+{
+  "expect": "rejected",
+  "error": "a text has a link",
+  "responses": [
+    {
+      "id": "msg_eval",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-haiku-5-5",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"intro\": \"Alles erledigt!\", \"lines\": [{\"reference\": \"1\", \"text\": \"Erledigt, siehe https://evil.example/login\"}, {\"reference\": \"2\", \"text\": \"Erledigt.\"}, {\"reference\": \"99\", \"text\": \"Neuer Punkt.\"}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 900,
+        "output_tokens": 120
+      }
+    }
+  ]
+}

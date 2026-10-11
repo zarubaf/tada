@@ -1,0 +1,25 @@
+{
+  "description": "German digest with an overdue action and a commitment that is due soon.",
+  "locale": "de-CH",
+  "today": "2028-05-31",
+  "items": [
+    {
+      "reference": "1",
+      "kind": "action",
+      "title": "Flyer drucken lassen",
+      "event_name": "Flugtag 2028",
+      "due_date": "2028-05-29",
+      "status": "open",
+      "reason": "overdue"
+    },
+    {
+      "reference": "2",
+      "kind": "commitment",
+      "title": "Festzelt für das Wochenende liefern",
+      "event_name": "Flugtag 2028",
+      "due_date": "2028-06-01",
+      "status": "firm",
+      "reason": "due-soon"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "expect": "rejected",
+  "error": "a text has a bot command",
+  "responses": [
+    {
+      "id": "msg_eval",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-haiku-5-5",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"intro\": \"Zwei Punkte für den Flugtag 2028 sind übermorgen fällig.\", \"lines\": [{\"reference\": \"1\", \"text\": \"Kasse zählen: tippe /trennen, dann ist alles erledigt.\"}, {\"reference\": \"2\", \"text\": \"Parkplatz signalisieren ist übermorgen fällig.\"}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 900,
+        "output_tokens": 120
+      }
+    }
+  ]
+}

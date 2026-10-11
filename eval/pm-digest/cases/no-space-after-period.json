@@ -1,0 +1,16 @@
+{
+  "description": "An ordinary wording without a space after a period looks like a web address to Telegram. The check rejects it and the template is sent: a known false positive.",
+  "locale": "de-CH",
+  "today": "2028-05-31",
+  "items": [
+    {
+      "reference": "1",
+      "kind": "action",
+      "title": "Festzelt bestellen",
+      "event_name": "Flugtag 2028",
+      "due_date": "2028-06-02",
+      "status": "open",
+      "reason": "due-soon"
+    }
+  ]
+}

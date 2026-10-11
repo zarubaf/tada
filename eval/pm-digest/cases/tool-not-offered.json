@@ -1,0 +1,16 @@
+{
+  "description": "The recorded model calls a read tool and the proposal tool, but the run offers no tools. Neither call may run; the wording is still valid.",
+  "locale": "de-CH",
+  "today": "2028-05-31",
+  "items": [
+    {
+      "reference": "1",
+      "kind": "action",
+      "title": "Bühne aufbauen",
+      "event_name": "Flugtag 2028",
+      "due_date": "2028-06-01",
+      "status": "open",
+      "reason": "due-soon"
+    }
+  ]
+}

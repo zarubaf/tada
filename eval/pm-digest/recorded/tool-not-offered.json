@@ -1,0 +1,52 @@
+{
+  "expect": "worded",
+  "responses": [
+    {
+      "id": "msg_eval",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-haiku-5-5",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01",
+          "name": "list_actions",
+          "input": {
+            "event_key": "FLY28"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_02",
+          "name": "propose_changeset",
+          "input": {
+            "event_key": "FLY28",
+            "proposals": []
+          }
+        }
+      ],
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 900,
+        "output_tokens": 120
+      }
+    },
+    {
+      "id": "msg_eval",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-haiku-5-5",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"intro\": \"Eine Aktion für den Flugtag 2028 ist morgen fällig.\", \"lines\": [{\"reference\": \"1\", \"text\": \"Bühne aufbauen ist morgen fällig.\"}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 900,
+        "output_tokens": 120
+      }
+    }
+  ]
+}

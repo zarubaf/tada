@@ -1,0 +1,22 @@
+{
+  "expect": "worded",
+  "responses": [
+    {
+      "id": "msg_eval",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-haiku-5-5",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"intro\": \"Good morning! One item for Sommerfest 2027 is blocked.\", \"lines\": [{\"reference\": \"1\", \"text\": \"Book the sound system is blocked. Check what it waits for.\"}]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 900,
+        "output_tokens": 120
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "description": "Two items. The recorded model adds a line for an unknown reference.",
+  "locale": "en",
+  "today": "2027-07-02",
+  "items": [
+    {
+      "reference": "1",
+      "kind": "action",
+      "title": "Print the menu cards",
+      "event_name": "Sommerfest 2027",
+      "due_date": "2027-07-03",
+      "status": "open",
+      "reason": "due-soon"
+    },
+    {
+      "reference": "2",
+      "kind": "commitment",
+      "title": "Deliver the benches",
+      "event_name": "Sommerfest 2027",
+      "due_date": "2027-07-03",
+      "status": "firm",
+      "reason": "due-soon"
+    }
+  ]
+}
