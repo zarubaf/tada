@@ -9,6 +9,7 @@ use axum::Router;
 use tada_adapters::clock::SystemClock;
 use tada_api::ApiState;
 use tada_app::ai_queries::{AiToolPorts, AiToolStores};
+use tada_app::build_info::Role;
 use tada_app::session::SessionAuthenticator;
 use tada_app::tokens::TokenAuthenticator;
 use tada_mcp::McpState;
@@ -17,6 +18,7 @@ use tada_store_pg::{Database, PgSignInRequestStore};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
+use crate::heartbeat::{self, Heartbeat};
 use crate::settings::ServeSettings;
 use crate::shutdown;
 
@@ -31,6 +33,7 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
+    heartbeat::check_schema(&db).await?;
     let storage = Arc::new(storage.open());
     let api = ApiState {
         dependencies: vec![Arc::new(db.clone()), storage.clone()],
@@ -69,6 +72,7 @@ pub async fn run(
         person_data: Arc::new(db.clone()),
         dispute_notes: Arc::new(db.clone()),
         redaction: Arc::new(db.clone()),
+        versions: Arc::new(db.clone()),
     };
 
     // The MCP server for the AI clients of members (ADR 0040). Only personal API tokens open it.
@@ -100,17 +104,22 @@ pub async fn run(
         .await
         .context("cannot listen on TADA_PORT")?;
     tracing::info!(port = http.port, "serve started");
+    let heartbeat = Heartbeat::start(&db, Role::Serve);
 
     let (stop, stopped) = oneshot::channel::<()>();
     let mut server = tokio::spawn(tada_api::serve(listener, router, async {
         let _ = stopped.await;
     }));
     tokio::select! {
-        result = &mut server => return Ok(result.context("the server failed")??),
+        result = &mut server => {
+            heartbeat.stop().await;
+            return Ok(result.context("the server failed")??);
+        }
         () = shutdown::signal_received() => {}
     }
 
     tracing::info!("serve stops");
+    heartbeat.stop().await;
     let _ = stop.send(());
     match tokio::time::timeout(shutdown::DRAIN_TIMEOUT, server).await {
         Ok(result) => result.context("the server failed")??,

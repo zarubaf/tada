@@ -24,6 +24,7 @@ mod retention;
 mod review;
 mod roles;
 mod sign_in;
+mod system;
 mod telegram;
 mod tokens;
 mod values;
@@ -64,6 +65,7 @@ use tada_app::review::ReviewStore;
 use tada_app::session::SessionStore;
 use tada_app::sign_in::{SignInRequestStore, SignInStore};
 use tada_app::sources::SourceStore;
+use tada_app::system::VersionStore;
 use tada_app::telegram::TelegramLinks;
 use tada_app::tokens::TokenStore;
 use tada_app::work::WorkStore;
@@ -126,6 +128,8 @@ pub struct ApiState {
     pub dispute_notes: Arc<dyn DisputeNoteStore>,
     /// Legal redaction (ADR 0072).
     pub redaction: Arc<dyn RedactionStore>,
+    /// The schema version and the heartbeats of the roles (ADR 0075).
+    pub versions: Arc<dyn VersionStore>,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -152,7 +156,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(work::routes())
                 .merge(person_data::routes())
                 .merge(dispute_notes::routes())
-                .merge(redactions::routes()),
+                .merge(redactions::routes())
+                .merge(system::routes()),
         )
         .split_for_parts();
     let problem_codes = problem_codes().into_iter().collect();
@@ -179,6 +184,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(person_data::problem_codes())
         .chain(dispute_notes::problem_codes())
         .chain(redactions::problem_codes())
+        .chain(system::problem_codes())
         .collect()
 }
 
@@ -1481,6 +1487,27 @@ mod tests {
     no_dispute_note_reads!(NoDocuments, NoReview, NoParties, NoWork);
 
     #[derive(Debug)]
+    struct NoVersions;
+
+    #[async_trait::async_trait]
+    impl tada_app::system::VersionStore for NoVersions {
+        async fn schema_version(
+            &self,
+            _: &tada_app::caller::MemberCaller,
+        ) -> Result<i64, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn running_heartbeats(
+            &self,
+            _: &tada_app::caller::MemberCaller,
+            _: jiff::SignedDuration,
+        ) -> Result<Vec<tada_app::system::Heartbeat>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[derive(Debug)]
     struct NoPersonData;
 
     #[async_trait::async_trait]
@@ -1636,6 +1663,7 @@ mod tests {
             person_data: Arc::new(NoPersonData),
             dispute_notes: Arc::new(NoPersonData),
             redaction: Arc::new(NoPersonData),
+            versions: Arc::new(NoVersions),
         }
     }
 

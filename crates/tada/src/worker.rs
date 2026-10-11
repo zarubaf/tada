@@ -7,6 +7,7 @@ use anyhow::Context;
 use tada_adapters::clock::SystemClock;
 use tada_adapters::mail::{FluentMailTexts, SmtpConfig, SmtpMailer};
 use tada_app::blobs::BlobStore;
+use tada_app::build_info::{BuildInfo, Role};
 use tada_app::caller::{JobRunner, ServiceCaller};
 use tada_app::clock::Clock;
 use tada_app::housekeeping::HousekeepingStore;
@@ -21,6 +22,7 @@ use tada_app::retention;
 use tada_store_pg::Database;
 use uuid::Uuid;
 
+use crate::heartbeat;
 use crate::settings::WorkerSettings;
 use crate::shutdown;
 
@@ -56,6 +58,7 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
+    heartbeat::check_schema(&db).await?;
     let mailer = SmtpMailer::new(SmtpConfig {
         host: smtp.host,
         port: smtp.port,
@@ -91,7 +94,10 @@ pub async fn run(
             () = &mut stop => break,
             _ = ticks.tick() => {}
         }
-        if let Err(error) = db.record_heartbeat(worker_id).await {
+        if let Err(error) = db
+            .record_heartbeat(worker_id, Role::Worker, &BuildInfo::CURRENT)
+            .await
+        {
             tracing::warn!(%error, "the heartbeat failed");
         }
         // Sign-in requests delete ended rate-limit counters too, but only if one comes (ADR 0065).

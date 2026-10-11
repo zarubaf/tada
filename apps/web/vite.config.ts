@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vitest/config";
@@ -47,10 +48,40 @@ function layerOrderFirst(): Plugin {
   };
 }
 
+// The build identity (ADR 0075). The commit has seven characters, as the one of the binary.
+function buildCommit(): string {
+  const given = process.env.TADA_BUILD_COMMIT?.trim();
+  if (given) return given.slice(0, 7);
+  try {
+    return execFileSync("git", ["rev-parse", "--short=7", "HEAD"], { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+// The build time as `YYYY-MM-DDTHH:MM:SSZ`; SOURCE_DATE_EPOCH fixes it, as it does for the binary.
+function builtAt(): string {
+  const epoch = Number(process.env.SOURCE_DATE_EPOCH);
+  const date =
+    Number.isFinite(epoch) && process.env.SOURCE_DATE_EPOCH ? new Date(epoch * 1000) : new Date();
+  return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+const { version } = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+) as {
+  version: string;
+};
+
 // The API and the MCP server run on `tada serve` (TADA_PORT 8080). In production, serve delivers the built files itself (ADR 0005).
 // An MCP client in development uses `http://localhost:5173/mcp`, the URL that the token page shows (ADR 0040).
 export default defineConfig({
   plugins: [react(), layerOrderFirst()],
+  define: {
+    __TADA_VERSION__: JSON.stringify(version),
+    __TADA_COMMIT__: JSON.stringify(buildCommit()),
+    __TADA_BUILT_AT__: JSON.stringify(builtAt()),
+  },
   // One CSS file for all chunks: the settings pages load on demand, and the order of the CSS layers
   // must stay the same as without the split.
   build: { cssCodeSplit: false },

@@ -46,6 +46,10 @@ use uuid::Uuid;
 /// Each other operation of the OpenAPI document needs a case in `attempts`.
 const NOT_ORGANIZATION_SCOPED: &[(&str, &str)] = &[
     (
+        "get_system_version",
+        "It shows the versions of the installation to each signed-in member and reads no record of an organization.",
+    ),
+    (
         "sign_out_everywhere",
         "It ends the own sessions of the caller in each organization and names no record.",
     ),

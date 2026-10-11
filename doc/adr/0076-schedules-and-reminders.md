@@ -126,6 +126,9 @@ Telegram webhook and health:
 - `/readyz` checks the database, the object storage and the last successful Bot API call.
   It fails if no call succeeded for 5 minutes.
 - The role stops within 25 seconds on SIGTERM.
+- The `serve` and `telegram` roles write a heartbeat with their role, version and commit only.
+  Only the `worker` row holds the queue depth ([ADR 0035](0035-observability.md)).
+  An operator check of the worker filters `role = 'worker'`.
 
 Dependencies:
 

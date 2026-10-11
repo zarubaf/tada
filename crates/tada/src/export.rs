@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use futures::TryStreamExt;
 use tada_adapters::clock::SystemClock;
 use tada_app::blobs::{BlobStore, ByteStream};
+use tada_app::build_info::BuildInfo;
 use tada_app::caller::{Exporter, ServiceCaller};
 use tada_app::clock::Clock;
 use tada_app::domain::identity::OrganizationSlug;
@@ -62,7 +63,7 @@ pub async fn execute(
         blobs,
         &mut sink,
         clock,
-        env!("CARGO_PKG_VERSION"),
+        BuildInfo::CURRENT.version,
     )
     .await
     .context("the export failed; remove the output directory before the next run")?;

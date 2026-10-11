@@ -6,7 +6,7 @@
     "license": {
       "name": "Apache-2.0"
     },
-    "version": "1"
+    "version": "0.1.0"
   },
   "paths": {
     "/api/v1/events": {
@@ -4717,6 +4717,43 @@
           "payload-too-large",
           "unsupported-media-type",
           "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/system/version": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Shows the versions of the product and of the running roles. Only a signed-in member can read them.",
+        "operationId": "get_system_version",
+        "responses": {
+          "200": {
+            "description": "The versions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemVersion"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
           "unavailable",
           "internal"
         ]
@@ -10946,6 +10983,34 @@
           }
         }
       },
+      "RoleVersion": {
+        "type": "object",
+        "description": "One running process role.",
+        "required": [
+          "role",
+          "version",
+          "commit",
+          "last_seen"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "`serve`, `worker` or `telegram`."
+          },
+          "version": {
+            "type": "string",
+            "description": "The product version of the role, or `unknown` for a role of a previous release."
+          },
+          "commit": {
+            "type": "string"
+          },
+          "last_seen": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time of the last heartbeat."
+          }
+        }
+      },
       "SessionInfo": {
         "type": "object",
         "description": "The signed-in user and the organization of the session.",
@@ -11068,6 +11133,54 @@
           "email": {
             "type": "string",
             "description": "The email address of the member."
+          }
+        }
+      },
+      "SystemVersion": {
+        "type": "object",
+        "description": "The versions of tada and of its components.",
+        "required": [
+          "product",
+          "commit",
+          "schema",
+          "api",
+          "mcp",
+          "roles",
+          "mismatch"
+        ],
+        "properties": {
+          "product": {
+            "type": "string",
+            "description": "The product version, for example `0.3.0`."
+          },
+          "commit": {
+            "type": "string",
+            "description": "The short Git commit of the build."
+          },
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The number of the last applied migration."
+          },
+          "api": {
+            "type": "string",
+            "description": "The version of the HTTP API.",
+            "example": "v1"
+          },
+          "mcp": {
+            "type": "string",
+            "description": "The version of the MCP server."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleVersion"
+            },
+            "description": "The process roles that run now."
+          },
+          "mismatch": {
+            "type": "boolean",
+            "description": "True if a running role has another version or commit than the process that answers."
           }
         }
       },

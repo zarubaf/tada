@@ -20,6 +20,26 @@ pub struct Database {
 #[error("the migration failed")]
 pub struct MigrationFailed(#[source] sqlx::migrate::MigrateError);
 
+/// The schema check failed.
+#[derive(Debug, thiserror::Error)]
+pub enum SchemaCheckError {
+    /// A newer release migrated the database. Start the newer image or restore the previous schema.
+    #[error("the database schema {applied} is newer than the schema {known} of this binary")]
+    TooNew { applied: i64, known: i64 },
+    /// The check could not read the schema, for example because the database is down.
+    #[error("cannot read the schema version")]
+    Unavailable(#[source] sqlx::Error),
+}
+
+/// The number of the last migration that this binary has.
+fn known_schema() -> i64 {
+    sqlx::migrate!()
+        .iter()
+        .map(|migration| migration.version)
+        .max()
+        .unwrap_or(0)
+}
+
 impl Database {
     /// Creates the pool. The first query opens the first connection, so a process can start while the
     /// database is down, and `GET /readyz` shows it.
@@ -47,11 +67,28 @@ impl Database {
     /// Applies the pending migrations.
     ///
     /// Migrations that the database has but this binary does not know stay applied, so the previous
-    /// image still starts after an expand migration (ADR 0006).
+    /// image can still run `migrate`. The other roles of a previous image refuse to start on such a
+    /// schema (`check_schema`, ADR 0075): start the newer image, or restore the previous schema.
     pub async fn migrate(&self) -> Result<(), MigrationFailed> {
         let mut migrator = sqlx::migrate!();
         migrator.set_ignore_missing(true);
         migrator.run(&self.pool).await.map_err(MigrationFailed)
+    }
+
+    /// Fails if the database has a migration that this binary does not know and that is newer than all
+    /// migrations that it knows. The binary must not start on such a schema (ADR 0075).
+    pub async fn check_schema(&self) -> Result<(), SchemaCheckError> {
+        let applied: Option<i64> = sqlx::query_scalar!(
+            r#"SELECT max(version) AS "version?" FROM _sqlx_migrations WHERE success"#
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(SchemaCheckError::Unavailable)?;
+        let known = known_schema();
+        match applied {
+            Some(applied) if applied > known => Err(SchemaCheckError::TooNew { applied, known }),
+            _ => Ok(()),
+        }
     }
 
     /// Closes all connections. Waits for the connections in use.
@@ -77,6 +114,28 @@ impl DependencyCheck for Database {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::testing::TestDatabase;
+
+    #[tokio::test]
+    async fn role_refuses_newer_schema() {
+        let test = TestDatabase::start().await;
+        test.database.check_schema().await.unwrap();
+
+        sqlx::query(
+            "INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time)
+             VALUES ($1, 'from a newer release', true, '\\x00', 1)",
+        )
+        .bind(known_schema() + 1)
+        .execute(test.pool())
+        .await
+        .unwrap();
+        let error = test.database.check_schema().await.unwrap_err();
+        assert!(
+            matches!(error, SchemaCheckError::TooNew { applied, known } if applied == known + 1)
+        );
+    }
+
     /// The versions of the committed migrations, in order.
     /// The numbers 16 and 18 stay unused: an existing database would apply a migration with such a number
     /// after the newer migrations, and a new database before them (see `migrations/README.md`).

@@ -80,6 +80,6 @@ mod values;
 mod work;
 mod workstreams;
 
-pub use database::{Database, MigrationFailed};
+pub use database::{Database, MigrationFailed, SchemaCheckError};
 pub use facts::SyncCatalogError;
 pub use sign_in::PgSignInRequestStore;
