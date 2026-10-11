@@ -88,8 +88,9 @@ privacy-template =
     Ist sie eingeschaltet, sendet tada dem Modell nur diese Angaben zu den Einträgen:
     den Titel, den Namen des Anlasses, die Frist, den Status und den Grund der Erinnerung.
     Dazu kommen die Sprache und das heutige Datum.
-    tada sendet keine Namen von Personen, keine E-Mail-Adressen und keine Quellentexte.
-    Ein Titel oder ein Name eines Anlasses kann trotzdem eine Person nennen, wenn jemand sie dort eingetragen hat.
+    tada sendet keine Namen aus den Personendaten, keine E-Mail-Adressen und keine Quellentexte.
+    Titel und Namen von Anlässen sind aber freier Text, den Mitglieder schreiben.
+    Sie können Namen von Personen enthalten.
     Das Modell kann nur Text formulieren.
     Es ändert keine Daten, und die Schaltflächen stammen nicht vom Modell.
     Wenn das Modell ausfällt oder sein Text die Prüfung nicht besteht, sendet tada die Vorlage.

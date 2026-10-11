@@ -46,7 +46,9 @@ It is not legal advice, and the club checks its own duties (ADR 0045).
   The notice states the quiet hours (20:00 to 08:00 in the local time of the member, by default), the stored time zone and the 90 days for the reminder state (ADR 0076).
 - The AI wording of the reminders.
   It is off until an organization switches it on.
-  The model receives titles, event names, due dates, statuses and reasons, and no names of persons or source texts.
+  The model receives titles, event names, due dates, statuses and reasons.
+  It receives no names from the person records, no email addresses and no source texts.
+  Titles and event names are free text that members write, so they can contain names.
   If the model fails, tada sends a fixed template.
   The operator checks the provider before the first call, and the model does not run without this check (ADR 0045, ADR 0077).
   The notice names the model provider as a processor of the operator.
