@@ -152,10 +152,6 @@ impl AiCostStore for TestCost {
     ) -> Result<Option<RecordVersion>, StoreError> {
         Ok(None)
     }
-
-    async fn ai_enabled(&self, _: OrgScope) -> Result<bool, StoreError> {
-        Ok(true)
-    }
 }
 
 /// The calls of the test tools: the tool name, the caller and the input.

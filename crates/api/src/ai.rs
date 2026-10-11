@@ -87,6 +87,7 @@ async fn get_ai(
     let status = app::get_ai_status(
         &caller,
         state.ai.as_ref(),
+        state.pm_policy.as_ref(),
         state.ai_setup,
         state.clock.as_ref(),
     )
@@ -117,6 +118,7 @@ async fn set_ai_cap(
         &request.cap_chf,
         record_version(request.expected_version)?,
         state.ai.as_ref(),
+        state.pm_policy.as_ref(),
         state.ai_setup,
         state.clock.as_ref(),
     )

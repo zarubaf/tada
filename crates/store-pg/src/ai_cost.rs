@@ -148,15 +148,4 @@ impl AiCostStore for Database {
         tx.commit().await.map_err(store_error)?;
         Ok(Some(version(changed, "ai_cap.version")?))
     }
-
-    async fn ai_enabled(&self, scope: OrgScope) -> Result<bool, StoreError> {
-        let enabled = sqlx::query_scalar!(
-            "SELECT ai_enabled FROM pm_policy WHERE organization_id = $1",
-            scope.organization_id().as_uuid(),
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(store_error)?;
-        Ok(enabled.unwrap_or(false))
-    }
 }

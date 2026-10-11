@@ -1750,13 +1750,6 @@ mod tests {
         ) -> Result<Option<tada_app::domain::RecordVersion>, tada_app::store::StoreError> {
             unreachable!()
         }
-
-        async fn ai_enabled(
-            &self,
-            _: tada_app::caller::OrgScope,
-        ) -> Result<bool, tada_app::store::StoreError> {
-            unreachable!()
-        }
     }
 
     fn state() -> ApiState {

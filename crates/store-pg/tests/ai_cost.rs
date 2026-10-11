@@ -10,6 +10,7 @@ use tada_app::domain::RecordVersion;
 use tada_app::domain::identity::OrganizationRole;
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_app::model::Usage;
+use tada_app::pm::policy::PmPolicyStore;
 use tada_store_pg::testing::TestDatabase;
 use uuid::Uuid;
 
@@ -133,7 +134,7 @@ async fn the_first_cap_inserts_and_a_stale_version_conflicts() {
     let db = test.connect();
     let testwil = scope(test.create_organization("testwil").await);
     assert_eq!(db.cap(testwil).await.unwrap(), None);
-    assert!(!db.ai_enabled(testwil).await.unwrap());
+    assert!(!PmPolicyStore::get(&db, testwil).await.unwrap().0.ai_enabled);
 
     let first = RecordVersion::FIRST;
     let two = db
@@ -184,5 +185,6 @@ async fn ai_is_enabled_by_the_policy() {
         organization.as_uuid()
     )])
     .await;
-    assert!(db.ai_enabled(scope(organization)).await.unwrap());
+    let (policy, _) = PmPolicyStore::get(&db, scope(organization)).await.unwrap();
+    assert!(policy.ai_enabled);
 }
