@@ -1,0 +1,73 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.record_kind, d.record_id, d.record_version,\n                      coalesce(a.event_id, c.event_id) AS \"event_id?\",\n                      i.finished_at AS \"sent_at: jiff_sqlx::Timestamp\"\n               FROM digest_item d\n               JOIN outbound_intent i ON i.id = d.intent_id AND i.organization_id = d.organization_id\n               LEFT JOIN action a ON d.record_kind = 'action'\n                    AND a.organization_id = d.organization_id AND a.id = d.record_id\n               LEFT JOIN commitment c ON d.record_kind = 'commitment'\n                    AND c.organization_id = d.organization_id AND c.id = d.record_id\n               WHERE d.id = $2 AND d.organization_id = $1 AND i.user_id = $3\n                 AND i.purpose = 'telegram-digest' AND i.status IN ('sent', 'unknown')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "record_kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "digest_item",
+            "name": "record_kind"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "record_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "digest_item",
+            "name": "record_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "record_version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "digest_item",
+            "name": "record_version"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "event_id?",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "sent_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "outbound_intent",
+            "name": "finished_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      true
+    ]
+  },
+  "hash": "fbdf832fc811150f45c3caea7879f4b474c171da2a9336f3d7a111997b198373"
+}

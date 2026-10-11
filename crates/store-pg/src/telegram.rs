@@ -232,6 +232,18 @@ impl TelegramLinks for Database {
         Ok(())
     }
 
+    async fn reached(&self, account: TelegramUserId) -> Result<(), StoreError> {
+        sqlx::query!(
+            "UPDATE telegram_identity SET blocked_at = NULL
+             WHERE telegram_user_id = $1 AND blocked_at IS NOT NULL",
+            account.0,
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(store_error)?;
+        Ok(())
+    }
+
     async fn record_update(&self, update_id: i64) -> Result<bool, StoreError> {
         let result = sqlx::query!(
             "INSERT INTO telegram_update (update_id, received_at) VALUES ($1, now()) ON CONFLICT DO NOTHING",

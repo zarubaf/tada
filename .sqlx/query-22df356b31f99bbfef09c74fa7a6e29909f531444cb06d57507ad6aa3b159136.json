@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE telegram_identity SET blocked_at = NULL\n             WHERE telegram_user_id = $1 AND blocked_at IS NOT NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "22df356b31f99bbfef09c74fa7a6e29909f531444cb06d57507ad6aa3b159136"
+}

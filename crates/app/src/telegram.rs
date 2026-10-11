@@ -165,6 +165,10 @@ pub trait TelegramLinks: Debug + Send + Sync {
     /// Infrastructure query (ADR 0039): a Telegram account has no organization before it names a user.
     async fn unlink_account(&self, account: TelegramUserId) -> Result<(), StoreError>;
 
+    /// Clears the blocked mark of the link of the account, if any: the account reached the bot again.
+    /// Infrastructure query (ADR 0039): a Telegram account has no organization before it names a user.
+    async fn reached(&self, account: TelegramUserId) -> Result<(), StoreError>;
+
     /// Records an update ID. Returns false if the gateway saw it before.
     /// Infrastructure query (ADR 0039): a Telegram update ID has no organization.
     async fn record_update(&self, update_id: i64) -> Result<bool, StoreError>;

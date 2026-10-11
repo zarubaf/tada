@@ -105,6 +105,8 @@ Digest intent and send:
 - After a send, the result updates `reminder_state` for each item.
   An `unknown` result updates it too and is not retried.
   A 403 sets `blocked_at` on the Telegram link.
+  A message or a button press from the private chat of the account with the bot clears `blocked_at`.
+  An update from a group does not clear it.
   A failed send changes no other state.
 - A refused connection or an error answer of the Bot API with 429 or 5xx is temporary: nothing went out.
   The send returns the intent to `pending`, and the queue retries the job with its backoff, as for a mail ([ADR 0042](0042-transactional-email.md)).
@@ -135,7 +137,15 @@ Buttons:
 - On a failed check the bot answers "outdated, open the record".
   It always answers the callback query.
 - A press writes the response.
-  Blocked, Done and Fulfilled also run the existing command, with the capability of the member, in the same transaction.
+  Blocked, Done and Fulfilled first run the existing command with the capability of the member.
+  The command expects the version of the item.
+  Then one statement writes the response.
+  It writes only if the record has the version that the command made and the member still owns it.
+  So a response never stays without its change.
+  A failure between the two writes can leave a change without its response.
+  That is safe: Done and Fulfilled close the record, and the rules treat a new version of a blocked action as new.
+- The response also counts as a notice of the version that the answer made.
+  So the rules do not remind the member of the own change.
 - Only private chats are served.
   Group updates stay ignored.
 

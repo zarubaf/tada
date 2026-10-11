@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO reminder_state (organization_id, record_kind, record_id, user_id, notified_version,\n                                         notified_at, response, response_version, response_at)\n             SELECT d.organization_id, d.record_kind, d.record_id, i.user_id, $5, i.finished_at, $4, $5, $6\n             FROM digest_item d\n             JOIN outbound_intent i ON i.id = d.intent_id AND i.organization_id = d.organization_id\n             WHERE d.id = $2 AND d.organization_id = $1 AND i.user_id = $3 AND i.finished_at IS NOT NULL\n               AND (EXISTS (SELECT 1 FROM action a\n                            WHERE d.record_kind = 'action' AND a.organization_id = d.organization_id\n                              AND a.id = d.record_id AND a.version = $5 AND a.owner_user_id = i.user_id)\n                    OR EXISTS (SELECT 1 FROM commitment c\n                               WHERE d.record_kind = 'commitment' AND c.organization_id = d.organization_id\n                                 AND c.id = d.record_id AND c.version = $5 AND c.owner_user_id = i.user_id))\n             ON CONFLICT (organization_id, record_kind, record_id, user_id) DO UPDATE\n                 SET notified_version = EXCLUDED.notified_version, response = EXCLUDED.response,\n                     response_version = EXCLUDED.response_version, response_at = EXCLUDED.response_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Int8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "035cf47b9ce49427e1aee652bae0fe3cdfd7f14a3e8c80a4aeb3279000009f16"
+}

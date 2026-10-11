@@ -1,5 +1,6 @@
 //! The AI PM: the reminder policy of an organization and its daily check (ADR 0076).
 
+pub mod answer;
 pub mod check;
 pub mod digest_wording;
 pub mod digests;

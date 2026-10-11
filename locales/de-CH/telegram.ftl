@@ -58,6 +58,10 @@ telegram-digest-done = { $number } Erledigt
 telegram-digest-fulfilled = { $number } Erfüllt
 telegram-digest-open = { $number } Öffnen
 telegram-digest-my-work = Meine Arbeit öffnen
+# The short answers to a press of a button of the digest.
+telegram-answer-recorded = Danke. Ihre Antwort ist gespeichert.
+telegram-answer-changed = Danke. Der Eintrag ist geändert.
+telegram-answer-outdated = Dieser Knopf ist veraltet. Öffnen Sie den Eintrag in tada.
 
 ## Problem codes (ADR 0037): `problem-<code>`
 

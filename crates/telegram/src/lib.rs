@@ -3,6 +3,7 @@
 //! (ADR 0076).
 
 mod bot_error;
+mod callback;
 mod command;
 mod digest_texts;
 mod health;
@@ -30,6 +31,7 @@ use tada_app::events::EventStore;
 use tada_app::facts::FactStore;
 use tada_app::identity::IdentityStore;
 use tada_app::parties::PartyStore;
+use tada_app::pm::answer::DigestAnswers;
 use tada_app::problem::{CommandError, ProblemCode};
 use tada_app::proposals::{ProposalStore, ProposeError, ProposeStores};
 use tada_app::public_url::PublicUrl;
@@ -65,6 +67,7 @@ pub trait Ports:
     + WorkstreamStore
     + PartyStore
     + WorkStore
+    + DigestAnswers
 {
 }
 
@@ -79,6 +82,7 @@ impl<T> Ports for T where
         + WorkstreamStore
         + PartyStore
         + WorkStore
+        + DigestAnswers
 {
 }
 
@@ -280,12 +284,37 @@ impl Gateway {
                 return Err(NotRecorded);
             }
         }
-        // A press of a digest button (ADR 0076) is not answered yet. The gateway asks for no other
-        // kind of update.
-        if let UpdateContent::Message(message) = update.content {
-            self.answer(&message).await;
+        // The gateway asks for no other kind of update.
+        match update.content {
+            UpdateContent::Message(message) => {
+                // Only the private chat shows that the account no longer blocks the bot.
+                if message.chat.type_field == ChatType::Private
+                    && let Some(account) = message
+                        .from
+                        .as_ref()
+                        .and_then(|from| i64::try_from(from.id).ok())
+                {
+                    self.reached(TelegramUserId(account)).await;
+                }
+                self.answer(&message).await;
+            }
+            UpdateContent::CallbackQuery(query) => {
+                let origin = callback::origin(&query);
+                if let callback::Origin::Private(account) = origin {
+                    self.reached(account).await;
+                }
+                self.press(&query, origin).await;
+            }
+            _ => {}
         }
         Ok(())
+    }
+
+    /// The account sent an update from its private chat with the bot, so a send to it can work again (ADR 0076).
+    async fn reached(&self, account: TelegramUserId) {
+        if let Err(error) = self.ports.reached(account).await {
+            tracing::warn!(%error, "cannot clear the blocked mark of the link");
+        }
     }
 
     /// Replies to a message in a private chat.
