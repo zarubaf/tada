@@ -227,6 +227,21 @@ describe("PmPage", () => {
     expect(await screen.findByRole("button", { name: "Neu anmelden" })).toBeInTheDocument();
   });
 
+  it("asks for a new sign-in before a change of the AI switch", async () => {
+    const calls = setup({
+      "POST /api/v1/organization/pm-policy/set": [() => problem(403, "recent-sign-in-required")],
+    });
+    const aiSwitch = await screen.findByRole("switch", { name: "KI formuliert die Erinnerungen" });
+    await user.click(aiSwitch);
+
+    expect(await screen.findByRole("button", { name: "Neu anmelden" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Melden Sie sich für diesen Schritt neu an",
+    );
+    expect(aiSwitch).not.toBeChecked();
+    expect(posts(calls)).toHaveLength(1);
+  });
+
   it("saves the cap and shows the usage", async () => {
     const calls = setup({
       "POST /api/v1/organization/ai/set-cap": [
