@@ -39,6 +39,7 @@
 //! a proposal insert at its start, an apply before kind 2, an upload of a new version on its source item after kind 6.
 //! So a writer and a redaction wait for each other, and no copy of redacted content goes in (ADR 0072).
 
+mod account_reminders;
 mod actor;
 mod audit;
 mod bootstrap;
@@ -61,6 +62,7 @@ mod members;
 mod outbound;
 mod parties;
 mod person_data;
+mod pm_policy;
 mod privacy;
 mod proposals;
 pub mod rate_limit;
@@ -68,6 +70,7 @@ mod redacted;
 mod redaction;
 mod retention;
 mod review;
+mod schedules;
 mod session;
 mod sign_in;
 mod sources;

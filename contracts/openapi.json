@@ -3104,6 +3104,189 @@
         ]
       }
     },
+    "/api/v1/organization/pm-policy": {
+      "get": {
+        "tags": [
+          "organization"
+        ],
+        "summary": "Shows the reminder policy. An owner or an admin can read it.",
+        "operationId": "get_pm_policy",
+        "responses": {
+          "200": {
+            "description": "The reminder policy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PmPolicy"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "record-version-conflict",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/organization/pm-policy/set": {
+      "post": {
+        "tags": [
+          "organization"
+        ],
+        "summary": "Replaces the reminder policy. An owner or an admin can do this.\nThe daily check moves to the new time at once.",
+        "operationId": "set_pm_policy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPmPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new reminder policy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PmPolicy"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "record-version-conflict",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/account/reminders": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Shows the reminder settings of the own account.",
+        "operationId": "get_reminder_settings",
+        "responses": {
+          "200": {
+            "description": "The reminder settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "unauthenticated",
+          "organization-required",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/account/reminders/set": {
+      "post": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Opts the own account in or out of reminders and sets its time zone.",
+        "operationId": "set_reminder_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetReminderSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new reminder settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/persons": {
       "get": {
         "tags": [
@@ -10362,6 +10545,88 @@
           }
         }
       },
+      "PmPolicy": {
+        "type": "object",
+        "description": "The reminder policy of the organization. A time is a local time `HH:MM:SS`; a request can leave out the seconds.",
+        "required": [
+          "local_time",
+          "time_zone",
+          "weekdays",
+          "quiet_start",
+          "quiet_end",
+          "cooldown_hours",
+          "follow_up_working_days",
+          "look_ahead_working_days",
+          "paused",
+          "ai_enabled",
+          "version"
+        ],
+        "properties": {
+          "local_time": {
+            "type": "string",
+            "description": "The local time of the daily check, in `time_zone`.",
+            "example": "08:30:00",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
+          },
+          "time_zone": {
+            "type": "string",
+            "description": "The IANA time zone of the daily check, for example `Europe/Zurich`."
+          },
+          "weekdays": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The days of the daily check as bits: bit 0 is Monday, bit 6 is Sunday.",
+            "maximum": 127,
+            "minimum": 1
+          },
+          "quiet_start": {
+            "type": "string",
+            "description": "The start of the quiet hours, in the local time of each recipient.",
+            "example": "20:00:00",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
+          },
+          "quiet_end": {
+            "type": "string",
+            "description": "The end of the quiet hours, in the local time of each recipient.",
+            "example": "08:00:00",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
+          },
+          "cooldown_hours": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The time after a digest in which a person gets no other digest.",
+            "maximum": 168,
+            "minimum": 1
+          },
+          "follow_up_working_days": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The working days without a response after which an item comes again.",
+            "maximum": 10,
+            "minimum": 1
+          },
+          "look_ahead_working_days": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The working days ahead in which a due date makes an item due soon.",
+            "maximum": 10,
+            "minimum": 0
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "True stops all reminders of the organization."
+          },
+          "ai_enabled": {
+            "type": "boolean",
+            "description": "True lets the AI word the digest."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. `SetPmPolicy` needs it. The defaults have version 1."
+          }
+        }
+      },
       "PrivacyNotice": {
         "type": "object",
         "description": "The privacy notice of the organization.",
@@ -10839,6 +11104,33 @@
         },
         "additionalProperties": false
       },
+      "ReminderSettings": {
+        "type": "object",
+        "description": "The reminder settings of the own account. They apply in each organization of the user.",
+        "required": [
+          "opted_in_at",
+          "time_zone",
+          "telegram_linked"
+        ],
+        "properties": {
+          "opted_in_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The time of the opt-in, or null if the user gets no reminders."
+          },
+          "time_zone": {
+            "type": "string",
+            "description": "The IANA time zone of the user. The quiet hours use it."
+          },
+          "telegram_linked": {
+            "type": "boolean",
+            "description": "True if the user has a confirmed Telegram link. An opt-in needs it."
+          }
+        }
+      },
       "RemoveEventMembershipRequest": {
         "type": "object",
         "description": "The input of `RemoveEventMembership`.",
@@ -11065,6 +11357,78 @@
           }
         }
       },
+      "SetPmPolicyRequest": {
+        "type": "object",
+        "description": "The input of `SetPmPolicy`: all values of the policy.",
+        "required": [
+          "local_time",
+          "time_zone",
+          "weekdays",
+          "quiet_start",
+          "quiet_end",
+          "cooldown_hours",
+          "follow_up_working_days",
+          "look_ahead_working_days",
+          "paused",
+          "ai_enabled",
+          "expected_version"
+        ],
+        "properties": {
+          "local_time": {
+            "type": "string",
+            "example": "08:30:00",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
+          },
+          "time_zone": {
+            "type": "string"
+          },
+          "weekdays": {
+            "type": "integer",
+            "format": "int64",
+            "maximum": 127,
+            "minimum": 1
+          },
+          "quiet_start": {
+            "type": "string",
+            "example": "20:00:00",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
+          },
+          "quiet_end": {
+            "type": "string",
+            "example": "08:00:00",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
+          },
+          "cooldown_hours": {
+            "type": "integer",
+            "format": "int64",
+            "maximum": 168,
+            "minimum": 1
+          },
+          "follow_up_working_days": {
+            "type": "integer",
+            "format": "int64",
+            "maximum": 10,
+            "minimum": 1
+          },
+          "look_ahead_working_days": {
+            "type": "integer",
+            "format": "int64",
+            "maximum": 10,
+            "minimum": 0
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "ai_enabled": {
+            "type": "boolean"
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
       "SetPrivacyNoticeRequest": {
         "type": "object",
         "description": "The input of `SetPrivacyNotice`.",
@@ -11084,6 +11448,24 @@
             "type": "integer",
             "format": "int64",
             "minimum": 1
+          }
+        }
+      },
+      "SetReminderSettingsRequest": {
+        "type": "object",
+        "description": "The input of `SetReminderSettings`.",
+        "required": [
+          "opt_in",
+          "time_zone"
+        ],
+        "properties": {
+          "opt_in": {
+            "type": "boolean",
+            "description": "True opts in, false opts out. An opt-in without a confirmed Telegram link gets the field code\n`telegram-not-linked`."
+          },
+          "time_zone": {
+            "type": "string",
+            "description": "An IANA time zone, for example `Europe/Zurich`."
           }
         }
       },

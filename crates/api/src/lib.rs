@@ -1,5 +1,6 @@
 //! HTTP handlers, DTOs and the OpenAPI document.
 
+mod account_reminders;
 mod actors;
 mod client_ip;
 mod contract;
@@ -16,6 +17,7 @@ mod members;
 mod origin;
 mod parties;
 mod person_data;
+mod pm_policy;
 mod privacy;
 mod problem;
 mod redactions;
@@ -42,6 +44,7 @@ use axum::middleware;
 use axum::response::Response;
 use axum::routing::any;
 use ipnet::IpNet;
+use tada_app::account_reminders::ReminderSettingsStore;
 use tada_app::auth::Authenticator;
 use tada_app::blobs::BlobStore;
 use tada_app::clock::Clock;
@@ -55,6 +58,7 @@ use tada_app::identity::IdentityStore;
 use tada_app::members::MemberStore;
 use tada_app::parties::PartyStore;
 use tada_app::person_data::PersonDataStore;
+use tada_app::pm::policy::PmPolicyStore;
 use tada_app::privacy::PrivacyStore;
 use tada_app::problem::ProblemCode;
 use tada_app::proposals::ProposalStore;
@@ -116,6 +120,10 @@ pub struct ApiState {
     pub privacy: Arc<dyn PrivacyStore>,
     /// The retention periods of the organization (ADR 0071).
     pub retention: Arc<dyn RetentionStore>,
+    /// The reminder policy of the organization (ADR 0076).
+    pub pm_policy: Arc<dyn PmPolicyStore>,
+    /// The reminder settings of the own account (ADR 0076).
+    pub reminder_settings: Arc<dyn ReminderSettingsStore>,
     /// Persons and institutions (ADR 0069).
     pub parties: Arc<dyn PartyStore>,
     /// The workstreams of events (ADR 0067).
@@ -151,6 +159,8 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(tokens::routes())
                 .merge(privacy::routes())
                 .merge(retention::routes())
+                .merge(pm_policy::routes())
+                .merge(account_reminders::routes())
                 .merge(parties::routes())
                 .merge(workstreams::routes())
                 .merge(work::routes())
@@ -178,6 +188,8 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(tokens::problem_codes())
         .chain(privacy::problem_codes())
         .chain(retention::problem_codes())
+        .chain(pm_policy::problem_codes())
+        .chain(account_reminders::problem_codes())
         .chain(parties::problem_codes())
         .chain(workstreams::problem_codes())
         .chain(work::problem_codes())
@@ -1632,6 +1644,55 @@ mod tests {
         }
     }
 
+    #[async_trait::async_trait]
+    impl tada_app::pm::policy::PmPolicyStore for NoRetention {
+        async fn get(
+            &self,
+            _: tada_app::caller::OrgScope,
+        ) -> Result<
+            (
+                tada_app::domain::reminders::PmPolicy,
+                tada_app::domain::RecordVersion,
+            ),
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn set(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::domain::reminders::PmPolicy,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<Option<tada_app::domain::RecordVersion>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl tada_app::account_reminders::ReminderSettingsStore for NoRetention {
+        async fn get(
+            &self,
+            _: &tada_app::caller::MemberCaller,
+        ) -> Result<tada_app::account_reminders::ReminderSettings, tada_app::store::StoreError>
+        {
+            unreachable!()
+        }
+
+        async fn set(
+            &self,
+            _: &tada_app::caller::MemberCaller,
+            _: &tada_app::account_reminders::ReminderChange,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            Option<tada_app::account_reminders::ReminderSettings>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
@@ -1657,6 +1718,8 @@ mod tests {
             tokens: Arc::new(NoTokens),
             privacy: Arc::new(NoPrivacy),
             retention: Arc::new(NoRetention),
+            pm_policy: Arc::new(NoRetention),
+            reminder_settings: Arc::new(NoRetention),
             parties: Arc::new(NoParties),
             workstreams: Arc::new(NoWorkstreams),
             work: Arc::new(NoWork),
