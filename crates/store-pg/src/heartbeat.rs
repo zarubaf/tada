@@ -115,12 +115,14 @@ mod tests {
         version: "0.1.0",
         commit: "2222222",
         built_at: "2026-10-01T00:00:00Z",
+        build_id: "0123456789abcdef0123456789abcdef",
     };
 
     const OLD: BuildInfo = BuildInfo {
         version: "0.0.9",
         commit: "1111111",
         built_at: "2026-01-01T00:00:00Z",
+        build_id: "0123456789abcdef0123456789abcdef",
     };
 
     fn caller() -> MemberCaller {

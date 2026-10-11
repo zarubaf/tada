@@ -16,7 +16,7 @@ import { NavLink } from "../ui/NavLink";
 import { Select } from "../ui/Select";
 import styles from "./Shell.module.css";
 import { VersionButton, VersionSheet } from "./VersionFooter";
-import { footerText, useOutdatedClient } from "./version";
+import { footerText, outdated as isOutdated, useServerVersion } from "./version";
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const session = useOptionalSession();
@@ -25,7 +25,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const navigate = useNavigate();
   const frameless = isPublicPath(pathname) || pathname === CHOOSE_ORGANIZATION_PATH;
   const [versionsOpen, setVersionsOpen] = useState(false);
-  const outdated = useOutdatedClient(api, !frameless && session?.organization !== undefined);
+  const server = useServerVersion(api, !frameless && session?.organization !== undefined);
+  const outdated = server !== undefined && isOutdated(server);
 
   // Without a session or an organization, and on the pages of the sign-in, there is no frame.
   if (frameless || !session?.organization) {
@@ -87,7 +88,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
         <div className={styles.member}>
           <footer className={styles.footer}>
             <NavLink to="/privacy">{t("nav-privacy")}</NavLink>
-            <VersionButton onPress={() => setVersionsOpen(true)} />
+            <VersionButton server={server} onPress={() => setVersionsOpen(true)} />
           </footer>
           <Menu
             trigger={user.displayName}
@@ -96,7 +97,12 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
               { id: "persons", label: t("nav-persons") },
               { id: "institutions", label: t("nav-institutions") },
               { id: "privacy", label: t("nav-privacy") },
-              { id: "versions", label: t("member-menu-versions", { build: footerText() }) },
+              {
+                id: "versions",
+                label: server
+                  ? t("member-menu-versions", { build: footerText(server) })
+                  : t("versions-title"),
+              },
               { id: "sign-out", label: t("sign-out") },
             ]}
             onAction={(id) => {

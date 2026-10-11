@@ -19,6 +19,7 @@ const OLD: BuildInfo = BuildInfo {
     version: "0.0.9",
     commit: "1111111",
     built_at: "2026-01-01T00:00:00Z",
+    build_id: "0123456789abcdef0123456789abcdef",
 };
 
 async fn member(app: &MailApp) -> String {
@@ -79,6 +80,7 @@ async fn system_version_lists_roles_and_marks_mismatch() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["product"], tada::BUILD.version);
     assert_eq!(body["commit"], tada::BUILD.commit);
+    assert_eq!(body["web_build"], tada::BUILD.build_id);
     assert_eq!(body["api"], "v1");
     assert_eq!(body["mcp"], tada::BUILD.version);
     assert!(body["schema"].as_i64().unwrap() >= 27);

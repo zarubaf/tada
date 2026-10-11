@@ -5,6 +5,7 @@ import { createApi } from "../api/client";
 import { Router } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 import { Shell } from "./Shell";
+import { CLIENT_BUILD_ID } from "./version";
 
 const first = {
   organization_id: "0199b8e0-0000-7000-8000-0000000000a1",
@@ -34,10 +35,11 @@ function json(status: number, body: unknown) {
 }
 
 /** The versions that the fake server reports; by default the build of this client. */
-function systemVersion(product = __TADA_VERSION__, commit = __TADA_COMMIT__) {
+function systemVersion(product = "0.0.0", commit = "1a2b3c4", web_build = CLIENT_BUILD_ID) {
   return {
     product,
     commit,
+    web_build,
     schema: 27,
     api: "v1",
     mcp: product,
@@ -50,13 +52,15 @@ function systemVersion(product = __TADA_VERSION__, commit = __TADA_COMMIT__) {
 }
 
 let server = systemVersion();
+/** While true, the fake server does not answer the versions. */
+let versionsPending = false;
 
 function renderShellAt(path: string, ...responses: Response[]) {
   const calls: { method: string; path: string; body: string }[] = [];
   const fetch = vi.fn(async (request: Request) => {
     // The shell asks for the versions on its own; the other answers keep their order.
     if (new URL(request.url).pathname === "/api/v1/system/version") {
-      return json(200, server);
+      return versionsPending ? new Promise<Response>(() => {}) : json(200, server);
     }
     calls.push({
       method: request.method,
@@ -90,6 +94,7 @@ function renderShell(...responses: Response[]) {
 afterEach(() => {
   window.history.replaceState(null, "", "/");
   server = systemVersion();
+  versionsPending = false;
 });
 
 describe("Shell", () => {
@@ -196,11 +201,19 @@ describe("Shell", () => {
     await vi.waitFor(() => expect(window.location.pathname).toBe(path));
   });
 
+  it("says „Versionen“ in the footer until the server names its build", async () => {
+    versionsPending = true;
+    renderShell(json(200, info([first], first)));
+
+    expect(await screen.findByRole("button", { name: "Versionen" })).toBeInTheDocument();
+    expect(screen.queryByText(/tada \d/)).toBeNull();
+  });
+
   it("shows the build in the footer and opens the list of the components", async () => {
     renderShell(json(200, info([first], first)));
 
     const footer = await screen.findByRole("button", {
-      name: `tada ${__TADA_VERSION__} · ${__TADA_COMMIT__}`,
+      name: "tada 0.0.0 · 1a2b3c4",
     });
     await userEvent.click(footer);
 
@@ -233,7 +246,7 @@ describe("Shell", () => {
   });
 
   it("asks to load the page again when the server runs another build", async () => {
-    server = systemVersion("9.9.9", "fedcba9");
+    server = systemVersion("9.9.9", "fedcba9", "fedcba9876543210fedcba9876543210");
     renderShell(json(200, info([first], first)));
 
     expect(await screen.findByText("Eine neue Version von tada ist installiert.")).toBeVisible();

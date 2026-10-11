@@ -119,6 +119,7 @@ mod tests {
         version: "0.1.0",
         commit: "2222222",
         built_at: "2026-10-01T00:00:00Z",
+        build_id: "0123456789abcdef0123456789abcdef",
     };
 
     fn job(kind: &'static str) -> NewJob {

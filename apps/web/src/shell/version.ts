@@ -1,45 +1,34 @@
-// The build identity of the web client and its comparison with the server (ADR 0075).
+// The build of the web client and its comparison with the server (ADR 0075, ADR 0078).
 import { useEffect, useState } from "react";
 import type { Api, SystemVersion } from "../api/client";
 
-export interface BuildIdentity {
-  version: string;
-  commit: string;
-}
-
-/** The identity that `vite.config.ts` writes into this build. */
-export const CLIENT: BuildIdentity = { version: __TADA_VERSION__, commit: __TADA_COMMIT__ };
-
-/** The text of the footer, for example `tada 0.3.0 · 1a2b3c4`. */
-export function footerText(identity: BuildIdentity = CLIENT): string {
-  return `tada ${identity.version} · ${identity.commit}`;
-}
-
 /**
- * True if `other` runs another build than `own`. A build without Git gives the commit `unknown`;
- * then only the versions count.
+ * The opaque ID that `vite.config.ts` writes into this build. The client holds no version and no
+ * commit: a client that is not signed in must not learn them (ADR 0078).
  */
-export function differs(own: BuildIdentity, other: BuildIdentity): boolean {
-  const commitsKnown = own.commit !== "unknown" && other.commit !== "unknown";
-  return own.version !== other.version || (commitsKnown && own.commit !== other.commit);
+export const CLIENT_BUILD_ID: string = __TADA_BUILD_ID__;
+
+/** The text of the footer from the answer of the server, for example `tada 0.3.0 · 1a2b3c4`. */
+export function footerText(server: Pick<SystemVersion, "product" | "commit">): string {
+  return `tada ${server.product} · ${server.commit}`;
 }
 
-/** The server as a build identity. */
-export function serverIdentity(server: SystemVersion): BuildIdentity {
-  return { version: server.product, commit: server.commit };
+/** True if the server delivers another web client than this one: the member must load the page again. */
+export function outdated(server: Pick<SystemVersion, "web_build">): boolean {
+  return server.web_build !== CLIENT_BUILD_ID;
 }
 
 /** A tab that comes back to the front checks again, but at most once in this time. */
 const RECHECK_MS = 60_000;
 
 /**
- * True when the server runs another build than this client: the member must load the page again.
- * The hook asks the server when the shell mounts and when the tab comes back to the front, because
- * a tab can stay open over an upgrade. A failed request changes nothing. Without `signedIn` it
- * asks nothing: tada shows no version to a client that is not signed in.
+ * The versions of the server, or `undefined` before the first answer. The hook asks the server
+ * when the shell mounts and when the tab comes back to the front, because a tab can stay open over
+ * an upgrade. A failed request keeps the last answer. Without `signedIn` it asks nothing: tada
+ * shows no version to a client that is not signed in.
  */
-export function useOutdatedClient(api: Api, signedIn: boolean): boolean {
-  const [outdated, setOutdated] = useState(false);
+export function useServerVersion(api: Api, signedIn: boolean): SystemVersion | undefined {
+  const [server, setServer] = useState<SystemVersion>();
   useEffect(() => {
     if (!signedIn) {
       return;
@@ -54,7 +43,7 @@ export function useOutdatedClient(api: Api, signedIn: boolean): boolean {
       try {
         const { data } = await api.GET("/api/v1/system/version");
         if (active && data) {
-          setOutdated(differs(CLIENT, serverIdentity(data)));
+          setServer(data);
         }
       } catch {
         // The next check tries again.
@@ -72,5 +61,5 @@ export function useOutdatedClient(api: Api, signedIn: boolean): boolean {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [api, signedIn]);
-  return signedIn && outdated;
+  return signedIn ? server : undefined;
 }

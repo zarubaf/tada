@@ -1825,6 +1825,7 @@ mod tests {
                 version: "0.0.0",
                 commit: "0000000",
                 built_at: "2026-01-01T00:00:00Z",
+                build_id: "0123456789abcdef0123456789abcdef",
             },
         }
     }

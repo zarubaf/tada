@@ -54,6 +54,8 @@ pub struct RoleVersion {
 pub struct SystemVersion {
     pub product: String,
     pub commit: String,
+    /// The opaque ID of the web client that this process serves (ADR 0078).
+    pub web_build: String,
     pub schema: i64,
     pub api: &'static str,
     pub mcp: String,
@@ -87,6 +89,7 @@ pub async fn system_version(
     Ok(SystemVersion {
         product: build.version.to_owned(),
         commit: build.commit.to_owned(),
+        web_build: build.build_id.to_owned(),
         schema,
         api: API_VERSION,
         mcp: build.version.to_owned(),
@@ -132,6 +135,7 @@ mod tests {
         version: "0.2.0",
         commit: "abc1234",
         built_at: "2026-10-11T08:00:00Z",
+        build_id: "0123456789abcdef0123456789abcdef",
     };
 
     fn heartbeat(role: Option<&str>, version: Option<&str>, commit: Option<&str>) -> Heartbeat {
@@ -162,6 +166,7 @@ mod tests {
         assert_eq!(shown.mcp, "0.2.0");
         assert_eq!(shown.api, "v1");
         assert_eq!(shown.schema, 27);
+        assert_eq!(shown.web_build, "0123456789abcdef0123456789abcdef");
         assert_eq!(shown.roles[0].role, "worker");
     }
 
