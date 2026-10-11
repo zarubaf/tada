@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ceil(coalesce(sum(cost_chf), 0) * 100000)::bigint AS \"used!\" FROM ai_usage\n               WHERE organization_id = $1 AND at >= $2 AND at < $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "used!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "677e88b97674fd7f89f70f41a8804c7ade28e27ff1fadaa0095a018a40ab13e9"
+}

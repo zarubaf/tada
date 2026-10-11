@@ -6,10 +6,14 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use ipnet::IpNet;
+use jiff::SignedDuration;
+use jiff::civil::Date;
 use secrecy::{ExposeSecret, SecretString};
 use tada_adapters::mail::SmtpTls;
 use tada_adapters::storage::{S3Config, S3Storage};
+use tada_app::ai_cost::{AiSetup, Chf};
 use tada_app::domain::identity::Email;
+use tada_app::model::AiLimits;
 use tada_app::public_url::PublicUrl;
 use tada_telegram::UpdateSource;
 use tracing_subscriber::EnvFilter;
@@ -20,9 +24,9 @@ use super::{Section, Setting, Source};
 // Each command also reads `Logging`; see `crate::main`.
 
 /// The settings of `tada serve`.
-pub type ServeSettings = (Database, Http, Storage, PublicUrl, SignIn, Uploads);
+pub type ServeSettings = (Database, Http, Storage, PublicUrl, SignIn, Uploads, AiSetup);
 /// The settings of `tada worker`.
-pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp, Storage);
+pub type WorkerSettings = (Database, PublicUrl, Mail, MailSmtp, Storage, Ai);
 /// The settings of `tada telegram`.
 pub type TelegramSettings = (Database, Telegram, Storage);
 /// The settings of `tada bootstrap`.
@@ -629,5 +633,262 @@ impl MailSmtp {
                 None
             }
         }
+    }
+}
+
+/// The model provider and the limits of the AI work (ADRs 0045, 0047 and 0077). Only `worker` reads it:
+/// it is the only role that calls the model, so it is the only role that holds the API key.
+#[derive(Debug)]
+pub struct Ai {
+    /// `None` if the operator set no API key. Then no AI work runs.
+    pub provider: Option<ModelProvider>,
+    default_cap: Chf,
+    pub limits: AiLimits,
+}
+
+impl Ai {
+    /// What the commands of the app need to know about these settings.
+    pub fn setup(&self) -> AiSetup {
+        AiSetup {
+            configured: self.provider.is_some(),
+            default_cap: self.default_cap,
+        }
+    }
+}
+
+/// The access to the model provider. It exists only with the date of the provider check (ADR 0045).
+#[derive(Debug)]
+pub struct ModelProvider {
+    pub api_key: SecretString,
+    pub api_url: Url,
+    pub checked_on: Date,
+}
+
+const MODEL_API_KEY: Setting = Setting {
+    name: "TADA_MODEL_API_KEY_FILE",
+    kind: "file path",
+    default: None,
+    secret: true,
+    description: "The file that contains the API key of the model provider. Optional: without it, tada does no AI work. Set it together with `TADA_MODEL_PROVIDER_CHECKED_ON`. `worker` reads the key. `serve` only checks that the file exists, to show whether AI is set up; it does not read the key.",
+};
+
+const MODEL_API_URL: Setting = Setting {
+    name: "TADA_MODEL_API_URL",
+    kind: "URL",
+    default: Some("https://api.anthropic.com"),
+    secret: false,
+    description: "The base URL of the Anthropic Messages API. Release builds accept only `https`. Tests set a local fake.",
+};
+
+const MODEL_PROVIDER_CHECKED_ON: Setting = Setting {
+    name: "TADA_MODEL_PROVIDER_CHECKED_ON",
+    kind: "date",
+    default: Some(""),
+    secret: false,
+    description: "The date of the data protection check of the model provider (ADR 0045), for example `2026-10-01`. A role with `TADA_MODEL_API_KEY_FILE` does not start without it.",
+};
+
+const AI_DEFAULT_MONTHLY_CAP: Setting = Setting {
+    name: "TADA_AI_DEFAULT_MONTHLY_CAP_CHF",
+    kind: "amount in CHF",
+    default: Some("25"),
+    secret: false,
+    description: "The monthly AI cap of an organization whose owner or admin set none. At the cap, the AI work pauses until the next month.",
+};
+
+const AI_RUN_MAX_TURNS: Setting = Setting {
+    name: "TADA_AI_RUN_MAX_TURNS",
+    kind: "number",
+    default: Some("6"),
+    secret: false,
+    description: "The most model calls in one run of an AI task.",
+};
+
+const AI_RUN_MAX_COST: Setting = Setting {
+    name: "TADA_AI_RUN_MAX_COST_CHF",
+    kind: "amount in CHF",
+    default: Some("0.05"),
+    secret: false,
+    description: "The highest cost of one run of an AI task. The run stops when it reaches the limit.",
+};
+
+const AI_RUN_TIMEOUT: Setting = Setting {
+    name: "TADA_AI_RUN_TIMEOUT",
+    kind: "duration",
+    default: Some("60s"),
+    secret: false,
+    description: "The longest time of one run of an AI task, with all model calls and tools, for example `60s` or `2m`.",
+};
+
+const AI_CALL_TIMEOUT: Setting = Setting {
+    name: "TADA_AI_CALL_TIMEOUT",
+    kind: "duration",
+    default: Some("20s"),
+    secret: false,
+    description: "The longest time of one call to the model provider. It must not be longer than `TADA_AI_RUN_TIMEOUT`.",
+};
+
+const AI_CALL_RETRIES: Setting = Setting {
+    name: "TADA_AI_CALL_RETRIES",
+    kind: "number",
+    default: Some("2"),
+    secret: false,
+    description: "How often tada repeats a model call after a temporary error: a 429, a 5xx or an overload.",
+};
+
+impl Section for Ai {
+    fn settings() -> Vec<&'static Setting> {
+        vec![
+            &MODEL_API_KEY,
+            &MODEL_API_URL,
+            &MODEL_PROVIDER_CHECKED_ON,
+            &AI_DEFAULT_MONTHLY_CAP,
+            &AI_RUN_MAX_TURNS,
+            &AI_RUN_MAX_COST,
+            &AI_RUN_TIMEOUT,
+            &AI_CALL_TIMEOUT,
+            &AI_CALL_RETRIES,
+        ]
+    }
+
+    fn read(source: &mut Source<'_>) -> Option<Self> {
+        let api_key = source.optional_secret(&MODEL_API_KEY);
+        let api_url = read_api_url(source);
+        let checked_on = read_checked_on(source);
+        let default_cap = positive(source, &AI_DEFAULT_MONTHLY_CAP);
+        let max_turns = positive(source, &AI_RUN_MAX_TURNS);
+        let max_cost = positive(source, &AI_RUN_MAX_COST);
+        let run_timeout = positive(source, &AI_RUN_TIMEOUT);
+        let call_timeout = positive(source, &AI_CALL_TIMEOUT);
+        let call_retries = source.value(&AI_CALL_RETRIES);
+        let api_key = api_key?;
+        let checked_on = checked_on_with_key(source, api_key.is_some(), checked_on?)?;
+        let provider = match (api_key, checked_on) {
+            (Some(api_key), Some(checked_on)) => Some(ModelProvider {
+                api_key,
+                api_url: api_url?,
+                checked_on,
+            }),
+            _ => None,
+        };
+        let (Duration(run_timeout), Duration(call_timeout)) = (run_timeout?, call_timeout?);
+        if call_timeout > run_timeout {
+            source.error(
+                &AI_CALL_TIMEOUT,
+                "must not be longer than TADA_AI_RUN_TIMEOUT",
+            );
+            return None;
+        }
+        Some(Self {
+            provider,
+            default_cap: default_cap?,
+            limits: AiLimits {
+                max_turns: max_turns?,
+                max_cost: max_cost?,
+                run_timeout,
+                call_timeout,
+                call_retries: call_retries?,
+            },
+        })
+    }
+}
+
+/// What `serve` needs to know about the AI work: whether it is set up, and the default cap.
+/// It never reads the API key (ADR 0036): only `worker` calls the model.
+impl Section for AiSetup {
+    fn settings() -> Vec<&'static Setting> {
+        vec![
+            &MODEL_API_KEY,
+            &MODEL_PROVIDER_CHECKED_ON,
+            &AI_DEFAULT_MONTHLY_CAP,
+        ]
+    }
+
+    fn read(source: &mut Source<'_>) -> Option<Self> {
+        let key_exists = source.secret_file_exists(&MODEL_API_KEY);
+        let checked_on = read_checked_on(source);
+        let default_cap = positive(source, &AI_DEFAULT_MONTHLY_CAP);
+        let key_exists = key_exists?;
+        let checked_on = checked_on_with_key(source, key_exists, checked_on?)?;
+        Some(Self {
+            configured: key_exists && checked_on.is_some(),
+            default_cap: default_cap?,
+        })
+    }
+}
+
+/// The base URL of the model API. A release build sends the key only over TLS.
+fn read_api_url(source: &mut Source<'_>) -> Option<Url> {
+    let url: Url = source.value(&MODEL_API_URL)?;
+    if cfg!(not(debug_assertions)) && url.scheme() != "https" {
+        source.error(
+            &MODEL_API_URL,
+            "must start with https:// in a release build",
+        );
+        return None;
+    }
+    Some(url)
+}
+
+/// The date of the provider check, which a key requires (ADR 0045). `None` is an error.
+fn checked_on_with_key(
+    source: &mut Source<'_>,
+    key_set: bool,
+    checked_on: Option<Date>,
+) -> Option<Option<Date>> {
+    if key_set && checked_on.is_none() {
+        source.error(
+            &MODEL_PROVIDER_CHECKED_ON,
+            "must be set together with TADA_MODEL_API_KEY_FILE (ADR 0045)",
+        );
+        return None;
+    }
+    Some(checked_on)
+}
+
+/// The date of the provider check. The outer `None` is an error; the inner one is an empty value.
+fn read_checked_on(source: &mut Source<'_>) -> Option<Option<Date>> {
+    let text: String = source.value(&MODEL_PROVIDER_CHECKED_ON)?;
+    if text.is_empty() {
+        return Some(None);
+    }
+    match text.parse() {
+        Ok(date) => Some(Some(date)),
+        Err(_) => {
+            source.error(
+                &MODEL_PROVIDER_CHECKED_ON,
+                "is not a valid date in the form 2026-10-01",
+            );
+            None
+        }
+    }
+}
+
+/// A value that must be more than zero.
+fn positive<T>(source: &mut Source<'_>, setting: &Setting) -> Option<T>
+where
+    T: FromStr + PartialOrd + Default,
+    T::Err: std::fmt::Display,
+{
+    let value: T = source.value(setting)?;
+    if value <= T::default() {
+        source.error(setting, "must be more than zero");
+        return None;
+    }
+    Some(value)
+}
+
+/// A duration in the friendly format of `jiff`, for example `20s`, `2m` or `1m 30s`.
+/// The error does not repeat the text, so that no value reaches the log.
+#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd)]
+struct Duration(SignedDuration);
+
+impl FromStr for Duration {
+    type Err = &'static str;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        text.parse()
+            .map(Self)
+            .map_err(|_| "expected a duration such as 20s or 2m")
     }
 }

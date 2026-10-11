@@ -29,7 +29,7 @@ pub fn routes(api: ApiState, mcp: McpState, web_root: Option<&Path>) -> Router {
 }
 
 pub async fn run(
-    (database, http, storage, public_url, sign_in, uploads): ServeSettings,
+    (database, http, storage, public_url, sign_in, uploads, ai_setup): ServeSettings,
 ) -> anyhow::Result<()> {
     let db = Database::connect_lazy(&database.url, &database.password)
         .context("invalid database settings")?;
@@ -75,6 +75,8 @@ pub async fn run(
         dispute_notes: Arc::new(db.clone()),
         redaction: Arc::new(db.clone()),
         versions: Arc::new(db.clone()),
+        ai: Arc::new(db.clone()),
+        ai_setup,
     };
 
     // The MCP server for the AI clients of members (ADR 0040). Only personal API tokens open it.

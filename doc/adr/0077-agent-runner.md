@@ -84,6 +84,8 @@ Cost control:
   A new organization gets the default from the setting.
   An owner or admin changes it ([ADR 0047](0047-model-adapter.md)).
 - AI work runs only if the organization switched it on, the key and the check date are set, and the usage of the month is below the cap.
+  The check is before a run, so the usage can go above the cap by at most the cost limit of each run that started below it.
+  The cap month is the calendar month in UTC.
 - No cache applies to `pm-digest`, because each input is new.
 
 Task `pm-digest`:

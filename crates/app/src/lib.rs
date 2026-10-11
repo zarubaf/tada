@@ -2,6 +2,7 @@
 
 pub mod access;
 pub mod account_reminders;
+pub mod ai_cost;
 pub mod ai_queries;
 pub mod ai_tools;
 pub mod audit;
@@ -25,6 +26,7 @@ pub mod jobs;
 pub mod mail;
 pub mod members;
 pub mod messenger;
+pub mod model;
 pub mod my_work;
 pub mod orphans;
 pub mod outbound;

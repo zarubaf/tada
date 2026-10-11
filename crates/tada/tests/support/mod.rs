@@ -26,6 +26,7 @@ use serde_json::Value;
 use tada_adapters::mail::{FluentMailTexts, MemoryMailer};
 use tada_api::ApiState;
 pub use tada_api::SESSION_COOKIE;
+use tada_app::ai_cost::{AiSetup, Chf};
 use tada_app::auth::Authenticator;
 use tada_app::blobs::{BlobError, BlobKey, BlobStore, ByteStream, ObjectInfo, UploadInfo};
 use tada_app::clock::Clock;
@@ -103,6 +104,11 @@ pub fn api_state_on(
         dispute_notes: database.clone(),
         redaction: database.clone(),
         versions: database.clone(),
+        ai: database.clone(),
+        ai_setup: AiSetup {
+            configured: false,
+            default_cap: Chf::from_millirappen(2_500_000),
+        },
     }
 }
 

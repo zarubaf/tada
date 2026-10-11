@@ -69,6 +69,8 @@ pub enum AuditAction {
     EventReopen,
     /// An owner changed the retention periods of the organization (ADR 0071).
     OrganizationSetRetention,
+    /// An owner or admin changed the monthly AI cap of the organization (ADR 0047). The event holds no amount.
+    OrganizationSetAiCap,
     /// A legal redaction of a source item and all its versions (ADR 0072). The detail names the reason.
     SourceItemRedact,
     /// A legal redaction of a fact version (ADR 0072). The detail names the reason.
@@ -135,6 +137,7 @@ impl AuditAction {
             Self::EventClose => "event.close",
             Self::EventReopen => "event.reopen",
             Self::OrganizationSetRetention => "organization.set_retention",
+            Self::OrganizationSetAiCap => "organization.set_ai_cap",
             Self::SourceItemRedact => "source_item.redact",
             Self::FactVersionRedact => "fact_version.redact",
             Self::DocumentVersionRedact => "document_version.redact",
@@ -169,6 +172,7 @@ impl AuditAction {
             Self::OrganizationCreate
             | Self::OrganizationSetPrivacyNotice
             | Self::OrganizationSetRetention
+            | Self::OrganizationSetAiCap
             | Self::OrganizationSetPmPolicy => "organization",
             Self::InvitationCreate
             | Self::InvitationRevoke

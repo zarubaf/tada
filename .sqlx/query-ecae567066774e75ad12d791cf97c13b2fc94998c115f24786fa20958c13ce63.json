@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ceil(input_chf_per_mtok * 100000)::bigint AS \"input!\",\n                      ceil(output_chf_per_mtok * 100000)::bigint AS \"output!\"\n               FROM ai_price WHERE model_id = $1 AND valid_from <= $2\n               ORDER BY valid_from DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "input!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "output!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "ecae567066774e75ad12d791cf97c13b2fc94998c115f24786fa20958c13ce63"
+}

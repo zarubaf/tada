@@ -2,6 +2,7 @@
 
 mod account_reminders;
 mod actors;
+mod ai;
 mod client_ip;
 mod contract;
 mod cursor;
@@ -45,6 +46,7 @@ use axum::response::Response;
 use axum::routing::any;
 use ipnet::IpNet;
 use tada_app::account_reminders::ReminderSettingsStore;
+use tada_app::ai_cost::{AiCostStore, AiSetup};
 use tada_app::auth::Authenticator;
 use tada_app::blobs::BlobStore;
 use tada_app::clock::Clock;
@@ -138,6 +140,10 @@ pub struct ApiState {
     pub redaction: Arc<dyn RedactionStore>,
     /// The schema version and the heartbeats of the roles (ADR 0075).
     pub versions: Arc<dyn VersionStore>,
+    /// The prices, the usage and the monthly cap of the AI work (ADR 0077).
+    pub ai: Arc<dyn AiCostStore>,
+    /// The model provider settings and the default cap of the operator (ADR 0077).
+    pub ai_setup: AiSetup,
 }
 
 pub use contract::{PROBLEM_CODES_EXTENSION, problem_catalog};
@@ -161,6 +167,7 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(retention::routes())
                 .merge(pm_policy::routes())
                 .merge(account_reminders::routes())
+                .merge(ai::routes())
                 .merge(parties::routes())
                 .merge(workstreams::routes())
                 .merge(work::routes())
@@ -190,6 +197,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(retention::problem_codes())
         .chain(pm_policy::problem_codes())
         .chain(account_reminders::problem_codes())
+        .chain(ai::problem_codes())
         .chain(parties::problem_codes())
         .chain(workstreams::problem_codes())
         .chain(work::problem_codes())
@@ -1693,6 +1701,64 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct NoAi;
+
+    #[async_trait::async_trait]
+    impl tada_app::ai_cost::AiCostStore for NoAi {
+        async fn price(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &str,
+            _: jiff::civil::Date,
+        ) -> Result<Option<tada_app::ai_cost::Price>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn month_usage(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::ai_cost::Month,
+        ) -> Result<tada_app::ai_cost::Chf, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn record(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::ai_cost::UsageRecord,
+        ) -> Result<(), tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn cap(
+            &self,
+            _: tada_app::caller::OrgScope,
+        ) -> Result<
+            Option<(tada_app::ai_cost::Chf, tada_app::domain::RecordVersion)>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn set_cap(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::ai_cost::Chf,
+            _: tada_app::domain::RecordVersion,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<Option<tada_app::domain::RecordVersion>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn ai_enabled(
+            &self,
+            _: tada_app::caller::OrgScope,
+        ) -> Result<bool, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
     fn state() -> ApiState {
         ApiState {
             dependencies: Vec::new(),
@@ -1727,6 +1793,11 @@ mod tests {
             dispute_notes: Arc::new(NoPersonData),
             redaction: Arc::new(NoPersonData),
             versions: Arc::new(NoVersions),
+            ai: Arc::new(NoAi),
+            ai_setup: tada_app::ai_cost::AiSetup {
+                configured: false,
+                default_cap: tada_app::ai_cost::Chf::ZERO,
+            },
         }
     }
 
