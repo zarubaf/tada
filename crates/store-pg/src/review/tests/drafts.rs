@@ -97,7 +97,7 @@ async fn a_draft_proposal_stores_its_manifest_and_lint_warnings_and_they_never_c
     let open_day = open_day(&test).await;
     let (fact, facts) = accepted_fact(&test, &open_day).await;
     let id = Uuid::now_v7();
-    let source = facts.source_version_id.as_uuid();
+    let source = facts.source_version_id.unwrap().as_uuid();
     let changeset = propose(
         &test,
         &open_day.contributor,
@@ -207,7 +207,7 @@ async fn a_draft_cannot_cite_a_fact_of_another_organization() {
         .await
         .unwrap();
 
-    let source = own.source_version_id.as_uuid();
+    let source = own.source_version_id.unwrap().as_uuid();
     let result = propose_draft(
         &test,
         &open_day.contributor,
@@ -235,7 +235,7 @@ async fn a_draft_cannot_cite_a_fact_of_another_organization() {
             draft(
                 open_day.event,
                 new_document(Uuid::now_v7()),
-                &markdown(own_fact, 1, theirs.source_version_id.as_uuid()),
+                &markdown(own_fact, 1, theirs.source_version_id.unwrap().as_uuid()),
             ),
             &[],
             "Das Open Day",
@@ -264,7 +264,7 @@ async fn a_draft_cannot_cite_an_open_proposal() {
         )],
     )
     .await;
-    let source = facts.source_version_id.as_uuid();
+    let source = facts.source_version_id.unwrap().as_uuid();
     for (target, version) in [(fact, 2), (open, 1)] {
         let result = propose_draft(
             &test,
@@ -292,7 +292,7 @@ async fn an_accepted_draft_is_a_draft_version_with_its_manifest() {
     let test = TestDatabase::start().await;
     let open_day = open_day(&test).await;
     let (fact, facts) = accepted_fact(&test, &open_day).await;
-    let source = facts.source_version_id.as_uuid();
+    let source = facts.source_version_id.unwrap().as_uuid();
     let (id, document) = (Uuid::now_v7(), Uuid::now_v7());
     let text = markdown(fact, 1, source);
     let changeset = propose(
@@ -474,7 +474,7 @@ async fn the_markdown_and_the_manifest_of_a_draft_version_never_change() {
             draft(
                 open_day.event,
                 new_document(Uuid::now_v7()),
-                &markdown(fact, 1, facts.source_version_id.as_uuid()),
+                &markdown(fact, 1, facts.source_version_id.unwrap().as_uuid()),
             ),
             &[],
             "Das Open Day",
@@ -530,7 +530,7 @@ async fn a_contributor_cites_the_intake_text_that_the_facts_of_the_event_cite() 
     .execute(&test.database.pool)
     .await
     .unwrap();
-    let intake = changeset.source_version_id.as_uuid();
+    let intake = changeset.source_version_id.unwrap().as_uuid();
     let has_event: bool = test
         .scalar(&format!(
             "SELECT i.event_id IS NOT NULL FROM source_version v
@@ -609,7 +609,7 @@ async fn a_draft_cannot_cite_a_fact_of_another_event() {
         .await
         .unwrap();
 
-    let source = facts.source_version_id.as_uuid();
+    let source = facts.source_version_id.unwrap().as_uuid();
     for caller in [&open_day.contributor, &open_day.owner] {
         let result = propose_draft(
             &test,

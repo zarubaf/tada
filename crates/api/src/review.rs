@@ -6,7 +6,7 @@ use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tada_app::dispute_notes::{DisputeNotes, NoteKey};
-use tada_app::domain::ids::{ChangesetId, EventId, LocalIdKind, ProposalId};
+use tada_app::domain::ids::{ChangesetId, EventId, LocalIdKind, ProposalId, SourceVersionId};
 use tada_app::domain::parties::Party as DomainParty;
 use tada_app::domain::proposals::{
     DraftDocument as DomainDraftDocument, Operation as DomainOperation,
@@ -121,8 +121,10 @@ pub struct CreatedChangeset {
     /// The event of the changeset. It is absent for a changeset of the organization.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_id: Option<Uuid>,
-    /// The source version that holds the text of the intake.
-    pub source_version_id: Uuid,
+    /// The source version that holds the member's own words of the intake.
+    /// It is absent if the changeset has no source text: its proposals cite only stored source versions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_version_id: Option<Uuid>,
     pub created_at: Timestamp,
     /// The IDs of the proposals, in the order of their IDs.
     pub proposal_ids: Vec<Uuid>,
@@ -139,7 +141,7 @@ impl From<AppChangeset> for CreatedChangeset {
         Self {
             id: changeset.id.as_uuid(),
             event_id: changeset.event_id.map(EventId::as_uuid),
-            source_version_id: changeset.source_version_id.as_uuid(),
+            source_version_id: changeset.source_version_id.map(SourceVersionId::as_uuid),
             created_at: changeset.created_at,
             proposal_ids,
         }
@@ -200,8 +202,10 @@ pub struct Changeset {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_id: Option<Uuid>,
     pub author: Author,
-    /// The source version that holds the text of the intake.
-    pub source_version_id: Uuid,
+    /// The source version that holds the member's own words of the intake.
+    /// It is absent if the changeset has no source text: its proposals cite only stored source versions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_version_id: Option<Uuid>,
     pub created_at: Timestamp,
     /// The proposals in the order of their IDs.
     pub proposals: Vec<Proposal>,
@@ -780,7 +784,7 @@ impl From<ChangesetReview> for Changeset {
             id: review.id.as_uuid(),
             event_id: review.event_id.map(EventId::as_uuid),
             author: review.author.into(),
-            source_version_id: review.source_version_id.as_uuid(),
+            source_version_id: review.source_version_id.map(SourceVersionId::as_uuid),
             created_at: review.created_at,
             proposals: review.proposals.into_iter().map(Proposal::from).collect(),
             redacted_proposals: review

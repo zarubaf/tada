@@ -33,7 +33,8 @@ pub struct ChangesetReview {
     /// `None` for a changeset of the organization, for example one that creates an event.
     pub event_id: Option<EventId>,
     pub author: Actor,
-    pub source_version_id: SourceVersionId,
+    /// The source version of the member's own words. It is absent if the changeset has no source text.
+    pub source_version_id: Option<SourceVersionId>,
     pub created_at: Timestamp,
     /// The proposals in the order of the changeset.
     pub proposals: Vec<ProposalReview>,
@@ -256,18 +257,18 @@ pub async fn get_changeset(
     })
 }
 
-/// The text of each source version that the evidence of the changeset cites: the source text of the changeset,
+/// The text of each source version that the evidence of the changeset cites: the source text of the changeset if it has one,
 /// and each other source version in the reach of the caller (`access::source_reach`).
 /// A reviewer of the changeset reads the evidence of its event, so a missing text is an inconsistent store.
 async fn evidence_texts(
     caller: &MemberCaller,
     changeset: &Changeset,
-    source: Redactable<SourceText>,
+    source: Option<Redactable<SourceText>>,
     stores: ReviewStores<'_>,
 ) -> Result<HashMap<SourceVersionId, SourceText>, StoreError> {
     let mut texts = HashMap::new();
-    if let Redactable::Present(source) = source {
-        texts.insert(changeset.source_version_id, source);
+    if let (Some(id), Some(Redactable::Present(source))) = (changeset.source_version_id, source) {
+        texts.insert(id, source);
     }
     let mut cited: Vec<SourceVersionId> = changeset
         .proposals

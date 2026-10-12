@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT c.event_id, c.author, c.source_version_id,\n                      c.created_at AS \"created_at: jiff_sqlx::Timestamp\", v.text\n               FROM changeset c\n               JOIN source_version v ON v.organization_id = c.organization_id AND v.id = c.source_version_id\n               WHERE c.organization_id = $1 AND c.id = $2",
+  "query": "SELECT c.event_id, c.author, c.source_version_id,\n                      c.created_at AS \"created_at: jiff_sqlx::Timestamp\", v.id AS \"version?\", v.text AS \"text?\"\n               FROM changeset c\n               LEFT JOIN source_version v ON v.organization_id = c.organization_id AND v.id = c.source_version_id\n               WHERE c.organization_id = $1 AND c.id = $2",
   "describe": {
     "columns": [
       {
@@ -49,7 +49,18 @@
       },
       {
         "ordinal": 4,
-        "name": "text",
+        "name": "version?",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "source_version",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "text?",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -68,10 +79,11 @@
     "nullable": [
       true,
       false,
+      true,
       false,
-      false,
+      true,
       true
     ]
   },
-  "hash": "d0b92fc630007610c4facf16c0dd922959c77aa330e9876df6db53f95775346a"
+  "hash": "11e5509fa82f90404b42dedae1647305a366dd19d85e1cca7b7a94dcb870f067"
 }
