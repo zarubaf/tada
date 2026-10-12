@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-06
+- Amended by: [0066](0066-problem-status-in-app.md)
 
 ## Context
 

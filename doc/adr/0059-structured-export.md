@@ -1,6 +1,6 @@
 # 0059. Structured export of one organization
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-08
 
 ## Context

@@ -1,6 +1,6 @@
 # 0060. Unicode normalization of source texts
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-07
 
 ## Context

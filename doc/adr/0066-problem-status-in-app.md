@@ -1,6 +1,6 @@
 # 0066. The HTTP status of a problem code lives in `app`
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-09
 - Amends: [0037](0037-error-model.md)
 

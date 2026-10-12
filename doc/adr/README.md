@@ -52,7 +52,7 @@ The ADRs are the authority for the decisions in this project.
 | [0034](0034-python-for-scripts.md)                              | Python for all scripts                                   | Accepted                           |
 | [0035](0035-observability.md)                                   | Observability without direct identifiers                 | Accepted, amended by 0070          |
 | [0036](0036-configuration.md)                                   | Configuration, secrets and the first owner               | Accepted, amended by 0070          |
-| [0037](0037-error-model.md)                                     | Error model                                              | Accepted                           |
+| [0037](0037-error-model.md)                                     | Error model                                              | Accepted, amended by 0066          |
 | [0038](0038-ids-and-time.md)                                    | IDs and time                                             | Accepted                           |
 | [0039](0039-actors-and-identities.md)                           | Callers, actors and service identities                   | Accepted, amended by 0070          |
 | [0040](0040-ai-intake-through-mcp.md)                           | AI intake through MCP first                              | Accepted                           |
@@ -73,15 +73,15 @@ The ADRs are the authority for the decisions in this project.
 | [0055](0055-office-format-detection.md)                         | Detection of office formats in ZIP containers            | Accepted                           |
 | [0056](0056-sign-in-details.md)                                 | Sign-in: organization, invitations and rate limits       | Accepted, amended by 0065 and 0070 |
 | [0057](0057-modular-mail-and-inbound-webhook.md)                | Modular mail adapters and an inbound webhook             | Accepted                           |
-| [0058](0058-markdown-renderer-for-drafts.md)                    | Markdown parser and renderer for drafts                  | Proposed                           |
-| [0059](0059-structured-export.md)                               | Structured export of one organization                    | Proposed                           |
-| [0060](0060-unicode-normalization-of-source-texts.md)           | Unicode normalization of source texts                    | Proposed                           |
-| [0061](0061-audit-subject-and-role-detail.md)                   | Audit subject and role detail                            | Proposed                           |
-| [0062](0062-authenticators-in-app.md)                           | Authenticators in `app`                                  | Proposed                           |
+| [0058](0058-markdown-renderer-for-drafts.md)                    | Markdown parser and renderer for drafts                  | Accepted                           |
+| [0059](0059-structured-export.md)                               | Structured export of one organization                    | Accepted                           |
+| [0060](0060-unicode-normalization-of-source-texts.md)           | Unicode normalization of source texts                    | Accepted                           |
+| [0061](0061-audit-subject-and-role-detail.md)                   | Audit subject and role detail                            | Accepted                           |
+| [0062](0062-authenticators-in-app.md)                           | Authenticators in `app`                                  | Accepted                           |
 | [0063](0063-ownership-after-removal.md)                         | Ownership after removal                                  | Proposed                           |
-| [0064](0064-one-proposal-input-for-http-and-mcp.md)             | One proposal input for HTTP and MCP                      | Proposed                           |
+| [0064](0064-one-proposal-input-for-http-and-mcp.md)             | One proposal input for HTTP and MCP                      | Accepted                           |
 | [0065](0065-worker-deletes-ended-rate-limit-counters.md)        | The worker deletes ended rate-limit counters             | Accepted, amended by 0070          |
-| [0066](0066-problem-status-in-app.md)                           | The HTTP status of a problem code lives in `app`         | Proposed                           |
+| [0066](0066-problem-status-in-app.md)                           | The HTTP status of a problem code lives in `app`         | Accepted                           |
 | [0067](0067-workstreams-and-review-routing.md)                  | Workstreams and review routing                           | Accepted                           |
 | [0068](0068-actions-and-commitments.md)                         | Actions and commitments                                  | Accepted                           |
 | [0069](0069-persons-and-institutions.md)                        | Persons and institutions                                 | Accepted                           |
