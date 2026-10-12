@@ -302,6 +302,27 @@ impl Operation {
         }
     }
 
+    /// True if only the event managers review the proposal, whatever record or workstream it names.
+    pub fn managers_only(&self) -> bool {
+        match self {
+            Self::CreateEvent { .. }
+            | Self::SetFact { .. }
+            | Self::AddFieldDefinition { .. }
+            | Self::AddChoiceValue { .. }
+            | Self::DeprecateField { .. }
+            | Self::CreateOpenQuestion { .. }
+            | Self::CreateDocumentDraft { .. }
+            | Self::CreatePerson { .. }
+            | Self::CreateInstitution { .. }
+            | Self::CreateWorkstream { .. }
+            | Self::CreateAction { .. }
+            | Self::CreateCommitment { .. }
+            | Self::ChangeActionStatus { .. }
+            | Self::ChangeActionDue { .. }
+            | Self::ChangeCommitmentStatus { .. } => false,
+        }
+    }
+
     /// The records that the operation names and that a proposal of the same changeset can create
     /// (ADR 0067, rule 5): the promisor of a new commitment.
     pub fn references(&self) -> Vec<NewRecord> {
@@ -576,6 +597,7 @@ mod tests {
         );
         for change in [&status, &due, &promise] {
             assert_eq!(change.workstream(), None);
+            assert!(!change.managers_only());
         }
 
         // A create changes no record. It names its workstream instead.
@@ -585,6 +607,7 @@ mod tests {
         assert_eq!(create.changed_record(), None);
         assert_eq!(create.workstream(), Some(workstream));
         assert_eq!(new_commitment(person, None).workstream(), None);
+        assert!(!create.managers_only());
     }
 
     #[test]

@@ -65,6 +65,9 @@ pub fn reviewers(
     if event.is_none() {
         return Reviewers::OrganizationAdmins;
     }
+    if operation.managers_only() {
+        return Reviewers::EventManagers;
+    }
     let user = match operation.changed_record() {
         Some(record) => lookup.owner_of(record),
         None => operation
@@ -240,7 +243,10 @@ impl RoutingFacts {
     ) -> Result<Self, StoreError> {
         let mut records = Vec::new();
         let mut needs_leads = false;
-        for operation in operations {
+        for operation in operations
+            .into_iter()
+            .filter(|operation| !operation.managers_only())
+        {
             match operation.changed_record() {
                 Some(record) => records.push(record),
                 None => needs_leads |= operation.workstream().is_some(),
