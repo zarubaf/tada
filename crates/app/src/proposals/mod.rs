@@ -120,8 +120,9 @@ pub struct Changeset {
     /// `None` for a changeset of the organization, for example one that creates an event.
     pub event_id: Option<EventId>,
     pub author: Actor,
-    /// The source version of the intake text. The evidence of a proposal can also cite other source versions.
-    pub source_version_id: SourceVersionId,
+    /// The source version of the intake text, the member's own words. The evidence of a proposal can also cite
+    /// other source versions.
+    pub source_version_id: Option<SourceVersionId>,
     pub created_at: Timestamp,
     /// The proposals with their content. A proposal that a legal redaction emptied is in `redacted` instead.
     pub proposals: Vec<Proposal>,
@@ -163,23 +164,25 @@ pub trait ProposalStore: Debug + Send + Sync {
 
     /// Stores `source` as a source version of the kind `member-text` with the ID `changeset.source_version_id`,
     /// then the changeset with its proposals, their dependencies, their evidence and the provenance of its drafts, then `audit`.
+    /// `source` and `changeset.source_version_id` are both present or both absent.
     /// It writes all of them in one transaction, or nothing. It locks each cited source version first, and refuses
     /// if a redaction removed its text (ADR 0072).
     async fn insert(
         &self,
         scope: OrgScope,
         changeset: &Changeset,
-        source: &SourceText,
+        source: Option<&SourceText>,
         audit: &AuditEvent,
     ) -> Result<Inserted, StoreError>;
 
     /// The changeset `id` of the organization with the normalized text of its source version, or `None`.
+    /// The text is absent if the changeset has no source version.
     /// Its proposals and drafts are in the order of their IDs. A legal redaction removes the text (ADR 0072).
     async fn get(
         &self,
         scope: OrgScope,
         id: ChangesetId,
-    ) -> Result<Option<(Changeset, Redactable<SourceText>)>, StoreError>;
+    ) -> Result<Option<(Changeset, Option<Redactable<SourceText>>)>, StoreError>;
 }
 
 /// The result of a successful `create_changeset`.
@@ -316,14 +319,16 @@ pub async fn create_changeset(
     if source.as_str().chars().count() > MAX_SOURCE_TEXT_CHARS {
         return Err(invalid("source_text", "length"));
     }
-    let source_version_id = SourceVersionId::from_uuid(Uuid::now_v7());
+    let text = Some(IntakeText {
+        id: SourceVersionId::from_uuid(Uuid::now_v7()),
+        text: &source,
+    });
     let retry = input.id.is_some();
-    let (id, proposals) = parse(input, &source, source_version_id)?;
+    let (id, proposals) = parse(input, text)?;
     let intake = Intake {
         event_id,
         author: caller.actor(),
-        source: &source,
-        source_version_id,
+        text,
         proposals: &proposals,
     };
     if retry && let Some(stored) = stores.proposals.get(scope, id).await? {
@@ -331,6 +336,7 @@ pub async fn create_changeset(
     }
     check_structure(event_id, &proposals)?;
     check_catalog(scope, event_id, &proposals, stores).await?;
+    let source_version_id = text.map(|text| text.id);
     check_cited_sources(caller, event_id, source_version_id, &proposals, stores).await?;
     let drafts = drafts::check_drafts(caller, &proposals, stores).await?;
     check_free_ids(id, &proposals, stores.proposals).await?;
@@ -353,7 +359,7 @@ pub async fn create_changeset(
     );
     match stores
         .proposals
-        .insert(scope, &changeset, &source, &audit)
+        .insert(scope, &changeset, text.map(|text| text.text), &audit)
         .await?
     {
         Inserted::Inserted => Ok(Created::New(changeset)),
@@ -401,13 +407,19 @@ fn cites_redacted(changeset: &Changeset, redacted: &[SourceVersionId]) -> Vec<Fi
     errors
 }
 
+/// The source text of a new changeset, with the ID of the source version that will hold it.
+#[derive(Clone, Copy)]
+struct IntakeText<'a> {
+    id: SourceVersionId,
+    text: &'a SourceText,
+}
+
 /// The content of a new changeset, to compare it with a stored changeset of the same ID.
 struct Intake<'a> {
     event_id: Option<EventId>,
     author: Actor,
-    source: &'a SourceText,
-    /// The new source version of `source`. A stored changeset has its own.
-    source_version_id: SourceVersionId,
+    /// The source text with its new source version. A stored changeset has its own source version.
+    text: Option<IntakeText<'a>>,
     proposals: &'a [Proposal],
 }
 
@@ -417,17 +429,25 @@ impl Intake<'_> {
     /// A redacted stored changeset is never the same as a new intake (ADR 0072).
     fn existing(
         &self,
-        (stored, source): (Changeset, Redactable<SourceText>),
+        (stored, source): (Changeset, Option<Redactable<SourceText>>),
     ) -> Result<Created, ProposeError> {
         let author = |actor: &Actor| (actor.kind(), actor.id(), actor.principal());
         let mut proposals = self.proposals.to_vec();
         proposals.sort_by_key(|proposal| proposal.id);
         // The evidence in the intake text names the source version of the stored changeset.
+        let renamed = self.text.map(|text| text.id).zip(stored.source_version_id);
         let intake = |mut evidence: Evidence| {
-            if evidence.source_version_id == self.source_version_id {
-                evidence.source_version_id = stored.source_version_id;
+            if let Some((new, old)) = renamed
+                && evidence.source_version_id == new
+            {
+                evidence.source_version_id = old;
             }
             evidence
+        };
+        let same_text = match (&source, self.text) {
+            (None, None) => true,
+            (Some(source), Some(text)) => source.as_present() == Some(text.text),
+            _ => false,
         };
         let proposals = proposals.into_iter().map(|mut proposal| {
             proposal.evidence = proposal.evidence.into_iter().map(intake).collect();
@@ -439,7 +459,7 @@ impl Intake<'_> {
         };
         let same = stored.event_id == self.event_id
             && author(&stored.author) == author(&self.author)
-            && source.as_present() == Some(self.source)
+            && same_text
             && stored.redacted.is_empty()
             && stored.proposals.len() == self.proposals.len()
             && stored
@@ -496,12 +516,10 @@ fn record_id_error(uuid: Uuid) -> Option<&'static str> {
     (!ids::is_record_id(uuid)).then_some("not-uuid-v7")
 }
 
-/// Maps the input to the domain, and checks the evidence of each proposal against the source text,
-/// which tada stores as the source version `source_version_id`.
+/// Maps the input to the domain, and checks the evidence of each proposal against the source text `intake`.
 fn parse(
     input: NewChangeset,
-    source: &SourceText,
-    source_version_id: SourceVersionId,
+    intake: Option<IntakeText<'_>>,
 ) -> Result<(ChangesetId, Vec<Proposal>), ProposeError> {
     let mut errors = Vec::new();
     let id = match input.id {
@@ -549,9 +567,12 @@ fn parse(
                 });
                 continue;
             }
-            match check_passage(&passage, source) {
+            let Some(intake) = intake else {
+                continue;
+            };
+            match check_passage(&passage, intake.text) {
                 Ok(()) => evidence.push(Evidence {
-                    source_version_id,
+                    source_version_id: intake.id,
                     passage,
                 }),
                 Err(error) => errors.push(FieldError::new(
@@ -597,7 +618,7 @@ fn parse(
 async fn check_cited_sources(
     caller: &impl MayPropose,
     changeset_event: Option<EventId>,
-    intake: SourceVersionId,
+    intake: Option<SourceVersionId>,
     proposals: &[Proposal],
     stores: ProposeStores<'_>,
 ) -> Result<(), ProposeError> {
@@ -614,7 +635,7 @@ async fn check_cited_sources(
                 .evidence
                 .iter()
                 .map(|evidence| evidence.source_version_id)
-                .filter(|id| *id != intake),
+                .filter(|id| Some(*id) != intake),
         );
     }
     let mut texts: HashMap<(EventId, SourceVersionId), Option<SourceText>> = HashMap::new();
@@ -635,7 +656,7 @@ async fn check_cited_sources(
     for (index, proposal) in proposals.iter().enumerate() {
         let event = event_of(proposal);
         for (number, evidence) in proposal.evidence.iter().enumerate() {
-            if evidence.source_version_id == intake {
+            if Some(evidence.source_version_id) == intake {
                 continue;
             }
             let text = event.and_then(|event| texts.get(&(event, evidence.source_version_id)));

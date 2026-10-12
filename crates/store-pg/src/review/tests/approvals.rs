@@ -378,7 +378,7 @@ async fn a_changed_date_window_marks_the_document_and_the_difference_lists_it() 
     let test = TestDatabase::start().await;
     let open_day = open_day(&test).await;
     let (fact, facts) = accepted_fact(&test, &open_day).await;
-    let source = facts.source_version_id.as_uuid();
+    let source = facts.source_version_id.unwrap().as_uuid();
     let document = Uuid::now_v7();
     let text = |version: i64, month: &str| {
         format!(
@@ -564,7 +564,7 @@ async fn a_source_outside_the_citable_reach_of_the_event_renders_hidden() {
     let test = TestDatabase::start().await;
     let open_day = open_day(&test).await;
     let (fact, facts) = accepted_fact(&test, &open_day).await;
-    let source = facts.source_version_id.as_uuid();
+    let source = facts.source_version_id.unwrap().as_uuid();
     let elsewhere = test.create_event(open_day.organization, "FLY31").await;
     let secret = test
         .database
@@ -601,11 +601,11 @@ async fn a_source_outside_the_citable_reach_of_the_event_renders_hidden() {
         passage: Passage::of_range(SOURCE, 4, 12).unwrap(),
     };
     changeset.id = ChangesetId::from_uuid(Uuid::now_v7());
-    changeset.source_version_id = SourceVersionId::from_uuid(Uuid::now_v7());
+    changeset.source_version_id = Some(SourceVersionId::from_uuid(Uuid::now_v7()));
     let proposal = &mut changeset.proposals[0];
     proposal.id = ProposalId::from_uuid(Uuid::now_v7());
     for evidence in &mut proposal.evidence {
-        evidence.source_version_id = changeset.source_version_id;
+        evidence.source_version_id = changeset.source_version_id.unwrap();
     }
     let Operation::CreateDocumentDraft {
         markdown: stored, ..
@@ -626,7 +626,7 @@ async fn a_source_outside_the_citable_reach_of_the_event_renders_hidden() {
         &test.database,
         open_day.contributor.scope(),
         &changeset,
-        &SourceText::normalize(SOURCE),
+        Some(&SourceText::normalize(SOURCE)),
         &audit,
     )
     .await
@@ -676,7 +676,7 @@ async fn a_cited_source_without_text_fails_the_read_of_the_draft() {
     let test = TestDatabase::start().await;
     let open_day = open_day(&test).await;
     let (_, facts) = accepted_fact(&test, &open_day).await;
-    let source = facts.source_version_id.as_uuid();
+    let source = facts.source_version_id.unwrap().as_uuid();
     let document = Uuid::now_v7();
     let version = add_draft(
         &test,

@@ -298,7 +298,7 @@ async fn an_applied_fact_makes_an_older_proposal_of_the_same_field_conflict() {
         .unwrap();
     assert_eq!(
         (source, quote.as_str()),
-        (second.source_version_id.as_uuid(), "im Mai 2030")
+        (second.source_version_id.unwrap().as_uuid(), "im Mai 2030")
     );
     assert_eq!(
         actor::from_json(&accepted_by).unwrap(),
@@ -1292,7 +1292,7 @@ async fn a_fact_applies_with_the_evidence_of_another_source_version_of_its_event
         )],
     )
     .await;
-    let earlier = first.source_version_id;
+    let earlier = first.source_version_id.unwrap();
     let mut cited = passage("20000 Besuchern");
     cited["source_version_id"] = json!(earlier.as_uuid());
     let id = Uuid::now_v7();
@@ -1483,7 +1483,7 @@ async fn a_redacted_proposal_reads_as_a_tombstone_in_the_review() {
             "UPDATE source_version SET text = NULL, url = NULL, sha256 = NULL, redacted_at = now(),
                  author_actor = jsonb_build_object('kind', author_actor -> 'kind', 'id', author_actor -> 'id')
              WHERE id = '{}'",
-            changeset.source_version_id
+            changeset.source_version_id.unwrap()
         ),
         &format!(
             "UPDATE proposal_evidence SET quote = NULL, redacted_at = now() WHERE proposal_id IN ('{kept}', '{emptied}')"

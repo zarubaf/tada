@@ -6207,7 +6207,6 @@
         "required": [
           "id",
           "author",
-          "source_version_id",
           "created_at",
           "proposals",
           "redacted_proposals"
@@ -6229,9 +6228,12 @@
             "$ref": "#/components/schemas/Author"
           },
           "source_version_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "description": "The source version that holds the text of the intake."
+            "description": "The source version that holds the member's own words of the intake.\nIt is absent if the changeset has no source text: its proposals cite only stored source versions."
           },
           "created_at": {
             "type": "string",
@@ -8166,7 +8168,6 @@
         "description": "A new changeset.",
         "required": [
           "id",
-          "source_version_id",
           "created_at",
           "proposal_ids"
         ],
@@ -8184,9 +8185,12 @@
             "description": "The event of the changeset. It is absent for a changeset of the organization."
           },
           "source_version_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "description": "The source version that holds the text of the intake."
+            "description": "The source version that holds the member's own words of the intake.\nIt is absent if the changeset has no source text: its proposals cite only stored source versions."
           },
           "created_at": {
             "type": "string",

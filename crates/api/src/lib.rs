@@ -1042,7 +1042,7 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: &tada_app::proposals::Changeset,
-            _: &tada_app::domain::sources::SourceText,
+            _: Option<&tada_app::domain::sources::SourceText>,
             _: &tada_app::audit::AuditEvent,
         ) -> Result<tada_app::proposals::Inserted, tada_app::store::StoreError> {
             unreachable!()
@@ -1055,7 +1055,9 @@ mod tests {
         ) -> Result<
             Option<(
                 tada_app::proposals::Changeset,
-                tada_app::domain::redaction::Redactable<tada_app::domain::sources::SourceText>,
+                Option<
+                    tada_app::domain::redaction::Redactable<tada_app::domain::sources::SourceText>,
+                >,
             )>,
             tada_app::store::StoreError,
         > {

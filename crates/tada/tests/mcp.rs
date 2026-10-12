@@ -571,7 +571,7 @@ async fn the_profile_keeps_open_proposals_apart_from_accepted_facts() {
     let evidence = &accepted[0]["evidence"][0];
     assert_eq!(
         evidence["source_version_id"],
-        changeset.source_version_id.as_uuid().to_string()
+        changeset.source_version_id.unwrap().as_uuid().to_string()
     );
     assert_eq!(evidence["quote"], "im Mai 2030");
     assert_eq!(evidence["captured_at"], "2030-05-18T08:00:00Z");
@@ -720,7 +720,7 @@ async fn a_member_reads_the_organization_source_that_the_facts_of_its_event_cite
         .result("search_sources", json!({"query": "Hangarfest"}))
         .await;
     assert!(result["hits"].as_array().unwrap().is_empty(), "{result}");
-    let source = changeset.source_version_id.as_uuid();
+    let source = changeset.source_version_id.unwrap().as_uuid();
     let citation = json!({"source_version_id": source, "start": 14, "end": 24});
     let body = mcp.call("get_source_passage", citation.clone()).await;
     assert_eq!(problem(&body)["code"], "not-found", "{body}");

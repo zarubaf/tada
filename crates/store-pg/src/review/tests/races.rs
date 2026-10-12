@@ -72,7 +72,7 @@ impl ProposalStore for RedactBeforeInsert<'_> {
         &self,
         scope: OrgScope,
         changeset: &Changeset,
-        source: &SourceText,
+        source: Option<&SourceText>,
         audit: &AuditEvent,
     ) -> Result<Inserted, StoreError> {
         redact_now(self.database, &self.owner, self.target).await;
@@ -83,7 +83,7 @@ impl ProposalStore for RedactBeforeInsert<'_> {
         &self,
         scope: OrgScope,
         id: ChangesetId,
-    ) -> Result<Option<(Changeset, Redactable<SourceText>)>, StoreError> {
+    ) -> Result<Option<(Changeset, Option<Redactable<SourceText>>)>, StoreError> {
         ProposalStore::get(self.database, scope, id).await
     }
 }
@@ -141,7 +141,7 @@ async fn a_submission_that_read_a_text_before_its_redaction_is_refused() {
     )
     .await;
     let mut cited = passage("20000 Besuchern");
-    cited["source_version_id"] = json!(first.source_version_id.as_uuid());
+    cited["source_version_id"] = json!(first.source_version_id.unwrap().as_uuid());
     let mut second = proposal(
         Uuid::now_v7(),
         json!({
@@ -163,7 +163,7 @@ async fn a_submission_that_read_a_text_before_its_redaction_is_refused() {
     let racing = RedactBeforeInsert {
         database: &test.database,
         owner: open_day.owner.clone(),
-        target: source_item(item_of(&test, first.source_version_id).await),
+        target: source_item(item_of(&test, first.source_version_id.unwrap()).await),
     };
     let stores = ProposeStores {
         proposals: &racing,
@@ -213,7 +213,7 @@ async fn an_apply_that_read_a_quote_before_its_redaction_writes_a_tombstone() {
     let racing = RedactBeforeApply {
         database: &test.database,
         owner: open_day.owner.clone(),
-        target: source_item(item_of(&test, changeset.source_version_id).await),
+        target: source_item(item_of(&test, changeset.source_version_id.unwrap()).await),
     };
     let stores = ReviewStores {
         review: &racing,

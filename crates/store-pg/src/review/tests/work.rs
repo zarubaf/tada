@@ -146,7 +146,10 @@ async fn applying_a_commitment_writes_its_evidence_with_version_1() {
     let records: Vec<_> = evidence.iter().map(|(record, _)| *record).collect();
     assert_eq!(records, [person, commitment]);
     for (_, passage) in &evidence {
-        assert_eq!(passage.source_version_id, changeset.source_version_id);
+        assert_eq!(
+            passage.source_version_id,
+            changeset.source_version_id.unwrap()
+        );
         assert_eq!(
             passage.record_version,
             tada_app::domain::RecordVersion::FIRST

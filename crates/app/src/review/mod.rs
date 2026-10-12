@@ -929,8 +929,9 @@ async fn changeset_access(
 /// A changeset that the caller reviews at least in part, with its review results and the reviewers of each proposal.
 struct Reviewable {
     changeset: Changeset,
+    /// The source text. It is absent if the changeset has no source version.
     /// A legal redaction removes the text (ADR 0072).
-    source: Redactable<SourceText>,
+    source: Option<Redactable<SourceText>>,
     results: Vec<ReviewRecord>,
     access: EventAccess,
     routes: ChangesetRoutes,

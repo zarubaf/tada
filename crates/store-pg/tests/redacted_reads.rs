@@ -350,7 +350,7 @@ async fn redacted_quotes_facts_and_proposals_read_as_redacted() {
             .await
             .unwrap()
             .unwrap();
-    assert_eq!(source, Redactable::Redacted);
+    assert_eq!(source, Some(Redactable::Redacted));
     assert_eq!(changeset.redacted.len(), 1);
     assert_eq!(changeset.redacted[0].id.as_uuid(), uuid(MOTTO_PROPOSAL));
     assert_eq!(changeset.redacted[0].operation_kind, "set_fact");

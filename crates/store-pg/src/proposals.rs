@@ -651,9 +651,14 @@ impl ProposalStore for Database {
         &self,
         scope: OrgScope,
         changeset: &Changeset,
-        source: &SourceText,
+        source: Option<&SourceText>,
         audit: &AuditEvent,
     ) -> Result<Inserted, StoreError> {
+        let source = match (changeset.source_version_id, source) {
+            (Some(version), Some(text)) => Some((version, text)),
+            (None, None) => None,
+            _ => return Err(InvalidRow("changeset.source_version_id").into()),
+        };
         let mut tx = self.pool.begin().await.map_err(store_error)?;
         // The checks read the cited texts before this transaction. A redaction that committed since then
         // removed them, so the copies of their quotes must not go in (ADR 0072).
@@ -672,21 +677,23 @@ impl ProposalStore for Database {
                     .collect(),
             ));
         }
-        let item = sources::TextItem {
-            kind: sources::TextKind::MemberText,
-            event: changeset.event_id,
-            version: changeset.source_version_id,
-        };
-        sources::insert_text(
-            &mut tx,
-            scope,
-            item,
-            source,
-            &changeset.author,
-            changeset.created_at,
-        )
-        .await
-        .map_err(store_error)?;
+        if let Some((version, text)) = source {
+            let item = sources::TextItem {
+                kind: sources::TextKind::MemberText,
+                event: changeset.event_id,
+                version,
+            };
+            sources::insert_text(
+                &mut tx,
+                scope,
+                item,
+                text,
+                &changeset.author,
+                changeset.created_at,
+            )
+            .await
+            .map_err(store_error)?;
+        }
         match insert_changeset(&mut tx, scope, changeset).await {
             Ok(()) => {}
             Err(sqlx::Error::Database(error))
@@ -705,13 +712,13 @@ impl ProposalStore for Database {
         &self,
         scope: OrgScope,
         id: ChangesetId,
-    ) -> Result<Option<(Changeset, Redactable<SourceText>)>, StoreError> {
+    ) -> Result<Option<(Changeset, Option<Redactable<SourceText>>)>, StoreError> {
         let organization = scope.organization_id().as_uuid();
         let Some(changeset) = sqlx::query!(
             r#"SELECT c.event_id, c.author, c.source_version_id,
-                      c.created_at AS "created_at: jiff_sqlx::Timestamp", v.text
+                      c.created_at AS "created_at: jiff_sqlx::Timestamp", v.id AS "version?", v.text AS "text?"
                FROM changeset c
-               JOIN source_version v ON v.organization_id = c.organization_id AND v.id = c.source_version_id
+               LEFT JOIN source_version v ON v.organization_id = c.organization_id AND v.id = c.source_version_id
                WHERE c.organization_id = $1 AND c.id = $2"#,
             organization,
             id.as_uuid(),
@@ -817,19 +824,27 @@ impl ProposalStore for Database {
                     .ok_or(InvalidRow("proposal.reason"))?,
             });
         }
+        // A source version that the join does not find is an inconsistent store, not a redaction.
+        let source = match (changeset.source_version_id, changeset.version) {
+            (None, _) => None,
+            // The stored text is normalized already; normalizing it again keeps it unchanged.
+            (Some(_), Some(_)) => Some(redacted::content(
+                changeset.text.as_deref().map(SourceText::normalize),
+            )),
+            (Some(_), None) => return Err(InvalidRow("changeset.source_version_id").into()),
+        };
         Ok(Some((
             Changeset {
                 id,
                 event_id: changeset.event_id.map(EventId::from_uuid),
                 author: actor::from_json(&changeset.author)?,
-                source_version_id: SourceVersionId::from_uuid(changeset.source_version_id),
+                source_version_id: changeset.source_version_id.map(SourceVersionId::from_uuid),
                 created_at: changeset.created_at.to_jiff(),
                 proposals,
                 redacted,
                 drafts: draft_provenance,
             },
-            // The stored text is normalized already; normalizing it again keeps it unchanged.
-            redacted::content(changeset.text.as_deref().map(SourceText::normalize)),
+            source,
         )))
     }
 }
@@ -847,7 +862,7 @@ fn cited_sources(changeset: &Changeset) -> Vec<Uuid> {
     let mut ids: Vec<Uuid> = evidence
         .chain(manifests)
         .map(|evidence| evidence.source_version_id)
-        .filter(|id| *id != changeset.source_version_id)
+        .filter(|id| Some(*id) != changeset.source_version_id)
         .map(SourceVersionId::as_uuid)
         .collect();
     ids.sort();
@@ -869,7 +884,7 @@ async fn insert_changeset(
         organization,
         changeset.event_id.map(EventId::as_uuid),
         actor::to_json(&changeset.author),
-        changeset.source_version_id.as_uuid(),
+        changeset.source_version_id.map(SourceVersionId::as_uuid),
         created_at as _,
     )
     .execute(&mut *conn)
@@ -1198,7 +1213,7 @@ mod tests {
              JOIN source_item i ON i.id = v.source_item_id
              WHERE v.id = $1 AND i.event_id = $2",
         )
-        .bind(changeset.source_version_id.as_uuid())
+        .bind(changeset.source_version_id.unwrap().as_uuid())
         .bind(event.as_uuid())
         .fetch_one(&test.database.pool)
         .await
@@ -1261,7 +1276,13 @@ mod tests {
             (ids[2], "im Mai 2030"),
         ]
         .into_iter()
-        .map(|(id, quote)| (id, changeset.source_version_id.as_uuid(), quote.to_owned()))
+        .map(|(id, quote)| {
+            (
+                id,
+                changeset.source_version_id.unwrap().as_uuid(),
+                quote.to_owned(),
+            )
+        })
         .collect();
         assert_eq!(evidence, expected);
         assert_eq!(
@@ -1630,16 +1651,75 @@ mod tests {
             Some(anna.scope()),
         );
         let mut again = first;
-        again.source_version_id = SourceVersionId::from_uuid(Uuid::now_v7());
+        again.source_version_id = Some(SourceVersionId::from_uuid(Uuid::now_v7()));
         let inserted = test
             .database
-            .insert(anna.scope(), &again, &SourceText::normalize(SOURCE), &audit)
+            .insert(
+                anna.scope(),
+                &again,
+                Some(&SourceText::normalize(SOURCE)),
+                &audit,
+            )
             .await
             .unwrap();
         assert_eq!(inserted, Inserted::IdTaken);
         for table in ["changeset", "source_version", "audit_event"] {
             assert_eq!(count(&test, table).await, 1, "{table}");
         }
+    }
+
+    #[tokio::test]
+    async fn a_changeset_without_a_source_text_has_no_source_version() {
+        let test = TestDatabase::start().await;
+        let (_, event, anna) = open_day(&test).await;
+        let (input, _) = intake(event);
+        let first = new(create_changeset(&anna, input, stores(&test), &FixedClock).await);
+
+        // The second changeset proposes the date again and cites the stored text of the first one only.
+        let mut second = first;
+        second.id = ChangesetId::from_uuid(Uuid::now_v7());
+        second.source_version_id = None;
+        second.proposals.retain(|proposal| {
+            proposal.operation.new_record().is_none() && proposal.depends_on.is_empty()
+        });
+        for proposal in &mut second.proposals {
+            proposal.id = ProposalId::from_uuid(Uuid::now_v7());
+        }
+        assert_eq!(second.proposals.len(), 1);
+        let audit = AuditEvent::new(
+            anna.actor(),
+            tada_app::audit::AuditAction::ChangesetCreate,
+            Some(second.id.as_uuid()),
+            Some(anna.scope()),
+        );
+        let inserted = test
+            .database
+            .insert(anna.scope(), &second, None, &audit)
+            .await
+            .unwrap();
+        assert_eq!(inserted, Inserted::Inserted);
+        assert_eq!(count(&test, "changeset").await, 2);
+        assert_eq!(count(&test, "source_version").await, 1);
+
+        let (stored, source) = ProposalStore::get(&test.database, anna.scope(), second.id)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut expected = second.clone();
+        expected.proposals.sort_by_key(|proposal| proposal.id);
+        assert_eq!(stored, expected);
+        assert_eq!(source, None);
+
+        // A source version needs its text, and a text needs its source version.
+        let mut broken = second;
+        broken.id = ChangesetId::from_uuid(Uuid::now_v7());
+        let text = SourceText::normalize(SOURCE);
+        let result = test
+            .database
+            .insert(anna.scope(), &broken, Some(&text), &audit)
+            .await;
+        assert!(matches!(result, Err(StoreError::Internal(_))), "{result:?}");
+        assert_eq!(count(&test, "changeset").await, 2);
     }
 
     #[test]

@@ -55,9 +55,9 @@ fn carla() -> UserId {
 struct Memory {
     role: Mutex<Option<EventRole>>,
     taken: Mutex<Vec<Uuid>>,
-    inserted: Mutex<Vec<(Changeset, SourceText, AuditEvent)>>,
+    inserted: Mutex<Vec<(Changeset, Option<SourceText>, AuditEvent)>>,
     /// The stored changesets, also the ones of a concurrent request.
-    stored: Mutex<Vec<(Changeset, SourceText)>>,
+    stored: Mutex<Vec<(Changeset, Option<SourceText>)>>,
     /// The next insert loses a race: a concurrent request stores this changeset first.
     race: Mutex<Option<Changeset>>,
     /// The fact versions of Testwil, with their events.
@@ -361,12 +361,14 @@ impl ProposalStore for Memory {
         &self,
         scope: OrgScope,
         changeset: &Changeset,
-        source: &SourceText,
+        source: Option<&SourceText>,
         audit: &AuditEvent,
     ) -> Result<Inserted, StoreError> {
         assert_eq!(scope.organization_id(), testwil());
+        assert_eq!(changeset.source_version_id.is_some(), source.is_some());
+        let source = source.cloned();
         if let Some(winner) = self.race.lock().unwrap().take() {
-            self.stored.lock().unwrap().push((winner, source.clone()));
+            self.stored.lock().unwrap().push((winner, source));
             return Ok(Inserted::IdTaken);
         }
         self.inserted
@@ -376,7 +378,7 @@ impl ProposalStore for Memory {
         self.stored
             .lock()
             .unwrap()
-            .push((changeset.clone(), source.clone()));
+            .push((changeset.clone(), source));
         Ok(Inserted::Inserted)
     }
 
@@ -384,8 +386,13 @@ impl ProposalStore for Memory {
         &self,
         scope: OrgScope,
         id: ChangesetId,
-    ) -> Result<Option<(Changeset, tada_domain::redaction::Redactable<SourceText>)>, StoreError>
-    {
+    ) -> Result<
+        Option<(
+            Changeset,
+            Option<tada_domain::redaction::Redactable<SourceText>>,
+        )>,
+        StoreError,
+    > {
         assert_eq!(scope.organization_id(), testwil());
         let stored = self.stored.lock().unwrap();
         Ok(stored
@@ -396,7 +403,9 @@ impl ProposalStore for Memory {
                 changeset.proposals.sort_by_key(|proposal| proposal.id);
                 (
                     changeset,
-                    tada_domain::redaction::Redactable::Present(source.clone()),
+                    source
+                        .clone()
+                        .map(tada_domain::redaction::Redactable::Present),
                 )
             }))
     }
@@ -528,7 +537,7 @@ async fn a_contributor_creates_a_changeset_with_its_source_and_an_audit_event() 
     assert_eq!(changeset.author, anna.actor());
     assert_eq!(changeset.created_at, FixedClock.now());
     assert!(ids::is_record_id(changeset.id.as_uuid()));
-    assert_eq!(source, &SourceText::normalize(SOURCE));
+    assert_eq!(source.as_ref(), Some(&SourceText::normalize(SOURCE)));
     assert_eq!(audit.action(), AuditAction::ChangesetCreate);
     assert_eq!(audit.record_kind(), "changeset");
     assert_eq!(audit.record_id(), Some(changeset.id.as_uuid()));
