@@ -159,8 +159,7 @@ pub(super) struct EvidenceItem {
     quote: String,
     /// True after a legal redaction of the source: the quote is empty (ADR 0072).
     redacted: bool,
-    /// The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Absent if there is none.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Empty if there is none.
     dispute_notes: Vec<DisputeNoteView>,
 }
 
