@@ -23,7 +23,7 @@
           "description": "An exact fact version that a draft cites. get_event_profile gives the current version of the fact.",
           "properties": {
             "dispute_notes": {
-              "description": "The dispute notes about the fact version (ADR 0073), oldest first: a person objects to it. Absent if there is none.",
+              "description": "The dispute notes about the fact version (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
               "items": {
                 "$ref": "#/$defs/DisputeNoteView"
               },
@@ -113,7 +113,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "dispute_notes": {
-          "description": "The dispute notes about the version (ADR 0073), oldest first: a person objects to it. Absent if there is none.",
+          "description": "The dispute notes about the version (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
           "items": {
             "$ref": "#/$defs/DisputeNoteView"
           },
@@ -241,7 +241,7 @@
               "type": "string"
             },
             "dispute_notes": {
-              "description": "The dispute notes about it (ADR 0073), oldest first: a person objects to it. Absent if there is none.",
+              "description": "The dispute notes about it (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
               "items": {
                 "$ref": "#/$defs/DisputeNoteView"
               },
@@ -308,7 +308,7 @@
               "type": "boolean"
             },
             "dispute_notes": {
-              "description": "The dispute notes about it (ADR 0073), oldest first: a person objects to it. Absent if there is none.",
+              "description": "The dispute notes about it (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
               "items": {
                 "$ref": "#/$defs/DisputeNoteView"
               },
@@ -491,7 +491,7 @@
               "description": "The reviewer who accepted the current fact version."
             },
             "dispute_notes": {
-              "description": "The dispute notes about it (ADR 0073), oldest first: a person objects to it. Absent if there is none.",
+              "description": "The dispute notes about it (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
               "items": {
                 "$ref": "#/$defs/DisputeNoteView"
               },
@@ -783,7 +783,7 @@
               "type": "string"
             },
             "statuses": {
-              "description": "The statuses of a record of this kind. It is absent for a kind without a status.",
+              "description": "The statuses of a record of this kind. Empty for a kind without a status.",
               "items": {
                 "type": "string"
               },
@@ -1069,7 +1069,7 @@
           "description": "A passage that supports one version of a record, from a source that the member can read.",
           "properties": {
             "dispute_notes": {
-              "description": "The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Absent if there is none.",
+              "description": "The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
               "items": {
                 "$ref": "#/$defs/DisputeNoteView"
               },
@@ -1281,7 +1281,7 @@
           "description": "A passage that supports one version of a record, from a source that the member can read.",
           "properties": {
             "dispute_notes": {
-              "description": "The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Absent if there is none.",
+              "description": "The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
               "items": {
                 "$ref": "#/$defs/DisputeNoteView"
               },
@@ -3051,7 +3051,7 @@
           "description": "A passage that supports one version of a record, from a source that the member can read.",
           "properties": {
             "dispute_notes": {
-              "description": "The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Absent if there is none.",
+              "description": "The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
               "items": {
                 "$ref": "#/$defs/DisputeNoteView"
               },

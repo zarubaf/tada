@@ -1418,7 +1418,7 @@ async fn an_agent_proposes_a_document_draft_and_reads_it_back() {
     assert_eq!(version["markdown"], markdown);
     assert_eq!(
         version["manifest"],
-        json!({"facts": [{"fact_id": fact, "version": 1}], "sources": []})
+        json!({"facts": [{"fact_id": fact, "version": 1, "dispute_notes": []}], "sources": []})
     );
 
     // A version that the member cannot read is not found, and the agent sees the refusal as a tool result.
@@ -1760,4 +1760,128 @@ async fn propose_a_workstream_and_its_first_action() {
         ))
         .await;
     assert_eq!(created, 0);
+}
+
+/// A strict MCP client rejects a result that the output schema of its tool does not accept.
+#[tokio::test]
+async fn each_tool_result_matches_its_output_schema() {
+    let mcp = Mcp::start().await;
+    let database = &mcp.test.database;
+    // One record of each kind in OPEN30, where Anna is a viewer.
+    let workstream = create_workstream(
+        &mcp.owner,
+        mcp.open_day,
+        NewWorkstream {
+            id: None,
+            name: "Aufbau".to_owned(),
+            lead: mcp.owner.user_id(),
+        },
+        database,
+        database,
+        &*mcp.clock,
+    )
+    .await
+    .unwrap();
+    let ports = WorkPorts {
+        identity: database,
+        work: database,
+        workstreams: database,
+        parties: database,
+        clock: &*mcp.clock,
+    };
+    let action = NewAction {
+        id: None,
+        title: "Zelt bestellen".to_owned(),
+        description: None,
+        owner: mcp.owner.user_id(),
+        workstream: Some(workstream.id),
+        due_date: None,
+    };
+    create_action(&mcp.owner, mcp.open_day, action, ports)
+        .await
+        .unwrap();
+    let institution = Party::Institution(mcp.institution().await);
+    mcp.commitment(mcp.open_day, institution, "Stellt Tische", None)
+        .await;
+    let (date, document, draft_id) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+    let draft = json!({
+        "kind": "create-document-draft",
+        "event_id": mcp.open_day.as_uuid(),
+        "document": {"new": {"id": document, "name": "Konzept Open Day"}},
+        "markdown": "# Konzept\n\nDas Open Day ist im Mai.\n",
+    });
+    let changeset = mcp
+        .propose(
+            Some(mcp.open_day),
+            SOURCE,
+            json!([
+                proposal(
+                    date,
+                    set_fact(mcp.open_day, "date_window", may_2030()),
+                    &[],
+                    SOURCE,
+                    "im Mai 2030"
+                ),
+                proposal(draft_id, draft, &[], SOURCE, "im Mai 2030"),
+            ]),
+        )
+        .await;
+    mcp.apply(&changeset, &[date, draft_id]).await;
+
+    let profile = mcp
+        .result("get_event_profile", json!({"event_key": "OPEN30"}))
+        .await;
+    let evidence = &profile["accepted"][0]["evidence"][0];
+    let documents = mcp
+        .result("list_documents", json!({"event_key": "OPEN30"}))
+        .await;
+    let version_id = documents["documents"][0]["newest_version"]["version_id"].clone();
+    let cases = [
+        ("list_events", json!({})),
+        ("list_members", json!({"event_key": "OPEN30"})),
+        ("get_event_schema", json!({"event_key": "OPEN30"})),
+        ("get_event_profile", json!({"event_key": "OPEN30"})),
+        ("search_sources", json!({"query": "Flugfeld"})),
+        (
+            "get_source_passage",
+            json!({"source_version_id": evidence["source_version_id"], "start": evidence["start"], "end": evidence["end"]}),
+        ),
+        ("list_documents", json!({"event_key": "OPEN30"})),
+        ("get_document_version", json!({"version_id": version_id})),
+        ("list_workstreams", json!({"event_key": "OPEN30"})),
+        ("list_actions", json!({"event_key": "OPEN30"})),
+        ("list_commitments", json!({"event_key": "OPEN30"})),
+        ("search_parties", json!({"q": "gemeinde"})),
+    ];
+
+    let list = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"});
+    let (_, listed) = mcp.rpc(Some(&mcp.token), None, &list).await;
+    let read_only: Vec<&Value> = listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|tool| tool["annotations"]["readOnlyHint"] == true)
+        .collect();
+    let mut called = Vec::new();
+    for (name, arguments) in cases {
+        let tool = read_only
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap_or_else(|| panic!("{name} is not a read-only tool"));
+        let validator = jsonschema::validator_for(&tool["outputSchema"]).unwrap();
+        let result = mcp.result(name, arguments).await;
+        let errors: Vec<String> = validator
+            .iter_errors(&result)
+            .map(|error| error.to_string())
+            .collect();
+        assert!(errors.is_empty(), "{name}: {errors:?}\n{result}");
+        called.push(name);
+    }
+    let mut expected: Vec<&str> = read_only
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    expected.sort_unstable();
+    called.sort_unstable();
+    assert_eq!(called, expected, "a read-only tool has no case");
 }

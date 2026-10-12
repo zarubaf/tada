@@ -121,8 +121,7 @@ pub struct EventMemberList {
 pub struct EntityView {
     pub name: &'static str,
     pub description: &'static str,
-    /// The statuses of a record of this kind. It is absent for a kind without a status.
-    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    /// The statuses of a record of this kind. Empty for a kind without a status.
     pub statuses: &'static [&'static str],
 }
 
@@ -286,8 +285,7 @@ pub struct FactView {
     /// True after a legal redaction: the value is gone (ADR 0072).
     pub redacted: bool,
     pub evidence: Vec<EvidenceView>,
-    /// The dispute notes about it (ADR 0073), oldest first: a person objects to it. Absent if there is none.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// The dispute notes about it (ADR 0073), oldest first: a person objects to it. Empty if there is none.
     pub dispute_notes: Vec<DisputeNoteView>,
     /// The reviewer who accepted the current fact version.
     pub accepted_by: AuthorView,
@@ -303,8 +301,7 @@ pub struct UnknownView {
     pub fact_id: Uuid,
     pub version: i64,
     pub evidence: Vec<EvidenceView>,
-    /// The dispute notes about it (ADR 0073), oldest first: a person objects to it. Absent if there is none.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// The dispute notes about it (ADR 0073), oldest first: a person objects to it. Empty if there is none.
     pub dispute_notes: Vec<DisputeNoteView>,
     /// The reviewer who accepted the current fact version.
     pub accepted_by: AuthorView,
@@ -356,8 +353,7 @@ pub struct EvidenceView {
     /// RFC 3339. The time when tada captured the source version.
     #[schemars(with = "String")]
     pub captured_at: Timestamp,
-    /// The dispute notes about it (ADR 0073), oldest first: a person objects to it. Absent if there is none.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// The dispute notes about it (ADR 0073), oldest first: a person objects to it. Empty if there is none.
     pub dispute_notes: Vec<DisputeNoteView>,
 }
 
@@ -707,8 +703,7 @@ pub struct DraftVersionView {
     /// True after a legal redaction: the Markdown is gone (ADR 0072).
     pub redacted: bool,
     pub manifest: ManifestView,
-    /// The dispute notes about the version (ADR 0073), oldest first: a person objects to it. Absent if there is none.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// The dispute notes about the version (ADR 0073), oldest first: a person objects to it. Empty if there is none.
     pub dispute_notes: Vec<DisputeNoteView>,
 }
 
@@ -735,8 +730,7 @@ pub struct ManifestView {
 pub struct CitedFactView {
     pub fact_id: Uuid,
     pub version: i64,
-    /// The dispute notes about the fact version (ADR 0073), oldest first: a person objects to it. Absent if there is none.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// The dispute notes about the fact version (ADR 0073), oldest first: a person objects to it. Empty if there is none.
     pub dispute_notes: Vec<DisputeNoteView>,
 }
 
