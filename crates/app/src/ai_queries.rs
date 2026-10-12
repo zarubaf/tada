@@ -28,6 +28,7 @@ use crate::documents::{
     self, DocumentCursor, DocumentReads, DocumentStore, DocumentView, ReadDocumentError,
     StoredDraft,
 };
+use crate::event_members::{self, EventMember, EventMemberStore, ListEventMembersError};
 use crate::events::{self, EventCursor, EventStore, ListEventsError};
 use crate::facts::{self, EventProfile, FactStore};
 use crate::identity::IdentityStore;
@@ -44,6 +45,8 @@ use crate::workstreams::{self, Workstream, WorkstreamError, WorkstreamStore};
 #[derive(Debug, Clone)]
 pub struct AiToolStores {
     pub events: Arc<dyn EventStore>,
+    /// The event memberships, for the members of an event.
+    pub members: Arc<dyn EventMemberStore>,
     pub identity: Arc<dyn IdentityStore>,
     pub facts: Arc<dyn FactStore>,
     pub sources: Arc<dyn SourceStore>,
@@ -103,6 +106,15 @@ pub async fn list_events(
     ports: &AiToolPorts,
 ) -> Result<Page<Event, EventCursor>, ListEventsError> {
     events::list_events(caller, after, limit, &*ports.0.events).await
+}
+
+/// `event_members::list_event_members`.
+pub async fn list_event_members(
+    caller: &AiCaller,
+    event: EventId,
+    ports: &AiToolPorts,
+) -> Result<Vec<EventMember>, ListEventMembersError> {
+    event_members::list_event_members(caller, event, &*ports.0.identity, &*ports.0.members).await
 }
 
 /// `events::find_event`.

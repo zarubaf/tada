@@ -63,6 +63,7 @@ impl App {
             public_url: support::public_url(),
             ports: AiToolPorts::new(AiToolStores {
                 events: database.clone(),
+                members: database.clone(),
                 identity: database.clone(),
                 facts: database.clone(),
                 sources: database.clone(),

@@ -1,7 +1,8 @@
 use super::*;
 
-const READ_TOOLS: [&str; 11] = [
+const READ_TOOLS: [&str; 12] = [
     "list_events",
+    "list_members",
     "get_event_schema",
     "get_event_profile",
     "search_sources",

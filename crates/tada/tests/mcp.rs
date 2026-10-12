@@ -151,6 +151,7 @@ impl Mcp {
             public_url: support::public_url(),
             ports: AiToolPorts::new(AiToolStores {
                 events: database.clone(),
+                members: database.clone(),
                 identity: database.clone(),
                 facts: database.clone(),
                 sources: database.clone(),
@@ -424,9 +425,10 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 12, "{names:?}");
+    assert_eq!(names.len(), 13, "{names:?}");
     for name in [
         "list_events",
+        "list_members",
         "get_event_schema",
         "get_event_profile",
         "search_sources",
@@ -479,6 +481,51 @@ async fn list_events_shows_only_the_events_of_the_member_in_its_organization() {
         .collect();
     assert_eq!(keys, ["OPEN30"]);
     assert_eq!(result["more"], false);
+}
+
+#[tokio::test]
+async fn list_events_names_the_user_id_of_the_member() {
+    let mcp = Mcp::start().await;
+    let result = mcp.result("list_events", json!({})).await;
+    assert_eq!(result["caller_user_id"], json!(mcp.anna.as_uuid()));
+}
+
+#[tokio::test]
+async fn list_members_shows_user_ids_names_and_roles_without_email() {
+    let mcp = Mcp::start().await;
+    let database = &mcp.test.database;
+    add_event_member(
+        &mcp.owner,
+        mcp.open_day,
+        mcp.owner.user_id(),
+        EventRole::EventManager,
+        database,
+        database,
+        &*mcp.clock,
+    )
+    .await
+    .unwrap();
+
+    let result = mcp
+        .result("list_members", json!({"event_key": "OPEN30"}))
+        .await;
+    assert_eq!(
+        result,
+        json!({"members": [
+            {"user_id": mcp.anna.as_uuid(), "display_name": "Anna", "event_role": "event-viewer"},
+            {"user_id": mcp.owner.user_id().as_uuid(), "display_name": "Olga", "event_role": "event-manager"},
+        ]})
+    );
+    assert!(!result.to_string().contains("@example.org"));
+}
+
+#[tokio::test]
+async fn list_members_does_not_find_an_event_without_a_role_or_of_another_organization() {
+    let mcp = Mcp::start().await;
+    for key in ["SECRET30", "FLY31", "NONE30"] {
+        let body = mcp.call("list_members", json!({"event_key": key})).await;
+        assert_eq!(problem(&body)["code"], "not-found", "{key}: {body}");
+    }
 }
 
 #[tokio::test]
@@ -770,7 +817,7 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
     let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &list).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     let tools = body["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 12);
+    assert_eq!(tools.len(), 13);
     for tool in tools {
         assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
         assert_eq!(tool["outputSchema"]["type"], "object", "{tool}");

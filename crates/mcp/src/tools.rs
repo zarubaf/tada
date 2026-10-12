@@ -26,6 +26,7 @@ const INSTRUCTIONS: &str = "tada holds the planning data of the events of a club
 Accepted facts are confirmed; assumptions are not confirmed; unknowns have no value. \
 Rules: use the existing fields of get_event_schema first. Never fill in an unknown value and never present an assumption or an open proposal as accepted. \
 Cite each statement with the source_version_id and the passage (start, end) that supports it; get_source_passage gives the exact quote. \
+An owner is a user ID: list_members gives the members of an event, and list_events gives the user ID of the member who uses the tool (caller_user_id). \
 Before you propose a new person or institution, search for it with search_parties and use the existing one. \
 For a conditional promise, propose create-commitment with a condition; never treat a condition as met without evidence. \
 Propose changes with propose_changeset; the member reviews them in tada, and no tool accepts, rejects or deletes. \

@@ -31,6 +31,7 @@ use tada_app::problem::{FieldError, ProblemCode};
 pub fn standard_catalog() -> ToolCatalog<AiToolPorts> {
     ToolCatalog::new(vec![
         Arc::new(Typed(events::ListEvents)),
+        Arc::new(Typed(events::ListMembers)),
         Arc::new(Typed(events::GetEventSchema)),
         Arc::new(Typed(events::GetEventProfile)),
         Arc::new(Typed(events::SearchSources)),
