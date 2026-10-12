@@ -73,6 +73,18 @@ for (const viewport of viewports) {
   }
 }
 
+test("a member opens an event from its row", async ({ page }) => {
+  await fakeSession(page);
+  await fakeEvents(page, 200, { items: events });
+  await page.goto("/events");
+  const [first] = events;
+  if (!first) {
+    throw new Error("no fixture event");
+  }
+  await page.getByRole("table").getByRole("link", { name: first.name }).click();
+  await expect(page).toHaveURL(new RegExp(`/events/${first.id}$`));
+});
+
 test("the e2e build has the gallery route", async ({ page }) => {
   await page.goto("/_gallery");
   await expect(page.getByRole("heading", { name: "Komponenten" })).toBeVisible();
