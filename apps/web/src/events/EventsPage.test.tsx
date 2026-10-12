@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { createApi, type Event, type Problem } from "../api/client";
+import { type Api, createApi, type Event, type Problem } from "../api/client";
 import { Router } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 import { EventsPage } from "./EventsPage";
@@ -38,12 +38,21 @@ function fakeApi(...responses: Response[]) {
   return { api: createApi(fetch as unknown as typeof globalThis.fetch), urls };
 }
 
+/** The names in the table are links, so the page needs the router. */
+function renderPage(api: Api) {
+  return render(
+    <Router>
+      <EventsPage api={api} />
+    </Router>,
+  );
+}
+
 describe("EventsPage", () => {
   it("lists the events in a table", async () => {
     const { api } = fakeApi(
       json(200, { items: [event("TEST30", "Tag der offenen Tür Testwil-Ämmerlibüel")] }),
     );
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     const table = await screen.findByRole("table", { name: "Anlässe" });
     expect(within(table).getByText("TEST30")).toBeInTheDocument();
@@ -51,9 +60,17 @@ describe("EventsPage", () => {
     expect(within(table).getByRole("columnheader", { name: "Kürzel" })).toBeInTheDocument();
   });
 
+  it("links the name of each event to its page", async () => {
+    const { api } = fakeApi(json(200, { items: [event("TEST30", "Fly-in 2030")] }));
+    renderPage(api);
+
+    const link = await screen.findByRole("link", { name: "Fly-in 2030" });
+    expect(link).toHaveAttribute("href", `/events/${event("TEST30", "").id}`);
+  });
+
   it("shows the empty state without events", async () => {
     const { api } = fakeApi(json(200, { items: [] }));
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     expect(await screen.findByText("Noch keine Anlässe erfasst")).toBeInTheDocument();
   });
@@ -72,7 +89,7 @@ describe("EventsPage", () => {
       json(503, problem, "application/problem+json"),
       json(200, { items: [event("FLY28", "Fly-in 2028")] }),
     );
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Der Dienst ist im Moment nicht erreichbar.");
@@ -95,7 +112,7 @@ describe("EventsPage", () => {
       unavailable(),
       json(200, { items: [event("FLY28", "Fly-in 2028")] }),
     );
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     await userEvent.click(await screen.findByRole("button", { name: "Erneut versuchen" }));
     await vi.waitFor(() => expect(screen.getByRole("alert")).toHaveFocus());
@@ -115,7 +132,7 @@ describe("EventsPage", () => {
       ),
       json(200, { items: [event("BB", "Zweiter Anlass")] }),
     );
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     const more = await screen.findByRole("button", { name: "Weitere Anlässe laden" });
     await userEvent.click(more);
@@ -137,7 +154,7 @@ describe("EventsPage", () => {
         "application/problem+json",
       ),
     );
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Die Anfrage ist ungültig.");
   });
@@ -147,7 +164,7 @@ describe("EventsPage", () => {
       json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "QUEgMDE" }),
       json(200, { items: [event("BB", "Zweiter Anlass")] }),
     );
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
     expect(await screen.findByText("BB")).toBeInTheDocument();
@@ -161,7 +178,7 @@ describe("EventsPage", () => {
       json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "c1" }),
       json(200, { items: [event("BB", "Zweiter Anlass")], next_cursor: "c2" }),
     );
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
 
@@ -175,7 +192,7 @@ describe("EventsPage", () => {
       json(200, { items: [event("AA", "Erster Anlass")], next_cursor: "c1" }),
       json(200, { items: [event("BB", "Zweiter Anlass")] }),
     );
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
 
@@ -221,7 +238,7 @@ describe("EventsPage toolbar", () => {
     const { api } = fakeApi(
       json(200, { items: [{ ...event("TEST31", "Fly-in 2031"), redacted: true }] }),
     );
-    render(<EventsPage api={api} />);
+    renderPage(api);
 
     const table = await screen.findByRole("table", { name: "Anlässe" });
     expect(within(table).getByText("TEST31")).toBeInTheDocument();

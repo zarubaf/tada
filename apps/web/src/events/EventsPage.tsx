@@ -11,6 +11,7 @@ import { LinkButton } from "../ui/LinkButton";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
+import { StandaloneLink } from "../ui/StandaloneLink";
 import styles from "./EventsPage.module.css";
 
 const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" });
@@ -18,7 +19,15 @@ const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", tim
 const columns: Column<Event>[] = [
   { id: "key", header: t("events-column-key"), cell: (event) => event.key, mono: true },
   // A redacted event keeps its name (ADR 0072).
-  { id: "name", header: t("events-column-name"), cell: (event) => event.name },
+  {
+    id: "name",
+    header: t("events-column-name"),
+    cell: (event) => (
+      <StandaloneLink inRow to={`/events/${encodeURIComponent(event.id)}`}>
+        {event.name}
+      </StandaloneLink>
+    ),
+  },
   { id: "time-zone", header: t("events-column-time-zone"), cell: (event) => event.time_zone },
   {
     id: "created",
