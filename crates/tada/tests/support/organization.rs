@@ -52,6 +52,7 @@ pub fn router(test: &TestDatabase, garage: &TestGarage) -> Router {
         public_url: super::public_url(),
         ports: AiToolPorts::new(AiToolStores {
             events: database.clone(),
+            members: database.clone(),
             identity: database.clone(),
             facts: database.clone(),
             sources: database.clone(),

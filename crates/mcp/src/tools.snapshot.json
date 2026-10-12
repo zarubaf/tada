@@ -1501,7 +1501,7 @@
   },
   {
     "name": "list_events",
-    "description": "List the events that the member can read, in the order of their keys. The other tools take the key. The list holds at most 200 events and has no next page. If more is true, the member can read more events than this tool can show: tell the member.",
+    "description": "List the events that the member can read, in the order of their keys. The other tools take the key. The result also holds caller_user_id, the user ID of the member: use it as owner to assign work to the member. The list holds at most 200 events and has no next page. If more is true, the member can read more events than this tool can show: tell the member.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -1538,6 +1538,11 @@
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "caller_user_id": {
+          "description": "The user ID of the member who uses the tool. Use it as `owner` to assign work to this member;\n`list_members` gives the user IDs of the other members of an event.",
+          "format": "uuid",
+          "type": "string"
+        },
         "events": {
           "items": {
             "$ref": "#/$defs/EventView"
@@ -1550,8 +1555,71 @@
         }
       },
       "required": [
+        "caller_user_id",
         "events",
         "more"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true
+    }
+  },
+  {
+    "name": "list_members",
+    "description": "List the members of an event with their user ID, display name and event role, in the order of the names. Use the user ID as owner of an open question, an action or a commitment: an owner has the event role event-manager or event-contributor. The user ID of the member who uses the tool is caller_user_id of list_events.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "event_key": {
+          "description": "The key of the event, for example `FLY28`, from `list_events`.",
+          "pattern": "^[A-Z0-9]{2,8}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_key"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "EventMemberView": {
+          "description": "A member of an event: what each reader of the event also sees in the web client.\nIt has no email address.",
+          "properties": {
+            "display_name": {
+              "type": "string"
+            },
+            "event_role": {
+              "description": "`event-manager`, `event-contributor` or `event-viewer`. An owner needs one of the first two.",
+              "type": "string"
+            },
+            "user_id": {
+              "description": "The user ID. Use it as `owner` of a question, action or commitment.",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "user_id",
+            "display_name",
+            "event_role"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "members": {
+          "items": {
+            "$ref": "#/$defs/EventMemberView"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "members"
       ],
       "type": "object"
     },

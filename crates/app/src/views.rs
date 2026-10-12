@@ -19,6 +19,7 @@ use uuid::Uuid;
 use crate::caller::Actor;
 use crate::dispute_notes::{DisputeNotes, NoteKey};
 use crate::documents::{DocumentView, StoredDraft, VersionContent, VersionView};
+use crate::event_members::EventMember;
 use crate::facts::{
     DatedEvidence, EventProfile, OpenProposalRef, OpenQuestionRef, ProfileEntry, value_schema,
 };
@@ -80,9 +81,39 @@ impl From<&Event> for EventView {
 /// The events that the caller can read, in the order of their keys.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct EventList {
+    /// The user ID of the member who uses the tool. Use it as `owner` to assign work to this member;
+    /// `list_members` gives the user IDs of the other members of an event.
+    pub caller_user_id: Uuid,
     pub events: Vec<EventView>,
     /// True if the caller can read more events than the list shows.
     pub more: bool,
+}
+
+/// A member of an event: what each reader of the event also sees in the web client.
+/// It has no email address.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct EventMemberView {
+    /// The user ID. Use it as `owner` of a question, action or commitment.
+    pub user_id: Uuid,
+    pub display_name: String,
+    /// `event-manager`, `event-contributor` or `event-viewer`. An owner needs one of the first two.
+    pub event_role: String,
+}
+
+impl From<&EventMember> for EventMemberView {
+    fn from(member: &EventMember) -> Self {
+        Self {
+            user_id: member.user_id.as_uuid(),
+            display_name: member.display_name.as_str().to_owned(),
+            event_role: member.event_role.as_str().to_owned(),
+        }
+    }
+}
+
+/// The members of an event, in the order of their display names.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct EventMemberList {
+    pub members: Vec<EventMemberView>,
 }
 
 /// A kind of record of tada, for the schema of an event.

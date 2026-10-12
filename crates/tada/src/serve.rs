@@ -91,6 +91,7 @@ pub async fn run(
         public_url,
         ports: AiToolPorts::new(AiToolStores {
             events: Arc::new(db.clone()),
+            members: Arc::new(db.clone()),
             identity: Arc::new(db.clone()),
             facts: Arc::new(db.clone()),
             sources: Arc::new(db.clone()),

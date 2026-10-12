@@ -1363,6 +1363,16 @@ fn tool_attempts(t: &Targets) -> Vec<(&'static str, Value, ToolExpect)> {
             ToolExpect::Refused,
         ),
         (
+            "list_members",
+            json!({"event_key": "OPEN30"}),
+            ToolExpect::Answers,
+        ),
+        (
+            "list_members",
+            json!({"event_key": "ONLYB31"}),
+            ToolExpect::Refused,
+        ),
+        (
             "list_workstreams",
             json!({"event_key": "OPEN30"}),
             ToolExpect::Answers,
