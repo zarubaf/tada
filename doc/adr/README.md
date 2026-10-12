@@ -55,7 +55,7 @@ The ADRs are the authority for the decisions in this project.
 | [0037](0037-error-model.md)                                     | Error model                                              | Accepted, amended by 0066          |
 | [0038](0038-ids-and-time.md)                                    | IDs and time                                             | Accepted                           |
 | [0039](0039-actors-and-identities.md)                           | Callers, actors and service identities                   | Accepted, amended by 0070          |
-| [0040](0040-ai-intake-through-mcp.md)                           | AI intake through MCP first                              | Accepted                           |
+| [0040](0040-ai-intake-through-mcp.md)                           | AI intake through MCP first                              | Accepted, amended by 0079          |
 | [0041](0041-ci-build-and-dependencies.md)                       | CI build and dependency policy                           | Accepted                           |
 | [0042](0042-transactional-email.md)                             | Transactional email                                      | Accepted                           |
 | [0043](0043-upload-policy.md)                                   | Upload policy                                            | Accepted                           |
@@ -94,6 +94,7 @@ The ADRs are the authority for the decisions in this project.
 | [0076](0076-schedules-and-reminders.md)                         | Schedules and reminders                                  | Accepted                           |
 | [0077](0077-agent-runner.md)                                    | Agent runner in Rust                                     | Accepted                           |
 | [0078](0078-opaque-build-id-in-the-web-client.md)               | Opaque build ID in the web client                        | Accepted                           |
+| [0079](0079-changesets-without-member-words.md)                 | Changesets without member words                          | Accepted                           |
 
 ## New ADR
 
