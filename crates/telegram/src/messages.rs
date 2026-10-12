@@ -67,6 +67,7 @@ mod tests {
         let messages = Messages::new();
         for id in [
             "telegram-help",
+            "telegram-linked-help",
             "telegram-link-claimed",
             "telegram-link-accepted",
             "telegram-link-nothing-to-accept",
