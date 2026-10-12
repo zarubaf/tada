@@ -11,11 +11,11 @@ The Git history keeps the done slices.
 
 Goal: workstream leads own their work directly, and the AI PM follows up without the PM.
 
-Slice 2 splits into the sub-slices 2a to 2f.
-The open sub-slices are 2d to 2f.
+Slice 2 splits into the sub-slices 2a to 2g.
+The open sub-slices are 2d to 2g.
 Each sub-slice has its own design, plan, reviews and merge.
 The owner wants tada usable for a first real club event as soon as possible.
-So 2d comes first, then the first real event, then 2e and 2f.
+So 2d comes first, then the first real event, then 2e, 2f and 2g.
 
 tada runs with invented data and public facts only until the external review of the sign-in is done ([Sign-in before real data](#sign-in-before-real-data)).
 The review of the authentication code is closed.
@@ -23,23 +23,17 @@ The review of the authentication code is closed.
 The person features of [ADR 0045](adr/0045-data-protection.md) are closed.
 The export of one person, the correction with dispute notes, the legal redaction with its journal, the retention jobs, the housekeeping and the orphan sweep deliver them.
 
-### Slice 2d: Further records and views
+### Slice 2d: Milestones, decisions, risks and requirements
 
-Scope: decisions, risks, requirements, milestones, participations, templates, the portfolio view and resource views.
+Scope: milestones, decisions, risks and requirements ([ADR 0080](adr/0080-milestones-decisions-risks-and-requirements.md)), the start date and the milestone of an action, the timeline of an event, and the proposal of a new workstream (`create-workstream`).
 The evidence of a proposal gets the capture time of its source version, as the design asks ([components](design/components.md)).
 The Review Inbox shows the time of the changeset until then.
 
-Planning views keep the record types fixed and make fields and views configurable:
-
-- The record types and their states stay fixed, because the review routing, the reminders and the retention depend on them.
-- An event manager adds custom fields to actions and commitments in the web client. They use the field definitions of [ADR 0049](adr/0049-entities-and-fact-model.md).
-- An event manager saves views of an event: a table, a board and a timeline. A view keeps its filter, grouping and sort order.
-- An action gets an optional start date.
-  The timeline shows actions as bars, grouped by workstream, with the milestones and the date of the event.
-- The resource view shows the open actions of each member for each week.
+- An action gets an optional start date and at most one milestone.
+- The timeline is one fixed, read-only page for each event.
+  It shows actions as bars, grouped by workstream, with the milestones and the event window.
+- MCP clients propose all four kinds and a new workstream.
 - Not in scope: dependencies between actions, a critical path, automatic rescheduling and time tracking.
-
-A new ADR records the views and the custom fields of work records before the work starts.
 
 Acceptance:
 
@@ -62,6 +56,19 @@ Acceptance:
 
 - (2) Duplicate notifications produce one source version and do not duplicate accepted commitments.
 - (6) Disconnected or delayed sync is visible and cannot produce a falsely reassuring brief.
+
+### Slice 2g: Views and the portfolio
+
+Scope: saved views, custom fields of work records, the portfolio view, the resource view, participations and templates.
+
+Planning views keep the record types fixed and make fields and views configurable:
+
+- The record types and their states stay fixed, because the review routing, the reminders and the retention depend on them.
+- An event manager adds custom fields to work records in the web client. They use the field definitions of [ADR 0049](adr/0049-entities-and-fact-model.md).
+- An event manager saves views of an event: a table, a board and a timeline. A view keeps its filter, grouping and sort order.
+- The resource view shows the open actions of each member for each week.
+
+A new ADR records the views and the custom fields of work records before the work starts.
 
 ### Follow-ups of Slice 2c
 
