@@ -65,10 +65,13 @@ Sidebar, from top to bottom:
 2. Search and command menu (`Ctrl+K` or `⌘K`).
 3. „Portfolio“, „Meine Arbeit“ and „Eingang“.
 4. „Anlässe“: the events of the member, with the current event expanded:
-   „Übersicht“, „Aufgaben“, „Register“, „Dokumente“ and „Personen“.
+   „Übersicht“, „Aufgaben“, „Zeitplan“, „Register“, „Dokumente“, „Mitglieder“ and „Arbeitsbereiche“.
 5. At the bottom: „Einstellungen“, „Datenschutz“, the build of the web client and the member menu.
    The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
    On narrow layouts, the member menu has the build.
+
+The sub-navigation of an event has a second row below „Register“: „Zusagen“, „Meilensteine“, „Entscheide“, „Risiken“ and „Anforderungen“.
+Each tab has its own URL: `/events/:id/commitments`, `/milestones`, `/decisions`, `/risks` and `/requirements`.
 
 Rules:
 
@@ -81,17 +84,40 @@ Rules:
 Each screen uses one of these templates. A new template needs a change to this document.
 Each template uses the `Page` component for the `main` element, the page gutters and the `h1` style.
 
-| Template         | Structure                                                                                                   | Used by                                              |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| List with detail | A list on the left, the selected item on the right (wide); the list, then the item as its own page (narrow) | „Eingang“, „Meine Arbeit“                            |
-| Register         | A toolbar with filters and actions, then a table                                                            | Risks, requirements, decisions, commitments, actions |
-| Overview         | A header with the key facts, then sections in one column                                                    | Event overview                                       |
-| Portfolio        | A filter bar, then a table of events with readiness columns                                                 | Portfolio                                            |
-| Form             | One column, at most 40rem wide, the actions at the bottom                                                   | Create and edit pages                                |
-| Public page      | No shell. The app name, one heading and a form column of at most 40rem                                      | Sign-in, magic link, invitation, organization choice |
-| Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings             |
-| Event page       | The event header with the key and the name, the sub-navigation of the event, then the sub-page              | „Übersicht“, „Mitglieder“, „Aufgaben“ of an event    |
-| Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                          |
+| Template         | Structure                                                                                                   | Used by                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| List with detail | A list on the left, the selected item on the right (wide); the list, then the item as its own page (narrow) | „Eingang“, „Meine Arbeit“                                        |
+| Register         | A toolbar with filters and actions, then a table                                                            | Milestones, risks, requirements, decisions, commitments, actions |
+| Overview         | A header with the key facts, then sections in one column                                                    | Event overview                                                   |
+| Portfolio        | A filter bar, then a table of events with readiness columns                                                 | Portfolio                                                        |
+| Form             | One column, at most 40rem wide, the actions at the bottom                                                   | Create and edit pages                                            |
+| Public page      | No shell. The app name, one heading and a form column of at most 40rem                                      | Sign-in, magic link, invitation, organization choice             |
+| Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings                         |
+| Event page       | The event header with the key and the name, the sub-navigation of the event, then the sub-page              | „Übersicht“, „Mitglieder“, „Aufgaben“ of an event                |
+| Timeline         | The event header, a filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)           | „Zeitplan“ of an event                                           |
+| Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                                      |
+
+### Timeline
+
+The „Zeitplan“ page shows the plan of one event.
+It is read-only. It has no drag.
+
+- One lane for each workstream, and one lane „ohne Arbeitsbereich“.
+- An action with a start date and a due date is a bar.
+  An action with only a due date is a point.
+  Actions without a due date appear as a count with a link to the action register.
+- A milestone is a marker with a vertical line across all lanes.
+- The event window is a band behind the lanes.
+  The window comes from the core facts `exact_dates` or `date_window` (ADR 0081).
+  If the window is unknown, the page shows no band.
+- A line marks today („heute“).
+- The axis shows weeks.
+  It runs from the earliest date to the later of the end of the event window and the last due date.
+  A long span scrolls inside the timeline. The page itself never scrolls horizontally.
+- Filters: owner and status. Each bar and point links to its action.
+- Bars, points and markers do not rely on color alone. Each has a label, and the status shows as text in the list.
+- Narrow layouts and screen readers get a list of the same items, grouped by week.
+- An event with no dated actions shows the empty state of the page, not an empty axis.
 
 ## Widths
 
