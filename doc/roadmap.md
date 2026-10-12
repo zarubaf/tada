@@ -15,7 +15,7 @@ Slice 2 splits into the sub-slices 2a to 2f.
 The open sub-slices are 2d to 2f.
 Each sub-slice has its own design, plan, reviews and merge.
 The owner wants tada usable for a first real club event as soon as possible.
-So 2f comes first, then the first real event, then 2d and 2e.
+So 2d comes first, then the first real event, then 2e and 2f.
 
 tada runs with invented data and public facts only until the external review of the sign-in is done ([Sign-in before real data](#sign-in-before-real-data)).
 The review of the authentication code is closed.
@@ -23,7 +23,7 @@ The review of the authentication code is closed.
 The person features of [ADR 0045](adr/0045-data-protection.md) are closed.
 The export of one person, the correction with dispute notes, the legal redaction with its journal, the retention jobs, the housekeeping and the orphan sweep deliver them.
 
-### Slice 2f: Further records and views
+### Slice 2d: Further records and views
 
 Scope: decisions, risks, requirements, milestones, participations, templates, the portfolio view and resource views.
 The evidence of a proposal gets the capture time of its source version, as the design asks ([components](design/components.md)).
@@ -43,9 +43,9 @@ A new ADR records the views and the custom fields of work records before the wor
 
 Acceptance:
 
-- (12) A simple club event can be organized without purchasing a separate task-management tool. Sub-slice 2f completes this criterion.
+- (12) A simple club event can be organized without purchasing a separate task-management tool. Sub-slice 2d completes this criterion.
 
-### Slice 2d: AI intake
+### Slice 2e: AI intake
 
 Scope: AI intake inside tada (web and Telegram), the usage totals of each event and the AI cap per event.
 The intake uses the model adapter, the agent runner and the AI cap of the organization that Slice 2c delivered ([ADR 0047](adr/0047-model-adapter.md), [ADR 0077](adr/0077-agent-runner.md)).
@@ -54,7 +54,7 @@ Acceptance:
 
 - (11) An AI cap leaves manual planning usable and provides per-event usage totals.
 
-### Slice 2e: Inbound email
+### Slice 2f: Inbound email
 
 Scope: inbound email with the modular adapters and the webhook of [ADR 0057](adr/0057-modular-mail-and-inbound-webhook.md), deduplication and the health of the sync.
 
@@ -99,7 +99,7 @@ Acceptance:
 ## Sign-in before real data
 
 An external review of the whole sign-in ([#46](https://github.com/zarubaf/tada/issues/46)) comes before the first real data.
-It runs at the same time as Slice 2f.
+It runs at the same time as Slice 2d.
 
 These items come later:
 
