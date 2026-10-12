@@ -1,6 +1,6 @@
 # 0058. Markdown parser and renderer for drafts
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-07
 
 ## Context

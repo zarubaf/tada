@@ -1,6 +1,6 @@
 # 0064. One proposal input for HTTP and MCP
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-09
 
 ## Context

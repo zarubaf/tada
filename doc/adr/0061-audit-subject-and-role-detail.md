@@ -1,6 +1,6 @@
 # 0061. Audit subject and role detail
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-07
 
 ## Context
