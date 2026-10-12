@@ -1055,6 +1055,79 @@ async fn a_changeset_through_mcp_waits_in_the_review_inbox_with_the_ai_as_author
     logs::assert_clean(&[&token, "Flugfeld", "Hangar 3", "im Mai 2030"]);
 }
 
+/// An agent proposes from a stored text without new words of the member (ADR 0079).
+#[tokio::test]
+async fn a_changeset_without_member_words_cites_only_stored_sources() {
+    let mcp = Mcp::start().await;
+    let (_, token) = mcp.contributor_token().await;
+    mcp.add_text(&mcp.owner, mcp.secret, "Der Ort ist der Hangar 3.")
+        .await;
+    let hits = mcp
+        .result(
+            "search_sources",
+            json!({"event_key": "SECRET30", "query": "Hangar"}),
+        )
+        .await;
+    let text = hits["hits"][0]["source_version_id"].clone();
+    let venue = |evidence: Value| {
+        json!({
+            "id": Uuid::now_v7(),
+            "operation": set_fact(mcp.secret, "venue", json!({"type": "text", "text": "Hangar 3"})),
+            "evidence": [evidence],
+            "reason": "The text of the event names the place.",
+        })
+    };
+
+    // A passage without a source version has nothing to point into.
+    let arguments = json!({
+        "event_id": mcp.secret.as_uuid(),
+        "proposals": [venue(json!({"start": 16, "end": 24, "quote": "Hangar 3"}))],
+    });
+    let body = mcp.propose_with(&token, arguments).await;
+    let data = &problem(&body);
+    assert_eq!(data["code"], "validation-failed", "{body}");
+    assert_eq!(
+        data["errors"],
+        json!([{"pointer": "/proposals/0/evidence/0", "code": "no-source-text"}]),
+        "{body}"
+    );
+
+    let versions: i64 = mcp.test.scalar("SELECT count(*) FROM source_version").await;
+    let arguments = json!({
+        "event_id": mcp.secret.as_uuid(),
+        "proposals": [venue(json!({"source_version_id": text, "start": 16, "end": 24, "quote": "Hangar 3"}))],
+    });
+    let body = mcp.propose_with(&token, arguments).await;
+    assert_eq!(body["result"]["isError"], false, "{body}");
+    let changeset_id = body["result"]["structuredContent"]["changeset_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    // tada stores no text in the name of the member.
+    let after: i64 = mcp.test.scalar("SELECT count(*) FROM source_version").await;
+    assert_eq!(after, versions);
+
+    // The reviewer sees the changeset without a source version, and the evidence of the stored text.
+    let cookie = mcp
+        .test
+        .sign_in(mcp.owner.user_id(), Some(mcp.testwil), mcp.clock.now())
+        .await;
+    let request = support::request(Method::GET, &format!("/api/v1/changesets/{changeset_id}"))
+        .header(
+            header::COOKIE,
+            format!("{}={cookie}", support::SESSION_COOKIE),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let web = support::session_router(&mcp.test, mcp.clock.clone());
+    let (status, changeset) = send(&web, request).await;
+    assert_eq!(status, StatusCode::OK, "{changeset}");
+    assert!(changeset.get("source_version_id").is_none(), "{changeset}");
+    let evidence = &changeset["proposals"][0]["evidence"][0];
+    assert_eq!(evidence["source_version_id"], text, "{changeset}");
+    assert_eq!(evidence["excerpt"]["quote"], "Hangar 3", "{changeset}");
+}
+
 /// One request ID connects an MCP call with its audit records, its answer and its log lines (ADR 0035, ADR 0039).
 #[tokio::test]
 async fn the_records_and_the_refusals_of_an_mcp_call_name_its_request() {

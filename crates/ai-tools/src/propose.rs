@@ -34,6 +34,7 @@ impl TypedTool for ProposeChangeset {
         "Propose changes for the member to review. Nothing changes until a reviewer accepts a proposal in the Review Inbox of tada; no tool accepts, rejects or deletes. \
 Only a `propose` token of a member who can propose in the event can propose. \
 One changeset holds one intake: source_text is the member's own words of this intake, and the proposals are the changes that these words support. \
+If the member said nothing new and the proposals rest only on stored sources, leave source_text out: never write words in the member's name. Each passage then names its source_version_id, and the reason of each proposal holds your explanation. \
 event_id comes from list_events; leave it out only for a changeset that creates new events. \
 The input schema names the kinds of operations and the rules of each field, for example the links of a document draft. \
 Use an existing field of get_event_schema first. Never guess a value: propose an unknown instead. \

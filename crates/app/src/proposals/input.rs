@@ -49,6 +49,10 @@ pub struct NewChangeset {
     /// The member's own words. tada stores them as a source version.
     /// The passages count characters (Unicode scalar values) of this text after normalization: Unicode NFC with `\n` line ends.
     /// At most 100,000 characters after the normalization.
+    /// Leave it out, or send it empty, if the member said nothing new and the proposals rest only on stored
+    /// source versions (ADR 0079). Never write words in the name of the member. Each passage then names its
+    /// `source_version_id`. A text of white space only counts as empty.
+    #[serde(default)]
     pub source_text: String,
     #[schemars(length(max = MAX_PROPOSALS))]
     pub proposals: Vec<NewProposal>,
@@ -65,11 +69,11 @@ pub struct NewProposal {
     /// for example the new field definition of a fact.
     #[serde(default)]
     pub depends_on: Vec<Uuid>,
-    /// The passages of the source text that support the proposal. Each proposal has at least one.
+    /// The passages of the source text or of stored source versions that support the proposal. Each proposal has at least one.
     #[serde(default)]
     #[schemars(length(max = MAX_PASSAGES))]
     pub evidence: Vec<PassageInput>,
-    /// A short reason for the proposal.
+    /// A short reason for the proposal. The words of the agent go here, never into `source_text`.
     pub reason: String,
 }
 
@@ -80,6 +84,7 @@ pub struct PassageInput {
     /// The source version of the passage. Leave it out for the source text of the changeset.
     /// Another source version must be readable in the event of the proposal and have a text,
     /// for example a text file that a member uploaded to the event.
+    /// A changeset without a source text needs it on each passage, else the code is `no-source-text`.
     #[serde(default)]
     pub source_version_id: Option<Uuid>,
     /// The offset of the first character.

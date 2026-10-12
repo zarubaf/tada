@@ -295,6 +295,8 @@ pub const MAX_PASSAGES: usize = 10;
 ///    Each proposal has at least one passage, and each passage matches the text of its source version (ADR 0040).
 ///    A passage names no source version for the source text of the changeset. A passage of another source version
 ///    must be readable in the event of the proposal (`access::event_source_reach`), for example a text file of the event.
+///    A source text that is empty or white space only is absent (ADR 0079). Each passage then names a source version,
+///    else its code is `no-source-text`.
 /// 3. Each new ID is a UUIDv7 and is free (ADR 0038).
 /// 4. The dependencies stay inside the changeset, have no cycle, and include the proposals that create the records that a proposal uses.
 ///    A fact that uses a new choice of the changeset depends on the proposal that adds the choice.
@@ -302,7 +304,7 @@ pub const MAX_PASSAGES: usize = 10;
 /// 6. Each link of a draft resolves to a fact version of its event or a visible source passage (ADR 0051).
 ///    The changeset keeps the provenance manifest and the lint warnings of each draft.
 ///
-/// It stores the source text as a source version, the changeset and an audit event in one transaction.
+/// It stores the source text as a source version if there is one, the changeset and an audit event in one transaction.
 /// If a check fails, it stores nothing.
 /// A retry with the ID of a stored changeset and the same content returns the stored changeset (ADR 0038).
 pub async fn create_changeset(
@@ -319,7 +321,8 @@ pub async fn create_changeset(
     if source.as_str().chars().count() > MAX_SOURCE_TEXT_CHARS {
         return Err(invalid("source_text", "length"));
     }
-    let text = Some(IntakeText {
+    // Without the member's own words, tada stores no source version (ADR 0079).
+    let text = (!source.as_str().trim().is_empty()).then(|| IntakeText {
         id: SourceVersionId::from_uuid(Uuid::now_v7()),
         text: &source,
     });
@@ -567,7 +570,12 @@ fn parse(
                 });
                 continue;
             }
+            // Without a source text, a passage must name a stored source version (ADR 0079).
             let Some(intake) = intake else {
+                errors.push(FieldError::new(
+                    path(&format!("evidence/{number}")),
+                    "no-source-text",
+                ));
                 continue;
             };
             match check_passage(&passage, intake.text) {

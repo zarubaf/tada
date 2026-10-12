@@ -408,6 +408,7 @@ export function ChangesetDetail({
             {t("inbox-proposed-at", { time: formatDateTime(changeset.created_at, timeZone) })}
           </time>
         </p>
+        {!changeset.source_version_id && <p className={styles.meta}>{t("inbox-no-source-text")}</p>}
         {reviewable.closed && <p className={styles.meta}>{t("inbox-event-closed")}</p>}
         {open.length > 0 && (
           <p className={styles.hints}>

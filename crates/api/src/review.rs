@@ -94,6 +94,9 @@ pub struct CreateChangesetRequest {
     pub id: Option<Uuid>,
     /// The member's own words. tada stores them as a source version.
     /// The passages count characters (Unicode scalar values) of this text after normalization: Unicode NFC with `\n` line ends.
+    /// Leave it out if the proposals rest only on stored source versions (ADR 0079). Each passage then names its
+    /// `source_version_id`. A text of white space only counts as empty.
+    #[serde(default)]
     pub source_text: String,
     #[schemars(length(max = proposals::MAX_PROPOSALS))]
     pub proposals: Vec<NewProposal>,

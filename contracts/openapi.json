@@ -6540,7 +6540,7 @@
                       "type": "array"
                     },
                     "evidence": {
-                      "description": "The passages of the source text that support the proposal. Each proposal has at least one.",
+                      "description": "The passages of the source text or of stored source versions that support the proposal. Each proposal has at least one.",
                       "items": {
                         "additionalProperties": false,
                         "description": "A passage of a source version: a range of characters and its exact quote.",
@@ -6565,7 +6565,7 @@
                             "type": "string"
                           },
                           "source_version_id": {
-                            "description": "The source version of the passage. Leave it out for the source text of the changeset.\nAnother source version must be readable in the event of the proposal and have a text,\nfor example a text file that a member uploaded to the event.",
+                            "description": "The source version of the passage. Leave it out for the source text of the changeset.\nAnother source version must be readable in the event of the proposal and have a text,\nfor example a text file that a member uploaded to the event.\nA changeset without a source text needs it on each passage, else the code is `no-source-text`.",
                             "format": "uuid",
                             "type": [
                               "string",
@@ -7833,7 +7833,7 @@
                       ]
                     },
                     "reason": {
-                      "description": "A short reason for the proposal.",
+                      "description": "A short reason for the proposal. The words of the agent go here, never into `source_text`.",
                       "type": "string"
                     }
                   },
@@ -7848,12 +7848,11 @@
                 "type": "array"
               },
               "source_text": {
-                "description": "The member's own words. tada stores them as a source version.\nThe passages count characters (Unicode scalar values) of this text after normalization: Unicode NFC with `\\n` line ends.",
+                "description": "The member's own words. tada stores them as a source version.\nThe passages count characters (Unicode scalar values) of this text after normalization: Unicode NFC with `\\n` line ends.\nLeave it out if the proposals rest only on stored source versions (ADR 0079). Each passage then names its\n`source_version_id`. A text of white space only counts as empty.",
                 "type": "string"
               }
             },
             "required": [
-              "source_text",
               "proposals"
             ],
             "type": "object"
