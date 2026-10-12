@@ -96,7 +96,7 @@ pub struct EventMemberView {
     /// The user ID. Use it as `owner` of a question, action or commitment.
     pub user_id: Uuid,
     pub display_name: String,
-    /// `event-manager`, `event-contributor` or `event-viewer`. An owner needs one of the first two.
+    /// `event-manager`, `event-contributor` or `event-viewer`. A member with one of the first two can own work; an owner or admin of the organization can also own work without an event role.
     pub event_role: String,
 }
 
