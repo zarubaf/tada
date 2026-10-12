@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-10
 - Amends: [0050](0050-proposals-and-review.md)
+- Amended by: [0081](0081-milestones-decisions-risks-and-requirements.md)
 
 ## Context
 

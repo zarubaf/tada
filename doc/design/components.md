@@ -120,6 +120,11 @@ See [accessibility.md](accessibility.md#focus).
 - A click on a row opens the record in a sheet on medium and wide layouts, and as a page on narrow layouts.
 - Bulk actions appear in the toolbar only when rows are selected.
 - A filter that hides rows shows the count of hidden rows and a "Filter zurücksetzen" action.
+- The registers of an event share this pattern: „Zusagen“, „Meilensteine“, „Entscheide“, „Risiken“, „Anforderungen“ and the actions.
+  Each shows the status actions of its record in the sheet.
+- „Meilensteine“ show the count of open actions and the two warnings (a late action, a past date).
+- „Risiken“ sort by likelihood times impact, then by impact (ADR 0081).
+- „Entscheide“ have no edit of the wording. „Ersetzen“ opens the create form for the new decision and supersedes the old one on save.
 
 ### Review Inbox („Eingang“)
 

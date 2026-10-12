@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-10
 - Amends: [0050](0050-proposals-and-review.md), [0052](0052-event-roles-and-ownership.md)
+- Amended by: [0081](0081-milestones-decisions-risks-and-requirements.md)
 
 ## Context
 
