@@ -6,8 +6,8 @@
 
 ## Context
 
-The AI features are the main value of tada: the AI PM digest, the intake of slice 2d, Ask Event and the PM brief.
-The digest of slice 2c uses AI wording, and the intake of slice 2d reuses the same adapter.
+The AI features are the main value of tada: the AI PM digest, the intake of slice 2e, Ask Event and the PM brief.
+The digest of slice 2c uses AI wording, and the intake of slice 2e reuses the same adapter.
 They need one safe loop that calls a model, runs tools and ends.
 [ADR 0010](0010-model-provider.md) limits AI to queries and proposals through `AiCaller`, and the compiler enforces this.
 [ADR 0047](0047-model-adapter.md) defines tasks, prompts, caps and the evaluation gate, and it expects a model adapter.
