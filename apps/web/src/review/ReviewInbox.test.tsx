@@ -290,7 +290,13 @@ const redactedChangeset = {
   ],
 };
 
+const CS_WORDLESS = "0199b8e0-0000-7000-8000-000000000c08";
+
+/** A changeset without the member's own words: its proposals cite stored sources only (ADR 0079). */
+const wordlessChangeset = { ...oldChangeset, id: CS_WORDLESS, source_version_id: undefined };
+
 const CHANGESETS = new Map<string, unknown>([
+  [CS_WORDLESS, wordlessChangeset],
   [CS_NOTES, notesChangeset],
   [CS_GONE, redactedChangeset],
   [CS_WORK, workChangeset],
@@ -452,6 +458,19 @@ describe("the detail", () => {
       within(card).getByText("Wir treffen uns auf dem Flugplatz Testwil."),
     ).toBeInTheDocument();
     expect(within(card).getByText("Die Mail nennt den Ort.")).toBeInTheDocument();
+    expect(within(card).getByText(/Quellversion 0199b8e0/)).toBeInTheDocument();
+    expect(screen.queryByText(/keine neuen Worte geschrieben/)).not.toBeInTheDocument();
+  });
+
+  it("says that a changeset without a source text has no words of the member", async () => {
+    renderAt(`/inbox/${CS_WORDLESS}`);
+
+    expect(
+      await screen.findByText(
+        "Das Mitglied hat keine neuen Worte geschrieben. Die Vorschläge stützen sich nur auf gespeicherte Quellen.",
+      ),
+    ).toBeInTheDocument();
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
     expect(within(card).getByText(/Quellversion 0199b8e0/)).toBeInTheDocument();
   });
 

@@ -625,6 +625,8 @@ inbox-detail-select = Wählen Sie in der Liste einen Eintrag.
 inbox-detail-of = Vorschläge zu { $title }
 inbox-detail-loading = Vorschläge werden geladen
 inbox-back = Zur Liste
+# A changeset without the member's own words: its proposals cite stored sources only (ADR 0079).
+inbox-no-source-text = Das Mitglied hat keine neuen Worte geschrieben. Die Vorschläge stützen sich nur auf gespeicherte Quellen.
 inbox-event-closed = Dieser Anlass ist abgeschlossen. Seine Vorschläge lassen sich nicht mehr prüfen.
 inbox-hints = Tastenkürzel
 inbox-hint-j = nächster Eintrag

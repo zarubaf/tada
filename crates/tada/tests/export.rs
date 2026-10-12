@@ -9,17 +9,18 @@ mod support;
 use std::path::Path;
 
 use jiff::Timestamp;
-use serde_json::Value;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use support::export::{contains, export, files};
 use support::files::pdf;
-use support::organization::{Client, fill, organization, router};
+use support::organization::{Client, SOURCE, fill, organization, router};
 use tada::export::{ExportCommand, execute};
 use tada_adapters::clock::SystemClock;
 use tada_adapters::storage::testing::TestGarage;
 use tada_app::domain::identity::OrganizationSlug;
 use tada_app::domain::ids::{OrganizationId, UserId};
 use tada_store_pg::testing::TestDatabase;
+use uuid::Uuid;
 
 /// Adds a row to each secret table that the API does not fill in this test.
 async fn add_secret_rows(test: &TestDatabase, organization: OrganizationId, user: UserId) {
@@ -87,6 +88,29 @@ async fn an_export_holds_one_organization_without_secrets_and_rebuilds_its_data(
     let (a, owner_a, client_a) = organization(&test, &garage, "testwil").await;
     let filled = fill(&test, &client_a, a, 424_242).await;
     add_secret_rows(&test, a, owner_a).await;
+    // A changeset without the member's words cites the stored text of the second event (ADR 0079).
+    let stored: Uuid = test
+        .scalar(&format!(
+            "SELECT source_version_id FROM changeset WHERE event_id = '{}'",
+            filled.second
+        ))
+        .await;
+    let start = SOURCE[..SOURCE.find("im Mai 2030").unwrap()]
+        .chars()
+        .count();
+    let wordless = json!({"proposals": [{
+        "id": Uuid::now_v7(),
+        "operation": client_a.date_operation(&filled.second).await,
+        "evidence": [{"source_version_id": stored, "start": start, "end": start + 11, "quote": "im Mai 2030"}],
+        "reason": "The stored text of the event names the month.",
+    }]});
+    let wordless = client_a
+        .post(
+            &format!("/api/v1/events/{}/changesets", filled.second),
+            &wordless,
+        )
+        .await;
+    assert!(wordless.get("source_version_id").is_none(), "{wordless}");
     let (b, owner_b, client_b) = organization(&test, &garage, "musterhausen").await;
     let event_b = client_b.create_event("FLY31", "Fly-in Musterhausen").await;
     client_b
@@ -177,7 +201,7 @@ async fn an_export_holds_one_organization_without_secrets_and_rebuilds_its_data(
     for (name, rows) in [
         ("organization", 1),
         ("event", 2),
-        ("changeset", 3),
+        ("changeset", 4),
         ("document", 2),
         ("document_version", 3),
         ("document_manifest_fact", 1),

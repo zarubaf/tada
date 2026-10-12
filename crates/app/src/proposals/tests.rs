@@ -1550,6 +1550,78 @@ async fn a_fact_cites_a_passage_of_a_text_file_of_its_event() {
 }
 
 #[tokio::test]
+async fn a_changeset_without_a_source_text_stores_no_source_version() {
+    for text in [None, Some(""), Some(" \n\t\r\n ")] {
+        let (memory, [source, ..]) = memory_with_targets();
+        let anna = contributor(&memory);
+        let mut input = fact_citing(source, "Das Flugfeld");
+        input.id = Some(Uuid::now_v7());
+        match text {
+            Some(text) => text.clone_into(&mut input.source_text),
+            None => {
+                input = serde_json::from_value(json!({
+                    "id": input.id,
+                    "event_id": open_day().as_uuid(),
+                    "proposals": [{
+                        "id": input.proposals[0].id,
+                        "operation": visitors(core_field("visitor_estimate"), quantity("20000")),
+                        "evidence": [{"source_version_id": source.as_uuid(), "start": 7, "end": 19, "quote": "Das Flugfeld"}],
+                        "reason": "The leaflet of the event names it.",
+                    }],
+                }))
+                .unwrap();
+            }
+        }
+        let changeset = changeset_of(
+            create_changeset(&anna, input.clone(), stores(&memory), &FixedClock)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(changeset.source_version_id, None, "{text:?}");
+        assert_eq!(changeset.proposals[0].evidence[0].source_version_id, source);
+        let (stored, source_text, _) = memory.inserted.lock().unwrap()[0].clone();
+        assert_eq!((stored, source_text), (changeset, None));
+
+        // A retry without a text finds the stored changeset.
+        let retry = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+        assert!(matches!(retry, Ok(Created::Existing(_))), "{retry:?}");
+    }
+}
+
+#[tokio::test]
+async fn without_a_source_text_each_passage_names_a_source_version() {
+    let (memory, [source, ..]) = memory_with_targets();
+    let anna = contributor(&memory);
+    let mut input = fact_citing(source, "Das Flugfeld");
+    let own = input.proposals[0].evidence[0].clone();
+    let mut without = own.clone();
+    without.source_version_id = None;
+    input.proposals[0].evidence = vec![own, without];
+    "  ".clone_into(&mut input.source_text);
+    let result = create_changeset(&anna, input, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/0/evidence/1".to_owned(), "no-source-text")]
+    );
+    assert!(memory.inserted.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_retry_with_a_text_does_not_match_a_changeset_without_one() {
+    let (memory, [source, ..]) = memory_with_targets();
+    let anna = contributor(&memory);
+    let mut input = fact_citing(source, "Das Flugfeld");
+    input.id = Some(Uuid::now_v7());
+    let with_text = input.clone();
+    input.source_text.clear();
+    create_changeset(&anna, input, stores(&memory), &FixedClock)
+        .await
+        .unwrap();
+    let result = create_changeset(&anna, with_text, stores(&memory), &FixedClock).await;
+    assert_eq!(invalid_fields(result), [("id".to_owned(), "taken")]);
+}
+
+#[tokio::test]
 async fn a_fact_cannot_cite_a_source_of_another_event_or_without_text() {
     let (memory, [_, elsewhere, organization]) = memory_with_targets();
     let pdf = SourceVersionId::from_uuid(Uuid::now_v7());
