@@ -124,6 +124,22 @@ id_type!(
     ScheduleId
 );
 id_type!(
+    /// The ID of a milestone.
+    MilestoneId
+);
+id_type!(
+    /// The ID of a decision.
+    DecisionId
+);
+id_type!(
+    /// The ID of a risk.
+    RiskId
+);
+id_type!(
+    /// The ID of a requirement.
+    RequirementId
+);
+id_type!(
     /// The opaque reference of one item in a digest. A button carries it (ADR 0038).
     DigestItemId
 );
@@ -149,6 +165,14 @@ pub enum LocalIdKind {
     Person,
     /// `INS-<n>`, local to the organization.
     Institution,
+    /// `MIL-<n>`, local to the event.
+    Milestone,
+    /// `DEC-<n>`, local to the event.
+    Decision,
+    /// `RSK-<n>`, local to the event.
+    Risk,
+    /// `REQ-<n>`, local to the event.
+    Requirement,
 }
 
 impl LocalIdKind {
@@ -160,6 +184,10 @@ impl LocalIdKind {
             Self::Commitment => "COM",
             Self::Person => "PER",
             Self::Institution => "INS",
+            Self::Milestone => "MIL",
+            Self::Decision => "DEC",
+            Self::Risk => "RSK",
+            Self::Requirement => "REQ",
         }
     }
 
@@ -186,5 +214,13 @@ mod local_id_tests {
         assert_eq!(LocalIdKind::Commitment.readable_id(42), "COM-042");
         assert_eq!(LocalIdKind::Person.readable_id(1), "PER-001");
         assert_eq!(LocalIdKind::Institution.readable_id(123), "INS-123");
+    }
+
+    #[test]
+    fn prefixes_of_new_kinds() {
+        assert_eq!(LocalIdKind::Milestone.readable_id(1), "MIL-001");
+        assert_eq!(LocalIdKind::Decision.readable_id(2), "DEC-002");
+        assert_eq!(LocalIdKind::Risk.readable_id(3), "RSK-003");
+        assert_eq!(LocalIdKind::Requirement.readable_id(4), "REQ-004");
     }
 }
