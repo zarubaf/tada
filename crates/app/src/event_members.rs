@@ -8,7 +8,7 @@ use tada_domain::RecordVersion;
 use tada_domain::identity::{DisplayName, EventRole};
 use tada_domain::ids::{EventId, UserId};
 
-use crate::access::{self, AccessError, EventClosed};
+use crate::access::{self, AccessError, EventClosed, Principal};
 use crate::audit::{AuditAction, AuditEvent, AuditRole};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
@@ -303,7 +303,7 @@ pub fn takes_last_manager(role: EventRole, new: Option<EventRole>, managers: usi
 /// The event memberships of an event: names and roles. Each member who can see the event reads
 /// them, so that a contributor can give work to another member. Only managers change them.
 pub async fn list_event_members(
-    caller: &MemberCaller,
+    caller: &impl Principal,
     event: EventId,
     identity: &dyn IdentityStore,
     store: &dyn EventMemberStore,
