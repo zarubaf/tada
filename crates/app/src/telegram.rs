@@ -273,6 +273,16 @@ pub async fn unlink_account(
     links.unlink_account(account).await
 }
 
+/// Whether the Telegram account is linked to a tada account. The gateway claims no code for a
+/// linked account.
+pub async fn is_linked_account(
+    _caller: &ServiceCaller<TelegramGateway>,
+    account: TelegramUserId,
+    links: &dyn TelegramLinks,
+) -> Result<bool, StoreError> {
+    Ok(links.user_of(account).await?.is_some())
+}
+
 /// The Telegram account that is linked to the calling member, if any.
 pub async fn get_link(
     caller: &MemberCaller,

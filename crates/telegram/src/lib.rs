@@ -39,7 +39,7 @@ use tada_app::sign_in::email_hint;
 use tada_app::sources::SourceStore;
 use tada_app::telegram::{
     FactMessage, TelegramActError, TelegramLinks, TelegramName, TelegramUserId, accept_link_claim,
-    claim_link_code, member_for, propose_fact, unlink_account,
+    claim_link_code, is_linked_account, member_for, propose_fact, unlink_account,
 };
 
 use tada_app::work::WorkStore;
@@ -351,6 +351,16 @@ impl Gateway {
         if let Some(command) = parse_link_command(source.as_str()) {
             return self.link_command(account, command).await;
         }
+        // A linked account has no code to claim. Free text or a used deep link must not look like a
+        // wrong code.
+        match is_linked_account(&self.caller, account, self.ports.as_ref()).await {
+            Ok(true) => return self.messages.get("telegram-linked-help"),
+            Ok(false) => {}
+            Err(error) => {
+                tracing::warn!(%error, "cannot look up the link of the account");
+                return self.messages.get("telegram-error");
+            }
+        }
         // A deep link sends "/start <code>"; a member can also paste the code.
         let code = text.strip_prefix("/start").unwrap_or(text).trim();
         if code.is_empty() {
@@ -390,7 +400,7 @@ impl Gateway {
         }
     }
 
-    /// The commands `/bestaetigen` and `/trennen` of the link (ADR 0011).
+    /// The commands `/bestaetigen` (also `/bestätigen`) and `/trennen` of the link (ADR 0011).
     async fn link_command(&self, account: TelegramUserId, command: LinkCommand) -> String {
         let ports = self.ports.as_ref();
         let result = match command {

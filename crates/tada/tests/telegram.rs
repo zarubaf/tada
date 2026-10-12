@@ -794,6 +794,30 @@ async fn an_unlinked_account_a_viewer_and_a_removed_member_get_a_refusal_and_no_
     support::logs::assert_clean(&["7130430", "7130431", "2030-06..2030-07", "morgen"]);
 }
 
+/// A linked account has no code to claim: free text, a used deep link and /start get the help of a
+/// linked account, not the message about an invalid code.
+#[tokio::test]
+async fn a_linked_account_never_gets_the_invalid_code_message() {
+    let club = Club::start().await;
+    club.linked_member(Some("event-contributor"), ACCOUNT).await;
+    let replies = converse(
+        &club.test,
+        vec![
+            update(1, "Hallo"),
+            update(2, "/start used-code"),
+            update(3, "/start"),
+            update(4, "/bestätigen"),
+        ],
+        4,
+    )
+    .await;
+    assert_eq!(replies.len(), 4, "{replies:?}");
+    for reply in &replies[..3] {
+        assert!(reply.contains("ist mit tada verknüpft"), "{reply}");
+    }
+    assert!(!replies[3].contains("ungültig"), "{}", replies[3]);
+}
+
 #[tokio::test]
 async fn a_bad_command_gets_a_german_hint_and_no_changeset() {
     let club = Club::start().await;

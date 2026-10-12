@@ -8,6 +8,8 @@ const PROPOSE: &str = "/vorschlag";
 
 /// The command that accepts the newest claim of a link code (ADR 0011).
 const ACCEPT: &str = "/bestaetigen";
+/// The same command with the umlaut, as German members type it.
+const ACCEPT_UMLAUT: &str = "/bestätigen";
 /// The command that ends the link of the account and rejects its open claims.
 const UNLINK: &str = "/trennen";
 
@@ -18,11 +20,11 @@ pub(crate) enum LinkCommand {
     Unlink,
 }
 
-/// Returns `None` if `text` is not `/bestaetigen` or `/trennen`. Words after the command do not count.
+/// Returns `None` if `text` is not `/bestaetigen`, `/bestätigen` or `/trennen`. Words after the command do not count.
 pub(crate) fn parse_link_command(text: &str) -> Option<LinkCommand> {
     let (command, _) = word(text, 0)?;
     let name = command.split_once('@').map_or(command, |(name, _)| name);
-    if name.eq_ignore_ascii_case(ACCEPT) {
+    if name.eq_ignore_ascii_case(ACCEPT) || name.to_lowercase() == ACCEPT_UMLAUT {
         Some(LinkCommand::Accept)
     } else if name.eq_ignore_ascii_case(UNLINK) {
         Some(LinkCommand::Unlink)
@@ -122,6 +124,13 @@ mod tests {
             parse_link_command("/bestaetigen"),
             Some(LinkCommand::Accept)
         );
+        for text in ["/bestätigen", "/Bestätigen@tada_bot", "/BESTÄTIGEN"] {
+            assert_eq!(
+                parse_link_command(text),
+                Some(LinkCommand::Accept),
+                "{text}"
+            );
+        }
         assert_eq!(
             parse_link_command("/Trennen@tada_bot"),
             Some(LinkCommand::Unlink)
