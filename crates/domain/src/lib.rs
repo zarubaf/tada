@@ -2,6 +2,9 @@
 //!
 //! A constructor checks each value, so other code cannot create an invalid value (ADR 0003).
 
+#[macro_use]
+mod macros;
+
 pub mod documents;
 pub mod events;
 pub mod facts;
