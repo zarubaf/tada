@@ -159,6 +159,9 @@ tada does not copy every tool into PostgreSQL.
   A passage of a proposal cites the source text of its changeset by default.
   It can also cite another source version with a text, for example an uploaded text file, if the source version is readable in the event of the proposal (`app::access::event_source_reach`).
   Otherwise the passage could show a text of another event to the members of the event.
+  A changeset without the member's own words has no source text and no source version ([ADR 0079](adr/0079-changesets-without-member-words.md)).
+  Each of its passages then cites a stored source version.
+  An agent writes its own words into the reason of a proposal, never into the source text.
   The source links of a draft follow the same rule: they cite only source versions that are readable in the event of the draft.
   A draft version has no source version, so a passage cannot cite a draft.
 - Audit messages contain no raw personal data.

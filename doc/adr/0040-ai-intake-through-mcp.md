@@ -39,6 +39,7 @@ Evidence:
 - tada stores the text as a source version with the channel `api-token`. Each proposal links to its passage.
 - A proposal without a supporting passage is rejected with a problem code (ADR 0037).
 - Amendment (2026-10-08): a passage can also cite another source version that is readable in the event of the proposal, for example an uploaded text file. [ARCHITECTURE.md](../ARCHITECTURE.md) holds this rule under "Records and provenance".
+- Amendment (2026-10-12, [ADR 0079](0079-changesets-without-member-words.md)): `source_text` is optional. Without it, tada stores no source version, and each passage cites a stored source version.
 
 Data protection:
 
