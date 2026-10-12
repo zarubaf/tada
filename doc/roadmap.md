@@ -14,31 +14,14 @@ Goal: workstream leads own their work directly, and the AI PM follows up without
 Slice 2 splits into the sub-slices 2a to 2f.
 The open sub-slices are 2d to 2f.
 Each sub-slice has its own design, plan, reviews and merge.
-The owner wants tada usable for a first real club event as soon as possible, so the sub-slices come in this order.
+The owner wants tada usable for a first real club event as soon as possible.
+So 2f comes first, then the first real event, then 2d and 2e.
 
-tada runs with invented data and public facts only until the passkeys and the external review of the sign-in are done ([Sign-in before real data](#sign-in-before-real-data)).
+tada runs with invented data and public facts only until the external review of the sign-in is done ([Sign-in before real data](#sign-in-before-real-data)).
 The review of the authentication code is closed.
 [ADR 0070](adr/0070-ai-security-review-replaces-the-external-review.md) records the AI security review and its fixes.
 The person features of [ADR 0045](adr/0045-data-protection.md) are closed.
 The export of one person, the correction with dispute notes, the legal redaction with its journal, the retention jobs, the housekeeping and the orphan sweep deliver them.
-
-### Slice 2d: AI intake
-
-Scope: AI intake inside tada (web and Telegram), the usage totals of each event and the AI cap per event.
-The intake uses the model adapter, the agent runner and the AI cap of the organization that Slice 2c delivered ([ADR 0047](adr/0047-model-adapter.md), [ADR 0077](adr/0077-agent-runner.md)).
-
-Acceptance:
-
-- (11) An AI cap leaves manual planning usable and provides per-event usage totals.
-
-### Slice 2e: Inbound email
-
-Scope: inbound email with the modular adapters and the webhook of [ADR 0057](adr/0057-modular-mail-and-inbound-webhook.md), deduplication and the health of the sync.
-
-Acceptance:
-
-- (2) Duplicate notifications produce one source version and do not duplicate accepted commitments.
-- (6) Disconnected or delayed sync is visible and cannot produce a falsely reassuring brief.
 
 ### Slice 2f: Further records and views
 
@@ -61,6 +44,24 @@ A new ADR records the views and the custom fields of work records before the wor
 Acceptance:
 
 - (12) A simple club event can be organized without purchasing a separate task-management tool. Sub-slice 2f completes this criterion.
+
+### Slice 2d: AI intake
+
+Scope: AI intake inside tada (web and Telegram), the usage totals of each event and the AI cap per event.
+The intake uses the model adapter, the agent runner and the AI cap of the organization that Slice 2c delivered ([ADR 0047](adr/0047-model-adapter.md), [ADR 0077](adr/0077-agent-runner.md)).
+
+Acceptance:
+
+- (11) An AI cap leaves manual planning usable and provides per-event usage totals.
+
+### Slice 2e: Inbound email
+
+Scope: inbound email with the modular adapters and the webhook of [ADR 0057](adr/0057-modular-mail-and-inbound-webhook.md), deduplication and the health of the sync.
+
+Acceptance:
+
+- (2) Duplicate notifications produce one source version and do not duplicate accepted commitments.
+- (6) Disconnected or delayed sync is visible and cannot produce a falsely reassuring brief.
 
 ### Follow-ups of Slice 2c
 
@@ -97,18 +98,16 @@ Acceptance:
 
 ## Sign-in before real data
 
-The owner set this order for the sign-in work:
+An external review of the whole sign-in ([#46](https://github.com/zarubaf/tada/issues/46)) comes before the first real data.
+It runs at the same time as Slice 2f.
 
-1. Passkeys ([#45](https://github.com/zarubaf/tada/issues/45)).
-   Owners and admins must use a passkey.
-   The magic link stays as recovery.
-2. An external review of the whole sign-in ([#46](https://github.com/zarubaf/tada/issues/46)).
-   It comes after the passkeys, so one review covers all sign-in methods.
-3. OAuth for MCP clients through a mature OAuth server ([#47](https://github.com/zarubaf/tada/issues/47)).
+These items come later:
 
-Steps 1 and 2 come before the first real data.
-Single sign-on with Google and Microsoft comes later ([#48](https://github.com/zarubaf/tada/issues/48)).
-Steps 1 and 3 keep a general model of sign-in methods, so that single sign-on adds one method without a redesign.
+- OAuth for MCP clients through a mature OAuth server ([#47](https://github.com/zarubaf/tada/issues/47)).
+- Passkeys ([#45](https://github.com/zarubaf/tada/issues/45)).
+- Single sign-on with Google and Microsoft ([#48](https://github.com/zarubaf/tada/issues/48)).
+
+Each new sign-in method uses a general model of sign-in methods, so that it adds one method without a redesign.
 
 ## Later
 
