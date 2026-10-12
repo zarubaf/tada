@@ -1,35 +1,6 @@
 //! Workstreams, actions and commitments, with their states (Slice 2a).
 
-use crate::facts::{TextError, checked_text};
-
-/// Defines a text newtype of 1 to `MAX_CHARS` characters, without control characters.
-/// `Debug` shows the length only (ADR 0035).
-macro_rules! text_type {
-    ($(#[$doc:meta])* $name:ident, $max:expr) => {
-        $(#[$doc])*
-        #[derive(Clone, PartialEq, Eq)]
-        pub struct $name(String);
-
-        impl $name {
-            pub const MAX_CHARS: usize = $max;
-
-            /// Removes the spaces at the ends, then checks the text.
-            pub fn parse(input: &str) -> Result<Self, TextError> {
-                Ok(Self(checked_text(input, Self::MAX_CHARS)?))
-            }
-
-            pub fn as_str(&self) -> &str {
-                &self.0
-            }
-        }
-
-        impl std::fmt::Debug for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}({} characters)", stringify!($name), self.0.chars().count())
-            }
-        }
-    };
-}
+use crate::facts::TextError;
 
 text_type!(
     /// The name of a workstream: 1 to 200 characters.
@@ -96,32 +67,6 @@ impl std::fmt::Debug for ActionDescription {
             self.0.chars().count()
         )
     }
-}
-
-/// Defines a status enum with kebab-case `as_str` and `parse`.
-macro_rules! status_enum {
-    ($(#[$doc:meta])* $name:ident { $($variant:ident => $text:literal),+ $(,)? }) => {
-        $(#[$doc])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        pub enum $name {
-            $($variant),+
-        }
-
-        impl $name {
-            pub const fn as_str(self) -> &'static str {
-                match self {
-                    $(Self::$variant => $text),+
-                }
-            }
-
-            pub fn parse(input: &str) -> Option<Self> {
-                match input {
-                    $($text => Some(Self::$variant),)+
-                    _ => None,
-                }
-            }
-        }
-    };
 }
 
 status_enum!(
