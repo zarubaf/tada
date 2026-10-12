@@ -90,10 +90,10 @@ The ADRs are the authority for the decisions in this project.
 | [0072](0072-legal-redaction-and-deletion-journal.md)            | Legal redaction and deletion journal                     | Accepted                           |
 | [0073](0073-person-export-and-dispute-notes.md)                 | Person export and dispute notes                          | Accepted                           |
 | [0074](0074-orphan-sweep.md)                                    | Orphan sweep of the object storage                       | Accepted                           |
-| [0075](0075-versions-of-tada-and-its-components.md)             | Versions of tada and its components                      | Accepted                           |
-| [0076](0076-schedules-and-reminders.md)                         | Schedules and reminders                                  | Proposed                           |
-| [0077](0077-agent-runner.md)                                    | Agent runner in Rust                                     | Proposed                           |
-| [0078](0078-opaque-build-id-in-the-web-client.md)               | Opaque build ID in the web client                        | Proposed                           |
+| [0075](0075-versions-of-tada-and-its-components.md)             | Versions of tada and its components                      | Accepted, amended by 0078          |
+| [0076](0076-schedules-and-reminders.md)                         | Schedules and reminders                                  | Accepted                           |
+| [0077](0077-agent-runner.md)                                    | Agent runner in Rust                                     | Accepted                           |
+| [0078](0078-opaque-build-id-in-the-web-client.md)               | Opaque build ID in the web client                        | Accepted                           |
 
 ## New ADR
 

@@ -1,6 +1,6 @@
 # 0077. Agent runner in Rust
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-11
 - Amends: [0047](0047-model-adapter.md)
 
