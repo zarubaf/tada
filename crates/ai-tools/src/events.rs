@@ -86,7 +86,7 @@ impl TypedTool for ListMembers {
 
     fn description() -> &'static str {
         "List the members of an event with their user ID, display name and event role, in the order of the names. \
-Use the user ID as owner of an open question, an action or a commitment: an owner has the event role event-manager or event-contributor. \
+Use the user ID as owner of an open question, an action or a commitment: a member with the event role event-manager or event-contributor can own work. An owner or admin of the organization can also own work; this list holds only the event members. \
 The user ID of the member who uses the tool is caller_user_id of list_events."
     }
 

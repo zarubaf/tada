@@ -1567,7 +1567,7 @@
   },
   {
     "name": "list_members",
-    "description": "List the members of an event with their user ID, display name and event role, in the order of the names. Use the user ID as owner of an open question, an action or a commitment: an owner has the event role event-manager or event-contributor. The user ID of the member who uses the tool is caller_user_id of list_events.",
+    "description": "List the members of an event with their user ID, display name and event role, in the order of the names. Use the user ID as owner of an open question, an action or a commitment: a member with the event role event-manager or event-contributor can own work. An owner or admin of the organization can also own work; this list holds only the event members. The user ID of the member who uses the tool is caller_user_id of list_events.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -1592,7 +1592,7 @@
               "type": "string"
             },
             "event_role": {
-              "description": "`event-manager`, `event-contributor` or `event-viewer`. An owner needs one of the first two.",
+              "description": "`event-manager`, `event-contributor` or `event-viewer`. A member with one of the first two can own work; an owner or admin of the organization can also own work without an event role.",
               "type": "string"
             },
             "user_id": {
