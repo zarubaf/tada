@@ -1,6 +1,6 @@
 # 0076. Schedules and reminders
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-11
 
 ## Context

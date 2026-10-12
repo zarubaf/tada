@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-10
+- Amended by: [0078](0078-opaque-build-id-in-the-web-client.md)
 
 ## Context
 

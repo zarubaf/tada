@@ -1,6 +1,6 @@
 # 0078. Opaque build ID in the web client
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-11
 - Amends: [0075](0075-versions-of-tada-and-its-components.md)
 
