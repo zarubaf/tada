@@ -8,8 +8,11 @@ The [writing guide](writing.md) contains the rules for prose.
 
 1. Install [mise](https://mise.jdx.dev).
 2. Install [rustup](https://rustup.rs). `rust-toolchain.toml` selects the Rust version.
-3. Run `mise run setup`. This installs the pinned tools, the Rust toolchain and the Git hooks.
-4. Run `mise run check`. All checks must pass before you start.
+   The mise tasks find `cargo` in `~/.cargo/bin`.
+   To use `cargo` directly in your shell, add `. "$HOME/.cargo/env"` to your shell profile.
+3. Install Docker. The local runtime needs it.
+4. Run `mise run setup`. This installs the pinned tools, the Rust toolchain and the Git hooks.
+5. Run `mise run check`. All checks must pass before you start.
 
 ## Local runtime
 
