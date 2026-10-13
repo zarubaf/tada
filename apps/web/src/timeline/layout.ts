@@ -180,7 +180,7 @@ export function weekGroups(timeline: TimelineLayout): { week: string; entries: W
 export interface AxisLabel {
   /** The day of the label from the first Monday. */
   at: number;
-  /** The Monday of the week that carries the label. */
+  /** The day that the label names: the 1st of a month, or the first Monday for the first label. */
   date: string;
   /** The label names the year too: the first label, a new year, and a coarse axis. */
   withYear: boolean;
@@ -190,24 +190,50 @@ export interface AxisLabel {
 const MONTH_STEPS = [1, 2, 3, 6, 12, 24, 60, 120, 240, 600] as const;
 const MOST_LABELS = 40;
 
+/** The 1st of a month inside the week of `monday`, with its distance in days from the Monday. */
+function firstOfMonthIn(monday: string): { date: string; offset: number } | null {
+  const year = Number(monday.slice(0, 4));
+  const month = Number(monday.slice(5, 7));
+  const day = Number(monday.slice(8));
+  if (day === 1) {
+    return { date: monday, offset: 0 };
+  }
+  const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const offset = length - day + 1;
+  if (offset > 6) {
+    return null;
+  }
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonth = String((month % 12) + 1).padStart(2, "0");
+  return { date: `${nextYear}-${nextMonth}-01`, offset };
+}
+
 /**
- * The labels of the axis: the first week and the first week of each month. A long axis labels
- * every few months, so that the page never draws a node for each week.
+ * The labels of the axis: the first week and each month, on the day of its 1st like the bars and
+ * the line of today. A long axis labels every few months, so that the page never draws a node for
+ * each week. The first label sits on the first Monday, unless the 1st of a month falls into that
+ * week.
  */
 export function axisLabels(weeks: readonly string[]): AxisLabel[] {
   const months = weeks.length / 4.35;
   const step = MONTH_STEPS.find((candidate) => months / candidate <= MOST_LABELS) ?? 600;
   const labels: AxisLabel[] = [];
-  weeks.forEach((date, index) => {
-    const month = Number(date.slice(5, 7));
-    const startsMonth = Number(date.slice(8)) <= 7;
-    const counted = Number(date.slice(0, 4)) * 12 + month - 1;
-    if (index !== 0 && !(startsMonth && counted % step === 0)) {
+  weeks.forEach((monday, index) => {
+    const first = firstOfMonthIn(monday);
+    if (first === null) {
+      if (index === 0) {
+        labels.push({ at: 0, date: monday, withYear: true });
+      }
+      return;
+    }
+    const month = Number(first.date.slice(5, 7));
+    const counted = Number(first.date.slice(0, 4)) * 12 + month - 1;
+    if (index !== 0 && counted % step !== 0) {
       return;
     }
     labels.push({
-      at: index * 7,
-      date,
+      at: index * 7 + first.offset,
+      date: first.date,
       withYear: index === 0 || month === 1 || step > 1,
     });
   });
