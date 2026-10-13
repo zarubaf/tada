@@ -3,9 +3,10 @@
 use crate::work::InvalidTransition;
 
 text_type!(
-    /// The text of a requirement: 1 to 500 characters.
+    /// The text of a requirement: 1 to 500 characters. It can have line breaks and tabs.
     RequirementText,
-    500
+    500,
+    multiline
 );
 
 status_enum!(
@@ -69,6 +70,23 @@ mod tests {
         assert!(RequirementText::parse(&"a".repeat(500)).is_ok());
         assert_eq!(
             RequirementText::parse(&"a".repeat(501)),
+            Err(TextError::TooLong)
+        );
+    }
+
+    #[test]
+    fn text_keeps_line_breaks_and_tabs() {
+        let text = RequirementText::parse(" Zufahrt:\n\t- Feuerwehr\n\t- Sanität ").unwrap();
+        assert_eq!(text.as_str(), "Zufahrt:\n\t- Feuerwehr\n\t- Sanität");
+        assert_eq!(
+            RequirementText::parse("Zu\rfahrt"),
+            Err(TextError::ControlCharacter)
+        );
+        assert_eq!(RequirementText::parse("\n \n"), Err(TextError::Empty));
+        let lines = format!("{}\n{}", "ä".repeat(250), "ö".repeat(249));
+        assert!(RequirementText::parse(&lines).is_ok());
+        assert_eq!(
+            RequirementText::parse(&format!("{lines}ü")),
             Err(TextError::TooLong)
         );
     }
