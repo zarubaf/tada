@@ -1508,3 +1508,116 @@ async fn an_action_cannot_name_a_new_milestone_of_another_new_event() {
         [("proposals/3/operation/milestone", "unknown-record")]
     );
 }
+
+/// The review edit follows the rule of the proposal: a new milestone of the changeset is one of the event of the
+/// action. An organization changeset with two new events cannot give an action of the one a milestone of the other.
+#[tokio::test]
+async fn edited_action_cannot_name_a_new_milestone_of_another_new_event() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let owner = open_day.owner.user_id();
+    let (first, second) = (
+        EventId::from_uuid(Uuid::now_v7()),
+        EventId::from_uuid(Uuid::now_v7()),
+    );
+    let (own_milestone, other_milestone, action_id) =
+        (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+    let ids: [Uuid; 5] = std::array::from_fn(|_| Uuid::now_v7());
+    let changeset = propose(
+        &test,
+        &open_day.owner,
+        None,
+        vec![
+            proposal(
+                ids[0],
+                json!({"kind": "create-event", "id": first.as_uuid(), "key": "OPEN35", "name": "Open Day 2035"}),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(
+                ids[1],
+                json!({"kind": "create-event", "id": second.as_uuid(), "key": "OPEN36", "name": "Open Day 2036"}),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(ids[2], milestone(first, own_milestone, owner), &[ids[0]], "im Mai 2030"),
+            proposal(ids[3], milestone(second, other_milestone, owner), &[ids[1]], "im Mai 2030"),
+            proposal(ids[4], action(first, action_id, owner, None), &[ids[0]], "Das Open Day"),
+        ],
+    )
+    .await;
+    let input = ApplyInput {
+        edits: vec![edit(ids[4], json!({"milestone": other_milestone}))],
+        ..select(&ids)
+    };
+    let result = apply(&test, &open_day.owner, &changeset, input).await;
+    assert_eq!(
+        invalid(result),
+        [("edits/0/fields/milestone".to_owned(), "unknown-record")]
+    );
+    assert_eq!(count(&test, "action").await, 0);
+
+    // A new milestone of the event of the action applies with the edit.
+    let input = ApplyInput {
+        edits: vec![edit(ids[4], json!({"milestone": own_milestone}))],
+        ..select(&ids)
+    };
+    apply(&test, &open_day.owner, &changeset, input)
+        .await
+        .unwrap();
+    let milestone: Option<Uuid> =
+        sqlx::query_scalar("SELECT milestone_id FROM action WHERE id = $1")
+            .bind(action_id)
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap();
+    assert_eq!(milestone, Some(own_milestone));
+}
+
+/// The version check of the apply takes a new workstream or milestone of the plan only in its own event, so a plan
+/// that the checks of the app let through still cannot give an action of the one event a record of the other.
+#[tokio::test]
+async fn the_apply_takes_a_new_workstream_or_milestone_only_of_the_same_event() {
+    use std::collections::HashMap;
+
+    use tada_app::domain::ids::{ActionId, WorkstreamId};
+    use tada_app::domain::proposals::Operation;
+    use tada_app::domain::work::ActionTitle;
+
+    use crate::review::records::{NewRecords, matches};
+
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let other = test.create_event(open_day.organization, "OTHER31").await;
+    let (workstream, milestone) = (Uuid::now_v7(), Uuid::now_v7());
+    let new_action = |workstream: Option<Uuid>, milestone: Option<Uuid>| Operation::CreateAction {
+        id: ActionId::from_uuid(Uuid::now_v7()),
+        event_id: open_day.event,
+        title: ActionTitle::parse("Bewilligung klären").unwrap(),
+        description: None,
+        owner: open_day.contributor.user_id(),
+        workstream: workstream.map(WorkstreamId::from_uuid),
+        start_date: None,
+        due_date: None,
+        milestone: milestone.map(MilestoneId::from_uuid),
+    };
+    let mut conn = test.database.pool.acquire().await.unwrap();
+    for (event, takes) in [(other, false), (open_day.event, true)] {
+        let plan: NewRecords = [(workstream, Some(event)), (milestone, Some(event))].into();
+        for operation in [
+            new_action(Some(workstream), None),
+            new_action(None, Some(milestone)),
+        ] {
+            let result = matches(
+                &mut conn,
+                open_day.manager.scope(),
+                &operation,
+                &plan,
+                &mut HashMap::new(),
+            )
+            .await
+            .unwrap();
+            assert_eq!(result, takes, "{operation:?} with new records of {event:?}");
+        }
+    }
+}

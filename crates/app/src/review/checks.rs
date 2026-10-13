@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use jiff::Timestamp;
 use tada_domain::facts::{ChoiceValue, FactState, Label, ValueType, Valued};
-use tada_domain::ids::{FieldDefinitionId, MilestoneId, ProposalId};
+use tada_domain::ids::{EventId, FieldDefinitionId, MilestoneId, ProposalId};
 use tada_domain::proposals::{NewRecord, NewWorkRecord, Operation};
 
 use super::{ApplyError, ApplyStep, Edit, ReviewStores, edits, finish};
@@ -184,10 +184,10 @@ pub(super) async fn check_edits(
             });
         }
     }
-    // The new milestones that the apply creates: an edited action can name one of them.
-    let new_milestones: HashSet<MilestoneId> = selection()
+    // The new milestones that the apply creates, each with its event: an edited action can name one of its event.
+    let new_milestones: HashSet<(Option<EventId>, MilestoneId)> = selection()
         .filter_map(|proposal| match proposal.operation.new_record() {
-            Some(NewRecord::Milestone(id)) => Some(id),
+            Some(NewRecord::Milestone(id)) => Some((proposal.operation.event_id(), id)),
             _ => None,
         })
         .collect();
@@ -226,12 +226,12 @@ pub(super) async fn check_edits(
 }
 
 /// The refusal of an edited milestone of a new action (ADR 0080): it must be a milestone of the event that is not
-/// canceled, or a new milestone of the selection. An unchanged milestone passed the check of the proposal.
+/// canceled, or a new milestone of the event in the selection. An unchanged milestone passed the check of the proposal.
 async fn edited_milestone_refusal(
     scope: OrgScope,
     proposed: &Operation,
     edited: &Operation,
-    new_milestones: &HashSet<MilestoneId>,
+    new_milestones: &HashSet<(Option<EventId>, MilestoneId)>,
     stores: ReviewStores<'_>,
     now: Timestamp,
 ) -> Result<Option<&'static str>, StoreError> {
@@ -249,7 +249,8 @@ async fn edited_milestone_refusal(
     else {
         return Ok(None);
     };
-    if *old_milestone == Some(*milestone) || new_milestones.contains(milestone) {
+    if *old_milestone == Some(*milestone) || new_milestones.contains(&(Some(*event_id), *milestone))
+    {
         return Ok(None);
     }
     milestone_refusal(scope, *event_id, *milestone, stores.milestones, now).await
