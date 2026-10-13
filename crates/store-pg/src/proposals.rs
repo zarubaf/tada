@@ -26,7 +26,7 @@ use tada_app::domain::records::{MilestoneStatus, MilestoneTitle};
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::domain::work::{
-    ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
+    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
     WorkstreamName,
 };
 use tada_app::drafts::DraftProvenance;
@@ -578,7 +578,7 @@ pub(crate) fn operation_from_json(
             id: ActionId::from_uuid(id),
             event_id: EventId::from_uuid(event_id),
             title: ActionTitle::parse(&title).map_err(|_| invalid())?,
-            description: parsed(description, ActionDescription::parse)?,
+            description: parsed(description, RecordDescription::parse)?,
             owner: UserId::from_uuid(owner),
             workstream: workstream.map(WorkstreamId::from_uuid),
             start_date: parsed(start_date, |text| text.parse())?,
@@ -674,7 +674,7 @@ pub(crate) fn operation_from_json(
             id: MilestoneId::from_uuid(id),
             event_id: EventId::from_uuid(event_id),
             title: MilestoneTitle::parse(&title).map_err(|_| invalid())?,
-            description: parsed(description, ActionDescription::parse)?,
+            description: parsed(description, RecordDescription::parse)?,
             date: date.parse().map_err(|_| invalid())?,
             owner: UserId::from_uuid(owner),
             workstream: workstream.map(WorkstreamId::from_uuid),
@@ -1954,7 +1954,7 @@ mod tests {
                 id: ActionId::from_uuid(Uuid::now_v7()),
                 event_id: event,
                 title: ActionTitle::parse("Bewilligung klären").unwrap(),
-                description: Some(ActionDescription::parse("Mit der Gemeinde.\nBald.").unwrap()),
+                description: Some(RecordDescription::parse("Mit der Gemeinde.\nBald.").unwrap()),
                 owner: UserId::from_uuid(Uuid::now_v7()),
                 workstream: Some(WorkstreamId::from_uuid(Uuid::now_v7())),
                 start_date: Some(jiff::civil::date(2030, 4, 1)),
@@ -2005,7 +2005,7 @@ mod tests {
                 id: MilestoneId::from_uuid(Uuid::now_v7()),
                 event_id: event,
                 title: MilestoneTitle::parse("Bewilligung liegt vor").unwrap(),
-                description: Some(ActionDescription::parse("Von der Gemeinde.").unwrap()),
+                description: Some(RecordDescription::parse("Von der Gemeinde.").unwrap()),
                 date: jiff::civil::date(2030, 5, 1),
                 owner: UserId::from_uuid(Uuid::now_v7()),
                 workstream: None,

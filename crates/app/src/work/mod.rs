@@ -20,8 +20,8 @@ use tada_domain::ids::{
 use tada_domain::parties::Party;
 use tada_domain::redaction::Redactable;
 use tada_domain::work::{
-    ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
-    FirmReason, InvalidTransition,
+    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, FirmReason,
+    InvalidTransition, RecordDescription,
 };
 
 pub use self::actions::{
@@ -75,7 +75,7 @@ impl ActionView {
 pub struct ActionFields {
     /// A legal redaction removes the title and the description (ADR 0072).
     pub title: Redactable<ActionTitle>,
-    pub description: Option<ActionDescription>,
+    pub description: Option<RecordDescription>,
     /// A member of the event with the contributor or manager role.
     pub owner: UserId,
     pub workstream_id: Option<WorkstreamId>,

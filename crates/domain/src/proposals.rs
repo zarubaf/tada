@@ -24,7 +24,7 @@ use crate::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use crate::records::{MilestoneStatus, MilestoneTitle, RecordRef};
 use crate::sources::Evidence;
 use crate::work::{
-    ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
+    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
     WorkstreamName,
 };
 
@@ -103,7 +103,7 @@ pub enum Operation {
         id: ActionId,
         event_id: EventId,
         title: ActionTitle,
-        description: Option<ActionDescription>,
+        description: Option<RecordDescription>,
         owner: UserId,
         workstream: Option<WorkstreamId>,
         start_date: Option<Date>,
@@ -162,7 +162,7 @@ pub enum Operation {
         id: MilestoneId,
         event_id: EventId,
         title: MilestoneTitle,
-        description: Option<ActionDescription>,
+        description: Option<RecordDescription>,
         date: Date,
         owner: UserId,
         workstream: Option<WorkstreamId>,

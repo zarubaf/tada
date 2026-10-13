@@ -8,7 +8,7 @@ use tada_domain::RecordVersion;
 use tada_domain::ids::{EventId, MilestoneId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::records::MilestoneStatus;
-use tada_domain::work::{ActionDescription, ActionTitle, CommitmentText, dates_in_order};
+use tada_domain::work::{ActionTitle, CommitmentText, RecordDescription, dates_in_order};
 
 use super::{ActionView, CommitmentView, MilestoneStore, WorkError, WorkPorts, may_change_work};
 use crate::access::{self, EventAccess, EventLevel, Principal};
@@ -28,14 +28,14 @@ pub(super) fn parse_title(check: &mut Checker, input: &str) -> Option<ActionTitl
 pub(super) fn parse_description(
     check: &mut Checker,
     input: Option<&str>,
-) -> Option<Option<ActionDescription>> {
+) -> Option<Option<RecordDescription>> {
     match input {
         None => Some(None),
         Some(text) => check
             .parse(
                 "description",
                 text,
-                ActionDescription::parse,
+                RecordDescription::parse,
                 text_error_code,
             )
             .map(Some),

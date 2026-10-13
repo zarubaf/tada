@@ -13,7 +13,7 @@ use tada_domain::parties::{PartyName, PhoneNumber};
 use tada_domain::proposals::Operation;
 use tada_domain::records::MilestoneTitle;
 use tada_domain::work::{
-    ActionDescription, ActionTitle, CommitmentText, ConditionText, dates_in_order,
+    ActionTitle, CommitmentText, ConditionText, RecordDescription, dates_in_order,
 };
 use uuid::Uuid;
 
@@ -243,7 +243,7 @@ pub(super) fn edit_record(
                     "description",
                     current_description,
                     description,
-                    ActionDescription::parse,
+                    RecordDescription::parse,
                     text_error_code,
                 ),
                 owner: owner.map_or(current_owner, UserId::from_uuid),
@@ -372,7 +372,7 @@ pub(super) fn edit_record(
                 "description",
                 current_description,
                 description,
-                ActionDescription::parse,
+                RecordDescription::parse,
                 text_error_code,
             ),
             date: errors.replace("date", current_date, date, parse_date, |_| "date"),
