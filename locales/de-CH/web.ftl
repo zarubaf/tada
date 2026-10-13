@@ -696,6 +696,9 @@ inbox-op-create-commitment = Zusage anlegen
 inbox-op-change-action-status = Status einer Aufgabe ändern
 inbox-op-change-action-due = Fälligkeit einer Aufgabe ändern
 inbox-op-change-commitment-status = Status einer Zusage ändern
+# $name: the name of the new workstream.
+inbox-op-create-workstream = Arbeitsbereich „{ $name }“ anlegen
+inbox-row-lead = Arbeitsbereichsleitung
 inbox-name-unknown = Nicht lesbar
 inbox-due-removed = Keine Fälligkeit
 inbox-row-email = E-Mail
