@@ -1629,7 +1629,7 @@
   },
   {
     "name": "list_workstreams",
-    "description": "List the workstreams of an event: its areas of work, each with its lead. A work record names a workstream by its ID. Propose a record in an active workstream only; a closed workstream takes no new records.",
+    "description": "List the workstreams of an event: its areas of work, each with its lead. A work record names a workstream by its ID. Propose a record in an active workstream, or in a new workstream of the same changeset (create-workstream); a closed workstream takes no new records.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -2308,7 +2308,7 @@
                 },
                 "workstream": {
                   "default": null,
-                  "description": "An active workstream of the event.",
+                  "description": "An active workstream of the event, or a new workstream of this changeset;\nthen the proposal depends on the proposal that creates it.",
                   "format": "uuid",
                   "type": [
                     "string",
@@ -2373,7 +2373,7 @@
                 },
                 "workstream": {
                   "default": null,
-                  "description": "An active workstream of the event.",
+                  "description": "An active workstream of the event, or a new workstream of this changeset;\nthen the proposal depends on the proposal that creates it.",
                   "format": "uuid",
                   "type": [
                     "string",
@@ -2520,7 +2520,7 @@
                   "type": "string"
                 },
                 "name": {
-                  "description": "1 to 200 characters. No other workstream of the event has this name, whatever its case.",
+                  "description": "1 to 200 characters. No other workstream of the event has this name, whatever its case.\n`list_workstreams` shows the existing names. A closed workstream keeps its name.",
                   "type": "string"
                 }
               },

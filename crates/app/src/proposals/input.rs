@@ -215,7 +215,8 @@ pub enum OperationInput {
         description: Option<String>,
         /// The user ID of a member with the contributor or manager role in the event.
         owner: Uuid,
-        /// An active workstream of the event.
+        /// An active workstream of the event, or a new workstream of this changeset;
+        /// then the proposal depends on the proposal that creates it.
         #[serde(default)]
         workstream: Option<Uuid>,
         /// The due date as `YYYY-MM-DD`.
@@ -235,7 +236,8 @@ pub enum OperationInput {
         promisor: PartyInput,
         /// The user ID of the member who follows the commitment up: a contributor or manager of the event.
         owner: Uuid,
-        /// An active workstream of the event.
+        /// An active workstream of the event, or a new workstream of this changeset;
+        /// then the proposal depends on the proposal that creates it.
         #[serde(default)]
         workstream: Option<Uuid>,
         /// The due date as `YYYY-MM-DD`.
@@ -281,6 +283,7 @@ pub enum OperationInput {
         id: Uuid,
         event_id: Uuid,
         /// 1 to 200 characters. No other workstream of the event has this name, whatever its case.
+        /// `list_workstreams` shows the existing names. A closed workstream keeps its name.
         name: String,
         /// The user ID of a member with the contributor or manager role in the event.
         lead: Uuid,

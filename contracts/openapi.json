@@ -7604,7 +7604,7 @@
                               "type": "string"
                             },
                             "workstream": {
-                              "description": "An active workstream of the event.",
+                              "description": "An active workstream of the event, or a new workstream of this changeset;\nthen the proposal depends on the proposal that creates it.",
                               "format": "uuid",
                               "type": [
                                 "string",
@@ -7693,7 +7693,7 @@
                               "type": "string"
                             },
                             "workstream": {
-                              "description": "An active workstream of the event.",
+                              "description": "An active workstream of the event, or a new workstream of this changeset;\nthen the proposal depends on the proposal that creates it.",
                               "format": "uuid",
                               "type": [
                                 "string",
@@ -7853,7 +7853,7 @@
                               "type": "string"
                             },
                             "name": {
-                              "description": "1 to 200 characters. No other workstream of the event has this name, whatever its case.",
+                              "description": "1 to 200 characters. No other workstream of the event has this name, whatever its case.\n`list_workstreams` shows the existing names. A closed workstream keeps its name.",
                               "type": "string"
                             }
                           },
