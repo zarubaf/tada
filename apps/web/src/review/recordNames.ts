@@ -1,4 +1,4 @@
-// The names behind the IDs of a work proposal: the owner, the workstream, the party of a
+// The names behind the IDs of a work proposal: the owner or lead, the workstream, the party of a
 // commitment and the record that a change targets. The inbox looks them up once per changeset.
 // A name that cannot be found is not an error: the view shows a neutral text.
 
@@ -7,6 +7,7 @@ import { loadOrganizationMembers } from "../events/eventMembers";
 
 export interface RecordNames {
   user: (id: string) => string | undefined;
+  /** A workstream, new in the changeset or existing. */
   workstream: (id: string) => string | undefined;
   /** A person or an institution, new in the changeset or existing. */
   party: (id: string) => string | undefined;
@@ -28,7 +29,11 @@ function references(changeset: Changeset) {
   const commitments = new Set<string>();
   let people = false;
   for (const { operation } of changeset.proposals) {
-    if (operation.kind === "create-action" || operation.kind === "create-commitment") {
+    if (
+      operation.kind === "create-action" ||
+      operation.kind === "create-commitment" ||
+      operation.kind === "create-workstream"
+    ) {
       people = true;
     }
     if (operation.kind === "create-commitment") {
@@ -57,6 +62,9 @@ export async function loadRecordNames(api: Api, changeset: Changeset): Promise<R
   for (const { operation } of changeset.proposals) {
     if (operation.kind === "create-person" || operation.kind === "create-institution") {
       partyNames.set(operation.id, operation.name);
+    }
+    if (operation.kind === "create-workstream") {
+      workstreams.set(operation.id, operation.name);
     }
   }
   const attempt = async (work: () => Promise<void>) => {

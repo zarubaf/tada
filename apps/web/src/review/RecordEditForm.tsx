@@ -19,6 +19,7 @@ import {
   message,
   type RecordOperation,
 } from "./recordEdit";
+import type { RecordNames } from "./recordNames";
 
 interface Values {
   title: string;
@@ -117,6 +118,8 @@ export interface RecordEditFormProps {
   api: Api;
   /** The event of the proposal, for the owners and the workstreams. */
   eventId: string | null | undefined;
+  /** The names behind the IDs of the proposal, for a workstream that the event does not have yet. */
+  names: RecordNames;
   proposal: Proposal;
   isPending: boolean;
   /** The fields that the server refused in the last apply. */
@@ -127,6 +130,7 @@ export interface RecordEditFormProps {
 
 function Form({
   proposal,
+  names,
   directory,
   isPending,
   serverErrors,
@@ -220,6 +224,11 @@ function Form({
             current={
               operation.kind === "create-action" || operation.kind === "create-commitment"
                 ? operation.workstream
+                : undefined
+            }
+            currentLabel={
+              operation.kind === "create-action" || operation.kind === "create-commitment"
+                ? names.workstream(operation.workstream ?? "")
                 : undefined
             }
             onChange={set("workstream")}

@@ -88,6 +88,8 @@ export function operationTitle(operation: Operation, fields: Map<string, FieldIn
       return t("inbox-op-change-action-due");
     case "change-commitment-status":
       return t("inbox-op-change-commitment-status");
+    case "create-workstream":
+      return t("inbox-op-create-workstream", { name: operation.name });
     default:
       // The list of operations is open: a newer server can send a kind that this client lacks.
       return t("inbox-op-unknown");
@@ -227,6 +229,15 @@ function WorkRows({ operation, names }: { operation: Operation; names: RecordNam
           ]}
         />
       );
+    case "create-workstream":
+      return (
+        <Rows
+          rows={[
+            [t("inbox-row-name"), operation.name],
+            [t("inbox-row-lead"), names.user(operation.lead) ?? unknown],
+          ]}
+        />
+      );
     default:
       return null;
   }
@@ -363,6 +374,7 @@ export function OperationDetails({
     case "change-action-status":
     case "change-action-due":
     case "change-commitment-status":
+    case "create-workstream":
       return <WorkRows operation={operation} names={names} />;
     default:
       return <p>{t("value-unsupported")}</p>;

@@ -245,6 +245,7 @@ export function ProposalCard(props: ProposalCardProps) {
           <RecordEditForm
             api={props.api}
             eventId={props.eventId}
+            names={props.names}
             proposal={proposal}
             isPending={isPending}
             serverErrors={props.recordErrors}

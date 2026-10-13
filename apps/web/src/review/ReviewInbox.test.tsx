@@ -1354,3 +1354,87 @@ describe("a link whose dependents go to another reviewer", () => {
     });
   });
 });
+
+const CS_STREAM = "0199b8e0-0000-7000-8000-000000000c0a";
+const P_WORKSTREAM = "0199b8e0-0000-7000-8000-0000000001f4";
+const P_IN_STREAM = "0199b8e0-0000-7000-8000-0000000001f5";
+const NEW_STREAM = "0199b8e0-0000-7000-8000-0000000006a4";
+
+/** A new workstream and a new action in it. */
+CHANGESETS.set(CS_STREAM, {
+  id: CS_STREAM,
+  event_id: EVENT.id,
+  author: AI,
+  source_version_id: evidence.source_version_id,
+  created_at: "2028-03-09T09:00:00Z",
+  proposals: [
+    proposal(P_WORKSTREAM, {
+      operation: {
+        kind: "create-workstream",
+        id: NEW_STREAM,
+        event_id: EVENT.id,
+        name: "Festwirtschaft",
+        lead: BERND,
+      },
+    }),
+    proposal(P_IN_STREAM, {
+      depends_on: [P_WORKSTREAM],
+      operation: {
+        kind: "create-action",
+        id: "0199b8e0-0000-7000-8000-0000000006a5",
+        event_id: EVENT.id,
+        title: "Getränke bestellen",
+        description: null,
+        owner: SESSION.user_id,
+        workstream: NEW_STREAM,
+        due_date: null,
+      },
+    }),
+  ],
+});
+
+describe("a new workstream", () => {
+  it("shows its name and its lead, and has no edit", async () => {
+    renderAt(`/inbox/${CS_STREAM}`, editServer());
+
+    const card = await screen.findByRole("article", {
+      name: "Arbeitsbereich „Festwirtschaft“ anlegen",
+    });
+    expect(within(card).getByText("Festwirtschaft")).toBeInTheDocument();
+    expect(await within(card).findByText("Bernd Beispiel")).toBeInTheDocument();
+    expect(
+      within(card).queryByRole("button", { name: /^Bearbeiten und annehmen/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("names the new workstream at the action in it", async () => {
+    renderAt(`/inbox/${CS_STREAM}`, editServer());
+
+    const card = await screen.findByRole("article", {
+      name: "Aufgabe „Getränke bestellen“ anlegen",
+    });
+    expect(await within(card).findByText("Festwirtschaft")).toBeInTheDocument();
+    // The action keeps its edit; only the workstream has none.
+    expect(
+      within(card).getByRole("button", { name: /^Bearbeiten und annehmen/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the new workstream as the current one in the edit of the action and keeps it", async () => {
+    const server = renderAt(`/inbox/${CS_STREAM}`, editServer());
+
+    const card = await openEdit("Aufgabe „Getränke bestellen“ anlegen");
+    expect(within(card).getByRole("button", { name: /Arbeitsbereich/ })).toHaveTextContent(
+      "Festwirtschaft",
+    );
+    const title = within(card).getByRole("textbox", { name: "Titel" });
+    await userEvent.clear(title);
+    await userEvent.type(title, "Getränke liefern");
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([
+      { proposal_id: P_IN_STREAM, fields: { title: "Getränke liefern" } },
+    ]);
+  });
+});

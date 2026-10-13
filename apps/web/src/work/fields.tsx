@@ -29,17 +29,23 @@ export function OwnerSelect({
   return <Select label={label} options={options} value={value} onChange={onChange} error={error} />;
 }
 
-/** The active workstreams, and the workstream of the record even after it closed. */
+/**
+ * The active workstreams, and the workstream of the record even after it closed.
+ * A workstream that the directory does not list yet, for example a new one of a changeset, shows
+ * as `currentLabel`.
+ */
 export function WorkstreamSelect({
   directory,
   value,
   current,
+  currentLabel,
   onChange,
   error,
 }: {
   directory: Directory;
   value: string;
   current: string | null | undefined;
+  currentLabel?: string | undefined;
   onChange: (id: string) => void;
   error?: string | undefined;
 }) {
@@ -49,6 +55,9 @@ export function WorkstreamSelect({
       .filter((w) => w.status === "active" || w.id === current)
       .map((w) => ({ id: w.id, label: w.name })),
   ];
+  if (current && currentLabel && !options.some((option) => option.id === current)) {
+    options.push({ id: current, label: currentLabel });
+  }
   return (
     <Select
       label={t("work-field-workstream")}
