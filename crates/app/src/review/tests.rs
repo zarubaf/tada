@@ -132,7 +132,7 @@ fn a_change_to_firm_without_a_valid_reason_does_not_apply() {
         status: CommitmentStatus::Firm,
         expected_version: tada_domain::RecordVersion::FIRST,
     };
-    firm.reason = Reason::parse(&"a".repeat(FirmReason::MAX_CHARS + 1)).unwrap();
+    firm.reason = Reason::parse(&"a".repeat(RecordReason::MAX_CHARS + 1)).unwrap();
     let result = step(&firm, &Edits::new(), &Links::default());
     assert!(matches!(result, Err(ApplyError::Invalid(_))), "{result:?}");
     firm.reason = Reason::parse("Der Auftrag ist unterschrieben.").unwrap();

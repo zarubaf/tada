@@ -400,7 +400,7 @@ async fn a_commitment_keeps_its_condition_and_its_firm_reason() {
 
     let fields = CommitmentFields {
         status: CommitmentStatus::Firm,
-        firm_reason: Some(FirmReason::parse("The order is signed.").unwrap()),
+        firm_reason: Some(RecordReason::parse("The order is signed.").unwrap()),
         ..commitment.fields.clone()
     };
     let Changed::Changed(firm) = db
