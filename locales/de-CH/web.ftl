@@ -986,6 +986,44 @@ milestone-warning-late-unknown = Eine Aufgabe ist erst danach fällig
 # $version: the record version that the evidence supports.
 milestone-evidence-version = Stützt die Version { $version } des Meilensteins
 
+timeline-title = Zeitplan
+timeline-loading = Zeitplan wird geladen
+timeline-empty-title = Noch nichts im Zeitplan
+timeline-empty-text = Geben Sie einer Aufgabe ein Fälligkeitsdatum oder erfassen Sie einen Meilenstein.
+timeline-empty-action = Zu den Aufgaben
+timeline-filters = Filter
+timeline-filter-owner = Verantwortlich
+timeline-filter-status = Status
+timeline-filter-all = Alle
+timeline-filter-reset = Filter zurücksetzen
+timeline-no-match = Keine Treffer für diese Filter.
+# $count: the actions that the filters hide.
+timeline-hidden = { $count ->
+    [one] 1 Aufgabe ausgeblendet
+   *[other] { $count } Aufgaben ausgeblendet
+}
+# $count: the actions without a due date. The link opens the register of actions.
+timeline-undated = { $count ->
+    [one] 1 Aufgabe ohne Fälligkeit
+   *[other] { $count } Aufgaben ohne Fälligkeit
+}
+timeline-legend = Legende
+timeline-today = heute
+timeline-axis = Zeitachse
+timeline-lane-none = ohne Arbeitsbereich
+timeline-milestones = Meilensteine
+timeline-by-week = Nach Wochen
+# $date: the Monday of the week, for example 04.05.2030.
+timeline-week = Woche vom { $date }
+# $from and $to: the start date and the due date of the action.
+timeline-span = { $from } bis { $to }
+# $date: the due date of the action.
+timeline-due = fällig { $date }
+# $id, $title: the action. $when: its dates. $status: its status, for example „offen“.
+timeline-action = { $id } { $title }, { $when }, { $status }
+# $id, $title: the milestone. $date: its date. $status: its status.
+timeline-milestone = { $id } { $title }, { $date }, { $status }
+
 commitments-title = Zusagen
 commitments-loading = Zusagen werden geladen
 commitments-empty-title = Noch keine Zusagen

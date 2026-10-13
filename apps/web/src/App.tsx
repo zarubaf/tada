@@ -49,6 +49,10 @@ const CommitmentsPage = lazy(() =>
 const MilestonesPage = lazy(() =>
   import("./work/MilestonesPage").then((module) => ({ default: module.MilestonesPage })),
 );
+// The timeline is a large screen of its own and seldom the first one.
+const TimelinePage = lazy(() =>
+  import("./timeline/TimelinePage").then((module) => ({ default: module.TimelinePage })),
+);
 const WorkstreamsPage = lazy(() =>
   import("./work/WorkstreamsPage").then((module) => ({ default: module.WorkstreamsPage })),
 );
@@ -150,6 +154,13 @@ export function App({ api = defaultApi }: { api?: Api }) {
                     <EventPage api={api}>
                       <RouteSuspense>
                         <ActionsPage api={api} />
+                      </RouteSuspense>
+                    </EventPage>
+                  </Route>
+                  <Route path="/events/:eventId/timeline">
+                    <EventPage api={api}>
+                      <RouteSuspense>
+                        <TimelinePage api={api} />
                       </RouteSuspense>
                     </EventPage>
                   </Route>

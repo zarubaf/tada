@@ -117,14 +117,15 @@ It has no drag.
   If the window is unknown, the page shows no band.
 - A line marks today („heute“).
 - The axis shows weeks.
-  It runs from the earliest date to the later of the end of the event window and the last due date.
+  It runs from the earliest to the latest date of the actions (start and due dates), the milestones and the event window.
   A long span scrolls inside the timeline. The page itself never scrolls horizontally.
 - Filters: owner and status.
   Each bar and point links to its action.
 - Bars, points and markers do not rely on color alone.
   Each has a label, and the status shows as text in the list.
 - Narrow layouts and screen readers get a list of the same items, grouped by week.
-- An event with no dated actions shows the empty state of the page, not an empty axis.
+- An event with no dated actions, no milestones and no event window shows the empty state of the page, not an empty axis.
+  An event with milestones but no dated actions shows its milestones, and the band if the window is known.
 
 ## Widths
 

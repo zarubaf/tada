@@ -3,7 +3,7 @@
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createApi, type Event } from "../api/client";
-import { EventContext } from "../events/eventContext";
+import { EventContext, type ProfileState } from "../events/eventContext";
 import { Router } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 
@@ -72,6 +72,8 @@ export interface Setup {
   answers?: Record<string, () => Response>;
   /** The default answers of the lists, by path suffix. */
   lists?: Record<string, unknown[]>;
+  /** The profile of the event that the event page has loaded. The default is still loading. */
+  profile?: ProfileState;
 }
 
 /** Renders `page` for the event with the fake server. It records `METHOD path` and the body. */
@@ -84,6 +86,7 @@ export function renderWork(
     workstreams = [ground],
     answers = {},
     lists = {},
+    profile = { kind: "loading" },
   }: Setup = {},
 ) {
   const calls: { call: string; query: string; body: unknown }[] = [];
@@ -137,9 +140,7 @@ export function renderWork(
   render(
     <Router>
       <SessionProvider api={api}>
-        <EventContext
-          value={{ event, profile: { kind: "loading" }, reloadProfile: async () => true }}
-        >
+        <EventContext value={{ event, profile, reloadProfile: async () => true }}>
           {page(api)}
         </EventContext>
       </SessionProvider>

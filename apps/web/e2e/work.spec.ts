@@ -3,6 +3,7 @@ import { expect, type Page, test } from "@playwright/test";
 import {
   events,
   fakeEvent,
+  fakeProfile,
   fakeSession,
   fontsLoaded,
   sessionInfo,
@@ -398,4 +399,106 @@ test("a member creates a milestone, links an action and sees the late action", a
     .click();
   const table = page.getByRole("table", { name: "Meilensteine" });
   await expect(table.getByText("ACT-004 ist erst danach fällig")).toBeVisible();
+});
+
+// „Zeitplan“: the dated actions in lanes, the milestones and the event window (an assumption).
+const windowField = {
+  id: "0199b8e0-0000-7000-8000-000000000201",
+  key: "date_window",
+  label: { kind: "message", id: "field-date_window" },
+  value_type: { type: "date-window", granularity: null },
+  value_schema: {},
+  description: "",
+  module: "core",
+  status: "active",
+};
+
+const windowProfile = {
+  facts: [
+    {
+      id: "0199b8e0-0000-7000-8000-000000000202",
+      field_id: windowField.id,
+      field_key: "date_window",
+      state: "assumption",
+      redacted: false,
+      value: { type: "date-window", start: "2030-04-15", end: "2030-06-15", granularity: "day" },
+      version: 1,
+      evidence: [],
+      accepted_by: { kind: "member", id: ME, channel: "web" },
+      accepted_at: "2030-03-04T08:30:00Z",
+    },
+  ],
+  proposals: [],
+  open_questions: [],
+};
+
+async function fakeTimeline(page: Page): Promise<void> {
+  await fakeWork(page);
+  await fakeProfile(page, windowProfile, [windowField]);
+}
+
+for (const viewport of viewports) {
+  for (const theme of themes) {
+    test(`timeline, ${theme}, ${viewport.name} px: no axe violation, screenshot`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await fakeSession(page, sessionWithRole("member"));
+      await fakeTimeline(page);
+      await page.goto(`/events/${event?.id}/timeline`);
+      await setTheme(page, theme);
+      await expect(page.getByRole("heading", { level: 2, name: "Zeitplan" })).toBeVisible();
+      await expect(page.getByRole("list", { name: "Legende" }).getByText("Annahme")).toBeVisible();
+      // The page never scrolls sideways, whatever the width of the axis.
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+
+      const results = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze();
+      expect(results.violations).toEqual([]);
+
+      await fontsLoaded(page);
+      await expect(page).toHaveScreenshot(`timeline-${theme}-${viewport.name}.png`, {
+        fullPage: true,
+      });
+    });
+  }
+}
+
+test("a span of years scrolls inside the timeline and never the page", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeSession(page, sessionWithRole("member"));
+  await fakeWork(page);
+  await fulfill(page, "**/api/v1/events/*/actions*", {
+    items: [{ ...actions[0], start_date: "2030-05-06", due_date: "2033-05-01" }],
+  });
+  await page.goto(`/events/${event?.id}/timeline`);
+  const axis = page.getByRole("region", { name: "Zeitachse" });
+  await expect(axis).toBeVisible();
+
+  const sizes = await axis.evaluate((node) => ({
+    inner: node.scrollWidth,
+    outer: node.clientWidth,
+  }));
+  expect(sizes.inner).toBeGreaterThan(sizes.outer);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test("at 320 px the timeline shows the list by week without a sideways scroll", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await fakeSession(page, sessionWithRole("member"));
+  await fakeTimeline(page);
+  await page.goto(`/events/${event?.id}/timeline`);
+  await expect(page.getByRole("region", { name: "Nach Wochen" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Zeitachse" })).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  expect(await textOverflows(page)).toEqual([]);
 });
