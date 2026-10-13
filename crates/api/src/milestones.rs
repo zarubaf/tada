@@ -21,7 +21,8 @@ use crate::ApiState;
 use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
-use crate::work::{RecordEvidence, decode_cursor, encode_cursor, owner_filter, ports, present};
+use crate::records::{RecordEvidence, decode_cursor, encode_cursor, present};
+use crate::work::{owner_filter, ports};
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()

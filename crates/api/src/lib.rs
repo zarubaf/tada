@@ -23,6 +23,7 @@ mod person_data;
 mod pm_policy;
 mod privacy;
 mod problem;
+mod records;
 mod redactions;
 mod request_id;
 mod retention;

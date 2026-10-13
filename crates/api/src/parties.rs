@@ -22,7 +22,7 @@ use crate::contract::{AUTHENTICATED, JSON_BODY, PATH, QUERY, codes};
 use crate::cursor;
 use crate::extract::{Caller, Json, Path, Query, page_limit, record_version};
 use crate::problem::{ApiError, Problem};
-use crate::work::RecordEvidence;
+use crate::records::RecordEvidence;
 
 pub(crate) fn routes() -> OpenApiRouter<ApiState> {
     OpenApiRouter::new()
