@@ -26,8 +26,6 @@ The export of one person, the correction with dispute notes, the legal redaction
 ### Slice 2d: Milestones, decisions, risks and requirements
 
 Scope: milestones, decisions, risks and requirements ([ADR 0080](adr/0080-milestones-decisions-risks-and-requirements.md)), the start date and the milestone of an action, the timeline of an event, and the proposal of a new workstream (`create-workstream`).
-The evidence of a proposal gets the capture time of its source version, as the design asks ([components](design/components.md)).
-The Review Inbox shows the time of the changeset until then.
 
 - An action gets an optional start date and at most one milestone.
 - The timeline is one fixed, read-only page for each event.
@@ -60,6 +58,8 @@ Acceptance:
 ### Slice 2g: Views and the portfolio
 
 Scope: saved views, custom fields of work records, the portfolio view, the resource view, participations and templates.
+The evidence of a proposal gets the capture time of its source version, as the design asks ([components](design/components.md)).
+The Review Inbox shows the time of the changeset until then.
 
 Planning views keep the record types fixed and make fields and views configurable:
 
