@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApi } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
@@ -51,7 +52,7 @@ interface Setup {
   /** The organization role of the caller. */
   role?: "owner" | "admin" | "member";
   /** Answers by `METHOD /path-suffix`. */
-  answers?: Record<string, () => Response>;
+  answers?: Record<string, () => Response | Promise<Response>>;
 }
 
 /** A fake server that filters the list by `q`. It records `METHOD path?query` and the body. */
@@ -157,6 +158,42 @@ describe("PartiesPage", () => {
       screen.queryByRole("button", { name: "Weitere Einträge laden" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "Personen" })).toHaveFocus();
+  });
+
+  it("drops a next page that arrives after the search changed the list", async () => {
+    let release: (response: Response) => void = () => {};
+    const late = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    let requests = 0;
+    const { calls } = setup({
+      answers: {
+        "GET /persons": () => {
+          requests += 1;
+          if (requests === 1) {
+            return json(200, { items: [beat], next_cursor: "old" });
+          }
+          if (requests === 2) {
+            return late;
+          }
+          return json(200, { items: [clara], next_cursor: "filtered" });
+        },
+      },
+    });
+    const table = await screen.findByRole("table", { name: "Personen" });
+
+    await user.click(screen.getByRole("button", { name: "Weitere Einträge laden" }));
+    await user.type(screen.getByRole("searchbox", { name: "Nach Name suchen" }), "probst");
+    await waitFor(() => expect(calls.some((c) => c.call.endsWith("?q=probst"))).toBe(true));
+    await within(table).findByText("Clara Probst");
+    release(json(200, { items: [{ ...clara, id: "p9", local_id: "PER-009", name: "Spät" }] }));
+    await act(async () => {});
+
+    expect(within(table).queryByText("Spät")).not.toBeInTheDocument();
+    expect(within(table).queryByText("Beat Muster")).not.toBeInTheDocument();
+    // The next page that the button asks for is the one of the filtered list.
+    await user.click(screen.getByRole("button", { name: "Weitere Einträge laden" }));
+    expect(calls.at(-1)?.call).toBe("GET /api/v1/persons?q=probst&cursor=filtered");
   });
 
   it("lists institutions with their kind", async () => {

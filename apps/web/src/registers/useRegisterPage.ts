@@ -19,7 +19,10 @@ export function useRegisterPage<T>(reload: () => Promise<boolean>) {
   const heading = useRef<HTMLHeadingElement>(null);
   const formHeading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  const { retried, retry } = useRetry(() => heading.current);
+  // A move to the heading never takes focus from the row that the address names.
+  const headingTarget = () =>
+    document.activeElement?.hasAttribute("data-linked") ? null : heading.current;
+  const { retried, retry } = useRetry(headingTarget);
 
   /** A new action of the member clears the messages of the last one. */
   const start = () => {
@@ -67,7 +70,7 @@ export function useRegisterPage<T>(reload: () => Promise<boolean>) {
       }
       setConfirmation(t("register-loaded-more"));
       if (result.last) {
-        focusAfterCommit(() => heading.current);
+        focusAfterCommit(headingTarget);
       }
     },
     savedMessage: (name: string) => t("register-saved", { name }),
