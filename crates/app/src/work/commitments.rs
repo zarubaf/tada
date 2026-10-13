@@ -9,8 +9,8 @@ use tada_domain::work::{CommitmentStatus, ConditionText, FirmReason};
 use uuid::Uuid;
 
 use super::checks::{
-    changed, check_owner, check_promisor, check_workstream, created, may_change, parse_text,
-    require_change, require_create, show, show_one, writable_access,
+    Assignment, changed, check_assignment, check_promisor, created, may_change, parse_text,
+    require_any_change, require_change, require_create, show, show_one, writable_access,
 };
 use super::{
     CommitmentFields, CommitmentView, NewCommitmentRecord, WorkError, WorkPorts, WorkQuery,
@@ -78,10 +78,8 @@ pub async fn create_commitment(
             .map(Some),
     };
     check_promisor(&mut check, scope, input.promisor, ports.parties).await?;
-    check_owner(&mut check, scope, event, input.owner, ports.identity).await?;
-    if let Some(workstream) = input.workstream {
-        check_workstream(&mut check, scope, event, workstream, ports.workstreams).await?;
-    }
+    let assigned = Assignment::new(input.owner, input.workstream);
+    check_assignment(&mut check, scope, event, None, assigned, ports).await?;
     let (text, condition) = check
         .finish(text.zip(condition))
         .map_err(WorkError::Invalid)?;
@@ -193,17 +191,12 @@ pub async fn change_commitment(
         status,
         expected_version,
     } = change;
-    if text.is_none()
-        && owner.is_none()
-        && workstream.is_none()
-        && due_date.is_none()
-        && status.is_none()
-    {
-        return Err(WorkError::Invalid(Vec::new()));
-    }
-    if current.version != expected_version {
-        return Err(WorkError::VersionConflict);
-    }
+    let any = text.is_some()
+        || owner.is_some()
+        || workstream.is_some()
+        || due_date.is_some()
+        || status.is_some();
+    require_any_change(any, current.version, expected_version)?;
     let scope = caller.scope();
     let mut check = Checker::default();
     let text = match &text {
@@ -211,15 +204,10 @@ pub async fn change_commitment(
         None => old.text.as_present().cloned(),
     };
     let owner = owner.unwrap_or(old.owner);
-    if owner != old.owner {
-        check_owner(&mut check, scope, event, owner, ports.identity).await?;
-    }
     let workstream_id = workstream.unwrap_or(old.workstream_id);
-    if let Some(new) = workstream_id
-        && workstream_id != old.workstream_id
-    {
-        check_workstream(&mut check, scope, event, new, ports.workstreams).await?;
-    }
+    let assigned = Assignment::new(owner, workstream_id);
+    let before = Assignment::new(old.owner, old.workstream_id);
+    check_assignment(&mut check, scope, event, Some(before), assigned, ports).await?;
     let text = check.finish(text).map_err(WorkError::Invalid)?;
     let status = match status {
         Some(next) => old.status.change_directly(next)?,
