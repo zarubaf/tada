@@ -12,6 +12,7 @@ const RECORD_KINDS = [
   "create-action",
   "create-commitment",
   "create-milestone",
+  "create-decision",
   "create-person",
   "create-institution",
 ] as const;

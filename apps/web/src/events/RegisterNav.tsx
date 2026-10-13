@@ -9,6 +9,7 @@ import { useEventContext } from "./eventContext";
 const REGISTERS = [
   { segment: "commitments", label: "register-nav-commitments" },
   { segment: "milestones", label: "register-nav-milestones" },
+  { segment: "decisions", label: "register-nav-decisions" },
 ] as const;
 
 /** The paths of the registers of the event at `base`. The first one opens „Register“. */

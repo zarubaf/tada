@@ -8,7 +8,8 @@ import { Select } from "../ui/Select";
 import { TextField } from "../ui/TextField";
 import type { Directory } from "./directory";
 import { blankToNull, fieldErrors } from "./fieldErrors";
-import { NO_WORKSTREAM, OwnerSelect, PartyPicker, WorkstreamSelect } from "./fields";
+import { NO_WORKSTREAM, OwnerSelect, WorkstreamSelect } from "./fields";
+import { PartyPicker } from "./PartiesSelect";
 import styles from "./Work.module.css";
 
 const FIELDS = ["text", "condition", "promisor", "owner", "workstream", "due"] as const;

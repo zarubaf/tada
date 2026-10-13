@@ -1,7 +1,7 @@
 // What the work pages need to know about the event: the names of the members, the workstreams, the
 // milestones and the actions if the page asks for them, and whether the member manages the event.
-// The server says per record what the caller may do (`can_change`); `isManager` serves only the
-// workstreams, which have no such field yet.
+// The server says per record what the caller may do (`can_change`, `can_end`); `isManager` serves
+// the workstreams, which have no such field yet, and the form that records a new decision.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Action,

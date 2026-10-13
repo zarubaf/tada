@@ -1,11 +1,10 @@
 import { useState } from "react";
-import type { Api, Milestone } from "../api/client";
+import type { Milestone } from "../api/client";
 import { t } from "../i18n";
 import { ComboBox } from "../ui/ComboBox";
 import { Select } from "../ui/Select";
 import type { Choice, Directory } from "./directory";
 import { milestoneName } from "./milestoneName";
-import { usePromisorSearch } from "./usePromisorSearch";
 
 /** The choice „no workstream“: a select cannot hold an empty value. */
 export const NO_WORKSTREAM = "none";
@@ -136,51 +135,6 @@ export function MilestoneSelect({
         onChange(id ?? NO_MILESTONE);
       }}
       error={error}
-    />
-  );
-}
-
-/**
- * A search for one person or institution of the organization. The server searches by name (ADR
- * 0069); the member types and picks. The picker keeps its own text. A parent that wants a fresh
- * picker, for example after a save, gives it a new `key`.
- */
-export function PartyPicker({
-  api,
-  label,
-  placeholder,
-  help,
-  error,
-  onChange,
-}: {
-  api: Api;
-  label: string;
-  placeholder?: string;
-  help?: string;
-  error?: string | undefined;
-  /** The chosen party (`person:{uuid}` or `institution:{uuid}`), or nothing when the member clears it. */
-  onChange: (party: Choice | undefined) => void;
-}) {
-  const [text, setText] = useState("");
-  const [chosen, setChosen] = useState<Choice>();
-  // The search stops while the text shows the label of the chosen option.
-  const options = usePromisorSearch(api, text, text !== chosen?.label);
-  return (
-    <ComboBox
-      label={label}
-      {...(placeholder !== undefined && { placeholder })}
-      {...(help !== undefined && { help })}
-      options={options.options}
-      inputValue={text}
-      onInputChange={setText}
-      selectedKey={chosen?.id}
-      onSelectionChange={(id) => {
-        const party = options.options.find((option) => option.id === id);
-        setChosen(party);
-        onChange(party);
-      }}
-      isLoading={options.loading}
-      error={error ?? options.failure}
     />
   );
 }

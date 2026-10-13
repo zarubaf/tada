@@ -1615,3 +1615,132 @@ describe("milestones", () => {
     expect(await within(card).findByText(/Das Startdatum liegt nach/)).toBeInTheDocument();
   });
 });
+
+const CS_DECISIONS = "0199b8e0-0000-7000-8000-000000000c0b";
+const P_DECISION = "0199b8e0-0000-7000-8000-0000000001e1";
+const P_SUPERSEDE = "0199b8e0-0000-7000-8000-0000000001e2";
+const P_REVOKE = "0199b8e0-0000-7000-8000-0000000001e3";
+const NEW_DECISION = "0199b8e0-0000-7000-8000-0000000007a1";
+const OLD_DECISION = "0199b8e0-0000-7000-8000-0000000007a2";
+const OTHER_DECISION = "0199b8e0-0000-7000-8000-0000000007a3";
+const PARTY_ONE = "0199b8e0-0000-7000-8000-0000000007b1";
+const PARTY_TWO = "0199b8e0-0000-7000-8000-0000000007b2";
+
+/** A new decision, the replacement of an old one by it, and the revocation of another. */
+CHANGESETS.set(CS_DECISIONS, {
+  id: CS_DECISIONS,
+  event_id: EVENT.id,
+  author: AI,
+  source_version_id: evidence.source_version_id,
+  created_at: "2028-03-09T09:00:00Z",
+  proposals: [
+    proposal(P_DECISION, {
+      operation: {
+        kind: "create-decision",
+        id: NEW_DECISION,
+        event_id: EVENT.id,
+        wording: "Das Fest findet bei jedem Wetter statt.\nBei Sturm entscheidet das OK.",
+        decided_on: "2028-03-01",
+        decided_by: [{ person: PARTY_ONE }, { institution: PARTY_TWO }],
+        owner: SESSION.user_id,
+        workstream: null,
+      },
+    }),
+    proposal(P_SUPERSEDE, {
+      depends_on: [P_DECISION],
+      operation: {
+        kind: "supersede-decision",
+        event_id: EVENT.id,
+        decision_id: OLD_DECISION,
+        successor: NEW_DECISION,
+        expected_version: 2,
+      },
+    }),
+    proposal(P_REVOKE, {
+      operation: {
+        kind: "revoke-decision",
+        event_id: EVENT.id,
+        decision_id: OTHER_DECISION,
+        reason: "Die Gemeinde verbietet das Feuerwerk.",
+        expected_version: 1,
+      },
+    }),
+  ],
+});
+
+function decisionServer(extra: Record<string, Handler> = {}) {
+  const decision = (id: string, local_id: string, wording: string) =>
+    json(200, { id, local_id, wording, redacted: false });
+  return editServer({
+    [`GET /api/v1/persons/${PARTY_ONE}`]: () =>
+      json(200, { id: PARTY_ONE, name: "Cäcilia Probst", redacted: false }),
+    [`GET /api/v1/persons/${PARTY_TWO}`]: () => json(404, { code: "not-found" }),
+    [`GET /api/v1/institutions/${PARTY_TWO}`]: () =>
+      json(200, { id: PARTY_TWO, name: "Organisationskomitee", redacted: false }),
+    [`GET /api/v1/events/:id/decisions/${OLD_DECISION}`]: () =>
+      decision(OLD_DECISION, "DEC-004", "Das Fest findet nur bei gutem Wetter statt."),
+    [`GET /api/v1/events/:id/decisions/${OTHER_DECISION}`]: () =>
+      decision(OTHER_DECISION, "DEC-005", "Es gibt ein Feuerwerk."),
+    ...extra,
+  });
+}
+
+describe("decisions", () => {
+  it("shows a new decision with its wording in lines, its date and its parties by name", async () => {
+    renderAt(`/inbox/${CS_DECISIONS}`, decisionServer());
+
+    const card = await screen.findByRole("article", { name: "Entscheid anlegen" });
+    const wording = within(card).getByText(/Das Fest findet bei jedem Wetter statt/);
+    // The line break stays in the text; the style of the element keeps it on screen.
+    expect(wording.textContent).toContain("statt.\nBei Sturm");
+    expect(within(card).getByText("01.03.2028")).toBeInTheDocument();
+    expect(
+      await within(card).findByText("Cäcilia Probst, Organisationskomitee"),
+    ).toBeInTheDocument();
+    expect(await within(card).findByText("Anna Muster")).toBeInTheDocument();
+  });
+
+  it("shows the decision that ends and its successor by readable ID", async () => {
+    renderAt(`/inbox/${CS_DECISIONS}`, decisionServer());
+
+    const card = await screen.findByRole("article", { name: "Entscheid ersetzen" });
+    expect(
+      await within(card).findByText("DEC-004 Das Fest findet nur bei gutem Wetter statt."),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        "Das Fest findet bei jedem Wetter statt. Bei Sturm entscheidet das OK.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the decision that a proposal revokes, with the reason", async () => {
+    renderAt(`/inbox/${CS_DECISIONS}`, decisionServer());
+
+    const card = await screen.findByRole("article", { name: "Entscheid widerrufen" });
+    expect(await within(card).findByText("DEC-005 Es gibt ein Feuerwerk.")).toBeInTheDocument();
+    expect(within(card).getByText("Die Gemeinde verbietet das Feuerwerk.")).toBeInTheDocument();
+  });
+
+  it("edits the owner of a new decision and shows wording, date and parties read-only", async () => {
+    const server = renderAt(`/inbox/${CS_DECISIONS}`, decisionServer());
+
+    const article = await screen.findByRole("article", { name: "Entscheid anlegen" });
+    await userEvent.click(
+      within(article).getByRole("button", { name: /^Bearbeiten und annehmen/ }),
+    );
+    const owner = await within(article).findByRole(
+      "button",
+      { name: /Verantwortlich/ },
+      { timeout: 4000 },
+    );
+    expect(within(article).queryByRole("textbox")).toBeNull();
+    expect(within(article).getByText(/Wortlaut, Datum und Parteien bleiben/)).toBeInTheDocument();
+    await userEvent.click(owner);
+    await userEvent.click(await screen.findByRole("option", { name: "Bernd Beispiel" }));
+    await submitEdit(article);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([{ proposal_id: P_DECISION, fields: { owner: BERND } }]);
+  });
+});

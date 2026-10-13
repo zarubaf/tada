@@ -5,6 +5,7 @@
 
 import type { Api, Changeset } from "../api/client";
 import { loadOrganizationMembers } from "../events/eventMembers";
+import { decisionName, oneLineWording } from "../work/decisionWording";
 import { milestoneName } from "../work/milestoneName";
 
 export interface RecordNames {
@@ -14,8 +15,8 @@ export interface RecordNames {
   /** A person or an institution, new in the changeset or existing. */
   party: (id: string) => string | undefined;
   /**
-   * An action, a commitment or a milestone: its readable ID and its text. A milestone that the
-   * changeset creates has no readable ID yet: its title.
+   * An action, a commitment, a milestone or a decision: its readable ID and its text. A record
+   * that the changeset creates has no readable ID yet: its title or its wording.
    */
   record: (id: string) => string | undefined;
 }
@@ -33,15 +34,29 @@ function references(changeset: Changeset) {
   const actions = new Set<string>();
   const commitments = new Set<string>();
   const milestones = new Set<string>();
+  const decisions = new Set<string>();
   let people = false;
   for (const { operation } of changeset.proposals) {
     if (
       operation.kind === "create-action" ||
       operation.kind === "create-commitment" ||
       operation.kind === "create-milestone" ||
+      operation.kind === "create-decision" ||
       operation.kind === "create-workstream"
     ) {
       people = true;
+    }
+    if (operation.kind === "create-decision") {
+      for (const party of operation.decided_by) {
+        parties.add("person" in party ? party.person : party.institution);
+      }
+    }
+    if (operation.kind === "supersede-decision") {
+      decisions.add(operation.decision_id);
+      decisions.add(operation.successor);
+    }
+    if (operation.kind === "revoke-decision") {
+      decisions.add(operation.decision_id);
     }
     if (operation.kind === "create-action" && operation.milestone) {
       milestones.add(operation.milestone);
@@ -67,13 +82,13 @@ function references(changeset: Changeset) {
       commitments.add(operation.commitment_id);
     }
   }
-  return { parties, actions, commitments, milestones, people };
+  return { parties, actions, commitments, milestones, decisions, people };
 }
 
 /** Best effort: each lookup that fails leaves its names out. */
 export async function loadRecordNames(api: Api, changeset: Changeset): Promise<RecordNames> {
   const eventId = changeset.event_id;
-  const { parties, actions, commitments, milestones, people } = references(changeset);
+  const { parties, actions, commitments, milestones, decisions, people } = references(changeset);
   const users = new Map<string, string>();
   const workstreams = new Map<string, string>();
   const records = new Map<string, string>();
@@ -87,6 +102,10 @@ export async function loadRecordNames(api: Api, changeset: Changeset): Promise<R
     }
     if (operation.kind === "create-milestone") {
       records.set(operation.id, operation.title);
+    }
+    // A decision of the changeset has no readable ID yet: its wording.
+    if (operation.kind === "create-decision") {
+      records.set(operation.id, oneLineWording(operation.wording));
     }
   }
   const attempt = async (work: () => Promise<void>) => {
@@ -160,6 +179,18 @@ export async function loadRecordNames(api: Api, changeset: Changeset): Promise<R
           });
           if (data) {
             records.set(id, milestoneName(data));
+          }
+        }),
+      ),
+    ...[...decisions]
+      .filter((id) => !records.has(id))
+      .map((id) =>
+        attempt(async () => {
+          const { data } = await api.GET("/api/v1/events/{event_id}/decisions/{id}", {
+            params: { path: { ...path, id } },
+          });
+          if (data) {
+            records.set(id, decisionName(data));
           }
         }),
       ),
