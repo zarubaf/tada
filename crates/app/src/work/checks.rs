@@ -29,15 +29,19 @@ pub(super) fn parse_description(
     check: &mut Checker,
     input: Option<&str>,
 ) -> Option<Option<RecordDescription>> {
+    parse_optional_text(check, "description", input)
+}
+
+/// An optional text with the limits of a description: the description of a record, or the mitigation of a risk.
+pub(super) fn parse_optional_text(
+    check: &mut Checker,
+    field: &'static str,
+    input: Option<&str>,
+) -> Option<Option<RecordDescription>> {
     match input {
         None => Some(None),
         Some(text) => check
-            .parse(
-                "description",
-                text,
-                RecordDescription::parse,
-                text_error_code,
-            )
+            .parse(field, text, RecordDescription::parse, text_error_code)
             .map(Some),
     }
 }
