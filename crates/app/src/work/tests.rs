@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use tada_domain::identity::{EventRole, OrganizationRole};
-use tada_domain::ids::{InstitutionId, OrganizationId, PersonId};
+use tada_domain::ids::{InstitutionId, MilestoneId, OrganizationId, PersonId};
 use tada_domain::parties::PartyName;
+use tada_domain::records::MilestoneStatus;
 use tada_domain::work::{WorkstreamName, WorkstreamStatus};
 
 use super::*;
@@ -68,6 +69,7 @@ fn kitchen() -> WorkstreamId {
 struct Memory {
     actions: Mutex<Vec<ActionView>>,
     commitments: Mutex<Vec<CommitmentView>>,
+    milestones: Mutex<Vec<MilestoneView>>,
     workstreams: Mutex<Vec<Workstream>>,
     audit: Mutex<Vec<AuditAction>>,
 }
@@ -85,6 +87,7 @@ impl Default for Memory {
         Self {
             actions: Mutex::default(),
             commitments: Mutex::default(),
+            milestones: Mutex::default(),
             workstreams: Mutex::new(vec![
                 workstream(ground(), "Gelände", WorkstreamStatus::Active),
                 workstream(kitchen(), "Küche", WorkstreamStatus::Closed),
@@ -99,6 +102,7 @@ impl Memory {
         WorkPorts {
             identity: self,
             work: self,
+            milestones: self,
             workstreams: self,
             parties: self,
             clock: &FixedClock,
@@ -369,6 +373,95 @@ impl PartyStore for Memory {
 
 fn next(version: RecordVersion) -> RecordVersion {
     RecordVersion::new(version.get() + 1).unwrap()
+}
+
+/// The fake has no warnings: the store calculates them in its query (`store-pg`).
+#[async_trait]
+impl MilestoneStore for Memory {
+    async fn create_milestone(
+        &self,
+        _: OrgScope,
+        milestone: &NewMilestoneRecord,
+        _: Timestamp,
+        audit: &AuditEvent,
+    ) -> Result<Created<MilestoneView>, StoreError> {
+        let mut all = self.milestones.lock().unwrap();
+        if all.iter().any(|known| known.id == milestone.id) {
+            return Ok(Created::IdTaken);
+        }
+        let view = MilestoneView {
+            id: milestone.id,
+            local_number: all.len() as u64 + 1,
+            event_id: milestone.event_id,
+            fields: milestone.fields.clone(),
+            version: RecordVersion::FIRST,
+            warnings: Vec::new(),
+        };
+        all.push(view.clone());
+        self.audit.lock().unwrap().push(audit.action());
+        Ok(Created::Created(view))
+    }
+
+    async fn change_milestone(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        id: MilestoneId,
+        fields: &MilestoneFields,
+        expected: RecordVersion,
+        _: Timestamp,
+        audit: &AuditEvent,
+    ) -> Result<Changed<MilestoneView>, StoreError> {
+        let mut all = self.milestones.lock().unwrap();
+        let Some(known) = all
+            .iter_mut()
+            .find(|known| known.id == id && known.event_id == event)
+        else {
+            return Ok(Changed::NotFound);
+        };
+        if known.version != expected {
+            return Ok(Changed::VersionConflict);
+        }
+        known.fields = fields.clone();
+        known.version = next(known.version);
+        self.audit.lock().unwrap().push(audit.action());
+        Ok(Changed::Changed(known.clone()))
+    }
+
+    async fn milestone(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        id: MilestoneId,
+        _: Timestamp,
+    ) -> Result<Option<MilestoneView>, StoreError> {
+        let all = self.milestones.lock().unwrap();
+        Ok(all
+            .iter()
+            .find(|known| known.id == id && known.event_id == event)
+            .cloned())
+    }
+
+    async fn milestones(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        filter: &WorkFilter<MilestoneStatus>,
+        _: Timestamp,
+    ) -> Result<Vec<MilestoneView>, StoreError> {
+        let all = self.milestones.lock().unwrap();
+        Ok(all
+            .iter()
+            .filter(|known| known.event_id == event)
+            .filter(|known| {
+                filter
+                    .status
+                    .is_none_or(|status| known.fields.status == status)
+            })
+            .take(filter.limit as usize)
+            .cloned()
+            .collect())
+    }
 }
 
 #[async_trait]
@@ -1226,4 +1319,209 @@ async fn a_list_pages_and_filters_by_owner() {
     .unwrap();
     assert_eq!(second.items[0].record.local_number, 3);
     assert_eq!(second.next, None);
+}
+
+fn new_milestone(owner: u128, workstream: Option<WorkstreamId>) -> NewMilestone {
+    NewMilestone {
+        id: None,
+        title: "Bewilligung liegt vor".to_owned(),
+        description: None,
+        date: jiff::civil::date(2030, 5, 1),
+        owner: user(owner),
+        workstream,
+    }
+}
+
+fn milestone_change(expected_version: RecordVersion) -> MilestoneChange {
+    MilestoneChange {
+        title: None,
+        description: None,
+        date: None,
+        owner: None,
+        workstream: None,
+        status: None,
+        expected_version,
+    }
+}
+
+async fn milestone_by(
+    memory: &Memory,
+    by: u128,
+    input: NewMilestone,
+) -> Result<MilestoneView, WorkError> {
+    create_milestone(&caller(by), open_day(), input, memory.ports())
+        .await
+        .map(|shown| shown.record)
+}
+
+async fn change_milestone_by(
+    memory: &Memory,
+    by: u128,
+    id: MilestoneId,
+    change: MilestoneChange,
+) -> Result<MilestoneView, WorkError> {
+    change_milestone(&caller(by), open_day(), id, change, memory.ports())
+        .await
+        .map(|shown| shown.record)
+}
+
+async fn milestone_status(
+    memory: &Memory,
+    id: MilestoneId,
+    status: MilestoneStatus,
+    expected_version: RecordVersion,
+) -> Result<MilestoneView, WorkError> {
+    let change = MilestoneChange {
+        status: Some(status),
+        ..milestone_change(expected_version)
+    };
+    change_milestone_by(memory, OWNER, id, change).await
+}
+
+#[tokio::test]
+async fn contributor_creates_a_milestone() {
+    let memory = Memory::default();
+    let milestone = milestone_by(&memory, OTHER, new_milestone(OWNER, Some(ground())))
+        .await
+        .unwrap();
+    assert_eq!(milestone.fields.owner, user(OWNER));
+    assert_eq!(milestone.fields.status, MilestoneStatus::Open);
+    assert_eq!(milestone.fields.date, jiff::civil::date(2030, 5, 1));
+    assert_eq!(milestone.local_id(), "MIL-001");
+    assert_eq!(memory.audit(), [AuditAction::MilestoneCreate]);
+
+    // The owner is a contributor or a manager, the workstream an active one of the event.
+    let result = milestone_by(&memory, OTHER, new_milestone(VIEWER, Some(kitchen()))).await;
+    assert_eq!(
+        fields(result),
+        [
+            ("owner".to_owned(), "unknown-member"),
+            ("workstream".to_owned(), "closed"),
+        ]
+    );
+    let long = NewMilestone {
+        title: "a".repeat(201),
+        ..new_milestone(OWNER, None)
+    };
+    let result = milestone_by(&memory, OTHER, long).await;
+    assert_eq!(fields(result), field("title", "too-long"));
+}
+
+#[tokio::test]
+async fn viewer_cannot_create_a_milestone() {
+    let memory = Memory::default();
+    let viewer = milestone_by(&memory, VIEWER, new_milestone(OWNER, None)).await;
+    assert!(matches!(viewer, Err(WorkError::Forbidden)), "{viewer:?}");
+    let stranger = milestone_by(&memory, STRANGER, new_milestone(OWNER, None)).await;
+    assert!(matches!(stranger, Err(WorkError::NotFound)), "{stranger:?}");
+    assert!(memory.audit().is_empty());
+}
+
+#[tokio::test]
+async fn owner_reaches_and_reopens_a_milestone() {
+    let memory = Memory::default();
+    let milestone = milestone_by(&memory, OWNER, new_milestone(OWNER, Some(ground())))
+        .await
+        .unwrap();
+    let reached = milestone_status(
+        &memory,
+        milestone.id,
+        MilestoneStatus::Reached,
+        milestone.version,
+    )
+    .await
+    .unwrap();
+    assert_eq!(reached.fields.status, MilestoneStatus::Reached);
+    let open = milestone_status(
+        &memory,
+        milestone.id,
+        MilestoneStatus::Open,
+        reached.version,
+    )
+    .await
+    .unwrap();
+    assert_eq!(open.fields.status, MilestoneStatus::Open);
+    assert_eq!(
+        memory.audit(),
+        [
+            AuditAction::MilestoneCreate,
+            AuditAction::MilestoneChange,
+            AuditAction::MilestoneChange
+        ]
+    );
+
+    // The lead and a manager change it too; another contributor and a viewer do not.
+    let mut version = open.version;
+    for by in [LEAD, MANAGER] {
+        let change = MilestoneChange {
+            date: Some(jiff::civil::date(2030, 5, 2)),
+            ..milestone_change(version)
+        };
+        version = change_milestone_by(&memory, by, milestone.id, change)
+            .await
+            .unwrap()
+            .version;
+    }
+    for by in [OTHER, VIEWER] {
+        let change = MilestoneChange {
+            title: Some("X".to_owned()),
+            ..milestone_change(version)
+        };
+        let result = change_milestone_by(&memory, by, milestone.id, change).await;
+        assert!(
+            matches!(result, Err(WorkError::Forbidden)),
+            "{by}: {result:?}"
+        );
+    }
+
+    // The view tells the owner the next statuses.
+    let shown = get_milestone(&caller(OWNER), open_day(), milestone.id, memory.ports())
+        .await
+        .unwrap();
+    assert_eq!(
+        shown.next_statuses(),
+        [MilestoneStatus::Reached, MilestoneStatus::Canceled]
+    );
+    let shown = get_milestone(&caller(VIEWER), open_day(), milestone.id, memory.ports())
+        .await
+        .unwrap();
+    assert!(shown.next_statuses().is_empty());
+}
+
+#[tokio::test]
+async fn canceled_milestone_is_final() {
+    let memory = Memory::default();
+    let milestone = milestone_by(&memory, OWNER, new_milestone(OWNER, None))
+        .await
+        .unwrap();
+    let canceled = milestone_status(
+        &memory,
+        milestone.id,
+        MilestoneStatus::Canceled,
+        milestone.version,
+    )
+    .await
+    .unwrap();
+    for status in MilestoneStatus::ALL {
+        let result = milestone_status(&memory, milestone.id, status, canceled.version).await;
+        assert!(
+            matches!(result, Err(WorkError::InvalidTransition)),
+            "{status:?}: {result:?}"
+        );
+    }
+    let page = list_milestones(
+        &caller(VIEWER),
+        open_day(),
+        WorkQuery {
+            owner: None,
+            status: Some(MilestoneStatus::Canceled),
+            workstream: None,
+            after: None,
+            limit: crate::paging::PageLimit::LARGEST,
+        },
+        memory.ports(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(page.items.len(), 1);
 }

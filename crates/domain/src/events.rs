@@ -107,6 +107,11 @@ impl EventTimeZone {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// The date of `now` in this time zone: "today" of the event.
+    pub fn today(&self, now: Timestamp) -> jiff::civil::Date {
+        now.to_zoned(crate::schedule::tz_of(self)).date()
+    }
 }
 
 /// The status of an event: it takes changes while active and only reads once closed (ADR 0045).
@@ -231,5 +236,14 @@ mod tests {
             Err(UnknownTimeZone)
         );
         assert_eq!(EventTimeZone::parse("+01:00"), Err(UnknownTimeZone));
+    }
+
+    #[test]
+    fn today_is_the_date_in_the_time_zone_of_the_event() {
+        let now: Timestamp = "2030-05-17T22:30:00Z".parse().unwrap();
+        let zurich = EventTimeZone::parse("Europe/Zurich").unwrap();
+        let new_york = EventTimeZone::parse("America/New_York").unwrap();
+        assert_eq!(zurich.today(now), jiff::civil::date(2030, 5, 18));
+        assert_eq!(new_york.today(now), jiff::civil::date(2030, 5, 17));
     }
 }

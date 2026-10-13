@@ -17,11 +17,11 @@ use crate::facts::{
 };
 use crate::identity::Email;
 use crate::ids::{
-    ActionId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId, OpenQuestionId,
-    PersonId, ProposalId, UserId, WorkstreamId,
+    ActionId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId, MilestoneId,
+    OpenQuestionId, PersonId, ProposalId, UserId, WorkstreamId,
 };
 use crate::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
-use crate::records::RecordRef;
+use crate::records::{MilestoneStatus, MilestoneTitle, RecordRef};
 use crate::sources::Evidence;
 use crate::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
@@ -147,6 +147,23 @@ pub enum Operation {
         name: WorkstreamName,
         lead: UserId,
     },
+    /// Create a milestone of an event with its owner (ADR 0080). It starts `open`.
+    CreateMilestone {
+        id: MilestoneId,
+        event_id: EventId,
+        title: MilestoneTitle,
+        description: Option<ActionDescription>,
+        date: Date,
+        owner: UserId,
+        workstream: Option<WorkstreamId>,
+    },
+    /// Change the status of a milestone. `expected_version` is the current version of the milestone.
+    ChangeMilestoneStatus {
+        event_id: EventId,
+        milestone_id: MilestoneId,
+        status: MilestoneStatus,
+        expected_version: RecordVersion,
+    },
 }
 
 /// The document of a draft: a new document, or an existing document of the event at its current version.
@@ -184,6 +201,7 @@ pub enum NewRecord {
     Action(ActionId),
     Commitment(CommitmentId),
     Workstream(WorkstreamId),
+    Milestone(MilestoneId),
 }
 
 impl NewRecord {
@@ -198,6 +216,7 @@ impl NewRecord {
             Self::Action(id) => id.as_uuid(),
             Self::Commitment(id) => id.as_uuid(),
             Self::Workstream(id) => id.as_uuid(),
+            Self::Milestone(id) => id.as_uuid(),
         }
     }
 }
@@ -218,13 +237,15 @@ impl Operation {
             Self::CreateAction { id, .. } => Some(NewRecord::Action(*id)),
             Self::CreateCommitment { id, .. } => Some(NewRecord::Commitment(*id)),
             Self::CreateWorkstream { id, .. } => Some(NewRecord::Workstream(*id)),
+            Self::CreateMilestone { id, .. } => Some(NewRecord::Milestone(*id)),
             Self::SetFact { .. }
             | Self::AddChoiceValue { .. }
             | Self::DeprecateField { .. }
             | Self::CreateDocumentDraft { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
-            | Self::ChangeCommitmentStatus { .. } => None,
+            | Self::ChangeCommitmentStatus { .. }
+            | Self::ChangeMilestoneStatus { .. } => None,
         }
     }
 
@@ -244,7 +265,9 @@ impl Operation {
             | Self::CreateWorkstream { event_id, .. }
             | Self::ChangeActionStatus { event_id, .. }
             | Self::ChangeActionDue { event_id, .. }
-            | Self::ChangeCommitmentStatus { event_id, .. } => Some(*event_id),
+            | Self::ChangeCommitmentStatus { event_id, .. }
+            | Self::CreateMilestone { event_id, .. }
+            | Self::ChangeMilestoneStatus { event_id, .. } => Some(*event_id),
             Self::CreatePerson { .. } | Self::CreateInstitution { .. } => None,
         }
     }
@@ -265,6 +288,9 @@ impl Operation {
             Self::ChangeCommitmentStatus { commitment_id, .. } => {
                 Some(RecordRef::Commitment(*commitment_id))
             }
+            Self::ChangeMilestoneStatus { milestone_id, .. } => {
+                Some(RecordRef::Milestone(*milestone_id))
+            }
             Self::CreateEvent { .. }
             | Self::SetFact { .. }
             | Self::AddFieldDefinition { .. }
@@ -276,16 +302,17 @@ impl Operation {
             | Self::CreateInstitution { .. }
             | Self::CreateAction { .. }
             | Self::CreateCommitment { .. }
-            | Self::CreateWorkstream { .. } => None,
+            | Self::CreateWorkstream { .. }
+            | Self::CreateMilestone { .. } => None,
         }
     }
 
     /// The workstream of the record that a create operation creates. Its lead reviews the proposal (ADR 0067, rule 2).
     pub fn workstream(&self) -> Option<WorkstreamId> {
         match self {
-            Self::CreateAction { workstream, .. } | Self::CreateCommitment { workstream, .. } => {
-                *workstream
-            }
+            Self::CreateAction { workstream, .. }
+            | Self::CreateCommitment { workstream, .. }
+            | Self::CreateMilestone { workstream, .. } => *workstream,
             Self::CreateEvent { .. }
             | Self::SetFact { .. }
             | Self::AddFieldDefinition { .. }
@@ -298,7 +325,8 @@ impl Operation {
             | Self::CreateWorkstream { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
-            | Self::ChangeCommitmentStatus { .. } => None,
+            | Self::ChangeCommitmentStatus { .. }
+            | Self::ChangeMilestoneStatus { .. } => None,
         }
     }
 
@@ -319,7 +347,9 @@ impl Operation {
             | Self::CreateCommitment { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
-            | Self::ChangeCommitmentStatus { .. } => false,
+            | Self::ChangeCommitmentStatus { .. }
+            | Self::CreateMilestone { .. }
+            | Self::ChangeMilestoneStatus { .. } => false,
         }
     }
 
@@ -352,7 +382,9 @@ impl Operation {
             | Self::CreateWorkstream { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
-            | Self::ChangeCommitmentStatus { .. } => None,
+            | Self::ChangeCommitmentStatus { .. }
+            | Self::CreateMilestone { .. }
+            | Self::ChangeMilestoneStatus { .. } => None,
         }
     }
 }

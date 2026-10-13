@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT DISTINCT source_version_id FROM record_evidence\n             WHERE organization_id = $1\n               AND (action_id = ANY($2) OR commitment_id = ANY($3)\n                    OR person_id = ANY($4) OR institution_id = ANY($5))",
+  "query": "SELECT DISTINCT source_version_id FROM record_evidence\n             WHERE organization_id = $1\n               AND (action_id = ANY($2) OR commitment_id = ANY($3)\n                    OR person_id = ANY($4) OR institution_id = ANY($5) OR milestone_id = ANY($6))",
   "describe": {
     "columns": [
       {
@@ -21,6 +21,7 @@
         "UuidArray",
         "UuidArray",
         "UuidArray",
+        "UuidArray",
         "UuidArray"
       ]
     },
@@ -28,5 +29,5 @@
       false
     ]
   },
-  "hash": "157703403f3370d5da459493168d38974fc912e705846e1c3a51cbf56630dba9"
+  "hash": "9ecceff9b87635a30cb44c7d3f02a3a03bdfbffc8d4618b246d3af739fcdb9e3"
 }

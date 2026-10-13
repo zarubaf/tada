@@ -84,7 +84,11 @@ const MENTIONS: &str = "
         WHERE v.organization_id = $1
           AND (v.markdown ILIKE ANY ($2) OR v.file_name ILIKE ANY ($2) OR d.name ILIKE ANY ($2))
         UNION ALL
-        SELECT 9, 'promisor', c.id, c.event_id,
+        SELECT 9, 'milestone', m.id, m.event_id, concat_ws(E'\\n', m.title, m.description), m.created_at
+        FROM milestone m
+        WHERE m.organization_id = $1 AND (m.title ILIKE ANY ($2) OR m.description ILIKE ANY ($2))
+        UNION ALL
+        SELECT 10, 'promisor', c.id, c.event_id,
                CASE WHEN c.redacted_at IS NULL THEN concat_ws(E'\\n', c.text, c.condition, c.firm_reason) END,
                c.created_at
         FROM commitment c WHERE c.organization_id = $1 AND c.person_id = $3

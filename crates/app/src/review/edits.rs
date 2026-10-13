@@ -11,6 +11,7 @@ use tada_domain::identity::Email;
 use tada_domain::ids::{UserId, WorkstreamId};
 use tada_domain::parties::{PartyName, PhoneNumber};
 use tada_domain::proposals::Operation;
+use tada_domain::records::MilestoneTitle;
 use tada_domain::work::{ActionDescription, ActionTitle, CommitmentText, ConditionText};
 use uuid::Uuid;
 
@@ -25,6 +26,7 @@ use crate::proposals::{parse_date, text_error_code};
 /// - `create-commitment`: `text`, `condition`, `due_date`, `owner`, `workstream`.
 ///   A condition makes the commitment start `conditional`. An edit cannot remove the condition of a proposed commitment.
 /// - `create-person` and `create-institution`: `name`, `email`, `phone`.
+/// - `create-milestone`: `title`, `description`, `date`, `owner`, `workstream`.
 #[derive(Clone, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RecordEditInput {
@@ -35,6 +37,9 @@ pub struct RecordEditInput {
     /// A date as `YYYY-MM-DD`.
     #[serde(default, deserialize_with = "present")]
     pub due_date: Option<Option<String>>,
+    /// The date of a milestone as `YYYY-MM-DD`.
+    #[serde(default)]
+    pub date: Option<String>,
     /// The user ID of a contributor or a manager of the event.
     #[serde(default)]
     pub owner: Option<Uuid>,
@@ -78,6 +83,9 @@ pub(super) fn editable_fields(operation: &Operation) -> &'static [&'static str] 
         }
         Operation::CreatePerson { .. } | Operation::CreateInstitution { .. } => {
             &["name", "email", "phone"]
+        }
+        Operation::CreateMilestone { .. } => {
+            &["title", "description", "date", "owner", "workstream"]
         }
         _ => &[],
     }
@@ -145,6 +153,7 @@ pub(super) fn edit_record(
         ("title", edit.title.is_some()),
         ("description", edit.description.is_some()),
         ("due_date", edit.due_date.is_some()),
+        ("date", edit.date.is_some()),
         ("owner", edit.owner.is_some()),
         ("workstream", edit.workstream.is_some()),
         ("text", edit.text.is_some()),
@@ -163,6 +172,7 @@ pub(super) fn edit_record(
         title,
         description,
         due_date,
+        date,
         owner,
         workstream,
         text,
@@ -302,6 +312,35 @@ pub(super) fn edit_record(
                 PhoneNumber::parse,
                 text_error_code,
             ),
+        },
+        Operation::CreateMilestone {
+            id,
+            event_id,
+            title: current_title,
+            description: current_description,
+            date: current_date,
+            owner: current_owner,
+            workstream: current_workstream,
+        } => Operation::CreateMilestone {
+            id,
+            event_id,
+            title: errors.replace(
+                "title",
+                current_title,
+                title,
+                MilestoneTitle::parse,
+                text_error_code,
+            ),
+            description: errors.replace_optional(
+                "description",
+                current_description,
+                description,
+                ActionDescription::parse,
+                text_error_code,
+            ),
+            date: errors.replace("date", current_date, date, parse_date, |_| "date"),
+            owner: owner.map_or(current_owner, UserId::from_uuid),
+            workstream: workstream.map_or(current_workstream, |id| id.map(WorkstreamId::from_uuid)),
         },
         other => other,
     };

@@ -9,6 +9,7 @@
 
 mod documents;
 mod events;
+mod milestones;
 mod propose;
 mod work;
 
@@ -41,6 +42,7 @@ pub fn standard_catalog() -> ToolCatalog<AiToolPorts> {
         Arc::new(Typed(work::ListWorkstreams)),
         Arc::new(Typed(work::ListActions)),
         Arc::new(Typed(work::ListCommitments)),
+        Arc::new(Typed(milestones::ListMilestones)),
         Arc::new(Typed(work::SearchParties)),
         Arc::new(Typed(propose::ProposeChangeset)),
     ])

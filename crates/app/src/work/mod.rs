@@ -1,9 +1,10 @@
-//! Actions and commitments (ADR 0068): the work records of an event, with their direct commands.
-//! A member creates and changes them without review. Proposals come later (ADR 0050).
+//! Actions, commitments and milestones (ADR 0068, ADR 0080): the work records of an event, with their direct
+//! commands. A member creates and changes them without review; an accepted proposal does the same (ADR 0050).
 
 mod actions;
 mod checks;
 mod commitments;
+mod milestones;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -28,6 +29,11 @@ pub(crate) use self::checks::{ChangeRights, WorkRecord, is_possible_owner};
 pub use self::commitments::{
     CommitmentChange, FirmInput, NewCommitment, change_commitment, create_commitment,
     get_commitment, list_commitments, make_commitment_firm,
+};
+pub use self::milestones::{
+    MilestoneChange, MilestoneFields, MilestoneStore, MilestoneView, MilestoneWarning,
+    NewMilestone, NewMilestoneRecord, change_milestone, create_milestone, get_milestone,
+    list_milestones,
 };
 use crate::access::{AccessError, EventClosed, EventLevel, EventReach};
 use crate::audit::AuditEvent;
@@ -300,6 +306,7 @@ pub trait WorkStore: EvidenceStore + Debug + Send + Sync {
 pub struct WorkPorts<'a> {
     pub identity: &'a dyn IdentityStore,
     pub work: &'a dyn WorkStore,
+    pub milestones: &'a dyn MilestoneStore,
     pub workstreams: &'a dyn WorkstreamStore,
     pub parties: &'a dyn PartyStore,
     pub clock: &'a dyn Clock,

@@ -44,6 +44,7 @@ pub enum MentionKind {
     DocumentVersion,
     /// A commitment whose promisor is the person: a reference by ID.
     Promisor,
+    Milestone,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -51,7 +52,7 @@ pub enum MentionKind {
 pub struct UnknownMentionKind;
 
 impl MentionKind {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::SourceItem,
         Self::FactVersion,
         Self::Proposal,
@@ -61,6 +62,7 @@ impl MentionKind {
         Self::Workstream,
         Self::DocumentVersion,
         Self::Promisor,
+        Self::Milestone,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -74,6 +76,7 @@ impl MentionKind {
             Self::Workstream => "workstream",
             Self::DocumentVersion => "document-version",
             Self::Promisor => "promisor",
+            Self::Milestone => "milestone",
         }
     }
 }

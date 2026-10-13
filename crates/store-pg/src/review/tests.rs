@@ -62,6 +62,7 @@ fn propose_stores(test: &TestDatabase) -> ProposeStores<'_> {
         workstreams: &test.database,
         parties: &test.database,
         work: &test.database,
+        milestones: &test.database,
     }
 }
 

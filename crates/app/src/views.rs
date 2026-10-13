@@ -12,6 +12,7 @@ use tada_domain::events::Event;
 use tada_domain::facts::{
     CORE_CATALOG_VERSION, FactState, FieldDefinition, FieldStatus, Label, Valued,
 };
+use tada_domain::records::MilestoneStatus;
 use tada_domain::redaction::Redactable;
 use tada_domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus};
 use uuid::Uuid;
@@ -141,13 +142,19 @@ const COMMITMENT_STATUSES: [&str; 5] = [
     CommitmentStatus::Withdrawn.as_str(),
 ];
 
+const MILESTONE_STATUSES: [&str; 3] = [
+    MilestoneStatus::Open.as_str(),
+    MilestoneStatus::Reached.as_str(),
+    MilestoneStatus::Canceled.as_str(),
+];
+
 const WORKSTREAM_STATUSES: [&str; 2] = [
     WorkstreamStatus::Active.as_str(),
     WorkstreamStatus::Closed.as_str(),
 ];
 
-/// The kinds of records that an agent can read (ADR 0049, ADR 0068, ADR 0069).
-const ENTITIES: [EntityView; 9] = [
+/// The kinds of records that an agent can read (ADR 0049, ADR 0068, ADR 0069, ADR 0080).
+const ENTITIES: [EntityView; 10] = [
     EntityView {
         name: "event",
         description: "One occurrence of an event, with its key, name and time zone. Facts, open questions, documents, workstreams, actions and commitments belong to it.",
@@ -182,6 +189,11 @@ const ENTITIES: [EntityView; 9] = [
         name: "commitment",
         description: "A promise of one person or one institution in an event, with the owner who follows it up and an event-local ID such as COM-001. With a condition it starts conditional, else firm. Only evidence that the condition is met makes it firm; never invent a signature or an approval. Conditional changes to firm; conditional and firm change to fulfilled, broken or withdrawn, which are final.",
         statuses: &COMMITMENT_STATUSES,
+    },
+    EntityView {
+        name: "milestone",
+        description: "A dated point of the plan of an event with one owner, an optional workstream and an event-local ID such as MIL-001. tada warns if it is open after its date, or if an open action of it is due after its date. Transitions: open changes to reached or canceled; reached changes to open; canceled is final.",
+        statuses: &MILESTONE_STATUSES,
     },
     EntityView {
         name: "person",

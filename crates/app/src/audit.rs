@@ -63,6 +63,10 @@ pub enum AuditAction {
     CommitmentChange,
     /// A conditional commitment became firm. The commitment keeps the reason; the event holds no text (ADR 0068).
     CommitmentFirm,
+    /// A contributor or manager created a milestone (ADR 0080).
+    MilestoneCreate,
+    /// The owner, the workstream lead or a manager changed a milestone (ADR 0080).
+    MilestoneChange,
     /// An event manager, owner or admin closed an event (ADR 0071).
     EventClose,
     /// An owner or admin reopened a closed event (ADR 0071).
@@ -134,6 +138,8 @@ impl AuditAction {
             Self::CommitmentCreate => "commitment.create",
             Self::CommitmentChange => "commitment.change",
             Self::CommitmentFirm => "commitment.firm",
+            Self::MilestoneCreate => "milestone.create",
+            Self::MilestoneChange => "milestone.change",
             Self::EventClose => "event.close",
             Self::EventReopen => "event.reopen",
             Self::OrganizationSetRetention => "organization.set_retention",
@@ -216,6 +222,7 @@ impl AuditAction {
             Self::WorkstreamCreate | Self::WorkstreamChange => "workstream",
             Self::ActionCreate | Self::ActionChange => "action",
             Self::CommitmentCreate | Self::CommitmentChange | Self::CommitmentFirm => "commitment",
+            Self::MilestoneCreate | Self::MilestoneChange => "milestone",
         }
     }
 }

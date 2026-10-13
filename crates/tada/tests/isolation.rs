@@ -425,6 +425,42 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
             json!({"title": "Bar", "expected_version": 1}),
             Expect::NotFound,
         )],
+        "list_milestones" => vec![
+            get(
+                api(format!("/events/{}/milestones", t.b_event)),
+                Expect::NotFound,
+            ),
+            get(api(format!("/events/{}/milestones", t.a_event)), READS),
+        ],
+        "create_milestone" => vec![
+            post(
+                api(format!("/events/{}/milestones", t.b_event)),
+                json!({"title": "Bewilligung", "date": "2030-05-01", "owner_user_id": t.a_member}),
+                Expect::NotFound,
+            ),
+            post(
+                api(format!("/events/{}/milestones", t.a_event)),
+                json!({"title": "Bewilligung", "date": "2030-05-01", "owner_user_id": t.b_member}),
+                Expect::Refused,
+            ),
+        ],
+        "get_milestone" => vec![get(
+            api(format!(
+                "/events/{}/milestones/{}",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            Expect::NotFound,
+        )],
+        "change_milestone" => vec![patch(
+            api(format!(
+                "/events/{}/milestones/{}",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            json!({"title": "Bar", "expected_version": 1}),
+            Expect::NotFound,
+        )],
         "list_commitments" => vec![
             get(
                 api(format!("/events/{}/commitments", t.b_event)),
@@ -1399,6 +1435,16 @@ fn tool_attempts(t: &Targets) -> Vec<(&'static str, Value, ToolExpect)> {
         ),
         (
             "list_commitments",
+            json!({"event_key": "ONLYB31"}),
+            ToolExpect::Refused,
+        ),
+        (
+            "list_milestones",
+            json!({"event_key": "OPEN30"}),
+            ToolExpect::Answers,
+        ),
+        (
+            "list_milestones",
             json!({"event_key": "ONLYB31"}),
             ToolExpect::Refused,
         ),

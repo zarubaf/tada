@@ -61,10 +61,11 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
     ]
 }
 
-fn ports(state: &ApiState) -> WorkPorts<'_> {
+pub(crate) fn ports(state: &ApiState) -> WorkPorts<'_> {
     WorkPorts {
         identity: state.identity.as_ref(),
         work: state.work.as_ref(),
+        milestones: state.milestones.as_ref(),
         workstreams: state.workstreams.as_ref(),
         parties: state.parties.as_ref(),
         clock: state.clock.as_ref(),
@@ -396,7 +397,7 @@ pub struct CreateActionRequest {
 }
 
 /// Tells an absent field from a field that is `null`: the first keeps the value, the second clears it.
-fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+pub(crate) fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
     deserializer: D,
 ) -> Result<Option<Option<T>>, D::Error> {
     Option::<T>::deserialize(deserializer).map(Some)
@@ -477,11 +478,11 @@ pub struct MakeFirmRequest {
     pub expected_version: i64,
 }
 
-fn encode_cursor(cursor: &NumberCursor) -> String {
+pub(crate) fn encode_cursor(cursor: &NumberCursor) -> String {
     cursor::encode(cursor.0.to_string())
 }
 
-fn decode_cursor(text: &str) -> Result<NumberCursor, ApiError> {
+pub(crate) fn decode_cursor(text: &str) -> Result<NumberCursor, ApiError> {
     cursor::decode_text(text)?
         .parse()
         .map(NumberCursor)
@@ -489,7 +490,10 @@ fn decode_cursor(text: &str) -> Result<NumberCursor, ApiError> {
 }
 
 /// The `owner` filter: `me` or the ID of a member.
-fn owner_filter(caller: &MemberCaller, owner: Option<&str>) -> Result<Option<UserId>, ApiError> {
+pub(crate) fn owner_filter(
+    caller: &MemberCaller,
+    owner: Option<&str>,
+) -> Result<Option<UserId>, ApiError> {
     match owner {
         None => Ok(None),
         Some("me") => Ok(Some(caller.user_id())),

@@ -315,8 +315,11 @@ impl RoutingLookup for RoutingFacts {
 #[cfg(test)]
 mod tests {
     use tada_domain::RecordVersion;
-    use tada_domain::ids::{ActionId, CommitmentId, FieldDefinitionId, InstitutionId, PersonId};
+    use tada_domain::ids::{
+        ActionId, CommitmentId, FieldDefinitionId, InstitutionId, MilestoneId, PersonId,
+    };
     use tada_domain::parties::{InstitutionKind, Party, PartyName};
+    use tada_domain::records::{MilestoneStatus, MilestoneTitle};
     use tada_domain::work::{ActionStatus, ActionTitle, CommitmentText, WorkstreamName};
     use uuid::Uuid;
 
@@ -502,6 +505,65 @@ mod tests {
                 &facts,
             )
             .routed_to(user(LEAD), EventLevel::Contributor, proposal_id(2))
+        );
+    }
+
+    fn milestone() -> MilestoneId {
+        MilestoneId::from_uuid(Uuid::from_u128(33))
+    }
+
+    fn new_milestone(workstream: Option<WorkstreamId>) -> Operation {
+        Operation::CreateMilestone {
+            id: milestone(),
+            event_id: event(),
+            title: MilestoneTitle::parse("Bewilligung liegt vor").unwrap(),
+            description: None,
+            date: jiff::civil::date(2030, 5, 1),
+            owner: user(OTHER),
+            workstream,
+        }
+    }
+
+    #[test]
+    fn change_of_a_milestone_goes_to_its_owner() {
+        let facts = RoutingFacts {
+            owners: HashMap::from([(RecordRef::Milestone(milestone()), user(OWNER))]),
+            leads: HashMap::new(),
+        };
+        let reached = Operation::ChangeMilestoneStatus {
+            event_id: event(),
+            milestone_id: milestone(),
+            status: MilestoneStatus::Reached,
+            expected_version: RecordVersion::new(1).unwrap(),
+        };
+        assert_eq!(
+            reviewers(&reached, Some(event()), &facts),
+            Reviewers::user(user(OWNER))
+        );
+        // An action with the same UUID is another record.
+        let same_uuid = RoutingFacts {
+            owners: HashMap::from([(
+                RecordRef::Action(ActionId::from_uuid(milestone().as_uuid())),
+                user(OWNER),
+            )]),
+            leads: HashMap::new(),
+        };
+        assert_eq!(
+            reviewers(&reached, Some(event()), &same_uuid),
+            Reviewers::EventManagers
+        );
+    }
+
+    #[test]
+    fn new_milestone_in_a_workstream_goes_to_the_lead() {
+        let facts = facts();
+        assert_eq!(
+            reviewers(&new_milestone(Some(workstream())), Some(event()), &facts),
+            Reviewers::user(user(LEAD))
+        );
+        assert_eq!(
+            reviewers(&new_milestone(None), Some(event()), &facts),
+            Reviewers::EventManagers
         );
     }
 

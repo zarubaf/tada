@@ -108,7 +108,7 @@ pub(super) struct PartiesInput {
 }
 
 /// The text of a redactable value: empty after a legal redaction (ADR 0072).
-fn text<T>(value: &Redactable<T>, as_str: impl Fn(&T) -> &str) -> String {
+pub(super) fn text<T>(value: &Redactable<T>, as_str: impl Fn(&T) -> &str) -> String {
     value
         .as_present()
         .map(|value| as_str(value).to_owned())
@@ -177,7 +177,7 @@ impl EvidenceItem {
     }
 }
 
-fn evidence<T>(shown: &Shown<T>) -> Vec<EvidenceItem> {
+pub(super) fn evidence<T>(shown: &Shown<T>) -> Vec<EvidenceItem> {
     shown
         .evidence
         .iter()
@@ -399,7 +399,7 @@ impl From<&Shown<InstitutionView>> for InstitutionItem {
 }
 
 /// The description of a list tool with a page of `PageLimit::MAX` records.
-fn list_description(what: &str, more: &str) -> String {
+pub(super) fn list_description(what: &str, more: &str) -> String {
     format!(
         "{what} The list holds at most {} records, in the order of their numbers, and has no next page. \
 If more is true, {more}: tell the member.",
@@ -423,7 +423,7 @@ A conditional commitment has a condition and stays conditional until a reviewer 
 });
 
 /// The first page of the largest size, without a filter but the status.
-fn query<S>(status: Option<S>) -> WorkQuery<S> {
+pub(super) fn query<S>(status: Option<S>) -> WorkQuery<S> {
     WorkQuery {
         owner: None,
         status,

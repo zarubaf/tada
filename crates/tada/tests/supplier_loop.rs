@@ -72,7 +72,8 @@ impl App {
                 clock: clock.clone(),
                 workstreams: database.clone(),
                 parties: database.clone(),
-                work: database,
+                work: database.clone(),
+                milestones: database,
             }),
             version: tada::BUILD.version,
         };

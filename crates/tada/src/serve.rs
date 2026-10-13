@@ -72,6 +72,7 @@ pub async fn run(
         parties: Arc::new(db.clone()),
         workstreams: Arc::new(db.clone()),
         work: Arc::new(db.clone()),
+        milestones: Arc::new(db.clone()),
         person_data: Arc::new(db.clone()),
         dispute_notes: Arc::new(db.clone()),
         redaction: Arc::new(db.clone()),
@@ -101,6 +102,7 @@ pub async fn run(
             workstreams: Arc::new(db.clone()),
             parties: Arc::new(db.clone()),
             work: Arc::new(db.clone()),
+            milestones: Arc::new(db.clone()),
         }),
         version: crate::BUILD.version,
     };

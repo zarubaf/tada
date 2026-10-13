@@ -5,7 +5,7 @@ pub mod milestone;
 pub mod requirement;
 pub mod risk;
 
-use crate::ids::{ActionId, CommitmentId, InstitutionId, PersonId};
+use crate::ids::{ActionId, CommitmentId, InstitutionId, MilestoneId, PersonId};
 
 pub use decision::{DecisionParties, DecisionStatus, DecisionWording, EmptyParties};
 pub use milestone::{MilestoneStatus, MilestoneTitle};
@@ -23,4 +23,5 @@ pub enum RecordRef {
     Commitment(CommitmentId),
     Person(PersonId),
     Institution(InstitutionId),
+    Milestone(MilestoneId),
 }

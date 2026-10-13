@@ -555,6 +555,27 @@ pub enum Operation {
         /// The user ID of the member who leads the workstream.
         lead: Uuid,
     },
+    /// A new milestone of the event. It starts `open`.
+    CreateMilestone {
+        id: Uuid,
+        event_id: Uuid,
+        title: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+        date: jiff::civil::Date,
+        /// The user ID of the member who owns the milestone.
+        owner: Uuid,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        workstream: Option<Uuid>,
+    },
+    ChangeMilestoneStatus {
+        event_id: Uuid,
+        milestone_id: Uuid,
+        /// `open`, `reached` or `canceled`.
+        status: String,
+        /// The version of the milestone that the proposal expects.
+        expected_version: i64,
+    },
 }
 
 /// The party that makes a commitment: `{"person": "<uuid>"}` or `{"institution": "<uuid>"}`.
@@ -796,6 +817,34 @@ impl From<&DomainOperation> for Operation {
                 name: name.as_str().to_owned(),
                 lead: lead.as_uuid(),
             },
+            DomainOperation::CreateMilestone {
+                id,
+                event_id,
+                title,
+                description,
+                date,
+                owner,
+                workstream,
+            } => Self::CreateMilestone {
+                id: id.as_uuid(),
+                event_id: event_id.as_uuid(),
+                title: title.as_str().to_owned(),
+                description: description.as_ref().map(|text| text.as_str().to_owned()),
+                date: *date,
+                owner: owner.as_uuid(),
+                workstream: workstream.map(|id| id.as_uuid()),
+            },
+            DomainOperation::ChangeMilestoneStatus {
+                event_id,
+                milestone_id,
+                status,
+                expected_version,
+            } => Self::ChangeMilestoneStatus {
+                event_id: event_id.as_uuid(),
+                milestone_id: milestone_id.as_uuid(),
+                status: status.as_str().to_owned(),
+                expected_version: expected_version.get(),
+            },
         }
     }
 }
@@ -959,6 +1008,8 @@ pub struct ReviewResult {
     pub persons: Vec<NewLocalRecord>,
     /// The new institutions with their organization-local IDs.
     pub institutions: Vec<NewLocalRecord>,
+    /// The new milestones with their event-local IDs.
+    pub milestones: Vec<NewLocalRecord>,
 }
 
 /// A proposal with its new status.
@@ -988,7 +1039,7 @@ pub struct NewDocument {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct NewLocalRecord {
     pub id: Uuid,
-    /// The readable ID, for example `ACT-001`, `COM-001`, `PER-001` or `INS-001` (ADR 0038).
+    /// The readable ID, for example `ACT-001`, `COM-001`, `PER-001`, `INS-001` or `MIL-001` (ADR 0038).
     pub local_id: String,
 }
 
@@ -1007,6 +1058,7 @@ impl From<Applied> for ReviewResult {
         let mut documents = Vec::new();
         let (mut actions, mut commitments) = (Vec::new(), Vec::new());
         let (mut persons, mut institutions) = (Vec::new(), Vec::new());
+        let mut milestones = Vec::new();
         for local in applied.local_ids {
             let number = local.local_number;
             match local.record {
@@ -1042,6 +1094,11 @@ impl From<Applied> for ReviewResult {
                     LocalIdKind::Institution,
                     number,
                 )),
+                LocalRecord::Milestone(id) => milestones.push(NewLocalRecord::new(
+                    id.as_uuid(),
+                    LocalIdKind::Milestone,
+                    number,
+                )),
             }
         }
         Self {
@@ -1049,6 +1106,7 @@ impl From<Applied> for ReviewResult {
             commitments,
             persons,
             institutions,
+            milestones,
             proposals: applied
                 .proposals
                 .into_iter()
@@ -1115,6 +1173,7 @@ async fn create_changeset(
         workstreams: state.workstreams.as_ref(),
         parties: state.parties.as_ref(),
         work: state.work.as_ref(),
+        milestones: state.milestones.as_ref(),
     };
     match proposals::create_changeset(&caller, input, stores, state.clock.as_ref()).await? {
         Created::New(changeset) => Ok((StatusCode::CREATED, axum::Json(changeset.into()))),
@@ -1342,6 +1401,7 @@ async fn reject_proposals(
         commitments: Vec::new(),
         persons: Vec::new(),
         institutions: Vec::new(),
+        milestones: Vec::new(),
     }))
 }
 

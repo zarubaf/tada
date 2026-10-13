@@ -45,7 +45,7 @@ use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::sources::SourceStore;
 use crate::store::StoreError;
 use crate::tokens::TokenScope;
-use crate::work::WorkStore;
+use crate::work::{MilestoneStore, WorkStore};
 use crate::workstreams::WorkstreamStore;
 
 /// A caller that can create proposals (ADR 0039): a member, or an AI client of a member.
@@ -209,6 +209,8 @@ pub struct ProposeStores<'a> {
     pub parties: &'a dyn PartyStore,
     /// The actions and commitments whose status or due date a proposal changes.
     pub work: &'a dyn WorkStore,
+    /// The milestones whose status a proposal changes.
+    pub milestones: &'a dyn MilestoneStore,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -338,7 +340,7 @@ pub async fn create_changeset(
         return intake.existing(stored);
     }
     check_structure(event_id, &proposals)?;
-    check_catalog(scope, event_id, &proposals, stores).await?;
+    check_catalog(scope, event_id, &proposals, stores, clock.now()).await?;
     let source_version_id = text.map(|text| text.id);
     check_cited_sources(caller, event_id, source_version_id, &proposals, stores).await?;
     let drafts = drafts::check_drafts(caller, &proposals, stores).await?;
@@ -841,6 +843,7 @@ async fn check_catalog(
     event_id: Option<EventId>,
     proposals: &[Proposal],
     stores: ProposeStores<'_>,
+    now: Timestamp,
 ) -> Result<(), ProposeError> {
     let mut errors = Vec::new();
     let path = |index: usize, field: &str| format!("proposals/{index}/operation/{field}");
@@ -987,7 +990,7 @@ async fn check_catalog(
             errors.push(FieldError::new(path(index, "owner"), "unknown-member"));
         }
     }
-    errors.extend(work::check_work(scope, proposals, stores).await?);
+    errors.extend(work::check_work(scope, proposals, stores, now).await?);
     finish(errors)
 }
 
