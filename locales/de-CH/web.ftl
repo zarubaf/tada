@@ -893,6 +893,7 @@ institution-kind-other = Andere
 work-loading = Daten des Anlasses werden geladen
 register-load-more = Weitere Einträge laden
 register-loaded-more = Weitere Einträge geladen.
+register-row-not-found = { $id } nicht gefunden
 work-column-id = ID
 work-column-owner = Verantwortlich
 work-column-workstream = Arbeitsbereich

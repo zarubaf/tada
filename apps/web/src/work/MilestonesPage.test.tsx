@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { BERND, EVENT, json, ME, problem, renderWork } from "../test/fakeWorkServer";
+import { BERND, EVENT, json, ME, pagedList, problem, renderWork } from "../test/fakeWorkServer";
 import { MilestonesPage } from "./MilestonesPage";
 
 const user = userEvent.setup({ delay: null });
@@ -73,6 +73,38 @@ describe("MilestonesPage", () => {
     // ACT-001 is open and ACT-002 in progress; ACT-003 is done and ACT-004 has no milestone.
     expect(within(row).getByText("2")).toBeInTheDocument();
     expect(within(row).getByText("offen")).toBeInTheDocument();
+  });
+
+  it("opens the milestone named by the hash of the address and focuses it", async () => {
+    render({
+      hash: "#MIL-002",
+      lists: {
+        "/milestones": [
+          milestone(),
+          milestone({ id: "m2", local_id: "MIL-002", title: "Festzelt steht" }),
+        ],
+      },
+    });
+
+    const row = (await screen.findByText("Festzelt steht")).closest("tr");
+    expect(row).toHaveAttribute("id", "MIL-002");
+    await waitFor(() => expect(row).toHaveFocus());
+    expect(row).toHaveAttribute("data-linked");
+  });
+
+  it("loads further pages until the milestone named by the hash appears", async () => {
+    render({
+      hash: "#MIL-002",
+      answers: {
+        "GET /milestones": pagedList([
+          [milestone()],
+          [milestone({ id: "m2", local_id: "MIL-002", title: "Festzelt steht" })],
+        ]),
+      },
+    });
+
+    const row = (await screen.findByText("Festzelt steht")).closest("tr");
+    await waitFor(() => expect(row).toHaveFocus());
   });
 
   it("shows both warnings of a milestone", async () => {

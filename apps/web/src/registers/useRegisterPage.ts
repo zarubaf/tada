@@ -9,7 +9,7 @@ import type { Register } from "./useRegister";
 /** What `RegisterView` needs of the state of the page. */
 export type RegisterPaging = Pick<
   ReturnType<typeof useRegisterPage>,
-  "retry" | "retried" | "loadMore"
+  "retry" | "retried" | "loadMore" | "setConfirmation" | "setFailure"
 >;
 
 export function useRegisterPage<T>(reload: () => Promise<boolean>) {
