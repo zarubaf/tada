@@ -81,7 +81,7 @@ export interface Setup {
   event?: Event;
   workstreams?: unknown[];
   /** Answers by `METHOD /path-suffix`; the first match wins. */
-  answers?: Record<string, () => Response>;
+  answers?: Record<string, () => Response | Promise<Response>>;
   /** The default answers of the lists, by path suffix. */
   lists?: Record<string, unknown[]>;
   /** The profile of the event that the event page has loaded. The default is still loading. */

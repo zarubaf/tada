@@ -31,6 +31,8 @@ export function useRegister<T extends { id: string }>(
   const [state, setState] = useState<RegisterState<T>>({ kind: "loading" });
   // The newest request wins: an older answer that arrives late is dropped.
   const latest = useRef(0);
+  // One request for the next page at a time: a second caller gets the answer of the open one.
+  const pending = useRef<ReturnType<Register<T>["loadMore"]>>(undefined);
 
   const reload = useCallback(async () => {
     const request = ++latest.current;
@@ -53,7 +55,20 @@ export function useRegister<T extends { id: string }>(
     void reload();
   }, [reload]);
 
-  const loadMore = async () => {
+  const loadMore = () => {
+    if (pending.current) {
+      return pending.current;
+    }
+    const request = fetchNext();
+    pending.current = request;
+    const clear = () => {
+      pending.current = undefined;
+    };
+    request.then(clear, clear);
+    return request;
+  };
+
+  const fetchNext = async (): ReturnType<Register<T>["loadMore"]> => {
     if (state.kind !== "loaded" || state.nextCursor === undefined) {
       return { last: true };
     }
