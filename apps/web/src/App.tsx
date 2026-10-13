@@ -1,4 +1,4 @@
-import { lazy } from "react";
+import { lazy, type ReactNode } from "react";
 import { type Api, createApi } from "./api/client";
 import { DocumentPage } from "./documents/DocumentPage";
 import { DocumentsPage } from "./documents/DocumentsPage";
@@ -6,6 +6,7 @@ import { CreateEventForm } from "./events/CreateEventForm";
 import { EventOverview } from "./events/EventOverview";
 import { EventPage } from "./events/EventPage";
 import { EventsPage } from "./events/EventsPage";
+import { RegisterNav } from "./events/RegisterNav";
 import { NotFoundPage } from "./NotFoundPage";
 import { PrivacyPage } from "./privacy/PrivacyPage";
 import { InboxProvider } from "./review/InboxProvider";
@@ -45,6 +46,9 @@ const ActionsPage = lazy(() =>
 const CommitmentsPage = lazy(() =>
   import("./work/CommitmentsPage").then((module) => ({ default: module.CommitmentsPage })),
 );
+const MilestonesPage = lazy(() =>
+  import("./work/MilestonesPage").then((module) => ({ default: module.MilestonesPage })),
+);
 const WorkstreamsPage = lazy(() =>
   import("./work/WorkstreamsPage").then((module) => ({ default: module.WorkstreamsPage })),
 );
@@ -71,6 +75,19 @@ const Gallery =
   import.meta.env.MODE === "production"
     ? null
     : lazy(() => import("./gallery/Gallery").then((module) => ({ default: module.Gallery })));
+
+/**
+ * A register of an event: the second row of the event navigation stays while the register loads,
+ * so that it does not jump when the member changes the register.
+ */
+function RegisterPage({ api, children }: { api: Api; children: ReactNode }) {
+  return (
+    <EventPage api={api}>
+      <RegisterNav />
+      <RouteSuspense>{children}</RouteSuspense>
+    </EventPage>
+  );
+}
 
 export function App({ api = defaultApi }: { api?: Api }) {
   return (
@@ -137,11 +154,14 @@ export function App({ api = defaultApi }: { api?: Api }) {
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/commitments">
-                    <EventPage api={api}>
-                      <RouteSuspense>
-                        <CommitmentsPage api={api} />
-                      </RouteSuspense>
-                    </EventPage>
+                    <RegisterPage api={api}>
+                      <CommitmentsPage api={api} />
+                    </RegisterPage>
+                  </Route>
+                  <Route path="/events/:eventId/milestones">
+                    <RegisterPage api={api}>
+                      <MilestonesPage api={api} />
+                    </RegisterPage>
                   </Route>
                   <Route path="/events/:eventId/workstreams">
                     <EventPage api={api}>

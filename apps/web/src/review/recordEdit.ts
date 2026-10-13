@@ -8,30 +8,32 @@ export type Fields = NonNullable<ApplyEdit["fields"]>;
 export type FieldName = keyof Fields;
 export type FieldErrors = Partial<Record<FieldName, string>>;
 
-export type RecordOperation = Extract<
-  Operation,
-  { kind: "create-action" | "create-commitment" | "create-person" | "create-institution" }
->;
+const RECORD_KINDS = [
+  "create-action",
+  "create-commitment",
+  "create-milestone",
+  "create-person",
+  "create-institution",
+] as const;
+
+export type RecordOperation = Extract<Operation, { kind: (typeof RECORD_KINDS)[number] }>;
 
 /** The operations whose fields the reviewer can change. */
 export function isRecordOperation(operation: Operation): operation is RecordOperation {
-  return (
-    operation.kind === "create-action" ||
-    operation.kind === "create-commitment" ||
-    operation.kind === "create-person" ||
-    operation.kind === "create-institution"
-  );
+  return (RECORD_KINDS as readonly string[]).includes(operation.kind);
 }
 
 /** The message for a refused field: the code of the server first, then the field. */
 export function message(field: FieldName, code: string): string {
   const key = field === "due_date" ? "due" : field;
-  for (const candidate of [`inbox-edit-error-${field}-${code}`, `inbox-edit-error-${field}`]) {
-    if (hasMessage(candidate)) {
-      return t(candidate);
-    }
-  }
-  return hasMessage(`work-error-${key}`) ? t(`work-error-${key}`) : t("problem-validation-failed");
+  const candidates = [
+    `inbox-edit-error-${field}-${code}`,
+    `inbox-edit-error-${field}`,
+    `work-error-${key}-${code}`,
+    `work-error-${key}`,
+  ];
+  const known = candidates.find((candidate) => hasMessage(candidate));
+  return t(known ?? "problem-validation-failed");
 }
 
 /** The refused fields of an apply that failed with `validation-failed`. */

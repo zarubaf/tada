@@ -1438,3 +1438,180 @@ describe("a new workstream", () => {
     ]);
   });
 });
+
+const CS_PLAN = "0199b8e0-0000-7000-8000-000000000c0b";
+const P_MILESTONE = "0199b8e0-0000-7000-8000-0000000001f1";
+const P_MILESTONE_STATUS = "0199b8e0-0000-7000-8000-0000000001f2";
+const P_ACTION_MILESTONE = "0199b8e0-0000-7000-8000-0000000001f3";
+const P_PLANNED = "0199b8e0-0000-7000-8000-0000000001f6";
+const NEW_MILESTONE = "0199b8e0-0000-7000-8000-0000000006a1";
+const OLD_MILESTONE = "0199b8e0-0000-7000-8000-0000000006a2";
+const OLD_ACTION = "0199b8e0-0000-7000-8000-0000000006a3";
+
+/** A new milestone with an action, and a change of a milestone and of an action. */
+CHANGESETS.set(CS_PLAN, {
+  id: CS_PLAN,
+  event_id: EVENT.id,
+  author: AI,
+  source_version_id: evidence.source_version_id,
+  created_at: "2028-03-09T09:00:00Z",
+  proposals: [
+    proposal(P_MILESTONE, {
+      operation: {
+        kind: "create-milestone",
+        id: NEW_MILESTONE,
+        event_id: EVENT.id,
+        title: "Bewilligung liegt vor",
+        description: null,
+        date: "2028-05-01",
+        owner: SESSION.user_id,
+        workstream: null,
+      },
+    }),
+    proposal(P_MILESTONE_STATUS, {
+      operation: {
+        kind: "change-milestone-status",
+        event_id: EVENT.id,
+        milestone_id: OLD_MILESTONE,
+        status: "reached",
+        expected_version: 2,
+      },
+    }),
+    proposal(P_ACTION_MILESTONE, {
+      operation: {
+        kind: "change-action-milestone",
+        event_id: EVENT.id,
+        action_id: OLD_ACTION,
+        milestone: OLD_MILESTONE,
+        expected_version: 1,
+      },
+    }),
+    proposal(P_PLANNED, {
+      depends_on: [P_MILESTONE],
+      operation: {
+        kind: "create-action",
+        id: "0199b8e0-0000-7000-8000-0000000006a6",
+        event_id: EVENT.id,
+        title: "Gesuch einreichen",
+        description: null,
+        owner: SESSION.user_id,
+        workstream: null,
+        start_date: "2028-04-01",
+        due_date: "2028-04-20",
+        milestone: NEW_MILESTONE,
+      },
+    }),
+  ],
+});
+
+function planServer(extra: Record<string, Handler> = {}) {
+  return editServer({
+    [`GET /api/v1/events/:id/milestones/${OLD_MILESTONE}`]: () =>
+      json(200, { id: OLD_MILESTONE, local_id: "MIL-004", title: "Zelt steht", redacted: false }),
+    [`GET /api/v1/events/:id/actions/${OLD_ACTION}`]: () =>
+      json(200, { id: OLD_ACTION, local_id: "ACT-007", title: "Zelt mieten", redacted: false }),
+    "GET /api/v1/events/:id/milestones": () =>
+      json(200, {
+        items: [
+          {
+            id: OLD_MILESTONE,
+            local_id: "MIL-004",
+            title: "Zelt steht",
+            status: "open",
+            redacted: false,
+          },
+        ],
+      }),
+    ...extra,
+  });
+}
+
+describe("milestones", () => {
+  it("shows a new milestone with its date and owner", async () => {
+    renderAt(`/inbox/${CS_PLAN}`, planServer());
+
+    const card = await screen.findByRole("article", {
+      name: "Meilenstein „Bewilligung liegt vor“ anlegen",
+    });
+    expect(within(card).getByText("01.05.2028")).toBeInTheDocument();
+    expect(await within(card).findByText("Anna Muster")).toBeInTheDocument();
+  });
+
+  it("shows the new status of a milestone", async () => {
+    renderAt(`/inbox/${CS_PLAN}`, planServer());
+
+    const card = await screen.findByRole("article", { name: "Status eines Meilensteins ändern" });
+    expect(await within(card).findByText("MIL-004 Zelt steht")).toBeInTheDocument();
+    expect(within(card).getByText("erreicht")).toBeInTheDocument();
+  });
+
+  it("shows the action and its new milestone", async () => {
+    renderAt(`/inbox/${CS_PLAN}`, planServer());
+
+    const card = await screen.findByRole("article", { name: "Meilenstein einer Aufgabe ändern" });
+    expect(await within(card).findByText("ACT-007 Zelt mieten")).toBeInTheDocument();
+    expect(within(card).getByText("MIL-004 Zelt steht")).toBeInTheDocument();
+  });
+
+  it("shows the start date and the new milestone of a new action", async () => {
+    renderAt(`/inbox/${CS_PLAN}`, planServer());
+
+    const card = await screen.findByRole("article", {
+      name: "Aufgabe „Gesuch einreichen“ anlegen",
+    });
+    expect(within(card).getByText("01.04.2028")).toBeInTheDocument();
+    expect(within(card).getByText("Bewilligung liegt vor")).toBeInTheDocument();
+  });
+
+  it("edits the date of a new milestone", async () => {
+    const server = renderAt(`/inbox/${CS_PLAN}`, planServer());
+
+    const card = await openEdit("Meilenstein „Bewilligung liegt vor“ anlegen");
+    const date = within(card).getByLabelText("Datum");
+    await userEvent.clear(date);
+    await userEvent.type(date, "2028-05-15");
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([
+      { proposal_id: P_MILESTONE, fields: { date: "2028-05-15" } },
+    ]);
+  });
+
+  it("edits the start date and the milestone of a new action", async () => {
+    const server = renderAt(`/inbox/${CS_PLAN}`, planServer());
+
+    const card = await openEdit("Aufgabe „Gesuch einreichen“ anlegen");
+    const start = within(card).getByLabelText("Startdatum");
+    await userEvent.clear(start);
+    await userEvent.type(start, "2028-04-05");
+    await userEvent.click(within(card).getByRole("combobox", { name: "Meilenstein" }));
+    await userEvent.click(await screen.findByRole("option", { name: "MIL-004 Zelt steht" }));
+    await submitEdit(card);
+
+    await waitFor(() => expect(applyCalls(server)).toHaveLength(1));
+    expect(lastEdits(server)).toEqual([
+      { proposal_id: P_PLANNED, fields: { start_date: "2028-04-05", milestone: OLD_MILESTONE } },
+    ]);
+  });
+
+  it("names the start-after-due refusal at the start date", async () => {
+    renderAt(
+      `/inbox/${CS_PLAN}`,
+      planServer({
+        "POST /api/v1/changesets/:id/apply": () =>
+          problemWith("validation-failed", 422, [
+            { pointer: "/edits/0/fields/start_date", code: "start-after-due" },
+          ]),
+      }),
+    );
+
+    const card = await openEdit("Aufgabe „Gesuch einreichen“ anlegen");
+    const start = within(card).getByLabelText("Startdatum");
+    await userEvent.clear(start);
+    await userEvent.type(start, "2028-05-05");
+    await submitEdit(card);
+
+    expect(await within(card).findByText(/Das Startdatum liegt nach/)).toBeInTheDocument();
+  });
+});

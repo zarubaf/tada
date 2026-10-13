@@ -7,6 +7,7 @@ import type {
   Changeset,
   CommitmentStatus,
   Field,
+  MilestoneStatus,
   Operation,
   Proposal,
   ValueType,
@@ -19,7 +20,7 @@ import { DisputeNotes } from "../ui/DisputeNotes";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Redacted } from "../ui/Redacted";
 import { StandaloneLink } from "../ui/StandaloneLink";
-import { ActionStatusLabel, CommitmentStatusLabel } from "../work/WorkStatus";
+import { ActionStatusLabel, CommitmentStatusLabel, MilestoneStatusLabel } from "../work/WorkStatus";
 import styles from "./OperationView.module.css";
 import { NO_NAMES, type RecordNames } from "./recordNames";
 
@@ -88,6 +89,12 @@ export function operationTitle(operation: Operation, fields: Map<string, FieldIn
       return t("inbox-op-change-action-due");
     case "change-commitment-status":
       return t("inbox-op-change-commitment-status");
+    case "create-milestone":
+      return t("inbox-op-create-milestone", { title: operation.title });
+    case "change-milestone-status":
+      return t("inbox-op-change-milestone-status");
+    case "change-action-milestone":
+      return t("inbox-op-change-action-milestone");
     case "create-workstream":
       return t("inbox-op-create-workstream", { name: operation.name });
     default:
@@ -121,6 +128,7 @@ const COMMITMENT_STATUSES: readonly string[] = [
   "broken",
   "withdrawn",
 ];
+const MILESTONE_STATUSES: readonly string[] = ["open", "reached", "canceled"];
 
 // The proposal carries the status as text, because a newer server can add a status.
 function actionStatus(status: string): ReactNode {
@@ -134,6 +142,14 @@ function actionStatus(status: string): ReactNode {
 function commitmentStatus(status: string): ReactNode {
   return COMMITMENT_STATUSES.includes(status) ? (
     <CommitmentStatusLabel status={status as CommitmentStatus} />
+  ) : (
+    status
+  );
+}
+
+function milestoneStatus(status: string): ReactNode {
+  return MILESTONE_STATUSES.includes(status) ? (
+    <MilestoneStatusLabel status={status as MilestoneStatus} />
   ) : (
     status
   );
@@ -179,7 +195,59 @@ function WorkRows({ operation, names }: { operation: Operation; names: RecordNam
               t("inbox-row-workstream"),
               operation.workstream ? (names.workstream(operation.workstream) ?? unknown) : null,
             ],
+            [t("inbox-row-start"), dueText(operation.start_date)],
             [t("inbox-row-due"), dueText(operation.due_date)],
+            [
+              t("inbox-row-milestone"),
+              operation.milestone ? (names.record(operation.milestone) ?? unknown) : null,
+            ],
+          ]}
+        />
+      );
+    case "create-milestone":
+      return (
+        <Rows
+          rows={[
+            [t("inbox-row-title"), operation.title],
+            [t("inbox-row-description"), operation.description],
+            [t("inbox-row-date"), formatDate(operation.date)],
+            [t("inbox-row-owner"), names.user(operation.owner) ?? unknown],
+            [
+              t("inbox-row-workstream"),
+              operation.workstream ? (names.workstream(operation.workstream) ?? unknown) : null,
+            ],
+          ]}
+        />
+      );
+    case "create-workstream":
+      return (
+        <Rows
+          rows={[
+            [t("inbox-row-name"), operation.name],
+            [t("inbox-row-lead"), names.user(operation.lead) ?? unknown],
+          ]}
+        />
+      );
+    case "change-milestone-status":
+      return (
+        <Rows
+          rows={[
+            [t("inbox-row-milestone"), names.record(operation.milestone_id) ?? unknown],
+            [t("inbox-row-new-status"), milestoneStatus(operation.status)],
+          ]}
+        />
+      );
+    case "change-action-milestone":
+      return (
+        <Rows
+          rows={[
+            [t("inbox-row-action"), names.record(operation.action_id) ?? unknown],
+            [
+              t("inbox-row-new-milestone"),
+              operation.milestone
+                ? (names.record(operation.milestone) ?? unknown)
+                : t("inbox-milestone-removed"),
+            ],
           ]}
         />
       );
@@ -374,6 +442,9 @@ export function OperationDetails({
     case "change-action-status":
     case "change-action-due":
     case "change-commitment-status":
+    case "create-milestone":
+    case "change-milestone-status":
+    case "change-action-milestone":
     case "create-workstream":
       return <WorkRows operation={operation} names={names} />;
     default:

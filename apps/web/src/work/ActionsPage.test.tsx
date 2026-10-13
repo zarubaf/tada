@@ -23,6 +23,25 @@ function action(over: Record<string, unknown> = {}) {
   };
 }
 
+function milestone(over: Record<string, unknown> = {}) {
+  return {
+    id: "m1",
+    local_id: "MIL-001",
+    event_id: EVENT.id,
+    title: "Festzelt steht",
+    redacted: false,
+    date: "2030-05-20",
+    owner_user_id: ME,
+    status: "open",
+    warnings: [],
+    version: 1,
+    evidence: [],
+    can_change: true,
+    next_statuses: ["reached", "canceled"],
+    ...over,
+  };
+}
+
 const render = (setup: Parameters<typeof renderWork>[1] = {}) =>
   renderWork((api) => <ActionsPage api={api} />, setup);
 
@@ -185,5 +204,111 @@ describe("ActionsPage", () => {
     const table = await screen.findByRole("table", { name: "Aufgaben" });
     expect(within(table).getByText("entfernt")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "ACT-001 bearbeiten" })).not.toBeInTheDocument();
+  });
+
+  it("sends the start date and the milestone of a new action", async () => {
+    const created = action({ id: "a2", local_id: "ACT-002", title: "Zelt aufbauen" });
+    const { calls } = render({
+      answers: { "POST /actions": () => json(201, created) },
+      lists: {
+        "/actions": [],
+        "/milestones": [
+          milestone(),
+          milestone({ id: "m2", local_id: "MIL-002", title: "Abgesagt", status: "canceled" }),
+        ],
+      },
+    });
+    await screen.findByText("Noch keine Aufgaben");
+
+    await user.type(screen.getByRole("textbox", { name: "Titel (Pflichtfeld)" }), "Zelt aufbauen");
+    await user.type(screen.getByLabelText("Startdatum"), "2030-05-01");
+    await user.type(screen.getByLabelText("Fällig am"), "2030-05-18");
+    await user.click(screen.getByRole("combobox", { name: "Meilenstein" }));
+    const options = within(await screen.findByRole("listbox")).getAllByRole("option");
+    // A canceled milestone takes no new action.
+    expect(options.map((option) => option.textContent)).toEqual([
+      "Kein Meilenstein",
+      "MIL-001 Festzelt steht",
+    ]);
+    await user.click(screen.getByRole("option", { name: "MIL-001 Festzelt steht" }));
+    await user.click(screen.getByRole("button", { name: "Erfassen" }));
+
+    expect(await screen.findByText("ACT-002")).toBeInTheDocument();
+    expect(calls.find((c) => c.call.startsWith("POST"))?.body).toEqual({
+      title: "Zelt aufbauen",
+      owner_user_id: ME,
+      start_date: "2030-05-01",
+      due_date: "2030-05-18",
+      milestone_id: "m1",
+    });
+  });
+
+  it("searches the milestones and keeps the canceled milestone of the action", async () => {
+    render({
+      lists: {
+        "/actions": [action({ milestone_id: "m2" })],
+        "/milestones": [
+          milestone(),
+          milestone({ id: "m2", local_id: "MIL-002", title: "Abgesagt", status: "canceled" }),
+          milestone({ id: "m3", local_id: "MIL-003", title: "Bühne steht" }),
+        ],
+      },
+    });
+    await screen.findByRole("table", { name: "Aufgaben" });
+
+    await user.click(screen.getByRole("button", { name: "ACT-001 bearbeiten" }));
+    const input = screen.getByRole("combobox", { name: "Meilenstein" });
+    expect(input).toHaveValue("MIL-002 Abgesagt");
+    await user.clear(input);
+    await user.type(input, "bühne");
+
+    const options = within(await screen.findByRole("listbox")).getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual(["MIL-003 Bühne steht"]);
+  });
+
+  it("clears the milestone and the start date of an action", async () => {
+    const { calls } = render({
+      answers: { "PATCH /actions/a1": () => json(200, action({ version: 3 })) },
+      lists: {
+        "/actions": [action({ start_date: "2030-05-01", milestone_id: "m1" })],
+        "/milestones": [milestone()],
+      },
+    });
+    await screen.findByRole("table", { name: "Aufgaben" });
+
+    await user.click(screen.getByRole("button", { name: "ACT-001 bearbeiten" }));
+    expect(screen.getByLabelText("Startdatum")).toHaveValue("2030-05-01");
+    await user.clear(screen.getByLabelText("Startdatum"));
+    await user.click(screen.getByRole("combobox", { name: "Meilenstein" }));
+    await user.click(await screen.findByRole("option", { name: "Kein Meilenstein" }));
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(calls.find((c) => c.call.startsWith("PATCH"))?.body).toEqual({
+        start_date: null,
+        milestone_id: null,
+        expected_version: 2,
+      }),
+    );
+  });
+
+  it("shows the start-after-due error at the start date", async () => {
+    render({
+      answers: {
+        "POST /actions": () =>
+          problem(422, "validation-failed", [{ pointer: "/start_date", code: "start-after-due" }]),
+      },
+      lists: { "/actions": [] },
+    });
+    await screen.findByText("Noch keine Aufgaben");
+
+    await user.type(screen.getByRole("textbox", { name: "Titel (Pflichtfeld)" }), "Zelt");
+    await user.type(screen.getByLabelText("Startdatum"), "2030-06-01");
+    await user.type(screen.getByLabelText("Fällig am"), "2030-05-18");
+    await user.click(screen.getByRole("button", { name: "Erfassen" }));
+
+    const start = screen.getByLabelText("Startdatum");
+    await waitFor(() => expect(start).toHaveAccessibleDescription(/Das Startdatum liegt nach/));
+    expect(start).toHaveFocus();
   });
 });

@@ -1,6 +1,6 @@
-// „Bearbeiten und annehmen“ for a proposal that creates an action, a commitment, a person or an
-// institution (ADR 0050): the fields that the reviewer may change, with the same pickers as the
-// work registers. The form sends only the fields that differ from the proposal.
+// „Bearbeiten und annehmen“ for a proposal that creates an action, a commitment, a milestone, a
+// person or an institution (ADR 0050): the fields that the reviewer may change, with the same
+// pickers as the work registers. The form sends only the fields that differ from the proposal.
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import type { Api, Proposal } from "../api/client";
@@ -10,7 +10,13 @@ import { firstInvalidField } from "../ui/focus";
 import { TextField } from "../ui/TextField";
 import { DirectoryGate } from "../work/DirectoryGate";
 import { type Directory, useDirectory } from "../work/directory";
-import { NO_WORKSTREAM, OwnerSelect, WorkstreamSelect } from "../work/fields";
+import {
+  MilestoneSelect,
+  NO_MILESTONE,
+  NO_WORKSTREAM,
+  OwnerSelect,
+  WorkstreamSelect,
+} from "../work/fields";
 import styles from "./EditForm.module.css";
 import {
   type FieldErrors,
@@ -19,7 +25,7 @@ import {
   message,
   type RecordOperation,
 } from "./recordEdit";
-import type { RecordNames } from "./recordNames";
+import { NO_NAMES, type RecordNames } from "./recordNames";
 
 interface Values {
   title: string;
@@ -29,9 +35,12 @@ interface Values {
   name: string;
   email: string;
   phone: string;
+  start_date: string;
   due_date: string;
+  date: string;
   owner: string;
   workstream: string;
+  milestone: string;
 }
 
 function initialValues(operation: RecordOperation): Values {
@@ -43,9 +52,12 @@ function initialValues(operation: RecordOperation): Values {
     name: "",
     email: "",
     phone: "",
+    start_date: "",
     due_date: "",
+    date: "",
     owner: "",
     workstream: NO_WORKSTREAM,
+    milestone: NO_MILESTONE,
   };
   switch (operation.kind) {
     case "create-action":
@@ -55,7 +67,18 @@ function initialValues(operation: RecordOperation): Values {
         description: operation.description ?? "",
         owner: operation.owner,
         workstream: operation.workstream ?? NO_WORKSTREAM,
+        start_date: operation.start_date ?? "",
         due_date: operation.due_date ?? "",
+        milestone: operation.milestone ?? NO_MILESTONE,
+      };
+    case "create-milestone":
+      return {
+        ...base,
+        title: operation.title,
+        description: operation.description ?? "",
+        date: operation.date,
+        owner: operation.owner,
+        workstream: operation.workstream ?? NO_WORKSTREAM,
       };
     case "create-commitment":
       return {
@@ -86,8 +109,8 @@ function changedFields(
   const start = initialValues(operation);
   const fields: Fields = {};
   const errors: FieldErrors = {};
-  const required = ["title", "text", "name"] as const;
-  const optional = ["description", "email", "phone", "due_date"] as const;
+  const required = ["title", "text", "name", "date"] as const;
+  const optional = ["description", "email", "phone", "start_date", "due_date"] as const;
   for (const field of required) {
     if (values[field].trim() !== start[field]) {
       fields[field] = values[field].trim();
@@ -103,6 +126,9 @@ function changedFields(
   }
   if (values.workstream !== start.workstream) {
     fields.workstream = values.workstream === NO_WORKSTREAM ? null : values.workstream;
+  }
+  if (values.milestone !== start.milestone) {
+    fields.milestone = values.milestone === NO_MILESTONE ? null : values.milestone;
   }
   if (values.condition.trim() !== start.condition) {
     if (values.condition.trim() === "") {
@@ -124,13 +150,15 @@ export interface RecordEditFormProps {
   isPending: boolean;
   /** The fields that the server refused in the last apply. */
   serverErrors: FieldErrors;
+  /** The names behind the IDs of the changeset, for a milestone that the changeset creates. */
+  names?: RecordNames;
   onSubmit: (fields: Fields) => void;
   onCancel: () => void;
 }
 
 function Form({
   proposal,
-  names,
+  names = NO_NAMES,
   directory,
   isPending,
   serverErrors,
@@ -183,15 +211,21 @@ function Form({
       {...extra}
     />
   );
-  const work = operation.kind === "create-action" || operation.kind === "create-commitment";
-  const due = text("due_date", t("work-field-due"), { type: "date" });
+  const owned =
+    operation.kind === "create-action" ||
+    operation.kind === "create-commitment" ||
+    operation.kind === "create-milestone";
 
   return (
     <form ref={form} noValidate className={styles.form} onSubmit={submit}>
       <h4 className={styles.title}>{t("inbox-edit-title")}</h4>
-      {operation.kind === "create-action" && text("title", t("inbox-row-title"))}
-      {operation.kind === "create-action" &&
-        text("description", t("inbox-row-description"), { rows: 3 })}
+      {(operation.kind === "create-action" || operation.kind === "create-milestone") && (
+        <>
+          {text("title", t("inbox-row-title"))}
+          {text("description", t("inbox-row-description"), { rows: 3 })}
+        </>
+      )}
+      {operation.kind === "create-milestone" && text("date", t("inbox-row-date"), { type: "date" })}
       {operation.kind === "create-commitment" &&
         text("text", t("inbox-row-commitment"), { rows: 3 })}
       {operation.kind === "create-commitment" &&
@@ -204,38 +238,39 @@ function Form({
           {text("phone", t("inbox-row-phone"))}
         </>
       )}
-      {work && directory && (
+      {owned && directory && (
         <>
           <OwnerSelect
             directory={directory}
             label={t("work-field-owner")}
             value={values.owner}
-            current={
-              operation.kind === "create-action" || operation.kind === "create-commitment"
-                ? operation.owner
-                : undefined
-            }
+            current={operation.owner}
             onChange={set("owner")}
             error={errors.owner}
           />
           <WorkstreamSelect
             directory={directory}
             value={values.workstream}
-            current={
-              operation.kind === "create-action" || operation.kind === "create-commitment"
-                ? operation.workstream
-                : undefined
-            }
-            currentLabel={
-              operation.kind === "create-action" || operation.kind === "create-commitment"
-                ? names.workstream(operation.workstream ?? "")
-                : undefined
-            }
+            current={operation.workstream}
+            currentLabel={names.workstream(operation.workstream ?? "")}
             onChange={set("workstream")}
             error={errors.workstream}
           />
-          {due}
         </>
+      )}
+      {operation.kind === "create-action" &&
+        text("start_date", t("work-field-start"), { type: "date" })}
+      {(operation.kind === "create-action" || operation.kind === "create-commitment") &&
+        text("due_date", t("work-field-due"), { type: "date" })}
+      {operation.kind === "create-action" && directory && (
+        <MilestoneSelect
+          milestones={directory.milestones}
+          value={values.milestone}
+          current={operation.milestone}
+          currentName={operation.milestone ? names.record(operation.milestone) : undefined}
+          onChange={set("milestone")}
+          error={errors.milestone}
+        />
       )}
       <div className={styles.actions}>
         <Button onPress={onCancel}>{t("inbox-edit-cancel")}</Button>
@@ -248,7 +283,9 @@ function Form({
 }
 
 function WithDirectory(props: RecordEditFormProps & { eventId: string }) {
-  const { state, reload } = useDirectory(props.api, props.eventId);
+  // A new action can name a milestone of the event.
+  const milestones = props.proposal.operation.kind === "create-action";
+  const { state, reload } = useDirectory(props.api, props.eventId, { milestones });
   return (
     <DirectoryGate state={state} reload={reload}>
       {(directory) => <Form {...props} directory={directory} />}
@@ -260,7 +297,9 @@ function WithDirectory(props: RecordEditFormProps & { eventId: string }) {
 export function RecordEditForm(props: RecordEditFormProps) {
   const { operation } = props.proposal;
   if (
-    (operation.kind === "create-action" || operation.kind === "create-commitment") &&
+    (operation.kind === "create-action" ||
+      operation.kind === "create-commitment" ||
+      operation.kind === "create-milestone") &&
     props.eventId
   ) {
     return <WithDirectory {...props} eventId={props.eventId} />;

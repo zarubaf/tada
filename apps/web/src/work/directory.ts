@@ -1,10 +1,19 @@
-// What the work pages need to know about the event: the names of the members, the workstreams, and
-// whether the member manages the event. The server says per record what the caller may do
-// (`can_change`); `isManager` serves only the workstreams, which have no such field yet.
+// What the work pages need to know about the event: the names of the members, the workstreams, the
+// milestones and the actions if the page asks for them, and whether the member manages the event.
+// The server says per record what the caller may do (`can_change`); `isManager` serves only the
+// workstreams, which have no such field yet.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type Api, type Problem, problemMessage, type Workstream } from "../api/client";
+import {
+  type Action,
+  type Api,
+  type Milestone,
+  type Problem,
+  problemMessage,
+  type Workstream,
+} from "../api/client";
 import { loadOrganizationMembers } from "../events/eventMembers";
 import { canManage } from "../members/roles";
+import { LARGEST_PAGE, loadAll } from "../registers/loadAll";
 import { useSession } from "../session/SessionProvider";
 
 export interface Choice {
@@ -14,6 +23,10 @@ export interface Choice {
 
 export interface Directory {
   workstreams: Workstream[];
+  /** All milestones of the event, for a page that asked for them; otherwise empty. */
+  milestones: Milestone[];
+  /** All actions of the event, for a page that asked for them; otherwise empty. */
+  actions: Action[];
   /** True for an event manager and for an owner or admin of the organization. */
   isManager: boolean;
   nameOf: (userId: string) => string;
@@ -29,6 +42,8 @@ export type DirectoryState =
 interface Loaded {
   names: Map<string, string>;
   workstreams: Workstream[];
+  milestones: Milestone[];
+  actions: Action[];
   /** The event members who may own a record or lead a workstream. */
   contributors: Choice[];
   eventManager: boolean;
@@ -40,11 +55,17 @@ function failed(error: Problem | undefined): DirectoryState {
 
 /**
  * Loads the directory of an event: the members of the organization for the names, the workstreams
- * and the event memberships for the roles. Each member of the event reads the memberships.
+ * and the event memberships for the roles. Each member of the event reads the memberships. On
+ * request, it also loads all milestones (for a form that links an action to one) or all actions
+ * (for the milestones that count them).
  */
 export function useDirectory(
   api: Api,
   eventId: string,
+  {
+    milestones: withMilestones = false,
+    actions: withActions = false,
+  }: { milestones?: boolean; actions?: boolean } = {},
 ): { state: DirectoryState; reload: () => Promise<boolean> } {
   const session = useSession();
   const [loaded, setLoaded] = useState<Loaded>();
@@ -54,21 +75,45 @@ export function useDirectory(
   const reload = useCallback(async () => {
     try {
       const path = { event_id: eventId };
-      const [members, workstreams, memberships] = await Promise.all([
+      const query = (cursor: string | undefined) => ({
+        limit: LARGEST_PAGE,
+        ...(cursor && { cursor }),
+      });
+      const [members, workstreams, memberships, milestones, actions] = await Promise.all([
         loadOrganizationMembers(api),
         api.GET("/api/v1/events/{event_id}/workstreams", { params: { path } }),
         api.GET("/api/v1/events/{event_id}/memberships", { params: { path } }),
+        withMilestones
+          ? loadAll((cursor) =>
+              api.GET("/api/v1/events/{event_id}/milestones", {
+                params: { path, query: query(cursor) },
+              }),
+            )
+          : { items: [] },
+        withActions
+          ? loadAll((cursor) =>
+              api.GET("/api/v1/events/{event_id}/actions", {
+                params: { path, query: query(cursor) },
+              }),
+            )
+          : { items: [] },
       ]);
-      if (!("members" in members) || !workstreams.data || !memberships.data) {
-        setError({
-          error: "members" in members ? (workstreams.error ?? memberships.error) : members.error,
-        });
+      if (!("members" in members)) {
+        setError({ error: members.error });
+        return false;
+      }
+      if (!workstreams.data || !memberships.data || "error" in milestones || "error" in actions) {
+        const lists = "error" in milestones ? milestones.error : undefined;
+        const failed = lists ?? ("error" in actions ? actions.error : undefined);
+        setError({ error: workstreams.error ?? memberships.error ?? failed });
         return false;
       }
       const names = new Map(members.members.map((m) => [m.user_id, m.display_name]));
       setLoaded({
         names,
         workstreams: workstreams.data.items,
+        milestones: milestones.items,
+        actions: actions.items,
         contributors: memberships.data.items
           .filter((item) => item.event_role !== "event-viewer")
           .map((item) => ({
@@ -85,7 +130,7 @@ export function useDirectory(
       setError({ error: undefined });
       return false;
     }
-  }, [api, eventId, me]);
+  }, [api, eventId, me, withMilestones, withActions]);
 
   useEffect(() => {
     void reload();
@@ -100,6 +145,8 @@ export function useDirectory(
         kind: "loaded",
         directory: {
           workstreams: loaded.workstreams,
+          milestones: loaded.milestones,
+          actions: loaded.actions,
           isManager,
           nameOf,
           assignees: loaded.contributors,

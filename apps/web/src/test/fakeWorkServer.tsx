@@ -1,5 +1,5 @@
-// A fake server and a render helper for the tests of the work pages (workstreams, actions and
-// commitments). Only invented data.
+// A fake server and a render helper for the tests of the work pages (workstreams, actions,
+// commitments and milestones). Only invented data.
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createApi, type Event } from "../api/client";
@@ -125,6 +125,10 @@ export function renderWork(
     const list = Object.entries(lists).find(([suffix]) => path.endsWith(suffix));
     if (request.method === "GET" && list) {
       return json(200, { items: list[1] });
+    }
+    // The milestones that the action form offers.
+    if (request.method === "GET" && path.endsWith("/milestones")) {
+      return json(200, { items: [] });
     }
     throw new Error(`unexpected ${request.method} ${path}`);
   };

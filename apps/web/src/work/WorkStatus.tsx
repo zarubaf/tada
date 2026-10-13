@@ -8,7 +8,7 @@ import {
   IconHourglass,
   IconLock,
 } from "@tabler/icons-react";
-import type { ActionStatus, CommitmentStatus } from "../api/client";
+import type { ActionStatus, CommitmentStatus, MilestoneStatus } from "../api/client";
 import { t } from "../i18n";
 import { StatusLabel } from "../ui/StatusLabel";
 
@@ -33,4 +33,14 @@ export function CommitmentStatusLabel({ status }: { status: CommitmentStatus }) 
     withdrawn: { icon: IconCircleMinus, tone: "muted" },
   } as const;
   return <StatusLabel {...parts[status]}>{t(`commitment-status-${status}`)}</StatusLabel>;
+}
+
+/** The same icons as the action statuses: open, reached like done, canceled. */
+export function MilestoneStatusLabel({ status }: { status: MilestoneStatus }) {
+  const parts = {
+    open: { icon: IconCircle, tone: "neutral" },
+    reached: { icon: IconCircleCheck, tone: "success" },
+    canceled: { icon: IconCircleMinus, tone: "muted" },
+  } as const;
+  return <StatusLabel {...parts[status]}>{t(`milestone-status-${status}`)}</StatusLabel>;
 }

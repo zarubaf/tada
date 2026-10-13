@@ -13,6 +13,7 @@ import { Skeleton } from "../ui/Skeleton";
 import { CloseEvent } from "./CloseEvent";
 import styles from "./EventPage.module.css";
 import { EventContext, type ProfileState, useEventProfile } from "./eventContext";
+import { registerPaths } from "./RegisterNav";
 
 type State =
   | { kind: "loading" }
@@ -69,6 +70,7 @@ export function EventPage({
   }, [load]);
 
   const base = `/events/${encodeURIComponent(eventId)}`;
+  const registers = registerPaths(base);
   return (
     <Page>
       {state.kind === "loading" && (
@@ -108,12 +110,15 @@ export function EventPage({
             <NavLink to={base} exact>
               {t("event-nav-overview")}
             </NavLink>
-            <NavLink to={`${base}/members`}>{t("event-nav-members")}</NavLink>
+            <NavLink to={`${base}/actions`}>{t("event-nav-actions")}</NavLink>
+            <NavLink to={`${base}/timeline`}>{t("event-nav-timeline")}</NavLink>
+            <NavLink to={registers[0]} alsoCurrentOn={registers}>
+              {t("event-nav-registers")}
+            </NavLink>
             <NavLink to={`${base}/documents`} within="/documents">
               {t("event-nav-documents")}
             </NavLink>
-            <NavLink to={`${base}/actions`}>{t("event-nav-actions")}</NavLink>
-            <NavLink to={`${base}/commitments`}>{t("event-nav-commitments")}</NavLink>
+            <NavLink to={`${base}/members`}>{t("event-nav-members")}</NavLink>
             <NavLink to={`${base}/workstreams`}>{t("event-nav-workstreams")}</NavLink>
           </SubNav>
           {children}
