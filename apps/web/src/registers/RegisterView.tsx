@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { t } from "../i18n";
 import { useHash } from "../router/Router";
 import { Button } from "../ui/Button";
@@ -40,8 +40,7 @@ export function RegisterView<T extends { id: string }>({
   empty,
 }: RegisterViewProps<T>) {
   const { state } = register;
-  const [loadingMore, setLoadingMore] = useState(false);
-  const { linked, searching } = useLinkedRow(register, page, rowId);
+  const linked = useLinkedRow(register, page, rowId);
 
   if (state.kind === "loading") {
     return <SkeletonLines label={loadingLabel} />;
@@ -76,17 +75,7 @@ export function RegisterView<T extends { id: string }>({
       />
       {state.nextCursor !== undefined && (
         <div>
-          <Button
-            isPending={loadingMore || searching}
-            onPress={async () => {
-              if (loadingMore || searching) {
-                return;
-              }
-              setLoadingMore(true);
-              await page.loadMore(register);
-              setLoadingMore(false);
-            }}
-          >
+          <Button isPending={register.loadingMore} onPress={() => void page.loadMore(register)}>
             {t("register-load-more")}
           </Button>
         </div>
@@ -98,77 +87,66 @@ export function RegisterView<T extends { id: string }>({
 /**
  * The row that the fragment of the address names: it scrolls to the row and takes focus, so that a
  * link from another page lands on it. A row that is not on the loaded pages makes the hook load
- * the next pages until the row appears; when the pages run out, the server repeats a cursor or
- * the hook has loaded `MAX_SEARCH_PAGES` pages, the page says so in the polite live region. While
- * the search runs, `searching` is true (the button shows it) and the live region stays silent.
- * Each fragment is handled once: a retry or „Weitere laden“ does not move focus again.
- * The mark of the row fades by itself, and not at all with reduced motion.
+ * the next pages until the row appears; when the list ends or the hook has loaded
+ * `MAX_SEARCH_PAGES` pages of one list, the page says so in the polite live region. While a page
+ * is on its way the button shows it, and the live region stays silent. A new list (a reload)
+ * starts the search again. Each fragment is handled once: a retry or „Weitere laden“ does not move
+ * focus again. The mark of the row fades by itself, and not at all with reduced motion.
  */
 function useLinkedRow<T extends { id: string }>(
   register: Register<T>,
   page: RegisterPaging,
   rowId: (row: T) => string,
-): { linked: string | undefined; searching: boolean } {
+): string | undefined {
   const fragment = useHash();
   const hash = isRowId(fragment) ? fragment : "";
-  const { state } = register;
+  const { state, loadingMore } = register;
   const present =
     hash !== "" && state.kind === "loaded" && state.items.some((row) => rowId(row) === hash);
   const handled = useRef<string>(undefined);
   const latestHash = useRef(hash);
   latestHash.current = hash;
-  const [searching, setSearching] = useState(false);
-  const fresh = { hash: "", pages: 0, cursor: undefined as string | undefined };
-  const searched = useRef(fresh);
+  // The pages that the search for one fragment has loaded of one list.
+  const searched = useRef({ hash: "", generation: 0, pages: 0 });
   const { setConfirmation, setFailure } = page;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `register` changes with each render; the state is the trigger
   useEffect(() => {
     if (hash === "") {
       handled.current = undefined;
-      // A later return to the same row starts a new search.
-      searched.current = fresh;
+      searched.current = { hash: "", generation: 0, pages: 0 };
       return;
     }
-    if (state.kind !== "loaded" || handled.current === hash) {
+    // A page on its way changes the state when it arrives, and that runs this effect again.
+    if (state.kind !== "loaded" || handled.current === hash || loadingMore) {
       return;
     }
     if (present) {
       handled.current = hash;
-      searched.current = fresh;
       const row = document.getElementById(hash);
       row?.scrollIntoView?.({ block: "center" });
       row?.focus({ preventScroll: true });
       return;
     }
-    if (searched.current.hash !== hash) {
-      searched.current = { hash, pages: 0, cursor: undefined };
-    }
-    if (searching) {
-      return;
+    if (searched.current.hash !== hash || searched.current.generation !== state.generation) {
+      searched.current = { hash, generation: state.generation, pages: 0 };
     }
     const progress = searched.current;
-    if (
-      state.nextCursor === undefined ||
-      state.nextCursor === progress.cursor ||
-      progress.pages >= MAX_SEARCH_PAGES
-    ) {
+    if (state.nextCursor === undefined || progress.pages >= MAX_SEARCH_PAGES) {
       handled.current = hash;
       setConfirmation(t("register-row-not-found", { id: hash }));
       return;
     }
     progress.pages += 1;
-    progress.cursor = state.nextCursor;
-    setSearching(true);
-    void register.loadMore().then((result) => {
-      setSearching(false);
-      // A result for a fragment that is no longer the address is dropped.
-      if ("failure" in result && latestHash.current === hash) {
+    void register.loadMore().then((outcome) => {
+      // A stale page needs nothing: the new list runs this effect again. A failure for a fragment
+      // that is no longer the address is dropped.
+      if (outcome.kind === "failed" && latestHash.current === hash) {
         handled.current = hash;
-        searched.current = fresh;
-        setFailure(result.failure);
+        searched.current = { hash: "", generation: 0, pages: 0 };
+        setFailure(outcome.message);
       }
     });
-  }, [hash, present, state, searching]);
-  return { linked: present ? hash : undefined, searching };
+  }, [hash, present, state, loadingMore]);
+  return present ? hash : undefined;
 }

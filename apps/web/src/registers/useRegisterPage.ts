@@ -63,14 +63,19 @@ export function useRegisterPage<T>(reload: () => Promise<boolean>) {
     /** Loads the next page, tells the member and keeps focus when the button goes away. */
     loadMore: async (register: Pick<Register<{ id: string }>, "loadMore">) => {
       start();
-      const result = await register.loadMore();
-      if ("failure" in result) {
-        setFailure(result.failure);
-        return;
-      }
-      setConfirmation(t("register-loaded-more"));
-      if (result.last) {
-        focusAfterCommit(headingTarget);
+      const outcome = await register.loadMore();
+      switch (outcome.kind) {
+        case "failed":
+          setFailure(outcome.message);
+          return;
+        case "stale":
+          // The page belongs to a list that the member has replaced: nothing to say.
+          return;
+        case "appended":
+          setConfirmation(t("register-loaded-more"));
+          if (outcome.last) {
+            focusAfterCommit(headingTarget);
+          }
       }
     },
     savedMessage: (name: string) => t("register-saved", { name }),

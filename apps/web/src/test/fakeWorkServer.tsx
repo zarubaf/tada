@@ -81,7 +81,7 @@ export interface Setup {
   event?: Event;
   workstreams?: unknown[];
   /** Answers by `METHOD /path-suffix`; the first match wins. */
-  answers?: Record<string, () => Response | Promise<Response>>;
+  answers?: Record<string, (url: URL) => Response | Promise<Response>>;
   /** The default answers of the lists, by path suffix. */
   lists?: Record<string, unknown[]>;
   /** The profile of the event that the event page has loaded. The default is still loading. */
@@ -125,7 +125,7 @@ export function renderWork(
       return request.method === method && url.pathname.endsWith(suffix);
     });
     if (answer) {
-      return answer[1]();
+      return answer[1](url);
     }
     const path = url.pathname;
     if (path.endsWith("/session")) {

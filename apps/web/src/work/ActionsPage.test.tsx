@@ -43,6 +43,15 @@ function milestone(over: Record<string, unknown> = {}) {
   };
 }
 
+/** An answer that the test sends when it calls `release`. */
+function held() {
+  let release: (response: Response) => void = () => {};
+  const response = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  return { response, release };
+}
+
 const render = (setup: Parameters<typeof renderWork>[1] = {}) =>
   renderWork((api) => <ActionsPage api={api} />, setup);
 
@@ -232,6 +241,61 @@ describe("ActionsPage", () => {
     expect(calls.filter((c) => c.call.endsWith("/actions"))).toHaveLength(3);
   });
 
+  for (const order of ["before", "after"] as const) {
+    it(`searches the new list when a conflict reloads it during the search (old page ${order})`, async () => {
+      const old = held();
+      const reloaded = held();
+      let first = 0;
+      render({
+        hash: "#ACT-050",
+        answers: {
+          "PATCH /actions/a1": () => problem(409, "record-version-conflict"),
+          "GET /actions": (url) => {
+            const cursor = url.searchParams.get("cursor");
+            if (cursor === null) {
+              first += 1;
+              const page = json(200, { items: [action()], next_cursor: "c1" });
+              return first === 1 ? page : reloaded.response;
+            }
+            if (cursor === "c1") {
+              return first === 1
+                ? old.response
+                : json(200, {
+                    items: [action({ id: "a2", local_id: "ACT-002" })],
+                    next_cursor: "c2",
+                  });
+            }
+            return json(200, {
+              items: [action({ id: "a50", local_id: "ACT-050", title: "Zelt aufbauen" })],
+            });
+          },
+        },
+      });
+      await user.click(await screen.findByRole("button", { name: "ACT-001 bearbeiten" }));
+      await user.type(screen.getByRole("textbox", { name: "Titel (Pflichtfeld)" }), " neu");
+      await user.click(screen.getByRole("button", { name: "Speichern" }));
+      await screen.findByText("Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.");
+      const page = () => json(200, { items: [action()], next_cursor: "c1" });
+      const late = () =>
+        json(200, { items: [action({ id: "a9", local_id: "ACT-009", title: "Spät" })] });
+      if (order === "before") {
+        old.release(late());
+        await act(async () => {});
+        reloaded.release(page());
+      } else {
+        reloaded.release(page());
+        await screen.findByText("ACT-002");
+        old.release(late());
+      }
+
+      const row = (await screen.findByText("Zelt aufbauen")).closest("tr");
+      await waitFor(() => expect(row).toHaveFocus());
+      await act(async () => {});
+      expect(screen.queryByText("Spät")).not.toBeInTheDocument();
+      expect(screen.queryByText(/nicht gefunden/)).not.toBeInTheDocument();
+    });
+  }
+
   it("loads further pages until the row named by the hash appears", async () => {
     const { calls } = render({
       hash: "#ACT-051",
@@ -311,6 +375,9 @@ describe("ActionsPage", () => {
     await waitFor(() => expect(row).toHaveAttribute("data-linked"));
     // The row that the address names wins focus over the heading that a retry moves it to.
     await waitFor(() => expect(row).toHaveFocus());
+    // The heading would take focus after the next commit: let it pass first.
+    await act(async () => {});
+    expect(row).toHaveFocus();
     expect(screen.getByRole("heading", { level: 2, name: "Aufgaben" })).not.toHaveFocus();
     expect(screen.queryByText(/nicht gefunden/)).not.toBeInTheDocument();
   });
