@@ -311,7 +311,8 @@ pub enum OperationInput {
         date: String,
         /// The user ID of a member with the contributor or manager role in the event.
         owner: Uuid,
-        /// An active workstream of the event.
+        /// An active workstream of the event, or a new workstream of this changeset;
+        /// then the proposal depends on the proposal that creates it.
         #[serde(default)]
         workstream: Option<Uuid>,
     },
