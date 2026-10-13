@@ -29,7 +29,9 @@ macro_rules! text_type {
     };
 }
 
-/// Defines a status enum with kebab-case `as_str` and `parse`.
+/// Defines a status enum with kebab-case `as_str` and `parse`, the list `ALL` of its statuses
+/// and the list `NAMES` of their texts, both in the order of the variants.
+/// With `: transitions`, it also defines `next_statuses` from the hand-written `change_to`.
 macro_rules! status_enum {
     ($(#[$doc:meta])* $name:ident { $($variant:ident => $text:literal),+ $(,)? }) => {
         $(#[$doc])*
@@ -39,6 +41,10 @@ macro_rules! status_enum {
         }
 
         impl $name {
+            pub const ALL: [Self; [$($text),+].len()] = [$(Self::$variant),+];
+
+            pub const NAMES: [&'static str; [$($text),+].len()] = [$($text),+];
+
             pub const fn as_str(self) -> &'static str {
                 match self {
                     $(Self::$variant => $text),+
@@ -50,6 +56,19 @@ macro_rules! status_enum {
                     $($text => Some(Self::$variant),)+
                     _ => None,
                 }
+            }
+        }
+    };
+    ($(#[$doc:meta])* $name:ident: transitions { $($variant:ident => $text:literal),+ $(,)? }) => {
+        status_enum!($(#[$doc])* $name { $($variant => $text),+ });
+
+        impl $name {
+            /// The statuses that a record in this status can change to.
+            pub fn next_statuses(self) -> Vec<Self> {
+                Self::ALL
+                    .into_iter()
+                    .filter(|next| self.change_to(*next).is_ok())
+                    .collect()
             }
         }
     };

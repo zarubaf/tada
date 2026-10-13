@@ -126,33 +126,6 @@ pub struct EntityView {
     pub statuses: &'static [&'static str],
 }
 
-const ACTION_STATUSES: [&str; 5] = [
-    ActionStatus::Open.as_str(),
-    ActionStatus::InProgress.as_str(),
-    ActionStatus::Blocked.as_str(),
-    ActionStatus::Done.as_str(),
-    ActionStatus::Canceled.as_str(),
-];
-
-const COMMITMENT_STATUSES: [&str; 5] = [
-    CommitmentStatus::Conditional.as_str(),
-    CommitmentStatus::Firm.as_str(),
-    CommitmentStatus::Fulfilled.as_str(),
-    CommitmentStatus::Broken.as_str(),
-    CommitmentStatus::Withdrawn.as_str(),
-];
-
-const MILESTONE_STATUSES: [&str; 3] = [
-    MilestoneStatus::Open.as_str(),
-    MilestoneStatus::Reached.as_str(),
-    MilestoneStatus::Canceled.as_str(),
-];
-
-const WORKSTREAM_STATUSES: [&str; 2] = [
-    WorkstreamStatus::Active.as_str(),
-    WorkstreamStatus::Closed.as_str(),
-];
-
 /// The kinds of records that an agent can read (ADR 0049, ADR 0068, ADR 0069, ADR 0080).
 const ENTITIES: [EntityView; 10] = [
     EntityView {
@@ -178,22 +151,22 @@ const ENTITIES: [EntityView; 10] = [
     EntityView {
         name: "workstream",
         description: "A part of the work of an event with a lead, for example ground operations. A closed workstream takes no new actions or commitments.",
-        statuses: &WORKSTREAM_STATUSES,
+        statuses: &WorkstreamStatus::NAMES,
     },
     EntityView {
         name: "action",
         description: "A task of an event with one owner, an optional workstream and an optional due date, and an event-local ID such as ACT-001. Transitions: open and in-progress change into each other; open and in-progress change to blocked; blocked changes to open or in-progress; open, in-progress and blocked change to done or canceled; done changes to open; canceled is final.",
-        statuses: &ACTION_STATUSES,
+        statuses: &ActionStatus::NAMES,
     },
     EntityView {
         name: "commitment",
         description: "A promise of one person or one institution in an event, with the owner who follows it up and an event-local ID such as COM-001. With a condition it starts conditional, else firm. Only evidence that the condition is met makes it firm; never invent a signature or an approval. Conditional changes to firm; conditional and firm change to fulfilled, broken or withdrawn, which are final.",
-        statuses: &COMMITMENT_STATUSES,
+        statuses: &CommitmentStatus::NAMES,
     },
     EntityView {
         name: "milestone",
         description: "A dated point of the plan of an event with one owner, an optional workstream and an event-local ID such as MIL-001. tada warns if it is open after its date, or if an open action of it is due after its date. Transitions: open changes to reached or canceled; reached changes to open; canceled is final.",
-        statuses: &MILESTONE_STATUSES,
+        statuses: &MilestoneStatus::NAMES,
     },
     EntityView {
         name: "person",

@@ -12,12 +12,10 @@ text_type!(
 
 status_enum!(
     /// The status of a milestone.
-    MilestoneStatus { Open => "open", Reached => "reached", Canceled => "canceled" }
+    MilestoneStatus: transitions { Open => "open", Reached => "reached", Canceled => "canceled" }
 );
 
 impl MilestoneStatus {
-    pub const ALL: [Self; 3] = [Self::Open, Self::Reached, Self::Canceled];
-
     /// The one decision of a status change of a milestone. `canceled` is final.
     pub fn change_to(self, next: Self) -> Result<Self, InvalidTransition> {
         use MilestoneStatus::{Canceled, Open, Reached};
@@ -33,14 +31,6 @@ impl MilestoneStatus {
     /// it is still open, and its date is before today in the time zone of the event.
     pub fn is_overdue(self, date: Date, today: Date) -> bool {
         self == Self::Open && date < today
-    }
-
-    /// The statuses that a record in this status can change to.
-    pub fn next_statuses(self) -> Vec<Self> {
-        Self::ALL
-            .into_iter()
-            .filter(|next| self.change_to(*next).is_ok())
-            .collect()
     }
 }
 

@@ -75,7 +75,7 @@ status_enum!(
 );
 status_enum!(
     /// The status of an action.
-    ActionStatus {
+    ActionStatus: transitions {
         Open => "open",
         InProgress => "in-progress",
         Blocked => "blocked",
@@ -110,14 +110,6 @@ pub fn dates_in_order(start: Option<jiff::civil::Date>, due: Option<jiff::civil:
 pub struct InvalidTransition;
 
 impl ActionStatus {
-    pub const ALL: [Self; 5] = [
-        Self::Open,
-        Self::InProgress,
-        Self::Blocked,
-        Self::Done,
-        Self::Canceled,
-    ];
-
     /// The one decision of a status change of an action (ADR 0068): the direct command, the check of a
     /// proposal and the apply all ask it.
     pub fn change_to(self, next: Self) -> Result<Self, InvalidTransition> {
@@ -137,25 +129,9 @@ impl ActionStatus {
             Err(InvalidTransition)
         }
     }
-
-    /// The statuses that an action in this status can change to.
-    pub fn next_statuses(self) -> Vec<Self> {
-        Self::ALL
-            .into_iter()
-            .filter(|next| self.change_to(*next).is_ok())
-            .collect()
-    }
 }
 
 impl CommitmentStatus {
-    pub const ALL: [Self; 5] = [
-        Self::Conditional,
-        Self::Firm,
-        Self::Fulfilled,
-        Self::Broken,
-        Self::Withdrawn,
-    ];
-
     /// The status of a new commitment: conditional with a condition, else firm.
     pub fn initial(condition: Option<&ConditionText>) -> Self {
         if condition.is_some() {
