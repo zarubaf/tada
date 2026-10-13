@@ -2,7 +2,7 @@ import { IconDiamond } from "@tabler/icons-react";
 import { useRef, useState } from "react";
 import type { Action, ActionStatus, Api } from "../api/client";
 import { type ProfileState, useEventContext } from "../events/eventContext";
-import { formatDate, formatLabel } from "../facts/formatValue";
+import { formatDate, formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
@@ -10,13 +10,15 @@ import { useFocusAfterCommit } from "../ui/focus";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Select } from "../ui/Select";
+import { SkeletonLines } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import { DirectoryGate } from "../work/DirectoryGate";
 import { type Directory, useDirectory } from "../work/directory";
-import { type EventWindow, eventWindow, layout } from "./layout";
+import { type EventWindow, eventWindow, isEmpty, layout } from "./layout";
 import styles from "./Timeline.module.css";
 import { TimelineChart } from "./TimelineChart";
 import { TimelineList } from "./TimelineList";
+import { useWide } from "./useWide";
 
 const STATUSES: readonly ActionStatus[] = ["open", "in-progress", "blocked", "done", "canceled"];
 const ALL = "all";
@@ -55,6 +57,8 @@ function Timeline({ directory }: { directory: Directory }) {
   const [owner, setOwner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const heading = useRef<HTMLHeadingElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const wide = useWide(root);
   const focusAfterCommit = useFocusAfterCommit();
   const base = `/events/${encodeURIComponent(event.id)}`;
 
@@ -69,7 +73,7 @@ function Timeline({ directory }: { directory: Directory }) {
   // The filters hide actions; the milestones and the window stay as the frame of the plan.
   const timeline = layout({ actions: shown, milestones, workstreams, window: dates, today });
   // Without any date the page shows its empty state, whatever the filters hide.
-  const complete = layout({ actions, milestones, workstreams, window: dates, today });
+  const empty = isEmpty({ actions, milestones, window: dates });
 
   const filtered = owner !== ALL || status !== ALL;
   const hidden = actions.length - shown.length;
@@ -82,14 +86,17 @@ function Timeline({ directory }: { directory: Directory }) {
   };
 
   return (
-    <div className={styles.timeline}>
+    <div ref={root} className={styles.timeline}>
       <LiveRegion kind="status">
         {filtered && hidden > 0 ? t("timeline-hidden", { count: hidden }) : ""}
       </LiveRegion>
       <h2 ref={heading} tabIndex={-1} className={styles.heading}>
         {t("timeline-title")}
       </h2>
-      {complete.weeks.length === 0 ? (
+      {profile.kind === "loading" ? (
+        // The window decides whether the page is empty: wait for it, so that no empty state flashes.
+        <SkeletonLines label={t("work-loading")} />
+      ) : empty ? (
         <EmptyState
           title={t("timeline-empty-title")}
           text={t("timeline-empty-text")}
@@ -148,7 +155,12 @@ function Timeline({ directory }: { directory: Directory }) {
                   assumption={dates?.state === "assumption"}
                 />
               </div>
-              <TimelineList timeline={timeline} base={base} nameOf={directory.nameOf} />
+              <TimelineList
+                timeline={timeline}
+                base={base}
+                nameOf={directory.nameOf}
+                focusable={!wide}
+              />
             </>
           )}
         </>
@@ -191,7 +203,7 @@ function Legend({
           </span>
           {dates ? (
             <KnowledgeState state={dates.state}>
-              {`${formatDate(dates.start)} – ${formatDate(dates.end)}`}
+              {formatValue(dates.fact, field?.value_type)}
             </KnowledgeState>
           ) : (
             <KnowledgeState state="unknown" />

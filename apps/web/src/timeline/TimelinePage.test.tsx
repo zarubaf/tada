@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProfileState } from "../events/eventContext";
 import { BERND, EVENT, ground, ME, renderWork } from "../test/fakeWorkServer";
 import { TimelinePage } from "./TimelinePage";
@@ -105,11 +105,11 @@ describe("TimelinePage", () => {
     const bar = within(timeline).getByRole("link", {
       name: "ACT-001 Gesuch einreichen, 06.05.2030 bis 10.05.2030, offen",
     });
-    expect(bar).toHaveAttribute("href", `/events/${EVENT.id}/actions`);
+    expect(bar).toHaveAttribute("href", `/events/${EVENT.id}/actions#ACT-001`);
     const point = within(timeline).getByRole("link", {
       name: "ACT-002 Festzelt reservieren, fällig 14.05.2030, blockiert",
     });
-    expect(point).toHaveAttribute("href", `/events/${EVENT.id}/actions`);
+    expect(point).toHaveAttribute("href", `/events/${EVENT.id}/actions#ACT-002`);
   });
 
   it("shows the lanes, the milestones, the event window and the undated count", async () => {
@@ -232,4 +232,113 @@ describe("TimelinePage", () => {
     expect(within(legend).getByText("Unbekannt")).toBeInTheDocument();
     await waitFor(() => expect(document.querySelector("[data-band]")).toBeNull());
   });
+
+  it("shows the status of each row as text, not by color alone", async () => {
+    render();
+    const timeline = await axis();
+    expect(within(timeline).getByText("blockiert")).toBeInTheDocument();
+    expect(within(timeline).getAllByText("offen")).toHaveLength(2);
+  });
+
+  it("links the rows of the list to the rows of the registers", async () => {
+    render();
+    const list = await screen.findByRole("region", { name: "Nach Wochen" });
+    expect(within(list).getByRole("link", { name: /ACT-002/ })).toHaveAttribute(
+      "href",
+      `/events/${EVENT.id}/actions#ACT-002`,
+    );
+    expect(within(list).getByRole("link", { name: /MIL-001/ })).toHaveAttribute(
+      "href",
+      `/events/${EVENT.id}/milestones#MIL-001`,
+    );
+  });
+
+  it("keeps the list for assistive technology at a wide width and out of the tab order", async () => {
+    widen(1000);
+    render();
+    const timeline = await axis();
+    const list = await screen.findByRole("region", { name: "Nach Wochen" });
+    // The list stays in the accessibility tree; its links leave the tab order of the chart's links.
+    const listLinks = within(list).getAllByRole("link");
+    expect(listLinks.length).toBeGreaterThan(0);
+    for (const link of listLinks) {
+      expect(link).toHaveAttribute("tabindex", "-1");
+    }
+    for (const link of within(timeline).getAllByRole("link")) {
+      expect(link).not.toHaveAttribute("tabindex", "-1");
+    }
+  });
+
+  it("lets the list take the keyboard at a narrow width", async () => {
+    widen(500);
+    render();
+    const list = await screen.findByRole("region", { name: "Nach Wochen" });
+    for (const link of within(list).getAllByRole("link")) {
+      expect(link).not.toHaveAttribute("tabindex");
+    }
+  });
+
+  it("shows a line in the list when nothing is on the axis but the window", async () => {
+    render({ lists: { "/actions": [], "/milestones": [] } });
+    const list = await screen.findByRole("region", { name: "Nach Wochen" });
+    expect(within(list).getByText("Keine Einträge in dieser Ansicht.")).toBeInTheDocument();
+  });
+
+  it("waits for the profile before it chooses the empty state", async () => {
+    render({
+      profile: { kind: "loading" },
+      lists: { "/actions": [action({ start_date: null, due_date: null })], "/milestones": [] },
+    });
+    expect(
+      await screen.findByRole("status", { name: "Daten des Anlasses werden geladen" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Noch nichts im Zeitplan")).not.toBeInTheDocument();
+  });
+
+  it("names a month window by its month", async () => {
+    const month = structuredClone(profile);
+    if (month.kind === "loaded" && month.profile.facts[0]) {
+      month.profile.facts[0].value = {
+        type: "date-window",
+        start: "2030-05-01",
+        end: "2030-05-31",
+        granularity: "month",
+      };
+    }
+    render({ profile: month });
+    await axis();
+    const legend = screen.getByRole("list", { name: "Legende" });
+    expect(within(legend).getByText("Mai 2030")).toBeInTheDocument();
+  });
+
+  it("draws no node for each week and few labels for a span of years", async () => {
+    render({
+      lists: {
+        "/actions": [action({ start_date: "2030-05-06", due_date: "2033-05-01" })],
+        "/milestones": [],
+      },
+    });
+    const timeline = await axis();
+    expect(timeline.querySelectorAll("[class*='weekLine']")).toHaveLength(0);
+    const labels = timeline.querySelectorAll("[class*='weekLabel']").length;
+    expect(labels).toBeGreaterThan(10);
+    expect(labels).toBeLessThanOrEqual(45);
+  });
 });
+
+/** jsdom has no layout: the observer reports the width of the container. */
+function widen(width: number) {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(private callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        this.callback([{ target, contentRect: { width } } as ResizeObserverEntry], this);
+      }
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+}
+
+afterEach(() => vi.unstubAllGlobals());

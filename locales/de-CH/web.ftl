@@ -987,7 +987,6 @@ milestone-warning-late-unknown = Eine Aufgabe ist erst danach fällig
 milestone-evidence-version = Stützt die Version { $version } des Meilensteins
 
 timeline-title = Zeitplan
-timeline-loading = Zeitplan wird geladen
 timeline-empty-title = Noch nichts im Zeitplan
 timeline-empty-text = Geben Sie einer Aufgabe ein Fälligkeitsdatum oder erfassen Sie einen Meilenstein.
 timeline-empty-action = Zu den Aufgaben
@@ -997,6 +996,7 @@ timeline-filter-status = Status
 timeline-filter-all = Alle
 timeline-filter-reset = Filter zurücksetzen
 timeline-no-match = Keine Treffer für diese Filter.
+timeline-list-empty = Keine Einträge in dieser Ansicht.
 # $count: the actions that the filters hide.
 timeline-hidden = { $count ->
     [one] 1 Aufgabe ausgeblendet

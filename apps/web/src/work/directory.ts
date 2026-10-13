@@ -2,7 +2,7 @@
 // milestones and the actions if the page asks for them, and whether the member manages the event.
 // The server says per record what the caller may do (`can_change`); `isManager` serves only the
 // workstreams, which have no such field yet.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Action,
   type Api,
@@ -40,6 +40,8 @@ export type DirectoryState =
   | { kind: "loaded"; directory: Directory };
 
 interface Loaded {
+  /** The event of the answer: a page that moved to another event must not show it. */
+  eventId: string;
   names: Map<string, string>;
   workstreams: Workstream[];
   milestones: Milestone[];
@@ -69,10 +71,14 @@ export function useDirectory(
 ): { state: DirectoryState; reload: () => Promise<boolean> } {
   const session = useSession();
   const [loaded, setLoaded] = useState<Loaded>();
-  const [error, setError] = useState<{ error: Problem | undefined }>();
+  const [error, setError] = useState<{ eventId: string; error: Problem | undefined }>();
+  // The newest request wins: the answer of an event that the page has left is dropped.
+  const latest = useRef(0);
 
   const me = session.user.id;
   const reload = useCallback(async () => {
+    const request = ++latest.current;
+    const current = () => request === latest.current;
     try {
       const path = { event_id: eventId };
       const query = (cursor: string | undefined) => ({
@@ -98,18 +104,22 @@ export function useDirectory(
             )
           : { items: [] },
       ]);
+      if (!current()) {
+        return false;
+      }
       if (!("members" in members)) {
-        setError({ error: members.error });
+        setError({ eventId, error: members.error });
         return false;
       }
       if (!workstreams.data || !memberships.data || "error" in milestones || "error" in actions) {
         const lists = "error" in milestones ? milestones.error : undefined;
         const failed = lists ?? ("error" in actions ? actions.error : undefined);
-        setError({ error: workstreams.error ?? memberships.error ?? failed });
+        setError({ eventId, error: workstreams.error ?? memberships.error ?? failed });
         return false;
       }
       const names = new Map(members.members.map((m) => [m.user_id, m.display_name]));
       setLoaded({
+        eventId,
         names,
         workstreams: workstreams.data.items,
         milestones: milestones.items,
@@ -127,7 +137,9 @@ export function useDirectory(
       setError(undefined);
       return true;
     } catch {
-      setError({ error: undefined });
+      if (current()) {
+        setError({ eventId, error: undefined });
+      }
       return false;
     }
   }, [api, eventId, me, withMilestones, withActions]);
@@ -138,7 +150,7 @@ export function useDirectory(
 
   const organizationManager = canManage(session.organization?.role);
   const state = useMemo<DirectoryState>(() => {
-    if (loaded) {
+    if (loaded && loaded.eventId === eventId) {
       const isManager = loaded.eventManager || organizationManager;
       const nameOf = (userId: string) => loaded.names.get(userId) ?? "";
       return {
@@ -153,8 +165,8 @@ export function useDirectory(
         },
       };
     }
-    return error ? failed(error.error) : { kind: "loading" };
-  }, [loaded, error, organizationManager]);
+    return error && error.eventId === eventId ? failed(error.error) : { kind: "loading" };
+  }, [loaded, error, eventId, organizationManager]);
 
   return { state, reload };
 }

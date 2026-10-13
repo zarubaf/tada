@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
-import { useId } from "react";
 import { t } from "../i18n";
 import { Link } from "../router/Router";
-import type { TimelineItem, TimelineLayout } from "./layout";
+import { ActionStatusLabel, MilestoneStatusLabel } from "../work/WorkStatus";
+import { type AxisLabel, axisLabels, type TimelineItem, type TimelineLayout } from "./layout";
 import styles from "./Timeline.module.css";
 import { actionLabel, laneName, milestoneLabel, titleOf } from "./text";
 
@@ -13,11 +13,17 @@ function place(values: Record<string, number>): CSSProperties {
   ) as CSSProperties;
 }
 
-/** A week label: the Monday, with the year on the first week and the first week of a year. */
-function weekLabel(week: string, index: number): string {
-  const [year, month, day] = week.split("-");
-  const startsYear = index === 0 || (month === "01" && Number(day) <= 7);
-  return startsYear ? `${day}.${month}.${year}` : `${day}.${month}.`;
+const monthFormat = new Intl.DateTimeFormat("de-CH", { month: "short", timeZone: "UTC" });
+const monthYearFormat = new Intl.DateTimeFormat("de-CH", {
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** The text of a label of the axis: the month, with the year where the layout says so. */
+function labelText({ date, withYear }: AxisLabel): string {
+  const day = new Date(`${date}T00:00:00Z`);
+  return (withYear ? monthYearFormat : monthFormat).format(day);
 }
 
 /**
@@ -37,8 +43,8 @@ export function TimelineChart({
   /** The event window is an assumption: its band has dotted edges. */
   assumption: boolean;
 }) {
-  const id = useId();
   const days = timeline.weeks.length * 7;
+  const labels = axisLabels(timeline.weeks);
   return (
     // A scrolled region must take the focus, so that the keyboard can scroll it.
     // biome-ignore lint/a11y/noNoninteractiveTabindex: the region scrolls; WCAG 2.1.1 needs the focus.
@@ -53,9 +59,6 @@ export function TimelineChart({
               style={place({ from: timeline.window.from, to: timeline.window.to })}
             />
           )}
-          {timeline.weeks.map((week, index) => (
-            <div key={week} className={styles.weekLine} style={place({ at: index * 7 })} />
-          ))}
           {timeline.milestones.map(({ milestone, at }) => (
             <div key={milestone.id} className={styles.milestoneLine} style={place({ at })} />
           ))}
@@ -67,22 +70,17 @@ export function TimelineChart({
         <div className={styles.axis} aria-hidden="true">
           <div className={styles.label} />
           <div className={styles.track}>
-            {timeline.weeks.map((week, index) => (
-              <span key={week} className={styles.weekLabel} style={place({ at: index * 7 })}>
-                {weekLabel(week, index)}
+            {labels.map((label) => (
+              <span key={label.date} className={styles.weekLabel} style={place({ at: label.at })}>
+                {labelText(label)}
               </span>
             ))}
-            {timeline.today !== null && (
-              <span className={styles.todayTag} style={place({ at: timeline.today })}>
-                {t("timeline-today")}
-              </span>
-            )}
           </div>
         </div>
 
         {timeline.milestones.length > 0 && (
-          <section className={styles.lane} aria-labelledby={`${id}-milestones`}>
-            <h3 id={`${id}-milestones`} className={styles.laneHeading}>
+          <div className={styles.lane}>
+            <h3 className={styles.laneHeading}>
               <span className={styles.laneName}>{t("timeline-milestones")}</span>
             </h3>
             <ul className={styles.rows}>
@@ -91,6 +89,7 @@ export function TimelineChart({
                   <span className={styles.label} aria-hidden="true">
                     <span className={styles.recordId}>{milestone.local_id}</span>
                     <span className={styles.rowTitle}>{titleOf(milestone)}</span>
+                    <MilestoneStatusLabel status={milestone.status} />
                   </span>
                   <span className={styles.track}>
                     <span
@@ -103,14 +102,13 @@ export function TimelineChart({
                 </li>
               ))}
             </ul>
-          </section>
+          </div>
         )}
 
         {timeline.lanes.map((lane) => {
-          const laneId = `${id}-${lane.workstream?.id ?? "none"}`;
           return (
-            <section key={laneId} className={styles.lane} aria-labelledby={laneId}>
-              <h3 id={laneId} className={styles.laneHeading}>
+            <div key={lane.workstream?.id ?? "none"} className={styles.lane}>
+              <h3 className={styles.laneHeading}>
                 <span className={styles.laneName}>{laneName(lane.workstream)}</span>
               </h3>
               <ul className={styles.rows}>
@@ -118,9 +116,20 @@ export function TimelineChart({
                   <Row key={item.action.id} item={item} base={base} />
                 ))}
               </ul>
-            </section>
+            </div>
           );
         })}
+
+        {timeline.today !== null && (
+          <div className={styles.footer} aria-hidden="true">
+            <div className={styles.label} />
+            <div className={styles.track}>
+              <span className={styles.todayTag} style={place({ at: timeline.today })}>
+                {t("timeline-today")}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -134,6 +143,7 @@ function Row({ item, base }: { item: TimelineItem; base: string }) {
       <span className={styles.label} aria-hidden="true">
         <span className={styles.recordId}>{action.local_id}</span>
         <span className={styles.rowTitle}>{titleOf(action)}</span>
+        <ActionStatusLabel status={action.status} />
       </span>
       <span className={styles.track}>
         <span
@@ -141,7 +151,11 @@ function Row({ item, base }: { item: TimelineItem; base: string }) {
           data-status={action.status}
           style={place(item.kind === "bar" ? { from: item.from, to: item.to } : { at: item.at })}
         >
-          <Link to={`${base}/actions`} className={styles.mark} aria-label={actionLabel(action)}>
+          <Link
+            to={`${base}/actions#${action.local_id}`}
+            className={styles.mark}
+            aria-label={actionLabel(action)}
+          >
             <span className={styles.markShape} />
           </Link>
         </span>

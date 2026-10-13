@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Action, Fact, Milestone, Workstream } from "../api/client";
-import { eventWindow, layout, weekGroups } from "./layout";
+import { axisLabels, eventWindow, isEmpty, layout, weekGroups } from "./layout";
 
 // Only invented data. 2030-05-06 is a Monday.
 
@@ -215,6 +215,72 @@ describe("layout", () => {
   });
 });
 
+describe("a span of centuries", () => {
+  // A due date typed as the year 2300 must not freeze the page.
+  const far = layout({
+    ...base,
+    actions: [
+      action("1", { start_date: "2030-05-06", due_date: "2300-05-01" }),
+      ...Array.from({ length: 200 }, (_, index) =>
+        action(`d${index}`, { due_date: `2030-06-${String((index % 28) + 1).padStart(2, "0")}` }),
+      ),
+    ],
+    milestones: [milestone("1", "2300-05-02")],
+  });
+
+  it("lays out in whole weeks", () => {
+    expect(far.weeks.length).toBeGreaterThan(14_000);
+    expect(far.weeks[0]).toBe("2030-05-06");
+  });
+
+  it("groups by week without a pass over the weeks for each entry", () => {
+    const started = performance.now();
+    const groups = weekGroups(far);
+    expect(performance.now() - started).toBeLessThan(250);
+    expect(groups.at(-1)?.week).toBe("2300-04-30");
+    expect(groups.reduce((sum, group) => sum + group.entries.length, 0)).toBe(202);
+  });
+
+  it("labels at most about forty weeks, at the start of a month", () => {
+    const labels = axisLabels(far.weeks);
+    expect(labels.length).toBeLessThanOrEqual(45);
+    expect(labels.length).toBeGreaterThan(1);
+    for (const label of labels) {
+      expect(label.date.endsWith("-01") || Number(label.date.slice(8)) <= 7).toBe(true);
+    }
+  });
+});
+
+describe("axisLabels", () => {
+  it("labels the first week and the first week of each month, with the year at a new year", () => {
+    const result = layout({
+      ...base,
+      actions: [action("1", { start_date: "2030-12-16", due_date: "2031-02-10" })],
+    });
+    const labels = axisLabels(result.weeks);
+    expect(labels.map((label) => [label.date, label.withYear])).toEqual([
+      ["2030-12-16", true],
+      ["2031-01-06", true],
+      ["2031-02-03", false],
+    ]);
+    expect(labels[0]?.at).toBe(0);
+    expect(labels[1]?.at).toBe(21);
+  });
+
+  it("gives none for an axis without weeks", () => {
+    expect(axisLabels([])).toEqual([]);
+  });
+});
+
+describe("isEmpty", () => {
+  it("is true only without dated actions, milestones and window", () => {
+    expect(isEmpty({ ...base, actions: [action("1")] })).toBe(true);
+    expect(isEmpty({ ...base, actions: [action("1", { due_date: "2030-05-09" })] })).toBe(false);
+    expect(isEmpty({ ...base, milestones: [milestone("1", "2030-05-09")] })).toBe(false);
+    expect(isEmpty({ ...base, window: { start: "2030-05-09", end: "2030-05-10" } })).toBe(false);
+  });
+});
+
 describe("weekGroups", () => {
   it("groups the actions by the week of the due date and the milestones by their date", () => {
     const result = layout({
@@ -260,6 +326,7 @@ describe("eventWindow", () => {
       fact("exact_dates", "accepted", "2030-05-18", "2030-05-19"),
     ];
     expect(eventWindow(facts)).toMatchObject({
+      fact: facts[1],
       start: "2030-05-18",
       end: "2030-05-19",
       field_key: "exact_dates",
