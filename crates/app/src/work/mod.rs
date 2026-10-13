@@ -20,8 +20,8 @@ use tada_domain::ids::{
 use tada_domain::parties::Party;
 use tada_domain::redaction::Redactable;
 use tada_domain::work::{
-    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, FirmReason,
-    InvalidTransition, RecordDescription,
+    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, InvalidTransition,
+    RecordDescription, RecordReason,
 };
 
 pub use self::actions::{
@@ -118,7 +118,7 @@ pub struct CommitmentFields {
     pub due_date: Option<Date>,
     pub status: CommitmentStatus,
     /// The reason that made the commitment firm. A conditional commitment has none.
-    pub firm_reason: Option<FirmReason>,
+    pub firm_reason: Option<RecordReason>,
 }
 
 impl Shown<ActionView> {

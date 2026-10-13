@@ -62,7 +62,7 @@ async fn only_make_firm_makes_a_commitment_firm() {
     .unwrap();
     assert_eq!(made.fields.status, CommitmentStatus::Firm);
     assert_eq!(
-        made.fields.firm_reason.as_ref().map(FirmReason::as_str),
+        made.fields.firm_reason.as_ref().map(RecordReason::as_str),
         Some("Order signed")
     );
     assert_eq!(

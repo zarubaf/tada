@@ -1,7 +1,7 @@
 //! The steps of an apply: the operation, the evidence and the audit events of each accepted proposal.
 
 use tada_domain::proposals::{Operation, Proposal};
-use tada_domain::work::{CommitmentStatus, FirmReason};
+use tada_domain::work::{CommitmentStatus, RecordReason};
 
 use super::checks::{Edited, Edits};
 use super::links::Links;
@@ -31,7 +31,7 @@ pub(super) fn step(
             status: CommitmentStatus::Firm,
             ..
         } => Some(
-            FirmReason::parse(proposal.reason.as_str()).map_err(|error| {
+            RecordReason::parse(proposal.reason.as_str()).map_err(|error| {
                 ApplyError::Invalid(vec![FieldError::new(
                     format!("proposals/{}/reason", proposal.id),
                     text_error_code(error),

@@ -14,9 +14,7 @@ pub use milestone::{MilestoneStatus, MilestoneTitle};
 pub use requirement::{RequirementStatus, RequirementText};
 pub use risk::{Level, RiskRating, RiskStatus, RiskTitle};
 
-/// The reason to revoke a decision or to waive a requirement: 1 to 500 characters.
-/// It is the type of the reason to make a commitment firm.
-pub use crate::work::FirmReason as RecordReason;
+pub use crate::work::RecordReason;
 
 /// A record that accepted proposals support with evidence (ADR 0068, ADR 0069).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

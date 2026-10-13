@@ -7,7 +7,7 @@ use jiff::Timestamp;
 use tada_domain::ids::{EventId, MilestoneId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::proposals::{NewRecord, NewWorkRecord, Operation, Proposal};
-use tada_domain::work::{CommitmentStatus, FirmReason, WorkstreamName, dates_in_order};
+use tada_domain::work::{CommitmentStatus, RecordReason, WorkstreamName, dates_in_order};
 
 use super::ProposeStores;
 use crate::caller::OrgScope;
@@ -142,7 +142,7 @@ pub(super) async fn check_work(
                 }
                 // The reason of the proposal becomes the reason of the firm commitment (ADR 0068).
                 if *status == CommitmentStatus::Firm
-                    && let Err(error) = FirmReason::parse(proposal.reason.as_str())
+                    && let Err(error) = RecordReason::parse(proposal.reason.as_str())
                 {
                     refuse(format!("proposals/{index}/reason"), text_error_code(error));
                 }

@@ -20,8 +20,8 @@ use tada_app::domain::parties::{Party, PartyName};
 use tada_app::domain::records::RecordKind;
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{
-    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, FirmReason,
-    RecordDescription,
+    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
+    RecordReason,
 };
 use tada_app::parties::PartyRef;
 use tada_app::records::{Changed, Created, NumberCursor, RecordRef};
@@ -161,7 +161,7 @@ impl CommitmentRow {
                 firm_reason: self
                     .firm_reason
                     .as_deref()
-                    .map(FirmReason::parse)
+                    .map(RecordReason::parse)
                     .transpose()
                     .map_err(|_| InvalidRow("commitment.firm_reason"))?,
             },
@@ -455,7 +455,7 @@ pub(crate) async fn insert_commitment(
         fields.workstream_id.map(WorkstreamId::as_uuid),
         fields.due_date.map(|date| date.to_sqlx()) as _,
         fields.status.as_str(),
-        fields.firm_reason.as_ref().map(FirmReason::as_str),
+        fields.firm_reason.as_ref().map(RecordReason::as_str),
         at.to_sqlx() as _,
     )
     .execute(&mut *conn)
@@ -488,7 +488,7 @@ pub(crate) async fn update_commitment(
         fields.workstream_id.map(WorkstreamId::as_uuid),
         fields.due_date.map(|date| date.to_sqlx()) as _,
         fields.status.as_str(),
-        fields.firm_reason.as_ref().map(FirmReason::as_str),
+        fields.firm_reason.as_ref().map(RecordReason::as_str),
         at.to_sqlx() as _,
     )
     .fetch_optional(&mut *conn)

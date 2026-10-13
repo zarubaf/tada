@@ -25,7 +25,7 @@ use tada_domain::ids::{
 use tada_domain::proposals::Operation;
 use tada_domain::redaction::Redactable;
 use tada_domain::sources::{Evidence, SourceText};
-use tada_domain::work::FirmReason;
+use tada_domain::work::RecordReason;
 
 pub use self::edits::RecordEditInput;
 pub use self::links::{Link, LinkedRecord, MAX_DUPLICATES};
@@ -236,7 +236,7 @@ pub struct ApplyStep {
     pub operation: Operation,
     pub evidence: StepEvidence,
     /// The reason of a proposal that makes a commitment firm. The commitment keeps it (ADR 0068).
-    pub firm_reason: Option<FirmReason>,
+    pub firm_reason: Option<RecordReason>,
 }
 
 /// An operation can hold an edited value with personal data, so `Debug` names the kind of the operation only (ADR 0035).

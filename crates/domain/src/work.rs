@@ -23,8 +23,9 @@ text_type!(
     500
 );
 text_type!(
-    /// The reason to make a commitment firm: 1 to 500 characters.
-    FirmReason,
+    /// The reason for a status change that needs one: make a commitment firm, revoke a decision,
+    /// waive a requirement. 1 to 500 characters.
+    RecordReason,
     500
 );
 
@@ -345,7 +346,10 @@ mod tests {
             ConditionText::parse(&"a".repeat(501)),
             Err(TextError::TooLong)
         );
-        assert_eq!(FirmReason::parse(&"a".repeat(501)), Err(TextError::TooLong));
+        assert_eq!(
+            RecordReason::parse(&"a".repeat(501)),
+            Err(TextError::TooLong)
+        );
         assert!(RecordDescription::parse(&"a".repeat(4000)).is_ok());
         assert_eq!(
             RecordDescription::parse(&"a".repeat(4001)),
@@ -381,6 +385,10 @@ mod tests {
         assert_eq!(
             format!("{:?}", ActionTitle::parse("secret").unwrap()),
             "ActionTitle(6 characters)"
+        );
+        assert_eq!(
+            format!("{:?}", RecordReason::parse("signed").unwrap()),
+            "RecordReason(6 characters)"
         );
     }
 }

@@ -5,7 +5,7 @@ use tada_domain::RecordVersion;
 use tada_domain::ids::{CommitmentId, EventId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::redaction::Redactable;
-use tada_domain::work::{CommitmentStatus, ConditionText, FirmReason};
+use tada_domain::work::{CommitmentStatus, ConditionText, RecordReason};
 use uuid::Uuid;
 
 use super::checks::{
@@ -244,7 +244,7 @@ pub async fn make_commitment_firm(
     ports: WorkPorts<'_>,
 ) -> Result<Shown<CommitmentView>, WorkError> {
     let (access, current) = changeable_commitment(caller, event, id, ports).await?;
-    let reason = FirmReason::parse(&input.reason).map_err(|error| {
+    let reason = RecordReason::parse(&input.reason).map_err(|error| {
         WorkError::Invalid(vec![FieldError::new("reason", text_error_code(error))])
     })?;
     if current.version != input.expected_version {
