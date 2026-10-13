@@ -241,7 +241,7 @@ async fn creates_and_changes_an_action_with_numbers_and_audit_events() {
     );
 
     let fields = ActionFields {
-        description: Some(ActionDescription::parse("Mit Diesel").unwrap()),
+        description: Some(RecordDescription::parse("Mit Diesel").unwrap()),
         due_date: None,
         status: ActionStatus::Done,
         ..first.fields.clone()

@@ -26,7 +26,7 @@ use tada_domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_domain::proposals::{DraftDocument, Operation, QuestionText};
 use tada_domain::records::{MilestoneStatus, MilestoneTitle};
 use tada_domain::work::{
-    ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
+    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
     WorkstreamName, dates_in_order,
 };
 use uuid::Uuid;
@@ -858,7 +858,7 @@ impl TryFrom<OperationInput> for Operation {
                 let description = errors.optional(
                     "description",
                     description,
-                    ActionDescription::parse,
+                    RecordDescription::parse,
                     text_error_code,
                 );
                 let start_date = errors.optional("start_date", start_date, parse_date, |_| "date");
@@ -996,7 +996,7 @@ impl TryFrom<OperationInput> for Operation {
                 let description = errors.optional(
                     "description",
                     description,
-                    ActionDescription::parse,
+                    RecordDescription::parse,
                     text_error_code,
                 );
                 let date = errors.take("date", parse_date(&date), |_| "date");

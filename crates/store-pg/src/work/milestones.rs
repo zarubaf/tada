@@ -13,7 +13,7 @@ use tada_app::domain::events::EventTimeZone;
 use tada_app::domain::ids::{ActionId, EventId, LocalIdKind, MilestoneId, UserId, WorkstreamId};
 use tada_app::domain::records::{MilestoneStatus, MilestoneTitle};
 use tada_app::domain::redaction::Redactable;
-use tada_app::domain::work::ActionDescription;
+use tada_app::domain::work::RecordDescription;
 use tada_app::records::{Changed, Created};
 use tada_app::store::StoreError;
 use tada_app::work::{
@@ -73,7 +73,7 @@ impl MilestoneRow {
                 },
                 description: self
                     .description
-                    .map(|text| ActionDescription::parse(&text))
+                    .map(|text| RecordDescription::parse(&text))
                     .transpose()
                     .map_err(|_| InvalidRow("milestone.description"))?,
                 date,
@@ -173,7 +173,7 @@ pub(crate) async fn insert_milestone(
         milestone.event_id.as_uuid(),
         number,
         fields.title.as_present().map(MilestoneTitle::as_str),
-        fields.description.as_ref().map(ActionDescription::as_str),
+        fields.description.as_ref().map(RecordDescription::as_str),
         fields.date.to_sqlx() as _,
         fields.owner.as_uuid(),
         fields.workstream_id.map(WorkstreamId::as_uuid),
@@ -207,7 +207,7 @@ pub(crate) async fn update_milestone(
         id.as_uuid(),
         expected.get(),
         fields.title.as_present().map(MilestoneTitle::as_str),
-        fields.description.as_ref().map(ActionDescription::as_str),
+        fields.description.as_ref().map(RecordDescription::as_str),
         fields.date.to_sqlx() as _,
         fields.owner.as_uuid(),
         fields.workstream_id.map(WorkstreamId::as_uuid),

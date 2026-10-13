@@ -19,8 +19,8 @@ use tada_app::domain::ids::{
 use tada_app::domain::parties::{Party, PartyName};
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{
-    ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
-    FirmReason,
+    ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, FirmReason,
+    RecordDescription,
 };
 use tada_app::parties::PartyRef;
 use tada_app::records::{Changed, Created, NumberCursor, RecordRef};
@@ -69,7 +69,7 @@ impl TryFrom<ActionRow> for ActionView {
                 },
                 description: row
                     .description
-                    .map(|text| ActionDescription::parse(&text))
+                    .map(|text| RecordDescription::parse(&text))
                     .transpose()
                     .map_err(|_| InvalidRow("action.description"))?,
                 owner: UserId::from_uuid(row.owner_user_id),
@@ -363,7 +363,7 @@ pub(crate) async fn insert_action(
         action.event_id.as_uuid(),
         number,
         fields.title.as_present().map(ActionTitle::as_str),
-        fields.description.as_ref().map(ActionDescription::as_str),
+        fields.description.as_ref().map(RecordDescription::as_str),
         fields.owner.as_uuid(),
         fields.workstream_id.map(WorkstreamId::as_uuid),
         fields.due_date.map(|date| date.to_sqlx()) as _,
@@ -402,7 +402,7 @@ pub(crate) async fn update_action(
         id.as_uuid(),
         expected.get(),
         fields.title.as_present().map(ActionTitle::as_str),
-        fields.description.as_ref().map(ActionDescription::as_str),
+        fields.description.as_ref().map(RecordDescription::as_str),
         fields.owner.as_uuid(),
         fields.workstream_id.map(WorkstreamId::as_uuid),
         fields.due_date.map(|date| date.to_sqlx()) as _,

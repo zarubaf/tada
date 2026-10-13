@@ -28,12 +28,12 @@ text_type!(
     500
 );
 
-/// The description of an action: 1 to 4000 characters.
+/// The description of a work record (an action, a milestone or a risk): 1 to 4000 characters.
 /// Unlike the other texts, it can have line breaks and tabs.
 #[derive(Clone, PartialEq, Eq)]
-pub struct ActionDescription(String);
+pub struct RecordDescription(String);
 
-impl ActionDescription {
+impl RecordDescription {
     pub const MAX_CHARS: usize = 4000;
 
     /// Removes the spaces at the ends, then checks the text.
@@ -59,11 +59,11 @@ impl ActionDescription {
     }
 }
 
-impl std::fmt::Debug for ActionDescription {
+impl std::fmt::Debug for RecordDescription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ActionDescription({} characters)",
+            "RecordDescription({} characters)",
             self.0.chars().count()
         )
     }
@@ -370,22 +370,22 @@ mod tests {
             Err(TextError::TooLong)
         );
         assert_eq!(FirmReason::parse(&"a".repeat(501)), Err(TextError::TooLong));
-        assert!(ActionDescription::parse(&"a".repeat(4000)).is_ok());
+        assert!(RecordDescription::parse(&"a".repeat(4000)).is_ok());
         assert_eq!(
-            ActionDescription::parse(&"a".repeat(4001)),
+            RecordDescription::parse(&"a".repeat(4001)),
             Err(TextError::TooLong)
         );
     }
 
     #[test]
     fn a_description_keeps_line_breaks_but_a_title_does_not() {
-        assert!(ActionDescription::parse("one\ntwo").is_ok());
+        assert!(RecordDescription::parse("one\ntwo").is_ok());
         assert_eq!(
             ActionTitle::parse("one\ntwo"),
             Err(TextError::ControlCharacter)
         );
         assert_eq!(
-            ActionDescription::parse("a\u{7}"),
+            RecordDescription::parse("a\u{7}"),
             Err(TextError::ControlCharacter)
         );
     }

@@ -11,7 +11,7 @@ use tada_domain::RecordVersion;
 use tada_domain::ids::{ActionId, EventId, LocalIdKind, MilestoneId, UserId, WorkstreamId};
 use tada_domain::records::{MilestoneStatus, MilestoneTitle};
 use tada_domain::redaction::Redactable;
-use tada_domain::work::ActionDescription;
+use tada_domain::work::RecordDescription;
 use uuid::Uuid;
 
 use super::checks::{
@@ -55,7 +55,7 @@ impl MilestoneView {
 pub struct MilestoneFields {
     /// A legal redaction removes the title and the description (ADR 0072).
     pub title: Redactable<MilestoneTitle>,
-    pub description: Option<ActionDescription>,
+    pub description: Option<RecordDescription>,
     pub date: Date,
     /// A member of the event with the contributor or manager role.
     pub owner: UserId,
