@@ -3800,6 +3800,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "tada-adapters",
+ "tada-ai-tools",
  "tada-api",
  "tada-app",
  "tada-mcp",
