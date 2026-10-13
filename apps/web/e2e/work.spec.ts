@@ -556,3 +556,21 @@ test("a bar opens its row in the register of actions", async ({ page }) => {
   await expect(page).toHaveURL(/\/actions#ACT-001$/);
   await expect(page.locator("tr#ACT-001")).toBeFocused();
 });
+
+test("hovering a milestone diamond changes its border, whatever its status", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeSession(page, sessionWithRole("member"));
+  await fakeTimeline(page);
+  await page.goto(`/events/${event?.id}/timeline`);
+  const axis = page.getByRole("region", { name: "Zeitachse" });
+  // MIL-001 is open, MIL-002 is reached; a screenshot cannot show a hover, so read the styles.
+  for (const id of ["MIL-001", "MIL-002"]) {
+    const link = axis.getByRole("link", { name: new RegExp(id) });
+    const diamond = link.locator("[data-status]");
+    const border = () => diamond.evaluate((el) => getComputedStyle(el).borderTopColor);
+    await page.mouse.move(0, 0);
+    const rest = await border();
+    await link.hover();
+    await expect.poll(border).not.toBe(rest);
+  }
+});

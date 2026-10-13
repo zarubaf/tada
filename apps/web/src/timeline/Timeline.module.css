@@ -389,9 +389,12 @@
     width: var(--space-3);
     height: var(--space-3);
     rotate: 45deg;
-    border: 1.5px solid var(--color-text);
+    border: 1.5px solid var(--color-border-control);
     border-radius: var(--radius-sm);
     background: var(--color-bg-surface);
+    transition-property: border-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
   }
 
   .diamond[data-status="reached"] {
@@ -404,8 +407,11 @@
     border-color: var(--color-text-muted);
   }
 
-  /* A reached or canceled milestone keeps its tone on hover, like the action points. */
-  .mark:hover .diamond:not([data-status="reached"], [data-status="canceled"]) {
+  /*
+   * Every milestone darkens its border on hover. The fill (reached) and the dashes (canceled)
+   * keep the status. The border rests lighter than this (see .diamond), so the change shows.
+   */
+  .mark:hover .diamond {
     border-color: var(--color-text);
   }
 
