@@ -191,6 +191,8 @@ export interface LinkProps {
   alsoCurrentOn?: readonly string[];
   /** For a link whose words do not name its target alone, for example in a table. */
   "aria-label"?: string;
+  /** `-1` takes the link out of the tab order, where another link of the page does the same. */
+  tabIndex?: number;
   children: ReactNode;
 }
 
@@ -202,6 +204,7 @@ export function Link({
   within,
   alsoCurrentOn = [],
   "aria-label": ariaLabel,
+  tabIndex,
   children,
 }: LinkProps) {
   const { pathname, navigate } = useLocation();
@@ -226,6 +229,7 @@ export function Link({
       href={to}
       className={className}
       aria-label={ariaLabel}
+      tabIndex={tabIndex}
       aria-current={current ? "page" : undefined}
       onClick={onClick}
     >

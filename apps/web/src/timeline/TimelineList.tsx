@@ -16,16 +16,22 @@ export function TimelineList({
   timeline,
   base,
   nameOf,
+  focusable,
 }: {
   timeline: TimelineLayout;
   /** The path of the event. */
   base: string;
   nameOf: (userId: string) => string;
+  /** False where the axis shows the same items and takes the keyboard: the links leave the tab order. */
+  focusable: boolean;
 }) {
   const id = useId();
+  const groups = weekGroups(timeline);
+  const tabIndex = focusable ? undefined : -1;
   return (
     <section className={styles.list} aria-label={t("timeline-by-week")}>
-      {weekGroups(timeline).map(({ week, entries }) => (
+      {groups.length === 0 && <p className={styles.noMatch}>{t("timeline-list-empty")}</p>}
+      {groups.map(({ week, entries }) => (
         <div key={week} className={styles.week}>
           <h3 id={`${id}-${week}`} className={styles.weekHeading}>
             {t("timeline-week", { date: formatDate(week) })}
@@ -34,7 +40,11 @@ export function TimelineList({
             {entries.map((entry) =>
               entry.kind === "action" ? (
                 <li key={entry.item.action.id} className={styles.entry}>
-                  <StandaloneLink to={`${base}/actions`} className={styles.entryTitle}>
+                  <StandaloneLink
+                    to={`${base}/actions#${entry.item.action.local_id}`}
+                    className={styles.entryTitle}
+                    tabIndex={tabIndex}
+                  >
                     <span className={styles.recordId}>{entry.item.action.local_id}</span>{" "}
                     {titleOf(entry.item.action)}
                   </StandaloneLink>
@@ -47,7 +57,11 @@ export function TimelineList({
                 </li>
               ) : (
                 <li key={entry.milestone.id} className={styles.entry}>
-                  <StandaloneLink to={`${base}/milestones`} className={styles.entryTitle}>
+                  <StandaloneLink
+                    to={`${base}/milestones#${entry.milestone.local_id}`}
+                    className={styles.entryTitle}
+                    tabIndex={tabIndex}
+                  >
                     <IconDiamond
                       className={styles.entryIcon}
                       size={16}

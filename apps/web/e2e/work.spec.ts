@@ -445,6 +445,8 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page, sessionWithRole("member"));
       await fakeTimeline(page);
+      // The baselines must not depend on the real date: today is a day on the axis.
+      await page.clock.setFixedTime(new Date("2030-05-08T10:00:00Z"));
       await page.goto(`/events/${event?.id}/timeline`);
       await setTheme(page, theme);
       await expect(page.getByRole("heading", { level: 2, name: "Zeitplan" })).toBeVisible();
@@ -494,6 +496,7 @@ test("at 320 px the timeline shows the list by week without a sideways scroll", 
   await page.setViewportSize({ width: 320, height: 800 });
   await fakeSession(page, sessionWithRole("member"));
   await fakeTimeline(page);
+  await page.clock.setFixedTime(new Date("2030-05-08T10:00:00Z"));
   await page.goto(`/events/${event?.id}/timeline`);
   await expect(page.getByRole("region", { name: "Nach Wochen" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Zeitachse" })).toBeHidden();
@@ -501,4 +504,55 @@ test("at 320 px the timeline shows the list by week without a sideways scroll", 
     true,
   );
   expect(await textOverflows(page)).toEqual([]);
+});
+
+test("wide: the axis takes the keyboard and the list stays in the accessibility tree", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeSession(page, sessionWithRole("member"));
+  await fakeTimeline(page);
+  await page.clock.setFixedTime(new Date("2030-05-08T10:00:00Z"));
+  await page.goto(`/events/${event?.id}/timeline`);
+  const axis = page.getByRole("region", { name: "Zeitachse" });
+  await expect(axis).toBeVisible();
+
+  // The list is out of sight, but a screen reader finds it by its role and name.
+  const list = page.getByRole("region", { name: "Nach Wochen" });
+  await expect(list).toHaveCount(1);
+  await expect(list.getByRole("link", { name: /ACT-001/ })).toHaveAttribute("tabindex", "-1");
+  await expect(axis.getByRole("link", { name: /ACT-001/ })).not.toHaveAttribute("tabindex", "-1");
+
+  // Tab from the axis goes through its links only: no focused link lies in the hidden list.
+  await axis.focus();
+  for (let step = 0; step < 4; step += 1) {
+    await page.keyboard.press("Tab");
+    expect(
+      await page.evaluate(() => document.activeElement?.closest("section")?.ariaLabel),
+    ).not.toBe("Nach Wochen");
+  }
+});
+
+test("narrow: the axis leaves the keyboard and the accessibility tree", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await fakeSession(page, sessionWithRole("member"));
+  await fakeTimeline(page);
+  await page.goto(`/events/${event?.id}/timeline`);
+  const list = page.getByRole("region", { name: "Nach Wochen" });
+  await expect(list).toBeVisible();
+  await expect(page.getByRole("region", { name: "Zeitachse" })).toHaveCount(0);
+  await expect(list.getByRole("link", { name: /ACT-001/ })).not.toHaveAttribute("tabindex", "-1");
+});
+
+test("a bar opens its row in the register of actions", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeSession(page, sessionWithRole("member"));
+  await fakeTimeline(page);
+  await page.goto(`/events/${event?.id}/timeline`);
+  await page
+    .getByRole("region", { name: "Zeitachse" })
+    .getByRole("link", { name: /ACT-001/ })
+    .click();
+  await expect(page).toHaveURL(/\/actions#ACT-001$/);
+  await expect(page.locator("tr#ACT-001")).toBeFocused();
 });

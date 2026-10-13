@@ -52,6 +52,18 @@ function monday(day: number): number {
 }
 
 /**
+ * True when there is nothing to put on an axis: no dated action, no milestone and no event window.
+ * The page then shows its empty state instead of an empty axis.
+ */
+export function isEmpty({
+  actions,
+  milestones,
+  window,
+}: Pick<LayoutInput, "actions" | "milestones" | "window">): boolean {
+  return !window && milestones.length === 0 && !actions.some((action) => action.due_date);
+}
+
+/**
  * Lays out the actions, milestones and the event window on an axis in weeks. The axis runs from
  * the earliest to the latest date of all of them: the start and due dates of the actions, the
  * milestones and the event window. An event with no dated action, no milestone and no window gets
@@ -66,7 +78,7 @@ export function layout({
 }: LayoutInput): TimelineLayout {
   const dated = actions.filter((action) => action.due_date);
   const undated = actions.length - dated.length;
-  if (dated.length === 0 && milestones.length === 0 && !window) {
+  if (isEmpty({ actions, milestones, window })) {
     return { weeks: [], lanes: [], milestones: [], window: null, today: null, undated };
   }
 
@@ -129,6 +141,8 @@ export type WeekEntry =
 /**
  * The same items as a list grouped by week, for narrow layouts and screen readers: an action in
  * the week of its due date, a milestone in the week of its date. Weeks without items are left out.
+ * It sorts the items once and cuts the groups from the sorted list, so a span of centuries costs
+ * no more than the items on it.
  */
 export function weekGroups(timeline: TimelineLayout): { week: string; entries: WeekEntry[] }[] {
   const entries: WeekEntry[] = [
@@ -146,15 +160,63 @@ export function weekGroups(timeline: TimelineLayout): { week: string; entries: W
       ({ milestone, at }): WeekEntry => ({ kind: "milestone", milestone, day: at }),
     ),
   ].sort((a, b) => a.day - b.day);
-  return timeline.weeks
-    .map((week, index) => ({
-      week,
-      entries: entries.filter((entry) => Math.floor(entry.day / 7) === index),
-    }))
-    .filter((group) => group.entries.length > 0);
+  const groups: { week: string; entries: WeekEntry[] }[] = [];
+  let last = -1;
+  for (const entry of entries) {
+    const index = Math.floor(entry.day / 7);
+    const week = timeline.weeks[index];
+    if (week === undefined) {
+      continue;
+    }
+    if (index !== last) {
+      groups.push({ week, entries: [] });
+      last = index;
+    }
+    groups[groups.length - 1]?.entries.push(entry);
+  }
+  return groups;
+}
+
+export interface AxisLabel {
+  /** The day of the label from the first Monday. */
+  at: number;
+  /** The Monday of the week that carries the label. */
+  date: string;
+  /** The label names the year too: the first label, a new year, and a coarse axis. */
+  withYear: boolean;
+}
+
+/** The step in months from the widest span that still has few labels. */
+const MONTH_STEPS = [1, 2, 3, 6, 12, 24, 60, 120, 240, 600] as const;
+const MOST_LABELS = 40;
+
+/**
+ * The labels of the axis: the first week and the first week of each month. A long axis labels
+ * every few months, so that the page never draws a node for each week.
+ */
+export function axisLabels(weeks: readonly string[]): AxisLabel[] {
+  const months = weeks.length / 4.35;
+  const step = MONTH_STEPS.find((candidate) => months / candidate <= MOST_LABELS) ?? 600;
+  const labels: AxisLabel[] = [];
+  weeks.forEach((date, index) => {
+    const month = Number(date.slice(5, 7));
+    const startsMonth = Number(date.slice(8)) <= 7;
+    const counted = Number(date.slice(0, 4)) * 12 + month - 1;
+    if (index !== 0 && !(startsMonth && counted % step === 0)) {
+      return;
+    }
+    labels.push({
+      at: index * 7,
+      date,
+      withYear: index === 0 || month === 1 || step > 1,
+    });
+  });
+  return labels;
 }
 
 export interface EventWindow {
+  /** The fact that holds the window, for its value and its field. */
+  fact: Fact;
   start: string;
   end: string;
   field_key: "exact_dates" | "date_window";
@@ -176,6 +238,7 @@ export function eventWindow(facts: readonly Fact[]): EventWindow | null {
       return null;
     }
     return {
+      fact,
       start: value.start,
       end: value.end,
       field_key: key,

@@ -4,6 +4,7 @@
    * inside `.scroller` and never the page (doc/design/layout-and-responsiveness.md, „Timeline“).
    */
   .timeline {
+    position: relative;
     container-type: inline-size;
     display: grid;
     gap: var(--space-4);
@@ -97,13 +98,22 @@
     gap: var(--space-5);
   }
 
+  /*
+   * The axis shows the same items, so the list leaves the screen. It stays in the accessibility
+   * tree (no `display: none`) as the list of the items, and its links leave the tab order.
+   */
   @container (width >= 40rem) {
     .chart {
       display: block;
     }
 
     .list {
-      display: none;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 
@@ -122,22 +132,33 @@
    * `--days` and `--weeks` come from the layout; a position is a share of `--days`.
    */
   .canvas {
-    --label-width: 17rem;
+    --label-width: 22rem;
     --week-width: 5.5rem;
 
     position: relative;
     width: max(100%, calc(var(--label-width) + var(--weeks) * var(--week-width)));
-    padding-bottom: var(--space-2);
   }
 
+  /*
+   * It starts below the labels of the axis, so that no line crosses their text. The week lines are
+   * one repeating background, not an element for each week.
+   */
   .overlay {
     position: absolute;
-    inset: 0 0 0 var(--label-width);
+    inset: var(--row-height) 0 0 var(--label-width);
     pointer-events: none;
   }
 
+  /* The week lines lie over the band: one repeating background for all weeks. */
+  .overlay::after {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(to right, var(--color-border-subtle) 1px, transparent 1px);
+    background-size: calc(100% / var(--weeks)) 100%;
+    content: "";
+  }
+
   .band,
-  .weekLine,
   .milestoneLine,
   .todayLine {
     position: absolute;
@@ -154,11 +175,6 @@
   /* An assumption has a dotted line, as its value elsewhere (doc/design/tokens.md). */
   .band[data-assumption] {
     border-inline-style: dotted;
-  }
-
-  .weekLine {
-    left: calc(var(--at) / var(--days) * 100%);
-    border-left: 1px solid var(--color-border-subtle);
   }
 
   /* A line in the middle of the day of the milestone or of today. */
@@ -217,6 +233,14 @@
     align-items: center;
     padding-inline: var(--space-1-5);
     white-space: nowrap;
+  }
+
+  /* The name of the line of today stands under its end, away from the labels of the axis. */
+  .footer {
+    display: grid;
+    grid-template-columns: var(--label-width) 1fr;
+    min-height: var(--row-height);
+    border-top: 1px solid var(--color-border-subtle);
   }
 
   .todayTag {
