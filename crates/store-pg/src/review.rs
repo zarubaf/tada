@@ -59,6 +59,10 @@ const RECORD_CONSTRAINTS: &[&str] = &[
     "workstream_name",
     "action_pkey",
     "commitment_pkey",
+    "milestone_pkey",
+    "decision_pkey",
+    "risk_pkey",
+    "requirement_pkey",
 ];
 
 #[async_trait]
