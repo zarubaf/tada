@@ -15,7 +15,7 @@ use tada_domain::events::{EventKey, EventName, EventTimeZone};
 use tada_domain::facts::{
     ChoiceKey, ChoiceValue, Currency, DateWindow, Decimal, Description, FactState, FactValue,
     FieldKey, Granularity, KeyError, Label, MinorUnits, ModuleKey, Range, ReferenceId,
-    ReferenceTarget, ShortText, TextError, Unit, ValueError, ValueType, Valued,
+    ReferenceTarget, ShortText, Unit, ValueError, ValueType, Valued,
 };
 use tada_domain::identity::Email;
 use tada_domain::ids::{
@@ -35,6 +35,7 @@ use super::{MAX_PASSAGES, MAX_PROPOSALS};
 use crate::events::{key_error_code, name_error_code};
 use crate::parties::email_code;
 use crate::problem::FieldError;
+use crate::records::{START_AFTER_DUE, text_error_code};
 
 /// A new changeset: the text of one intake and the proposals that it supports.
 #[derive(Clone, Deserialize, JsonSchema)]
@@ -599,17 +600,6 @@ impl Errors {
             Some(value) if self.0.is_empty() => Ok(value),
             _ => Err(self.0),
         }
-    }
-}
-
-/// The field code of a start date after the due date of an action (ADR 0080).
-pub(crate) const START_AFTER_DUE: &str = "start-after-due";
-
-pub(crate) fn text_error_code(error: TextError) -> &'static str {
-    match error {
-        TextError::Empty => "empty",
-        TextError::TooLong => "too-long",
-        TextError::ControlCharacter => "control-character",
     }
 }
 

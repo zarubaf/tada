@@ -19,7 +19,7 @@ use crate::clock::Clock;
 use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::{CommandError, FieldError, ProblemCode};
-use crate::proposals::text_error_code;
+use crate::records::text_error_code;
 use crate::records::{
     Changed, Checker, Created, EvidenceStore, NumberCursor, RecordRef, Shown, audit, page,
     record_id, shown, shown_one,

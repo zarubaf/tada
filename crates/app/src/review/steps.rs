@@ -9,7 +9,7 @@ use super::{ApplyError, ApplyStep, ProposalStatus, StepEvidence};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::MemberCaller;
 use crate::problem::FieldError;
-use crate::proposals::text_error_code;
+use crate::records::text_error_code;
 
 /// The step of one proposal. A change to firm needs a valid reason: the commitment keeps it (ADR 0068).
 /// A linked proposal creates no record; each other proposal uses the linked records (ADR 0069).

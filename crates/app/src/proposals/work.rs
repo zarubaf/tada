@@ -10,10 +10,10 @@ use tada_domain::proposals::{NewRecord, NewWorkRecord, Operation, Proposal};
 use tada_domain::work::{CommitmentStatus, FirmReason, WorkstreamName, dates_in_order};
 
 use super::ProposeStores;
-use super::input::{START_AFTER_DUE, text_error_code};
 use crate::caller::OrgScope;
 use crate::identity::IdentityStore;
 use crate::problem::FieldError;
+use crate::records::{START_AFTER_DUE, text_error_code};
 use crate::store::StoreError;
 use crate::work::{is_possible_owner, milestone_refusal};
 use crate::workstreams::{ActiveWorkstreamError, WorkstreamStore, active_workstream};

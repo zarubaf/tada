@@ -16,8 +16,8 @@ use crate::caller::{MemberCaller, OrgScope};
 use crate::clock::Clock;
 use crate::identity::IdentityStore;
 use crate::problem::{CommandError, FieldError, ProblemCode};
-use crate::proposals::text_error_code;
 use crate::records;
+use crate::records::text_error_code;
 use crate::store::StoreError;
 
 /// A workstream of an event.

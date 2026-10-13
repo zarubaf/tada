@@ -16,6 +16,7 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use jiff::Timestamp;
 use tada_domain::RecordVersion;
+use tada_domain::facts::TextError;
 use tada_domain::ids::{self, ProposalId, SourceVersionId};
 pub use tada_domain::records::RecordRef;
 use tada_domain::redaction::Redactable;
@@ -29,6 +30,17 @@ use crate::identity::IdentityStore;
 use crate::paging::{Page, PageLimit};
 use crate::problem::FieldError;
 use crate::store::StoreError;
+
+/// The field code of a start date after the due date of an action (ADR 0080).
+pub(crate) const START_AFTER_DUE: &str = "start-after-due";
+
+pub(crate) fn text_error_code(error: TextError) -> &'static str {
+    match error {
+        TextError::Empty => "empty",
+        TextError::TooLong => "too-long",
+        TextError::ControlCharacter => "control-character",
+    }
+}
 
 /// Collects the field errors of one input, so that the caller sees all of them at once.
 #[derive(Debug, Default)]

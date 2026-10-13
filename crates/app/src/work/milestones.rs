@@ -23,10 +23,9 @@ use crate::access::{self, Principal};
 use crate::audit::{AuditAction, AuditEvent};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::paging::Page;
-use crate::proposals::text_error_code;
+use crate::records::text_error_code;
 use crate::records::{
-    Changed, Checker, Created, EvidenceStore, NumberCursor, RecordRef, Shown, audit, page,
-    record_id,
+    Changed, Checker, Created, NumberCursor, RecordRef, Shown, audit, page, record_id,
 };
 use crate::store::StoreError;
 
@@ -84,7 +83,7 @@ pub struct NewMilestoneRecord {
 /// A create or a change records its audit event in the same transaction.
 /// Each view carries its warnings: `at` or `now` gives "today" in the time zone of the event.
 #[async_trait]
-pub trait MilestoneStore: EvidenceStore + Debug + Send + Sync {
+pub trait MilestoneStore: Debug + Send + Sync {
     /// Inserts a milestone with the version 1 and gives it the next number of its event (ADR 0038).
     async fn create_milestone(
         &self,
