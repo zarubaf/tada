@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 use jiff::Timestamp;
 use jiff_sqlx::ToSqlx;
+use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::audit::AuditEvent;
 use tada_app::caller::OrgScope;
@@ -47,6 +48,32 @@ impl TryFrom<WorkstreamRow> for Workstream {
     }
 }
 
+/// Inserts a new workstream. The direct command and the apply of a proposal both create one here (ADR 0067).
+/// A taken ID or name violates `workstream_pkey` or `workstream_name`.
+pub(crate) async fn insert_workstream(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    workstream: &Workstream,
+    now: Timestamp,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "INSERT INTO workstream
+                 (id, organization_id, event_id, name, lead_user_id, status, version, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)",
+        workstream.id.as_uuid(),
+        scope.organization_id().as_uuid(),
+        workstream.event_id.as_uuid(),
+        workstream.name.as_present().map(WorkstreamName::as_str),
+        workstream.lead.as_uuid(),
+        workstream.status.as_str(),
+        workstream.version.get(),
+        now.to_sqlx() as _,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 #[async_trait]
 impl WorkstreamStore for Database {
     async fn create(
@@ -57,21 +84,7 @@ impl WorkstreamStore for Database {
         audit: &AuditEvent,
     ) -> Result<Created, StoreError> {
         let mut tx = self.pool.begin().await.map_err(store_error)?;
-        let inserted = sqlx::query!(
-            "INSERT INTO workstream
-                 (id, organization_id, event_id, name, lead_user_id, status, version, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)",
-            workstream.id.as_uuid(),
-            scope.organization_id().as_uuid(),
-            workstream.event_id.as_uuid(),
-            workstream.name.as_present().map(WorkstreamName::as_str),
-            workstream.lead.as_uuid(),
-            workstream.status.as_str(),
-            workstream.version.get(),
-            now.to_sqlx() as _,
-        )
-        .execute(&mut *tx)
-        .await;
+        let inserted = insert_workstream(&mut tx, scope, workstream, now).await;
         match inserted {
             Ok(_) => {}
             Err(error) if violates(&error, "workstream_pkey") => return Ok(Created::IdTaken),
