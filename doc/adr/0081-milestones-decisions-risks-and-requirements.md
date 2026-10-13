@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-10-13
-- Amends: [0067](0067-workstreams-and-review-routing.md), [0068](0068-actions-and-commitments.md)
+- Amends: [0049](0049-entities-and-fact-model.md), [0052](0052-event-roles-and-ownership.md), [0067](0067-workstreams-and-review-routing.md), [0068](0068-actions-and-commitments.md)
 
 ## Context
 
@@ -106,17 +106,38 @@ The MCP tools must also serialize an empty `statuses` list ([#73](https://github
   - An event contributor or manager creates a milestone, a risk or a requirement.
   - The owner, the lead of its workstream or an event manager changes one of them.
   - Only an event manager creates, supersedes or revokes a decision, or changes its owner or workstream.
-- Routing replaces the per-kind functions of ADR 0067 with two functions, the owner of a record and the lead of a workstream.
-  Rules 1 to 3 of ADR 0067 apply to milestones, risks and requirements.
+- Routing applies the rules 1 to 3 of ADR 0067 to the new kinds, except decisions.
+  Two functions give the reviewers: the owner of a record and the lead of a workstream.
 - Each decision operation, and `CreateWorkstream`, goes to the event managers.
   A contributor who leads a workstream does not review a decision in it.
 - Rule 5 of ADR 0067 (the reviewers of a dependent also decide on the new record) gets these cases:
-  - a new milestone that a new action or `ChangeActionMilestone` names;
-  - a new person or institution that a new decision or requirement names;
-  - a new workstream that a new record names.
-    A new successor that `SupersedeDecision` names needs no case.
-    Its `CreateDecision` goes to the event managers like every decision operation, so the same reviewers decide on both.
-- The review edit (ADR 0068) cannot name a milestone of another event, or a canceled milestone, on a new action.
+  - a new person or institution that a new requirement names as its source;
+  - a new milestone that a new action or `ChangeActionMilestone` names.
+- A new workstream of a new record, a new party of a decision and a new successor of a decision change no reviewer: they go to the event managers anyway.
+
+### Review edit
+
+- ADR 0068 limits the review edit to the text fields, the due date, the condition, the owner and the workstream.
+  For the create operations of the new kinds, the reviewer can edit these fields:
+  - `CreateMilestone`: the title, the description, the date, the owner and the workstream.
+  - `CreateAction`: also the start date and the milestone.
+  - `CreateDecision`: the owner and the workstream.
+    The wording, the date and the parties stay as proposed.
+  - `CreateRisk`: the title, the description, the mitigation, the rating (likelihood and impact), the owner and the workstream.
+  - `CreateRequirement`: the text, the source, the due date, the owner and the workstream.
+- The change operations and `CreateWorkstream` have no review edit.
+- A reviewer who needs another wording rejects the proposal.
+- The review edit cannot name a milestone of another event, or a canceled milestone, on a new action.
+
+### Earlier ADRs
+
+- ADR 0052 lets a contributor create work records and change the records that the contributor owns.
+  It also routes a proposal for a record to its owner.
+  For decisions, this ADR narrows both rules: only the event managers create, supersede and revoke a decision, and review its proposals.
+  A contributor can own a decision and follow it up, but cannot create or change it.
+- ADR 0049 says: "Documents and decisions refer to exact fact versions".
+  This ADR adds no link from a decision to fact versions.
+  A later ADR adds the links if the product owner wants them.
 
 ### Personal data
 
