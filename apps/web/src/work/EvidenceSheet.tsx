@@ -6,18 +6,21 @@ import { Sheet } from "../ui/Sheet";
 import styles from "./Work.module.css";
 
 /**
- * The evidence of a commitment: the passages of the accepted proposals, each with the version of
- * the commitment that it produced and the capture time of its source version.
+ * The evidence of a work record: the passages of the accepted proposals, each with the version of
+ * the record that it produced and the capture time of its source version.
  */
-export function CommitmentEvidence({
+export function EvidenceSheet({
   title,
   evidence,
   timeZone,
+  versionText,
   onClose,
 }: {
   title: string;
   evidence: RecordEvidence[];
   timeZone: string;
+  /** The line that names the record version that a passage supports. */
+  versionText: (version: number) => string;
   onClose: () => void;
 }) {
   return (
@@ -26,9 +29,7 @@ export function CommitmentEvidence({
         {evidence.map((item) => (
           <li key={`${item.proposal_id}:${item.start_offset}:${item.end_offset}`}>
             <Excerpt quote={item.quote} redacted={item.redacted} notes={item.dispute_notes} />
-            <p className={styles.meta}>
-              {t("commitment-evidence-version", { version: item.record_version })}
-            </p>
+            <p className={styles.meta}>{versionText(item.record_version)}</p>
             {typeof item.page === "number" && (
               <p className={styles.meta}>{t("evidence-page", { page: item.page })}</p>
             )}
