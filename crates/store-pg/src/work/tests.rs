@@ -584,18 +584,22 @@ async fn owners_reads_only_the_records_of_the_given_event() {
     let commitment = f.commitment(None).await;
     let db = &f.test.database;
 
-    let owners = db
-        .owners(f.scope, f.event, &[action.id], &[commitment.id])
-        .await
-        .unwrap();
-    assert_eq!(owners.actions, [(action.id, f.owner)]);
-    assert_eq!(owners.commitments, [(commitment.id, f.owner)]);
+    let records = [
+        RecordRef::Action(action.id),
+        RecordRef::Commitment(commitment.id),
+    ];
+
+    let owners = db.owners(f.scope, f.event, &records).await.unwrap();
+    assert_eq!(
+        owners,
+        WorkOwners::from([
+            (RecordRef::Action(action.id), f.owner),
+            (RecordRef::Commitment(commitment.id), f.owner),
+        ])
+    );
 
     let testwil = f.scope.organization_id();
     let other_event = f.test.create_event(testwil, "TEST31").await;
-    let elsewhere = db
-        .owners(f.scope, other_event, &[action.id], &[commitment.id])
-        .await
-        .unwrap();
+    let elsewhere = db.owners(f.scope, other_event, &records).await.unwrap();
     assert_eq!(elsewhere, WorkOwners::default());
 }

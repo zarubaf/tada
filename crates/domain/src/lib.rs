@@ -10,6 +10,7 @@ pub mod ids;
 pub mod name;
 pub mod parties;
 pub mod proposals;
+pub mod records;
 pub mod redaction;
 pub mod reminders;
 pub mod schedule;

@@ -284,8 +284,7 @@ impl WorkStore for Memory {
         &self,
         _: OrgScope,
         _: EventId,
-        _: &[ActionId],
-        _: &[CommitmentId],
+        _: &[RecordRef],
     ) -> Result<WorkOwners, StoreError> {
         unreachable!()
     }

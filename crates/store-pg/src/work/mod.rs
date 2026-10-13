@@ -22,7 +22,7 @@ use tada_app::domain::work::{
     FirmReason,
 };
 use tada_app::parties::PartyRef;
-use tada_app::records::{Changed, Created, NumberCursor};
+use tada_app::records::{Changed, Created, NumberCursor, RecordRef};
 use tada_app::store::StoreError;
 use tada_app::work::{
     ActionFields, ActionView, CommitmentFields, CommitmentView, InEvent, MyWork, NewActionRecord,
@@ -689,11 +689,19 @@ impl WorkStore for Database {
         &self,
         scope: OrgScope,
         event: EventId,
-        actions: &[ActionId],
-        commitments: &[CommitmentId],
+        records: &[RecordRef],
     ) -> Result<WorkOwners, StoreError> {
-        let actions: Vec<Uuid> = actions.iter().map(|id| id.as_uuid()).collect();
-        let commitments: Vec<Uuid> = commitments.iter().map(|id| id.as_uuid()).collect();
+        let ids = |kind: fn(&RecordRef) -> Option<Uuid>| -> Vec<Uuid> {
+            records.iter().filter_map(kind).collect()
+        };
+        let actions = ids(|record| match record {
+            RecordRef::Action(id) => Some(id.as_uuid()),
+            _ => None,
+        });
+        let commitments = ids(|record| match record {
+            RecordRef::Commitment(id) => Some(id.as_uuid()),
+            _ => None,
+        });
         let rows = sqlx::query!(
             r#"SELECT 'action' AS "kind!", id AS "id!", owner_user_id AS "owner_user_id!" FROM action
                WHERE organization_id = $1 AND event_id = $2 AND id = ANY($3)
@@ -708,18 +716,16 @@ impl WorkStore for Database {
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
-        let mut owners = WorkOwners::default();
-        for row in rows {
-            let owner = UserId::from_uuid(row.owner_user_id);
-            if row.kind == "action" {
-                owners.actions.push((ActionId::from_uuid(row.id), owner));
-            } else {
-                owners
-                    .commitments
-                    .push((CommitmentId::from_uuid(row.id), owner));
-            }
-        }
-        Ok(owners)
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let record = match row.kind.as_str() {
+                    "action" => RecordRef::Action(ActionId::from_uuid(row.id)),
+                    _ => RecordRef::Commitment(CommitmentId::from_uuid(row.id)),
+                };
+                (record, UserId::from_uuid(row.owner_user_id))
+            })
+            .collect())
     }
 
     async fn my_open_work(
