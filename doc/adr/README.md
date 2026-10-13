@@ -64,10 +64,10 @@ The ADRs are the authority for the decisions in this project.
 | [0046](0046-inbound-email.md)                                   | Inbound email                                            | Accepted, amended by 0057          |
 | [0047](0047-model-adapter.md)                                   | Model adapter details                                    | Accepted, amended by 0077          |
 | [0048](0048-ai-evaluation-set.md)                               | AI evaluation set                                        | Accepted                           |
-| [0049](0049-entities-and-fact-model.md)                         | Typed entities and a field catalog for facts             | Accepted                           |
+| [0049](0049-entities-and-fact-model.md)                         | Typed entities and a field catalog for facts             | Accepted, amended by 0080          |
 | [0050](0050-proposals-and-review.md)                            | Proposals and review                                     | Accepted                           |
 | [0051](0051-document-drafts-and-provenance.md)                  | Document drafts and provenance                           | Accepted                           |
-| [0052](0052-event-roles-and-ownership.md)                       | Event roles and record ownership                         | Accepted                           |
+| [0052](0052-event-roles-and-ownership.md)                       | Event roles and record ownership                         | Accepted, amended by 0080          |
 | [0053](0053-development-authenticator.md)                       | Development authenticator for the walking skeleton       | Superseded by 0056                 |
 | [0054](0054-job-queue-implementation.md)                        | Job queue in store-pg                                    | Accepted                           |
 | [0055](0055-office-format-detection.md)                         | Detection of office formats in ZIP containers            | Accepted                           |
@@ -82,8 +82,8 @@ The ADRs are the authority for the decisions in this project.
 | [0064](0064-one-proposal-input-for-http-and-mcp.md)             | One proposal input for HTTP and MCP                      | Accepted                           |
 | [0065](0065-worker-deletes-ended-rate-limit-counters.md)        | The worker deletes ended rate-limit counters             | Accepted, amended by 0070          |
 | [0066](0066-problem-status-in-app.md)                           | The HTTP status of a problem code lives in `app`         | Accepted                           |
-| [0067](0067-workstreams-and-review-routing.md)                  | Workstreams and review routing                           | Accepted                           |
-| [0068](0068-actions-and-commitments.md)                         | Actions and commitments                                  | Accepted                           |
+| [0067](0067-workstreams-and-review-routing.md)                  | Workstreams and review routing                           | Accepted, amended by 0080          |
+| [0068](0068-actions-and-commitments.md)                         | Actions and commitments                                  | Accepted, amended by 0080          |
 | [0069](0069-persons-and-institutions.md)                        | Persons and institutions                                 | Accepted                           |
 | [0070](0070-ai-security-review-replaces-the-external-review.md) | An AI security review replaces the external review       | Accepted                           |
 | [0071](0071-event-closing-and-retention.md)                     | Event closing, retention and housekeeping                | Accepted                           |
