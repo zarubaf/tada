@@ -404,8 +404,9 @@
     border-color: var(--color-text-muted);
   }
 
-  .mark:hover .diamond {
-    border-color: var(--color-accent);
+  /* A reached or canceled milestone keeps its tone on hover, like the action points. */
+  .mark:hover .diamond:not([data-status="reached"], [data-status="canceled"]) {
+    border-color: var(--color-text);
   }
 
   /* The list grouped by week: narrow containers. */
