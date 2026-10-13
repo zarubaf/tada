@@ -4,9 +4,10 @@ use crate::parties::Party;
 use crate::work::InvalidTransition;
 
 text_type!(
-    /// The wording of a decision: 1 to 2000 characters.
+    /// The wording of a decision: 1 to 2000 characters. It can have line breaks and tabs.
     DecisionWording,
-    2000
+    2000,
+    multiline
 );
 
 status_enum!(
@@ -124,6 +125,23 @@ mod tests {
         assert!(DecisionWording::parse(&"a".repeat(2000)).is_ok());
         assert_eq!(
             DecisionWording::parse(&"a".repeat(2001)),
+            Err(TextError::TooLong)
+        );
+    }
+
+    #[test]
+    fn wording_keeps_line_breaks_and_tabs() {
+        let wording = DecisionWording::parse(" Erstens.\nZweitens:\tGeld.\nDrittens. ").unwrap();
+        assert_eq!(wording.as_str(), "Erstens.\nZweitens:\tGeld.\nDrittens.");
+        assert_eq!(
+            DecisionWording::parse("Erstens.\u{7}"),
+            Err(TextError::ControlCharacter)
+        );
+        assert_eq!(DecisionWording::parse(" \n\t "), Err(TextError::Empty));
+        let lines = format!("{}\n{}", "ä".repeat(1000), "ö".repeat(999));
+        assert!(DecisionWording::parse(&lines).is_ok());
+        assert_eq!(
+            DecisionWording::parse(&format!("{lines}ü")),
             Err(TextError::TooLong)
         );
     }

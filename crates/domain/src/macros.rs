@@ -1,9 +1,16 @@
 //! Macros that define text newtypes and status enums.
 
 /// Defines a text newtype of 1 to `MAX_CHARS` characters, without control characters.
+/// With `multiline`, the text can also have line breaks and tabs.
 /// `Debug` shows the length only (ADR 0035).
 macro_rules! text_type {
+    ($(#[$doc:meta])* $name:ident, $max:expr, multiline) => {
+        text_type!(@define $(#[$doc])* $name, $max, $crate::facts::checked_multiline_text);
+    };
     ($(#[$doc:meta])* $name:ident, $max:expr) => {
+        text_type!(@define $(#[$doc])* $name, $max, $crate::facts::checked_text);
+    };
+    (@define $(#[$doc:meta])* $name:ident, $max:expr, $check:path) => {
         $(#[$doc])*
         #[derive(Clone, PartialEq, Eq)]
         pub struct $name(String);
@@ -13,7 +20,7 @@ macro_rules! text_type {
 
             /// Removes the spaces at the ends, then checks the text.
             pub fn parse(input: &str) -> Result<Self, $crate::facts::TextError> {
-                Ok(Self($crate::facts::checked_text(input, Self::MAX_CHARS)?))
+                Ok(Self($check(input, Self::MAX_CHARS)?))
             }
 
             pub fn as_str(&self) -> &str {

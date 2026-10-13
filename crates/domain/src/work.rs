@@ -1,7 +1,5 @@
 //! Workstreams, actions and commitments, with their states (Slice 2a).
 
-use crate::facts::TextError;
-
 text_type!(
     /// The name of a workstream: 1 to 200 characters.
     WorkstreamName,
@@ -29,46 +27,13 @@ text_type!(
     500
 );
 
-/// The description of a work record (an action, a milestone or a risk): 1 to 4000 characters.
-/// Unlike the other texts, it can have line breaks and tabs.
-#[derive(Clone, PartialEq, Eq)]
-pub struct RecordDescription(String);
-
-impl RecordDescription {
-    pub const MAX_CHARS: usize = 4000;
-
-    /// Removes the spaces at the ends, then checks the text.
-    pub fn parse(input: &str) -> Result<Self, TextError> {
-        let text = input.trim();
-        if text.is_empty() {
-            return Err(TextError::Empty);
-        }
-        if text.chars().count() > Self::MAX_CHARS {
-            return Err(TextError::TooLong);
-        }
-        if text
-            .chars()
-            .any(|c| c.is_control() && !matches!(c, '\n' | '\t'))
-        {
-            return Err(TextError::ControlCharacter);
-        }
-        Ok(Self(text.to_owned()))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Debug for RecordDescription {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "RecordDescription({} characters)",
-            self.0.chars().count()
-        )
-    }
-}
+text_type!(
+    /// The description of a work record (an action, a milestone or a risk): 1 to 4000 characters.
+    /// Unlike a title, it can have line breaks and tabs.
+    RecordDescription,
+    4000,
+    multiline
+);
 
 status_enum!(
     /// The status of a workstream.
@@ -177,6 +142,7 @@ impl CommitmentStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::facts::TextError;
 
     const ACTION: [ActionStatus; 5] = ActionStatus::ALL;
     const COMMITMENT: [CommitmentStatus; 5] = CommitmentStatus::ALL;

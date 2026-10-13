@@ -66,6 +66,17 @@ fn check_snake_case(value: &str) -> Result<(), KeyError> {
 
 /// Removes the spaces at the ends, then checks for 1 to `max_chars` characters without control characters.
 pub(crate) fn checked_text(input: &str, max_chars: usize) -> Result<String, TextError> {
+    checked(input, max_chars, char::is_control)
+}
+
+/// Like `checked_text`, but the text can have line breaks (`\n`) and tabs (`\t`).
+pub(crate) fn checked_multiline_text(input: &str, max_chars: usize) -> Result<String, TextError> {
+    checked(input, max_chars, |c| {
+        c.is_control() && !matches!(c, '\n' | '\t')
+    })
+}
+
+fn checked(input: &str, max_chars: usize, refused: fn(char) -> bool) -> Result<String, TextError> {
     let text = input.trim();
     if text.is_empty() {
         return Err(TextError::Empty);
@@ -73,7 +84,7 @@ pub(crate) fn checked_text(input: &str, max_chars: usize) -> Result<String, Text
     if text.chars().count() > max_chars {
         return Err(TextError::TooLong);
     }
-    if text.chars().any(char::is_control) {
+    if text.chars().any(refused) {
         return Err(TextError::ControlCharacter);
     }
     Ok(text.to_owned())
