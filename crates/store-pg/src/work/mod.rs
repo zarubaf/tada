@@ -1,5 +1,5 @@
 //! The `WorkStore` adapter: actions and commitments (ADR 0068). `milestones` holds the `MilestoneStore` adapter,
-//! `decisions` the `DecisionStore` adapter.
+//! `decisions` the `DecisionStore` adapter and `risks` the `RiskStore` adapter.
 
 use std::collections::HashMap;
 
@@ -732,6 +732,7 @@ impl WorkStore for Database {
         let commitments = ids_of(records, RecordKind::Commitment);
         let milestones = ids_of(records, RecordKind::Milestone);
         let decisions = ids_of(records, RecordKind::Decision);
+        let risks = ids_of(records, RecordKind::Risk);
         let rows = sqlx::query!(
             r#"SELECT 'action' AS "kind!", id AS "id!", owner_user_id AS "owner_user_id!" FROM action
                WHERE organization_id = $1 AND event_id = $2 AND id = ANY($3)
@@ -743,13 +744,17 @@ impl WorkStore for Database {
                WHERE organization_id = $1 AND event_id = $2 AND id = ANY($5)
                UNION ALL
                SELECT 'decision', id, owner_user_id FROM decision
-               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($6)"#,
+               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($6)
+               UNION ALL
+               SELECT 'risk', id, owner_user_id FROM risk
+               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($7)"#,
             scope.organization_id().as_uuid(),
             event.as_uuid(),
             &actions,
             &commitments,
             &milestones,
             &decisions,
+            &risks,
         )
         .fetch_all(&self.pool)
         .await
@@ -795,6 +800,7 @@ impl WorkStore for Database {
 
 pub(crate) mod decisions;
 pub(crate) mod milestones;
+pub(crate) mod risks;
 
 #[cfg(test)]
 mod tests;

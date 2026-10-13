@@ -440,7 +440,7 @@ A conditional commitment has a condition and stays conditional until a reviewer 
 });
 
 /// The first page of the largest size, without a filter but the status.
-pub(super) fn query<S>(status: Option<S>) -> WorkQuery<S> {
+pub(super) fn query<S, C>(status: Option<S>) -> WorkQuery<S, C> {
     WorkQuery {
         owner: None,
         status,

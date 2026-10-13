@@ -24,6 +24,7 @@ mod approvals;
 mod drafts;
 mod links;
 mod races;
+mod risks;
 mod work;
 
 const SOURCE: &str = "Das Open Day findet im Mai 2030 statt. Wir rechnen mit 20000 Besuchern.";
@@ -64,6 +65,7 @@ fn propose_stores(test: &TestDatabase) -> ProposeStores<'_> {
         work: &test.database,
         milestones: &test.database,
         decisions: &test.database,
+        risks: &test.database,
     }
 }
 

@@ -12,6 +12,7 @@ mod documents;
 mod events;
 mod milestones;
 mod propose;
+mod risks;
 mod work;
 
 use std::sync::Arc;
@@ -45,6 +46,7 @@ pub fn standard_catalog() -> ToolCatalog<AiToolPorts> {
         Arc::new(Typed(work::ListCommitments)),
         Arc::new(Typed(milestones::ListMilestones)),
         Arc::new(Typed(decisions::ListDecisions)),
+        Arc::new(Typed(risks::ListRisks)),
         Arc::new(Typed(work::SearchParties)),
         Arc::new(Typed(propose::ProposeChangeset)),
     ])

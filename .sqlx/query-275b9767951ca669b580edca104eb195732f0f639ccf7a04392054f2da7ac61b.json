@@ -1,0 +1,162 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id!\", event_id AS \"event_id!\", local_number AS \"local_number!\", title, description,\n                  likelihood AS \"likelihood!\", impact AS \"impact!\", mitigation, owner_user_id AS \"owner_user_id!\",\n                  workstream_id, status AS \"status!\", version AS \"version!\"\n           FROM risk\n           WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "local_number!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "local_number"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "likelihood!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "likelihood"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "impact!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "impact"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "mitigation",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "mitigation"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "owner_user_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "owner_user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "workstream_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "workstream_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "status!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "version!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "275b9767951ca669b580edca104eb195732f0f639ccf7a04392054f2da7ac61b"
+}

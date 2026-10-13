@@ -63,7 +63,8 @@ pub fn router(test: &TestDatabase, garage: &TestGarage) -> Router {
             parties: database.clone(),
             work: database.clone(),
             milestones: database.clone(),
-            decisions: database,
+            decisions: database.clone(),
+            risks: database,
         }),
         version: tada::BUILD.version,
     };

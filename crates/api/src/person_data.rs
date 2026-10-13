@@ -41,7 +41,7 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct PersonMention {
     /// `source-item`, `fact-version`, `proposal`, `open-question`, `action`, `commitment`, `workstream`,
-    /// `document-version`, `milestone`, `decision`, `promisor` for a commitment whose promisor is the person, or
+    /// `document-version`, `milestone`, `decision`, `risk`, `promisor` for a commitment whose promisor is the person, or
     /// `decision-party` for a decision that the person took.
     /// The list of kinds is open.
     pub kind: String,

@@ -75,6 +75,10 @@ pub enum AuditAction {
     DecisionSupersede,
     /// An event manager revoked a decision. The decision keeps the reason; the event holds no text (ADR 0080).
     DecisionRevoke,
+    /// A contributor or a manager recorded a risk (ADR 0080).
+    RiskCreate,
+    /// The owner, the workstream lead or a manager changed a risk (ADR 0080).
+    RiskChange,
     /// An event manager, owner or admin closed an event (ADR 0071).
     EventClose,
     /// An owner or admin reopened a closed event (ADR 0071).
@@ -152,6 +156,8 @@ impl AuditAction {
             Self::DecisionChange => "decision.change",
             Self::DecisionSupersede => "decision.supersede",
             Self::DecisionRevoke => "decision.revoke",
+            Self::RiskCreate => "risk.create",
+            Self::RiskChange => "risk.change",
             Self::EventClose => "event.close",
             Self::EventReopen => "event.reopen",
             Self::OrganizationSetRetention => "organization.set_retention",
@@ -235,6 +241,7 @@ impl AuditAction {
             Self::ActionCreate | Self::ActionChange => "action",
             Self::CommitmentCreate | Self::CommitmentChange | Self::CommitmentFirm => "commitment",
             Self::MilestoneCreate | Self::MilestoneChange => "milestone",
+            Self::RiskCreate | Self::RiskChange => "risk",
             Self::DecisionCreate
             | Self::DecisionChange
             | Self::DecisionSupersede

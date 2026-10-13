@@ -2133,6 +2133,217 @@
     }
   },
   {
+    "name": "list_risks",
+    "description": "List the risks of an event: what can go wrong, each with its likelihood and impact (low, medium or high), mitigation, owner, status and the evidence of the accepted proposals that made it. Read the list before you propose a risk, so you change the rating or the status of a known risk instead of proposing a duplicate. A rating change is its own operation; a status change does not change the rating. The list holds at most 200 records, the worst risk first (likelihood times impact, with low 1, medium 2 and high 3, then impact, then number), and has no next page. If more is true, the event has more risks than this tool can show: tell the member.",
+    "inputSchema": {
+      "$defs": {
+        "RiskStatusInput": {
+          "enum": [
+            "open",
+            "mitigated",
+            "occurred",
+            "closed"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "event_key": {
+          "description": "The key of the event, for example `FLY28`, from `list_events`.",
+          "pattern": "^[A-Z0-9]{2,8}$",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RiskStatusInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only the risks with this status."
+        }
+      },
+      "required": [
+        "event_key"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DisputeNoteView": {
+          "description": "A dispute note: the objection of a person to a fact version or to a source (ADR 0073).",
+          "properties": {
+            "created_at": {
+              "description": "RFC 3339.",
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "EvidenceItem": {
+          "description": "A passage that supports one version of a record, from a source that the member can read.",
+          "properties": {
+            "dispute_notes": {
+              "description": "The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
+              "items": {
+                "$ref": "#/$defs/DisputeNoteView"
+              },
+              "type": "array"
+            },
+            "end": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "quote": {
+              "description": "Empty after a legal redaction of the source (ADR 0072).",
+              "type": "string"
+            },
+            "record_version": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "redacted": {
+              "description": "True after a legal redaction of the source: the quote is empty (ADR 0072).",
+              "type": "boolean"
+            },
+            "source_version_id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "start": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "record_version",
+            "source_version_id",
+            "start",
+            "end",
+            "quote",
+            "redacted",
+            "dispute_notes"
+          ],
+          "type": "object"
+        },
+        "RiskItem": {
+          "properties": {
+            "description": {
+              "description": "It can have several lines.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "evidence": {
+              "items": {
+                "$ref": "#/$defs/EvidenceItem"
+              },
+              "type": "array"
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "impact": {
+              "description": "`low`, `medium` or `high`.",
+              "type": "string"
+            },
+            "likelihood": {
+              "description": "`low`, `medium` or `high`.",
+              "type": "string"
+            },
+            "local_id": {
+              "description": "The readable ID, for example `RSK-001`.",
+              "type": "string"
+            },
+            "mitigation": {
+              "description": "What the club does about the risk. It can have several lines.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "owner_user_id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "redacted": {
+              "description": "True after a legal redaction: the texts are empty (ADR 0072).",
+              "type": "boolean"
+            },
+            "status": {
+              "description": "`open`, `mitigated`, `occurred` or `closed`.",
+              "type": "string"
+            },
+            "title": {
+              "description": "Empty after a legal redaction (ADR 0072).",
+              "type": "string"
+            },
+            "version": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "workstream_id": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "local_id",
+            "title",
+            "redacted",
+            "likelihood",
+            "impact",
+            "owner_user_id",
+            "status",
+            "version",
+            "evidence"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "more": {
+          "description": "True if the event has more risks than the list shows.",
+          "type": "boolean"
+        },
+        "risks": {
+          "items": {
+            "$ref": "#/$defs/RiskItem"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "risks",
+        "more"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true
+    }
+  },
+  {
     "name": "list_workstreams",
     "description": "List the workstreams of an event: its areas of work, each with its lead. A work record names a workstream by its ID. Propose a record in an active workstream, or in a new workstream of the same changeset (create-workstream); a closed workstream takes no new records.",
     "inputSchema": {
@@ -2391,6 +2602,15 @@
             "company",
             "club",
             "other"
+          ],
+          "type": "string"
+        },
+        "LevelInput": {
+          "description": "A level of the likelihood or the impact of a risk.",
+          "enum": [
+            "low",
+            "medium",
+            "high"
           ],
           "type": "string"
         },
@@ -3325,6 +3545,147 @@
                 "expected_version"
               ],
               "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Record a risk of the event: what can go wrong, how likely it is and how much it hurts. It starts `open`.",
+              "properties": {
+                "description": {
+                  "default": null,
+                  "description": "1 to 4000 characters. It can have several lines.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The UUIDv7 of the new risk.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "impact": {
+                  "$ref": "#/$defs/LevelInput"
+                },
+                "kind": {
+                  "const": "create-risk",
+                  "type": "string"
+                },
+                "likelihood": {
+                  "$ref": "#/$defs/LevelInput"
+                },
+                "mitigation": {
+                  "default": null,
+                  "description": "What the club does about the risk, 1 to 4000 characters. It can have several lines.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "owner": {
+                  "description": "The user ID of a member with the contributor or manager role in the event.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "title": {
+                  "description": "1 to 200 characters.",
+                  "type": "string"
+                },
+                "workstream": {
+                  "default": null,
+                  "description": "An active workstream of the event, or a new workstream of this changeset;\nthen the proposal depends on the proposal that creates it.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "event_id",
+                "title",
+                "likelihood",
+                "impact",
+                "owner"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Change the status of a risk of the event.\n`open` and `mitigated` change into each other; `open` and `mitigated` change to `occurred`;\n`open`, `mitigated` and `occurred` change to `closed`; `closed` changes back to `open`.\nA status change does not change the rating.",
+              "properties": {
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "expected_version": {
+                  "description": "The current version of the risk.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "change-risk-status",
+                  "type": "string"
+                },
+                "risk_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/$defs/RiskStatusInput"
+                }
+              },
+              "required": [
+                "kind",
+                "event_id",
+                "risk_id",
+                "status",
+                "expected_version"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Change the likelihood and the impact of a risk of the event. Give both, also the one that stays.",
+              "properties": {
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "expected_version": {
+                  "description": "The current version of the risk.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "impact": {
+                  "$ref": "#/$defs/LevelInput"
+                },
+                "kind": {
+                  "const": "change-risk-rating",
+                  "type": "string"
+                },
+                "likelihood": {
+                  "$ref": "#/$defs/LevelInput"
+                },
+                "risk_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "event_id",
+                "risk_id",
+                "likelihood",
+                "impact",
+                "expected_version"
+              ],
+              "type": "object"
             }
           ]
         },
@@ -3410,6 +3771,15 @@
           "enum": [
             "document",
             "event"
+          ],
+          "type": "string"
+        },
+        "RiskStatusInput": {
+          "enum": [
+            "open",
+            "mitigated",
+            "occurred",
+            "closed"
           ],
           "type": "string"
         },

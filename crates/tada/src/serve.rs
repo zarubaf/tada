@@ -74,6 +74,7 @@ pub async fn run(
         work: Arc::new(db.clone()),
         milestones: Arc::new(db.clone()),
         decisions: Arc::new(db.clone()),
+        risks: Arc::new(db.clone()),
         person_data: Arc::new(db.clone()),
         dispute_notes: Arc::new(db.clone()),
         redaction: Arc::new(db.clone()),
@@ -105,6 +106,7 @@ pub async fn run(
             work: Arc::new(db.clone()),
             milestones: Arc::new(db.clone()),
             decisions: Arc::new(db.clone()),
+            risks: Arc::new(db.clone()),
         }),
         version: crate::BUILD.version,
     };

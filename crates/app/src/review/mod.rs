@@ -20,7 +20,7 @@ use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
 use tada_domain::ids::{
     ActionId, ChangesetId, CommitmentId, DecisionId, DocumentId, EventId, InstitutionId,
-    MilestoneId, OpenQuestionId, PersonId, ProposalId, UserId,
+    MilestoneId, OpenQuestionId, PersonId, ProposalId, RiskId, UserId,
 };
 use tada_domain::proposals::Operation;
 use tada_domain::redaction::Redactable;
@@ -264,6 +264,9 @@ impl Debug for ApplyStep {
             Operation::CreateDecision { .. } => "CreateDecision",
             Operation::SupersedeDecision { .. } => "SupersedeDecision",
             Operation::RevokeDecision { .. } => "RevokeDecision",
+            Operation::CreateRisk { .. } => "CreateRisk",
+            Operation::ChangeRiskStatus { .. } => "ChangeRiskStatus",
+            Operation::ChangeRiskRating { .. } => "ChangeRiskRating",
         };
         f.debug_struct("ApplyStep")
             .field("proposal_id", &self.proposal_id)
@@ -317,6 +320,8 @@ pub enum LocalRecord {
     Milestone(MilestoneId),
     /// A decision: `DEC-<n>`, local to its event.
     Decision(DecisionId),
+    /// A risk: `RSK-<n>`, local to its event.
+    Risk(RiskId),
 }
 
 /// The result of `ReviewStore::apply`. Each result other than `Applied` changed nothing.

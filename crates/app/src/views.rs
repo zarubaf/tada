@@ -12,7 +12,7 @@ use tada_domain::events::Event;
 use tada_domain::facts::{
     CORE_CATALOG_VERSION, FactState, FieldDefinition, FieldStatus, Label, Valued,
 };
-use tada_domain::records::{DecisionStatus, MilestoneStatus};
+use tada_domain::records::{DecisionStatus, MilestoneStatus, RiskStatus};
 use tada_domain::redaction::Redactable;
 use tada_domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus};
 use uuid::Uuid;
@@ -127,7 +127,7 @@ pub struct EntityView {
 }
 
 /// The kinds of records that an agent can read (ADR 0049, ADR 0068, ADR 0069, ADR 0080).
-const ENTITIES: [EntityView; 11] = [
+const ENTITIES: [EntityView; 12] = [
     EntityView {
         name: "event",
         description: "One occurrence of an event, with its key, name and time zone. Facts, open questions, documents, workstreams, actions and commitments belong to it.",
@@ -172,6 +172,11 @@ const ENTITIES: [EntityView; 11] = [
         name: "decision",
         description: "A decision that the club made in an event: its wording (it can have several lines), the date, the persons or institutions that decided it, one owner who follows it up, an optional workstream and an event-local ID such as DEC-001. The wording, the date and the parties never change. Only the event managers record, supersede or revoke a decision. A changed decision is a new decision that supersedes the old one. Transitions: in-force changes to superseded, with the newer decision, or to revoked, with a reason; both are final.",
         statuses: &DecisionStatus::NAMES,
+    },
+    EntityView {
+        name: "risk",
+        description: "Something that can go wrong in an event: a title, an optional description (it can have several lines), a likelihood and an impact (each low, medium or high), an optional mitigation, one owner, an optional workstream and an event-local ID such as RSK-001. The mitigation can have several lines. The list shows the worst risk first: likelihood times impact (low 1, medium 2, high 3), then impact, then number. The owner, the lead of its workstream and the event managers change a risk; any contributor or manager records one. A status change does not change the rating; a separate rating change does. Transitions: open and mitigated change into each other; open and mitigated change to occurred; open, mitigated and occurred change to closed; closed changes to open.",
+        statuses: &RiskStatus::NAMES,
     },
     EntityView {
         name: "person",

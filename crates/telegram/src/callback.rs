@@ -48,6 +48,7 @@ impl Gateway {
                 work: ports,
                 milestones: ports,
                 decisions: ports,
+                risks: ports,
                 workstreams: ports,
                 parties: ports,
                 clock: self.clock.as_ref(),

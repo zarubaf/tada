@@ -319,11 +319,13 @@ impl RoutingLookup for RoutingFacts {
 mod tests {
     use tada_domain::RecordVersion;
     use tada_domain::ids::{
-        ActionId, CommitmentId, DecisionId, FieldDefinitionId, InstitutionId, MilestoneId, PersonId,
+        ActionId, CommitmentId, DecisionId, FieldDefinitionId, InstitutionId, MilestoneId,
+        PersonId, RiskId,
     };
     use tada_domain::parties::{InstitutionKind, Party, PartyName};
     use tada_domain::records::{
-        DecisionParties, DecisionWording, MilestoneStatus, MilestoneTitle, RecordReason,
+        DecisionParties, DecisionWording, Level, MilestoneStatus, MilestoneTitle, RecordReason,
+        RiskRating, RiskStatus, RiskTitle,
     };
     use tada_domain::work::{ActionStatus, ActionTitle, CommitmentText, WorkstreamName};
     use uuid::Uuid;
@@ -595,6 +597,73 @@ mod tests {
             assert!(routes.routed_to(user(MANAGER), EventLevel::Manager, id));
             assert!(routes.may_review(user(MANAGER), EventLevel::Manager, id));
         }
+    }
+
+    fn risk() -> RiskId {
+        RiskId::from_uuid(Uuid::from_u128(36))
+    }
+
+    fn new_risk(workstream: Option<WorkstreamId>) -> Operation {
+        Operation::CreateRisk {
+            id: RiskId::from_uuid(Uuid::from_u128(37)),
+            event_id: event(),
+            title: RiskTitle::parse("Starkregen am Festtag").unwrap(),
+            description: None,
+            rating: RiskRating {
+                likelihood: Level::Medium,
+                impact: Level::High,
+            },
+            mitigation: None,
+            owner: user(OTHER),
+            workstream,
+        }
+    }
+
+    #[test]
+    fn rating_change_goes_to_the_owner() {
+        let facts = RoutingFacts {
+            owners: HashMap::from([(RecordRef::Risk(risk()), user(OWNER))]),
+            leads: HashMap::from([(workstream(), user(LEAD))]),
+        };
+        let rating = Operation::ChangeRiskRating {
+            event_id: event(),
+            risk_id: risk(),
+            rating: RiskRating {
+                likelihood: Level::High,
+                impact: Level::High,
+            },
+            expected_version: RecordVersion::new(1).unwrap(),
+        };
+        let status = Operation::ChangeRiskStatus {
+            event_id: event(),
+            risk_id: risk(),
+            status: RiskStatus::Mitigated,
+            expected_version: RecordVersion::new(1).unwrap(),
+        };
+        for change in [&rating, &status] {
+            assert_eq!(
+                reviewers(change, Some(event()), &facts),
+                Reviewers::user(user(OWNER))
+            );
+        }
+        // A risk without a known owner goes to the event managers.
+        let no_owner = RoutingFacts {
+            owners: HashMap::new(),
+            leads: HashMap::new(),
+        };
+        assert_eq!(
+            reviewers(&rating, Some(event()), &no_owner),
+            Reviewers::EventManagers
+        );
+        // A new risk in a workstream goes to the lead (rule 2); without one, to the managers (rule 3).
+        assert_eq!(
+            reviewers(&new_risk(Some(workstream())), Some(event()), &facts),
+            Reviewers::user(user(LEAD))
+        );
+        assert_eq!(
+            reviewers(&new_risk(None), Some(event()), &facts),
+            Reviewers::EventManagers
+        );
     }
 
     fn milestone() -> MilestoneId {

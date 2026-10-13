@@ -527,6 +527,40 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
             json!({"reason": "Verboten", "expected_version": 1}),
             Expect::NotFound,
         )],
+        "list_risks" => vec![
+            get(
+                api(format!("/events/{}/risks", t.b_event)),
+                Expect::NotFound,
+            ),
+            get(api(format!("/events/{}/risks", t.a_event)), READS),
+        ],
+        "create_risk" => vec![
+            post(
+                api(format!("/events/{}/risks", t.b_event)),
+                json!({
+                    "title": "Starkregen", "likelihood": "medium", "impact": "high",
+                    "owner_user_id": t.a_member,
+                }),
+                Expect::NotFound,
+            ),
+            post(
+                api(format!("/events/{}/risks", t.a_event)),
+                json!({
+                    "title": "Starkregen", "likelihood": "medium", "impact": "high",
+                    "owner_user_id": t.b_member,
+                }),
+                Expect::Refused,
+            ),
+        ],
+        "get_risk" => vec![get(
+            api(format!("/events/{}/risks/{}", t.b_event, Uuid::now_v7())),
+            Expect::NotFound,
+        )],
+        "change_risk" => vec![patch(
+            api(format!("/events/{}/risks/{}", t.b_event, Uuid::now_v7())),
+            json!({"title": "Bar", "expected_version": 1}),
+            Expect::NotFound,
+        )],
         "list_commitments" => vec![
             get(
                 api(format!("/events/{}/commitments", t.b_event)),
@@ -1521,6 +1555,16 @@ fn tool_attempts(t: &Targets) -> Vec<(&'static str, Value, ToolExpect)> {
         ),
         (
             "list_decisions",
+            json!({"event_key": "ONLYB31"}),
+            ToolExpect::Refused,
+        ),
+        (
+            "list_risks",
+            json!({"event_key": "OPEN30"}),
+            ToolExpect::Answers,
+        ),
+        (
+            "list_risks",
             json!({"event_key": "ONLYB31"}),
             ToolExpect::Refused,
         ),

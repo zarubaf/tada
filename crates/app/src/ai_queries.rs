@@ -19,7 +19,7 @@ use std::sync::Arc;
 use tada_domain::events::{Event, EventKey};
 use tada_domain::facts::FieldDefinition;
 use tada_domain::ids::{DocumentVersionId, EventId};
-use tada_domain::records::{DecisionStatus, MilestoneStatus};
+use tada_domain::records::{DecisionStatus, MilestoneStatus, RiskStatus};
 use tada_domain::work::{ActionStatus, CommitmentStatus};
 
 use crate::access::AccessError;
@@ -41,7 +41,7 @@ use crate::search::{self, SearchError, SearchRequest};
 use crate::sources::{self, PassageError, PassageRequest, SourceHit, SourcePassage, SourceStore};
 use crate::work::{
     self, ActionView, CommitmentView, DecisionStore, DecisionView, MilestoneStore, MilestoneView,
-    WorkError, WorkPorts, WorkQuery, WorkStore,
+    RiskCursor, RiskStore, RiskView, WorkError, WorkPorts, WorkQuery, WorkStore,
 };
 use crate::workstreams::{self, Workstream, WorkstreamError, WorkstreamStore};
 
@@ -64,6 +64,7 @@ pub struct AiToolStores {
     pub work: Arc<dyn WorkStore>,
     pub milestones: Arc<dyn MilestoneStore>,
     pub decisions: Arc<dyn DecisionStore>,
+    pub risks: Arc<dyn RiskStore>,
 }
 
 /// The ports of the AI tools. The stores stay inside: only the functions of this module use them.
@@ -90,6 +91,7 @@ impl AiToolPorts {
             work: &*self.0.work,
             milestones: &*self.0.milestones,
             decisions: &*self.0.decisions,
+            risks: &*self.0.risks,
             workstreams: &*self.0.workstreams,
             parties: &*self.0.parties,
             clock: &*self.0.clock,
@@ -241,6 +243,16 @@ pub async fn list_decisions(
     work::list_decisions(caller, event, query, ports.work_ports()).await
 }
 
+/// `work::list_risks`.
+pub async fn list_risks(
+    caller: &AiCaller,
+    event: EventId,
+    query: WorkQuery<RiskStatus, RiskCursor>,
+    ports: &AiToolPorts,
+) -> Result<Page<Shown<RiskView>, RiskCursor>, WorkError> {
+    work::list_risks(caller, event, query, ports.work_ports()).await
+}
+
 /// `parties::list_persons`.
 pub async fn list_persons(
     caller: &AiCaller,
@@ -282,6 +294,7 @@ pub async fn create_changeset(
         work: &*ports.0.work,
         milestones: &*ports.0.milestones,
         decisions: &*ports.0.decisions,
+        risks: &*ports.0.risks,
     };
     proposals::create_changeset(caller, input, stores, &*ports.0.clock).await
 }

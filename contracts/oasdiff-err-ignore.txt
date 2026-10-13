@@ -6,7 +6,8 @@ GET /api/v1/changesets/{changeset_id} added `subschema #8, subschema #9, subsche
 # ADR 0080: `create-action` gets the optional `start_date` and `milestone`. oasdiff matches the kinds of the list by
 # their schema, so it sees the changed kind as one added (#10). The request side is in oasdiff-warn-ignore.txt.
 # ADR 0080: #19 to #21 are the new kinds `create-decision`, `supersede-decision` and `revoke-decision`.
-GET /api/v1/changesets/{changeset_id} added `subschema #10, subschema #15, subschema #16, subschema #17, subschema #18, subschema #19, subschema #20, subschema #21` to the `proposals/items/operation` response property `oneOf` list for the response status `200`
+# ADR 0080: #22 to #24 are the new kinds `create-risk`, `change-risk-status` and `change-risk-rating`.
+GET /api/v1/changesets/{changeset_id} added `subschema #10, subschema #15, subschema #16, subschema #17, subschema #18, subschema #19, subschema #20, subschema #21, subschema #22, subschema #23, subschema #24` to the `proposals/items/operation` response property `oneOf` list for the response status `200`
 # ADR 0079: a changeset without the member's own words has no source version. tada is before 1.0, and its only client, the web client, ships in the same image and handles an absent field.
 GET /api/v1/changesets/{changeset_id} the response property `source_version_id` became nullable for the status `200`
 GET /api/v1/changesets/{changeset_id} the response property `source_version_id` became optional for the status `200`

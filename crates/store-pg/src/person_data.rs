@@ -93,12 +93,17 @@ const MENTIONS: &str = "
         FROM decision d
         WHERE d.organization_id = $1 AND (d.wording ILIKE ANY ($2) OR d.revoked_reason ILIKE ANY ($2))
         UNION ALL
-        SELECT 11, 'promisor', c.id, c.event_id,
+        SELECT 11, 'risk', r.id, r.event_id, concat_ws(E'\\n', r.title, r.description, r.mitigation), r.created_at
+        FROM risk r
+        WHERE r.organization_id = $1
+          AND (r.title ILIKE ANY ($2) OR r.description ILIKE ANY ($2) OR r.mitigation ILIKE ANY ($2))
+        UNION ALL
+        SELECT 12, 'promisor', c.id, c.event_id,
                CASE WHEN c.redacted_at IS NULL THEN concat_ws(E'\\n', c.text, c.condition, c.firm_reason) END,
                c.created_at
         FROM commitment c WHERE c.organization_id = $1 AND c.person_id = $3
         UNION ALL
-        SELECT 12, 'decision-party', d.id, d.event_id,
+        SELECT 13, 'decision-party', d.id, d.event_id,
                CASE WHEN d.redacted_at IS NULL THEN concat_ws(E'\\n', d.wording, d.revoked_reason) END,
                d.created_at
         FROM decision d

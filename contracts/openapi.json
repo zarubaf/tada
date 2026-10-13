@@ -5584,6 +5584,308 @@
         ]
       }
     },
+    "/api/v1/events/{event_id}/risks": {
+      "get": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Lists the risks of an event, the worst first: likelihood times impact (low 1, medium 2, high 3), then impact,\nthen the number. Each reader of the event can do it.",
+        "operationId": "list_risks",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page. A risk that changes its rating between two pages can appear twice\nor move, but the change of a risk never makes the list skip another risk.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "owner",
+            "in": "query",
+            "description": "`me`, or the ID of a member: only the risks that this member owns.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RiskStatus"
+            }
+          },
+          {
+            "name": "workstream",
+            "in": "query",
+            "description": "Only the risks of this workstream.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of risks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Creates a risk. A contributor or manager of the event can do it.\nAn owner without the contributor or manager role gives `validation-failed` with the field code `unknown-member`.\nA closed workstream gives the field code `closed`.",
+        "operationId": "create_risk",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRiskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new risk.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Risk"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "event-closed",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/risks/{id}": {
+      "get": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Reads one risk of the event, with its evidence.",
+        "operationId": "get_risk",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the risk.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The risk.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Risk"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Changes a risk. Its owner, the lead of its workstream or an event manager can do it.\nA status that the current status cannot change to gives `invalid-transition`; so does the current status itself.\n`open` and `mitigated` change into each other and to `occurred`; `open`, `mitigated` and `occurred` change to\n`closed`; `closed` changes to `open`. A status change does not change the rating.",
+        "operationId": "change_risk",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the risk.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRiskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed risk.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Risk"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "event-closed",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/persons/{person_id}/mentions": {
       "get": {
         "tags": [
@@ -6167,9 +6469,42 @@
                             "null"
                           ]
                         },
+                        "impact": {
+                          "description": "The impact of a risk.",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high",
+                            null
+                          ],
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "likelihood": {
+                          "description": "The likelihood of a risk.",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high",
+                            null
+                          ],
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "milestone": {
                           "description": "A milestone of the event that is not canceled.",
                           "format": "uuid",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "mitigation": {
+                          "description": "The mitigation of a risk.",
                           "type": [
                             "string",
                             "null"
@@ -7057,6 +7392,84 @@
             ],
             "format": "uuid",
             "description": "A member of the caller's organization."
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "ChangeRiskRequest": {
+        "type": "object",
+        "description": "The input of `ChangeRisk`. An absent field stays as it is. `null` clears an optional field.\nA request needs at least one field to change.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "likelihood": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Level",
+                "description": "The likelihood and the impact change on their own: the one that is absent stays."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "impact": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Level"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mitigation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "workstream_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "An active workstream of the event. A record keeps a workstream that closes later."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RiskStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "expected_version": {
             "type": "integer",
@@ -9089,6 +9502,174 @@
                             "expected_version"
                           ],
                           "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Record a risk of the event: what can go wrong, how likely it is and how much it hurts. It starts `open`.",
+                          "properties": {
+                            "description": {
+                              "description": "1 to 4000 characters. It can have several lines.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "id": {
+                              "description": "The UUIDv7 of the new risk.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "impact": {
+                              "description": "A level of the likelihood or the impact of a risk.",
+                              "enum": [
+                                "low",
+                                "medium",
+                                "high"
+                              ],
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create-risk",
+                              "type": "string"
+                            },
+                            "likelihood": {
+                              "description": "A level of the likelihood or the impact of a risk.",
+                              "enum": [
+                                "low",
+                                "medium",
+                                "high"
+                              ],
+                              "type": "string"
+                            },
+                            "mitigation": {
+                              "description": "What the club does about the risk, 1 to 4000 characters. It can have several lines.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "owner": {
+                              "description": "The user ID of a member with the contributor or manager role in the event.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "title": {
+                              "description": "1 to 200 characters.",
+                              "type": "string"
+                            },
+                            "workstream": {
+                              "description": "An active workstream of the event, or a new workstream of this changeset;\nthen the proposal depends on the proposal that creates it.",
+                              "format": "uuid",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "event_id",
+                            "title",
+                            "likelihood",
+                            "impact",
+                            "owner"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Change the status of a risk of the event.\n`open` and `mitigated` change into each other; `open` and `mitigated` change to `occurred`;\n`open`, `mitigated` and `occurred` change to `closed`; `closed` changes back to `open`.\nA status change does not change the rating.",
+                          "properties": {
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "description": "The current version of the risk.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "kind": {
+                              "const": "change-risk-status",
+                              "type": "string"
+                            },
+                            "risk_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "status": {
+                              "enum": [
+                                "open",
+                                "mitigated",
+                                "occurred",
+                                "closed"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "risk_id",
+                            "status",
+                            "expected_version"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Change the likelihood and the impact of a risk of the event. Give both, also the one that stays.",
+                          "properties": {
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "description": "The current version of the risk.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "impact": {
+                              "description": "A level of the likelihood or the impact of a risk.",
+                              "enum": [
+                                "low",
+                                "medium",
+                                "high"
+                              ],
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "change-risk-rating",
+                              "type": "string"
+                            },
+                            "likelihood": {
+                              "description": "A level of the likelihood or the impact of a risk.",
+                              "enum": [
+                                "low",
+                                "medium",
+                                "high"
+                              ],
+                              "type": "string"
+                            },
+                            "risk_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "risk_id",
+                            "likelihood",
+                            "impact",
+                            "expected_version"
+                          ],
+                          "type": "object"
                         }
                       ]
                     },
@@ -9435,6 +10016,64 @@
             "type": "string",
             "description": "Always `request`: the redaction answers the request of a person.",
             "example": "request"
+          }
+        }
+      },
+      "CreateRiskRequest": {
+        "type": "object",
+        "description": "The input of `CreateRisk`.",
+        "required": [
+          "title",
+          "likelihood",
+          "impact",
+          "owner_user_id"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The UUIDv7 of the new risk. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry."
+          },
+          "title": {
+            "type": "string",
+            "description": "1 to 200 characters.",
+            "example": "Starkregen am Festtag"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "1 to 4000 characters. It can have several lines."
+          },
+          "likelihood": {
+            "$ref": "#/components/schemas/Level"
+          },
+          "impact": {
+            "$ref": "#/components/schemas/Level"
+          },
+          "mitigation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "1 to 4000 characters. It can have several lines."
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A member with the contributor or manager role in the event."
+          },
+          "workstream_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "An active workstream of the event."
           }
         }
       },
@@ -10946,6 +11585,15 @@
         ],
         "description": "The label that people see: a Fluent message of a shipped field, or the German text of a field of an event."
       },
+      "Level": {
+        "type": "string",
+        "description": "A level of the likelihood or the impact of a risk.",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
       "LineChange": {
         "type": "object",
         "description": "One line of the text difference.",
@@ -11460,7 +12108,7 @@
           },
           "local_id": {
             "type": "string",
-            "description": "The readable ID, for example `ACT-001`, `COM-001`, `PER-001`, `INS-001`, `MIL-001` or `DEC-001`\n(ADR 0038)."
+            "description": "The readable ID, for example `ACT-001`, `COM-001`, `PER-001`, `INS-001`, `MIL-001`, `DEC-001` or `RSK-001`\n(ADR 0038)."
           }
         }
       },
@@ -12428,6 +13076,145 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "A new risk of the event. It starts `open`.",
+            "required": [
+              "id",
+              "event_id",
+              "title",
+              "likelihood",
+              "impact",
+              "owner",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "likelihood": {
+                "type": "string",
+                "description": "`low`, `medium` or `high`."
+              },
+              "impact": {
+                "type": "string",
+                "description": "`low`, `medium` or `high`."
+              },
+              "mitigation": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "owner": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The user ID of the member who owns the risk."
+              },
+              "workstream": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create-risk"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "risk_id",
+              "status",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "risk_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "description": "`open`, `mitigated`, `occurred` or `closed`."
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The version of the risk that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "change-risk-status"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "risk_id",
+              "likelihood",
+              "impact",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "risk_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "likelihood": {
+                "type": "string",
+                "description": "`low`, `medium` or `high`."
+              },
+              "impact": {
+                "type": "string",
+                "description": "`low`, `medium` or `high`."
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The version of the risk that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "change-risk-rating"
+                ]
+              }
+            }
           }
         ],
         "description": "The change that a proposal suggests. `kind` names the operation. The list of kinds is open."
@@ -12640,7 +13427,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "description": "`source-item`, `fact-version`, `proposal`, `open-question`, `action`, `commitment`, `workstream`,\n`document-version`, `milestone`, `decision`, `promisor` for a commitment whose promisor is the person, or\n`decision-party` for a decision that the person took.\nThe list of kinds is open."
+            "description": "`source-item`, `fact-version`, `proposal`, `open-question`, `action`, `commitment`, `workstream`,\n`document-version`, `milestone`, `decision`, `risk`, `promisor` for a commitment whose promisor is the person, or\n`decision-party` for a decision that the person took.\nThe list of kinds is open."
           },
           "id": {
             "type": "string",
@@ -13372,7 +14159,8 @@
           "persons",
           "institutions",
           "milestones",
-          "decisions"
+          "decisions",
+          "risks"
         ],
         "properties": {
           "proposals": {
@@ -13436,6 +14224,13 @@
               "$ref": "#/components/schemas/NewLocalRecord"
             },
             "description": "The new decisions with their event-local IDs."
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewLocalRecord"
+            },
+            "description": "The new risks with their event-local IDs."
           }
         }
       },
@@ -13475,6 +14270,137 @@
             "minimum": 1
           }
         }
+      },
+      "Risk": {
+        "type": "object",
+        "description": "A risk of an event.",
+        "required": [
+          "id",
+          "local_id",
+          "event_id",
+          "title",
+          "likelihood",
+          "impact",
+          "redacted",
+          "owner_user_id",
+          "status",
+          "version",
+          "evidence",
+          "can_change",
+          "next_statuses"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_id": {
+            "type": "string",
+            "description": "The readable ID, for example `RSK-001`."
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Empty after a legal redaction (ADR 0072)."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absent after a legal redaction. It can have several lines."
+          },
+          "likelihood": {
+            "$ref": "#/components/schemas/Level"
+          },
+          "impact": {
+            "$ref": "#/components/schemas/Level"
+          },
+          "mitigation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the club does about the risk. Absent after a legal redaction. It can have several lines."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The member who owns the risk: a contributor or manager of the event."
+          },
+          "workstream_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RiskStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. A change needs it."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordEvidence"
+            },
+            "description": "The evidence of the accepted proposals that created or changed the risk."
+          },
+          "can_change": {
+            "type": "boolean",
+            "description": "True if the caller can change the risk now: its owner, the lead of its workstream or an event manager."
+          },
+          "next_statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskStatus"
+            },
+            "description": "The statuses that the caller can set with a change now. Empty without `can_change`."
+          }
+        }
+      },
+      "RiskPage": {
+        "type": "object",
+        "description": "One page of risks.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Risk"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page. It is absent on the last page."
+          }
+        }
+      },
+      "RiskStatus": {
+        "type": "string",
+        "description": "The status of a risk.",
+        "enum": [
+          "open",
+          "mitigated",
+          "occurred",
+          "closed"
+        ]
       },
       "RoleVersion": {
         "type": "object",

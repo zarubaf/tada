@@ -65,6 +65,7 @@ pub(crate) fn ports(state: &ApiState) -> WorkPorts<'_> {
         work: state.work.as_ref(),
         milestones: state.milestones.as_ref(),
         decisions: state.decisions.as_ref(),
+        risks: state.risks.as_ref(),
         workstreams: state.workstreams.as_ref(),
         parties: state.parties.as_ref(),
         clock: state.clock.as_ref(),

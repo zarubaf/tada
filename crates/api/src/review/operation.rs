@@ -214,6 +214,42 @@ pub enum Operation {
         /// The version of the decision that the proposal expects.
         expected_version: i64,
     },
+    /// A new risk of the event. It starts `open`.
+    CreateRisk {
+        id: Uuid,
+        event_id: Uuid,
+        title: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+        /// `low`, `medium` or `high`.
+        likelihood: String,
+        /// `low`, `medium` or `high`.
+        impact: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mitigation: Option<String>,
+        /// The user ID of the member who owns the risk.
+        owner: Uuid,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        workstream: Option<Uuid>,
+    },
+    ChangeRiskStatus {
+        event_id: Uuid,
+        risk_id: Uuid,
+        /// `open`, `mitigated`, `occurred` or `closed`.
+        status: String,
+        /// The version of the risk that the proposal expects.
+        expected_version: i64,
+    },
+    ChangeRiskRating {
+        event_id: Uuid,
+        risk_id: Uuid,
+        /// `low`, `medium` or `high`.
+        likelihood: String,
+        /// `low`, `medium` or `high`.
+        impact: String,
+        /// The version of the risk that the proposal expects.
+        expected_version: i64,
+    },
 }
 
 /// The party that makes a commitment: `{"person": "<uuid>"}` or `{"institution": "<uuid>"}`.
@@ -540,6 +576,49 @@ impl From<&DomainOperation> for Operation {
                 event_id: event_id.as_uuid(),
                 decision_id: decision_id.as_uuid(),
                 reason: reason.as_str().to_owned(),
+                expected_version: expected_version.get(),
+            },
+            DomainOperation::CreateRisk {
+                id,
+                event_id,
+                title,
+                description,
+                rating,
+                mitigation,
+                owner,
+                workstream,
+            } => Self::CreateRisk {
+                id: id.as_uuid(),
+                event_id: event_id.as_uuid(),
+                title: title.as_str().to_owned(),
+                description: description.as_ref().map(|text| text.as_str().to_owned()),
+                likelihood: rating.likelihood.as_str().to_owned(),
+                impact: rating.impact.as_str().to_owned(),
+                mitigation: mitigation.as_ref().map(|text| text.as_str().to_owned()),
+                owner: owner.as_uuid(),
+                workstream: workstream.map(|id| id.as_uuid()),
+            },
+            DomainOperation::ChangeRiskStatus {
+                event_id,
+                risk_id,
+                status,
+                expected_version,
+            } => Self::ChangeRiskStatus {
+                event_id: event_id.as_uuid(),
+                risk_id: risk_id.as_uuid(),
+                status: status.as_str().to_owned(),
+                expected_version: expected_version.get(),
+            },
+            DomainOperation::ChangeRiskRating {
+                event_id,
+                risk_id,
+                rating,
+                expected_version,
+            } => Self::ChangeRiskRating {
+                event_id: event_id.as_uuid(),
+                risk_id: risk_id.as_uuid(),
+                likelihood: rating.likelihood.as_str().to_owned(),
+                impact: rating.impact.as_str().to_owned(),
                 expected_version: expected_version.get(),
             },
         }

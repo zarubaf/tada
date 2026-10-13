@@ -18,11 +18,12 @@ use crate::facts::{
 use crate::identity::Email;
 use crate::ids::{
     ActionId, CommitmentId, DecisionId, DocumentId, EventId, FieldDefinitionId, InstitutionId,
-    MilestoneId, OpenQuestionId, PersonId, ProposalId, UserId, WorkstreamId,
+    MilestoneId, OpenQuestionId, PersonId, ProposalId, RiskId, UserId, WorkstreamId,
 };
 use crate::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use crate::records::{
     DecisionParties, DecisionWording, MilestoneStatus, MilestoneTitle, RecordReason, RecordRef,
+    RiskRating, RiskStatus, RiskTitle,
 };
 use crate::sources::Evidence;
 use crate::work::{
@@ -202,6 +203,32 @@ pub enum Operation {
         reason: RecordReason,
         expected_version: RecordVersion,
     },
+    /// Record a risk of an event with its owner (ADR 0080). It starts `open`.
+    /// The mitigation is optional.
+    CreateRisk {
+        id: RiskId,
+        event_id: EventId,
+        title: RiskTitle,
+        description: Option<RecordDescription>,
+        rating: RiskRating,
+        mitigation: Option<RecordDescription>,
+        owner: UserId,
+        workstream: Option<WorkstreamId>,
+    },
+    /// Change the status of a risk. `expected_version` is the current version of the risk.
+    ChangeRiskStatus {
+        event_id: EventId,
+        risk_id: RiskId,
+        status: RiskStatus,
+        expected_version: RecordVersion,
+    },
+    /// Change the likelihood and the impact of a risk. `expected_version` is the current version of the risk.
+    ChangeRiskRating {
+        event_id: EventId,
+        risk_id: RiskId,
+        rating: RiskRating,
+        expected_version: RecordVersion,
+    },
 }
 
 /// The document of a draft: a new document, or an existing document of the event at its current version.
@@ -241,6 +268,7 @@ pub enum NewRecord {
     Workstream(WorkstreamId),
     Milestone(MilestoneId),
     Decision(DecisionId),
+    Risk(RiskId),
 }
 
 impl NewRecord {
@@ -257,6 +285,7 @@ impl NewRecord {
             Self::Workstream(id) => id.as_uuid(),
             Self::Milestone(id) => id.as_uuid(),
             Self::Decision(id) => id.as_uuid(),
+            Self::Risk(id) => id.as_uuid(),
         }
     }
 }
@@ -287,6 +316,7 @@ impl Operation {
             Self::CreateWorkstream { id, .. } => Some(NewRecord::Workstream(*id)),
             Self::CreateMilestone { id, .. } => Some(NewRecord::Milestone(*id)),
             Self::CreateDecision { id, .. } => Some(NewRecord::Decision(*id)),
+            Self::CreateRisk { id, .. } => Some(NewRecord::Risk(*id)),
             Self::SetFact { .. }
             | Self::AddChoiceValue { .. }
             | Self::DeprecateField { .. }
@@ -297,7 +327,9 @@ impl Operation {
             | Self::ChangeCommitmentStatus { .. }
             | Self::ChangeMilestoneStatus { .. }
             | Self::SupersedeDecision { .. }
-            | Self::RevokeDecision { .. } => None,
+            | Self::RevokeDecision { .. }
+            | Self::ChangeRiskStatus { .. }
+            | Self::ChangeRiskRating { .. } => None,
         }
     }
 
@@ -323,7 +355,10 @@ impl Operation {
             | Self::ChangeMilestoneStatus { event_id, .. }
             | Self::CreateDecision { event_id, .. }
             | Self::SupersedeDecision { event_id, .. }
-            | Self::RevokeDecision { event_id, .. } => Some(*event_id),
+            | Self::RevokeDecision { event_id, .. }
+            | Self::CreateRisk { event_id, .. }
+            | Self::ChangeRiskStatus { event_id, .. }
+            | Self::ChangeRiskRating { event_id, .. } => Some(*event_id),
             Self::CreatePerson { .. } | Self::CreateInstitution { .. } => None,
         }
     }
@@ -351,7 +386,10 @@ impl Operation {
             | Self::ChangeMilestoneStatus { .. }
             | Self::CreateDecision { .. }
             | Self::SupersedeDecision { .. }
-            | Self::RevokeDecision { .. } => None,
+            | Self::RevokeDecision { .. }
+            | Self::CreateRisk { .. }
+            | Self::ChangeRiskStatus { .. }
+            | Self::ChangeRiskRating { .. } => None,
         }
     }
 
@@ -369,6 +407,9 @@ impl Operation {
             }
             Self::SupersedeDecision { decision_id, .. }
             | Self::RevokeDecision { decision_id, .. } => Some(RecordRef::Decision(*decision_id)),
+            Self::ChangeRiskStatus { risk_id, .. } | Self::ChangeRiskRating { risk_id, .. } => {
+                Some(RecordRef::Risk(*risk_id))
+            }
             Self::CreateEvent { .. }
             | Self::SetFact { .. }
             | Self::AddFieldDefinition { .. }
@@ -382,7 +423,8 @@ impl Operation {
             | Self::CreateCommitment { .. }
             | Self::CreateWorkstream { .. }
             | Self::CreateMilestone { .. }
-            | Self::CreateDecision { .. } => None,
+            | Self::CreateDecision { .. }
+            | Self::CreateRisk { .. } => None,
         }
     }
 
@@ -420,6 +462,12 @@ impl Operation {
             }
             | Self::RevokeDecision {
                 expected_version, ..
+            }
+            | Self::ChangeRiskStatus {
+                expected_version, ..
+            }
+            | Self::ChangeRiskRating {
+                expected_version, ..
             } => Some(*expected_version),
             Self::CreateDocumentDraft {
                 document: DraftDocument::New { .. },
@@ -436,7 +484,8 @@ impl Operation {
             | Self::CreateCommitment { .. }
             | Self::CreateWorkstream { .. }
             | Self::CreateMilestone { .. }
-            | Self::CreateDecision { .. } => None,
+            | Self::CreateDecision { .. }
+            | Self::CreateRisk { .. } => None,
         }
     }
 
@@ -467,6 +516,12 @@ impl Operation {
                 owner,
                 workstream,
                 ..
+            }
+            | Self::CreateRisk {
+                event_id,
+                owner,
+                workstream,
+                ..
             } => Some(NewWorkRecord {
                 event_id: *event_id,
                 owner: *owner,
@@ -492,7 +547,9 @@ impl Operation {
             | Self::ChangeCommitmentStatus { .. }
             | Self::ChangeMilestoneStatus { .. }
             | Self::SupersedeDecision { .. }
-            | Self::RevokeDecision { .. } => None,
+            | Self::RevokeDecision { .. }
+            | Self::ChangeRiskStatus { .. }
+            | Self::ChangeRiskRating { .. } => None,
         }
     }
 
@@ -502,7 +559,8 @@ impl Operation {
             Self::CreateAction { workstream, .. }
             | Self::CreateCommitment { workstream, .. }
             | Self::CreateMilestone { workstream, .. }
-            | Self::CreateDecision { workstream, .. } => *workstream,
+            | Self::CreateDecision { workstream, .. }
+            | Self::CreateRisk { workstream, .. } => *workstream,
             Self::CreateEvent { .. }
             | Self::SetFact { .. }
             | Self::AddFieldDefinition { .. }
@@ -519,7 +577,9 @@ impl Operation {
             | Self::ChangeCommitmentStatus { .. }
             | Self::ChangeMilestoneStatus { .. }
             | Self::SupersedeDecision { .. }
-            | Self::RevokeDecision { .. } => None,
+            | Self::RevokeDecision { .. }
+            | Self::ChangeRiskStatus { .. }
+            | Self::ChangeRiskRating { .. } => None,
         }
     }
 
@@ -547,7 +607,10 @@ impl Operation {
             | Self::ChangeActionMilestone { .. }
             | Self::ChangeCommitmentStatus { .. }
             | Self::CreateMilestone { .. }
-            | Self::ChangeMilestoneStatus { .. } => false,
+            | Self::ChangeMilestoneStatus { .. }
+            | Self::CreateRisk { .. }
+            | Self::ChangeRiskStatus { .. }
+            | Self::ChangeRiskRating { .. } => false,
         }
     }
 
@@ -584,7 +647,10 @@ impl Operation {
             | Self::CreateWorkstream { .. }
             | Self::CreateMilestone { .. }
             | Self::ChangeMilestoneStatus { .. }
-            | Self::RevokeDecision { .. } => Vec::new(),
+            | Self::RevokeDecision { .. }
+            | Self::CreateRisk { .. }
+            | Self::ChangeRiskStatus { .. }
+            | Self::ChangeRiskRating { .. } => Vec::new(),
         };
         promisor
             .into_iter()
@@ -616,7 +682,10 @@ impl Operation {
             | Self::ChangeMilestoneStatus { .. }
             | Self::CreateDecision { .. }
             | Self::SupersedeDecision { .. }
-            | Self::RevokeDecision { .. } => None,
+            | Self::RevokeDecision { .. }
+            | Self::CreateRisk { .. }
+            | Self::ChangeRiskStatus { .. }
+            | Self::ChangeRiskRating { .. } => None,
         }
     }
 }
@@ -948,6 +1017,55 @@ mod tests {
             expected_version: version(),
         };
         assert!(cleared.references().is_empty());
+    }
+
+    #[test]
+    fn each_risk_operation_is_a_normal_work_record_operation() {
+        let risk = RiskId::from_uuid(Uuid::from_u128(90));
+        let workstream = WorkstreamId::from_uuid(Uuid::from_u128(40));
+        let rating = RiskRating {
+            likelihood: crate::records::Level::Medium,
+            impact: crate::records::Level::High,
+        };
+        let create = Operation::CreateRisk {
+            id: risk,
+            event_id: event(),
+            title: RiskTitle::parse("Starkregen am Festtag").unwrap(),
+            description: None,
+            rating,
+            mitigation: None,
+            owner: UserId::from_uuid(Uuid::from_u128(1)),
+            workstream: Some(workstream),
+        };
+        assert_eq!(create.new_record(), Some(NewRecord::Risk(risk)));
+        assert_eq!(create.references(), [NewRecord::Workstream(workstream)]);
+        assert_eq!(create.workstream(), Some(workstream));
+        assert_eq!(create.changed_record(), None);
+        assert!(create.new_work_record().is_some());
+        let status = Operation::ChangeRiskStatus {
+            event_id: event(),
+            risk_id: risk,
+            status: RiskStatus::Mitigated,
+            expected_version: version(),
+        };
+        let rating_change = Operation::ChangeRiskRating {
+            event_id: event(),
+            risk_id: risk,
+            rating,
+            expected_version: version(),
+        };
+        for change in [&status, &rating_change] {
+            assert_eq!(change.changed_record(), Some(RecordRef::Risk(risk)));
+            assert_eq!(change.expected_version(), Some(version()));
+            assert_eq!(change.new_record(), None);
+            assert!(change.references().is_empty());
+            assert!(change.new_work_record().is_none());
+        }
+        // Rules 1 to 3 route a risk; no operation of a risk goes to the managers only.
+        for operation in [&create, &status, &rating_change] {
+            assert!(!operation.managers_only());
+            assert_eq!(operation.event_id(), Some(event()));
+        }
     }
 
     #[test]
