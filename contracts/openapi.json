@@ -8349,7 +8349,7 @@
                               "type": "string"
                             },
                             "workstream": {
-                              "description": "An active workstream of the event.",
+                              "description": "An active workstream of the event, or a new workstream of this changeset;\nthen the proposal depends on the proposal that creates it.",
                               "format": "uuid",
                               "type": [
                                 "string",
