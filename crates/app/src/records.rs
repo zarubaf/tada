@@ -16,9 +16,8 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use jiff::Timestamp;
 use tada_domain::RecordVersion;
-use tada_domain::ids::{
-    self, ActionId, CommitmentId, InstitutionId, PersonId, ProposalId, SourceVersionId,
-};
+use tada_domain::ids::{self, ProposalId, SourceVersionId};
+pub use tada_domain::records::RecordRef;
 use tada_domain::redaction::Redactable;
 use uuid::Uuid;
 
@@ -115,15 +114,6 @@ pub(crate) fn record_id(id: Option<Uuid>) -> Result<Uuid, FieldError> {
 /// The audit event of a direct command on the record `record`.
 pub(crate) fn audit(caller: &MemberCaller, action: AuditAction, record: Uuid) -> AuditEvent {
     AuditEvent::new(caller.actor(), action, Some(record), Some(caller.scope()))
-}
-
-/// A record that accepted proposals support with evidence (ADR 0068, ADR 0069).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum RecordRef {
-    Action(ActionId),
-    Commitment(CommitmentId),
-    Person(PersonId),
-    Institution(InstitutionId),
 }
 
 /// A passage that supports one version of a record (ADR 0068).

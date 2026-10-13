@@ -21,6 +21,7 @@ use crate::ids::{
     PersonId, ProposalId, UserId, WorkstreamId,
 };
 use crate::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
+use crate::records::RecordRef;
 use crate::sources::Evidence;
 use crate::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
@@ -243,6 +244,61 @@ impl Operation {
         }
     }
 
+    /// The existing record that a change operation changes. Its owner reviews the proposal (ADR 0067, rule 1).
+    pub fn changed_record(&self) -> Option<RecordRef> {
+        match self {
+            Self::ChangeActionStatus { action_id, .. }
+            | Self::ChangeActionDue { action_id, .. } => Some(RecordRef::Action(*action_id)),
+            Self::ChangeCommitmentStatus { commitment_id, .. } => {
+                Some(RecordRef::Commitment(*commitment_id))
+            }
+            Self::CreateEvent { .. }
+            | Self::SetFact { .. }
+            | Self::AddFieldDefinition { .. }
+            | Self::AddChoiceValue { .. }
+            | Self::DeprecateField { .. }
+            | Self::CreateOpenQuestion { .. }
+            | Self::CreateDocumentDraft { .. }
+            | Self::CreatePerson { .. }
+            | Self::CreateInstitution { .. }
+            | Self::CreateAction { .. }
+            | Self::CreateCommitment { .. } => None,
+        }
+    }
+
+    /// The workstream of the record that a create operation creates. Its lead reviews the proposal (ADR 0067, rule 2).
+    pub fn workstream(&self) -> Option<WorkstreamId> {
+        match self {
+            Self::CreateAction { workstream, .. } | Self::CreateCommitment { workstream, .. } => {
+                *workstream
+            }
+            Self::CreateEvent { .. }
+            | Self::SetFact { .. }
+            | Self::AddFieldDefinition { .. }
+            | Self::AddChoiceValue { .. }
+            | Self::DeprecateField { .. }
+            | Self::CreateOpenQuestion { .. }
+            | Self::CreateDocumentDraft { .. }
+            | Self::CreatePerson { .. }
+            | Self::CreateInstitution { .. }
+            | Self::ChangeActionStatus { .. }
+            | Self::ChangeActionDue { .. }
+            | Self::ChangeCommitmentStatus { .. } => None,
+        }
+    }
+
+    /// The records that the operation names and that a proposal of the same changeset can create
+    /// (ADR 0067, rule 5): the promisor of a new commitment.
+    pub fn references(&self) -> Vec<NewRecord> {
+        self.promisor()
+            .map(|promisor| match promisor {
+                Party::Person(id) => NewRecord::Person(id),
+                Party::Institution(id) => NewRecord::Institution(id),
+            })
+            .into_iter()
+            .collect()
+    }
+
     /// The existing or new field that the operation uses or changes.
     pub fn field_id(&self) -> Option<FieldDefinitionId> {
         match self {
@@ -451,6 +507,88 @@ mod tests {
             QuestionText::parse(&"a".repeat(QuestionText::MAX_CHARS + 1)),
             Err(TextError::TooLong)
         );
+    }
+
+    fn event() -> EventId {
+        EventId::from_uuid(Uuid::from_u128(20))
+    }
+
+    fn version() -> RecordVersion {
+        RecordVersion::new(1).unwrap()
+    }
+
+    fn new_commitment(promisor: Party, workstream: Option<WorkstreamId>) -> Operation {
+        Operation::CreateCommitment {
+            id: CommitmentId::from_uuid(Uuid::from_u128(32)),
+            event_id: event(),
+            text: CommitmentText::parse("Liefert den Generator").unwrap(),
+            promisor,
+            owner: UserId::from_uuid(Uuid::from_u128(1)),
+            workstream,
+            due_date: None,
+            condition: None,
+        }
+    }
+
+    #[test]
+    fn changed_record_of_each_change() {
+        let action = ActionId::from_uuid(Uuid::from_u128(30));
+        let commitment = CommitmentId::from_uuid(Uuid::from_u128(31));
+        let status = Operation::ChangeActionStatus {
+            event_id: event(),
+            action_id: action,
+            status: ActionStatus::Done,
+            expected_version: version(),
+        };
+        let due = Operation::ChangeActionDue {
+            event_id: event(),
+            action_id: action,
+            due_date: None,
+            expected_version: version(),
+        };
+        let promise = Operation::ChangeCommitmentStatus {
+            event_id: event(),
+            commitment_id: commitment,
+            status: CommitmentStatus::Firm,
+            expected_version: version(),
+        };
+        assert_eq!(status.changed_record(), Some(RecordRef::Action(action)));
+        assert_eq!(due.changed_record(), Some(RecordRef::Action(action)));
+        assert_eq!(
+            promise.changed_record(),
+            Some(RecordRef::Commitment(commitment))
+        );
+        for change in [&status, &due, &promise] {
+            assert_eq!(change.workstream(), None);
+        }
+
+        // A create changes no record. It names its workstream instead.
+        let workstream = WorkstreamId::from_uuid(Uuid::from_u128(40));
+        let person = Party::Person(PersonId::from_uuid(Uuid::from_u128(60)));
+        let create = new_commitment(person, Some(workstream));
+        assert_eq!(create.changed_record(), None);
+        assert_eq!(create.workstream(), Some(workstream));
+        assert_eq!(new_commitment(person, None).workstream(), None);
+    }
+
+    #[test]
+    fn references_of_a_commitment_name_its_promisor() {
+        let uuid = Uuid::from_u128(60);
+        let person = new_commitment(Party::Person(PersonId::from_uuid(uuid)), None);
+        assert_eq!(
+            person.references(),
+            [NewRecord::Person(PersonId::from_uuid(uuid))]
+        );
+        let institution = new_commitment(Party::Institution(InstitutionId::from_uuid(uuid)), None);
+        assert_eq!(
+            institution.references(),
+            [NewRecord::Institution(InstitutionId::from_uuid(uuid))]
+        );
+        let deprecation = Operation::DeprecateField {
+            event_id: event(),
+            field_id: FieldDefinitionId::from_uuid(Uuid::from_u128(50)),
+        };
+        assert!(deprecation.references().is_empty());
     }
 
     #[test]

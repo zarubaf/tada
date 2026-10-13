@@ -1464,8 +1464,7 @@ mod tests {
             &self,
             _: tada_app::caller::OrgScope,
             _: tada_app::domain::ids::EventId,
-            _: &[tada_app::domain::ids::ActionId],
-            _: &[tada_app::domain::ids::CommitmentId],
+            _: &[tada_app::records::RecordRef],
         ) -> Result<tada_app::work::WorkOwners, tada_app::store::StoreError> {
             unreachable!()
         }

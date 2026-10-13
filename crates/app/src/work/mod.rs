@@ -5,6 +5,7 @@ mod actions;
 mod checks;
 mod commitments;
 
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 use async_trait::async_trait;
@@ -36,7 +37,7 @@ use crate::identity::IdentityStore;
 use crate::paging::PageLimit;
 use crate::parties::{PartyRef, PartyStore};
 use crate::problem::{CommandError, FieldError, ProblemCode};
-use crate::records::{Changed, Created, EvidenceStore, NumberCursor, Shown};
+use crate::records::{Changed, Created, EvidenceStore, NumberCursor, RecordRef, Shown};
 use crate::store::StoreError;
 use crate::workstreams::WorkstreamStore;
 
@@ -188,12 +189,8 @@ pub struct MyWork {
     pub commitments: Vec<InEvent<CommitmentView>>,
 }
 
-/// The current owner of each found action and commitment (`WorkStore::owners`).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct WorkOwners {
-    pub actions: Vec<(ActionId, UserId)>,
-    pub commitments: Vec<(CommitmentId, UserId)>,
-}
+/// The current owner of each found record (`WorkStore::owners`).
+pub type WorkOwners = HashMap<RecordRef, UserId>;
 
 /// The repository port for actions and commitments. Each method stays inside `scope`.
 /// A create or a change records its audit event in the same transaction.
@@ -279,14 +276,13 @@ pub trait WorkStore: EvidenceStore + Debug + Send + Sync {
         filter: &WorkFilter<CommitmentStatus>,
     ) -> Result<Vec<CommitmentView>, StoreError>;
 
-    /// The current owners of the actions `actions` and the commitments `commitments` of the event, for the review
-    /// routing (ADR 0067). A record that the event does not have is missing in the result.
+    /// The current owners of the records `records` of the event, for the review routing (ADR 0067).
+    /// A record that the event does not have, or a record without an owner, is missing in the result.
     async fn owners(
         &self,
         scope: OrgScope,
         event: EventId,
-        actions: &[ActionId],
-        commitments: &[CommitmentId],
+        records: &[RecordRef],
     ) -> Result<WorkOwners, StoreError>;
 
     /// The open records that `user` owns in the active events of `events` (`access::readable_events`).

@@ -8,9 +8,9 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use tada_domain::ids::{ActionId, CommitmentId, EventId, ProposalId, UserId, WorkstreamId};
-use tada_domain::parties::Party;
-use tada_domain::proposals::{NewRecord, Operation};
+use tada_domain::ids::{EventId, ProposalId, UserId, WorkstreamId};
+use tada_domain::proposals::Operation;
+use tada_domain::records::RecordRef;
 
 use super::selection::closure;
 use crate::access::EventLevel;
@@ -47,11 +47,10 @@ impl Reviewers {
     }
 }
 
-/// The current state that the routing reads: the owner of each action and commitment and the lead of each
-/// workstream of the event. `None` means that the event has no such record.
+/// The current state that the routing reads: the owner of each record and the lead of each workstream of the event.
+/// `None` means that the event has no such record, or that the record has no owner who can review.
 pub trait RoutingLookup {
-    fn action_owner(&self, id: ActionId) -> Option<UserId>;
-    fn commitment_owner(&self, id: CommitmentId) -> Option<UserId>;
+    fn owner_of(&self, record: RecordRef) -> Option<UserId>;
     fn workstream_lead(&self, id: WorkstreamId) -> Option<UserId>;
 }
 
@@ -66,17 +65,11 @@ pub fn reviewers(
     if event.is_none() {
         return Reviewers::OrganizationAdmins;
     }
-    let user = match operation {
-        Operation::ChangeActionStatus { action_id, .. }
-        | Operation::ChangeActionDue { action_id, .. } => lookup.action_owner(*action_id),
-        Operation::ChangeCommitmentStatus { commitment_id, .. } => {
-            lookup.commitment_owner(*commitment_id)
-        }
-        Operation::CreateAction { workstream, .. }
-        | Operation::CreateCommitment { workstream, .. } => {
-            workstream.and_then(|id| lookup.workstream_lead(id))
-        }
-        _ => None,
+    let user = match operation.changed_record() {
+        Some(record) => lookup.owner_of(record),
+        None => operation
+            .workstream()
+            .and_then(|id| lookup.workstream_lead(id)),
     };
     user.map_or(Reviewers::EventManagers, Reviewers::user)
 }
@@ -120,17 +113,14 @@ pub fn in_inbox_of(
     routed_to(caller, access, own, dependents) || (access.can_review() && overdue)
 }
 
-/// True if `dependent` refers to the record that `dependency` creates (rule 5): in 2a, a new commitment whose
-/// promisor is a new person or a new institution of the changeset.
+/// True if `dependent` refers to the record that `dependency` creates (rule 5): `Operation::references`, for example
+/// a new commitment whose promisor is a new person or a new institution of the changeset.
 /// Only then the reviewers of the dependent decide on the dependency too.
 /// Any other dependency keeps its own reviewers, so a `depends_on` entry cannot move a proposal to another reviewer.
 fn refers_to_new_record(dependent: &Operation, dependency: &Operation) -> bool {
-    let new_party = match dependency.new_record() {
-        Some(NewRecord::Person(id)) => Party::Person(id),
-        Some(NewRecord::Institution(id)) => Party::Institution(id),
-        _ => return false,
-    };
-    dependent.promisor() == Some(new_party)
+    dependency
+        .new_record()
+        .is_some_and(|record| dependent.references().contains(&record))
 }
 
 /// One proposal of a changeset as the routing sees it.
@@ -233,8 +223,7 @@ impl ChangesetRoutes {
 /// The current owners and leads that the routing of some proposals of one event reads.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct RoutingFacts {
-    action_owners: HashMap<ActionId, UserId>,
-    commitment_owners: HashMap<CommitmentId, UserId>,
+    owners: HashMap<RecordRef, UserId>,
     leads: HashMap<WorkstreamId, UserId>,
 }
 
@@ -249,31 +238,17 @@ impl RoutingFacts {
         operations: impl IntoIterator<Item = &'a Operation>,
         ports: RoutingPorts<'_>,
     ) -> Result<Self, StoreError> {
-        let mut actions = Vec::new();
-        let mut commitments = Vec::new();
+        let mut records = Vec::new();
         let mut needs_leads = false;
         for operation in operations {
-            match operation {
-                Operation::ChangeActionStatus { action_id, .. }
-                | Operation::ChangeActionDue { action_id, .. } => actions.push(*action_id),
-                Operation::ChangeCommitmentStatus { commitment_id, .. } => {
-                    commitments.push(*commitment_id);
-                }
-                Operation::CreateAction { workstream, .. }
-                | Operation::CreateCommitment { workstream, .. } => {
-                    needs_leads |= workstream.is_some();
-                }
-                _ => {}
+            match operation.changed_record() {
+                Some(record) => records.push(record),
+                None => needs_leads |= operation.workstream().is_some(),
             }
         }
         let mut facts = Self::default();
-        if !actions.is_empty() || !commitments.is_empty() {
-            let owners = ports
-                .work
-                .owners(scope, event, &actions, &commitments)
-                .await?;
-            facts.action_owners = owners.actions.into_iter().collect();
-            facts.commitment_owners = owners.commitments.into_iter().collect();
+        if !records.is_empty() {
+            facts.owners = ports.work.owners(scope, event, &records).await?;
         }
         if needs_leads {
             facts.leads = ports
@@ -296,9 +271,8 @@ impl RoutingFacts {
         identity: &dyn IdentityStore,
     ) -> Result<(), StoreError> {
         let users: BTreeSet<UserId> = self
-            .action_owners
+            .owners
             .values()
-            .chain(self.commitment_owners.values())
             .chain(self.leads.values())
             .copied()
             .collect();
@@ -308,10 +282,7 @@ impl RoutingFacts {
                 reviewers.insert(user);
             }
         }
-        self.action_owners
-            .retain(|_, user| reviewers.contains(user));
-        self.commitment_owners
-            .retain(|_, user| reviewers.contains(user));
+        self.owners.retain(|_, user| reviewers.contains(user));
         self.leads.retain(|_, user| reviewers.contains(user));
         Ok(())
     }
@@ -326,12 +297,8 @@ pub(crate) struct RoutingPorts<'a> {
 }
 
 impl RoutingLookup for RoutingFacts {
-    fn action_owner(&self, id: ActionId) -> Option<UserId> {
-        self.action_owners.get(&id).copied()
-    }
-
-    fn commitment_owner(&self, id: CommitmentId) -> Option<UserId> {
-        self.commitment_owners.get(&id).copied()
+    fn owner_of(&self, record: RecordRef) -> Option<UserId> {
+        self.owners.get(&record).copied()
     }
 
     fn workstream_lead(&self, id: WorkstreamId) -> Option<UserId> {
@@ -342,7 +309,7 @@ impl RoutingLookup for RoutingFacts {
 #[cfg(test)]
 mod tests {
     use tada_domain::RecordVersion;
-    use tada_domain::ids::{FieldDefinitionId, InstitutionId, PersonId};
+    use tada_domain::ids::{ActionId, CommitmentId, FieldDefinitionId, InstitutionId, PersonId};
     use tada_domain::parties::{InstitutionKind, Party, PartyName};
     use tada_domain::work::{ActionStatus, ActionTitle, CommitmentText};
     use uuid::Uuid;
@@ -377,8 +344,7 @@ mod tests {
     /// The action `action()` with the owner `OWNER` and the workstream `workstream()` with the lead `LEAD`.
     fn facts() -> RoutingFacts {
         RoutingFacts {
-            action_owners: HashMap::from([(action(), user(OWNER))]),
-            commitment_owners: HashMap::new(),
+            owners: HashMap::from([(RecordRef::Action(action()), user(OWNER))]),
             leads: HashMap::from([(workstream(), user(LEAD))]),
         }
     }
