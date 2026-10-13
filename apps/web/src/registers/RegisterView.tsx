@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
 import { useHash } from "../router/Router";
 import { Button } from "../ui/Button";
@@ -35,7 +35,7 @@ export function RegisterView<T extends { id: string }>({
 }: RegisterViewProps<T>) {
   const { state } = register;
   const [loadingMore, setLoadingMore] = useState(false);
-  const linked = useLinkedRow(state.kind === "loaded" ? state.items.map(rowId) : []);
+  const linked = useLinkedRow(register, page, rowId);
 
   if (state.kind === "loading") {
     return <SkeletonLines label={loadingLabel} />;
@@ -90,20 +90,57 @@ export function RegisterView<T extends { id: string }>({
 }
 
 /**
- * The row that the fragment of the address names, once the rows are on the page: it scrolls to the
- * row and takes focus, so that a link from another page lands on it. A fragment that names no row
- * does nothing. The mark of the row fades by itself, and not at all with reduced motion.
+ * The row that the fragment of the address names: it scrolls to the row and takes focus, so that a
+ * link from another page lands on it. A row that is not on the loaded pages makes the hook load
+ * the next pages until the row appears; when the pages run out, the page says so in the polite
+ * live region. Each fragment is handled once: a retry or „Weitere laden“ does not move focus again.
+ * The mark of the row fades by itself, and not at all with reduced motion.
  */
-function useLinkedRow(ids: string[]): string | undefined {
+function useLinkedRow<T extends { id: string }>(
+  register: Register<T>,
+  page: RegisterPaging,
+  rowId: (row: T) => string,
+): string | undefined {
   const hash = useHash();
-  const found = hash !== "" && ids.includes(hash) ? hash : undefined;
+  const { state } = register;
+  const present =
+    hash !== "" && state.kind === "loaded" && state.items.some((row) => rowId(row) === hash);
+  const handled = useRef<string>(undefined);
+  const searching = useRef(false);
+  const { setConfirmation, setFailure } = page;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `register` changes with each render; the state is the trigger
   useEffect(() => {
-    if (found === undefined) {
+    if (hash === "") {
+      handled.current = undefined;
       return;
     }
-    const row = document.getElementById(found);
-    row?.scrollIntoView?.({ block: "center" });
-    row?.focus({ preventScroll: true });
-  }, [found]);
-  return found;
+    if (state.kind !== "loaded" || handled.current === hash) {
+      return;
+    }
+    if (present) {
+      handled.current = hash;
+      const row = document.getElementById(hash);
+      row?.scrollIntoView?.({ block: "center" });
+      row?.focus({ preventScroll: true });
+      return;
+    }
+    if (state.nextCursor === undefined) {
+      handled.current = hash;
+      setConfirmation(t("register-row-not-found", { id: hash }));
+      return;
+    }
+    if (searching.current) {
+      return;
+    }
+    searching.current = true;
+    void register.loadMore().then((result) => {
+      searching.current = false;
+      if ("failure" in result) {
+        handled.current = hash;
+        setFailure(result.failure);
+      }
+    });
+  }, [hash, present, state]);
+  return present ? hash : undefined;
 }

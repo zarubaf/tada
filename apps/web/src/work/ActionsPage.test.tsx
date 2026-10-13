@@ -1,7 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { EVENT, json, ME, problem, renderWork } from "../test/fakeWorkServer";
+import { EVENT, json, ME, pagedList, problem, renderWork } from "../test/fakeWorkServer";
 import { ActionsPage } from "./ActionsPage";
 
 const user = userEvent.setup({ delay: null });
@@ -85,6 +86,86 @@ describe("ActionsPage", () => {
     render({ hash: "#ACT-099", lists: { "/actions": [action()] } });
     await screen.findByRole("table", { name: "Aufgaben" });
     expect(document.querySelector("[data-linked]")).toBeNull();
+  });
+
+  it("loads further pages until the row named by the hash appears", async () => {
+    const { calls } = render({
+      hash: "#ACT-051",
+      answers: {
+        "GET /actions": pagedList([
+          [action({ id: "a1", local_id: "ACT-001" })],
+          [action({ id: "a51", local_id: "ACT-051", title: "Zelt aufbauen" })],
+        ]),
+      },
+    });
+
+    const table = await screen.findByRole("table", { name: "Aufgaben" });
+    const row = await within(table).findByText("Zelt aufbauen");
+    await waitFor(() => expect(row.closest("tr")).toHaveFocus());
+    expect(
+      calls.filter((c) => c.call === "GET /api/v1/events/" + EVENT.id + "/actions"),
+    ).toHaveLength(2);
+  });
+
+  it("says in the live region that the row of the hash is on no page", async () => {
+    render({
+      hash: "#ACT-099",
+      answers: {
+        "GET /actions": pagedList([
+          [action({ id: "a1", local_id: "ACT-001" })],
+          [action({ id: "a2", local_id: "ACT-002" })],
+        ]),
+      },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("ACT-099 nicht gefunden"),
+    );
+    expect(screen.getByText("ACT-002")).toBeInTheDocument();
+    expect(document.querySelector("[data-linked]")).toBeNull();
+  });
+
+  it("does not move focus to the row again when more rows load", async () => {
+    render({
+      hash: "#ACT-001",
+      answers: {
+        "GET /actions": pagedList([
+          [action({ id: "a1", local_id: "ACT-001" })],
+          [action({ id: "a2", local_id: "ACT-002" })],
+        ]),
+      },
+    });
+
+    const row = (await screen.findByText("Generator bestellen")).closest("tr");
+    await waitFor(() => expect(row).toHaveFocus());
+    const more = screen.getByRole("button", { name: "Weitere Einträge laden" });
+    more.focus();
+    await user.click(more);
+    await screen.findByText("ACT-002");
+    expect(row).not.toHaveFocus();
+  });
+
+  it("focuses the new row when the hash changes on the mounted page", async () => {
+    render({
+      hash: "#ACT-002",
+      lists: {
+        "/actions": [
+          action({ id: "a2", local_id: "ACT-002", title: "Zelt aufbauen" }),
+          action({ id: "a3", local_id: "ACT-003", title: "Bar planen" }),
+        ],
+      },
+    });
+    const first = (await screen.findByText("Zelt aufbauen")).closest("tr");
+    await waitFor(() => expect(first).toHaveFocus());
+
+    act(() => {
+      window.history.pushState(null, "", `${window.location.pathname}#ACT-003`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    const second = screen.getByText("Bar planen").closest("tr");
+    await waitFor(() => expect(second).toHaveFocus());
+    expect(second).toHaveAttribute("data-linked");
   });
 
   it("shows the edit control where the server says the caller can change the action", async () => {
