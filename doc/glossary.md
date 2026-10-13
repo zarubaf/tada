@@ -43,7 +43,7 @@ The "Avoid" column lists words that have a different meaning or no fixed meaning
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
 | event series     | A recurring kind of event, for example the annual fly-in.                                                                          |                         |
 | event            | One occurrence of an event, with its own dates and accepted state.                                                                 | occurrence (in UI)      |
-| event window     | The dates of an event: `exact_dates` if accepted, else `date_window` if accepted or assumed. The timeline shows a band (ADR 0080). |                         |
+| event window     | The dates of an event: accepted `exact_dates`, else `date_window` if accepted or an assumption. The timeline shows it as a band.   |                         |
 | template         | A versioned set of checklists, roles and relative deadlines for an event series. A template never copies approvals or evidence.    |                         |
 | module           | A domain feature that an event enables, for example aviation. Do not confuse with a code module.                                   | plugin                  |
 | event profile    | The typed fields of an event and all its facts, including assumptions and unknowns.                                                |                         |

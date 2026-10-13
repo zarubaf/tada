@@ -113,20 +113,22 @@ The MCP tools must also serialize an empty `statuses` list ([#73](https://github
 - Rule 5 of ADR 0067 (the reviewers of a dependent also decide on the new record) gets these cases:
   - a new person or institution that a new requirement names as its source;
   - a new milestone that a new action or `ChangeActionMilestone` names.
-- A new workstream of a new record, a new party of a decision and a new successor of a decision change no reviewer: they go to the event managers anyway.
+- A new workstream, a new party of a decision and a new successor of a decision add no reviewers.
+  Their own proposals go to the event managers.
+- Rule 5 of ADR 0067 does not apply to a dependency that only the event managers review.
 
 ### Review edit
 
 - ADR 0068 limits the review edit to the text fields, the due date, the condition, the owner and the workstream.
-  For the create operations of the new kinds, the reviewer can edit these fields:
+  For the create operations of the new and the changed kinds, the reviewer can edit these fields:
   - `CreateMilestone`: the title, the description, the date, the owner and the workstream.
   - `CreateAction`: also the start date and the milestone.
   - `CreateDecision`: the owner and the workstream.
     The wording, the date and the parties stay as proposed.
+    A reviewer who needs another wording rejects the proposal.
   - `CreateRisk`: the title, the description, the mitigation, the rating (likelihood and impact), the owner and the workstream.
   - `CreateRequirement`: the text, the source, the due date, the owner and the workstream.
 - The change operations and `CreateWorkstream` have no review edit.
-- A reviewer who needs another wording rejects the proposal.
 - The review edit cannot name a milestone of another event, or a canceled milestone, on a new action.
 
 ### Earlier ADRs
