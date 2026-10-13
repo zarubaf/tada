@@ -1008,6 +1008,14 @@
               "description": "The readable ID, for example `ACT-001`.",
               "type": "string"
             },
+            "milestone_id": {
+              "description": "The ID of the milestone of the action, from `list_milestones`.",
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "owner_user_id": {
               "format": "uuid",
               "type": "string"
@@ -1015,6 +1023,13 @@
             "redacted": {
               "description": "True after a legal redaction: the texts are empty (ADR 0072).",
               "type": "boolean"
+            },
+            "start_date": {
+              "description": "Not after `due_date`.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "status": {
               "description": "`open`, `in-progress`, `blocked`, `done` or `canceled`.",
@@ -2545,10 +2560,27 @@
                   "const": "create-action",
                   "type": "string"
                 },
+                "milestone": {
+                  "default": null,
+                  "description": "A milestone of the event that is not canceled, or a new milestone of the same changeset;\nthen the proposal depends on the proposal that creates it.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "owner": {
                   "description": "The user ID of a member with the contributor or manager role in the event.",
                   "format": "uuid",
                   "type": "string"
+                },
+                "start_date": {
+                  "default": null,
+                  "description": "The start date as `YYYY-MM-DD`. It is not after the due date.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "title": {
                   "description": "1 to 200 characters.",
@@ -2869,6 +2901,45 @@
                 "event_id",
                 "milestone_id",
                 "status",
+                "expected_version"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Set or clear the milestone of an action of the event.",
+              "properties": {
+                "action_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "expected_version": {
+                  "description": "The current version of the action.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "change-action-milestone",
+                  "type": "string"
+                },
+                "milestone": {
+                  "default": null,
+                  "description": "A milestone of the event that is not canceled, or a new milestone of the same changeset.\nLeave it out to clear the milestone.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "event_id",
+                "action_id",
                 "expected_version"
               ],
               "type": "object"

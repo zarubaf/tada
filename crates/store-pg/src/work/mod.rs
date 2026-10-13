@@ -44,7 +44,9 @@ struct ActionRow {
     description: Option<String>,
     owner_user_id: Uuid,
     workstream_id: Option<Uuid>,
+    start_date: Option<jiff_sqlx::Date>,
     due_date: Option<jiff_sqlx::Date>,
+    milestone_id: Option<Uuid>,
     status: String,
     version: i64,
 }
@@ -72,7 +74,9 @@ impl TryFrom<ActionRow> for ActionView {
                     .map_err(|_| InvalidRow("action.description"))?,
                 owner: UserId::from_uuid(row.owner_user_id),
                 workstream_id: row.workstream_id.map(WorkstreamId::from_uuid),
+                start_date: row.start_date.map(jiff_sqlx::Date::to_jiff),
                 due_date: row.due_date.map(jiff_sqlx::Date::to_jiff),
+                milestone_id: row.milestone_id.map(MilestoneId::from_uuid),
                 status: ActionStatus::parse(&row.status).ok_or(InvalidRow("action.status"))?,
             },
             version: RecordVersion::new(row.version).ok_or(InvalidRow("action.version"))?,
@@ -224,7 +228,8 @@ async fn select_actions(
     let rows = sqlx::query_as!(
         ActionRow,
         r#"SELECT id, event_id, local_number, title, description, owner_user_id, workstream_id,
-                  due_date AS "due_date: jiff_sqlx::Date", status, version
+                  start_date AS "start_date: jiff_sqlx::Date", due_date AS "due_date: jiff_sqlx::Date",
+                  milestone_id, status, version
            FROM action
            WHERE organization_id = $1
              AND ($2::uuid IS NULL OR event_id = $2)
@@ -351,8 +356,8 @@ pub(crate) async fn insert_action(
     sqlx::query!(
         "INSERT INTO action
              (id, organization_id, event_id, local_number, title, description, owner_user_id,
-              workstream_id, due_date, status, version, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, $11, $11)",
+              workstream_id, due_date, status, version, created_at, updated_at, start_date, milestone_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, $11, $11, $12, $13)",
         action.id.as_uuid(),
         scope.organization_id().as_uuid(),
         action.event_id.as_uuid(),
@@ -364,6 +369,8 @@ pub(crate) async fn insert_action(
         fields.due_date.map(|date| date.to_sqlx()) as _,
         fields.status.as_str(),
         at.to_sqlx() as _,
+        fields.start_date.map(|date| date.to_sqlx()) as _,
+        fields.milestone_id.map(MilestoneId::as_uuid),
     )
     .execute(&mut *conn)
     .await?;
@@ -386,7 +393,8 @@ pub(crate) async fn update_action(
     sqlx::query_scalar!(
         "UPDATE action
          SET title = $5, description = $6, owner_user_id = $7, workstream_id = $8,
-             due_date = $9, status = $10, version = version + 1, updated_at = $11
+             due_date = $9, status = $10, version = version + 1, updated_at = $11,
+             start_date = $12, milestone_id = $13
          WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4
          RETURNING version",
         scope.organization_id().as_uuid(),
@@ -400,6 +408,8 @@ pub(crate) async fn update_action(
         fields.due_date.map(|date| date.to_sqlx()) as _,
         fields.status.as_str(),
         at.to_sqlx() as _,
+        fields.start_date.map(|date| date.to_sqlx()) as _,
+        fields.milestone_id.map(MilestoneId::as_uuid),
     )
     .fetch_optional(&mut *conn)
     .await

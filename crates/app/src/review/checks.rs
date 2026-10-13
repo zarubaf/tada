@@ -2,9 +2,10 @@
 
 use std::collections::{HashMap, HashSet};
 
+use jiff::Timestamp;
 use tada_domain::facts::{ChoiceValue, FactState, Label, ValueType, Valued};
-use tada_domain::ids::{FieldDefinitionId, ProposalId};
-use tada_domain::proposals::Operation;
+use tada_domain::ids::{FieldDefinitionId, MilestoneId, ProposalId};
+use tada_domain::proposals::{NewRecord, Operation};
 
 use super::{ApplyError, ApplyStep, Edit, ReviewStores, edits, finish};
 use crate::caller::OrgScope;
@@ -14,6 +15,7 @@ use crate::proposals::{
     Changeset, owner_refusal, state_from_input, value_error_code, workstream_refusal,
 };
 use crate::store::StoreError;
+use crate::work::milestone_refusal;
 
 /// The steps that create an action, a commitment, a milestone or a workstream whose owner or lead is no longer a
 /// contributor or a manager of the event. An edited owner passed `check_edits`, so only a member who changed role after
@@ -151,6 +153,7 @@ pub(super) async fn check_edits(
     selected: &HashSet<ProposalId>,
     edits: &Edits,
     stores: ReviewStores<'_>,
+    now: Timestamp,
 ) -> Result<(), ApplyError> {
     let mut value_types: HashMap<FieldDefinitionId, ValueType> = HashMap::new();
     let mut events = HashSet::new();
@@ -192,6 +195,13 @@ pub(super) async fn check_edits(
             });
         }
     }
+    // The new milestones that the apply creates: an edited action can name one of them.
+    let new_milestones: HashSet<MilestoneId> = selection()
+        .filter_map(|proposal| match proposal.operation.new_record() {
+            Some(NewRecord::Milestone(id)) => Some(id),
+            _ => None,
+        })
+        .collect();
     let mut errors = Vec::new();
     for proposal in &changeset.proposals {
         match (edits.get(&proposal.id), &proposal.operation) {
@@ -213,11 +223,47 @@ pub(super) async fn check_edits(
                 for (field, code) in edited_work_refusals(scope, proposed, edited, stores).await? {
                     errors.push(FieldError::new(path(field), code));
                 }
+                if let Some(code) =
+                    edited_milestone_refusal(scope, proposed, edited, &new_milestones, stores, now)
+                        .await?
+                {
+                    errors.push(FieldError::new(path("milestone"), code));
+                }
             }
             _ => {}
         }
     }
     finish(errors)
+}
+
+/// The refusal of an edited milestone of a new action (ADR 0080): it must be a milestone of the event that is not
+/// canceled, or a new milestone of the selection. An unchanged milestone passed the check of the proposal.
+async fn edited_milestone_refusal(
+    scope: OrgScope,
+    proposed: &Operation,
+    edited: &Operation,
+    new_milestones: &HashSet<MilestoneId>,
+    stores: ReviewStores<'_>,
+    now: Timestamp,
+) -> Result<Option<&'static str>, StoreError> {
+    let (
+        Operation::CreateAction {
+            milestone: old_milestone,
+            ..
+        },
+        Operation::CreateAction {
+            event_id,
+            milestone: Some(milestone),
+            ..
+        },
+    ) = (proposed, edited)
+    else {
+        return Ok(None);
+    };
+    if *old_milestone == Some(*milestone) || new_milestones.contains(milestone) {
+        return Ok(None);
+    }
+    milestone_refusal(scope, *event_id, *milestone, stores.milestones, now).await
 }
 
 /// The refusals of an edited owner and an edited workstream of a new work record, as (field, code).

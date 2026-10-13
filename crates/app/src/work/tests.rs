@@ -653,7 +653,9 @@ fn new_action(owner: u128, workstream: Option<WorkstreamId>) -> NewAction {
         description: None,
         owner: user(owner),
         workstream,
+        start_date: None,
         due_date: None,
+        milestone: None,
     }
 }
 
@@ -663,7 +665,9 @@ fn no_change(expected_version: RecordVersion) -> ActionChange {
         description: None,
         owner: None,
         workstream: None,
+        start_date: None,
         due_date: None,
+        milestone: None,
         status: None,
         expected_version,
     }
@@ -1524,4 +1528,139 @@ async fn canceled_milestone_is_final() {
     .await
     .unwrap();
     assert_eq!(page.items.len(), 1);
+}
+
+#[tokio::test]
+async fn action_start_after_due_is_refused() {
+    let memory = Memory::default();
+    let (may, june) = (jiff::civil::date(2030, 5, 1), jiff::civil::date(2030, 6, 1));
+    let late_start = NewAction {
+        start_date: Some(june),
+        due_date: Some(may),
+        ..new_action(OWNER, None)
+    };
+    let result = action_by(&memory, OWNER, late_start).await;
+    assert_eq!(fields(result), field("start_date", "start-after-due"));
+
+    // The same day is in order. A change checks the dates that the action has after the change.
+    let action = action_by(
+        &memory,
+        OWNER,
+        NewAction {
+            start_date: Some(may),
+            due_date: Some(may),
+            ..new_action(OWNER, None)
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(action.fields.start_date, Some(may));
+    let earlier_due = ActionChange {
+        due_date: Some(Some(jiff::civil::date(2030, 4, 1))),
+        ..no_change(action.version)
+    };
+    let result = change_action_by(&memory, OWNER, action.id, earlier_due).await;
+    assert_eq!(fields(result), field("start_date", "start-after-due"));
+    let moved = ActionChange {
+        start_date: Some(Some(june)),
+        due_date: Some(None),
+        ..no_change(action.version)
+    };
+    let moved = change_action_by(&memory, OWNER, action.id, moved)
+        .await
+        .unwrap();
+    assert_eq!(
+        (moved.fields.start_date, moved.fields.due_date),
+        (Some(june), None)
+    );
+}
+
+/// A milestone of another event: the store of the event does not find it.
+fn foreign_milestone() -> MilestoneId {
+    MilestoneId::from_uuid(Uuid::from_u128(300))
+}
+
+#[tokio::test]
+async fn action_cannot_name_a_milestone_of_another_event() {
+    let memory = Memory::default();
+    let foreign = NewAction {
+        milestone: Some(foreign_milestone()),
+        ..new_action(OWNER, None)
+    };
+    let result = action_by(&memory, OWNER, foreign).await;
+    assert_eq!(fields(result), field("milestone", "unknown-record"));
+
+    let milestone = milestone_by(&memory, OWNER, new_milestone(OWNER, None))
+        .await
+        .unwrap();
+    let action = action_by(
+        &memory,
+        OWNER,
+        NewAction {
+            milestone: Some(milestone.id),
+            ..new_action(OWNER, None)
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(action.fields.milestone_id, Some(milestone.id));
+    let change = ActionChange {
+        milestone: Some(Some(foreign_milestone())),
+        ..no_change(action.version)
+    };
+    let result = change_action_by(&memory, OWNER, action.id, change).await;
+    assert_eq!(fields(result), field("milestone", "unknown-record"));
+    let cleared = ActionChange {
+        milestone: Some(None),
+        ..no_change(action.version)
+    };
+    let cleared = change_action_by(&memory, OWNER, action.id, cleared)
+        .await
+        .unwrap();
+    assert_eq!(cleared.fields.milestone_id, None);
+}
+
+#[tokio::test]
+async fn action_cannot_name_a_canceled_milestone() {
+    let memory = Memory::default();
+    let milestone = milestone_by(&memory, OWNER, new_milestone(OWNER, None))
+        .await
+        .unwrap();
+    let action = action_by(
+        &memory,
+        OWNER,
+        NewAction {
+            milestone: Some(milestone.id),
+            ..new_action(OWNER, None)
+        },
+    )
+    .await
+    .unwrap();
+    milestone_status(
+        &memory,
+        milestone.id,
+        MilestoneStatus::Canceled,
+        milestone.version,
+    )
+    .await
+    .unwrap();
+    let result = action_by(
+        &memory,
+        OWNER,
+        NewAction {
+            milestone: Some(milestone.id),
+            ..new_action(OWNER, None)
+        },
+    )
+    .await;
+    assert_eq!(fields(result), field("milestone", "unknown-record"));
+    // The existing link stays, and a change of another field keeps it.
+    let change = ActionChange {
+        title: Some("Zelt bestellen".to_owned()),
+        ..no_change(action.version)
+    };
+    let changed = change_action_by(&memory, OWNER, action.id, change)
+        .await
+        .unwrap();
+    assert_eq!(changed.fields.milestone_id, Some(milestone.id));
 }

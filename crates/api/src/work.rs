@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use tada_app::caller::MemberCaller;
 use tada_app::dispute_notes::{DisputeNotes, NoteKey};
 use tada_app::domain::ids::{
-    ActionId, CommitmentId, EventId, InstitutionId, PersonId, UserId, WorkstreamId,
+    ActionId, CommitmentId, EventId, InstitutionId, MilestoneId, PersonId, UserId, WorkstreamId,
 };
 use tada_app::domain::parties::Party;
 use tada_app::domain::work::{
@@ -158,7 +158,11 @@ pub struct Action {
     /// The member who owns the action: a contributor or manager of the event.
     pub owner_user_id: Uuid,
     pub workstream_id: Option<Uuid>,
+    /// Not after `due_date`.
+    pub start_date: Option<civil::Date>,
     pub due_date: Option<civil::Date>,
+    /// A milestone of the event. The link stays when the milestone is canceled later.
+    pub milestone_id: Option<Uuid>,
     pub status: ActionStatus,
     /// The record version. A change needs it.
     pub version: i64,
@@ -195,7 +199,9 @@ impl From<Shown<ActionView>> for Action {
             description: fields.description.map(|text| text.as_str().to_owned()),
             owner_user_id: fields.owner.as_uuid(),
             workstream_id: fields.workstream_id.map(WorkstreamId::as_uuid),
+            start_date: fields.start_date,
             due_date: fields.due_date,
+            milestone_id: fields.milestone_id.map(MilestoneId::as_uuid),
             status: fields.status.into(),
             version: action.version.get(),
             evidence: evidence
@@ -393,7 +399,11 @@ pub struct CreateActionRequest {
     pub owner_user_id: Uuid,
     /// An active workstream of the event.
     pub workstream_id: Option<Uuid>,
+    /// Not after `due_date`, else the field code is `start-after-due`.
+    pub start_date: Option<civil::Date>,
     pub due_date: Option<civil::Date>,
+    /// A milestone of the event that is not canceled, else the field code is `unknown-record`.
+    pub milestone_id: Option<Uuid>,
 }
 
 /// Tells an absent field from a field that is `null`: the first keeps the value, the second clears it.
@@ -416,9 +426,17 @@ pub struct ChangeActionRequest {
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<Uuid>)]
     pub workstream_id: Option<Option<Uuid>>,
+    /// Not after the due date that the action has after the change, else the field code is `start-after-due`.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<civil::Date>)]
+    pub start_date: Option<Option<civil::Date>>,
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<civil::Date>)]
     pub due_date: Option<Option<civil::Date>>,
+    /// A milestone of the event that is not canceled, else the field code is `unknown-record`.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<Uuid>)]
+    pub milestone_id: Option<Option<Uuid>>,
     pub status: Option<ActionStatus>,
     #[schema(minimum = 1)]
     pub expected_version: i64,
@@ -573,7 +591,9 @@ async fn create_action(
         description: request.description,
         owner: UserId::from_uuid(request.owner_user_id),
         workstream: request.workstream_id.map(WorkstreamId::from_uuid),
+        start_date: request.start_date,
         due_date: request.due_date,
+        milestone: request.milestone_id.map(MilestoneId::from_uuid),
     };
     let action =
         app::create_action(&caller, EventId::from_uuid(event_id), input, ports(&state)).await?;
@@ -640,7 +660,11 @@ async fn change_action(
         workstream: request
             .workstream_id
             .map(|id| id.map(WorkstreamId::from_uuid)),
+        start_date: request.start_date,
         due_date: request.due_date,
+        milestone: request
+            .milestone_id
+            .map(|id| id.map(MilestoneId::from_uuid)),
         status: request.status.map(DomainActionStatus::from),
         expected_version: record_version(request.expected_version)?,
     };

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, event_id, local_number, title, description, owner_user_id, workstream_id,\n                  due_date AS \"due_date: jiff_sqlx::Date\", status, version\n           FROM action\n           WHERE organization_id = $1\n             AND ($2::uuid IS NULL OR event_id = $2)\n             AND ($3::uuid IS NULL OR id = $3)\n             AND ($4::uuid IS NULL OR owner_user_id = $4)\n             AND ($5::text IS NULL OR status = $5)\n             AND ($6::uuid IS NULL OR workstream_id = $6)\n             AND local_number > $7\n             AND (NOT $8 OR status IN ('open', 'in-progress', 'blocked'))\n             AND ($10::uuid[] IS NULL OR event_id = ANY($10))\n           ORDER BY event_id, local_number\n           LIMIT $9",
+  "query": "SELECT id, event_id, local_number, title, description, owner_user_id, workstream_id,\n                  start_date AS \"start_date: jiff_sqlx::Date\", due_date AS \"due_date: jiff_sqlx::Date\",\n                  milestone_id, status, version\n           FROM action\n           WHERE organization_id = $1\n             AND ($2::uuid IS NULL OR event_id = $2)\n             AND ($3::uuid IS NULL OR id = $3)\n             AND ($4::uuid IS NULL OR owner_user_id = $4)\n             AND ($5::text IS NULL OR status = $5)\n             AND ($6::uuid IS NULL OR workstream_id = $6)\n             AND local_number > $7\n             AND (NOT $8 OR status IN ('open', 'in-progress', 'blocked'))\n             AND ($10::uuid[] IS NULL OR event_id = ANY($10))\n           ORDER BY event_id, local_number\n           LIMIT $9",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,17 @@
       },
       {
         "ordinal": 7,
+        "name": "start_date: jiff_sqlx::Date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "action",
+            "name": "start_date"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "due_date: jiff_sqlx::Date",
         "type_info": "Date",
         "origin": {
@@ -92,7 +103,18 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
+        "name": "milestone_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "action",
+            "name": "milestone_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -103,7 +125,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 11,
         "name": "version",
         "type_info": "Int8",
         "origin": {
@@ -137,9 +159,11 @@
       false,
       true,
       true,
+      true,
+      true,
       false,
       false
     ]
   },
-  "hash": "c2c14f0ad8ea53a30fd28ad78b472c11a921736303163351adc7508e69fe0a72"
+  "hash": "f02478bef7cefed08e396a589810cfc4998c08b9e417258f566c2de5feb4565d"
 }

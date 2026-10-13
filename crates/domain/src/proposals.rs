@@ -98,6 +98,7 @@ pub enum Operation {
         phone: Option<PhoneNumber>,
     },
     /// Create an action of an event with its owner (ADR 0068). It starts `open`.
+    /// The start date is not after the due date, and the milestone is one of the same event (ADR 0080).
     CreateAction {
         id: ActionId,
         event_id: EventId,
@@ -105,7 +106,9 @@ pub enum Operation {
         description: Option<ActionDescription>,
         owner: UserId,
         workstream: Option<WorkstreamId>,
+        start_date: Option<Date>,
         due_date: Option<Date>,
+        milestone: Option<MilestoneId>,
     },
     /// Create a commitment of an event (ADR 0068). It starts `conditional` with a condition, else `firm`.
     CreateCommitment {
@@ -130,6 +133,13 @@ pub enum Operation {
         event_id: EventId,
         action_id: ActionId,
         due_date: Option<Date>,
+        expected_version: RecordVersion,
+    },
+    /// Set or clear the milestone of an action (ADR 0080).
+    ChangeActionMilestone {
+        event_id: EventId,
+        action_id: ActionId,
+        milestone: Option<MilestoneId>,
         expected_version: RecordVersion,
     },
     /// Change the status of a commitment. A change to `firm` is the AI path for "condition met" (ADR 0068).
@@ -244,6 +254,7 @@ impl Operation {
             | Self::CreateDocumentDraft { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
+            | Self::ChangeActionMilestone { .. }
             | Self::ChangeCommitmentStatus { .. }
             | Self::ChangeMilestoneStatus { .. } => None,
         }
@@ -265,6 +276,7 @@ impl Operation {
             | Self::CreateWorkstream { event_id, .. }
             | Self::ChangeActionStatus { event_id, .. }
             | Self::ChangeActionDue { event_id, .. }
+            | Self::ChangeActionMilestone { event_id, .. }
             | Self::ChangeCommitmentStatus { event_id, .. }
             | Self::CreateMilestone { event_id, .. }
             | Self::ChangeMilestoneStatus { event_id, .. } => Some(*event_id),
@@ -284,7 +296,8 @@ impl Operation {
     pub fn changed_record(&self) -> Option<RecordRef> {
         match self {
             Self::ChangeActionStatus { action_id, .. }
-            | Self::ChangeActionDue { action_id, .. } => Some(RecordRef::Action(*action_id)),
+            | Self::ChangeActionDue { action_id, .. }
+            | Self::ChangeActionMilestone { action_id, .. } => Some(RecordRef::Action(*action_id)),
             Self::ChangeCommitmentStatus { commitment_id, .. } => {
                 Some(RecordRef::Commitment(*commitment_id))
             }
@@ -325,6 +338,7 @@ impl Operation {
             | Self::CreateWorkstream { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
+            | Self::ChangeActionMilestone { .. }
             | Self::ChangeCommitmentStatus { .. }
             | Self::ChangeMilestoneStatus { .. } => None,
         }
@@ -347,6 +361,7 @@ impl Operation {
             | Self::CreateCommitment { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
+            | Self::ChangeActionMilestone { .. }
             | Self::ChangeCommitmentStatus { .. }
             | Self::CreateMilestone { .. }
             | Self::ChangeMilestoneStatus { .. } => false,
@@ -354,14 +369,20 @@ impl Operation {
     }
 
     /// The records that the operation names and that a proposal of the same changeset can create
-    /// (ADR 0067, rule 5): the promisor of a new commitment.
+    /// (ADR 0067, rule 5): the promisor of a new commitment and the milestone of an action (ADR 0081).
     pub fn references(&self) -> Vec<NewRecord> {
-        self.promisor()
-            .map(|promisor| match promisor {
-                Party::Person(id) => NewRecord::Person(id),
-                Party::Institution(id) => NewRecord::Institution(id),
-            })
+        let promisor = self.promisor().map(|promisor| match promisor {
+            Party::Person(id) => NewRecord::Person(id),
+            Party::Institution(id) => NewRecord::Institution(id),
+        });
+        let milestone = match self {
+            Self::CreateAction { milestone, .. }
+            | Self::ChangeActionMilestone { milestone, .. } => milestone.map(NewRecord::Milestone),
+            _ => None,
+        };
+        promisor
             .into_iter()
+            .chain(milestone)
             .collect()
     }
 
@@ -382,6 +403,7 @@ impl Operation {
             | Self::CreateWorkstream { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
+            | Self::ChangeActionMilestone { .. }
             | Self::ChangeCommitmentStatus { .. }
             | Self::CreateMilestone { .. }
             | Self::ChangeMilestoneStatus { .. } => None,
@@ -675,6 +697,39 @@ mod tests {
             field_id: FieldDefinitionId::from_uuid(Uuid::from_u128(50)),
         };
         assert!(deprecation.references().is_empty());
+    }
+
+    #[test]
+    fn an_action_names_its_milestone_and_a_milestone_change_changes_the_action() {
+        let milestone = MilestoneId::from_uuid(Uuid::from_u128(70));
+        let action = ActionId::from_uuid(Uuid::from_u128(30));
+        let create = Operation::CreateAction {
+            id: action,
+            event_id: event(),
+            title: ActionTitle::parse("Zelt bestellen").unwrap(),
+            description: None,
+            owner: UserId::from_uuid(Uuid::from_u128(1)),
+            workstream: None,
+            start_date: None,
+            due_date: None,
+            milestone: Some(milestone),
+        };
+        assert_eq!(create.references(), [NewRecord::Milestone(milestone)]);
+        let change = Operation::ChangeActionMilestone {
+            event_id: event(),
+            action_id: action,
+            milestone: Some(milestone),
+            expected_version: version(),
+        };
+        assert_eq!(change.references(), [NewRecord::Milestone(milestone)]);
+        assert_eq!(change.changed_record(), Some(RecordRef::Action(action)));
+        let cleared = Operation::ChangeActionMilestone {
+            event_id: event(),
+            action_id: action,
+            milestone: None,
+            expected_version: version(),
+        };
+        assert!(cleared.references().is_empty());
     }
 
     #[test]

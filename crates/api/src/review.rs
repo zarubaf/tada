@@ -505,7 +505,12 @@ pub enum Operation {
         #[serde(skip_serializing_if = "Option::is_none")]
         workstream: Option<Uuid>,
         #[serde(skip_serializing_if = "Option::is_none")]
+        start_date: Option<jiff::civil::Date>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         due_date: Option<jiff::civil::Date>,
+        /// A milestone of the event, or a new milestone of the same changeset.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        milestone: Option<Uuid>,
     },
     /// A new commitment of the event. With a condition it starts `conditional`, else `firm`.
     CreateCommitment {
@@ -574,6 +579,15 @@ pub enum Operation {
         /// `open`, `reached` or `canceled`.
         status: String,
         /// The version of the milestone that the proposal expects.
+        expected_version: i64,
+    },
+    ChangeActionMilestone {
+        event_id: Uuid,
+        action_id: Uuid,
+        /// The new milestone. It is absent if the proposal clears the milestone.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        milestone: Option<Uuid>,
+        /// The version of the action that the proposal expects.
         expected_version: i64,
     },
 }
@@ -744,7 +758,9 @@ impl From<&DomainOperation> for Operation {
                 description,
                 owner,
                 workstream,
+                start_date,
                 due_date,
+                milestone,
             } => Self::CreateAction {
                 id: id.as_uuid(),
                 event_id: event_id.as_uuid(),
@@ -752,7 +768,9 @@ impl From<&DomainOperation> for Operation {
                 description: description.as_ref().map(|text| text.as_str().to_owned()),
                 owner: owner.as_uuid(),
                 workstream: workstream.map(|id| id.as_uuid()),
+                start_date: *start_date,
                 due_date: *due_date,
+                milestone: milestone.map(|id| id.as_uuid()),
             },
             DomainOperation::CreateCommitment {
                 id,
@@ -793,6 +811,17 @@ impl From<&DomainOperation> for Operation {
                 event_id: event_id.as_uuid(),
                 action_id: action_id.as_uuid(),
                 due_date: *due_date,
+                expected_version: expected_version.get(),
+            },
+            DomainOperation::ChangeActionMilestone {
+                event_id,
+                action_id,
+                milestone,
+                expected_version,
+            } => Self::ChangeActionMilestone {
+                event_id: event_id.as_uuid(),
+                action_id: action_id.as_uuid(),
+                milestone: milestone.map(|id| id.as_uuid()),
                 expected_version: expected_version.get(),
             },
             DomainOperation::ChangeCommitmentStatus {
@@ -1130,6 +1159,7 @@ fn review_stores(state: &ApiState) -> ReviewStores<'_> {
         sources: state.sources.as_ref(),
         workstreams: state.workstreams.as_ref(),
         work: state.work.as_ref(),
+        milestones: state.milestones.as_ref(),
         parties: state.parties.as_ref(),
     }
 }

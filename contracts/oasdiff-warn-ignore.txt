@@ -1,6 +1,6 @@
 # Changes that oasdiff reports as warnings but that ADR 0017 allows. Each line names the method, the path and the
 # change as oasdiff prints them.
 # Remove an entry when main contains the change.
-# The descriptions of `workstream` in `create-action` and `create-commitment` name a new workstream of the changeset.
-# A changed description makes oasdiff see one kind removed and one added; the schema itself does not change.
-POST /api/v1/events/{event_id}/changesets removed `subschema #10, subschema #11` from the `allOf[subschema #1]/proposals/items/operation` request property `oneOf` list
+# ADR 0081: `create-action` gets the optional `start_date` and `milestone`. oasdiff matches the kinds of the list by
+# their schema, so it sees the changed kind as one removed and one added. A client that sends the old kind still passes.
+POST /api/v1/events/{event_id}/changesets removed `subschema #10` from the `allOf[subschema #1]/proposals/items/operation` request property `oneOf` list

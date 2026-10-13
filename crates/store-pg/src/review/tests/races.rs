@@ -327,6 +327,7 @@ async fn an_apply_waits_for_a_running_redaction_of_its_proposal() {
             sources: &database,
             workstreams: &database,
             work: &database,
+            milestones: &database,
             parties: &database,
         };
         apply_changeset(&manager, changeset.id, select(&[id]), stores, &FixedClock).await

@@ -8,21 +8,24 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer};
 use tada_domain::identity::Email;
-use tada_domain::ids::{UserId, WorkstreamId};
+use tada_domain::ids::{MilestoneId, UserId, WorkstreamId};
 use tada_domain::parties::{PartyName, PhoneNumber};
 use tada_domain::proposals::Operation;
 use tada_domain::records::MilestoneTitle;
-use tada_domain::work::{ActionDescription, ActionTitle, CommitmentText, ConditionText};
+use tada_domain::work::{
+    ActionDescription, ActionTitle, CommitmentText, ConditionText, dates_in_order,
+};
 use uuid::Uuid;
 
 use crate::parties::email_code;
 use crate::problem::FieldError;
-use crate::proposals::{parse_date, text_error_code};
+use crate::proposals::{START_AFTER_DUE, parse_date, text_error_code};
 
 /// The fields of a proposed record that the reviewer replaces. An absent field keeps the proposed value;
 /// `null` clears an optional field.
 ///
-/// - `create-action`: `title`, `description`, `due_date`, `owner`, `workstream`.
+/// - `create-action`: `title`, `description`, `start_date`, `due_date`, `milestone`, `owner`, `workstream`.
+///   The start date is not after the due date; the milestone is one of the event that is not canceled.
 /// - `create-commitment`: `text`, `condition`, `due_date`, `owner`, `workstream`.
 ///   A condition makes the commitment start `conditional`. An edit cannot remove the condition of a proposed commitment.
 /// - `create-person` and `create-institution`: `name`, `email`, `phone`.
@@ -36,7 +39,13 @@ pub struct RecordEditInput {
     pub description: Option<Option<String>>,
     /// A date as `YYYY-MM-DD`.
     #[serde(default, deserialize_with = "present")]
+    pub start_date: Option<Option<String>>,
+    /// A date as `YYYY-MM-DD`.
+    #[serde(default, deserialize_with = "present")]
     pub due_date: Option<Option<String>>,
+    /// A milestone of the event that is not canceled.
+    #[serde(default, deserialize_with = "present")]
+    pub milestone: Option<Option<Uuid>>,
     /// The date of a milestone as `YYYY-MM-DD`.
     #[serde(default)]
     pub date: Option<String>,
@@ -75,9 +84,15 @@ fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
 /// The fields of the operation that a reviewer can edit. Empty for an operation without a record edit.
 pub(super) fn editable_fields(operation: &Operation) -> &'static [&'static str] {
     match operation {
-        Operation::CreateAction { .. } => {
-            &["title", "description", "due_date", "owner", "workstream"]
-        }
+        Operation::CreateAction { .. } => &[
+            "title",
+            "description",
+            "start_date",
+            "due_date",
+            "milestone",
+            "owner",
+            "workstream",
+        ],
         Operation::CreateCommitment { .. } => {
             &["text", "condition", "due_date", "owner", "workstream"]
         }
@@ -152,7 +167,9 @@ pub(super) fn edit_record(
     let given = [
         ("title", edit.title.is_some()),
         ("description", edit.description.is_some()),
+        ("start_date", edit.start_date.is_some()),
         ("due_date", edit.due_date.is_some()),
+        ("milestone", edit.milestone.is_some()),
         ("date", edit.date.is_some()),
         ("owner", edit.owner.is_some()),
         ("workstream", edit.workstream.is_some()),
@@ -171,7 +188,9 @@ pub(super) fn edit_record(
     let RecordEditInput {
         title,
         description,
+        start_date,
         due_date,
+        milestone,
         date,
         owner,
         workstream,
@@ -189,34 +208,52 @@ pub(super) fn edit_record(
             description: current_description,
             owner: current_owner,
             workstream: current_workstream,
+            start_date: current_start_date,
             due_date: current_due_date,
-        } => Operation::CreateAction {
-            id,
-            event_id,
-            title: errors.replace(
-                "title",
-                current_title,
-                title,
-                ActionTitle::parse,
-                text_error_code,
-            ),
-            description: errors.replace_optional(
-                "description",
-                current_description,
-                description,
-                ActionDescription::parse,
-                text_error_code,
-            ),
-            owner: owner.map_or(current_owner, UserId::from_uuid),
-            workstream: workstream.map_or(current_workstream, |id| id.map(WorkstreamId::from_uuid)),
-            due_date: errors.replace_optional(
+            milestone: current_milestone,
+        } => {
+            let start_date = errors.replace_optional(
+                "start_date",
+                current_start_date,
+                start_date,
+                parse_date,
+                |_| "date",
+            );
+            let due_date = errors.replace_optional(
                 "due_date",
                 current_due_date,
                 due_date,
                 parse_date,
                 |_| "date",
-            ),
-        },
+            );
+            if !dates_in_order(start_date, due_date) {
+                errors.push("start_date", START_AFTER_DUE);
+            }
+            Operation::CreateAction {
+                id,
+                event_id,
+                title: errors.replace(
+                    "title",
+                    current_title,
+                    title,
+                    ActionTitle::parse,
+                    text_error_code,
+                ),
+                description: errors.replace_optional(
+                    "description",
+                    current_description,
+                    description,
+                    ActionDescription::parse,
+                    text_error_code,
+                ),
+                owner: owner.map_or(current_owner, UserId::from_uuid),
+                workstream: workstream
+                    .map_or(current_workstream, |id| id.map(WorkstreamId::from_uuid)),
+                start_date,
+                due_date,
+                milestone: milestone.map_or(current_milestone, |id| id.map(MilestoneId::from_uuid)),
+            }
+        }
         Operation::CreateCommitment {
             id,
             event_id,

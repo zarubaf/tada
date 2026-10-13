@@ -114,7 +114,8 @@ pub(super) fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEven
             Some((AuditAction::WorkstreamCreate, id.as_uuid()))
         }
         Operation::ChangeActionStatus { action_id, .. }
-        | Operation::ChangeActionDue { action_id, .. } => {
+        | Operation::ChangeActionDue { action_id, .. }
+        | Operation::ChangeActionMilestone { action_id, .. } => {
             Some((AuditAction::ActionChange, action_id.as_uuid()))
         }
         Operation::ChangeCommitmentStatus {

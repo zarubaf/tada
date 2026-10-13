@@ -103,6 +103,7 @@ enum OperationRecord {
         email: Option<String>,
         phone: Option<String>,
     },
+    /// `start_date` and `milestone` are absent in the records of older releases; they read as `None`.
     CreateAction {
         id: Uuid,
         event_id: Uuid,
@@ -111,6 +112,8 @@ enum OperationRecord {
         owner: Uuid,
         workstream: Option<Uuid>,
         due_date: Option<String>,
+        start_date: Option<String>,
+        milestone: Option<Uuid>,
     },
     CreateCommitment {
         id: Uuid,
@@ -132,6 +135,12 @@ enum OperationRecord {
         event_id: Uuid,
         action_id: Uuid,
         due_date: Option<String>,
+        expected_version: i64,
+    },
+    ChangeActionMilestone {
+        event_id: Uuid,
+        action_id: Uuid,
+        milestone: Option<Uuid>,
         expected_version: i64,
     },
     ChangeCommitmentStatus {
@@ -307,7 +316,9 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             description,
             owner,
             workstream,
+            start_date,
             due_date,
+            milestone,
         } => OperationRecord::CreateAction {
             id: id.as_uuid(),
             event_id: event_id.as_uuid(),
@@ -316,6 +327,8 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             owner: owner.as_uuid(),
             workstream: workstream.map(WorkstreamId::as_uuid),
             due_date: due_date.map(|date| date.to_string()),
+            start_date: start_date.map(|date| date.to_string()),
+            milestone: milestone.map(MilestoneId::as_uuid),
         },
         Operation::CreateCommitment {
             id,
@@ -359,6 +372,17 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             event_id: event_id.as_uuid(),
             action_id: action_id.as_uuid(),
             due_date: due_date.map(|date| date.to_string()),
+            expected_version: expected_version.get(),
+        },
+        Operation::ChangeActionMilestone {
+            event_id,
+            action_id,
+            milestone,
+            expected_version,
+        } => OperationRecord::ChangeActionMilestone {
+            event_id: event_id.as_uuid(),
+            action_id: action_id.as_uuid(),
+            milestone: milestone.map(MilestoneId::as_uuid),
             expected_version: expected_version.get(),
         },
         Operation::ChangeCommitmentStatus {
@@ -548,6 +572,8 @@ pub(crate) fn operation_from_json(
             owner,
             workstream,
             due_date,
+            start_date,
+            milestone,
         } => Operation::CreateAction {
             id: ActionId::from_uuid(id),
             event_id: EventId::from_uuid(event_id),
@@ -555,7 +581,9 @@ pub(crate) fn operation_from_json(
             description: parsed(description, ActionDescription::parse)?,
             owner: UserId::from_uuid(owner),
             workstream: workstream.map(WorkstreamId::from_uuid),
+            start_date: parsed(start_date, |text| text.parse())?,
             due_date: parsed(due_date, |text| text.parse())?,
+            milestone: milestone.map(MilestoneId::from_uuid),
         },
         OperationRecord::CreateCommitment {
             id,
@@ -599,6 +627,17 @@ pub(crate) fn operation_from_json(
             event_id: EventId::from_uuid(event_id),
             action_id: ActionId::from_uuid(action_id),
             due_date: parsed(due_date, |text| text.parse())?,
+            expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+        },
+        OperationRecord::ChangeActionMilestone {
+            event_id,
+            action_id,
+            milestone,
+            expected_version,
+        } => Operation::ChangeActionMilestone {
+            event_id: EventId::from_uuid(event_id),
+            action_id: ActionId::from_uuid(action_id),
+            milestone: milestone.map(MilestoneId::from_uuid),
             expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
         },
         OperationRecord::ChangeCommitmentStatus {
@@ -693,6 +732,11 @@ fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>) {
             ..
         }
         | Operation::ChangeActionDue {
+            action_id,
+            expected_version,
+            ..
+        }
+        | Operation::ChangeActionMilestone {
             action_id,
             expected_version,
             ..
@@ -1913,7 +1957,15 @@ mod tests {
                 description: Some(ActionDescription::parse("Mit der Gemeinde.\nBald.").unwrap()),
                 owner: UserId::from_uuid(Uuid::now_v7()),
                 workstream: Some(WorkstreamId::from_uuid(Uuid::now_v7())),
+                start_date: Some(jiff::civil::date(2030, 4, 1)),
                 due_date: Some(jiff::civil::date(2030, 4, 30)),
+                milestone: Some(MilestoneId::from_uuid(Uuid::now_v7())),
+            },
+            Operation::ChangeActionMilestone {
+                event_id: event,
+                action_id: ActionId::from_uuid(Uuid::now_v7()),
+                milestone: None,
+                expected_version: RecordVersion::FIRST,
             },
             Operation::CreateCommitment {
                 id: CommitmentId::from_uuid(Uuid::now_v7()),
@@ -1979,5 +2031,20 @@ mod tests {
         });
         assert!(operation_from_json(OPERATION_VERSION + 1, &json).is_err());
         assert!(operation_from_json(OPERATION_VERSION, &json!({"kind": "set_fact"})).is_err());
+        // An action of an older release has no start date and no milestone.
+        let older = json!({
+            "kind": "create_action", "id": Uuid::now_v7(), "event_id": event.as_uuid(),
+            "title": "Zelt bestellen", "description": null, "owner": Uuid::now_v7(),
+            "workstream": null, "due_date": "2030-04-30",
+        });
+        let Operation::CreateAction {
+            start_date,
+            milestone,
+            ..
+        } = operation_from_json(OPERATION_VERSION, &older).unwrap()
+        else {
+            panic!("not an action");
+        };
+        assert_eq!((start_date, milestone), (None, None));
     }
 }

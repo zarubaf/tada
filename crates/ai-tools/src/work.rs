@@ -18,7 +18,7 @@ use tada_app::ai_queries;
 use tada_app::caller::AiCaller;
 use tada_app::dispute_notes::{DisputeNotes, NoteKey};
 use tada_app::domain::events::EventKey;
-use tada_app::domain::ids::{UserId, WorkstreamId};
+use tada_app::domain::ids::{MilestoneId, UserId, WorkstreamId};
 use tada_app::domain::parties::{Party, PartyName};
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{
@@ -204,7 +204,11 @@ pub(super) struct ActionItem {
     description: Option<String>,
     owner_user_id: Uuid,
     workstream_id: Option<Uuid>,
+    /// Not after `due_date`.
+    start_date: Option<String>,
     due_date: Option<String>,
+    /// The ID of the milestone of the action, from `list_milestones`.
+    milestone_id: Option<Uuid>,
     /// `open`, `in-progress`, `blocked`, `done` or `canceled`.
     status: &'static str,
     version: i64,
@@ -226,7 +230,9 @@ impl From<&Shown<ActionView>> for ActionItem {
                 .map(|text| text.as_str().to_owned()),
             owner_user_id: fields.owner.as_uuid(),
             workstream_id: fields.workstream_id.map(WorkstreamId::as_uuid),
+            start_date: fields.start_date.map(|date| date.to_string()),
             due_date: fields.due_date.map(|date| date.to_string()),
+            milestone_id: fields.milestone_id.map(MilestoneId::as_uuid),
             status: fields.status.as_str(),
             version: action.version.get(),
             evidence: evidence(shown),

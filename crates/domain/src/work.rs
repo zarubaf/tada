@@ -94,6 +94,15 @@ status_enum!(
     }
 );
 
+/// True if an action can have these dates (ADR 0080): the start date is not after the due date.
+/// An action without one of the dates passes.
+pub fn dates_in_order(start: Option<jiff::civil::Date>, due: Option<jiff::civil::Date>) -> bool {
+    match (start, due) {
+        (Some(start), Some(due)) => start <= due,
+        _ => true,
+    }
+}
+
 /// A status change that the transitions of ADR 0068 do not allow.
 /// A change to the same status is not a transition either.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -379,6 +388,16 @@ mod tests {
             ActionDescription::parse("a\u{7}"),
             Err(TextError::ControlCharacter)
         );
+    }
+
+    #[test]
+    fn the_start_of_an_action_is_not_after_its_due_date() {
+        let (may, june) = (jiff::civil::date(2030, 5, 1), jiff::civil::date(2030, 6, 1));
+        assert!(dates_in_order(Some(may), Some(june)));
+        assert!(dates_in_order(Some(may), Some(may)));
+        assert!(!dates_in_order(Some(june), Some(may)));
+        assert!(dates_in_order(Some(june), None));
+        assert!(dates_in_order(None, Some(may)));
     }
 
     #[test]

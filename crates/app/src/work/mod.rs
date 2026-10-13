@@ -14,7 +14,9 @@ use jiff::Timestamp;
 use jiff::civil::Date;
 use tada_domain::RecordVersion;
 use tada_domain::events::EventKey;
-use tada_domain::ids::{ActionId, CommitmentId, EventId, LocalIdKind, UserId, WorkstreamId};
+use tada_domain::ids::{
+    ActionId, CommitmentId, EventId, LocalIdKind, MilestoneId, UserId, WorkstreamId,
+};
 use tada_domain::parties::Party;
 use tada_domain::redaction::Redactable;
 use tada_domain::work::{
@@ -25,7 +27,7 @@ use tada_domain::work::{
 pub use self::actions::{
     ActionChange, NewAction, change_action, create_action, get_action, list_actions,
 };
-pub(crate) use self::checks::{ChangeRights, WorkRecord, is_possible_owner};
+pub(crate) use self::checks::{ChangeRights, WorkRecord, is_possible_owner, milestone_refusal};
 pub use self::commitments::{
     CommitmentChange, FirmInput, NewCommitment, change_commitment, create_commitment,
     get_commitment, list_commitments, make_commitment_firm,
@@ -77,7 +79,11 @@ pub struct ActionFields {
     /// A member of the event with the contributor or manager role.
     pub owner: UserId,
     pub workstream_id: Option<WorkstreamId>,
+    /// Not after `due_date` (ADR 0080).
+    pub start_date: Option<Date>,
     pub due_date: Option<Date>,
+    /// A milestone of the same event. A link stays when the milestone is canceled later.
+    pub milestone_id: Option<MilestoneId>,
     pub status: ActionStatus,
 }
 
