@@ -103,7 +103,19 @@ pub(super) fn editable_fields(operation: &Operation) -> &'static [&'static str] 
         Operation::CreateMilestone { .. } => {
             &["title", "description", "date", "owner", "workstream"]
         }
-        _ => &[],
+        Operation::CreateEvent { .. }
+        | Operation::SetFact { .. }
+        | Operation::AddFieldDefinition { .. }
+        | Operation::AddChoiceValue { .. }
+        | Operation::DeprecateField { .. }
+        | Operation::CreateOpenQuestion { .. }
+        | Operation::CreateDocumentDraft { .. }
+        | Operation::ChangeActionStatus { .. }
+        | Operation::ChangeActionDue { .. }
+        | Operation::ChangeActionMilestone { .. }
+        | Operation::ChangeCommitmentStatus { .. }
+        | Operation::CreateWorkstream { .. }
+        | Operation::ChangeMilestoneStatus { .. } => &[],
     }
 }
 
