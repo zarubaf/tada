@@ -46,6 +46,9 @@ const ActionsPage = lazy(() =>
 const CommitmentsPage = lazy(() =>
   import("./work/CommitmentsPage").then((module) => ({ default: module.CommitmentsPage })),
 );
+const DecisionsPage = lazy(() =>
+  import("./work/DecisionsPage").then((module) => ({ default: module.DecisionsPage })),
+);
 const MilestonesPage = lazy(() =>
   import("./work/MilestonesPage").then((module) => ({ default: module.MilestonesPage })),
 );
@@ -172,6 +175,11 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   <Route path="/events/:eventId/milestones">
                     <RegisterPage api={api}>
                       <MilestonesPage api={api} />
+                    </RegisterPage>
+                  </Route>
+                  <Route path="/events/:eventId/decisions">
+                    <RegisterPage api={api}>
+                      <DecisionsPage api={api} />
                     </RegisterPage>
                   </Route>
                   <Route path="/events/:eventId/workstreams">

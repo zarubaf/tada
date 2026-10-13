@@ -51,8 +51,12 @@
     gap: var(--space-2);
   }
 
-  /* The condition and the reason of a commitment sit under its text. */
-  .condition {
+  /*
+   * The condition and the reason of a commitment sit under its text. The link to the successor and
+   * the reason of a revoked decision sit under its status.
+   */
+  .condition,
+  .statusNote {
     display: block;
     color: var(--color-text-muted);
     font-size: var(--font-size-sm);
@@ -94,5 +98,40 @@
   .meta {
     color: var(--color-text-muted);
     font-size: var(--font-size-sm);
+  }
+
+  /* The wording of a decision keeps its line breaks and wraps inside the cell. */
+  .wording {
+    display: block;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .parties {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .partyList {
+    display: grid;
+    gap: var(--space-1);
+    list-style: none;
+    padding: 0;
+  }
+
+  .party {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    overflow-wrap: anywhere;
+  }
+
+  /* The link to the successor of a decision: the link color and an underline. */
+  .recordLink {
+    white-space: nowrap;
+    color: var(--color-accent-text);
+    text-decoration: underline;
+    text-underline-offset: var(--space-0-5);
   }
 }

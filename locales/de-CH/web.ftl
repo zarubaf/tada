@@ -211,6 +211,7 @@ event-nav-workstreams = Arbeitsbereiche
 register-nav = Register
 register-nav-commitments = Zusagen
 register-nav-milestones = Meilensteine
+register-nav-decisions = Entscheide
 event-overview-loading = Übersicht wird geladen
 event-overview-questions = Offene Fragen
 event-overview-questions-none = Es gibt keine offenen Fragen.
@@ -706,6 +707,16 @@ inbox-op-change-milestone-status = Status eines Meilensteins ändern
 inbox-op-change-action-milestone = Meilenstein einer Aufgabe ändern
 # $name: the name of the new workstream.
 inbox-op-create-workstream = Arbeitsbereich „{ $name }“ anlegen
+inbox-op-create-decision = Entscheid anlegen
+inbox-op-supersede-decision = Entscheid ersetzen
+inbox-op-revoke-decision = Entscheid widerrufen
+inbox-row-wording = Wortlaut
+inbox-row-decided-on = Beschlossen am
+inbox-row-decided-by = Beschlossen von
+inbox-row-decision = Entscheid
+inbox-row-successor = Neuer Entscheid
+inbox-row-reason = Grund
+inbox-edit-decision-fixed = Wortlaut, Datum und Parteien bleiben, wie sie sind. Lehnen Sie den Vorschlag ab, wenn sie nicht stimmen.
 inbox-milestone-removed = Kein Meilenstein
 inbox-row-date = Datum
 inbox-row-start = Startdatum
@@ -936,6 +947,7 @@ work-error-start_date = Das ist kein gültiges Datum.
 work-error-start_date-start-after-due = Das Startdatum liegt nach dem Fälligkeitsdatum. Wählen Sie ein früheres Startdatum.
 work-error-milestone = Wählen Sie einen Meilenstein dieses Anlasses, der nicht abgesagt ist.
 work-error-reason = Geben Sie einen Grund an. Er hat 1 bis 500 Zeichen.
+work-error-reason-control-character = Der Grund enthält ein Zeichen, das nicht erlaubt ist.
 work-error-name = Der Name hat 1 bis 200 Zeichen.
 work-error-name-taken = Diesen Namen gibt es in diesem Anlass schon.
 work-error-lead = Wählen Sie ein Mitglied des Anlasses mit Mitarbeit oder Anlassleitung.
@@ -986,6 +998,75 @@ milestone-warning-late-action = { $id } ist erst danach fällig
 milestone-warning-late-unknown = Eine Aufgabe ist erst danach fällig
 # $version: the record version that the evidence supports.
 milestone-evidence-version = Stützt die Version { $version } des Meilensteins
+
+## Decisions (ADR 0080)
+
+decisions-title = Entscheide
+decisions-loading = Entscheide werden geladen
+decisions-empty-title = Noch keine Entscheide
+decisions-empty-text = Erfassen Sie den ersten Entscheid mit dem Formular unter der Liste.
+decisions-empty-text-read = Die Anlassleitung erfasst die Entscheide dieses Anlasses.
+decision-column-wording = Wortlaut
+decision-column-decided-on = Beschlossen am
+decision-column-decided-by = Beschlossen von
+decision-status-in-force = in Kraft
+decision-status-superseded = ersetzt
+decision-status-revoked = widerrufen
+decision-superseded-by = ersetzt durch
+# $reason: why the decision was revoked.
+decision-revoked-reason-line = Grund: { $reason }
+decision-create-title = Entscheid erfassen
+# $id: the readable ID of the decision that the new one replaces.
+decision-replace-title = { $id } ersetzen
+# $id: the readable ID of the decision that the new one replaces.
+decision-replace-gone = { $id } lässt sich nicht mehr ersetzen. Kopieren Sie den Text, und brechen Sie dann ab.
+# $id: the readable ID of the decision that the new one replaces.
+decision-replace-ended = { $id } lässt sich nicht mehr ersetzen.
+# $id: the readable ID of the decision that the new one replaces.
+decision-replace-stale = Die Fassung von { $id } ist nicht mehr aktuell. Kopieren Sie den Text, und brechen Sie dann ab. Öffnen Sie { $id } danach neu.
+# $id: the readable ID of the decision that the new one replaces.
+decision-replace-note = Der neue Entscheid ersetzt { $id }. Der Wortlaut von { $id } bleibt unverändert; { $id } gilt danach als ersetzt.
+decision-field-wording = Wortlaut (Pflichtfeld)
+decision-field-wording-help = Mehrere Zeilen sind möglich. Der Wortlaut lässt sich später nicht ändern. Ein neuer Entscheid ersetzt ihn. 1 bis 2000 Zeichen.
+decision-field-decided-on = Beschlossen am (Pflichtfeld)
+decision-field-decided-by = Beschlossen von (Pflichtfeld)
+decision-parties-list = Beschlossen von
+# $name: the name of a chosen person or institution.
+parties-remove = { $name } entfernen
+parties-remove-short = Entfernen
+# $name: the name of the person or institution that the member chose.
+parties-added = { $name } hinzugefügt
+# $name: the name of the person or institution that the member removed.
+parties-removed = { $name } entfernt
+decision-replace = Ersetzen
+# $id: the readable ID of the decision.
+decision-replace-of = { $id } ersetzen
+decision-revoke = Widerrufen
+# $id: the readable ID of the decision.
+decision-revoke-of = { $id } widerrufen
+# $id: the readable ID of the decision.
+decision-revoke-title = { $id } widerrufen
+decision-revoke-text = Der Entscheid gilt danach als widerrufen. Ein neuer Entscheid folgt nicht. Der Wortlaut und der Grund bleiben sichtbar.
+decision-revoke-reason = Grund (Pflichtfeld)
+decision-revoke-reason-help = Warum gilt der Entscheid nicht mehr? 1 bis 500 Zeichen.
+decision-wording-more = Ganz zeigen
+decision-wording-less = Kürzen
+# $id: the readable ID of the decision.
+decision-wording-more-of = Wortlaut von { $id } ganz zeigen
+# $id: the readable ID of the decision.
+decision-wording-less-of = Wortlaut von { $id } kürzen
+# $id: the new decision. $old: the decision that it replaces.
+decision-replaced = { $id } ersetzt { $old }.
+# $id: the readable ID of the decision.
+decision-revoked = { $id } ist jetzt widerrufen.
+decision-evidence-version = Stützt die Version { $version } des Entscheids
+decision-error-wording = Der Wortlaut hat 1 bis 2000 Zeichen.
+decision-error-wording-too-long = Der Wortlaut hat höchstens 2000 Zeichen.
+decision-error-wording-control-character = Der Wortlaut enthält ein Zeichen, das nicht erlaubt ist.
+decision-error-decided_on = Geben Sie ein gültiges Datum an.
+decision-error-decided_by = Wählen Sie 1 bis 50 Personen oder Institutionen.
+decision-error-decided_by-too-long = Wählen Sie höchstens 50 Personen oder Institutionen.
+decision-error-decided_by-unknown-record = Diese Person oder Institution gibt es nicht.
 
 timeline-title = Zeitplan
 timeline-empty-title = Noch nichts im Zeitplan

@@ -7,8 +7,14 @@ import {
   IconCircleX,
   IconHourglass,
   IconLock,
+  IconReplace,
 } from "@tabler/icons-react";
-import type { ActionStatus, CommitmentStatus, MilestoneStatus } from "../api/client";
+import type {
+  ActionStatus,
+  CommitmentStatus,
+  DecisionStatus,
+  MilestoneStatus,
+} from "../api/client";
 import { t } from "../i18n";
 import { StatusLabel } from "../ui/StatusLabel";
 
@@ -43,4 +49,14 @@ export function MilestoneStatusLabel({ status }: { status: MilestoneStatus }) {
     canceled: { icon: IconCircleMinus, tone: "muted" },
   } as const;
   return <StatusLabel {...parts[status]}>{t(`milestone-status-${status}`)}</StatusLabel>;
+}
+
+/** A decision in force binds; a superseded or revoked one is history, so it shows muted. */
+export function DecisionStatusLabel({ status }: { status: DecisionStatus }) {
+  const parts = {
+    "in-force": { icon: IconCircleCheck, tone: "success" },
+    superseded: { icon: IconReplace, tone: "muted" },
+    revoked: { icon: IconCircleX, tone: "muted" },
+  } as const;
+  return <StatusLabel {...parts[status]}>{t(`decision-status-${status}`)}</StatusLabel>;
 }

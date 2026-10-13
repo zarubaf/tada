@@ -18,6 +18,7 @@ import {
   WorkstreamSelect,
 } from "../work/fields";
 import styles from "./EditForm.module.css";
+import { DecisionFixedRows } from "./OperationView";
 import {
   type FieldErrors,
   type FieldName,
@@ -77,6 +78,12 @@ function initialValues(operation: RecordOperation): Values {
         title: operation.title,
         description: operation.description ?? "",
         date: operation.date,
+        owner: operation.owner,
+        workstream: operation.workstream ?? NO_WORKSTREAM,
+      };
+    case "create-decision":
+      return {
+        ...base,
         owner: operation.owner,
         workstream: operation.workstream ?? NO_WORKSTREAM,
       };
@@ -214,7 +221,8 @@ function Form({
   const owned =
     operation.kind === "create-action" ||
     operation.kind === "create-commitment" ||
-    operation.kind === "create-milestone";
+    operation.kind === "create-milestone" ||
+    operation.kind === "create-decision";
 
   return (
     <form ref={form} noValidate className={styles.form} onSubmit={submit}>
@@ -223,6 +231,12 @@ function Form({
         <>
           {text("title", t("inbox-row-title"))}
           {text("description", t("inbox-row-description"), { rows: 3 })}
+        </>
+      )}
+      {operation.kind === "create-decision" && (
+        <>
+          <DecisionFixedRows operation={operation} names={names} />
+          <p className={styles.note}>{t("inbox-edit-decision-fixed")}</p>
         </>
       )}
       {operation.kind === "create-milestone" && text("date", t("inbox-row-date"), { type: "date" })}
@@ -299,7 +313,8 @@ export function RecordEditForm(props: RecordEditFormProps) {
   if (
     (operation.kind === "create-action" ||
       operation.kind === "create-commitment" ||
-      operation.kind === "create-milestone") &&
+      operation.kind === "create-milestone" ||
+      operation.kind === "create-decision") &&
     props.eventId
   ) {
     return <WithDirectory {...props} eventId={props.eventId} />;

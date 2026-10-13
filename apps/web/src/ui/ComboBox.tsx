@@ -1,5 +1,7 @@
+import { type RefObject, useContext, useLayoutEffect, useRef } from "react";
 import {
   ComboBox as AriaComboBox,
+  ComboBoxStateContext,
   FieldError,
   Input,
   Label,
@@ -25,10 +27,26 @@ export interface ComboBoxProps {
   placeholder?: string;
   /** Help below the input. */
   help?: string;
+  /** Empties the input after a choice, for a list that collects the choices. */
+  clearOnSelect?: boolean;
   /** The options load: the list says so instead of „no result“. */
   isLoading?: boolean;
   /** The error below the input. It marks the input as invalid. */
   error?: string | undefined;
+}
+
+/**
+ * Closes the list that the empty input opens after a choice. React Aria opens the list when the
+ * text changes while the input has focus, and the list has no prop that stops it.
+ */
+function CloseAfterChoice({ closing }: { closing: RefObject<boolean> }) {
+  const state = useContext(ComboBoxStateContext);
+  useLayoutEffect(() => {
+    if (closing.current && state?.isOpen) {
+      state.close();
+    }
+  });
+  return null;
 }
 
 /**
@@ -44,28 +62,42 @@ export function ComboBox({
   onSelectionChange,
   placeholder,
   help,
+  clearOnSelect,
   isLoading,
   error,
 }: ComboBoxProps) {
+  // True from a choice of a `clearOnSelect` box until the member types or opens the list again.
+  const closing = useRef(false);
   return (
     <AriaComboBox
       className={styles.combo}
       items={options}
       inputValue={inputValue}
-      onInputChange={onInputChange}
+      onInputChange={(text) => {
+        closing.current = false;
+        onInputChange(text);
+      }}
+      onOpenChange={(open, trigger) => {
+        if (open && trigger !== "input") {
+          closing.current = false;
+        }
+      }}
       selectedKey={selectedKey ?? null}
       onSelectionChange={(key) => {
+        closing.current = clearOnSelect === true && key !== null;
         onSelectionChange(key === null ? undefined : String(key));
         // The input shows the chosen option; a controlled input does not follow by itself.
         const chosen = options.find((option) => option.id === key);
         if (chosen) {
-          onInputChange(chosen.label);
+          // Not through the handler of the box: that one ends the closing.
+          onInputChange(clearOnSelect ? "" : chosen.label);
         }
       }}
       menuTrigger="focus"
       allowsEmptyCollection
       isInvalid={error !== undefined || undefined}
     >
+      <CloseAfterChoice closing={closing} />
       <Label className={styles.label}>{label}</Label>
       <Input className={styles.input} {...(placeholder === undefined ? {} : { placeholder })} />
       {help && (

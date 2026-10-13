@@ -37,6 +37,8 @@ export interface Register<T> {
   setLoading: () => void;
   /** Loads the first page again. Resolves to true when it loaded. */
   reload: () => Promise<boolean>;
+  /** The rows of the newest load of the first page; empty when it failed. Read it after `reload`. */
+  lastLoaded: () => T[];
   /** Loads the next page of the list on screen. */
   loadMore: () => Promise<PageOutcome>;
   replace: (item: T) => void;
@@ -58,6 +60,8 @@ export function useRegister<T extends { id: string }>(
   const shown = useRef<{ generation: number; nextCursor: string | undefined }>(undefined);
   // The generation that has a request for the next page on its way: one at a time.
   const busy = useRef<number>(undefined);
+  // The rows that the newest load of the first page brought, for a caller that awaits `reload`.
+  const loadedRows = useRef<T[]>([]);
 
   const show = useCallback((next: RegisterState<T>) => {
     shown.current =
@@ -86,6 +90,7 @@ export function useRegister<T extends { id: string }>(
       next = { kind: "failed", message: problemMessage(undefined), requestId: undefined };
     }
     if (generation === latest.current) {
+      loadedRows.current = next.kind === "loaded" ? next.items : [];
       show(next);
     }
     return next.kind === "loaded";
@@ -151,6 +156,7 @@ export function useRegister<T extends { id: string }>(
     loadingMore,
     setLoading: () => show({ kind: "loading" }),
     reload,
+    lastLoaded: () => loadedRows.current,
     loadMore,
     replace: (item) => update((items) => items.map((i) => (i.id === item.id ? item : i))),
     append: (item) => update((items) => [...items.filter((i) => i.id !== item.id), item]),

@@ -97,6 +97,12 @@ export function operationTitle(operation: Operation, fields: Map<string, FieldIn
       return t("inbox-op-change-action-milestone");
     case "create-workstream":
       return t("inbox-op-create-workstream", { name: operation.name });
+    case "create-decision":
+      return t("inbox-op-create-decision");
+    case "supersede-decision":
+      return t("inbox-op-supersede-decision");
+    case "revoke-decision":
+      return t("inbox-op-revoke-decision");
     default:
       // The list of operations is open: a newer server can send a kind that this client lacks.
       return t("inbox-op-unknown");
@@ -157,6 +163,44 @@ function milestoneStatus(status: string): ReactNode {
 
 function dueText(date: string | null | undefined): string | null {
   return date ? formatDate(date) : null;
+}
+
+/** The wording of a decision keeps its line breaks. */
+function wordingText(wording: string): ReactNode {
+  return <span className={styles.wording}>{wording}</span>;
+}
+
+/** The names of the parties that decided, in their order. */
+function partyNames(
+  operation: Extract<Operation, { kind: "create-decision" }>,
+  names: RecordNames,
+) {
+  const unknown = t("inbox-name-unknown");
+  return operation.decided_by
+    .map((party) => names.party("person" in party ? party.person : party.institution) ?? unknown)
+    .join(", ");
+}
+
+/**
+ * What a reviewer cannot change in a new decision: the wording, the date and the parties. They
+ * are one with the words of the source (ADR 0080).
+ */
+export function DecisionFixedRows({
+  operation,
+  names,
+}: {
+  operation: Extract<Operation, { kind: "create-decision" }>;
+  names: RecordNames;
+}) {
+  return (
+    <Rows
+      rows={[
+        [t("inbox-row-wording"), wordingText(operation.wording)],
+        [t("inbox-row-decided-on"), formatDate(operation.decided_on)],
+        [t("inbox-row-decided-by"), partyNames(operation, names)],
+      ]}
+    />
+  );
 }
 
 /** The data of the proposals that create or change a work record. */
@@ -225,6 +269,39 @@ function WorkRows({ operation, names }: { operation: Operation; names: RecordNam
           rows={[
             [t("inbox-row-name"), operation.name],
             [t("inbox-row-lead"), names.user(operation.lead) ?? unknown],
+          ]}
+        />
+      );
+    case "create-decision":
+      return (
+        <>
+          <DecisionFixedRows operation={operation} names={names} />
+          <Rows
+            rows={[
+              [t("inbox-row-owner"), names.user(operation.owner) ?? unknown],
+              [
+                t("inbox-row-workstream"),
+                operation.workstream ? (names.workstream(operation.workstream) ?? unknown) : null,
+              ],
+            ]}
+          />
+        </>
+      );
+    case "supersede-decision":
+      return (
+        <Rows
+          rows={[
+            [t("inbox-row-decision"), names.record(operation.decision_id) ?? unknown],
+            [t("inbox-row-successor"), names.record(operation.successor) ?? unknown],
+          ]}
+        />
+      );
+    case "revoke-decision":
+      return (
+        <Rows
+          rows={[
+            [t("inbox-row-decision"), names.record(operation.decision_id) ?? unknown],
+            [t("inbox-row-reason"), operation.reason],
           ]}
         />
       );
@@ -446,6 +523,9 @@ export function OperationDetails({
     case "change-milestone-status":
     case "change-action-milestone":
     case "create-workstream":
+    case "create-decision":
+    case "supersede-decision":
+    case "revoke-decision":
       return <WorkRows operation={operation} names={names} />;
     default:
       return <p>{t("value-unsupported")}</p>;

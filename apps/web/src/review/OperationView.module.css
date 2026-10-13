@@ -60,4 +60,10 @@
       gap: var(--space-3);
     }
   }
+
+  /* The wording of a decision keeps its line breaks. */
+  .wording {
+    display: block;
+    white-space: pre-wrap;
+  }
 }

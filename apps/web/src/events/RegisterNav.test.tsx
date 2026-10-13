@@ -29,7 +29,11 @@ describe("RegisterNav", () => {
 
     const nav = screen.getByRole("navigation", { name: "Register" });
     const links = within(nav).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Zusagen", "Meilensteine"]);
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Zusagen",
+      "Meilensteine",
+      "Entscheide",
+    ]);
     expect(within(nav).getByRole("link", { name: "Meilensteine" })).toHaveAttribute(
       "aria-current",
       "page",

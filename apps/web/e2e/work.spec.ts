@@ -193,6 +193,66 @@ const milestones = [
   },
 ];
 
+const party = {
+  kind: "institution",
+  id: "0199b8e0-0000-7000-8000-0000000000f2",
+  local_id: "INS-002",
+  name: "Gemeinde Testwil",
+  redacted: false,
+};
+
+const decisions = [
+  {
+    id: "0199b8e0-0000-7000-8000-000000000301",
+    local_id: "DEC-001",
+    event_id: event?.id,
+    wording:
+      "Das Fest findet bei jedem Wetter statt.\nBei Sturm entscheidet das Organisationskomitee am Vortag über eine Verschiebung auf den Ersatztermin.",
+    redacted: false,
+    decided_on: "2030-03-12",
+    decided_by: [party],
+    owner_user_id: ME,
+    workstream_id: workstreams[0]?.id,
+    status: "in-force",
+    version: 2,
+    evidence: [],
+    can_change: true,
+    can_end: true,
+  },
+  {
+    id: "0199b8e0-0000-7000-8000-000000000302",
+    local_id: "DEC-002",
+    event_id: event?.id,
+    wording: "Es gibt ein Feuerwerk am Samstagabend.",
+    redacted: false,
+    decided_on: "2030-02-01",
+    decided_by: [party],
+    owner_user_id: BERND,
+    status: "revoked",
+    revoked_reason: "Die Gemeinde verbietet das Feuerwerk.",
+    version: 3,
+    evidence: [],
+    can_change: false,
+    can_end: false,
+  },
+  {
+    id: "0199b8e0-0000-7000-8000-000000000303",
+    local_id: "DEC-003",
+    event_id: event?.id,
+    wording: "Das Fest dauert zwei Tage.",
+    redacted: false,
+    decided_on: "2030-01-15",
+    decided_by: [party],
+    owner_user_id: ME,
+    status: "superseded",
+    superseded_by: "0199b8e0-0000-7000-8000-000000000301",
+    version: 3,
+    evidence: [],
+    can_change: false,
+    can_end: false,
+  },
+];
+
 function fulfill(page: Page, pattern: string, body: unknown) {
   return page.route(pattern, (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) }),
@@ -207,6 +267,7 @@ async function fakeWork(page: Page): Promise<void> {
   await fulfill(page, "**/api/v1/events/*/actions*", { items: actions });
   await fulfill(page, "**/api/v1/events/*/commitments*", { items: commitments });
   await fulfill(page, "**/api/v1/events/*/milestones*", { items: milestones });
+  await fulfill(page, "**/api/v1/events/*/decisions*", { items: decisions });
   await fulfill(page, "**/api/v1/persons*", { items: [] });
   await fulfill(page, "**/api/v1/institutions*", { items: [] });
 }
@@ -215,6 +276,7 @@ const pages = [
   { name: "actions", path: "actions", title: "Aufgaben", table: "Aufgaben" },
   { name: "commitments", path: "commitments", title: "Zusagen", table: "Zusagen" },
   { name: "milestones", path: "milestones", title: "Meilensteine", table: "Meilensteine" },
+  { name: "decisions", path: "decisions", title: "Entscheide", table: "Entscheide" },
   { name: "workstreams", path: "workstreams", title: "Arbeitsbereiche", table: "Arbeitsbereiche" },
 ] as const;
 
@@ -267,6 +329,22 @@ for (const theme of themes) {
   });
 }
 
+for (const theme of themes) {
+  test(`revoke dialog, ${theme}: no axe violation`, async ({ page }) => {
+    await fakeSession(page, sessionWithRole("member"));
+    await fakeWork(page);
+    await page.goto(`/events/${event?.id}/decisions`);
+    await setTheme(page, theme);
+
+    await page.getByRole("button", { name: "DEC-001 widerrufen" }).click();
+    await expect(page.getByRole("dialog", { name: "DEC-001 widerrufen" })).toBeVisible();
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(results.violations).toEqual([]);
+  });
+}
+
 // ADR 0024: no text overflows with the 40 % longer pseudo-locale, and the sub-navigation with seven
 // links wraps instead of scrolling sideways.
 for (const viewport of viewports) {
@@ -295,11 +373,150 @@ test("at 320 px the sub-navigation and the register do not scroll sideways", asy
 
   const nav = page.getByRole("navigation", { name: "Anlass" });
   await expect(nav.getByRole("link")).toHaveCount(7);
-  await expect(page.getByRole("navigation", { name: "Register" }).getByRole("link")).toHaveCount(2);
+  await expect(page.getByRole("navigation", { name: "Register" }).getByRole("link")).toHaveCount(3);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
   expect(await textOverflows(page)).toEqual([]);
+});
+
+test("a manager records, replaces and revokes a decision; a contributor has no write action", async ({
+  page,
+}) => {
+  await fakeSession(page, sessionWithRole("member"));
+  await fakeWork(page);
+  const shown: Record<string, unknown>[] = [];
+  const base = {
+    event_id: event?.id,
+    redacted: false,
+    decided_by: [party],
+    owner_user_id: ME,
+    version: 1,
+    evidence: [],
+    can_change: true,
+    can_end: true,
+  };
+  const bodies: unknown[] = [];
+  await page.route(/\/api\/v1\/events\/[^/]+\/decisions/, async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const reply = (status: number, body: unknown) =>
+      route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    if (request.method() === "GET") {
+      return reply(200, { items: shown });
+    }
+    const body = request.postDataJSON();
+    bodies.push({ path, body });
+    if (path.endsWith("/supersede")) {
+      const next = {
+        ...base,
+        id: "0199b8e0-0000-7000-8000-000000000402",
+        local_id: "DEC-002",
+        wording: body.successor.wording,
+        decided_on: body.successor.decided_on,
+      };
+      Object.assign(shown[0] ?? {}, {
+        status: "superseded",
+        superseded_by: next.id,
+        can_end: false,
+        version: 2,
+      });
+      shown.push({ ...next, status: "in-force" });
+      return reply(201, next);
+    }
+    if (path.endsWith("/revoke")) {
+      Object.assign(shown[1] ?? {}, {
+        status: "revoked",
+        revoked_reason: body.reason,
+        can_end: false,
+        version: 2,
+      });
+      return reply(200, shown[1]);
+    }
+    const created = {
+      ...base,
+      id: "0199b8e0-0000-7000-8000-000000000401",
+      local_id: "DEC-001",
+      wording: body.wording,
+      decided_on: body.decided_on,
+      status: "in-force",
+    };
+    shown.push(created);
+    return reply(201, created);
+  });
+  await fulfill(page, "**/api/v1/institutions*", { items: [party] });
+
+  await page.goto(`/events/${event?.id}/decisions`);
+  await expect(page.getByText("Noch keine Entscheide")).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "Wortlaut (Pflichtfeld)" })
+    .fill("Zeile eins\nZeile zwei");
+  await page.getByLabel("Beschlossen am (Pflichtfeld)").fill("2030-03-12");
+  await page.getByRole("combobox", { name: "Beschlossen von (Pflichtfeld)" }).fill("Gemeinde");
+  await page.getByRole("option", { name: "Gemeinde Testwil (INS-002)" }).click();
+  await page.getByRole("button", { name: "Erfassen" }).click();
+  const table = page.getByRole("table", { name: "Entscheide" });
+  await expect(table.getByText("DEC-001")).toBeVisible();
+
+  await page.getByRole("button", { name: "DEC-001 ersetzen" }).click();
+  await expect(page.getByRole("heading", { name: "DEC-001 ersetzen" })).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "Wortlaut (Pflichtfeld)" })).toHaveValue(
+    "Zeile eins\nZeile zwei",
+  );
+  await page.getByRole("textbox", { name: "Wortlaut (Pflichtfeld)" }).fill("Neue Zeile");
+  await page.getByLabel("Beschlossen am (Pflichtfeld)").fill("2030-04-01");
+  await page.getByRole("button", { name: "Ersetzen", exact: true }).click();
+  const first = table.getByText("DEC-001").locator("xpath=ancestor::tr");
+  await expect(first.getByText("ersetzt", { exact: true })).toBeVisible();
+  await expect(first.getByRole("link", { name: "DEC-002" })).toBeVisible();
+
+  await page.getByRole("button", { name: "DEC-002 widerrufen" }).click();
+  const dialog = page.getByRole("dialog", { name: "DEC-002 widerrufen" });
+  await dialog.getByRole("button", { name: "Widerrufen" }).click();
+  await expect(dialog.getByText("Geben Sie einen Grund an.")).toBeVisible();
+  await dialog.getByRole("textbox", { name: "Grund (Pflichtfeld)" }).fill("Plan geändert");
+  await dialog.getByRole("button", { name: "Widerrufen" }).click();
+  await expect(dialog).toBeHidden();
+  const second = table.getByText("DEC-002").locator("xpath=ancestor::tr");
+  await expect(second.getByText("widerrufen", { exact: true })).toBeVisible();
+  await expect(second.getByText("Grund: Plan geändert")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Entscheide" })).toBeFocused();
+
+  expect(bodies).toMatchObject([
+    {
+      path: expect.stringMatching(/\/decisions$/),
+      body: {
+        wording: "Zeile eins\nZeile zwei",
+        decided_by: [{ kind: "institution", id: party.id }],
+      },
+    },
+    {
+      path: expect.stringMatching(/\/supersede$/),
+      body: { expected_version: 1, successor: { wording: "Neue Zeile" } },
+    },
+    {
+      path: expect.stringMatching(/\/revoke$/),
+      body: { reason: "Plan geändert", expected_version: 1 },
+    },
+  ]);
+});
+
+test("a contributor sees the decisions and no write action", async ({ page }) => {
+  await fakeSession(page, sessionWithRole("member"));
+  await fakeWork(page);
+  await fulfill(page, "**/api/v1/events/*/memberships", {
+    items: memberships.map((membership, index) =>
+      index === 0 ? { ...membership, event_role: "event-contributor" } : membership,
+    ),
+  });
+  await fulfill(page, "**/api/v1/events/*/decisions*", {
+    items: decisions.map((decision) => ({ ...decision, can_change: false, can_end: false })),
+  });
+
+  await page.goto(`/events/${event?.id}/decisions`);
+  await expect(page.getByRole("table", { name: "Entscheide" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /ersetzen|widerrufen|Erfassen/ })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: /Wortlaut/ })).toHaveCount(0);
 });
 
 test("a member creates a milestone, links an action and sees the late action", async ({ page }) => {
