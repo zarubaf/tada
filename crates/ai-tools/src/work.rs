@@ -455,7 +455,7 @@ impl TypedTool for ListWorkstreams {
 
     fn description() -> &'static str {
         "List the workstreams of an event: its areas of work, each with its lead. \
-A work record names a workstream by its ID. Propose a record in an active workstream only; a closed workstream takes no new records."
+A work record names a workstream by its ID. Propose a record in an active workstream, or in a new workstream of the same changeset (create-workstream); a closed workstream takes no new records."
     }
 
     async fn run(

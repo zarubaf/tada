@@ -1735,6 +1735,11 @@ async fn propose_a_workstream_and_its_first_action() {
     // The action names the new workstream, so it depends on the proposal that creates it.
     let body = mcp.propose_with(&propose, arguments(&[])).await;
     assert_eq!(problem(&body)["code"], "validation-failed", "{body}");
+    assert_eq!(
+        problem(&body)["errors"],
+        json!([{"pointer": "/proposals/1/depends_on", "code": "dependency-missing"}]),
+        "{body}"
+    );
     let body = mcp
         .propose_with(&propose, arguments(&[stream_proposal]))
         .await;
