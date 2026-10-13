@@ -21,7 +21,7 @@ The MCP tools must also serialize an empty `statuses` list ([#73](https://github
   The prefixes are `MIL`, `DEC`, `RSK` and `REQ`.
 - The owner is a member of the event with the contributor or manager role.
   Any other owner returns `validation-failed` with the field code `unknown-member`.
-- A closed workstream, or a workstream of another event, returns the field code `unknown-record`, as in ADR 0067.
+- A workstream of another event returns the field code `unknown-record`, and a closed workstream returns `closed`, as in ADR 0067.
 - A change to the current status returns `invalid-transition`.
 - `record_evidence` gets one column for each new kind.
   The `CHECK` that exactly one is set covers them.
