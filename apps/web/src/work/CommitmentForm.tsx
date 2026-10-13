@@ -3,14 +3,12 @@ import { type Api, type Commitment, type CommitmentStatus, problemMessage } from
 import { t } from "../i18n";
 import { type SaveFailure, saveFailure } from "../registers/saveFailure";
 import { Button } from "../ui/Button";
-import { ComboBox } from "../ui/ComboBox";
 import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { Select } from "../ui/Select";
 import { TextField } from "../ui/TextField";
 import type { Directory } from "./directory";
 import { blankToNull, fieldErrors } from "./fieldErrors";
-import { NO_WORKSTREAM, OwnerSelect, WorkstreamSelect } from "./fields";
-import { usePromisorSearch } from "./usePromisorSearch";
+import { NO_WORKSTREAM, OwnerSelect, PartyPicker, WorkstreamSelect } from "./fields";
 import styles from "./Work.module.css";
 
 const FIELDS = ["text", "condition", "promisor", "owner", "workstream", "due"] as const;
@@ -65,9 +63,8 @@ export function CommitmentForm({
   const [text, setText] = useState(record?.text ?? "");
   const [condition, setCondition] = useState("");
   const [promisor, setPromisor] = useState<string>();
-  const [promisorText, setPromisorText] = useState("");
-  // The label of the chosen option: the search stops while the text shows it.
-  const [promisorLabel, setPromisorLabel] = useState<string>();
+  // A new key gives the picker an empty text after a save.
+  const [pickers, setPickers] = useState(0);
   const [owner, setOwner] = useState(record?.owner_user_id ?? userId);
   const [workstream, setWorkstream] = useState(record?.workstream_id ?? NO_WORKSTREAM);
   const [due, setDue] = useState(record?.due_date ?? "");
@@ -77,11 +74,6 @@ export function CommitmentForm({
   const form = useRef<HTMLFormElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const focusInvalidField = () => focusAfterCommit(() => firstInvalidField(form.current));
-  const promisors = usePromisorSearch(
-    api,
-    promisorText,
-    record === undefined && promisorText !== promisorLabel,
-  );
   const path = { event_id: eventId };
 
   const submit = async (event: FormEvent) => {
@@ -131,8 +123,7 @@ export function CommitmentForm({
           setText("");
           setCondition("");
           setPromisor(undefined);
-          setPromisorText("");
-          setPromisorLabel(undefined);
+          setPickers((count) => count + 1);
           setDue("");
           setWorkstream(NO_WORKSTREAM);
           focusAfterCommit(() => form.current?.querySelector<HTMLElement>("input"));
@@ -179,19 +170,13 @@ export function CommitmentForm({
         </>
       ) : (
         <>
-          <ComboBox
+          <PartyPicker
+            key={pickers}
+            api={api}
             label={t("commitment-field-promisor")}
             placeholder={t("commitment-field-promisor-placeholder")}
-            options={promisors.options}
-            inputValue={promisorText}
-            onInputChange={setPromisorText}
-            selectedKey={promisor}
-            onSelectionChange={(id) => {
-              setPromisor(id);
-              setPromisorLabel(promisors.options.find((o) => o.id === id)?.label);
-            }}
-            isLoading={promisors.loading}
-            error={errors.promisor ?? promisors.failure}
+            error={errors.promisor}
+            onChange={(party) => setPromisor(party?.id)}
           />
           <TextField
             label={t("commitment-field-condition")}
