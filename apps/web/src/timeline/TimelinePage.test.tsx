@@ -314,8 +314,10 @@ describe("TimelinePage", () => {
       profile: { kind: "loading" },
       lists: { "/actions": [action({ start_date: null, due_date: null })], "/milestones": [] },
     });
+    // The directory shows a skeleton of the same name first: wait for the page itself.
+    await screen.findByRole("heading", { level: 2, name: "Zeitplan" });
     expect(
-      await screen.findByRole("status", { name: "Daten des Anlasses werden geladen" }),
+      screen.getByRole("status", { name: "Daten des Anlasses werden geladen" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Noch nichts im Zeitplan")).not.toBeInTheDocument();
   });
