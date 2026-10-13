@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use jiff::Timestamp;
 use jiff::civil::Date;
+use tada_domain::RecordVersion;
 use tada_domain::ids::{EventId, MilestoneId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::records::MilestoneStatus;
@@ -45,8 +46,57 @@ pub(super) fn parse_text(check: &mut Checker, input: &str) -> Option<CommitmentT
     check.parse("text", input, CommitmentText::parse, text_error_code)
 }
 
+/// The owner and the workstream of a work record.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) struct Assignment {
+    owner: UserId,
+    workstream: Option<WorkstreamId>,
+}
+
+impl Assignment {
+    pub(super) fn new(owner: UserId, workstream: Option<WorkstreamId>) -> Self {
+        Self { owner, workstream }
+    }
+}
+
+/// Checks the owner and the workstream of a work record: all of a new record (`old` is `None`), and only the changed
+/// ones of a change. An owner who lost the role or a workstream that closed after it was set stays.
+pub(super) async fn check_assignment(
+    check: &mut Checker,
+    scope: OrgScope,
+    event: EventId,
+    old: Option<Assignment>,
+    new: Assignment,
+    ports: WorkPorts<'_>,
+) -> Result<(), StoreError> {
+    if old.is_none_or(|old| old.owner != new.owner) {
+        check_owner(check, scope, event, new.owner, ports.identity).await?;
+    }
+    if let Some(workstream) = new.workstream
+        && old.is_none_or(|old| old.workstream != new.workstream)
+    {
+        check_workstream(check, scope, event, workstream, ports.workstreams).await?;
+    }
+    Ok(())
+}
+
+/// Refuses a change that changes no field, then a change of another version than the current one.
+pub(super) fn require_any_change(
+    any: bool,
+    current: RecordVersion,
+    expected: RecordVersion,
+) -> Result<(), WorkError> {
+    if !any {
+        return Err(WorkError::Invalid(Vec::new()));
+    }
+    if current != expected {
+        return Err(WorkError::VersionConflict);
+    }
+    Ok(())
+}
+
 /// The owner of a work record must be a contributor or a manager of the event (ADR 0068).
-pub(super) async fn check_owner(
+async fn check_owner(
     check: &mut Checker,
     scope: OrgScope,
     event: EventId,
@@ -72,7 +122,7 @@ pub(crate) async fn is_possible_owner(
 }
 
 /// A new workstream of a record must be active and in the event. A store failure stops the command.
-pub(super) async fn check_workstream(
+async fn check_workstream(
     check: &mut Checker,
     scope: OrgScope,
     event: EventId,

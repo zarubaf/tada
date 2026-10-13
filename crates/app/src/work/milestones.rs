@@ -15,8 +15,8 @@ use tada_domain::work::ActionDescription;
 use uuid::Uuid;
 
 use super::checks::{
-    WorkRecord, changed, check_owner, check_workstream, created, may_change, parse_description,
-    require_change, require_create, show, show_one, writable_access,
+    Assignment, WorkRecord, changed, check_assignment, created, may_change, parse_description,
+    require_any_change, require_change, require_create, show, show_one, writable_access,
 };
 use super::{WorkError, WorkFilter, WorkPorts, WorkQuery};
 use crate::access::{self, Principal};
@@ -196,10 +196,8 @@ pub async fn create_milestone(
     let mut check = Checker::default();
     let title = parse_title(&mut check, &input.title);
     let description = parse_description(&mut check, input.description.as_deref());
-    check_owner(&mut check, scope, event, input.owner, ports.identity).await?;
-    if let Some(workstream) = input.workstream {
-        check_workstream(&mut check, scope, event, workstream, ports.workstreams).await?;
-    }
+    let assigned = Assignment::new(input.owner, input.workstream);
+    check_assignment(&mut check, scope, event, None, assigned, ports).await?;
     let (title, description) = check
         .finish(title.zip(description))
         .map_err(WorkError::Invalid)?;
@@ -273,18 +271,13 @@ pub async fn change_milestone(
         status,
         expected_version,
     } = change;
-    if title.is_none()
-        && description.is_none()
-        && date.is_none()
-        && owner.is_none()
-        && workstream.is_none()
-        && status.is_none()
-    {
-        return Err(WorkError::Invalid(Vec::new()));
-    }
-    if current.version != expected_version {
-        return Err(WorkError::VersionConflict);
-    }
+    let any = title.is_some()
+        || description.is_some()
+        || date.is_some()
+        || owner.is_some()
+        || workstream.is_some()
+        || status.is_some();
+    require_any_change(any, current.version, expected_version)?;
     let mut check = Checker::default();
     let title = match &title {
         Some(text) => parse_title(&mut check, text),
@@ -295,15 +288,10 @@ pub async fn change_milestone(
         None => Some(old.description.clone()),
     };
     let owner = owner.unwrap_or(old.owner);
-    if owner != old.owner {
-        check_owner(&mut check, scope, event, owner, ports.identity).await?;
-    }
     let workstream_id = workstream.unwrap_or(old.workstream_id);
-    if let Some(new) = workstream_id
-        && workstream_id != old.workstream_id
-    {
-        check_workstream(&mut check, scope, event, new, ports.workstreams).await?;
-    }
+    let assigned = Assignment::new(owner, workstream_id);
+    let before = Assignment::new(old.owner, old.workstream_id);
+    check_assignment(&mut check, scope, event, Some(before), assigned, ports).await?;
     let (title, description) = check
         .finish(title.zip(description))
         .map_err(WorkError::Invalid)?;

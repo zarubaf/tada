@@ -8,9 +8,9 @@ use tada_domain::work::ActionStatus;
 use uuid::Uuid;
 
 use super::checks::{
-    changed, check_dates, check_milestone, check_owner, check_workstream, created, may_change,
-    parse_description, parse_title, require_change, require_create, show, show_one,
-    writable_access,
+    Assignment, changed, check_assignment, check_dates, check_milestone, created, may_change,
+    parse_description, parse_title, require_any_change, require_change, require_create, show,
+    show_one, writable_access,
 };
 use super::{ActionFields, ActionView, NewActionRecord, WorkError, WorkPorts, WorkQuery};
 use crate::access::{self, Principal};
@@ -61,10 +61,8 @@ pub async fn create_action(
     let mut check = Checker::default();
     let title = parse_title(&mut check, &input.title);
     let description = parse_description(&mut check, input.description.as_deref());
-    check_owner(&mut check, scope, event, input.owner, ports.identity).await?;
-    if let Some(workstream) = input.workstream {
-        check_workstream(&mut check, scope, event, workstream, ports.workstreams).await?;
-    }
+    let assigned = Assignment::new(input.owner, input.workstream);
+    check_assignment(&mut check, scope, event, None, assigned, ports).await?;
     if let Err(error) = check_dates(input.start_date, input.due_date) {
         check.add(error);
     }
@@ -147,20 +145,15 @@ pub async fn change_action(
         status,
         expected_version,
     } = change;
-    if title.is_none()
-        && description.is_none()
-        && owner.is_none()
-        && workstream.is_none()
-        && start_date.is_none()
-        && due_date.is_none()
-        && milestone.is_none()
-        && status.is_none()
-    {
-        return Err(WorkError::Invalid(Vec::new()));
-    }
-    if current.version != expected_version {
-        return Err(WorkError::VersionConflict);
-    }
+    let any = title.is_some()
+        || description.is_some()
+        || owner.is_some()
+        || workstream.is_some()
+        || start_date.is_some()
+        || due_date.is_some()
+        || milestone.is_some()
+        || status.is_some();
+    require_any_change(any, current.version, expected_version)?;
     let mut check = Checker::default();
     let title = match &title {
         Some(text) => parse_title(&mut check, text),
@@ -171,15 +164,10 @@ pub async fn change_action(
         None => Some(old.description.clone()),
     };
     let owner = owner.unwrap_or(old.owner);
-    if owner != old.owner {
-        check_owner(&mut check, scope, event, owner, ports.identity).await?;
-    }
     let workstream_id = workstream.unwrap_or(old.workstream_id);
-    if let Some(new) = workstream_id
-        && workstream_id != old.workstream_id
-    {
-        check_workstream(&mut check, scope, event, new, ports.workstreams).await?;
-    }
+    let assigned = Assignment::new(owner, workstream_id);
+    let before = Assignment::new(old.owner, old.workstream_id);
+    check_assignment(&mut check, scope, event, Some(before), assigned, ports).await?;
     let start_date = start_date.unwrap_or(old.start_date);
     let due_date = due_date.unwrap_or(old.due_date);
     if let Err(error) = check_dates(start_date, due_date) {
