@@ -210,10 +210,25 @@ mod tests {
         let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut seen: BTreeMap<String, String> = BTreeMap::new();
         let mut duplicates = Vec::new();
-        for entry in std::fs::read_dir(folder).unwrap() {
-            let path = entry.unwrap().path();
+        let mut folders = vec![folder.clone()];
+        let mut files = Vec::new();
+        while let Some(next) = folders.pop() {
+            for entry in std::fs::read_dir(next).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    folders.push(path);
+                } else {
+                    files.push(path);
+                }
+            }
+        }
+        for path in files {
             let source = std::fs::read_to_string(&path).unwrap();
-            let file = path.file_name().unwrap().to_string_lossy().into_owned();
+            let file = path
+                .strip_prefix(&folder)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
             for name in schema_types(&source) {
                 if let Some(other) = seen.insert(name.clone(), file.clone()) {
                     duplicates.push(format!("{name} in {other} and {file}"));
