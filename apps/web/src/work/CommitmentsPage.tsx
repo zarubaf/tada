@@ -151,6 +151,7 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
         page={page}
         label={t("commitments-title")}
         columns={columns}
+        rowId={(row) => row.local_id}
         loadingLabel={t("commitments-loading")}
         empty={{ title: t("commitments-empty-title"), text: t("commitments-empty-text") }}
       />

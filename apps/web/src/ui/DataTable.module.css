@@ -51,6 +51,22 @@
     border-top: 1px solid var(--color-border-subtle);
   }
 
+  /* The row that a link opened: it takes focus and its mark fades. */
+  .table tbody tr:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+
+  .table tbody tr[data-linked] {
+    animation: linked calc(var(--duration-slow) * 6) var(--ease-out) 1;
+  }
+
+  @keyframes linked {
+    from {
+      background: var(--color-accent-subtle);
+    }
+  }
+
   .table td[data-mono] {
     font-family: var(--font-family-mono);
     font-size: var(--font-size-sm);

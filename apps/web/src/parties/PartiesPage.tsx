@@ -118,6 +118,7 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
         page={page}
         label={title}
         columns={columns}
+        rowId={(row) => row.local_id}
         loadingLabel={t("parties-loading")}
         empty={
           search === ""
