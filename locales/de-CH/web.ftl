@@ -205,8 +205,12 @@ event-nav-overview = Übersicht
 event-nav-members = Mitglieder
 event-nav-documents = Dokumente
 event-nav-actions = Aufgaben
-event-nav-commitments = Zusagen
+event-nav-timeline = Zeitplan
+event-nav-registers = Register
 event-nav-workstreams = Arbeitsbereiche
+register-nav = Register
+register-nav-commitments = Zusagen
+register-nav-milestones = Meilensteine
 event-overview-loading = Übersicht wird geladen
 event-overview-questions = Offene Fragen
 event-overview-questions-none = Es gibt keine offenen Fragen.
@@ -696,8 +700,17 @@ inbox-op-create-commitment = Zusage anlegen
 inbox-op-change-action-status = Status einer Aufgabe ändern
 inbox-op-change-action-due = Fälligkeit einer Aufgabe ändern
 inbox-op-change-commitment-status = Status einer Zusage ändern
+# $title: the title of the new milestone.
+inbox-op-create-milestone = Meilenstein „{ $title }“ anlegen
+inbox-op-change-milestone-status = Status eines Meilensteins ändern
+inbox-op-change-action-milestone = Meilenstein einer Aufgabe ändern
 # $name: the name of the new workstream.
 inbox-op-create-workstream = Arbeitsbereich „{ $name }“ anlegen
+inbox-milestone-removed = Kein Meilenstein
+inbox-row-date = Datum
+inbox-row-start = Startdatum
+inbox-row-milestone = Meilenstein
+inbox-row-new-milestone = Neuer Meilenstein
 inbox-row-lead = Arbeitsbereichsleitung
 inbox-name-unknown = Nicht lesbar
 inbox-due-removed = Keine Fälligkeit
@@ -900,7 +913,10 @@ register-saved = „{ $name }“ gespeichert.
 register-conflict = Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.
 work-field-owner = Verantwortlich
 work-field-workstream = Arbeitsbereich
+work-field-start = Startdatum
 work-field-due = Fällig am
+work-field-milestone = Meilenstein
+work-no-milestone = Kein Meilenstein
 work-field-status = Status
 work-no-workstream = Kein Arbeitsbereich
 work-error-title = Der Titel hat 1 bis 200 Zeichen.
@@ -914,6 +930,10 @@ work-error-owner = Wählen Sie ein Mitglied des Anlasses mit Mitarbeit oder Anla
 work-error-workstream = Wählen Sie einen aktiven Arbeitsbereich dieses Anlasses.
 work-error-workstream-closed = Dieser Arbeitsbereich ist geschlossen.
 work-error-due = Das ist kein gültiges Datum.
+work-error-date = Geben Sie ein gültiges Datum an.
+work-error-start_date = Das ist kein gültiges Datum.
+work-error-start_date-start-after-due = Das Startdatum liegt nach dem Fälligkeitsdatum. Wählen Sie ein früheres Startdatum.
+work-error-milestone = Wählen Sie einen Meilenstein dieses Anlasses, der nicht abgesagt ist.
 work-error-reason = Geben Sie einen Grund an. Er hat 1 bis 500 Zeichen.
 work-error-name = Der Name hat 1 bis 200 Zeichen.
 work-error-name-taken = Diesen Namen gibt es in diesem Anlass schon.
@@ -934,6 +954,37 @@ action-status-in-progress = in Arbeit
 action-status-blocked = blockiert
 action-status-done = erledigt
 action-status-canceled = abgebrochen
+
+milestones-title = Meilensteine
+milestones-loading = Meilensteine werden geladen
+milestones-empty-title = Noch keine Meilensteine
+milestones-empty-text = Erfassen Sie den ersten Meilenstein mit dem Formular unter der Liste.
+milestone-column-title = Titel
+milestone-column-date = Datum
+milestone-column-open-actions = Offene Aufgaben
+milestone-create-title = Meilenstein erfassen
+# $id: the readable ID of the milestone.
+milestone-change-title = { $id } bearbeiten
+milestone-field-title = Titel (Pflichtfeld)
+milestone-field-description = Beschreibung
+milestone-field-date = Datum (Pflichtfeld)
+milestone-status-open = offen
+milestone-status-reached = erreicht
+milestone-status-canceled = abgesagt
+milestone-reach = Als erreicht markieren
+# $id: the readable ID of the milestone.
+milestone-reach-of = { $id } als erreicht markieren
+milestone-reopen = Wieder öffnen
+# $id: the readable ID of the milestone.
+milestone-reopen-of = { $id } wieder öffnen
+# $id: the readable ID of the milestone. $status: its new status, for example „erreicht“.
+milestone-status-changed = { $id } ist jetzt { $status }.
+milestone-warning-overdue = Datum überschritten
+# $id: the readable ID of an open action that is due after the milestone.
+milestone-warning-late-action = { $id } ist erst danach fällig
+milestone-warning-late-unknown = Eine Aufgabe ist erst danach fällig
+# $version: the record version that the evidence supports.
+milestone-evidence-version = Stützt die Version { $version } des Meilensteins
 
 commitments-title = Zusagen
 commitments-loading = Zusagen werden geladen

@@ -23,7 +23,8 @@ import { ActionStatusLabel } from "./WorkStatus";
  */
 export function ActionsPage({ api }: { api: Api }) {
   const { event } = useEventContext();
-  const { state, reload } = useDirectory(api, event.id);
+  // The action form links an action to a milestone.
+  const { state, reload } = useDirectory(api, event.id, { milestones: true });
   return (
     <DirectoryGate state={state} reload={reload}>
       {(directory) => <Actions api={api} eventId={event.id} directory={directory} />}

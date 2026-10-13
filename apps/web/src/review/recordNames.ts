@@ -1,9 +1,11 @@
 // The names behind the IDs of a work proposal: the owner or lead, the workstream, the party of a
-// commitment and the record that a change targets. The inbox looks them up once per changeset.
-// A name that cannot be found is not an error: the view shows a neutral text.
+// commitment, the milestone of an action and the record that a change targets. The inbox looks
+// them up once per changeset. A name that cannot be found is not an error: the view shows a
+// neutral text.
 
 import type { Api, Changeset } from "../api/client";
 import { loadOrganizationMembers } from "../events/eventMembers";
+import { milestoneName } from "../work/milestoneName";
 
 export interface RecordNames {
   user: (id: string) => string | undefined;
@@ -11,7 +13,10 @@ export interface RecordNames {
   workstream: (id: string) => string | undefined;
   /** A person or an institution, new in the changeset or existing. */
   party: (id: string) => string | undefined;
-  /** An action or a commitment: its readable ID and its text. */
+  /**
+   * An action, a commitment or a milestone: its readable ID and its text. A milestone that the
+   * changeset creates has no readable ID yet: its title.
+   */
   record: (id: string) => string | undefined;
 }
 
@@ -27,14 +32,28 @@ function references(changeset: Changeset) {
   const parties = new Set<string>();
   const actions = new Set<string>();
   const commitments = new Set<string>();
+  const milestones = new Set<string>();
   let people = false;
   for (const { operation } of changeset.proposals) {
     if (
       operation.kind === "create-action" ||
       operation.kind === "create-commitment" ||
+      operation.kind === "create-milestone" ||
       operation.kind === "create-workstream"
     ) {
       people = true;
+    }
+    if (operation.kind === "create-action" && operation.milestone) {
+      milestones.add(operation.milestone);
+    }
+    if (operation.kind === "change-milestone-status") {
+      milestones.add(operation.milestone_id);
+    }
+    if (operation.kind === "change-action-milestone") {
+      actions.add(operation.action_id);
+      if (operation.milestone) {
+        milestones.add(operation.milestone);
+      }
     }
     if (operation.kind === "create-commitment") {
       parties.add(
@@ -48,13 +67,13 @@ function references(changeset: Changeset) {
       commitments.add(operation.commitment_id);
     }
   }
-  return { parties, actions, commitments, people };
+  return { parties, actions, commitments, milestones, people };
 }
 
 /** Best effort: each lookup that fails leaves its names out. */
 export async function loadRecordNames(api: Api, changeset: Changeset): Promise<RecordNames> {
   const eventId = changeset.event_id;
-  const { parties, actions, commitments, people } = references(changeset);
+  const { parties, actions, commitments, milestones, people } = references(changeset);
   const users = new Map<string, string>();
   const workstreams = new Map<string, string>();
   const records = new Map<string, string>();
@@ -65,6 +84,9 @@ export async function loadRecordNames(api: Api, changeset: Changeset): Promise<R
     }
     if (operation.kind === "create-workstream") {
       workstreams.set(operation.id, operation.name);
+    }
+    if (operation.kind === "create-milestone") {
+      records.set(operation.id, operation.title);
     }
   }
   const attempt = async (work: () => Promise<void>) => {
@@ -129,6 +151,18 @@ export async function loadRecordNames(api: Api, changeset: Changeset): Promise<R
         }
       }),
     ),
+    ...[...milestones]
+      .filter((id) => !records.has(id))
+      .map((id) =>
+        attempt(async () => {
+          const { data } = await api.GET("/api/v1/events/{event_id}/milestones/{id}", {
+            params: { path: { ...path, id } },
+          });
+          if (data) {
+            records.set(id, milestoneName(data));
+          }
+        }),
+      ),
     ...[...commitments].map((id) =>
       attempt(async () => {
         const { data } = await api.GET("/api/v1/events/{event_id}/commitments/{id}", {

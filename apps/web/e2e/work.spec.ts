@@ -66,7 +66,9 @@ const actions = [
     description: "Drei Angebote einholen.",
     owner_user_id: ME,
     workstream_id: workstreams[0]?.id,
+    start_date: "2030-05-04",
     due_date: "2030-05-18",
+    milestone_id: "0199b8e0-0000-7000-8000-000000000101",
     status: "in-progress",
     version: 2,
     can_change: true,
@@ -153,6 +155,43 @@ const commitments = [
   },
 ];
 
+const milestones = [
+  {
+    id: "0199b8e0-0000-7000-8000-000000000101",
+    local_id: "MIL-001",
+    event_id: event?.id,
+    title: "Stromversorgung für Festwirtschaft und Flugplatzinfrastruktur gesichert",
+    redacted: false,
+    date: "2030-05-15",
+    owner_user_id: ME,
+    workstream_id: workstreams[0]?.id,
+    status: "open",
+    warnings: [
+      { kind: "overdue" },
+      { kind: "late-action", action_id: "0199b8e0-0000-7000-8000-0000000000d1" },
+    ],
+    version: 2,
+    evidence: [],
+    can_change: true,
+    next_statuses: ["reached", "canceled"],
+  },
+  {
+    id: "0199b8e0-0000-7000-8000-000000000102",
+    local_id: "MIL-002",
+    event_id: event?.id,
+    title: "Bewilligung liegt vor",
+    redacted: false,
+    date: "2030-04-01",
+    owner_user_id: BERND,
+    status: "reached",
+    warnings: [],
+    version: 3,
+    evidence: [],
+    can_change: true,
+    next_statuses: ["open"],
+  },
+];
+
 function fulfill(page: Page, pattern: string, body: unknown) {
   return page.route(pattern, (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) }),
@@ -166,6 +205,7 @@ async function fakeWork(page: Page): Promise<void> {
   await fulfill(page, "**/api/v1/events/*/workstreams", { items: workstreams });
   await fulfill(page, "**/api/v1/events/*/actions*", { items: actions });
   await fulfill(page, "**/api/v1/events/*/commitments*", { items: commitments });
+  await fulfill(page, "**/api/v1/events/*/milestones*", { items: milestones });
   await fulfill(page, "**/api/v1/persons*", { items: [] });
   await fulfill(page, "**/api/v1/institutions*", { items: [] });
 }
@@ -173,6 +213,7 @@ async function fakeWork(page: Page): Promise<void> {
 const pages = [
   { name: "actions", path: "actions", title: "Aufgaben", table: "Aufgaben" },
   { name: "commitments", path: "commitments", title: "Zusagen", table: "Zusagen" },
+  { name: "milestones", path: "milestones", title: "Meilensteine", table: "Meilensteine" },
   { name: "workstreams", path: "workstreams", title: "Arbeitsbereiche", table: "Arbeitsbereiche" },
 ] as const;
 
@@ -225,7 +266,7 @@ for (const theme of themes) {
   });
 }
 
-// ADR 0024: no text overflows with the 40 % longer pseudo-locale, and the sub-navigation with six
+// ADR 0024: no text overflows with the 40 % longer pseudo-locale, and the sub-navigation with seven
 // links wraps instead of scrolling sideways.
 for (const viewport of viewports) {
   for (const shown of pages) {
@@ -252,9 +293,109 @@ test("at 320 px the sub-navigation and the register do not scroll sideways", asy
   await expect(page.getByRole("table", { name: "Zusagen" })).toBeVisible();
 
   const nav = page.getByRole("navigation", { name: "Anlass" });
-  await expect(nav.getByRole("link")).toHaveCount(6);
+  await expect(nav.getByRole("link")).toHaveCount(7);
+  await expect(page.getByRole("navigation", { name: "Register" }).getByRole("link")).toHaveCount(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
   expect(await textOverflows(page)).toEqual([]);
+});
+
+test("a member creates a milestone, links an action and sees the late action", async ({ page }) => {
+  await fakeSession(page, sessionWithRole("member"));
+  await fakeWork(page);
+  const created = {
+    ...milestones[1],
+    id: "0199b8e0-0000-7000-8000-000000000103",
+    local_id: "MIL-003",
+    title: "Festzelt steht",
+    date: "2030-05-20",
+    owner_user_id: ME,
+    status: "open",
+    version: 1,
+    next_statuses: ["reached", "canceled"],
+  };
+  const action = {
+    ...actions[1],
+    id: "0199b8e0-0000-7000-8000-0000000000d4",
+    local_id: "ACT-004",
+    title: "Zeltboden verlegen",
+    owner_user_id: ME,
+    due_date: "2030-05-25",
+    milestone_id: created.id,
+    status: "open",
+  };
+  const shown: unknown[] = [];
+  const listed: unknown[] = [];
+  let linked = false;
+  let sent: unknown;
+  await page.route("**/api/v1/events/*/milestones*", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify(created),
+        })
+      : route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            items: linked
+              ? [{ ...created, warnings: [{ kind: "late-action", action_id: action.id }] }]
+              : shown,
+          }),
+        }),
+  );
+  await page.route("**/api/v1/events/*/actions*", (route) => {
+    if (route.request().method() === "POST") {
+      linked = true;
+      listed.push(action);
+      sent = route.request().postDataJSON();
+      return route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify(action),
+      });
+    }
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ items: listed }),
+    });
+  });
+
+  await page.goto(`/events/${event?.id}/commitments`);
+  await page
+    .getByRole("navigation", { name: "Register" })
+    .getByRole("link", { name: "Meilensteine" })
+    .click();
+  await expect(page.getByText("Noch keine Meilensteine")).toBeVisible();
+  await page.getByRole("textbox", { name: "Titel (Pflichtfeld)" }).fill("Festzelt steht");
+  await page.getByLabel("Datum (Pflichtfeld)").fill("2030-05-20");
+  await page.getByRole("button", { name: "Erfassen" }).click();
+  await expect(
+    page.getByRole("table", { name: "Meilensteine" }).getByText("MIL-003"),
+  ).toBeVisible();
+  shown.push(created);
+
+  await page
+    .getByRole("navigation", { name: "Anlass" })
+    .getByRole("link", { name: "Aufgaben" })
+    .click();
+  await page.getByRole("textbox", { name: "Titel (Pflichtfeld)" }).fill("Zeltboden verlegen");
+  await page.getByLabel("Fällig am").fill("2030-05-25");
+  await page.getByRole("combobox", { name: "Meilenstein" }).click();
+  await page.getByRole("option", { name: "MIL-003 Festzelt steht" }).click();
+  await page.getByRole("button", { name: "Erfassen" }).click();
+  await expect(page.getByRole("table", { name: "Aufgaben" }).getByText("ACT-004")).toBeVisible();
+  expect(sent).toMatchObject({ milestone_id: created.id, due_date: "2030-05-25" });
+
+  await page
+    .getByRole("navigation", { name: "Anlass" })
+    .getByRole("link", { name: "Register" })
+    .click();
+  await page
+    .getByRole("navigation", { name: "Register" })
+    .getByRole("link", { name: "Meilensteine" })
+    .click();
+  const table = page.getByRole("table", { name: "Meilensteine" });
+  await expect(table.getByText("ACT-004 ist erst danach fällig")).toBeVisible();
 });

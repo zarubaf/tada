@@ -249,6 +249,7 @@ export function ProposalCard(props: ProposalCardProps) {
             proposal={proposal}
             isPending={isPending}
             serverErrors={props.recordErrors}
+            names={props.names}
             onSubmit={props.onRecordEditSubmit}
             onCancel={props.onEditCancel}
           />

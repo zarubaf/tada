@@ -125,6 +125,11 @@ function renderAt(path: string, api: ReturnType<typeof createApi>) {
               <p>Zusagenliste</p>
             </EventPage>
           </Route>
+          <Route path="/events/:eventId/milestones">
+            <EventPage api={api}>
+              <p>Meilensteinliste</p>
+            </EventPage>
+          </Route>
           <Route path="/events/:eventId/workstreams">
             <EventPage api={api}>
               <p>Arbeitsbereichsliste</p>
@@ -157,6 +162,34 @@ describe("EventPage", () => {
       "aria-current",
     );
     expect(within(nav).queryByRole("link", { name: "Personen" })).not.toBeInTheDocument();
+  });
+
+  it("shows the sub-navigation in the order of the design", async () => {
+    const { api } = fakeApi(json(200, event));
+    renderAt(`/events/${event.id}`, api);
+
+    const nav = await screen.findByRole("navigation", { name: "Anlass" });
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual([
+      "Übersicht",
+      "Aufgaben",
+      "Zeitplan",
+      "Register",
+      "Dokumente",
+      "Mitglieder",
+      "Arbeitsbereiche",
+    ]);
+    expect(within(nav).getByRole("link", { name: "Zeitplan" })).toHaveAttribute(
+      "href",
+      `/events/${event.id}/timeline`,
+    );
+    expect(within(nav).getByRole("link", { name: "Register" })).toHaveAttribute(
+      "href",
+      `/events/${event.id}/commitments`,
+    );
   });
 
   it("shows the date window of the profile in the header with its state", async () => {
@@ -226,9 +259,10 @@ describe("EventPage", () => {
 
   it.each([
     ["Aufgaben", "actions", "Aufgabenliste"],
-    ["Zusagen", "commitments", "Zusagenliste"],
+    ["Register", "commitments", "Zusagenliste"],
+    ["Register", "milestones", "Meilensteinliste"],
     ["Arbeitsbereiche", "workstreams", "Arbeitsbereichsliste"],
-  ])("marks only %s as current on its path", async (name, segment, content) => {
+  ])("marks only %s as current on the path %s", async (name, segment, content) => {
     const { api } = fakeApi(json(200, event));
     renderAt(`/events/${event.id}/${segment}`, api);
 
@@ -242,7 +276,7 @@ describe("EventPage", () => {
 
   it.each([
     ["Aufgaben", "actions", "Aufgabenliste"],
-    ["Zusagen", "commitments", "Zusagenliste"],
+    ["Register", "commitments", "Zusagenliste"],
     ["Arbeitsbereiche", "workstreams", "Arbeitsbereichsliste"],
   ])("opens %s from the sub-navigation", async (name, segment, content) => {
     const { api, urls } = fakeApi(json(200, event));

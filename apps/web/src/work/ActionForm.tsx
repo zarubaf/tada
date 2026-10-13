@@ -8,10 +8,24 @@ import { Select } from "../ui/Select";
 import { TextField } from "../ui/TextField";
 import type { Directory } from "./directory";
 import { blankToNull, fieldErrors } from "./fieldErrors";
-import { NO_WORKSTREAM, OwnerSelect, WorkstreamSelect } from "./fields";
+import {
+  MilestoneSelect,
+  NO_MILESTONE,
+  NO_WORKSTREAM,
+  OwnerSelect,
+  WorkstreamSelect,
+} from "./fields";
 import styles from "./Work.module.css";
 
-const FIELDS = ["title", "description", "owner", "workstream", "due"] as const;
+const FIELDS = [
+  "title",
+  "description",
+  "owner",
+  "workstream",
+  "start_date",
+  "due",
+  "milestone",
+] as const;
 type Field = (typeof FIELDS)[number];
 type FieldErrors = Partial<Record<Field, string>>;
 
@@ -23,7 +37,9 @@ function changes(
     description: string | null;
     owner: string;
     workstream: string | null;
+    start: string | null;
     due: string | null;
+    milestone: string | null;
     status: ActionStatus;
   },
 ) {
@@ -32,7 +48,9 @@ function changes(
     ...(input.description !== (record.description ?? null) && { description: input.description }),
     ...(input.owner !== record.owner_user_id && { owner_user_id: input.owner }),
     ...(input.workstream !== (record.workstream_id ?? null) && { workstream_id: input.workstream }),
+    ...(input.start !== (record.start_date ?? null) && { start_date: input.start }),
     ...(input.due !== (record.due_date ?? null) && { due_date: input.due }),
+    ...(input.milestone !== (record.milestone_id ?? null) && { milestone_id: input.milestone }),
     ...(input.status !== record.status && { status: input.status }),
   };
 }
@@ -68,7 +86,9 @@ export function ActionForm({
   const [description, setDescription] = useState(record?.description ?? "");
   const [owner, setOwner] = useState(record?.owner_user_id ?? userId);
   const [workstream, setWorkstream] = useState(record?.workstream_id ?? NO_WORKSTREAM);
+  const [start, setStart] = useState(record?.start_date ?? "");
   const [due, setDue] = useState(record?.due_date ?? "");
+  const [milestone, setMilestone] = useState(record?.milestone_id ?? NO_MILESTONE);
   const [status, setStatus] = useState<ActionStatus>(record?.status ?? "open");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
@@ -96,7 +116,9 @@ export function ActionForm({
         description: blankToNull(description),
         owner,
         workstream: workstream === NO_WORKSTREAM ? null : workstream,
+        start: blankToNull(start),
         due: blankToNull(due),
+        milestone: milestone === NO_MILESTONE ? null : milestone,
         status,
       };
       const result = record
@@ -111,15 +133,19 @@ export function ActionForm({
               owner_user_id: owner,
               ...(input.description !== null && { description: input.description }),
               ...(input.workstream !== null && { workstream_id: input.workstream }),
+              ...(input.start !== null && { start_date: input.start }),
               ...(input.due !== null && { due_date: input.due }),
+              ...(input.milestone !== null && { milestone_id: input.milestone }),
             },
           });
       if (result.data) {
         if (!record) {
           setTitle("");
           setDescription("");
+          setStart("");
           setDue("");
           setWorkstream(NO_WORKSTREAM);
+          setMilestone(NO_MILESTONE);
           focusAfterCommit(() => form.current?.querySelector<HTMLElement>("input"));
         }
         onSaved(result.data);
@@ -172,11 +198,25 @@ export function ActionForm({
         error={errors.workstream}
       />
       <TextField
+        label={t("work-field-start")}
+        type="date"
+        value={start}
+        onChange={setStart}
+        error={errors.start_date}
+      />
+      <TextField
         label={t("work-field-due")}
         type="date"
         value={due}
         onChange={setDue}
         error={errors.due}
+      />
+      <MilestoneSelect
+        milestones={directory.milestones}
+        value={milestone}
+        current={record?.milestone_id}
+        onChange={setMilestone}
+        error={errors.milestone}
       />
       {record && (
         <Select

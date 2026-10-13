@@ -58,6 +58,28 @@
     font-size: var(--font-size-sm);
   }
 
+  /* The warnings of a milestone sit under its title; the icon carries the tone, the text wraps. */
+  .warnings {
+    display: grid;
+    gap: var(--space-0-5);
+    margin-top: var(--space-0-5);
+    list-style: none;
+    padding: 0;
+    font-size: var(--font-size-sm);
+  }
+
+  .warning {
+    display: flex;
+    align-items: start;
+    gap: var(--space-1);
+  }
+
+  .warningIcon {
+    flex: none;
+    margin-top: var(--space-0-5);
+    color: var(--color-warning);
+  }
+
   .fixedLabel {
     color: var(--color-text-muted);
   }

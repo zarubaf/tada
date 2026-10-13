@@ -166,6 +166,11 @@ export interface LinkProps {
    * or the pages of the documents of one event, whose paths do not start with the path of the link.
    */
   within?: string;
+  /**
+   * The link is also current on each of these paths and the paths below them, for example a link to
+   * the first page of a group of pages with a navigation of its own.
+   */
+  alsoCurrentOn?: readonly string[];
   /** For a link whose words do not name its target alone, for example in a table. */
   "aria-label"?: string;
   children: ReactNode;
@@ -177,6 +182,7 @@ export function Link({
   className,
   exact,
   within,
+  alsoCurrentOn = [],
   "aria-label": ariaLabel,
   children,
 }: LinkProps) {
@@ -184,7 +190,8 @@ export function Link({
   const current =
     pathname === to ||
     (!exact && pathname.startsWith(`${to}/`)) ||
-    (within !== undefined && pathname.startsWith(`${within}/`));
+    (within !== undefined && pathname.startsWith(`${within}/`)) ||
+    alsoCurrentOn.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     const plain =
       event.button === 0 &&
