@@ -51,6 +51,7 @@ Optional later adapters: Microsoft Graph (mail, calendar, SharePoint), Nextcloud
 
 An MCP tool answers a refusal of `app`, also invalid arguments, as a tool result with `isError`, the problem code and the JSON pointers of the invalid values; only `internal` and `unavailable` are JSON-RPC errors.
 Each refusal and each JSON-RPC error of a tool also contains the request ID.
+The refusal is the JSON text of the tool result, without `structuredContent`, because a client can validate `structuredContent` against the output schema of the tool also when `isError` is true.
 
 Search uses PostgreSQL full-text search first.
 pgvector comes only if an evaluation shows a benefit.

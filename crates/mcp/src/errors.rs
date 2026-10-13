@@ -4,11 +4,14 @@
 //! `isError`: clients show tool results to the model, so the agent can correct its call. Only a failure of tada
 //! itself (`internal`, `unavailable`) is a JSON-RPC error. The agent sees the problem code, the JSON pointers of
 //! the invalid values and the request ID, never the input itself.
+//!
+//! The problem is the JSON text of the result, without `structuredContent`: a client can check `structuredContent`
+//! against the output schema of the tool also when `isError` is true, and a problem does not match that schema.
 
 use axum::http::request::Parts;
 use rmcp::ErrorData;
 use rmcp::handler::server::tool::IntoCallToolResult;
-use rmcp::model::{CallToolResponse, CallToolResult};
+use rmcp::model::{CallToolResponse, CallToolResult, ContentBlock};
 use serde_json::{Value, json};
 use tada_app::ai_tools::AiToolError;
 use tada_app::caller::AiCaller;
@@ -18,7 +21,7 @@ use uuid::Uuid;
 /// The error of a tool call.
 #[derive(Debug)]
 pub(crate) enum ToolError {
-    /// The structured content of a tool result with `isError`: the problem code and the invalid values.
+    /// The JSON text of a tool result with `isError`: the problem code and the invalid values.
     Problem(Value),
     /// A failure of tada itself.
     Fault(ErrorData),
@@ -63,7 +66,9 @@ impl From<AiToolError> for ToolError {
 impl IntoCallToolResult for ToolError {
     fn into_call_tool_result(self) -> Result<CallToolResponse, ErrorData> {
         match self {
-            Self::Problem(content) => Ok(CallToolResult::structured_error(content).into()),
+            Self::Problem(problem) => {
+                Ok(CallToolResult::error(vec![ContentBlock::text(problem.to_string())]).into())
+            }
             Self::Fault(error) => Err(error),
         }
     }
@@ -85,8 +90,14 @@ pub(crate) fn name_request(
     };
     match answer {
         Ok(CallToolResponse::Complete(mut result)) if result.is_error == Some(true) => {
-            if let Some(content) = result.structured_content.as_mut() {
-                name(content);
+            // The problem is the JSON text that `ToolError::Problem` wrote.
+            for content in &mut result.content {
+                if let ContentBlock::Text(text) = content
+                    && let Ok(mut problem) = serde_json::from_str::<Value>(&text.text)
+                {
+                    name(&mut problem);
+                    text.text = problem.to_string();
+                }
             }
             Ok(result.into())
         }
@@ -120,6 +131,16 @@ mod tests {
         }
     }
 
+    /// The problem of a refusal: the JSON text of the result. A refusal has no structured content.
+    fn problem(result: &CallToolResult) -> Value {
+        assert_eq!(result.is_error, Some(true));
+        assert_eq!(result.structured_content, None);
+        let [ContentBlock::Text(text)] = result.content.as_slice() else {
+            panic!("not one text: {result:?}");
+        };
+        serde_json::from_str(&text.text).unwrap()
+    }
+
     #[test]
     fn a_problem_of_the_app_is_a_tool_result_and_a_failure_of_tada_is_a_json_rpc_error() {
         let invalid = FieldError::new("proposals/0/evidence", "evidence-missing");
@@ -128,13 +149,12 @@ mod tests {
             &[invalid],
         ))
         .unwrap();
-        assert_eq!(result.is_error, Some(true));
         assert_eq!(
-            result.structured_content,
-            Some(json!({
+            problem(&result),
+            json!({
                 "code": "validation-failed",
                 "errors": [{"pointer": "/proposals/0/evidence", "code": "evidence-missing"}],
-            }))
+            })
         );
         for code in [
             ProblemCode::Forbidden,
@@ -142,10 +162,10 @@ mod tests {
             ProblemCode::MalformedRequest,
         ] {
             let result = answer(ToolError::problem(code, &[])).unwrap();
-            assert_eq!(result.is_error, Some(true), "{code:?}");
             assert_eq!(
-                result.structured_content,
-                Some(json!({"code": code.as_str(), "errors": []}))
+                problem(&result),
+                json!({"code": code.as_str(), "errors": []}),
+                "{code:?}"
             );
         }
         for code in [ProblemCode::Internal, ProblemCode::Unavailable] {
@@ -168,8 +188,8 @@ mod tests {
             panic!("not a complete result");
         };
         assert_eq!(
-            refusal.structured_content,
-            Some(json!({"code": "forbidden", "errors": [], "request_id": id}))
+            problem(&refusal),
+            json!({"code": "forbidden", "errors": [], "request_id": id})
         );
         let failure = named(ToolError::problem(ProblemCode::Unavailable, &[])).unwrap_err();
         assert_eq!(

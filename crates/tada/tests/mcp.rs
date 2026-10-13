@@ -5,6 +5,7 @@
 
 mod support;
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use tada_app::caller::TestScope;
 
@@ -14,9 +15,11 @@ use axum::http::{Method, Request, StatusCode, header};
 use jiff::SignedDuration;
 use secrecy::ExposeSecret;
 use serde_json::{Value, json};
+use tada_ai_tools::standard_catalog;
 use tada_app::ai_queries::{AiToolPorts, AiToolStores};
 use tada_app::caller::{MemberCaller, OrganizationRole};
 use tada_app::clock::Clock;
+use tada_app::dispute_notes::{NewDisputeNote, create_dispute_note};
 use tada_app::domain::RecordVersion;
 use tada_app::domain::facts::core_catalog;
 use tada_app::domain::identity::{DisplayName, Email, EventRole};
@@ -341,13 +344,16 @@ impl Mcp {
     }
 }
 
-/// The structured content of a tool result with `isError`: a refusal of the call, with its problem code.
-fn problem(body: &Value) -> &Value {
+/// The problem of a tool result with `isError`: a refusal of the call, with its problem code.
+/// The problem is the JSON text of the result; a refusal has no structured content.
+fn problem(body: &Value) -> Value {
     assert!(body["error"].is_null(), "not a tool result: {body}");
     assert_eq!(body["result"]["isError"], true, "{body}");
-    let content = &body["result"]["structuredContent"];
-    assert!(content["errors"].is_array(), "{body}");
-    content
+    assert!(body["result"].get("structuredContent").is_none(), "{body}");
+    let text = body["result"]["content"][0]["text"].as_str().unwrap();
+    let problem: Value = serde_json::from_str(text).unwrap();
+    assert!(problem["errors"].is_array(), "{body}");
+    problem
 }
 
 /// Sends a request and returns the status and the JSON body. Each response must forbid the referrer (ADR 0008).
@@ -1654,8 +1660,7 @@ async fn search_parties_rejects_empty_and_201_chars() {
     let mcp = Mcp::start().await;
     for (q, code) in [("", "empty"), ("a".repeat(201).as_str(), "too-long")] {
         let body = mcp.call("search_parties", json!({"q": q})).await;
-        assert_eq!(body["result"]["isError"], true, "{body}");
-        let problem = &body["result"]["structuredContent"];
+        let problem = problem(&body);
         assert_eq!(problem["code"], "validation-failed", "{body}");
         assert_eq!(problem["errors"][0]["pointer"], "/q", "{body}");
         assert_eq!(problem["errors"][0]["code"], code, "{body}");
@@ -1773,11 +1778,92 @@ async fn propose_a_workstream_and_its_first_action() {
     assert_eq!(created, 0);
 }
 
+/// The output schema of the tool `name`, as `tools/list` shows it.
+async fn output_schema(mcp: &Mcp, name: &str) -> Value {
+    let list = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"});
+    let (_, listed) = mcp.rpc(Some(&mcp.token), None, &list).await;
+    listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == name)
+        .unwrap_or_else(|| panic!("{name} is not listed"))["outputSchema"]
+        .clone()
+}
+
+/// A validator of `schema` with the definitions of `root`, with the formats checked.
+fn validator(root: &Value, schema: &Value) -> jsonschema::Validator {
+    let mut schema = schema.clone();
+    if let (Some(fields), Some(defs)) = (schema.as_object_mut(), root.get("$defs")) {
+        fields.insert("$defs".to_owned(), defs.clone());
+    }
+    jsonschema::options()
+        .should_validate_formats(true)
+        .build(&schema)
+        .unwrap()
+}
+
+/// Adds to `found` each definition of `root` that a part of `value` takes, along the parts of `schema`.
+/// Of the alternatives of `oneOf` and `anyOf`, it follows the ones that `value` matches.
+fn instantiated_defs(root: &Value, schema: &Value, value: &Value, found: &mut BTreeSet<String>) {
+    if let Some(name) = schema["$ref"]
+        .as_str()
+        .and_then(|r| r.strip_prefix("#/$defs/"))
+    {
+        found.insert(name.to_owned());
+        instantiated_defs(root, &root["$defs"][name], value, found);
+    }
+    for key in ["oneOf", "anyOf"] {
+        for branch in schema[key].as_array().into_iter().flatten() {
+            if validator(root, branch).is_valid(value) {
+                instantiated_defs(root, branch, value, found);
+            }
+        }
+    }
+    for branch in schema["allOf"].as_array().into_iter().flatten() {
+        instantiated_defs(root, branch, value, found);
+    }
+    if let (Some(properties), Some(fields)) = (schema["properties"].as_object(), value.as_object())
+    {
+        for (key, property) in properties {
+            if let Some(field) = fields.get(key) {
+                instantiated_defs(root, property, field, found);
+            }
+        }
+    }
+    if let (Some(items), Some(values)) = (schema.get("items"), value.as_array()) {
+        for item in values {
+            instantiated_defs(root, items, item, found);
+        }
+    }
+    if let (Some(extra), Some(fields)) = (schema.get("additionalProperties"), value.as_object())
+        && extra.is_object()
+    {
+        for field in fields.values() {
+            instantiated_defs(root, extra, field, found);
+        }
+    }
+}
+
+/// Adds a dispute note of the owner to the target `kind` with `id`.
+async fn dispute(mcp: &Mcp, kind: &str, id: Uuid) {
+    let note = NewDisputeNote {
+        target_kind: kind.to_owned(),
+        target_id: id,
+        text: "Olga bestreitet das.".to_owned(),
+    };
+    create_dispute_note(&mcp.owner, note, &mcp.test.database, &*mcp.clock)
+        .await
+        .unwrap();
+}
+
 /// A strict MCP client rejects a result that the output schema of its tool does not accept.
+/// The world has a record of each kind that a result can hold, so each part of each schema gets a value.
 #[tokio::test]
 async fn each_tool_result_matches_its_output_schema() {
     let mcp = Mcp::start().await;
     let database = &mcp.test.database;
+    let (event, olga) = (mcp.open_day.as_uuid(), mcp.owner.user_id().as_uuid());
     // One record of each kind in OPEN30, where Anna is a viewer.
     let workstream = create_workstream(
         &mcp.owner,
@@ -1801,19 +1887,6 @@ async fn each_tool_result_matches_its_output_schema() {
         parties: database,
         clock: &*mcp.clock,
     };
-    let action = NewAction {
-        id: None,
-        title: "Zelt bestellen".to_owned(),
-        description: None,
-        owner: mcp.owner.user_id(),
-        workstream: Some(workstream.id),
-        start_date: None,
-        due_date: None,
-        milestone: None,
-    };
-    create_action(&mcp.owner, mcp.open_day, action, ports)
-        .await
-        .unwrap();
     // A milestone with a past date is overdue, so its warnings are not empty.
     let milestone = NewMilestone {
         id: None,
@@ -1829,88 +1902,387 @@ async fn each_tool_result_matches_its_output_schema() {
     let institution = Party::Institution(mcp.institution().await);
     mcp.commitment(mcp.open_day, institution, "Stellt Tische", None)
         .await;
-    let (date, document, draft_id) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
-    let draft = json!({
-        "kind": "create-document-draft",
-        "event_id": mcp.open_day.as_uuid(),
-        "document": {"new": {"id": document, "name": "Konzept Open Day"}},
-        "markdown": "# Konzept\n\nDas Open Day ist im Mai.\n",
-    });
-    let changeset = mcp
+
+    // Accepted facts, an assumption, an unknown, a reference, an open question, and records with evidence.
+    // The proposal IDs give the order of the steps (UUIDv7).
+    let proposals: [Uuid; 10] = std::array::from_fn(|_| Uuid::now_v7());
+    let [
+        date,
+        guess,
+        venue,
+        field,
+        reference,
+        question,
+        person,
+        action,
+        commitment,
+        milestone,
+    ] = proposals;
+    let (field_id, person_id) = (Uuid::now_v7(), Uuid::now_v7());
+    let quoted = |id: Uuid, operation: Value, depends_on: &[Uuid], quote: &str| {
+        proposal(id, operation, depends_on, SOURCE, quote)
+    };
+    let records = mcp
         .propose(
             Some(mcp.open_day),
             SOURCE,
             json!([
-                proposal(
-                    date,
-                    set_fact(mcp.open_day, "date_window", may_2030()),
+                quoted(date, set_fact(mcp.open_day, "date_window", may_2030()), &[], "im Mai 2030"),
+                quoted(
+                    guess,
+                    json!({
+                        "kind": "set-fact", "event_id": event, "field_id": core_field("visitor_estimate"),
+                        "state": {"state": "assumption",
+                                  "value": {"type": "quantity", "min": "2000", "max": "3000"}},
+                    }),
                     &[],
-                    SOURCE,
-                    "im Mai 2030"
+                    "Das Open Day"
                 ),
-                proposal(draft_id, draft, &[], SOURCE, "im Mai 2030"),
+                quoted(
+                    venue,
+                    json!({
+                        "kind": "set-fact", "event_id": event, "field_id": core_field("venue"),
+                        "state": {"state": "unknown"},
+                    }),
+                    &[],
+                    "Der Ort ist noch offen"
+                ),
+                quoted(
+                    field,
+                    json!({
+                        "kind": "add-field-definition", "id": field_id, "event_id": event,
+                        "key": "main_event", "label": "Hauptanlass",
+                        "value_type": {"type": "reference", "target": "event"},
+                        "description": "The event that this event belongs to.", "module": "aviation",
+                    }),
+                    &[],
+                    "Das Open Day"
+                ),
+                quoted(
+                    reference,
+                    json!({
+                        "kind": "set-fact", "event_id": event, "field_id": field_id,
+                        "state": {"state": "accepted",
+                                  "value": {"type": "reference", "target": "event", "id": event}},
+                    }),
+                    &[field],
+                    "Das Open Day"
+                ),
+                quoted(
+                    question,
+                    json!({
+                        "kind": "create-open-question", "id": Uuid::now_v7(), "event_id": event,
+                        "text": "Welcher Ort?", "owner": olga,
+                    }),
+                    &[],
+                    "Der Ort ist noch offen"
+                ),
+                quoted(
+                    person,
+                    json!({"kind": "create-person", "id": person_id, "name": "Gerda Gemeinde"}),
+                    &[],
+                    "Das Open Day"
+                ),
+                quoted(
+                    action,
+                    json!({
+                        "kind": "create-action", "id": Uuid::now_v7(), "event_id": event,
+                        "title": "Zelt bestellen", "owner": olga, "workstream": workstream.id.as_uuid(),
+                    }),
+                    &[],
+                    "auf dem Flugfeld"
+                ),
+                quoted(
+                    commitment,
+                    json!({
+                        "kind": "create-commitment", "id": Uuid::now_v7(), "event_id": event,
+                        "text": "Stellt den Platz", "promisor": {"person": person_id}, "owner": olga,
+                    }),
+                    &[person],
+                    "auf dem Flugfeld"
+                ),
+                quoted(
+                    milestone,
+                    json!({
+                        "kind": "create-milestone", "id": Uuid::now_v7(), "event_id": event,
+                        "title": "Ort steht fest", "date": "2030-04-30", "owner": olga,
+                    }),
+                    &[],
+                    "Der Ort ist noch offen"
+                ),
             ]),
         )
         .await;
-    mcp.apply(&changeset, &[date, draft_id]).await;
+    mcp.apply(&records, &proposals).await;
 
     let profile = mcp
         .result("get_event_profile", json!({"event_key": "OPEN30"}))
         .await;
-    let evidence = &profile["accepted"][0]["evidence"][0];
+    let evidence = profile["accepted"][0]["evidence"][0].clone();
+    let source_version: Uuid = evidence["source_version_id"]
+        .as_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    let date_fact: Uuid = mcp
+        .test
+        .scalar(&format!(
+            "SELECT id FROM fact WHERE event_id = '{event}' AND field_id = '{}'",
+            core_field("date_window")
+        ))
+        .await;
+    // A draft that cites a fact version and a passage, and an open proposal that nobody reviews.
+    let (draft, document, open) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+    let markdown = format!(
+        "# Konzept\n\nDas Open Day ist am [](tada:fact/{date_fact}?v=1).\n\
+         Es findet [auf dem Flugfeld](tada:source/{source_version}#{}-{}) statt.\n",
+        evidence["start"], evidence["end"],
+    );
+    let drafts = mcp
+        .propose(
+            Some(mcp.open_day),
+            SOURCE,
+            json!([
+                quoted(
+                    draft,
+                    json!({
+                        "kind": "create-document-draft", "event_id": event,
+                        "document": {"new": {"id": document, "name": "Konzept Open Day"}},
+                        "markdown": markdown,
+                    }),
+                    &[],
+                    "im Mai 2030"
+                ),
+                quoted(
+                    open,
+                    json!({
+                        "kind": "set-fact", "event_id": event, "field_id": core_field("duration_days"),
+                        "state": {"state": "accepted",
+                                  "value": {"type": "quantity", "min": "1", "max": "1"}},
+                    }),
+                    &[],
+                    "Das Open Day"
+                ),
+            ]),
+        )
+        .await;
+    mcp.apply(&drafts, &[draft]).await;
     let documents = mcp
         .result("list_documents", json!({"event_key": "OPEN30"}))
         .await;
     let version_id = documents["documents"][0]["newest_version"]["version_id"].clone();
-    let cases = [
-        ("list_events", json!({})),
-        ("list_members", json!({"event_key": "OPEN30"})),
-        ("get_event_schema", json!({"event_key": "OPEN30"})),
-        ("get_event_profile", json!({"event_key": "OPEN30"})),
-        ("search_sources", json!({"query": "Flugfeld"})),
+
+    // A dispute note on the source, on the fact version and on the document version.
+    let source_item: Uuid = mcp
+        .test
+        .scalar(&format!(
+            "SELECT source_item_id FROM source_version WHERE id = '{source_version}'"
+        ))
+        .await;
+    dispute(&mcp, "source-item", source_item).await;
+    let fact_version: Uuid = mcp
+        .test
+        .scalar(&format!(
+            "SELECT id FROM fact_version WHERE fact_id = '{date_fact}' AND number = 1"
+        ))
+        .await;
+    dispute(&mcp, "fact-version", fact_version).await;
+    dispute(
+        &mcp,
+        "document-version",
+        version_id.as_str().unwrap().parse().unwrap(),
+    )
+    .await;
+
+    // Anna proposes in SECRET30, where she is a contributor.
+    let (_, propose) = mcp.contributor_token().await;
+    let proposed = changeset(
+        mcp.secret,
+        SOURCE,
+        json!([proposal(
+            Uuid::now_v7(),
+            set_fact(mcp.secret, "date_window", may_2030()),
+            &[],
+            SOURCE,
+            "im Mai 2030"
+        )]),
+    );
+    // Each case: the tool, its arguments, the token, and the arrays of its result that must not be empty.
+    let cases: [(&str, Value, &str, &[&str]); 14] = [
+        ("list_events", json!({}), &mcp.token, &["/events"]),
+        (
+            "list_members",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &["/members"],
+        ),
+        (
+            "get_event_schema",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &["/fields"],
+        ),
+        (
+            "get_event_profile",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &[
+                "/accepted",
+                "/accepted/0/evidence",
+                "/accepted/0/evidence/0/dispute_notes",
+                "/assumptions",
+                "/unknowns",
+                "/open_proposals",
+                "/open_questions",
+            ],
+        ),
+        (
+            "search_sources",
+            json!({"query": "Flugfeld"}),
+            &mcp.token,
+            &["/hits"],
+        ),
         (
             "get_source_passage",
-            json!({"source_version_id": evidence["source_version_id"], "start": evidence["start"], "end": evidence["end"]}),
+            json!({"source_version_id": source_version, "start": evidence["start"], "end": evidence["end"]}),
+            &mcp.token,
+            &[],
         ),
-        ("list_documents", json!({"event_key": "OPEN30"})),
-        ("get_document_version", json!({"version_id": version_id})),
-        ("list_workstreams", json!({"event_key": "OPEN30"})),
-        ("list_actions", json!({"event_key": "OPEN30"})),
-        ("list_commitments", json!({"event_key": "OPEN30"})),
-        ("list_milestones", json!({"event_key": "OPEN30"})),
-        ("search_parties", json!({"q": "gemeinde"})),
+        (
+            "list_documents",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &["/documents"],
+        ),
+        (
+            "get_document_version",
+            json!({"version_id": version_id}),
+            &mcp.token,
+            &[
+                "/dispute_notes",
+                "/manifest/facts",
+                "/manifest/facts/0/dispute_notes",
+                "/manifest/sources",
+            ],
+        ),
+        (
+            "list_workstreams",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &["/workstreams"],
+        ),
+        (
+            "list_actions",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &["/actions", "/actions/0/evidence"],
+        ),
+        (
+            "list_commitments",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &["/commitments"],
+        ),
+        (
+            "list_milestones",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &[
+                "/milestones",
+                "/milestones/0/warnings",
+                "/milestones/1/evidence",
+            ],
+        ),
+        (
+            "search_parties",
+            json!({"q": "gemeinde"}),
+            &mcp.token,
+            &["/persons", "/persons/0/evidence", "/institutions"],
+        ),
+        ("propose_changeset", proposed, &propose, &[]),
     ];
 
-    let list = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"});
-    let (_, listed) = mcp.rpc(Some(&mcp.token), None, &list).await;
-    let read_only: Vec<&Value> = listed["result"]["tools"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|tool| tool["annotations"]["readOnlyHint"] == true)
-        .collect();
     let mut called = Vec::new();
-    for (name, arguments) in cases {
-        let tool = read_only
-            .iter()
-            .find(|tool| tool["name"] == name)
-            .unwrap_or_else(|| panic!("{name} is not a read-only tool"));
-        let validator = jsonschema::validator_for(&tool["outputSchema"]).unwrap();
-        let result = mcp.result(name, arguments).await;
-        let errors: Vec<String> = validator
-            .iter_errors(&result)
+    for (name, arguments, token, arrays) in cases {
+        let body = json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": name, "arguments": arguments},
+        });
+        let (status, body) = mcp.rpc(Some(token), None, &body).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["result"]["isError"], false, "{name}: {body}");
+        let result = &body["result"]["structuredContent"];
+        for pointer in arrays {
+            let array = result.pointer(pointer).and_then(Value::as_array);
+            assert!(
+                array.is_some_and(|array| !array.is_empty()),
+                "{name}: {pointer} is empty\n{result}"
+            );
+        }
+        let schema = output_schema(&mcp, name).await;
+        let errors: Vec<String> = validator(&schema, &schema)
+            .iter_errors(result)
             .map(|error| error.to_string())
             .collect();
         assert!(errors.is_empty(), "{name}: {errors:?}\n{result}");
+        // Each definition of the schema gets a value, so no part of the schema goes unchecked.
+        let mut found = BTreeSet::new();
+        instantiated_defs(&schema, &schema, result, &mut found);
+        let defs: BTreeSet<String> = schema["$defs"]
+            .as_object()
+            .map(|defs| defs.keys().cloned().collect())
+            .unwrap_or_default();
+        let missing: Vec<&String> = defs.difference(&found).collect();
+        assert!(
+            missing.is_empty(),
+            "{name}: no value of {missing:?}\n{result}"
+        );
         called.push(name);
     }
-    let mut expected: Vec<&str> = read_only
-        .iter()
-        .map(|tool| tool["name"].as_str().unwrap())
-        .collect();
-    expected.sort_unstable();
+    let accepted = profile["accepted"].as_array().unwrap();
+    assert!(
+        accepted
+            .iter()
+            .any(|fact| fact["value"]["type"] == "reference" && fact["value"]["target"] == "event"),
+        "no reference value: {profile}"
+    );
     called.sort_unstable();
-    assert_eq!(called, expected, "a read-only tool has no case");
+    let mut expected: Vec<&str> = standard_catalog().all().map(|tool| tool.name()).collect();
+    expected.sort_unstable();
+    assert_eq!(called, expected, "a tool has no case");
+}
+
+/// A client that validates `structuredContent` against the output schema also when `isError` is true must accept a
+/// refusal; else the agent never sees the problem code. So a refusal has no `structuredContent`, and its text holds
+/// the problem.
+#[tokio::test]
+async fn a_refusal_has_no_structured_content_that_the_output_schema_refuses() {
+    let mcp = Mcp::start().await;
+    let (_, propose) = mcp.contributor_token().await;
+    let refusals = [
+        (
+            "get_event_profile",
+            json!({"event_key": "NONE99"}),
+            &mcp.token,
+            "not-found",
+        ),
+        (
+            "propose_changeset",
+            changeset(mcp.secret, SOURCE, json!([])),
+            &propose,
+            "validation-failed",
+        ),
+    ];
+    for (name, arguments, token, code) in refusals {
+        let body = json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": name, "arguments": arguments},
+        });
+        let (status, body) = mcp.rpc(Some(token), None, &body).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        // `problem` also checks that the result has no structured content.
+        assert_eq!(problem(&body)["code"], code, "{name}: {body}");
+    }
 }
 
 /// An agent proposes a new milestone and a new action of it; the action names the milestone and depends on it.
