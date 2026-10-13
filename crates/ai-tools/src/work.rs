@@ -410,10 +410,15 @@ impl From<&Shown<InstitutionView>> for InstitutionItem {
     }
 }
 
-/// The description of a list tool with a page of `PageLimit::MAX` records.
+/// The description of a list tool with a page of `PageLimit::MAX` records in the order of their numbers.
 pub(super) fn list_description(what: &str, more: &str) -> String {
+    list_description_in_order(what, "in the order of their numbers", more)
+}
+
+/// The description of a list tool with a page of `PageLimit::MAX` records in the order `order`.
+pub(super) fn list_description_in_order(what: &str, order: &str, more: &str) -> String {
     format!(
-        "{what} The list holds at most {} records, in the order of their numbers, and has no next page. \
+        "{what} The list holds at most {} records, {order}, and has no next page. \
 If more is true, {more}: tell the member.",
         PageLimit::MAX
     )
