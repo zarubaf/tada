@@ -58,8 +58,8 @@ The MCP tools must also serialize an empty `statuses` list ([#73](https://github
   A changed decision is a new decision that supersedes the old one.
 - Statuses: `in-force`, `superseded` and `revoked`.
 - Transitions, both final:
-  - `in-force` to `superseded` names `superseded_by`.
-    That is another decision of the same event that is in force.
+  - `in-force` to `superseded` names the successor in `superseded_by`.
+    The successor is another decision of the same event that is in force, or a new decision of the same changeset.
     Any other target returns `unknown-record` and changes nothing.
   - `in-force` to `revoked` needs a reason (at most 500 characters).
 - A decision in a proposal is the "proposed" stage of the decision.
@@ -89,7 +89,9 @@ The MCP tools must also serialize an empty `statuses` list ([#73](https://github
 ### Operations in proposals
 
 - `CreateMilestone` and `ChangeMilestoneStatus`.
-- `CreateDecision`, `SupersedeDecision` (it carries the new decision) and `RevokeDecision` (it carries the reason).
+- `CreateDecision`, `SupersedeDecision` and `RevokeDecision` (it carries the reason).
+- `SupersedeDecision` names its successor: a decision of the event that is in force, or a new decision of the same changeset.
+  If the successor is new, the proposal depends on the `CreateDecision` of the successor.
 - `CreateRisk`, `ChangeRiskStatus` and `ChangeRiskRating`.
 - `CreateRequirement` and `ChangeRequirementStatus` (`waived` needs the reason).
 - `CreateAction` gets the optional `start_date` and `milestone`.
@@ -112,7 +114,8 @@ The MCP tools must also serialize an empty `statuses` list ([#73](https://github
   - a new milestone that a new action or `ChangeActionMilestone` names;
   - a new person or institution that a new decision or requirement names;
   - a new workstream that a new record names.
-    A new decision that `SupersedeDecision` names needs no case, because both go to the managers.
+    A new successor that `SupersedeDecision` names needs no case.
+    Its `CreateDecision` goes to the event managers like every decision operation, so the same reviewers decide on both.
 - The review edit (ADR 0068) cannot name a milestone of another event, or a canceled milestone, on a new action.
 
 ### Personal data
