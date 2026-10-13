@@ -7,6 +7,7 @@
 //! the functions of `app::ai_queries`, which read or propose (ADR 0010).
 //! The names are stable; the descriptions tell the agent the rules.
 
+mod decisions;
 mod documents;
 mod events;
 mod milestones;
@@ -43,6 +44,7 @@ pub fn standard_catalog() -> ToolCatalog<AiToolPorts> {
         Arc::new(Typed(work::ListActions)),
         Arc::new(Typed(work::ListCommitments)),
         Arc::new(Typed(milestones::ListMilestones)),
+        Arc::new(Typed(decisions::ListDecisions)),
         Arc::new(Typed(work::SearchParties)),
         Arc::new(Typed(propose::ProposeChangeset)),
     ])

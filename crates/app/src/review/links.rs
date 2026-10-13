@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use tada_domain::ids::{InstitutionId, PersonId, ProposalId};
 use tada_domain::parties::{Party, PartyName, normalized_name};
 use tada_domain::proposals::Operation;
+use tada_domain::records::DecisionParties;
 use uuid::Uuid;
 
 use super::checks::Edits;
@@ -57,10 +58,22 @@ impl Links {
 
     /// The operation with each party that a linked proposal creates replaced by its linked record.
     pub(super) fn resolved(&self, mut operation: Operation) -> Operation {
-        if let Operation::CreateCommitment { promisor, .. } = &mut operation
-            && let Some(record) = self.by_proposed.get(&promisor.as_uuid())
-        {
-            *promisor = *record;
+        let linked = |party: Party| {
+            self.by_proposed
+                .get(&party.as_uuid())
+                .copied()
+                .unwrap_or(party)
+        };
+        match &mut operation {
+            Operation::CreateCommitment { promisor, .. } => *promisor = linked(*promisor),
+            Operation::CreateDecision { decided_by, .. } => {
+                let parties = decided_by.as_slice().iter().copied().map(linked).collect();
+                // Two parties that link to one record become one; the first position stays.
+                if let Ok(parties) = DecisionParties::new(parties) {
+                    *decided_by = parties;
+                }
+            }
+            _ => {}
         }
         operation
     }

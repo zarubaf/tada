@@ -319,10 +319,12 @@ impl RoutingLookup for RoutingFacts {
 mod tests {
     use tada_domain::RecordVersion;
     use tada_domain::ids::{
-        ActionId, CommitmentId, FieldDefinitionId, InstitutionId, MilestoneId, PersonId,
+        ActionId, CommitmentId, DecisionId, FieldDefinitionId, InstitutionId, MilestoneId, PersonId,
     };
     use tada_domain::parties::{InstitutionKind, Party, PartyName};
-    use tada_domain::records::{MilestoneStatus, MilestoneTitle};
+    use tada_domain::records::{
+        DecisionParties, DecisionWording, MilestoneStatus, MilestoneTitle, RecordReason,
+    };
     use tada_domain::work::{ActionStatus, ActionTitle, CommitmentText, WorkstreamName};
     use uuid::Uuid;
 
@@ -511,6 +513,88 @@ mod tests {
             )
             .routed_to(user(LEAD), EventLevel::Contributor, proposal_id(2))
         );
+    }
+
+    fn decision(n: u128) -> DecisionId {
+        DecisionId::from_uuid(Uuid::from_u128(n))
+    }
+
+    #[test]
+    fn decision_proposals_go_to_managers_even_in_a_workstream() {
+        // The lead of the workstream and the owner of the decision are contributors: neither reviews a decision.
+        let person = PersonId::from_uuid(Uuid::from_u128(61));
+        let facts = RoutingFacts {
+            owners: HashMap::from([(RecordRef::Decision(decision(80)), user(OWNER))]),
+            leads: HashMap::from([(workstream(), user(LEAD))]),
+        };
+        let create = Operation::CreateDecision {
+            id: decision(81),
+            event_id: event(),
+            wording: DecisionWording::parse("Das Fest findet bei jedem Wetter statt.").unwrap(),
+            decided_on: jiff::civil::date(2030, 3, 1),
+            decided_by: DecisionParties::new(vec![Party::Person(person)]).unwrap(),
+            owner: user(OWNER),
+            workstream: Some(workstream()),
+        };
+        let supersede = Operation::SupersedeDecision {
+            event_id: event(),
+            decision_id: decision(80),
+            successor: decision(81),
+            expected_version: RecordVersion::FIRST,
+        };
+        let revoke = Operation::RevokeDecision {
+            event_id: event(),
+            decision_id: decision(80),
+            reason: RecordReason::parse("Die Gemeinde verbietet es.").unwrap(),
+            expected_version: RecordVersion::FIRST,
+        };
+        for operation in [&create, &supersede, &revoke] {
+            assert_eq!(
+                reviewers(operation, Some(event()), &facts),
+                Reviewers::EventManagers
+            );
+        }
+        // The new party of the decision and its successor stay with the managers too (rule 5).
+        let person_proposal = new_person(person);
+        let routes = ChangesetRoutes::new(
+            [
+                RoutedProposal {
+                    id: proposal_id(1),
+                    operation: &person_proposal,
+                    depends_on: &[],
+                    open: true,
+                },
+                RoutedProposal {
+                    id: proposal_id(2),
+                    operation: &create,
+                    depends_on: &[proposal_id(1)],
+                    open: true,
+                },
+                RoutedProposal {
+                    id: proposal_id(3),
+                    operation: &supersede,
+                    depends_on: &[proposal_id(2)],
+                    open: true,
+                },
+                RoutedProposal {
+                    id: proposal_id(4),
+                    operation: &revoke,
+                    depends_on: &[],
+                    open: true,
+                },
+            ],
+            Some(event()),
+            &facts,
+        );
+        for id in (1..=4).map(proposal_id) {
+            for member in [LEAD, OWNER] {
+                assert!(!routes.routed_to(user(member), EventLevel::Contributor, id));
+                assert!(!routes.may_review(user(member), EventLevel::Contributor, id));
+                assert!(!routes.in_inbox_of(user(member), EventLevel::Contributor, id, true));
+            }
+            assert!(routes.routed_to(user(MANAGER), EventLevel::Manager, id));
+            assert!(routes.may_review(user(MANAGER), EventLevel::Manager, id));
+        }
     }
 
     fn milestone() -> MilestoneId {

@@ -18,6 +18,7 @@ use jiff::Timestamp;
 use tada_domain::RecordVersion;
 use tada_domain::facts::TextError;
 use tada_domain::ids::{self, ProposalId, SourceVersionId};
+use tada_domain::records::PartiesError;
 pub use tada_domain::records::RecordRef;
 use tada_domain::redaction::Redactable;
 use uuid::Uuid;
@@ -39,6 +40,14 @@ pub(crate) fn text_error_code(error: TextError) -> &'static str {
         TextError::Empty => "empty",
         TextError::TooLong => "too-long",
         TextError::ControlCharacter => "control-character",
+    }
+}
+
+/// The field code of the parties of a decision: none (`required`) or more than the limit (`too-long`).
+pub(crate) fn parties_code(error: PartiesError) -> &'static str {
+    match error {
+        PartiesError::Empty => "required",
+        PartiesError::TooMany => "too-long",
     }
 }
 

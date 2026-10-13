@@ -1236,7 +1236,7 @@
               "type": "string"
             },
             "promisor": {
-              "$ref": "#/$defs/PromisorItem"
+              "$ref": "#/$defs/PartyItem"
             },
             "redacted": {
               "description": "True after a legal redaction: the texts are empty (ADR 0072).",
@@ -1340,7 +1340,8 @@
           ],
           "type": "object"
         },
-        "PromisorItem": {
+        "PartyItem": {
+          "description": "A person or an institution of the organization: the promisor of a commitment, or a party of a decision.",
           "properties": {
             "id": {
               "format": "uuid",
@@ -1388,6 +1389,255 @@
       },
       "required": [
         "commitments",
+        "more"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true
+    }
+  },
+  {
+    "name": "list_decisions",
+    "description": "List the decisions of an event: what the club decided, when, who decided it, its owner, its status and the evidence of the accepted proposals that made or ended it. A decision never changes its wording: a newer decision supersedes it. Read the list before you propose a decision, so you supersede the decision in force instead of a duplicate. The list holds at most 200 records, in the order of their numbers, and has no next page. If more is true, the event has more decisions than this tool can show: tell the member.",
+    "inputSchema": {
+      "$defs": {
+        "DecisionStatusInput": {
+          "description": "The status of a decision. Only a supersede or a revoke changes it.",
+          "enum": [
+            "in-force",
+            "superseded",
+            "revoked"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "event_key": {
+          "description": "The key of the event, for example `FLY28`, from `list_events`.",
+          "pattern": "^[A-Z0-9]{2,8}$",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecisionStatusInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only the decisions with this status."
+        }
+      },
+      "required": [
+        "event_key"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DecisionItem": {
+          "properties": {
+            "decided_by": {
+              "description": "The persons and institutions that decided, in their order.",
+              "items": {
+                "$ref": "#/$defs/PartyItem"
+              },
+              "type": "array"
+            },
+            "decided_on": {
+              "description": "The date of the decision as `YYYY-MM-DD`.",
+              "type": "string"
+            },
+            "evidence": {
+              "items": {
+                "$ref": "#/$defs/EvidenceItem"
+              },
+              "type": "array"
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "local_id": {
+              "description": "The readable ID, for example `DEC-001`.",
+              "type": "string"
+            },
+            "owner_user_id": {
+              "description": "The member who follows the decision up.",
+              "format": "uuid",
+              "type": "string"
+            },
+            "redacted": {
+              "description": "True after a legal redaction: the texts are empty (ADR 0072).",
+              "type": "boolean"
+            },
+            "revoked_reason": {
+              "description": "Why the decision was revoked. Only a `revoked` decision has it, and a legal redaction removes it.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "description": "`in-force`, `superseded` or `revoked`.",
+              "type": "string"
+            },
+            "superseded_by": {
+              "description": "The newer decision that replaced this one. Only a `superseded` decision has it.",
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "version": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "wording": {
+              "description": "The words of the decision. It can have several lines. Empty after a legal redaction (ADR 0072).",
+              "type": "string"
+            },
+            "workstream_id": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "local_id",
+            "wording",
+            "redacted",
+            "decided_on",
+            "decided_by",
+            "owner_user_id",
+            "status",
+            "version",
+            "evidence"
+          ],
+          "type": "object"
+        },
+        "DisputeNoteView": {
+          "description": "A dispute note: the objection of a person to a fact version or to a source (ADR 0073).",
+          "properties": {
+            "created_at": {
+              "description": "RFC 3339.",
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "EvidenceItem": {
+          "description": "A passage that supports one version of a record, from a source that the member can read.",
+          "properties": {
+            "dispute_notes": {
+              "description": "The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
+              "items": {
+                "$ref": "#/$defs/DisputeNoteView"
+              },
+              "type": "array"
+            },
+            "end": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "quote": {
+              "description": "Empty after a legal redaction of the source (ADR 0072).",
+              "type": "string"
+            },
+            "record_version": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "redacted": {
+              "description": "True after a legal redaction of the source: the quote is empty (ADR 0072).",
+              "type": "boolean"
+            },
+            "source_version_id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "start": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "record_version",
+            "source_version_id",
+            "start",
+            "end",
+            "quote",
+            "redacted",
+            "dispute_notes"
+          ],
+          "type": "object"
+        },
+        "PartyItem": {
+          "description": "A person or an institution of the organization: the promisor of a commitment, or a party of a decision.",
+          "properties": {
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "kind": {
+              "description": "`person` or `institution`.",
+              "type": "string"
+            },
+            "local_id": {
+              "description": "The readable ID, for example `INS-001`.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Empty after a legal redaction (ADR 0072).",
+              "type": "string"
+            },
+            "redacted": {
+              "description": "True after a legal redaction: the texts are empty (ADR 0072).",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "local_id",
+            "name",
+            "redacted"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "decisions": {
+          "items": {
+            "$ref": "#/$defs/DecisionItem"
+          },
+          "type": "array"
+        },
+        "more": {
+          "description": "True if the event has more decisions than the list shows.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "decisions",
         "more"
       ],
       "type": "object"
@@ -2940,6 +3190,138 @@
                 "kind",
                 "event_id",
                 "action_id",
+                "expected_version"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Record a decision that was made in the event: what, when and by whom. It starts `in-force`.\nOnly the event managers review it. Its wording, its date and its parties never change after the acceptance:\na reviewer who wants other words rejects it.",
+              "properties": {
+                "decided_by": {
+                  "description": "The persons and institutions that decided, 1 to 50, in their order.\nEach is one of the organization, or a new person or institution of the same changeset;\nthen the proposal depends on the proposal that creates it.",
+                  "items": {
+                    "$ref": "#/$defs/PartyInput"
+                  },
+                  "maxItems": 50,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "decided_on": {
+                  "description": "The date of the decision as `YYYY-MM-DD`.",
+                  "type": "string"
+                },
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The UUIDv7 of the new decision.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "create-decision",
+                  "type": "string"
+                },
+                "owner": {
+                  "description": "The user ID of the member who follows the decision up: a contributor or manager of the event.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "wording": {
+                  "description": "The words of the decision as it was made, 1 to 2000 characters.\nIt can have several lines: line breaks (`\\n`) and tabs are allowed, other control characters are not.",
+                  "type": "string"
+                },
+                "workstream": {
+                  "default": null,
+                  "description": "An active workstream of the event, or a new workstream of this changeset;\nthen the proposal depends on the proposal that creates it.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "event_id",
+                "wording",
+                "decided_on",
+                "decided_by",
+                "owner"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Replace a decision in force with a newer decision: the old one becomes `superseded` and names the successor.\nOnly the event managers review it.",
+              "properties": {
+                "decision_id": {
+                  "description": "The decision that ends. It must be in force.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "expected_version": {
+                  "description": "The current version of the decision that ends.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "supersede-decision",
+                  "type": "string"
+                },
+                "successor": {
+                  "description": "The newer decision: another decision of the event in force, or a new decision of the same changeset;\nthen the proposal depends on the proposal that creates it. A changed decision is a new decision.",
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "event_id",
+                "decision_id",
+                "successor",
+                "expected_version"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Revoke a decision in force without a successor. Only the event managers review it.",
+              "properties": {
+                "decision_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "expected_version": {
+                  "description": "The current version of the decision.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "revoke-decision",
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "Why the decision ends, 1 to 500 characters. The decision keeps it.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "event_id",
+                "decision_id",
+                "reason",
                 "expected_version"
               ],
               "type": "object"

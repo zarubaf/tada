@@ -7,9 +7,11 @@ pub mod risk;
 
 use uuid::Uuid;
 
-use crate::ids::{ActionId, CommitmentId, InstitutionId, MilestoneId, PersonId};
+use crate::ids::{ActionId, CommitmentId, DecisionId, InstitutionId, MilestoneId, PersonId};
 
-pub use decision::{DecisionParties, DecisionStatus, DecisionWording, EmptyParties};
+pub use decision::{
+    DecisionChange, DecisionParties, DecisionStatus, DecisionWording, PartiesError,
+};
 pub use milestone::{MilestoneStatus, MilestoneTitle};
 pub use requirement::{RequirementStatus, RequirementText};
 pub use risk::{Level, RiskRating, RiskStatus, RiskTitle};
@@ -24,6 +26,7 @@ pub enum RecordRef {
     Person(PersonId),
     Institution(InstitutionId),
     Milestone(MilestoneId),
+    Decision(DecisionId),
 }
 
 /// The kind of a record that a `RecordRef` names.
@@ -34,15 +37,17 @@ pub enum RecordKind {
     Person,
     Institution,
     Milestone,
+    Decision,
 }
 
 impl RecordKind {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Action,
         Self::Commitment,
         Self::Person,
         Self::Institution,
         Self::Milestone,
+        Self::Decision,
     ];
 
     /// The name of the table of the kind.
@@ -53,6 +58,7 @@ impl RecordKind {
             Self::Person => "person",
             Self::Institution => "institution",
             Self::Milestone => "milestone",
+            Self::Decision => "decision",
         }
     }
 
@@ -70,6 +76,7 @@ impl RecordRef {
             RecordKind::Person => Self::Person(PersonId::from_uuid(id)),
             RecordKind::Institution => Self::Institution(InstitutionId::from_uuid(id)),
             RecordKind::Milestone => Self::Milestone(MilestoneId::from_uuid(id)),
+            RecordKind::Decision => Self::Decision(DecisionId::from_uuid(id)),
         }
     }
 
@@ -80,6 +87,7 @@ impl RecordRef {
             Self::Person(_) => RecordKind::Person,
             Self::Institution(_) => RecordKind::Institution,
             Self::Milestone(_) => RecordKind::Milestone,
+            Self::Decision(_) => RecordKind::Decision,
         }
     }
 
@@ -90,6 +98,7 @@ impl RecordRef {
             Self::Person(id) => id.as_uuid(),
             Self::Institution(id) => id.as_uuid(),
             Self::Milestone(id) => id.as_uuid(),
+            Self::Decision(id) => id.as_uuid(),
         }
     }
 }

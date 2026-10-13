@@ -398,7 +398,10 @@ async fn lock_targets(
             | Operation::ChangeCommitmentStatus { .. }
             | Operation::CreateWorkstream { .. }
             | Operation::CreateMilestone { .. }
-            | Operation::ChangeMilestoneStatus { .. } => {}
+            | Operation::ChangeMilestoneStatus { .. }
+            | Operation::CreateDecision { .. }
+            | Operation::SupersedeDecision { .. }
+            | Operation::RevokeDecision { .. } => {}
         }
     }
     // Shipped fields have no organization and change only with `tada migrate`, so they need no lock.
@@ -602,7 +605,10 @@ async fn check_versions(
             | Operation::ChangeCommitmentStatus { .. }
             | Operation::CreateWorkstream { .. }
             | Operation::CreateMilestone { .. }
-            | Operation::ChangeMilestoneStatus { .. }) => {
+            | Operation::ChangeMilestoneStatus { .. }
+            | Operation::CreateDecision { .. }
+            | Operation::SupersedeDecision { .. }
+            | Operation::RevokeDecision { .. }) => {
                 records::matches(conn, scope, operation, &new_records, &mut record_versions).await?
             }
         };
@@ -854,7 +860,10 @@ async fn write_step(
         | Operation::ChangeCommitmentStatus { .. }
         | Operation::CreateWorkstream { .. }
         | Operation::CreateMilestone { .. }
-        | Operation::ChangeMilestoneStatus { .. } => {
+        | Operation::ChangeMilestoneStatus { .. }
+        | Operation::CreateDecision { .. }
+        | Operation::SupersedeDecision { .. }
+        | Operation::RevokeDecision { .. } => {
             let written = records::write_record(conn, scope, plan, step).await?;
             local_id = written.local_id;
             edit_source = written.edit_source;

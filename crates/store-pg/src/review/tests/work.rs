@@ -2,7 +2,7 @@
 
 use tada_app::access::SourceReach;
 use tada_app::caller::TestScope;
-use tada_app::domain::ids::{CommitmentId, LocalIdKind, MilestoneId, PersonId};
+use tada_app::domain::ids::{CommitmentId, DecisionId, LocalIdKind, MilestoneId, PersonId};
 use tada_app::records::{EvidenceStore, RecordRef};
 use tada_app::review::{LocalRecord, NewLocalId, RecordEditInput};
 
@@ -1620,4 +1620,359 @@ async fn the_apply_takes_a_new_workstream_or_milestone_only_of_the_same_event() 
             assert_eq!(result, takes, "{operation:?} with new records of {event:?}");
         }
     }
+}
+
+fn decision(event: EventId, id: Uuid, decided_by: Value, owner: UserId) -> Value {
+    json!({
+        "kind": "create-decision", "id": id, "event_id": event.as_uuid(),
+        "wording": "Das Open Day findet statt.\nDer Vorstand trägt das Risiko.",
+        "decided_on": "2030-03-01", "decided_by": decided_by, "owner": owner.as_uuid(),
+    })
+}
+
+fn supersede(event: EventId, old: Uuid, successor: Uuid, expected_version: i64) -> Value {
+    json!({
+        "kind": "supersede-decision", "event_id": event.as_uuid(), "decision_id": old,
+        "successor": successor, "expected_version": expected_version,
+    })
+}
+
+/// The state of a decision: its status, its successor, its reason and its version.
+async fn decision_state(
+    test: &TestDatabase,
+    id: Uuid,
+) -> (String, Option<Uuid>, Option<String>, i64) {
+    sqlx::query_as(
+        "SELECT status, superseded_by, revoked_reason, version FROM decision WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_one(&test.database.pool)
+    .await
+    .unwrap()
+}
+
+/// A changeset of the contributor with a new decision of a new person, applied by the manager.
+async fn applied_decision(test: &TestDatabase, open_day: &OpenDay) -> Uuid {
+    let (person_id, decision_id, first, second) = (
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+    );
+    let anna = open_day.contributor.user_id();
+    let changeset = propose(
+        test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![
+            proposal(first, person(person_id), &[], "Das Open Day"),
+            proposal(
+                second,
+                decision(
+                    open_day.event,
+                    decision_id,
+                    json!([{"person": person_id}]),
+                    anna,
+                ),
+                &[first],
+                "im Mai 2030",
+            ),
+        ],
+    )
+    .await;
+    // The contributor owns the decision, but only a manager reviews it.
+    let refused = apply(test, &open_day.contributor, &changeset, select(&[second])).await;
+    assert!(matches!(refused, Err(ApplyError::Forbidden)), "{refused:?}");
+    let applied = apply(test, &open_day.manager, &changeset, select(&[second]))
+        .await
+        .unwrap();
+    assert!(
+        applied
+            .local_ids
+            .iter()
+            .any(|local| local.record == LocalRecord::Decision(DecisionId::from_uuid(decision_id))),
+        "{:?}",
+        applied.local_ids
+    );
+    let party: Uuid = test
+        .scalar(&format!(
+            "SELECT person_id FROM decision_party WHERE decision_id = '{decision_id}' AND position = 0"
+        ))
+        .await;
+    assert_eq!(party, person_id);
+    decision_id
+}
+
+/// A review edit of a new decision sets its owner and its workstream; its wording, the date and the parties stay.
+#[tokio::test]
+async fn an_edited_decision_takes_the_owner_and_the_workstream_but_not_the_wording() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let workstream = insert_workstream(&test, &open_day, "active").await;
+    let (person_id, decision_id, first, second) = (
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+    );
+    let anna = open_day.contributor.user_id();
+    let mia = open_day.manager.user_id();
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![
+            proposal(first, person(person_id), &[], "Das Open Day"),
+            proposal(
+                second,
+                decision(
+                    open_day.event,
+                    decision_id,
+                    json!([{"person": person_id}]),
+                    anna,
+                ),
+                &[first],
+                "im Mai 2030",
+            ),
+        ],
+    )
+    .await;
+    let input = |fields: Value| ApplyInput {
+        edits: vec![edit(second, fields)],
+        ..select(&[first, second])
+    };
+    // The wording is not a field of the edit, and the text of another record is not the wording.
+    let refused = apply(
+        &test,
+        &open_day.manager,
+        &changeset,
+        input(json!({"text": "Anderer Wortlaut"})),
+    )
+    .await;
+    assert_eq!(
+        invalid(refused),
+        [("edits/0/fields/text".to_owned(), "not-editable")]
+    );
+    assert_eq!(count(&test, "decision").await, 0);
+
+    apply(
+        &test,
+        &open_day.manager,
+        &changeset,
+        input(json!({"owner": mia.as_uuid(), "workstream": workstream})),
+    )
+    .await
+    .unwrap();
+    let (owner, edited_workstream, wording): (Uuid, Option<Uuid>, String) =
+        sqlx::query_as("SELECT owner_user_id, workstream_id, wording FROM decision WHERE id = $1")
+            .bind(decision_id)
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap();
+    assert_eq!(owner, mia.as_uuid());
+    assert_eq!(edited_workstream, Some(workstream));
+    assert!(
+        wording.starts_with("Das Open Day findet statt."),
+        "{wording}"
+    );
+}
+
+/// A supersede and the new successor that it names apply in one apply (ADR 0080): the old decision names the
+/// successor, and its evidence holds the new version.
+#[tokio::test]
+async fn accepted_supersede_with_a_new_successor_applies_together() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let old = applied_decision(&test, &open_day).await;
+    assert_eq!(
+        record_evidence(&test, "decision_id", old).await.len(),
+        1,
+        "the new decision has the evidence of its proposal"
+    );
+    let anna = open_day.contributor.user_id();
+    let (successor, create, replace) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![
+            proposal(
+                create,
+                decision(
+                    open_day.event,
+                    successor,
+                    json!([{"person": open_day_person(&test, old).await}]),
+                    anna,
+                ),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(
+                replace,
+                supersede(open_day.event, old, successor, 1),
+                &[create],
+                "im Mai 2030",
+            ),
+        ],
+    )
+    .await;
+    // Selecting the supersede also applies the successor that it depends on.
+    let applied = apply(&test, &open_day.manager, &changeset, select(&[replace]))
+        .await
+        .unwrap();
+    assert_eq!(
+        applied.local_ids,
+        [NewLocalId {
+            record: LocalRecord::Decision(DecisionId::from_uuid(successor)),
+            local_number: 2,
+        }]
+    );
+    assert_eq!(
+        decision_state(&test, old).await,
+        ("superseded".to_owned(), Some(successor), None, 2)
+    );
+    assert_eq!(
+        decision_state(&test, successor).await,
+        ("in-force".to_owned(), None, None, 1)
+    );
+    assert_eq!(
+        record_evidence(&test, "decision_id", old).await[1..],
+        [(2, replace, "im Mai 2030".to_owned())]
+    );
+    assert_eq!(
+        audit_actions(&test, old).await,
+        ["decision.create", "decision.supersede"]
+    );
+    assert_eq!(audit_actions(&test, successor).await, ["decision.create"]);
+}
+
+/// The person that decided the decision `id`.
+async fn open_day_person(test: &TestDatabase, id: Uuid) -> Uuid {
+    test.scalar(&format!(
+        "SELECT person_id FROM decision_party WHERE decision_id = '{id}'"
+    ))
+    .await
+}
+
+/// A successor that ended after the proposal makes the supersede a conflict, and nothing changes.
+/// A revoke keeps the reason of its operation.
+#[tokio::test]
+async fn a_supersede_of_an_ended_successor_conflicts() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let (old, successor) = (
+        applied_decision(&test, &open_day).await,
+        applied_decision(&test, &open_day).await,
+    );
+    let replace = Uuid::now_v7();
+    let superseding = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            replace,
+            supersede(open_day.event, old, successor, 1),
+            &[],
+            "im Mai 2030",
+        )],
+    )
+    .await;
+    let revoke = Uuid::now_v7();
+    let revoking = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            revoke,
+            json!({
+                "kind": "revoke-decision", "event_id": open_day.event.as_uuid(),
+                "decision_id": successor, "reason": "Die Gemeinde verbietet es.",
+                "expected_version": 1,
+            }),
+            &[],
+            "Das Open Day",
+        )],
+    )
+    .await;
+    apply(&test, &open_day.manager, &revoking, select(&[revoke]))
+        .await
+        .unwrap();
+    assert_eq!(
+        decision_state(&test, successor).await,
+        (
+            "revoked".to_owned(),
+            None,
+            Some("Die Gemeinde verbietet es.".to_owned()),
+            2
+        )
+    );
+    let result = apply(&test, &open_day.manager, &superseding, select(&[replace])).await;
+    assert!(
+        matches!(&result, Err(ApplyError::Conflict(ids)) if ids == &[ProposalId::from_uuid(replace)]),
+        "{result:?}"
+    );
+    assert_eq!(
+        decision_state(&test, old).await,
+        ("in-force".to_owned(), None, None, 1)
+    );
+}
+
+/// Two applies that supersede two decisions with each other take their locks in one order: one applies, the other
+/// conflicts, and neither ends in a deadlock.
+#[tokio::test]
+async fn crossed_supersedes_leave_one_winner() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let (first, second) = (
+        applied_decision(&test, &open_day).await,
+        applied_decision(&test, &open_day).await,
+    );
+    let mut changesets = Vec::new();
+    for (old, successor) in [(first, second), (second, first)] {
+        let id = Uuid::now_v7();
+        let changeset = propose(
+            &test,
+            &open_day.contributor,
+            Some(open_day.event),
+            vec![proposal(
+                id,
+                supersede(open_day.event, old, successor, 1),
+                &[],
+                "im Mai 2030",
+            )],
+        )
+        .await;
+        changesets.push((changeset, id));
+    }
+    let (a, b) = tokio::join!(
+        apply(
+            &test,
+            &open_day.manager,
+            &changesets[0].0,
+            select(&[changesets[0].1])
+        ),
+        apply(
+            &test,
+            &open_day.manager,
+            &changesets[1].0,
+            select(&[changesets[1].1])
+        ),
+    );
+    let applied = [&a, &b].iter().filter(|result| result.is_ok()).count();
+    assert_eq!(applied, 1, "{a:?} {b:?}");
+    assert!(
+        [&a, &b]
+            .iter()
+            .any(|result| matches!(result, Err(ApplyError::Conflict(_)))),
+        "{a:?} {b:?}"
+    );
+    let states = [
+        decision_state(&test, first).await.0,
+        decision_state(&test, second).await.0,
+    ];
+    assert_eq!(
+        states.iter().filter(|status| *status == "in-force").count(),
+        1,
+        "{states:?}"
+    );
 }

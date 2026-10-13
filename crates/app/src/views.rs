@@ -12,7 +12,7 @@ use tada_domain::events::Event;
 use tada_domain::facts::{
     CORE_CATALOG_VERSION, FactState, FieldDefinition, FieldStatus, Label, Valued,
 };
-use tada_domain::records::MilestoneStatus;
+use tada_domain::records::{DecisionStatus, MilestoneStatus};
 use tada_domain::redaction::Redactable;
 use tada_domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus};
 use uuid::Uuid;
@@ -127,7 +127,7 @@ pub struct EntityView {
 }
 
 /// The kinds of records that an agent can read (ADR 0049, ADR 0068, ADR 0069, ADR 0080).
-const ENTITIES: [EntityView; 10] = [
+const ENTITIES: [EntityView; 11] = [
     EntityView {
         name: "event",
         description: "One occurrence of an event, with its key, name and time zone. Facts, open questions, documents, workstreams, actions and commitments belong to it.",
@@ -167,6 +167,11 @@ const ENTITIES: [EntityView; 10] = [
         name: "milestone",
         description: "A dated point of the plan of an event with one owner, an optional workstream and an event-local ID such as MIL-001. tada warns if it is open after its date, or if an open action of it is due after its date. Transitions: open changes to reached or canceled; reached changes to open; canceled is final.",
         statuses: &MilestoneStatus::NAMES,
+    },
+    EntityView {
+        name: "decision",
+        description: "A decision that the club made in an event: its wording (it can have several lines), the date, the persons or institutions that decided it, one owner who follows it up, an optional workstream and an event-local ID such as DEC-001. The wording, the date and the parties never change. Only the event managers record, supersede or revoke a decision. A changed decision is a new decision that supersedes the old one. Transitions: in-force changes to superseded, with the newer decision, or to revoked, with a reason; both are final.",
+        statuses: &DecisionStatus::NAMES,
     },
     EntityView {
         name: "person",

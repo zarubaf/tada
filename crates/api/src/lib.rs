@@ -6,6 +6,7 @@ mod ai;
 mod client_ip;
 mod contract;
 mod cursor;
+mod decisions;
 mod digests;
 mod dispute_notes;
 mod documents;
@@ -79,7 +80,7 @@ use tada_app::sources::SourceStore;
 use tada_app::system::VersionStore;
 use tada_app::telegram::TelegramLinks;
 use tada_app::tokens::TokenStore;
-use tada_app::work::{MilestoneStore, WorkStore};
+use tada_app::work::{DecisionStore, MilestoneStore, WorkStore};
 use tada_app::workstreams::WorkstreamStore;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa::openapi::OpenApi;
@@ -141,6 +142,8 @@ pub struct ApiState {
     pub work: Arc<dyn WorkStore>,
     /// The milestones of events (ADR 0080).
     pub milestones: Arc<dyn MilestoneStore>,
+    /// The decisions of events (ADR 0080).
+    pub decisions: Arc<dyn DecisionStore>,
     /// The mentions and the export of a person (ADR 0073).
     pub person_data: Arc<dyn PersonDataStore>,
     /// The dispute notes about evidence (ADR 0073).
@@ -184,6 +187,7 @@ fn api() -> (Router<ApiState>, OpenApi) {
                 .merge(workstreams::routes())
                 .merge(work::routes())
                 .merge(milestones::routes())
+                .merge(decisions::routes())
                 .merge(person_data::routes())
                 .merge(dispute_notes::routes())
                 .merge(redactions::routes())
@@ -216,6 +220,7 @@ fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
         .chain(workstreams::problem_codes())
         .chain(work::problem_codes())
         .chain(milestones::problem_codes())
+        .chain(decisions::problem_codes())
         .chain(person_data::problem_codes())
         .chain(dispute_notes::problem_codes())
         .chain(redactions::problem_codes())
@@ -1486,6 +1491,88 @@ mod tests {
     }
 
     #[async_trait::async_trait]
+    impl DecisionStore for NoWork {
+        async fn create_decision(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: &tada_app::work::NewDecisionRecord,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::records::Created<tada_app::work::DecisionView>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn change_decision(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::DecisionId,
+            _: &tada_app::work::DecisionFields,
+            _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::records::Changed<tada_app::work::DecisionView>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn supersede_decision(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::DecisionId,
+            _: &tada_app::work::NewDecisionRecord,
+            _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
+            _: &[tada_app::audit::AuditEvent],
+        ) -> Result<
+            tada_app::records::Created<tada_app::records::Changed<tada_app::work::Superseded>>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn revoke_decision(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::DecisionId,
+            _: &tada_app::domain::records::RecordReason,
+            _: tada_app::domain::RecordVersion,
+            _: jiff::Timestamp,
+            _: &tada_app::audit::AuditEvent,
+        ) -> Result<
+            tada_app::records::Changed<tada_app::work::DecisionView>,
+            tada_app::store::StoreError,
+        > {
+            unreachable!()
+        }
+
+        async fn decision(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: tada_app::domain::ids::DecisionId,
+        ) -> Result<Option<tada_app::work::DecisionView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+
+        async fn decisions(
+            &self,
+            _: tada_app::caller::OrgScope,
+            _: tada_app::domain::ids::EventId,
+            _: &tada_app::work::WorkFilter<tada_app::domain::records::DecisionStatus>,
+        ) -> Result<Vec<tada_app::work::DecisionView>, tada_app::store::StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[async_trait::async_trait]
     impl MilestoneStore for NoWork {
         async fn create_milestone(
             &self,
@@ -1872,6 +1959,7 @@ mod tests {
             workstreams: Arc::new(NoWorkstreams),
             work: Arc::new(NoWork),
             milestones: Arc::new(NoWork),
+            decisions: Arc::new(NoWork),
             person_data: Arc::new(NoPersonData),
             dispute_notes: Arc::new(NoPersonData),
             redaction: Arc::new(NoPersonData),

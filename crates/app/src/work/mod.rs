@@ -1,9 +1,10 @@
-//! Actions, commitments and milestones (ADR 0068, ADR 0080): the work records of an event, with their direct
-//! commands. A member creates and changes them without review; an accepted proposal does the same (ADR 0050).
+//! Actions, commitments, milestones and decisions (ADR 0068, ADR 0080): the work records of an event, with their
+//! direct commands. A member creates and changes them without review; an accepted proposal does the same (ADR 0050).
 
 mod actions;
 mod checks;
 mod commitments;
+mod decisions;
 mod milestones;
 
 use std::collections::HashMap;
@@ -31,6 +32,11 @@ pub(crate) use self::checks::{ChangeRights, WorkRecord, is_possible_owner, miles
 pub use self::commitments::{
     CommitmentChange, FirmInput, NewCommitment, change_commitment, create_commitment,
     get_commitment, list_commitments, make_commitment_firm,
+};
+pub use self::decisions::{
+    DecisionFields, DecisionState, DecisionStore, DecisionUpdate, DecisionView, NewDecision,
+    NewDecisionRecord, Revocation, Superseded, change_decision, create_decision, get_decision,
+    list_decisions, revoke_decision, supersede_decision,
 };
 pub use self::milestones::{
     MilestoneChange, MilestoneFields, MilestoneStore, MilestoneView, MilestoneWarning,
@@ -313,6 +319,7 @@ pub struct WorkPorts<'a> {
     pub identity: &'a dyn IdentityStore,
     pub work: &'a dyn WorkStore,
     pub milestones: &'a dyn MilestoneStore,
+    pub decisions: &'a dyn DecisionStore,
     pub workstreams: &'a dyn WorkstreamStore,
     pub parties: &'a dyn PartyStore,
     pub clock: &'a dyn Clock,

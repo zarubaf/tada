@@ -1,4 +1,5 @@
-//! The `WorkStore` adapter: actions and commitments (ADR 0068). `milestones` holds the `MilestoneStore` adapter.
+//! The `WorkStore` adapter: actions and commitments (ADR 0068). `milestones` holds the `MilestoneStore` adapter,
+//! `decisions` the `DecisionStore` adapter.
 
 use std::collections::HashMap;
 
@@ -107,30 +108,15 @@ struct CommitmentRow {
 
 impl CommitmentRow {
     fn promisor(&self) -> Result<PartyRef, InvalidRow> {
-        let (party, kind) = match (self.person_id, self.institution_id) {
-            (Some(id), None) => (Party::Person(PersonId::from_uuid(id)), LocalIdKind::Person),
-            (None, Some(id)) => (
-                Party::Institution(InstitutionId::from_uuid(id)),
-                LocalIdKind::Institution,
-            ),
-            _ => return Err(InvalidRow("commitment.promisor")),
-        };
-        let number = self
-            .promisor_number
-            .and_then(|number| u64::try_from(number).ok())
-            .ok_or(InvalidRow("commitment.promisor"))?;
-        // The promisor exists, so a name without a value is the tombstone of a legal redaction (ADR 0072).
-        let name = match self.promisor_name.as_deref() {
-            Some(name) => Redactable::Present(
-                PartyName::parse(name).map_err(|_| InvalidRow("commitment.promisor"))?,
-            ),
-            None => Redactable::Redacted,
-        };
-        Ok(PartyRef {
-            party,
-            local_id: kind.readable_id(number),
-            name,
-        })
+        party_ref(
+            PartyColumns {
+                person_id: self.person_id,
+                institution_id: self.institution_id,
+                number: self.promisor_number,
+                name: self.promisor_name.as_deref(),
+            },
+            "commitment.promisor",
+        )
     }
 
     fn into_view(self) -> Result<CommitmentView, InvalidRow> {
@@ -168,6 +154,44 @@ impl CommitmentRow {
             version: RecordVersion::new(self.version).ok_or(InvalidRow("commitment.version"))?,
         })
     }
+}
+
+/// The columns of a person or an institution that a record names: exactly one ID, with the number and the name of
+/// the party that it joins.
+pub(crate) struct PartyColumns<'a> {
+    pub person_id: Option<Uuid>,
+    pub institution_id: Option<Uuid>,
+    pub number: Option<i64>,
+    pub name: Option<&'a str>,
+}
+
+/// The party of the columns with its readable ID and its name. `what` names the column in an error.
+pub(crate) fn party_ref(
+    columns: PartyColumns<'_>,
+    what: &'static str,
+) -> Result<PartyRef, InvalidRow> {
+    let (party, kind) = match (columns.person_id, columns.institution_id) {
+        (Some(id), None) => (Party::Person(PersonId::from_uuid(id)), LocalIdKind::Person),
+        (None, Some(id)) => (
+            Party::Institution(InstitutionId::from_uuid(id)),
+            LocalIdKind::Institution,
+        ),
+        _ => return Err(InvalidRow(what)),
+    };
+    let number = columns
+        .number
+        .and_then(|number| u64::try_from(number).ok())
+        .ok_or(InvalidRow(what))?;
+    // The party exists, so a name without a value is the tombstone of a legal redaction (ADR 0072).
+    let name = match columns.name {
+        Some(name) => Redactable::Present(PartyName::parse(name).map_err(|_| InvalidRow(what))?),
+        None => Redactable::Redacted,
+    };
+    Ok(PartyRef {
+        party,
+        local_id: kind.readable_id(number),
+        name,
+    })
 }
 
 /// The records that one select reads. Each field that is `None` does not filter.
@@ -707,6 +731,7 @@ impl WorkStore for Database {
         let actions = ids_of(records, RecordKind::Action);
         let commitments = ids_of(records, RecordKind::Commitment);
         let milestones = ids_of(records, RecordKind::Milestone);
+        let decisions = ids_of(records, RecordKind::Decision);
         let rows = sqlx::query!(
             r#"SELECT 'action' AS "kind!", id AS "id!", owner_user_id AS "owner_user_id!" FROM action
                WHERE organization_id = $1 AND event_id = $2 AND id = ANY($3)
@@ -715,12 +740,16 @@ impl WorkStore for Database {
                WHERE organization_id = $1 AND event_id = $2 AND id = ANY($4)
                UNION ALL
                SELECT 'milestone', id, owner_user_id FROM milestone
-               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($5)"#,
+               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($5)
+               UNION ALL
+               SELECT 'decision', id, owner_user_id FROM decision
+               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($6)"#,
             scope.organization_id().as_uuid(),
             event.as_uuid(),
             &actions,
             &commitments,
             &milestones,
+            &decisions,
         )
         .fetch_all(&self.pool)
         .await
@@ -764,6 +793,7 @@ impl WorkStore for Database {
     }
 }
 
+pub(crate) mod decisions;
 pub(crate) mod milestones;
 
 #[cfg(test)]

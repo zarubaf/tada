@@ -134,6 +134,13 @@ pub(super) fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEven
         Operation::ChangeMilestoneStatus { milestone_id, .. } => {
             Some((AuditAction::MilestoneChange, milestone_id.as_uuid()))
         }
+        Operation::CreateDecision { id, .. } => Some((AuditAction::DecisionCreate, id.as_uuid())),
+        Operation::SupersedeDecision { decision_id, .. } => {
+            Some((AuditAction::DecisionSupersede, decision_id.as_uuid()))
+        }
+        Operation::RevokeDecision { decision_id, .. } => {
+            Some((AuditAction::DecisionRevoke, decision_id.as_uuid()))
+        }
         // These records have their own audit, or none (ADR 0050).
         Operation::SetFact { .. }
         | Operation::AddFieldDefinition { .. }

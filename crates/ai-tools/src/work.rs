@@ -25,7 +25,7 @@ use tada_app::domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, WorkstreamName,
 };
 use tada_app::paging::PageLimit;
-use tada_app::parties::{InstitutionView, PersonView};
+use tada_app::parties::{InstitutionView, PartyRef, PersonView};
 use tada_app::records::{RecordEvidenceView, Shown};
 use tada_app::search::MAX_QUERY_CHARS;
 use tada_app::views::{DisputeNoteView, note_views};
@@ -247,8 +247,9 @@ pub(super) struct CommitmentList {
     more: bool,
 }
 
+/// A person or an institution of the organization: the promisor of a commitment, or a party of a decision.
 #[derive(Debug, Serialize, JsonSchema)]
-pub(super) struct PromisorItem {
+pub(super) struct PartyItem {
     /// `person` or `institution`.
     kind: &'static str,
     id: Uuid,
@@ -258,6 +259,21 @@ pub(super) struct PromisorItem {
     name: String,
     /// True after a legal redaction: the texts are empty (ADR 0072).
     redacted: bool,
+}
+
+impl From<&PartyRef> for PartyItem {
+    fn from(party: &PartyRef) -> Self {
+        Self {
+            kind: match party.party {
+                Party::Person(_) => "person",
+                Party::Institution(_) => "institution",
+            },
+            id: party.party.as_uuid(),
+            local_id: party.local_id.clone(),
+            name: text(&party.name, PartyName::as_str),
+            redacted: party.name.as_present().is_none(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -272,7 +288,7 @@ pub(super) struct CommitmentItem {
     /// The condition of a conditional promise. It stays after the commitment becomes firm.
     /// A condition is met only when evidence says so.
     condition: Option<String>,
-    promisor: PromisorItem,
+    promisor: PartyItem,
     owner_user_id: Uuid,
     workstream_id: Option<Uuid>,
     due_date: Option<String>,
@@ -288,7 +304,6 @@ impl From<&Shown<CommitmentView>> for CommitmentItem {
     fn from(shown: &Shown<CommitmentView>) -> Self {
         let commitment = &shown.record;
         let fields = &commitment.fields;
-        let promisor = &commitment.promisor;
         Self {
             id: commitment.id.as_uuid(),
             local_id: commitment.local_id(),
@@ -298,16 +313,7 @@ impl From<&Shown<CommitmentView>> for CommitmentItem {
                 .condition
                 .as_ref()
                 .map(|text| text.as_str().to_owned()),
-            promisor: PromisorItem {
-                kind: match promisor.party {
-                    Party::Person(_) => "person",
-                    Party::Institution(_) => "institution",
-                },
-                id: promisor.party.as_uuid(),
-                local_id: promisor.local_id.clone(),
-                name: text(&promisor.name, PartyName::as_str),
-                redacted: promisor.name.as_present().is_none(),
-            },
+            promisor: PartyItem::from(&commitment.promisor),
             owner_user_id: fields.owner.as_uuid(),
             workstream_id: fields.workstream_id.map(WorkstreamId::as_uuid),
             due_date: fields.due_date.map(|date| date.to_string()),

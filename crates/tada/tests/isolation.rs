@@ -461,6 +461,72 @@ fn attempts(operation: &str, t: &Targets) -> Option<Vec<Attempt>> {
             json!({"title": "Bar", "expected_version": 1}),
             Expect::NotFound,
         )],
+        "list_decisions" => vec![
+            get(
+                api(format!("/events/{}/decisions", t.b_event)),
+                Expect::NotFound,
+            ),
+            get(api(format!("/events/{}/decisions", t.a_event)), READS),
+        ],
+        "create_decision" => vec![
+            post(
+                api(format!("/events/{}/decisions", t.b_event)),
+                json!({
+                    "wording": "Das Fest findet statt.", "decided_on": "2030-05-01",
+                    "decided_by": [{"kind": "person", "id": Uuid::now_v7()}], "owner_user_id": t.a_member,
+                }),
+                Expect::NotFound,
+            ),
+            post(
+                api(format!("/events/{}/decisions", t.a_event)),
+                json!({
+                    "wording": "Das Fest findet statt.", "decided_on": "2030-05-01",
+                    "decided_by": [{"kind": "person", "id": Uuid::now_v7()}], "owner_user_id": t.b_member,
+                }),
+                Expect::Refused,
+            ),
+        ],
+        "get_decision" => vec![get(
+            api(format!(
+                "/events/{}/decisions/{}",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            Expect::NotFound,
+        )],
+        "change_decision" => vec![patch(
+            api(format!(
+                "/events/{}/decisions/{}",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            json!({"owner_user_id": t.a_member, "expected_version": 1}),
+            Expect::NotFound,
+        )],
+        "supersede_decision" => vec![post(
+            api(format!(
+                "/events/{}/decisions/{}/supersede",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            json!({
+                "successor": {
+                    "wording": "Das Fest findet statt.", "decided_on": "2030-05-01",
+                    "decided_by": [{"kind": "person", "id": Uuid::now_v7()}], "owner_user_id": t.a_member,
+                },
+                "expected_version": 1,
+            }),
+            Expect::NotFound,
+        )],
+        "revoke_decision" => vec![post(
+            api(format!(
+                "/events/{}/decisions/{}/revoke",
+                t.b_event,
+                Uuid::now_v7()
+            )),
+            json!({"reason": "Verboten", "expected_version": 1}),
+            Expect::NotFound,
+        )],
         "list_commitments" => vec![
             get(
                 api(format!("/events/{}/commitments", t.b_event)),
@@ -1445,6 +1511,16 @@ fn tool_attempts(t: &Targets) -> Vec<(&'static str, Value, ToolExpect)> {
         ),
         (
             "list_milestones",
+            json!({"event_key": "ONLYB31"}),
+            ToolExpect::Refused,
+        ),
+        (
+            "list_decisions",
+            json!({"event_key": "OPEN30"}),
+            ToolExpect::Answers,
+        ),
+        (
+            "list_decisions",
             json!({"event_key": "ONLYB31"}),
             ToolExpect::Refused,
         ),

@@ -526,6 +526,154 @@ async fn event_redaction_clears_milestone_text() {
     );
 }
 
+/// A decision of the event loses its wording and its reason, and its evidence loses its quote (ADR 0080).
+/// The date, the parties and the status stay.
+#[tokio::test]
+async fn event_redaction_clears_decision_text() {
+    let test = database().await;
+    let (decision, person) = (Uuid::now_v7(), Uuid::now_v7());
+    sqlx::query(
+        "INSERT INTO person (id, organization_id, local_number, name, version, created_at, updated_at)
+         VALUES ($1, $2, 90, 'Gerda Gemeinde', 1, now(), now())",
+    )
+    .bind(person)
+    .bind(uuid(ORGANIZATION))
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO decision
+             (id, organization_id, event_id, local_number, wording, decided_on, owner_user_id, status,
+              revoked_reason, version, created_at, updated_at)
+         VALUES ($1, $2, $3, 1, E'Max Muster darf fliegen.\nNur am Samstag.', '2030-03-01', $4, 'revoked',
+                 'Max Muster zieht zurück.', 2, now(), now())",
+    )
+    .bind(decision)
+    .bind(uuid(ORGANIZATION))
+    .bind(uuid(EVENT))
+    .bind(uuid(OWNER))
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO decision_party (organization_id, decision_id, position, person_id) VALUES ($1, $2, 0, $3)",
+    )
+    .bind(uuid(ORGANIZATION))
+    .bind(decision)
+    .bind(person)
+    .execute(test.pool())
+    .await
+    .unwrap();
+    // The evidence cites the words of another event: only the decision, not its source, makes the quote fall.
+    let (other_event, item, version) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+    sqlx::query(
+        "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)
+         VALUES ($1, $2, 'FLYIN', 'Fly-in', 'Europe/Zurich', 1, now())",
+    )
+    .bind(other_event)
+    .bind(uuid(ORGANIZATION))
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO source_item (id, organization_id, event_id, kind, created_at)
+         VALUES ($1, $2, $3, 'member-text', now())",
+    )
+    .bind(item)
+    .bind(uuid(ORGANIZATION))
+    .bind(other_event)
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO source_version
+             (id, organization_id, source_item_id, kind, channel, author_actor, text, sha256, captured_at)
+         VALUES ($1, $2, $3, 'member-text', 'web',
+                 jsonb_build_object('kind', 'member', 'id', $4::uuid, 'principal', NULL, 'channel', 'web',
+                                    'request_id', NULL),
+                 $5, sha256(convert_to($5, 'UTF8')), now())",
+    )
+    .bind(version)
+    .bind(uuid(ORGANIZATION))
+    .bind(item)
+    .bind(uuid(OWNER))
+    .bind("Der Fly-in braucht eine Bewilligung.")
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO record_evidence
+             (id, organization_id, decision_id, record_version, proposal_id, source_version_id,
+              start_offset, end_offset, quote)
+         VALUES ($1, $2, $3, 1, '0190a000-0000-7000-8000-000000000042', $4, 23, 35, 'Bewilligung')",
+    )
+    .bind(Uuid::now_v7())
+    .bind(uuid(ORGANIZATION))
+    .bind(decision)
+    .bind(version)
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query("UPDATE event SET status = 'closed', closed_at = now() WHERE id = $1")
+        .bind(uuid(EVENT))
+        .execute(test.pool())
+        .await
+        .unwrap();
+
+    redact(
+        &test,
+        &[target(RedactionTargetKind::Event, EVENT)],
+        RedactionReason::Request,
+    )
+    .await;
+
+    assert_eq!(
+        count(
+            &test,
+            &format!(
+                "SELECT count(*) FROM decision
+                 WHERE id = '{decision}' AND wording IS NULL AND revoked_reason IS NULL AND redacted_at IS NOT NULL
+                   AND version = 3 AND decided_on = '2030-03-01' AND status = 'revoked'"
+            )
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &test,
+            &format!(
+                "SELECT count(*) FROM record_evidence
+                 WHERE decision_id = '{decision}' AND quote IS NULL AND redacted_at IS NOT NULL"
+            )
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &test,
+            &format!(
+                "SELECT count(*) FROM source_version WHERE id = '{version}' AND redacted_at IS NULL"
+            )
+        )
+        .await,
+        1
+    );
+    // The party stays: it is no text of a member, and its own name stays with the person.
+    assert_eq!(
+        count(
+            &test,
+            &format!(
+                "SELECT count(*) FROM decision_party p JOIN person r ON r.id = p.person_id
+                 WHERE p.decision_id = '{decision}' AND r.name = 'Gerda Gemeinde'"
+            )
+        )
+        .await,
+        1
+    );
+}
+
 #[tokio::test]
 async fn redact_person_clears_contact_and_link() {
     let test = database().await;

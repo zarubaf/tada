@@ -848,3 +848,78 @@ async fn a_redaction_of_a_source_item_redacts_its_dispute_notes() {
         .await;
     assert!(!review.to_string().contains("bestreitet"), "{review}");
 }
+
+/// A decision that the person took is a reference by ID; a decision whose wording names the person is a mention
+/// (ADR 0080). The export lists both.
+#[tokio::test]
+async fn person_export_lists_the_decisions_of_a_person() {
+    let world = World::start().await;
+    let person = world.person(json!({"name": "Beat Muster"})).await;
+    let other = world.person(json!({"name": "Gerda Gemeinde"})).await;
+    let decisions = format!("/api/v1/events/{}/decisions", world.event);
+    let decide = |party: &str, wording: &str| {
+        json!({"wording": wording, "decided_on": "2030-03-01",
+               "decided_by": [{"kind": "person", "id": party}],
+               "owner_user_id": world.owner_id.as_uuid()})
+    };
+    let taken = world
+        .owner
+        .post(
+            &decisions,
+            &decide(&person, "Das Fest findet statt.\nBei Regen im Zelt."),
+        )
+        .await;
+    let named = world
+        .owner
+        .post(
+            &decisions,
+            &decide(&other, "Beat Muster leitet den Aufbau."),
+        )
+        .await;
+    world
+        .owner
+        .post(&decisions, &decide(&other, "Der Zaun bleibt."))
+        .await;
+
+    let mentions = world.mentions(&person).await;
+    assert_eq!(
+        kinds(&mentions),
+        ["decision", "decision-party"],
+        "{mentions:?}"
+    );
+    let party = mentions
+        .iter()
+        .find(|m| m["kind"] == "decision-party")
+        .unwrap();
+    assert_eq!(party["id"], taken["id"]);
+    assert_eq!(
+        party["excerpt"],
+        "Das Fest findet statt.\nBei Regen im Zelt."
+    );
+    let mention = mentions.iter().find(|m| m["kind"] == "decision").unwrap();
+    assert_eq!(mention["id"], named["id"]);
+
+    let request = support::request(Method::GET, &format!("/api/v1/persons/{person}/export"))
+        .header(
+            header::COOKIE,
+            format!("{SESSION_COOKIE}={}", world.owner.cookie),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let response = tower::ServiceExt::oneshot(world.owner.router.clone(), request)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let export: Value = serde_json::from_slice(&body).unwrap();
+    let references = export["references"].as_array().unwrap();
+    assert_eq!(references.len(), 1, "{export}");
+    assert_eq!(references[0]["kind"], "decision-party");
+    assert_eq!(references[0]["id"], taken["id"]);
+    let mentions = export["mentions"].as_array().unwrap();
+    assert_eq!(mentions.len(), 1, "{export}");
+    assert_eq!(mentions[0]["kind"], "decision");
+    assert_eq!(mentions[0]["text"], "Beat Muster leitet den Aufbau.");
+}

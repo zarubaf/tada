@@ -4,9 +4,10 @@
 //! a new record takes only an active workstream of its event, and a status changes only along its transitions.
 
 use jiff::Timestamp;
-use tada_domain::ids::{EventId, MilestoneId, UserId, WorkstreamId};
+use tada_domain::ids::{DecisionId, EventId, MilestoneId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::proposals::{NewRecord, NewWorkRecord, Operation, Proposal};
+use tada_domain::records::DecisionStatus;
 use tada_domain::work::{CommitmentStatus, RecordReason, WorkstreamName, dates_in_order};
 
 use super::ProposeStores;
@@ -75,10 +76,65 @@ pub(super) async fn check_work(
         match &proposal.operation {
             Operation::CreateAction { .. } | Operation::CreateMilestone { .. } => {}
             Operation::CreateCommitment { promisor, .. } => {
-                if !promisor_exists(scope, *promisor, proposals, stores).await? {
+                if !party_exists(scope, *promisor, proposals, stores).await? {
                     refuse(operation("promisor"), "unknown-record");
                 }
             }
+            Operation::CreateDecision { decided_by, .. } => {
+                for (position, party) in decided_by.with_input_positions() {
+                    if !party_exists(scope, *party, proposals, stores).await? {
+                        refuse(
+                            operation(&format!("decided_by/{position}")),
+                            "unknown-record",
+                        );
+                    }
+                }
+            }
+            Operation::SupersedeDecision {
+                event_id,
+                decision_id,
+                successor,
+                ..
+            } => {
+                match stores
+                    .decisions
+                    .decision(scope, *event_id, *decision_id)
+                    .await?
+                {
+                    None => refuse(operation("decision_id"), "unknown-record"),
+                    Some(current) if current.state.status() != DecisionStatus::InForce => {
+                        refuse(operation("decision_id"), "invalid-transition");
+                    }
+                    Some(_) => {}
+                }
+                if !successor_usable(
+                    scope,
+                    *event_id,
+                    *decision_id,
+                    *successor,
+                    proposals,
+                    stores,
+                )
+                .await?
+                {
+                    refuse(operation("successor"), "unknown-record");
+                }
+            }
+            Operation::RevokeDecision {
+                event_id,
+                decision_id,
+                ..
+            } => match stores
+                .decisions
+                .decision(scope, *event_id, *decision_id)
+                .await?
+            {
+                None => refuse(operation("decision_id"), "unknown-record"),
+                Some(current) if current.state.status() != DecisionStatus::InForce => {
+                    refuse(operation("decision_id"), "invalid-transition");
+                }
+                Some(_) => {}
+            },
             Operation::CreateWorkstream { event_id, name, .. } => {
                 if name_taken(scope, *event_id, name, proposals[..index].iter(), stores).await? {
                     refuse(operation("name"), "taken");
@@ -278,27 +334,53 @@ async fn milestone_refusal_in(
     milestone_refusal(scope, event, milestone, stores.milestones, now).await
 }
 
-/// True if the promisor is a person or an institution of the organization, or a new one of the changeset.
-/// `check_structure` checks that the proposal depends on the proposal that creates it.
-async fn promisor_exists(
+/// True if the successor of a superseded decision can take its place (ADR 0080): another decision of the event in
+/// force, or a new decision of the event in the changeset. A decision of another event, the decision itself, an
+/// unknown one and one that ended are refused alike. `check_structure` checks that the proposal depends on the
+/// proposal that creates a new successor; the apply checks the successor again.
+async fn successor_usable(
     scope: OrgScope,
-    promisor: Party,
+    event: EventId,
+    old: DecisionId,
+    successor: DecisionId,
+    proposals: &[Proposal],
+    stores: ProposeStores<'_>,
+) -> Result<bool, StoreError> {
+    if successor == old {
+        return Ok(false);
+    }
+    if created_in(proposals, Some(event), NewRecord::Decision(successor)) {
+        return Ok(true);
+    }
+    Ok(stores
+        .decisions
+        .decision(scope, event, successor)
+        .await?
+        .is_some_and(|decision| decision.state.status() == DecisionStatus::InForce))
+}
+
+/// True if the party is a person or an institution of the organization, or a new one of the changeset: the promisor
+/// of a commitment or a party of a decision. `check_structure` checks that the proposal depends on the proposal that
+/// creates it.
+async fn party_exists(
+    scope: OrgScope,
+    party: Party,
     proposals: &[Proposal],
     stores: ProposeStores<'_>,
 ) -> Result<bool, StoreError> {
     let created = proposals.iter().any(|proposal| {
         matches!(
-            (proposal.operation.new_record(), promisor),
+            (proposal.operation.new_record(), party),
             (Some(NewRecord::Person(new)), Party::Person(id)) if new == id
         ) || matches!(
-            (proposal.operation.new_record(), promisor),
+            (proposal.operation.new_record(), party),
             (Some(NewRecord::Institution(new)), Party::Institution(id)) if new == id
         )
     });
     if created {
         return Ok(true);
     }
-    Ok(match promisor {
+    Ok(match party {
         Party::Person(id) => stores.parties.person(scope, id).await?.is_some(),
         Party::Institution(id) => stores.parties.institution(scope, id).await?.is_some(),
     })

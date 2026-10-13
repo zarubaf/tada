@@ -183,6 +183,37 @@ pub enum Operation {
         /// The version of the action that the proposal expects.
         expected_version: i64,
     },
+    /// A new decision of the event. It starts `in-force`. Only the event managers review it.
+    CreateDecision {
+        id: Uuid,
+        event_id: Uuid,
+        /// The words of the decision. It can have line breaks.
+        wording: String,
+        decided_on: jiff::civil::Date,
+        /// The persons and institutions that decided, in their order.
+        decided_by: Vec<ProposalPromisor>,
+        /// The user ID of the member who follows the decision up.
+        owner: Uuid,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        workstream: Option<Uuid>,
+    },
+    /// The successor replaces a decision in force. Only the event managers review it.
+    SupersedeDecision {
+        event_id: Uuid,
+        decision_id: Uuid,
+        /// A decision of the event in force, or a new decision of the same changeset.
+        successor: Uuid,
+        /// The version of the decision that the proposal expects.
+        expected_version: i64,
+    },
+    /// A decision in force ends without a successor. Only the event managers review it.
+    RevokeDecision {
+        event_id: Uuid,
+        decision_id: Uuid,
+        reason: String,
+        /// The version of the decision that the proposal expects.
+        expected_version: i64,
+    },
 }
 
 /// The party that makes a commitment: `{"person": "<uuid>"}` or `{"institution": "<uuid>"}`.
@@ -465,6 +496,50 @@ impl From<&DomainOperation> for Operation {
                 event_id: event_id.as_uuid(),
                 milestone_id: milestone_id.as_uuid(),
                 status: status.as_str().to_owned(),
+                expected_version: expected_version.get(),
+            },
+            DomainOperation::CreateDecision {
+                id,
+                event_id,
+                wording,
+                decided_on,
+                decided_by,
+                owner,
+                workstream,
+            } => Self::CreateDecision {
+                id: id.as_uuid(),
+                event_id: event_id.as_uuid(),
+                wording: wording.as_str().to_owned(),
+                decided_on: *decided_on,
+                decided_by: decided_by
+                    .as_slice()
+                    .iter()
+                    .copied()
+                    .map(ProposalPromisor::from)
+                    .collect(),
+                owner: owner.as_uuid(),
+                workstream: workstream.map(|id| id.as_uuid()),
+            },
+            DomainOperation::SupersedeDecision {
+                event_id,
+                decision_id,
+                successor,
+                expected_version,
+            } => Self::SupersedeDecision {
+                event_id: event_id.as_uuid(),
+                decision_id: decision_id.as_uuid(),
+                successor: successor.as_uuid(),
+                expected_version: expected_version.get(),
+            },
+            DomainOperation::RevokeDecision {
+                event_id,
+                decision_id,
+                reason,
+                expected_version,
+            } => Self::RevokeDecision {
+                event_id: event_id.as_uuid(),
+                decision_id: decision_id.as_uuid(),
+                reason: reason.as_str().to_owned(),
                 expected_version: expected_version.get(),
             },
         }

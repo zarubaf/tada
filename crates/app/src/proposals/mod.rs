@@ -28,9 +28,9 @@ use tada_domain::sources::{Evidence, Passage, PassageError, SourceText};
 use uuid::Uuid;
 
 pub use self::input::{
-    ActionStatusInput, ChoiceInput, CommitmentStatusInput, DraftDocumentInput, FactStateInput,
-    GranularityInput, InstitutionKindInput, NewChangeset, NewProposal, OperationInput, PartyInput,
-    PassageInput, ReferenceTargetInput, ValueInput, ValueTypeInput,
+    ActionStatusInput, ChoiceInput, CommitmentStatusInput, DecisionStatusInput, DraftDocumentInput,
+    FactStateInput, GranularityInput, InstitutionKindInput, NewChangeset, NewProposal,
+    OperationInput, PartyInput, PassageInput, ReferenceTargetInput, ValueInput, ValueTypeInput,
 };
 pub(crate) use self::input::{parse_date, state_from_input, value_error_code};
 pub(crate) use self::work::{owner_refusal, workstream_refusal};
@@ -48,7 +48,7 @@ use crate::records::text_error_code;
 use crate::sources::SourceStore;
 use crate::store::StoreError;
 use crate::tokens::TokenScope;
-use crate::work::{MilestoneStore, WorkStore};
+use crate::work::{DecisionStore, MilestoneStore, WorkStore};
 use crate::workstreams::WorkstreamStore;
 
 /// A caller that can create proposals (ADR 0039): a member, or an AI client of a member.
@@ -214,6 +214,8 @@ pub struct ProposeStores<'a> {
     pub work: &'a dyn WorkStore,
     /// The milestones whose status a proposal changes.
     pub milestones: &'a dyn MilestoneStore,
+    /// The decisions that a proposal supersedes or revokes, and their successors.
+    pub decisions: &'a dyn DecisionStore,
 }
 
 #[derive(Debug, thiserror::Error)]

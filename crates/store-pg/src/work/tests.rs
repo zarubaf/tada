@@ -751,3 +751,322 @@ async fn milestone_warns_about_late_open_actions() {
     // Before the date of the milestone, so it is not overdue.
     assert_eq!(f.warnings(milestone.id, "2030-04-01T08:00:00Z").await, late);
 }
+
+mod decisions {
+    use tada_app::domain::ids::{DecisionId, PersonId};
+    use tada_app::domain::records::{
+        DecisionParties, DecisionStatus, DecisionWording, RecordReason,
+    };
+    use tada_app::parties::PersonFields;
+    use tada_app::work::{
+        DecisionFields, DecisionState, DecisionStore, DecisionView, NewDecisionRecord, Superseded,
+    };
+
+    use super::*;
+
+    const WORDING: &str = "Das Fest findet bei jedem Wetter statt.\nBei Sturm entscheidet das OK.";
+
+    impl Fixture {
+        async fn person(&self, name: &str) -> PersonId {
+            let id = PersonId::from_uuid(Uuid::now_v7());
+            let fields = PersonFields {
+                name: PartyName::parse(name).unwrap(),
+                email: None,
+                phone: None,
+                user_id: None,
+            };
+            self.test
+                .database
+                .create_person(
+                    self.scope,
+                    id,
+                    &fields,
+                    AT.parse().unwrap(),
+                    &self.audit(AuditAction::PersonCreate, id.as_uuid()),
+                )
+                .await
+                .unwrap();
+            id
+        }
+
+        fn new_decision(&self, parties: Vec<Party>) -> NewDecisionRecord {
+            NewDecisionRecord {
+                id: DecisionId::from_uuid(Uuid::now_v7()),
+                event_id: self.event,
+                wording: DecisionWording::parse(WORDING).unwrap(),
+                decided_on: date(2030, 3, 1),
+                parties: DecisionParties::new(parties).unwrap(),
+                fields: DecisionFields {
+                    owner: self.owner,
+                    workstream_id: None,
+                },
+            }
+        }
+
+        async fn decision(&self, parties: Vec<Party>) -> DecisionView {
+            let record = self.new_decision(parties);
+            let audit = self.audit(AuditAction::DecisionCreate, record.id.as_uuid());
+            match self
+                .test
+                .database
+                .create_decision(self.scope, &record, AT.parse().unwrap(), &audit)
+                .await
+                .unwrap()
+            {
+                Created::Created(view) => view,
+                Created::IdTaken => panic!("id taken"),
+            }
+        }
+
+        async fn supersede(
+            &self,
+            old: &DecisionView,
+            successor: &NewDecisionRecord,
+        ) -> Created<Changed<Superseded>> {
+            let audit = [
+                self.audit(AuditAction::DecisionCreate, successor.id.as_uuid()),
+                self.audit(AuditAction::DecisionSupersede, old.id.as_uuid()),
+            ];
+            self.test
+                .database
+                .supersede_decision(
+                    self.scope,
+                    self.event,
+                    old.id,
+                    successor,
+                    old.version,
+                    CHANGED_AT.parse().unwrap(),
+                    &audit,
+                )
+                .await
+                .unwrap()
+        }
+
+        async fn decision_count(&self) -> i64 {
+            sqlx::query_scalar("SELECT count(*) FROM decision")
+                .fetch_one(&self.test.database.pool)
+                .await
+                .unwrap()
+        }
+    }
+
+    #[tokio::test]
+    async fn records_supersedes_and_revokes_decisions_with_parties_and_audit_events() {
+        let f = Fixture::start().await;
+        let person = f.person("Beat Muster").await;
+        let parties = vec![Party::Institution(f.supplier), Party::Person(person)];
+        let first = f.decision(parties.clone()).await;
+        assert_eq!(first.local_id(), "DEC-001");
+        assert_eq!(
+            first.wording.as_present().map(DecisionWording::as_str),
+            Some(WORDING)
+        );
+        assert_eq!(first.decided_on, date(2030, 3, 1));
+        assert_eq!(first.state, DecisionState::InForce);
+        // The parties keep their order, with their readable IDs and names.
+        let named: Vec<(Party, &str, Option<&str>)> = first
+            .parties
+            .iter()
+            .map(|party| {
+                (
+                    party.party,
+                    party.local_id.as_str(),
+                    party.name.as_present().map(PartyName::as_str),
+                )
+            })
+            .collect();
+        assert_eq!(
+            named,
+            [
+                (
+                    Party::Institution(f.supplier),
+                    "INS-001",
+                    Some("Testwil Generatoren AG")
+                ),
+                (Party::Person(person), "PER-001", Some("Beat Muster")),
+            ]
+        );
+
+        // The owner changes; the rest stays.
+        let fields = DecisionFields {
+            owner: f.owner,
+            workstream_id: None,
+        };
+        let changed = f
+            .test
+            .database
+            .change_decision(
+                f.scope,
+                f.event,
+                first.id,
+                &fields,
+                first.version,
+                CHANGED_AT.parse().unwrap(),
+                &f.audit(AuditAction::DecisionChange, first.id.as_uuid()),
+            )
+            .await
+            .unwrap();
+        let Changed::Changed(first) = changed else {
+            panic!("not changed: {changed:?}");
+        };
+        assert_eq!(first.version.get(), 2);
+
+        // A supersede creates the successor and ends the old decision in one step.
+        let successor = f.new_decision(vec![Party::Person(person)]);
+        let result = f.supersede(&first, &successor).await;
+        let Created::Created(Changed::Changed(Superseded { old, successor })) = result else {
+            panic!("not superseded: {result:?}");
+        };
+        assert_eq!(old.state, DecisionState::Superseded { by: successor.id });
+        assert_eq!(old.version.get(), 3);
+        assert_eq!(successor.local_id(), "DEC-002");
+        assert_eq!(successor.state, DecisionState::InForce);
+
+        // A revoke keeps its reason.
+        let reason = RecordReason::parse("Die Gemeinde verbietet es.").unwrap();
+        let revoked = f
+            .test
+            .database
+            .revoke_decision(
+                f.scope,
+                f.event,
+                successor.id,
+                &reason,
+                successor.version,
+                CHANGED_AT.parse().unwrap(),
+                &f.audit(AuditAction::DecisionRevoke, successor.id.as_uuid()),
+            )
+            .await
+            .unwrap();
+        let Changed::Changed(revoked) = revoked else {
+            panic!("not revoked: {revoked:?}");
+        };
+        assert_eq!(
+            revoked.state,
+            DecisionState::Revoked {
+                reason: Redactable::Present(reason.clone())
+            }
+        );
+        // An ended decision does not end again.
+        let again = f
+            .test
+            .database
+            .revoke_decision(
+                f.scope,
+                f.event,
+                revoked.id,
+                &reason,
+                revoked.version,
+                CHANGED_AT.parse().unwrap(),
+                &f.audit(AuditAction::DecisionRevoke, revoked.id.as_uuid()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(again, Changed::VersionConflict);
+        let in_force = WorkFilter {
+            owner: None,
+            status: Some(DecisionStatus::InForce),
+            workstream: None,
+            after: None,
+            limit: 10,
+        };
+        assert!(
+            f.test
+                .database
+                .decisions(f.scope, f.event, &in_force)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            f.audit_actions().await,
+            [
+                "institution.create",
+                "person.create",
+                "decision.create",
+                "decision.change",
+                "decision.create",
+                "decision.supersede",
+                "decision.revoke",
+            ]
+        );
+    }
+
+    /// Two supersedes of one decision with the same version: one wins, and the successor of the other does not stay.
+    #[tokio::test]
+    async fn two_supersedes_of_one_decision_leave_one_winner() {
+        let f = Fixture::start().await;
+        let old = f.decision(vec![Party::Institution(f.supplier)]).await;
+        let (alpha, beta) = (
+            f.new_decision(vec![Party::Institution(f.supplier)]),
+            f.new_decision(vec![Party::Institution(f.supplier)]),
+        );
+        let (a, b) = tokio::join!(f.supersede(&old, &alpha), f.supersede(&old, &beta));
+        let won = |result: &Created<Changed<Superseded>>| {
+            matches!(result, Created::Created(Changed::Changed(_)))
+        };
+        assert_eq!(
+            [&a, &b].iter().filter(|result| won(result)).count(),
+            1,
+            "{a:?} {b:?}"
+        );
+        assert!([&a, &b].contains(&&Created::Created(Changed::VersionConflict)));
+        assert_eq!(f.decision_count().await, 2);
+        let winner = if won(&a) { alpha.id } else { beta.id };
+        let stored = f
+            .test
+            .database
+            .decision(f.scope, f.event, old.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.state, DecisionState::Superseded { by: winner });
+    }
+
+    /// A supersede with a taken ID or of another event changes nothing.
+    #[tokio::test]
+    async fn a_refused_supersede_changes_nothing() {
+        let f = Fixture::start().await;
+        let old = f.decision(vec![Party::Institution(f.supplier)]).await;
+        let itself = NewDecisionRecord {
+            id: old.id,
+            ..f.new_decision(vec![Party::Institution(f.supplier)])
+        };
+        assert_eq!(f.supersede(&old, &itself).await, Created::IdTaken);
+        let other = f
+            .test
+            .create_event(f.scope.organization_id(), "OTHER30")
+            .await;
+        let foreign = f
+            .test
+            .database
+            .supersede_decision(
+                f.scope,
+                other,
+                old.id,
+                &NewDecisionRecord {
+                    event_id: other,
+                    ..f.new_decision(vec![Party::Institution(f.supplier)])
+                },
+                old.version,
+                CHANGED_AT.parse().unwrap(),
+                &[],
+            )
+            .await
+            .unwrap();
+        assert_eq!(foreign, Created::Created(Changed::NotFound));
+        assert_eq!(f.decision_count().await, 1);
+        let stored = f
+            .test
+            .database
+            .decision(f.scope, f.event, old.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored, old);
+        assert_eq!(
+            f.audit_actions().await,
+            ["institution.create", "decision.create"]
+        );
+    }
+}

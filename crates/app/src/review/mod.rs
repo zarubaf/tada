@@ -19,8 +19,8 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use jiff::{SignedDuration, Timestamp};
 use tada_domain::ids::{
-    ActionId, ChangesetId, CommitmentId, DocumentId, EventId, InstitutionId, MilestoneId,
-    OpenQuestionId, PersonId, ProposalId, UserId,
+    ActionId, ChangesetId, CommitmentId, DecisionId, DocumentId, EventId, InstitutionId,
+    MilestoneId, OpenQuestionId, PersonId, ProposalId, UserId,
 };
 use tada_domain::proposals::Operation;
 use tada_domain::redaction::Redactable;
@@ -261,6 +261,9 @@ impl Debug for ApplyStep {
             Operation::CreateWorkstream { .. } => "CreateWorkstream",
             Operation::CreateMilestone { .. } => "CreateMilestone",
             Operation::ChangeMilestoneStatus { .. } => "ChangeMilestoneStatus",
+            Operation::CreateDecision { .. } => "CreateDecision",
+            Operation::SupersedeDecision { .. } => "SupersedeDecision",
+            Operation::RevokeDecision { .. } => "RevokeDecision",
         };
         f.debug_struct("ApplyStep")
             .field("proposal_id", &self.proposal_id)
@@ -312,6 +315,8 @@ pub enum LocalRecord {
     Commitment(CommitmentId),
     /// A milestone: `MIL-<n>`, local to its event.
     Milestone(MilestoneId),
+    /// A decision: `DEC-<n>`, local to its event.
+    Decision(DecisionId),
 }
 
 /// The result of `ReviewStore::apply`. Each result other than `Applied` changed nothing.

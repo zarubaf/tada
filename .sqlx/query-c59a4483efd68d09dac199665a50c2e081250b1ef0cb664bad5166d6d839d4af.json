@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n               SELECT 1 FROM decision\n               WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND status = 'in-force'\n           ) AS \"in_force!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "in_force!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c59a4483efd68d09dac199665a50c2e081250b1ef0cb664bad5166d6d839d4af"
+}

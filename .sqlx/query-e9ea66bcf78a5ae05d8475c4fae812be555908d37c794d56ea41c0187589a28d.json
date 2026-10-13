@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO decision_party (organization_id, decision_id, position, person_id, institution_id)\n         SELECT $1, $2, (t.ordinality - 1)::smallint, t.person_id, t.institution_id\n         FROM unnest($3::uuid[], $4::uuid[]) WITH ORDINALITY AS t (person_id, institution_id, ordinality)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e9ea66bcf78a5ae05d8475c4fae812be555908d37c794d56ea41c0187589a28d"
+}

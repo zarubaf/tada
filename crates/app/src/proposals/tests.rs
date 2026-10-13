@@ -19,7 +19,7 @@ use crate::facts::{EventProfile, FactVersionRef};
 use crate::identity::{Membership, UserRef};
 use crate::sources::{SourceHit, SourceVersionRef, SourceVersionText};
 use crate::tokens::TokenScope;
-use crate::work::{ActionView, CommitmentView, MilestoneView};
+use crate::work::{ActionView, CommitmentView, DecisionView, MilestoneView};
 use crate::workstreams::Workstream;
 
 mod work;
@@ -74,6 +74,7 @@ struct Memory {
     actions: Mutex<Vec<ActionView>>,
     commitments: Mutex<Vec<CommitmentView>>,
     milestones: Mutex<Vec<MilestoneView>>,
+    decisions: Mutex<Vec<DecisionView>>,
 }
 
 #[async_trait]
@@ -439,6 +440,7 @@ fn stores(memory: &Memory) -> ProposeStores<'_> {
         parties: memory,
         work: memory,
         milestones: memory,
+        decisions: memory,
     }
 }
 

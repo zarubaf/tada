@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE decision\n         SET status = $5, superseded_by = $6, revoked_reason = $7, version = version + 1, updated_at = $8\n         WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4 AND status = 'in-force'\n         RETURNING version",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Text",
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c75c12fdd65bfd17050ed3ba25ddd78a4fb7ffed251ae34e327a20f9a5f6e5ef"
+}

@@ -17,11 +17,13 @@ use crate::facts::{
 };
 use crate::identity::Email;
 use crate::ids::{
-    ActionId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId, MilestoneId,
-    OpenQuestionId, PersonId, ProposalId, UserId, WorkstreamId,
+    ActionId, CommitmentId, DecisionId, DocumentId, EventId, FieldDefinitionId, InstitutionId,
+    MilestoneId, OpenQuestionId, PersonId, ProposalId, UserId, WorkstreamId,
 };
 use crate::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
-use crate::records::{MilestoneStatus, MilestoneTitle, RecordRef};
+use crate::records::{
+    DecisionParties, DecisionWording, MilestoneStatus, MilestoneTitle, RecordReason, RecordRef,
+};
 use crate::sources::Evidence;
 use crate::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
@@ -174,6 +176,32 @@ pub enum Operation {
         status: MilestoneStatus,
         expected_version: RecordVersion,
     },
+    /// Record a decision of an event with its owner (ADR 0080). It starts `in-force`.
+    /// Its wording, its date and its parties never change. Only the event managers review it.
+    CreateDecision {
+        id: DecisionId,
+        event_id: EventId,
+        wording: DecisionWording,
+        decided_on: Date,
+        decided_by: DecisionParties,
+        owner: UserId,
+        workstream: Option<WorkstreamId>,
+    },
+    /// End a decision in force: the successor replaces it. The successor is another decision of the same event in
+    /// force, or a new decision of the same changeset. Only the event managers review it.
+    SupersedeDecision {
+        event_id: EventId,
+        decision_id: DecisionId,
+        successor: DecisionId,
+        expected_version: RecordVersion,
+    },
+    /// End a decision in force without a successor, for the reason. Only the event managers review it.
+    RevokeDecision {
+        event_id: EventId,
+        decision_id: DecisionId,
+        reason: RecordReason,
+        expected_version: RecordVersion,
+    },
 }
 
 /// The document of a draft: a new document, or an existing document of the event at its current version.
@@ -212,6 +240,7 @@ pub enum NewRecord {
     Commitment(CommitmentId),
     Workstream(WorkstreamId),
     Milestone(MilestoneId),
+    Decision(DecisionId),
 }
 
 impl NewRecord {
@@ -227,6 +256,7 @@ impl NewRecord {
             Self::Commitment(id) => id.as_uuid(),
             Self::Workstream(id) => id.as_uuid(),
             Self::Milestone(id) => id.as_uuid(),
+            Self::Decision(id) => id.as_uuid(),
         }
     }
 }
@@ -256,6 +286,7 @@ impl Operation {
             Self::CreateCommitment { id, .. } => Some(NewRecord::Commitment(*id)),
             Self::CreateWorkstream { id, .. } => Some(NewRecord::Workstream(*id)),
             Self::CreateMilestone { id, .. } => Some(NewRecord::Milestone(*id)),
+            Self::CreateDecision { id, .. } => Some(NewRecord::Decision(*id)),
             Self::SetFact { .. }
             | Self::AddChoiceValue { .. }
             | Self::DeprecateField { .. }
@@ -264,7 +295,9 @@ impl Operation {
             | Self::ChangeActionDue { .. }
             | Self::ChangeActionMilestone { .. }
             | Self::ChangeCommitmentStatus { .. }
-            | Self::ChangeMilestoneStatus { .. } => None,
+            | Self::ChangeMilestoneStatus { .. }
+            | Self::SupersedeDecision { .. }
+            | Self::RevokeDecision { .. } => None,
         }
     }
 
@@ -287,7 +320,10 @@ impl Operation {
             | Self::ChangeActionMilestone { event_id, .. }
             | Self::ChangeCommitmentStatus { event_id, .. }
             | Self::CreateMilestone { event_id, .. }
-            | Self::ChangeMilestoneStatus { event_id, .. } => Some(*event_id),
+            | Self::ChangeMilestoneStatus { event_id, .. }
+            | Self::CreateDecision { event_id, .. }
+            | Self::SupersedeDecision { event_id, .. }
+            | Self::RevokeDecision { event_id, .. } => Some(*event_id),
             Self::CreatePerson { .. } | Self::CreateInstitution { .. } => None,
         }
     }
@@ -312,7 +348,10 @@ impl Operation {
             | Self::ChangeCommitmentStatus { .. }
             | Self::CreateWorkstream { .. }
             | Self::CreateMilestone { .. }
-            | Self::ChangeMilestoneStatus { .. } => None,
+            | Self::ChangeMilestoneStatus { .. }
+            | Self::CreateDecision { .. }
+            | Self::SupersedeDecision { .. }
+            | Self::RevokeDecision { .. } => None,
         }
     }
 
@@ -328,6 +367,8 @@ impl Operation {
             Self::ChangeMilestoneStatus { milestone_id, .. } => {
                 Some(RecordRef::Milestone(*milestone_id))
             }
+            Self::SupersedeDecision { decision_id, .. }
+            | Self::RevokeDecision { decision_id, .. } => Some(RecordRef::Decision(*decision_id)),
             Self::CreateEvent { .. }
             | Self::SetFact { .. }
             | Self::AddFieldDefinition { .. }
@@ -340,7 +381,8 @@ impl Operation {
             | Self::CreateAction { .. }
             | Self::CreateCommitment { .. }
             | Self::CreateWorkstream { .. }
-            | Self::CreateMilestone { .. } => None,
+            | Self::CreateMilestone { .. }
+            | Self::CreateDecision { .. } => None,
         }
     }
 
@@ -372,6 +414,12 @@ impl Operation {
             }
             | Self::ChangeMilestoneStatus {
                 expected_version, ..
+            }
+            | Self::SupersedeDecision {
+                expected_version, ..
+            }
+            | Self::RevokeDecision {
+                expected_version, ..
             } => Some(*expected_version),
             Self::CreateDocumentDraft {
                 document: DraftDocument::New { .. },
@@ -387,7 +435,8 @@ impl Operation {
             | Self::CreateAction { .. }
             | Self::CreateCommitment { .. }
             | Self::CreateWorkstream { .. }
-            | Self::CreateMilestone { .. } => None,
+            | Self::CreateMilestone { .. }
+            | Self::CreateDecision { .. } => None,
         }
     }
 
@@ -408,6 +457,12 @@ impl Operation {
                 ..
             }
             | Self::CreateMilestone {
+                event_id,
+                owner,
+                workstream,
+                ..
+            }
+            | Self::CreateDecision {
                 event_id,
                 owner,
                 workstream,
@@ -435,7 +490,9 @@ impl Operation {
             | Self::ChangeActionDue { .. }
             | Self::ChangeActionMilestone { .. }
             | Self::ChangeCommitmentStatus { .. }
-            | Self::ChangeMilestoneStatus { .. } => None,
+            | Self::ChangeMilestoneStatus { .. }
+            | Self::SupersedeDecision { .. }
+            | Self::RevokeDecision { .. } => None,
         }
     }
 
@@ -444,7 +501,8 @@ impl Operation {
         match self {
             Self::CreateAction { workstream, .. }
             | Self::CreateCommitment { workstream, .. }
-            | Self::CreateMilestone { workstream, .. } => *workstream,
+            | Self::CreateMilestone { workstream, .. }
+            | Self::CreateDecision { workstream, .. } => *workstream,
             Self::CreateEvent { .. }
             | Self::SetFact { .. }
             | Self::AddFieldDefinition { .. }
@@ -459,13 +517,20 @@ impl Operation {
             | Self::ChangeActionDue { .. }
             | Self::ChangeActionMilestone { .. }
             | Self::ChangeCommitmentStatus { .. }
-            | Self::ChangeMilestoneStatus { .. } => None,
+            | Self::ChangeMilestoneStatus { .. }
+            | Self::SupersedeDecision { .. }
+            | Self::RevokeDecision { .. } => None,
         }
     }
 
-    /// True if only the event managers review the proposal, whatever record or workstream it names.
+    /// True if only the event managers review the proposal, whatever record or workstream it names:
+    /// a new workstream and each decision operation (ADR 0080).
     pub fn managers_only(&self) -> bool {
         match self {
+            Self::CreateWorkstream { .. }
+            | Self::CreateDecision { .. }
+            | Self::SupersedeDecision { .. }
+            | Self::RevokeDecision { .. } => true,
             Self::CreateEvent { .. }
             | Self::SetFact { .. }
             | Self::AddFieldDefinition { .. }
@@ -475,7 +540,6 @@ impl Operation {
             | Self::CreateDocumentDraft { .. }
             | Self::CreatePerson { .. }
             | Self::CreateInstitution { .. }
-            | Self::CreateWorkstream { .. }
             | Self::CreateAction { .. }
             | Self::CreateCommitment { .. }
             | Self::ChangeActionStatus { .. }
@@ -488,15 +552,22 @@ impl Operation {
     }
 
     /// The records that the operation names and that a proposal of the same changeset can create
-    /// (ADR 0067, rule 5): the promisor of a new commitment and the milestone of an action (ADR 0081).
+    /// (ADR 0067, rule 5): the promisor of a new commitment, the workstream of a new record, the milestone of an
+    /// action, the parties of a new decision and the successor of a superseded decision (ADR 0080).
     pub fn references(&self) -> Vec<NewRecord> {
-        let promisor = self.promisor().map(|promisor| match promisor {
-            Party::Person(id) => NewRecord::Person(id),
-            Party::Institution(id) => NewRecord::Institution(id),
-        });
-        let milestone = match self {
+        let promisor = self.promisor().map(party_record);
+        let workstream = self.workstream().map(NewRecord::Workstream);
+        let named: Vec<NewRecord> = match self {
             Self::CreateAction { milestone, .. }
-            | Self::ChangeActionMilestone { milestone, .. } => milestone.map(NewRecord::Milestone),
+            | Self::ChangeActionMilestone { milestone, .. } => {
+                milestone.map(NewRecord::Milestone).into_iter().collect()
+            }
+            Self::CreateDecision { decided_by, .. } => decided_by
+                .as_slice()
+                .iter()
+                .map(|party| party_record(*party))
+                .collect(),
+            Self::SupersedeDecision { successor, .. } => vec![NewRecord::Decision(*successor)],
             Self::CreateEvent { .. }
             | Self::SetFact { .. }
             | Self::AddFieldDefinition { .. }
@@ -512,11 +583,13 @@ impl Operation {
             | Self::ChangeCommitmentStatus { .. }
             | Self::CreateWorkstream { .. }
             | Self::CreateMilestone { .. }
-            | Self::ChangeMilestoneStatus { .. } => None,
+            | Self::ChangeMilestoneStatus { .. }
+            | Self::RevokeDecision { .. } => Vec::new(),
         };
         promisor
             .into_iter()
-            .chain(milestone)
+            .chain(workstream)
+            .chain(named)
             .collect()
     }
 
@@ -540,8 +613,19 @@ impl Operation {
             | Self::ChangeActionMilestone { .. }
             | Self::ChangeCommitmentStatus { .. }
             | Self::CreateMilestone { .. }
-            | Self::ChangeMilestoneStatus { .. } => None,
+            | Self::ChangeMilestoneStatus { .. }
+            | Self::CreateDecision { .. }
+            | Self::SupersedeDecision { .. }
+            | Self::RevokeDecision { .. } => None,
         }
+    }
+}
+
+/// The new record that a party is if a proposal of the same changeset creates it.
+fn party_record(party: Party) -> NewRecord {
+    match party {
+        Party::Person(id) => NewRecord::Person(id),
+        Party::Institution(id) => NewRecord::Institution(id),
     }
 }
 
@@ -864,6 +948,64 @@ mod tests {
             expected_version: version(),
         };
         assert!(cleared.references().is_empty());
+    }
+
+    #[test]
+    fn each_decision_operation_goes_to_the_managers_and_names_its_new_records() {
+        let (old, new) = (
+            DecisionId::from_uuid(Uuid::from_u128(80)),
+            DecisionId::from_uuid(Uuid::from_u128(81)),
+        );
+        let (person, institution) = (
+            PersonId::from_uuid(Uuid::from_u128(60)),
+            InstitutionId::from_uuid(Uuid::from_u128(61)),
+        );
+        let workstream = WorkstreamId::from_uuid(Uuid::from_u128(40));
+        let create = Operation::CreateDecision {
+            id: new,
+            event_id: event(),
+            wording: DecisionWording::parse("Das Fest findet bei jedem Wetter statt.").unwrap(),
+            decided_on: jiff::civil::date(2030, 3, 1),
+            decided_by: DecisionParties::new(vec![
+                Party::Person(person),
+                Party::Institution(institution),
+            ])
+            .unwrap(),
+            owner: UserId::from_uuid(Uuid::from_u128(1)),
+            workstream: Some(workstream),
+        };
+        assert_eq!(
+            create.references(),
+            [
+                NewRecord::Workstream(workstream),
+                NewRecord::Person(person),
+                NewRecord::Institution(institution),
+            ]
+        );
+        assert_eq!(create.new_record(), Some(NewRecord::Decision(new)));
+        assert_eq!(create.workstream(), Some(workstream));
+        assert_eq!(create.changed_record(), None);
+        let supersede = Operation::SupersedeDecision {
+            event_id: event(),
+            decision_id: old,
+            successor: new,
+            expected_version: version(),
+        };
+        assert_eq!(supersede.references(), [NewRecord::Decision(new)]);
+        assert_eq!(supersede.changed_record(), Some(RecordRef::Decision(old)));
+        assert_eq!(supersede.expected_version(), Some(version()));
+        let revoke = Operation::RevokeDecision {
+            event_id: event(),
+            decision_id: old,
+            reason: RecordReason::parse("Der Vorstand hebt ihn auf.").unwrap(),
+            expected_version: version(),
+        };
+        assert!(revoke.references().is_empty());
+        assert_eq!(revoke.changed_record(), Some(RecordRef::Decision(old)));
+        for operation in [&create, &supersede, &revoke] {
+            assert!(operation.managers_only());
+            assert_eq!(operation.event_id(), Some(event()));
+        }
     }
 
     #[test]

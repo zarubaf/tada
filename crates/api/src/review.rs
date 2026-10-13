@@ -578,6 +578,8 @@ pub struct ReviewResult {
     pub institutions: Vec<NewLocalRecord>,
     /// The new milestones with their event-local IDs.
     pub milestones: Vec<NewLocalRecord>,
+    /// The new decisions with their event-local IDs.
+    pub decisions: Vec<NewLocalRecord>,
 }
 
 /// A proposal with its new status.
@@ -607,7 +609,8 @@ pub struct NewDocument {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct NewLocalRecord {
     pub id: Uuid,
-    /// The readable ID, for example `ACT-001`, `COM-001`, `PER-001`, `INS-001` or `MIL-001` (ADR 0038).
+    /// The readable ID, for example `ACT-001`, `COM-001`, `PER-001`, `INS-001`, `MIL-001` or `DEC-001`
+    /// (ADR 0038).
     pub local_id: String,
 }
 
@@ -626,7 +629,7 @@ impl From<Applied> for ReviewResult {
         let mut documents = Vec::new();
         let (mut actions, mut commitments) = (Vec::new(), Vec::new());
         let (mut persons, mut institutions) = (Vec::new(), Vec::new());
-        let mut milestones = Vec::new();
+        let (mut milestones, mut decisions) = (Vec::new(), Vec::new());
         for local in applied.local_ids {
             let number = local.local_number;
             match local.record {
@@ -667,6 +670,11 @@ impl From<Applied> for ReviewResult {
                     LocalIdKind::Milestone,
                     number,
                 )),
+                LocalRecord::Decision(id) => decisions.push(NewLocalRecord::new(
+                    id.as_uuid(),
+                    LocalIdKind::Decision,
+                    number,
+                )),
             }
         }
         Self {
@@ -675,6 +683,7 @@ impl From<Applied> for ReviewResult {
             persons,
             institutions,
             milestones,
+            decisions,
             proposals: applied
                 .proposals
                 .into_iter()
@@ -743,6 +752,7 @@ async fn create_changeset(
         parties: state.parties.as_ref(),
         work: state.work.as_ref(),
         milestones: state.milestones.as_ref(),
+        decisions: state.decisions.as_ref(),
     };
     match proposals::create_changeset(&caller, input, stores, state.clock.as_ref()).await? {
         Created::New(changeset) => Ok((StatusCode::CREATED, axum::Json(changeset.into()))),
@@ -971,6 +981,7 @@ async fn reject_proposals(
         persons: Vec::new(),
         institutions: Vec::new(),
         milestones: Vec::new(),
+        decisions: Vec::new(),
     }))
 }
 

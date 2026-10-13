@@ -167,7 +167,8 @@ impl Mcp {
                 workstreams: database.clone(),
                 parties: database.clone(),
                 work: database.clone(),
-                milestones: database,
+                milestones: database.clone(),
+                decisions: database,
             }),
             version: tada::BUILD.version,
         };
@@ -258,6 +259,7 @@ impl Mcp {
             parties: &self.test.database,
             work: &self.test.database,
             milestones: &self.test.database,
+            decisions: &self.test.database,
         };
         match create_changeset(&self.owner, input, stores, &*self.clock)
             .await
@@ -437,7 +439,7 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 14, "{names:?}");
+    assert_eq!(names.len(), 15, "{names:?}");
     for name in [
         "list_events",
         "list_members",
@@ -451,6 +453,7 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         "list_actions",
         "list_commitments",
         "list_milestones",
+        "list_decisions",
         "search_parties",
         "propose_changeset",
     ] {
@@ -830,7 +833,7 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
     let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &list).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     let tools = body["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 14);
+    assert_eq!(tools.len(), 15);
     for tool in tools {
         assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
         assert_eq!(tool["outputSchema"]["type"], "object", "{tool}");
@@ -1478,6 +1481,7 @@ impl Mcp {
             identity: database,
             work: database,
             milestones: database,
+            decisions: database,
             workstreams: database,
             parties: database,
             clock: &*self.clock,
@@ -1569,6 +1573,7 @@ async fn mcp_lists_workstreams_and_actions() {
         identity: database,
         work: database,
         milestones: database,
+        decisions: database,
         workstreams: database,
         parties: database,
         clock: &*mcp.clock,
@@ -1883,6 +1888,7 @@ async fn each_tool_result_matches_its_output_schema() {
         identity: database,
         work: database,
         milestones: database,
+        decisions: database,
         workstreams: database,
         parties: database,
         clock: &*mcp.clock,
@@ -1905,7 +1911,7 @@ async fn each_tool_result_matches_its_output_schema() {
 
     // Accepted facts, an assumption, an unknown, a reference, an open question, and records with evidence.
     // The proposal IDs give the order of the steps (UUIDv7).
-    let proposals: [Uuid; 10] = std::array::from_fn(|_| Uuid::now_v7());
+    let proposals: [Uuid; 11] = std::array::from_fn(|_| Uuid::now_v7());
     let [
         date,
         guess,
@@ -1917,6 +1923,7 @@ async fn each_tool_result_matches_its_output_schema() {
         action,
         commitment,
         milestone,
+        decision,
     ] = proposals;
     let (field_id, person_id) = (Uuid::now_v7(), Uuid::now_v7());
     let quoted = |id: Uuid, operation: Value, depends_on: &[Uuid], quote: &str| {
@@ -2009,6 +2016,17 @@ async fn each_tool_result_matches_its_output_schema() {
                     }),
                     &[],
                     "Der Ort ist noch offen"
+                ),
+                quoted(
+                    decision,
+                    json!({
+                        "kind": "create-decision", "id": Uuid::now_v7(), "event_id": event,
+                        "wording": "Das Open Day findet statt.\nDer Ort folgt.", "decided_on": "2030-03-01",
+                        "decided_by": [{"person": person_id}], "owner": olga,
+                        "workstream": workstream.id.as_uuid(),
+                    }),
+                    &[person],
+                    "Das Open Day"
                 ),
             ]),
         )
@@ -2108,7 +2126,7 @@ async fn each_tool_result_matches_its_output_schema() {
         )]),
     );
     // Each case: the tool, its arguments, the token, and the arrays of its result that must not be empty.
-    let cases: [(&str, Value, &str, &[&str]); 14] = [
+    let cases: [(&str, Value, &str, &[&str]); 15] = [
         ("list_events", json!({}), &mcp.token, &["/events"]),
         (
             "list_members",
@@ -2191,6 +2209,16 @@ async fn each_tool_result_matches_its_output_schema() {
                 "/milestones",
                 "/milestones/0/warnings",
                 "/milestones/1/evidence",
+            ],
+        ),
+        (
+            "list_decisions",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &[
+                "/decisions",
+                "/decisions/0/decided_by",
+                "/decisions/0/evidence",
             ],
         ),
         (
@@ -2353,4 +2381,110 @@ async fn propose_a_milestone_and_an_action_that_names_it() {
         "{actions}"
     );
     assert_eq!(actions["actions"][0]["start_date"], "2030-04-01");
+}
+
+/// An agent proposes a decision with several lines of wording and a new person that took it, then a newer decision
+/// that supersedes it. Only the event managers review them.
+#[tokio::test]
+async fn propose_a_decision_and_its_successor() {
+    let mcp = Mcp::start().await;
+    let (_, token) = mcp.contributor_token().await;
+    let (person_id, decision_id, successor_id) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+    let wording = "Der Ort ist das Flugfeld.\nBei Regen gilt die Halle.";
+    let proposals: [Uuid; 4] = std::array::from_fn(|_| Uuid::now_v7());
+    let decision = |id: Uuid, wording: &str| {
+        json!({
+            "kind": "create-decision", "id": id, "event_id": mcp.secret.as_uuid(),
+            "wording": wording, "decided_on": "2030-03-01",
+            "decided_by": [{"person": person_id}], "owner": mcp.anna.as_uuid(),
+        })
+    };
+    let changeset_id = Uuid::now_v7();
+    let mut arguments = changeset(
+        mcp.secret,
+        SOURCE,
+        json!([
+            proposal(
+                proposals[0],
+                json!({"kind": "create-person", "id": person_id, "name": "Gerda Gemeinde"}),
+                &[],
+                SOURCE,
+                "im Mai 2030"
+            ),
+            proposal(
+                proposals[1],
+                decision(decision_id, wording),
+                &[proposals[0]],
+                SOURCE,
+                "Der Ort ist noch offen"
+            ),
+        ]),
+    );
+    arguments["id"] = json!(changeset_id);
+    let body = mcp.propose_with(&token, arguments).await;
+    assert_eq!(body["result"]["isError"], false, "{body}");
+    async fn stored(mcp: &Mcp, id: Uuid) -> Changeset {
+        tada_app::proposals::ProposalStore::get(
+            &mcp.test.database,
+            mcp.owner.scope(),
+            tada_app::domain::ids::ChangesetId::from_uuid(id),
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0
+    }
+    mcp.apply(&stored(&mcp, changeset_id).await, &[proposals[1]])
+        .await;
+    let decisions = mcp
+        .result("list_decisions", json!({"event_key": "SECRET30"}))
+        .await;
+    let first = &decisions["decisions"][0];
+    assert_eq!(first["local_id"], "DEC-001", "{decisions}");
+    assert_eq!(first["wording"], wording);
+    assert_eq!(first["status"], "in-force");
+    assert_eq!(first["decided_by"][0]["name"], "Gerda Gemeinde");
+    assert_eq!(first["decided_by"][0]["kind"], "person");
+
+    // The successor is new in the changeset, so the supersede depends on it.
+    let changeset_id = Uuid::now_v7();
+    let mut arguments = changeset(
+        mcp.secret,
+        SOURCE,
+        json!([
+            proposal(
+                proposals[2],
+                decision(successor_id, "Der Ort ist die Halle."),
+                &[],
+                SOURCE,
+                "Der Ort ist noch offen"
+            ),
+            proposal(
+                proposals[3],
+                json!({
+                    "kind": "supersede-decision", "event_id": mcp.secret.as_uuid(),
+                    "decision_id": decision_id, "successor": successor_id, "expected_version": 1,
+                }),
+                &[proposals[2]],
+                SOURCE,
+                "Der Ort ist noch offen"
+            ),
+        ]),
+    );
+    arguments["id"] = json!(changeset_id);
+    let body = mcp.propose_with(&token, arguments).await;
+    assert_eq!(body["result"]["isError"], false, "{body}");
+    mcp.apply(&stored(&mcp, changeset_id).await, &[proposals[3]])
+        .await;
+    let superseded = mcp
+        .result(
+            "list_decisions",
+            json!({"event_key": "SECRET30", "status": "superseded"}),
+        )
+        .await;
+    assert_eq!(
+        superseded["decisions"][0]["superseded_by"],
+        json!(successor_id),
+        "{superseded}"
+    );
 }

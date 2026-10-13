@@ -64,6 +64,7 @@ pub(crate) fn ports(state: &ApiState) -> WorkPorts<'_> {
         identity: state.identity.as_ref(),
         work: state.work.as_ref(),
         milestones: state.milestones.as_ref(),
+        decisions: state.decisions.as_ref(),
         workstreams: state.workstreams.as_ref(),
         parties: state.parties.as_ref(),
         clock: state.clock.as_ref(),
@@ -392,7 +393,7 @@ pub struct ChangeActionRequest {
     pub expected_version: i64,
 }
 
-/// The promisor of a new commitment: a person or an institution of the organization.
+/// A person or an institution of the organization: the promisor of a new commitment, or a party of a new decision.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct PromisorInput {
     pub kind: PartyKind,
@@ -463,7 +464,8 @@ pub(crate) fn owner_filter(
     }
 }
 
-fn promisor(input: &PromisorInput) -> Party {
+/// The party that the input names.
+pub(crate) fn party(input: &PromisorInput) -> Party {
     match input.kind {
         PartyKind::Person => Party::Person(PersonId::from_uuid(input.id)),
         PartyKind::Institution => Party::Institution(InstitutionId::from_uuid(input.id)),
@@ -675,7 +677,7 @@ async fn create_commitment(
         id: request.id,
         text: request.text,
         condition: request.condition,
-        promisor: promisor(&request.promisor),
+        promisor: party(&request.promisor),
         owner: UserId::from_uuid(request.owner_user_id),
         workstream: request.workstream_id.map(WorkstreamId::from_uuid),
         due_date: request.due_date,

@@ -45,6 +45,10 @@ pub enum MentionKind {
     /// A commitment whose promisor is the person: a reference by ID.
     Promisor,
     Milestone,
+    /// A decision whose wording or reason contains a term.
+    Decision,
+    /// A decision that the person decided: a reference by ID.
+    DecisionParty,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -52,7 +56,7 @@ pub enum MentionKind {
 pub struct UnknownMentionKind;
 
 impl MentionKind {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 12] = [
         Self::SourceItem,
         Self::FactVersion,
         Self::Proposal,
@@ -63,7 +67,26 @@ impl MentionKind {
         Self::DocumentVersion,
         Self::Promisor,
         Self::Milestone,
+        Self::Decision,
+        Self::DecisionParty,
     ];
+
+    /// True if the kind refers to the person by ID, not by a text that names the person.
+    pub const fn is_reference(self) -> bool {
+        match self {
+            Self::Promisor | Self::DecisionParty => true,
+            Self::SourceItem
+            | Self::FactVersion
+            | Self::Proposal
+            | Self::OpenQuestion
+            | Self::Action
+            | Self::Commitment
+            | Self::Workstream
+            | Self::DocumentVersion
+            | Self::Milestone
+            | Self::Decision => false,
+        }
+    }
 
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -77,6 +100,8 @@ impl MentionKind {
             Self::DocumentVersion => "document-version",
             Self::Promisor => "promisor",
             Self::Milestone => "milestone",
+            Self::Decision => "decision",
+            Self::DecisionParty => "decision-party",
         }
     }
 }
@@ -543,7 +568,7 @@ pub async fn export_person(
     let (references, mentions): (Vec<FoundMention>, Vec<FoundMention>) = records
         .mentions
         .into_iter()
-        .partition(|found| found.kind == MentionKind::Promisor);
+        .partition(|found| found.kind.is_reference());
     Ok(PersonExport {
         format_version: FORMAT_VERSION,
         generated_at: clock.now(),
