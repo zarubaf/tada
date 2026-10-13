@@ -1454,3 +1454,57 @@ async fn a_milestone_that_is_canceled_after_the_proposal_makes_the_apply_conflic
     assert!(matches!(result, Err(ApplyError::Conflict(_))), "{result:?}");
     assert_eq!(count(&test, "action").await, 0);
 }
+
+/// A new milestone of the changeset is one of the event of the action: an organization changeset that creates two
+/// events cannot give an action of the one a new milestone of the other (ADR 0080).
+#[tokio::test]
+async fn an_action_cannot_name_a_new_milestone_of_another_new_event() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let owner = open_day.owner.user_id();
+    let (first, second) = (
+        EventId::from_uuid(Uuid::now_v7()),
+        EventId::from_uuid(Uuid::now_v7()),
+    );
+    let (milestone_id, action_id) = (Uuid::now_v7(), Uuid::now_v7());
+    let ids = [
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+    ];
+    let mut new_action = action(first, action_id, owner, None);
+    new_action["milestone"] = json!(milestone_id);
+    let input: NewChangeset = serde_json::from_value(json!({
+        "source_text": SOURCE,
+        "proposals": [
+            proposal(
+                ids[0],
+                json!({"kind": "create-event", "id": first.as_uuid(), "key": "OPEN33", "name": "Open Day 2033"}),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(
+                ids[1],
+                json!({"kind": "create-event", "id": second.as_uuid(), "key": "OPEN34", "name": "Open Day 2034"}),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(ids[2], milestone(second, milestone_id, owner), &[ids[1]], "im Mai 2030"),
+            proposal(ids[3], new_action, &[ids[0], ids[2]], "Das Open Day"),
+        ],
+    }))
+    .unwrap();
+    let result = create_changeset(&open_day.owner, input, propose_stores(&test), &FixedClock).await;
+    let Err(tada_app::proposals::ProposeError::Invalid(errors)) = result else {
+        panic!("not invalid: {result:?}");
+    };
+    let errors: Vec<_> = errors
+        .iter()
+        .map(|error| (error.field.as_ref(), error.code))
+        .collect();
+    assert_eq!(
+        errors,
+        [("proposals/3/operation/milestone", "unknown-record")]
+    );
+}
