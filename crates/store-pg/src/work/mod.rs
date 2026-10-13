@@ -17,6 +17,7 @@ use tada_app::domain::ids::{
     WorkstreamId,
 };
 use tada_app::domain::parties::{Party, PartyName};
+use tada_app::domain::records::RecordKind;
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, FirmReason,
@@ -33,6 +34,7 @@ use tada_app::work::{
 use crate::Database;
 use crate::audit;
 use crate::error::{InvalidRow, store_error, violates};
+use crate::evidence::ids_of;
 use crate::local_ids::next_local_number;
 
 struct ActionRow {
@@ -702,21 +704,9 @@ impl WorkStore for Database {
         event: EventId,
         records: &[RecordRef],
     ) -> Result<WorkOwners, StoreError> {
-        let ids = |kind: fn(&RecordRef) -> Option<Uuid>| -> Vec<Uuid> {
-            records.iter().filter_map(kind).collect()
-        };
-        let actions = ids(|record| match record {
-            RecordRef::Action(id) => Some(id.as_uuid()),
-            _ => None,
-        });
-        let commitments = ids(|record| match record {
-            RecordRef::Commitment(id) => Some(id.as_uuid()),
-            _ => None,
-        });
-        let milestones = ids(|record| match record {
-            RecordRef::Milestone(id) => Some(id.as_uuid()),
-            _ => None,
-        });
+        let actions = ids_of(records, RecordKind::Action);
+        let commitments = ids_of(records, RecordKind::Commitment);
+        let milestones = ids_of(records, RecordKind::Milestone);
         let rows = sqlx::query!(
             r#"SELECT 'action' AS "kind!", id AS "id!", owner_user_id AS "owner_user_id!" FROM action
                WHERE organization_id = $1 AND event_id = $2 AND id = ANY($3)
@@ -737,12 +727,8 @@ impl WorkStore for Database {
         .map_err(store_error)?;
         rows.into_iter()
             .map(|row| {
-                let record = match row.kind.as_str() {
-                    "action" => RecordRef::Action(ActionId::from_uuid(row.id)),
-                    "commitment" => RecordRef::Commitment(CommitmentId::from_uuid(row.id)),
-                    "milestone" => RecordRef::Milestone(MilestoneId::from_uuid(row.id)),
-                    _ => return Err(InvalidRow("owner.kind").into()),
-                };
+                let kind = RecordKind::parse(&row.kind).ok_or(InvalidRow("owner.kind"))?;
+                let record = RecordRef::new(kind, row.id);
                 Ok((record, UserId::from_uuid(row.owner_user_id)))
             })
             .collect()
