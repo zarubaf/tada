@@ -547,6 +547,14 @@ pub enum Operation {
         /// The version of the commitment that the proposal expects.
         expected_version: i64,
     },
+    /// A new workstream of the event. It starts `active`.
+    CreateWorkstream {
+        id: Uuid,
+        event_id: Uuid,
+        name: String,
+        /// The user ID of the member who leads the workstream.
+        lead: Uuid,
+    },
 }
 
 /// The party that makes a commitment: `{"person": "<uuid>"}` or `{"institution": "<uuid>"}`.
@@ -776,6 +784,17 @@ impl From<&DomainOperation> for Operation {
                 commitment_id: commitment_id.as_uuid(),
                 status: status.as_str().to_owned(),
                 expected_version: expected_version.get(),
+            },
+            DomainOperation::CreateWorkstream {
+                id,
+                event_id,
+                name,
+                lead,
+            } => Self::CreateWorkstream {
+                id: id.as_uuid(),
+                event_id: event_id.as_uuid(),
+                name: name.as_str().to_owned(),
+                lead: lead.as_uuid(),
             },
         }
     }

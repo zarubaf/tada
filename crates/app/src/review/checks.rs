@@ -15,8 +15,9 @@ use crate::proposals::{
 };
 use crate::store::StoreError;
 
-/// The steps that create an action or a commitment whose owner is no longer a contributor or a manager of the event.
-/// An edited owner passed `check_edits`, so only an owner who changed role after the proposal shows here.
+/// The steps that create an action, a commitment or a workstream whose owner or lead is no longer a contributor or
+/// a manager of the event. An edited owner passed `check_edits`, so only a member who changed role after the proposal
+/// shows here.
 pub(super) async fn stale_owners(
     scope: OrgScope,
     steps: &[ApplyStep],
@@ -29,6 +30,11 @@ pub(super) async fn stale_owners(
         }
         | Operation::CreateCommitment {
             event_id, owner, ..
+        }
+        | Operation::CreateWorkstream {
+            event_id,
+            lead: owner,
+            ..
         } = &step.operation
             && owner_refusal(scope, *event_id, *owner, identity)
                 .await?

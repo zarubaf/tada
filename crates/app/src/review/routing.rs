@@ -311,7 +311,7 @@ mod tests {
     use tada_domain::RecordVersion;
     use tada_domain::ids::{ActionId, CommitmentId, FieldDefinitionId, InstitutionId, PersonId};
     use tada_domain::parties::{InstitutionKind, Party, PartyName};
-    use tada_domain::work::{ActionStatus, ActionTitle, CommitmentText};
+    use tada_domain::work::{ActionStatus, ActionTitle, CommitmentText, WorkstreamName};
     use uuid::Uuid;
 
     use super::*;
@@ -440,6 +440,62 @@ mod tests {
         assert_eq!(
             reviewers(&change_action(), Some(event()), &RoutingFacts::default()),
             Reviewers::EventManagers
+        );
+    }
+
+    fn new_workstream() -> Operation {
+        Operation::CreateWorkstream {
+            id: workstream(),
+            event_id: event(),
+            name: WorkstreamName::parse("Programm").unwrap(),
+            lead: user(LEAD),
+        }
+    }
+
+    #[test]
+    fn new_workstream_goes_to_the_managers() {
+        // Not to its future lead: the lead reviews the records of the workstream only after the managers created it.
+        let facts = facts();
+        let create = new_workstream();
+        assert_eq!(
+            reviewers(&create, Some(event()), &facts),
+            Reviewers::EventManagers
+        );
+        let routes = ChangesetRoutes::new(
+            [
+                RoutedProposal {
+                    id: proposal_id(1),
+                    operation: &create,
+                    depends_on: &[],
+                    open: true,
+                },
+                RoutedProposal {
+                    id: proposal_id(2),
+                    operation: &new_action(Some(workstream())),
+                    depends_on: &[proposal_id(1)],
+                    open: true,
+                },
+            ],
+            Some(event()),
+            &RoutingFacts::default(),
+        );
+        for id in [proposal_id(1), proposal_id(2)] {
+            assert!(!routes.routed_to(user(LEAD), EventLevel::Contributor, id));
+            assert!(routes.routed_to(user(MANAGER), EventLevel::Manager, id));
+        }
+        // With the lead of the existing workstream, the action alone would go to the lead.
+        assert!(
+            ChangesetRoutes::new(
+                [RoutedProposal {
+                    id: proposal_id(2),
+                    operation: &new_action(Some(workstream())),
+                    depends_on: &[],
+                    open: true,
+                }],
+                Some(event()),
+                &facts,
+            )
+            .routed_to(user(LEAD), EventLevel::Contributor, proposal_id(2))
         );
     }
 

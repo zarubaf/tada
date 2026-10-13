@@ -18,7 +18,7 @@ use tada_domain::facts::{
     ValueType,
 };
 use tada_domain::ids::{
-    self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId,
+    self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId, WorkstreamId,
 };
 use tada_domain::proposals::{DependencyError, Operation, Proposal, Reason, check_dependencies};
 use tada_domain::redaction::Redactable;
@@ -788,6 +788,7 @@ fn check_structure(event_id: Option<EventId>, proposals: &[Proposal]) -> Result<
                 .filter(|_| !matches!(operation, Operation::AddFieldDefinition { .. }))
                 .map(FieldDefinitionId::as_uuid),
             operation.promisor().map(|promisor| promisor.as_uuid()),
+            operation.workstream().map(WorkstreamId::as_uuid),
         ];
         let record_creators = uses
             .into_iter()

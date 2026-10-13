@@ -6,7 +6,7 @@
 use tada_domain::ids::{EventId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::proposals::{NewRecord, Operation, Proposal};
-use tada_domain::work::{CommitmentStatus, FirmReason};
+use tada_domain::work::{CommitmentStatus, FirmReason, WorkstreamName};
 
 use super::ProposeStores;
 use super::input::text_error_code;
@@ -39,8 +39,14 @@ pub(super) async fn check_work(
                 {
                     refuse(operation("owner"), code);
                 }
-                if let Some(code) =
-                    workstream_refusal(scope, *event_id, *workstream, stores.workstreams).await?
+                if let Some(code) = new_record_workstream_refusal(
+                    scope,
+                    *event_id,
+                    *workstream,
+                    proposals,
+                    stores.workstreams,
+                )
+                .await?
                 {
                     refuse(operation("workstream"), code);
                 }
@@ -56,13 +62,32 @@ pub(super) async fn check_work(
                 {
                     refuse(operation("owner"), code);
                 }
-                if let Some(code) =
-                    workstream_refusal(scope, *event_id, *workstream, stores.workstreams).await?
+                if let Some(code) = new_record_workstream_refusal(
+                    scope,
+                    *event_id,
+                    *workstream,
+                    proposals,
+                    stores.workstreams,
+                )
+                .await?
                 {
                     refuse(operation("workstream"), code);
                 }
                 if !promisor_exists(scope, *promisor, proposals, stores).await? {
                     refuse(operation("promisor"), "unknown-record");
+                }
+            }
+            Operation::CreateWorkstream {
+                event_id,
+                name,
+                lead,
+                ..
+            } => {
+                if let Some(code) = owner_refusal(scope, *event_id, *lead, stores.identity).await? {
+                    refuse(operation("lead"), code);
+                }
+                if name_taken(scope, *event_id, name, proposals[..index].iter(), stores).await? {
+                    refuse(operation("name"), "taken");
                 }
             }
             Operation::ChangeActionStatus {
@@ -146,6 +171,61 @@ pub(crate) async fn workstream_refusal(
         Err(ActiveWorkstreamError::Refused(error)) => Ok(Some(error.code)),
         Err(ActiveWorkstreamError::Store(error)) => Err(error),
     }
+}
+
+/// Like `workstream_refusal`, but a workstream that a proposal of the changeset creates in the event is fine.
+/// `check_structure` checks that the proposal depends on the proposal that creates it.
+/// The apply checks that the workstream is active when it comes.
+async fn new_record_workstream_refusal(
+    scope: OrgScope,
+    event: EventId,
+    workstream: Option<WorkstreamId>,
+    proposals: &[Proposal],
+    store: &dyn WorkstreamStore,
+) -> Result<Option<&'static str>, StoreError> {
+    let created = workstream.is_some_and(|id| {
+        proposals.iter().any(|proposal| {
+            proposal.operation.event_id() == Some(event)
+                && proposal.operation.new_record() == Some(NewRecord::Workstream(id))
+        })
+    });
+    if created {
+        return Ok(None);
+    }
+    workstream_refusal(scope, event, workstream, store).await
+}
+
+/// True if a workstream of the event, or one of the `earlier` proposals, has the name, whatever its case.
+async fn name_taken<'a>(
+    scope: OrgScope,
+    event: EventId,
+    name: &WorkstreamName,
+    earlier: impl Iterator<Item = &'a Proposal>,
+    stores: ProposeStores<'_>,
+) -> Result<bool, StoreError> {
+    let wanted = name.as_str().to_lowercase();
+    let same = |other: &str| other.to_lowercase() == wanted;
+    let proposed = earlier.into_iter().any(|proposal| {
+        matches!(
+            &proposal.operation,
+            Operation::CreateWorkstream { event_id, name, .. }
+                if *event_id == event && same(name.as_str())
+        )
+    });
+    if proposed {
+        return Ok(true);
+    }
+    Ok(stores
+        .workstreams
+        .list(scope, event)
+        .await?
+        .iter()
+        .any(|workstream| {
+            workstream
+                .name
+                .as_present()
+                .is_some_and(|n| same(n.as_str()))
+        }))
 }
 
 /// True if the promisor is a person or an institution of the organization, or a new one of the changeset.

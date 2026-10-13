@@ -2496,6 +2496,42 @@
                 "expected_version"
               ],
               "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Create a workstream of the event: a named part with a lead, to group the actions and commitments of the event.\nActions and commitments of the same changeset can name it; then they depend on this proposal.\nOnly the event managers review it.",
+              "properties": {
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The UUIDv7 of the new workstream.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "create-workstream",
+                  "type": "string"
+                },
+                "lead": {
+                  "description": "The user ID of a member with the contributor or manager role in the event.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "1 to 200 characters. No other workstream of the event has this name, whatever its case.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "event_id",
+                "name",
+                "lead"
+              ],
+              "type": "object"
             }
           ]
         },
