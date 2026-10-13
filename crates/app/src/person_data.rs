@@ -49,6 +49,8 @@ pub enum MentionKind {
     Decision,
     /// A decision that the person decided: a reference by ID.
     DecisionParty,
+    /// A risk whose title, description or mitigation contains a term.
+    Risk,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -56,7 +58,7 @@ pub enum MentionKind {
 pub struct UnknownMentionKind;
 
 impl MentionKind {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::SourceItem,
         Self::FactVersion,
         Self::Proposal,
@@ -69,6 +71,7 @@ impl MentionKind {
         Self::Milestone,
         Self::Decision,
         Self::DecisionParty,
+        Self::Risk,
     ];
 
     /// True if the kind refers to the person by ID, not by a text that names the person.
@@ -84,7 +87,8 @@ impl MentionKind {
             | Self::Workstream
             | Self::DocumentVersion
             | Self::Milestone
-            | Self::Decision => false,
+            | Self::Decision
+            | Self::Risk => false,
         }
     }
 
@@ -102,6 +106,7 @@ impl MentionKind {
             Self::Milestone => "milestone",
             Self::Decision => "decision",
             Self::DecisionParty => "decision-party",
+            Self::Risk => "risk",
         }
     }
 }

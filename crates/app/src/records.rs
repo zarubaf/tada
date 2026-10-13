@@ -110,16 +110,22 @@ pub struct NumberCursor(pub u64);
 
 /// The page of `items`, which hold one record more than `limit` if a next page exists.
 pub(crate) fn page<T>(
-    mut items: Vec<T>,
+    items: Vec<T>,
     limit: PageLimit,
     number: impl Fn(&T) -> u64,
 ) -> Page<T, NumberCursor> {
+    page_by(items, limit, |item| NumberCursor(number(item)))
+}
+
+/// Like `page`, for a list whose cursor is more than a number.
+pub(crate) fn page_by<T, C>(
+    mut items: Vec<T>,
+    limit: PageLimit,
+    cursor: impl Fn(&T) -> C,
+) -> Page<T, C> {
     let more = items.len() > limit.get() as usize;
     items.truncate(limit.get() as usize);
-    let next = more
-        .then(|| items.last())
-        .flatten()
-        .map(|last| NumberCursor(number(last)));
+    let next = more.then(|| items.last()).flatten().map(cursor);
     Page { items, next }
 }
 

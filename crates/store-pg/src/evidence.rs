@@ -1,5 +1,5 @@
 //! The evidence of records (ADR 0068, ADR 0069, ADR 0080): the passages that support each accepted version of an
-//! action, a commitment, a person, an institution, a milestone or a decision. The apply writes them; each record read reads them
+//! action, a commitment, a person, an institution, a milestone, a decision or a risk. The apply writes them; each record read reads them
 //! here. `record_evidence` has one column for each kind of record, and exactly one of them is set.
 
 use async_trait::async_trait;
@@ -9,7 +9,7 @@ use tada_app::access::SourceReach;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{
-    ActionId, CommitmentId, DecisionId, InstitutionId, MilestoneId, PersonId, ProposalId,
+    ActionId, CommitmentId, DecisionId, InstitutionId, MilestoneId, PersonId, ProposalId, RiskId,
     SourceVersionId,
 };
 use tada_app::domain::records::RecordKind;
@@ -37,6 +37,7 @@ struct EvidenceRow {
     institution_id: Option<Uuid>,
     milestone_id: Option<Uuid>,
     decision_id: Option<Uuid>,
+    risk_id: Option<Uuid>,
     record_version: i64,
     proposal_id: Uuid,
     source_version_id: Uuid,
@@ -63,6 +64,8 @@ impl EvidenceRow {
                 .map(|id| RecordRef::Milestone(MilestoneId::from_uuid(id))),
             self.decision_id
                 .map(|id| RecordRef::Decision(DecisionId::from_uuid(id))),
+            self.risk_id
+                .map(|id| RecordRef::Risk(RiskId::from_uuid(id))),
         ];
         match set.into_iter().flatten().collect::<Vec<_>>()[..] {
             [record] => Ok(record),
@@ -102,6 +105,7 @@ impl EvidenceStore for Database {
         let (actions, commitments) = (ids(RecordKind::Action), ids(RecordKind::Commitment));
         let (persons, institutions) = (ids(RecordKind::Person), ids(RecordKind::Institution));
         let (milestones, decisions) = (ids(RecordKind::Milestone), ids(RecordKind::Decision));
+        let risks = ids(RecordKind::Risk);
         let organization = scope.organization_id().as_uuid();
         // A person or an institution belongs to the organization, but the source of its evidence belongs to an event:
         // the caller sees only the passages of the sources that it can read (ADR 0050). The filter comes before the
@@ -111,7 +115,7 @@ impl EvidenceStore for Database {
              WHERE organization_id = $1
                AND (action_id = ANY($2) OR commitment_id = ANY($3)
                     OR person_id = ANY($4) OR institution_id = ANY($5) OR milestone_id = ANY($6)
-                    OR decision_id = ANY($7))",
+                    OR decision_id = ANY($7) OR risk_id = ANY($8))",
             organization,
             &actions,
             &commitments,
@@ -119,6 +123,7 @@ impl EvidenceStore for Database {
             &institutions,
             &milestones,
             &decisions,
+            &risks,
         )
         .fetch_all(&self.pool)
         .await
@@ -133,7 +138,7 @@ impl EvidenceStore for Database {
         let rows = sqlx::query_as!(
             EvidenceRow,
             r#"SELECT e.action_id, e.commitment_id, e.person_id, e.institution_id, e.milestone_id,
-                      e.decision_id, e.record_version,
+                      e.decision_id, e.risk_id, e.record_version,
                       e.proposal_id, e.source_version_id,
                       v.captured_at AS "captured_at: jiff_sqlx::Timestamp",
                       e.start_offset, e.end_offset, e.quote, e.page
@@ -143,8 +148,8 @@ impl EvidenceStore for Database {
                WHERE e.organization_id = $1
                  AND (e.action_id = ANY($2) OR e.commitment_id = ANY($3)
                       OR e.person_id = ANY($4) OR e.institution_id = ANY($5) OR e.milestone_id = ANY($6)
-                      OR e.decision_id = ANY($7))
-                 AND e.source_version_id = ANY($8)
+                      OR e.decision_id = ANY($7) OR e.risk_id = ANY($8))
+                 AND e.source_version_id = ANY($9)
                ORDER BY e.record_version, e.start_offset, e.id"#,
             organization,
             &actions,
@@ -153,6 +158,7 @@ impl EvidenceStore for Database {
             &institutions,
             &milestones,
             &decisions,
+            &risks,
             &readable,
         )
         .fetch_all(&self.pool)
@@ -185,10 +191,10 @@ pub(crate) async fn insert_evidence(
         sqlx::query!(
             "INSERT INTO record_evidence
                  (id, organization_id, action_id, commitment_id, person_id, institution_id, milestone_id,
-                  decision_id, record_version, proposal_id, source_version_id, start_offset, end_offset, quote,
-                  page, redacted_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-                     CASE WHEN $14::text IS NULL THEN now() END)",
+                  decision_id, risk_id, record_version, proposal_id, source_version_id, start_offset, end_offset,
+                  quote, page, redacted_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+                     CASE WHEN $15::text IS NULL THEN now() END)",
             Uuid::now_v7(),
             scope.organization_id().as_uuid(),
             column(RecordKind::Action),
@@ -197,6 +203,7 @@ pub(crate) async fn insert_evidence(
             column(RecordKind::Institution),
             column(RecordKind::Milestone),
             column(RecordKind::Decision),
+            column(RecordKind::Risk),
             version,
             proposal.as_uuid(),
             source_version_id.as_uuid(),

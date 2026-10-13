@@ -7,7 +7,9 @@ pub mod risk;
 
 use uuid::Uuid;
 
-use crate::ids::{ActionId, CommitmentId, DecisionId, InstitutionId, MilestoneId, PersonId};
+use crate::ids::{
+    ActionId, CommitmentId, DecisionId, InstitutionId, MilestoneId, PersonId, RiskId,
+};
 
 pub use decision::{
     DecisionChange, DecisionParties, DecisionStatus, DecisionWording, PartiesError,
@@ -27,6 +29,7 @@ pub enum RecordRef {
     Institution(InstitutionId),
     Milestone(MilestoneId),
     Decision(DecisionId),
+    Risk(RiskId),
 }
 
 /// The kind of a record that a `RecordRef` names.
@@ -38,16 +41,18 @@ pub enum RecordKind {
     Institution,
     Milestone,
     Decision,
+    Risk,
 }
 
 impl RecordKind {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Action,
         Self::Commitment,
         Self::Person,
         Self::Institution,
         Self::Milestone,
         Self::Decision,
+        Self::Risk,
     ];
 
     /// The name of the table of the kind.
@@ -59,6 +64,7 @@ impl RecordKind {
             Self::Institution => "institution",
             Self::Milestone => "milestone",
             Self::Decision => "decision",
+            Self::Risk => "risk",
         }
     }
 
@@ -77,6 +83,7 @@ impl RecordRef {
             RecordKind::Institution => Self::Institution(InstitutionId::from_uuid(id)),
             RecordKind::Milestone => Self::Milestone(MilestoneId::from_uuid(id)),
             RecordKind::Decision => Self::Decision(DecisionId::from_uuid(id)),
+            RecordKind::Risk => Self::Risk(RiskId::from_uuid(id)),
         }
     }
 
@@ -88,6 +95,7 @@ impl RecordRef {
             Self::Institution(_) => RecordKind::Institution,
             Self::Milestone(_) => RecordKind::Milestone,
             Self::Decision(_) => RecordKind::Decision,
+            Self::Risk(_) => RecordKind::Risk,
         }
     }
 
@@ -99,6 +107,7 @@ impl RecordRef {
             Self::Institution(id) => id.as_uuid(),
             Self::Milestone(id) => id.as_uuid(),
             Self::Decision(id) => id.as_uuid(),
+            Self::Risk(id) => id.as_uuid(),
         }
     }
 }

@@ -141,6 +141,11 @@ pub(super) fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEven
         Operation::RevokeDecision { decision_id, .. } => {
             Some((AuditAction::DecisionRevoke, decision_id.as_uuid()))
         }
+        Operation::CreateRisk { id, .. } => Some((AuditAction::RiskCreate, id.as_uuid())),
+        Operation::ChangeRiskStatus { risk_id, .. }
+        | Operation::ChangeRiskRating { risk_id, .. } => {
+            Some((AuditAction::RiskChange, risk_id.as_uuid()))
+        }
         // These records have their own audit, or none (ADR 0050).
         Operation::SetFact { .. }
         | Operation::AddFieldDefinition { .. }

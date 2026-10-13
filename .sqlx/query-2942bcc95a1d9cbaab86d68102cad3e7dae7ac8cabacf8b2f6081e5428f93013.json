@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE risk\n         SET title = $5, description = $6, likelihood = $7, impact = $8, mitigation = $9,\n             owner_user_id = $10, workstream_id = $11, status = $12, version = version + 1, updated_at = $13\n         WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4\n         RETURNING version",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2942bcc95a1d9cbaab86d68102cad3e7dae7ac8cabacf8b2f6081e5428f93013"
+}

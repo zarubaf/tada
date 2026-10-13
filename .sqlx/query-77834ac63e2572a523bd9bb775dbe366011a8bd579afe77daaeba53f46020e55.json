@@ -1,0 +1,168 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id!\", event_id AS \"event_id!\", local_number AS \"local_number!\", title, description,\n                  likelihood AS \"likelihood!\", impact AS \"impact!\", mitigation, owner_user_id AS \"owner_user_id!\",\n                  workstream_id, status AS \"status!\", version AS \"version!\"\n           FROM (\n               SELECT r.*,\n                      (CASE r.likelihood WHEN 'low' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END)\n                        * (CASE r.impact WHEN 'low' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END) AS score,\n                      (CASE r.impact WHEN 'low' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END) AS impact_weight\n               FROM risk r\n               WHERE r.organization_id = $1 AND r.event_id = $2\n           ) ranked\n           WHERE ($3::uuid IS NULL OR owner_user_id = $3)\n             AND ($4::text IS NULL OR status = $4)\n             AND ($5::uuid IS NULL OR workstream_id = $5)\n             AND ($6::int IS NULL OR (-score, -impact_weight, local_number) > (-$6::int, -$7::int, $8::bigint))\n           ORDER BY score DESC, impact_weight DESC, local_number\n           LIMIT $9",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "local_number!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "local_number"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "likelihood!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "likelihood"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "impact!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "impact"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "mitigation",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "mitigation"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "owner_user_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "owner_user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "workstream_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "workstream_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "status!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "version!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "risk",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "77834ac63e2572a523bd9bb775dbe366011a8bd579afe77daaeba53f46020e55"
+}

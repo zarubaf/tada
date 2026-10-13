@@ -2,9 +2,11 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use tada_domain::identity::{EventRole, OrganizationRole};
-use tada_domain::ids::{DecisionId, InstitutionId, MilestoneId, OrganizationId, PersonId};
+use tada_domain::ids::{DecisionId, InstitutionId, MilestoneId, OrganizationId, PersonId, RiskId};
 use tada_domain::parties::PartyName;
-use tada_domain::records::{DecisionChange, DecisionStatus, MilestoneStatus, RecordReason};
+use tada_domain::records::{
+    DecisionChange, DecisionStatus, MilestoneStatus, RecordReason, RiskStatus,
+};
 use tada_domain::work::{WorkstreamName, WorkstreamStatus};
 
 use super::*;
@@ -71,6 +73,7 @@ struct Memory {
     commitments: Mutex<Vec<CommitmentView>>,
     milestones: Mutex<Vec<MilestoneView>>,
     decisions: Mutex<Vec<DecisionView>>,
+    risks: Mutex<Vec<RiskView>>,
     workstreams: Mutex<Vec<Workstream>>,
     audit: Mutex<Vec<AuditAction>>,
 }
@@ -90,6 +93,7 @@ impl Default for Memory {
             commitments: Mutex::default(),
             milestones: Mutex::default(),
             decisions: Mutex::default(),
+            risks: Mutex::default(),
             workstreams: Mutex::new(vec![
                 workstream(ground(), "Gelände", WorkstreamStatus::Active),
                 workstream(kitchen(), "Küche", WorkstreamStatus::Closed),
@@ -106,6 +110,7 @@ impl Memory {
             work: self,
             milestones: self,
             decisions: self,
+            risks: self,
             workstreams: self,
             parties: self,
             clock: &FixedClock,
@@ -463,6 +468,98 @@ impl MilestoneStore for Memory {
             })
             .take(filter.limit as usize)
             .cloned()
+            .collect())
+    }
+}
+
+#[async_trait]
+impl RiskStore for Memory {
+    async fn create_risk(
+        &self,
+        _: OrgScope,
+        risk: &NewRiskRecord,
+        _: Timestamp,
+        audit: &AuditEvent,
+    ) -> Result<Created<RiskView>, StoreError> {
+        let mut all = self.risks.lock().unwrap();
+        if all.iter().any(|known| known.id == risk.id) {
+            return Ok(Created::IdTaken);
+        }
+        let view = RiskView {
+            id: risk.id,
+            local_number: all.len() as u64 + 1,
+            event_id: risk.event_id,
+            fields: risk.fields.clone(),
+            version: RecordVersion::FIRST,
+        };
+        all.push(view.clone());
+        self.audit.lock().unwrap().push(audit.action());
+        Ok(Created::Created(view))
+    }
+
+    async fn change_risk(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        id: RiskId,
+        fields: &RiskFields,
+        expected: RecordVersion,
+        _: Timestamp,
+        audit: &AuditEvent,
+    ) -> Result<Changed<RiskView>, StoreError> {
+        let mut all = self.risks.lock().unwrap();
+        let Some(known) = all
+            .iter_mut()
+            .find(|known| known.id == id && known.event_id == event)
+        else {
+            return Ok(Changed::NotFound);
+        };
+        if known.version != expected {
+            return Ok(Changed::VersionConflict);
+        }
+        known.fields = fields.clone();
+        known.version = next(known.version);
+        self.audit.lock().unwrap().push(audit.action());
+        Ok(Changed::Changed(known.clone()))
+    }
+
+    async fn risk(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        id: RiskId,
+    ) -> Result<Option<RiskView>, StoreError> {
+        let all = self.risks.lock().unwrap();
+        Ok(all
+            .iter()
+            .find(|known| known.id == id && known.event_id == event)
+            .cloned())
+    }
+
+    async fn risks(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        filter: &WorkFilter<RiskStatus, RiskCursor>,
+    ) -> Result<Vec<RiskView>, StoreError> {
+        let mut all: Vec<RiskView> = self
+            .risks
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|known| known.event_id == event)
+            .filter(|known| {
+                filter
+                    .status
+                    .is_none_or(|status| known.fields.status == status)
+            })
+            .cloned()
+            .collect();
+        all.sort_by_key(|risk| (risk.fields.rating.sort_key(), risk.local_number));
+        Ok(all
+            .into_iter()
+            .filter(|risk| filter.after.is_none_or(|cursor| cursor.comes_before(risk)))
+            .take(filter.limit as usize)
             .collect())
     }
 }
@@ -950,3 +1047,4 @@ mod actions;
 mod commitments;
 mod decisions;
 mod milestones;
+mod risks;

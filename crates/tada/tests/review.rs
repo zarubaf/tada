@@ -615,6 +615,7 @@ mod review {
             work: database,
             milestones: database,
             decisions: database,
+            risks: database,
         };
         let caller = MemberCaller::new(owner.user, owner.organization, OrganizationRole::Owner);
         create_changeset(&caller, input, stores, api.clock.as_ref())

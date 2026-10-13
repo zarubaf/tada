@@ -10,12 +10,13 @@ use tada_app::domain::facts::{ChoiceKey, Description, FieldKey, ModuleKey, Short
 use tada_app::domain::identity::Email;
 use tada_app::domain::ids::{
     ActionId, CommitmentId, DecisionId, DocumentId, EventId, FieldDefinitionId, InstitutionId,
-    MilestoneId, OpenQuestionId, PersonId, UserId, WorkstreamId,
+    MilestoneId, OpenQuestionId, PersonId, RiskId, UserId, WorkstreamId,
 };
 use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_app::domain::proposals::{DraftDocument, Operation, QuestionText};
 use tada_app::domain::records::{
-    DecisionParties, DecisionWording, MilestoneStatus, MilestoneTitle, RecordReason, RecordRef,
+    DecisionParties, DecisionWording, Level, MilestoneStatus, MilestoneTitle, RecordReason,
+    RecordRef, RiskRating, RiskStatus, RiskTitle,
 };
 use tada_app::domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
@@ -178,6 +179,38 @@ enum OperationRecord {
         reason: String,
         expected_version: i64,
     },
+    CreateRisk {
+        id: Uuid,
+        event_id: Uuid,
+        title: String,
+        description: Option<String>,
+        likelihood: String,
+        impact: String,
+        mitigation: Option<String>,
+        owner: Uuid,
+        workstream: Option<Uuid>,
+    },
+    ChangeRiskStatus {
+        event_id: Uuid,
+        risk_id: Uuid,
+        status: String,
+        expected_version: i64,
+    },
+    ChangeRiskRating {
+        event_id: Uuid,
+        risk_id: Uuid,
+        likelihood: String,
+        impact: String,
+        expected_version: i64,
+    },
+}
+
+/// The rating of a risk from the two levels that a stored operation holds.
+fn rating_from(likelihood: &str, impact: &str) -> Option<RiskRating> {
+    Some(RiskRating {
+        likelihood: Level::parse(likelihood)?,
+        impact: Level::parse(impact)?,
+    })
 }
 
 impl From<Party> for PartyRecord {
@@ -502,6 +535,53 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             reason: reason.as_str().to_owned(),
             expected_version: expected_version.get(),
         },
+        Operation::CreateRisk {
+            id,
+            event_id,
+            title,
+            description,
+            rating,
+            mitigation,
+            owner,
+            workstream,
+        } => OperationRecord::CreateRisk {
+            id: id.as_uuid(),
+            event_id: event_id.as_uuid(),
+            title: title.as_str().to_owned(),
+            description: description
+                .as_ref()
+                .map(|description| description.as_str().to_owned()),
+            likelihood: rating.likelihood.as_str().to_owned(),
+            impact: rating.impact.as_str().to_owned(),
+            mitigation: mitigation
+                .as_ref()
+                .map(|mitigation| mitigation.as_str().to_owned()),
+            owner: owner.as_uuid(),
+            workstream: workstream.map(WorkstreamId::as_uuid),
+        },
+        Operation::ChangeRiskStatus {
+            event_id,
+            risk_id,
+            status,
+            expected_version,
+        } => OperationRecord::ChangeRiskStatus {
+            event_id: event_id.as_uuid(),
+            risk_id: risk_id.as_uuid(),
+            status: status.as_str().to_owned(),
+            expected_version: expected_version.get(),
+        },
+        Operation::ChangeRiskRating {
+            event_id,
+            risk_id,
+            rating,
+            expected_version,
+        } => OperationRecord::ChangeRiskRating {
+            event_id: event_id.as_uuid(),
+            risk_id: risk_id.as_uuid(),
+            likelihood: rating.likelihood.as_str().to_owned(),
+            impact: rating.impact.as_str().to_owned(),
+            expected_version: expected_version.get(),
+        },
     };
     serde_json::to_value(record).expect("an operation record is valid JSON")
 }
@@ -794,6 +874,55 @@ pub(crate) fn operation_from_json(
             reason: RecordReason::parse(&reason).map_err(|_| invalid())?,
             expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
         },
+        OperationRecord::CreateRisk {
+            id,
+            event_id,
+            title,
+            description,
+            likelihood,
+            impact,
+            mitigation,
+            owner,
+            workstream,
+        } => Operation::CreateRisk {
+            id: RiskId::from_uuid(id),
+            event_id: EventId::from_uuid(event_id),
+            title: RiskTitle::parse(&title).map_err(|_| invalid())?,
+            description: description
+                .map(|text| RecordDescription::parse(&text))
+                .transpose()
+                .map_err(|_| invalid())?,
+            rating: rating_from(&likelihood, &impact).ok_or_else(invalid)?,
+            mitigation: mitigation
+                .map(|text| RecordDescription::parse(&text))
+                .transpose()
+                .map_err(|_| invalid())?,
+            owner: UserId::from_uuid(owner),
+            workstream: workstream.map(WorkstreamId::from_uuid),
+        },
+        OperationRecord::ChangeRiskStatus {
+            event_id,
+            risk_id,
+            status,
+            expected_version,
+        } => Operation::ChangeRiskStatus {
+            event_id: EventId::from_uuid(event_id),
+            risk_id: RiskId::from_uuid(risk_id),
+            status: RiskStatus::parse(&status).ok_or_else(invalid)?,
+            expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+        },
+        OperationRecord::ChangeRiskRating {
+            event_id,
+            risk_id,
+            likelihood,
+            impact,
+            expected_version,
+        } => Operation::ChangeRiskRating {
+            event_id: EventId::from_uuid(event_id),
+            risk_id: RiskId::from_uuid(risk_id),
+            rating: rating_from(&likelihood, &impact).ok_or_else(invalid)?,
+            expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+        },
     })
 }
 
@@ -827,6 +956,7 @@ pub(super) fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>)
         Operation::CreateCommitment { id, .. } => record(RecordRef::Commitment(*id)),
         Operation::CreateMilestone { id, .. } => record(RecordRef::Milestone(*id)),
         Operation::CreateDecision { id, .. } => record(RecordRef::Decision(*id)),
+        Operation::CreateRisk { id, .. } => record(RecordRef::Risk(*id)),
         Operation::ChangeActionStatus { action_id, .. }
         | Operation::ChangeActionDue { action_id, .. }
         | Operation::ChangeActionMilestone { action_id, .. } => {
@@ -842,6 +972,8 @@ pub(super) fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>)
         | Operation::RevokeDecision { decision_id, .. } => {
             record(RecordRef::Decision(*decision_id))
         }
+        Operation::ChangeRiskStatus { risk_id, .. }
+        | Operation::ChangeRiskRating { risk_id, .. } => record(RecordRef::Risk(*risk_id)),
     };
     (
         kind,

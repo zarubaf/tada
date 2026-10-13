@@ -20,12 +20,13 @@ use tada_domain::facts::{
 use tada_domain::identity::Email;
 use tada_domain::ids::{
     ActionId, CommitmentId, DecisionId, DocumentId, EventId, FieldDefinitionId, InstitutionId,
-    MilestoneId, OpenQuestionId, PersonId, UserId, WorkstreamId,
+    MilestoneId, OpenQuestionId, PersonId, RiskId, UserId, WorkstreamId,
 };
 use tada_domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_domain::proposals::{DraftDocument, Operation, QuestionText};
 use tada_domain::records::{
-    DecisionParties, DecisionStatus, DecisionWording, MilestoneStatus, MilestoneTitle,
+    DecisionParties, DecisionStatus, DecisionWording, Level, MilestoneStatus, MilestoneTitle,
+    RiskRating, RiskStatus, RiskTitle,
 };
 use tada_domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
@@ -383,6 +384,48 @@ pub enum OperationInput {
         /// The current version of the decision.
         expected_version: i64,
     },
+    /// Record a risk of the event: what can go wrong, how likely it is and how much it hurts. It starts `open`.
+    CreateRisk {
+        /// The UUIDv7 of the new risk.
+        id: Uuid,
+        event_id: Uuid,
+        /// 1 to 200 characters.
+        title: String,
+        /// 1 to 4000 characters. It can have several lines.
+        #[serde(default)]
+        description: Option<String>,
+        likelihood: LevelInput,
+        impact: LevelInput,
+        /// What the club does about the risk, 1 to 4000 characters. It can have several lines.
+        #[serde(default)]
+        mitigation: Option<String>,
+        /// The user ID of a member with the contributor or manager role in the event.
+        owner: Uuid,
+        /// An active workstream of the event, or a new workstream of this changeset;
+        /// then the proposal depends on the proposal that creates it.
+        #[serde(default)]
+        workstream: Option<Uuid>,
+    },
+    /// Change the status of a risk of the event.
+    /// `open` and `mitigated` change into each other; `open` and `mitigated` change to `occurred`;
+    /// `open`, `mitigated` and `occurred` change to `closed`; `closed` changes back to `open`.
+    /// A status change does not change the rating.
+    ChangeRiskStatus {
+        event_id: Uuid,
+        risk_id: Uuid,
+        status: RiskStatusInput,
+        /// The current version of the risk.
+        expected_version: i64,
+    },
+    /// Change the likelihood and the impact of a risk of the event. Give both, also the one that stays.
+    ChangeRiskRating {
+        event_id: Uuid,
+        risk_id: Uuid,
+        likelihood: LevelInput,
+        impact: LevelInput,
+        /// The current version of the risk.
+        expected_version: i64,
+    },
 }
 
 /// The party that makes a commitment: `{"person": "<uuid>"}` or `{"institution": "<uuid>"}`.
@@ -428,6 +471,24 @@ pub enum MilestoneStatusInput {
     Open,
     Reached,
     Canceled,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum RiskStatusInput {
+    Open,
+    Mitigated,
+    Occurred,
+    Closed,
+}
+
+/// A level of the likelihood or the impact of a risk.
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum LevelInput {
+    Low,
+    Medium,
+    High,
 }
 
 /// The status of a decision. Only a supersede or a revoke changes it.
@@ -601,7 +662,9 @@ redacted_debug!(
     ActionStatusInput,
     CommitmentStatusInput,
     MilestoneStatusInput,
-    DecisionStatusInput
+    DecisionStatusInput,
+    RiskStatusInput,
+    LevelInput
 );
 
 /// Collects the invalid fields of one input, with paths relative to it.
@@ -1132,6 +1195,70 @@ impl TryFrom<OperationInput> for Operation {
                     })
                 })()
             }
+            OperationInput::CreateRisk {
+                id,
+                event_id,
+                title,
+                description,
+                likelihood,
+                impact,
+                mitigation,
+                owner,
+                workstream,
+            } => {
+                let title = errors.take("title", RiskTitle::parse(&title), text_error_code);
+                let description = errors.optional(
+                    "description",
+                    description,
+                    RecordDescription::parse,
+                    text_error_code,
+                );
+                let mitigation = errors.optional(
+                    "mitigation",
+                    mitigation,
+                    RecordDescription::parse,
+                    text_error_code,
+                );
+                (|| {
+                    Some(Operation::CreateRisk {
+                        id: RiskId::from_uuid(id),
+                        event_id: EventId::from_uuid(event_id),
+                        title: title?,
+                        description: description?,
+                        rating: rating(likelihood, impact),
+                        mitigation: mitigation?,
+                        owner: UserId::from_uuid(owner),
+                        workstream: workstream.map(WorkstreamId::from_uuid),
+                    })
+                })()
+            }
+            OperationInput::ChangeRiskStatus {
+                event_id,
+                risk_id,
+                status,
+                expected_version,
+            } => errors.version(expected_version).map(|expected_version| {
+                Operation::ChangeRiskStatus {
+                    event_id: EventId::from_uuid(event_id),
+                    risk_id: RiskId::from_uuid(risk_id),
+                    status: status.into(),
+                    expected_version,
+                }
+            }),
+            OperationInput::ChangeRiskRating {
+                event_id,
+                risk_id,
+                likelihood,
+                impact,
+                expected_version,
+            } => errors.version(expected_version).map(|expected_version| {
+                Operation::ChangeRiskRating {
+                    event_id: EventId::from_uuid(event_id),
+                    risk_id: RiskId::from_uuid(risk_id),
+                    rating: rating(likelihood, impact),
+                    expected_version,
+                }
+            }),
         };
         errors.finish(operation)
     }
@@ -1181,6 +1308,35 @@ impl From<MilestoneStatusInput> for MilestoneStatus {
             MilestoneStatusInput::Reached => Self::Reached,
             MilestoneStatusInput::Canceled => Self::Canceled,
         }
+    }
+}
+
+impl From<RiskStatusInput> for RiskStatus {
+    fn from(input: RiskStatusInput) -> Self {
+        match input {
+            RiskStatusInput::Open => Self::Open,
+            RiskStatusInput::Mitigated => Self::Mitigated,
+            RiskStatusInput::Occurred => Self::Occurred,
+            RiskStatusInput::Closed => Self::Closed,
+        }
+    }
+}
+
+impl From<LevelInput> for Level {
+    fn from(input: LevelInput) -> Self {
+        match input {
+            LevelInput::Low => Self::Low,
+            LevelInput::Medium => Self::Medium,
+            LevelInput::High => Self::High,
+        }
+    }
+}
+
+/// The rating of a risk from the two levels that an input gives.
+pub(crate) fn rating(likelihood: LevelInput, impact: LevelInput) -> RiskRating {
+    RiskRating {
+        likelihood: likelihood.into(),
+        impact: impact.into(),
     }
 }
 

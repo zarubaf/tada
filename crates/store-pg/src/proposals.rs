@@ -51,7 +51,8 @@ impl ProposalStore for Database {
                UNION SELECT id FROM action WHERE id = ANY($1)
                UNION SELECT id FROM commitment WHERE id = ANY($1)
                UNION SELECT id FROM milestone WHERE id = ANY($1)
-               UNION SELECT id FROM decision WHERE id = ANY($1)"#,
+               UNION SELECT id FROM decision WHERE id = ANY($1)
+               UNION SELECT id FROM risk WHERE id = ANY($1)"#,
             ids,
         )
         .fetch_all(&self.pool)
@@ -476,11 +477,13 @@ mod tests {
     use tada_app::domain::events::{EventKey, EventName, EventTimeZone};
     use tada_app::domain::facts::{ChoiceKey, Description, FieldKey, ModuleKey, ShortText};
     use tada_app::domain::ids::{
-        ActionId, CommitmentId, FieldDefinitionId, InstitutionId, MilestoneId, PersonId,
+        ActionId, CommitmentId, FieldDefinitionId, InstitutionId, MilestoneId, PersonId, RiskId,
         WorkstreamId,
     };
     use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
-    use tada_app::domain::records::{MilestoneStatus, MilestoneTitle};
+    use tada_app::domain::records::{
+        Level, MilestoneStatus, MilestoneTitle, RiskRating, RiskStatus, RiskTitle,
+    };
     use tada_app::domain::work::{
         ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
         RecordDescription,
@@ -527,6 +530,7 @@ mod tests {
             work: &test.database,
             milestones: &test.database,
             decisions: &test.database,
+            risks: &test.database,
         }
     }
 
@@ -1283,6 +1287,49 @@ mod tests {
                 event_id: event,
                 milestone_id: MilestoneId::from_uuid(Uuid::now_v7()),
                 status: MilestoneStatus::Reached,
+                expected_version: RecordVersion::FIRST,
+            },
+            Operation::CreateRisk {
+                id: RiskId::from_uuid(Uuid::now_v7()),
+                event_id: event,
+                title: RiskTitle::parse("Starkregen am Festtag").unwrap(),
+                description: Some(
+                    RecordDescription::parse("Das Zelt\nsteht auf der Wiese.").unwrap(),
+                ),
+                rating: RiskRating {
+                    likelihood: Level::Medium,
+                    impact: Level::High,
+                },
+                mitigation: Some(RecordDescription::parse("Zweiter Eingang").unwrap()),
+                owner: UserId::from_uuid(Uuid::now_v7()),
+                workstream: Some(WorkstreamId::from_uuid(Uuid::now_v7())),
+            },
+            Operation::CreateRisk {
+                id: RiskId::from_uuid(Uuid::now_v7()),
+                event_id: event,
+                title: RiskTitle::parse("Ausfall des Stroms").unwrap(),
+                description: None,
+                rating: RiskRating {
+                    likelihood: Level::Low,
+                    impact: Level::Low,
+                },
+                mitigation: None,
+                owner: UserId::from_uuid(Uuid::now_v7()),
+                workstream: None,
+            },
+            Operation::ChangeRiskStatus {
+                event_id: event,
+                risk_id: RiskId::from_uuid(Uuid::now_v7()),
+                status: RiskStatus::Occurred,
+                expected_version: RecordVersion::new(3).unwrap(),
+            },
+            Operation::ChangeRiskRating {
+                event_id: event,
+                risk_id: RiskId::from_uuid(Uuid::now_v7()),
+                rating: RiskRating {
+                    likelihood: Level::High,
+                    impact: Level::Medium,
+                },
                 expected_version: RecordVersion::FIRST,
             },
         ];

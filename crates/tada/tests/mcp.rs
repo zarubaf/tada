@@ -168,7 +168,8 @@ impl Mcp {
                 parties: database.clone(),
                 work: database.clone(),
                 milestones: database.clone(),
-                decisions: database,
+                decisions: database.clone(),
+                risks: database,
             }),
             version: tada::BUILD.version,
         };
@@ -260,6 +261,7 @@ impl Mcp {
             work: &self.test.database,
             milestones: &self.test.database,
             decisions: &self.test.database,
+            risks: &self.test.database,
         };
         match create_changeset(&self.owner, input, stores, &*self.clock)
             .await
@@ -439,7 +441,7 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 15, "{names:?}");
+    assert_eq!(names.len(), 16, "{names:?}");
     for name in [
         "list_events",
         "list_members",
@@ -454,6 +456,7 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         "list_commitments",
         "list_milestones",
         "list_decisions",
+        "list_risks",
         "search_parties",
         "propose_changeset",
     ] {
@@ -833,7 +836,7 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
     let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &list).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     let tools = body["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 15);
+    assert_eq!(tools.len(), 16);
     for tool in tools {
         assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
         assert_eq!(tool["outputSchema"]["type"], "object", "{tool}");
@@ -1482,6 +1485,7 @@ impl Mcp {
             work: database,
             milestones: database,
             decisions: database,
+            risks: database,
             workstreams: database,
             parties: database,
             clock: &*self.clock,
@@ -1574,6 +1578,7 @@ async fn mcp_lists_workstreams_and_actions() {
         work: database,
         milestones: database,
         decisions: database,
+        risks: database,
         workstreams: database,
         parties: database,
         clock: &*mcp.clock,
@@ -1889,6 +1894,7 @@ async fn each_tool_result_matches_its_output_schema() {
         work: database,
         milestones: database,
         decisions: database,
+        risks: database,
         workstreams: database,
         parties: database,
         clock: &*mcp.clock,
@@ -1911,7 +1917,7 @@ async fn each_tool_result_matches_its_output_schema() {
 
     // Accepted facts, an assumption, an unknown, a reference, an open question, and records with evidence.
     // The proposal IDs give the order of the steps (UUIDv7).
-    let proposals: [Uuid; 11] = std::array::from_fn(|_| Uuid::now_v7());
+    let proposals: [Uuid; 12] = std::array::from_fn(|_| Uuid::now_v7());
     let [
         date,
         guess,
@@ -1924,6 +1930,7 @@ async fn each_tool_result_matches_its_output_schema() {
         commitment,
         milestone,
         decision,
+        risk,
     ] = proposals;
     let (field_id, person_id) = (Uuid::now_v7(), Uuid::now_v7());
     let quoted = |id: Uuid, operation: Value, depends_on: &[Uuid], quote: &str| {
@@ -2028,6 +2035,17 @@ async fn each_tool_result_matches_its_output_schema() {
                     &[person],
                     "Das Open Day"
                 ),
+                quoted(
+                    risk,
+                    json!({
+                        "kind": "create-risk", "id": Uuid::now_v7(), "event_id": event,
+                        "title": "Der Ort fällt aus", "description": "Das Flugfeld ist\nnoch nicht frei.",
+                        "likelihood": "medium", "impact": "high", "mitigation": "Die Halle als Ersatz",
+                        "owner": olga, "workstream": workstream.id.as_uuid(),
+                    }),
+                    &[],
+                    "Der Ort ist noch offen"
+                ),
             ]),
         )
         .await;
@@ -2126,7 +2144,7 @@ async fn each_tool_result_matches_its_output_schema() {
         )]),
     );
     // Each case: the tool, its arguments, the token, and the arrays of its result that must not be empty.
-    let cases: [(&str, Value, &str, &[&str]); 15] = [
+    let cases: [(&str, Value, &str, &[&str]); 16] = [
         ("list_events", json!({}), &mcp.token, &["/events"]),
         (
             "list_members",
@@ -2220,6 +2238,12 @@ async fn each_tool_result_matches_its_output_schema() {
                 "/decisions/0/decided_by",
                 "/decisions/0/evidence",
             ],
+        ),
+        (
+            "list_risks",
+            json!({"event_key": "OPEN30"}),
+            &mcp.token,
+            &["/risks", "/risks/0/evidence"],
         ),
         (
             "search_parties",
@@ -2487,4 +2511,112 @@ async fn propose_a_decision_and_its_successor() {
         json!(successor_id),
         "{superseded}"
     );
+}
+
+/// An agent proposes a new risk, then a change of its rating and of its status; the risk list shows the worst risk
+/// first and keeps the evidence of each change.
+#[tokio::test]
+async fn propose_a_risk_and_change_its_rating() {
+    let mcp = Mcp::start().await;
+    let (_, token) = mcp.contributor_token().await;
+    let (risk_id, minor_id) = (Uuid::now_v7(), Uuid::now_v7());
+    let [first, second, third, fourth] = [(); 4].map(|()| Uuid::now_v7());
+    let create = |id: Uuid, title: &str, likelihood: &str, impact: &str| {
+        json!({
+            "kind": "create-risk", "id": id, "event_id": mcp.secret.as_uuid(),
+            "title": title, "likelihood": likelihood, "impact": impact,
+            "owner": mcp.anna.as_uuid(),
+        })
+    };
+    let changeset_id = Uuid::now_v7();
+    let mut arguments = changeset(
+        mcp.secret,
+        SOURCE,
+        json!([
+            proposal(
+                first,
+                create(risk_id, "Der Ort fällt aus", "low", "medium"),
+                &[],
+                SOURCE,
+                "im Mai 2030"
+            ),
+            proposal(
+                second,
+                create(minor_id, "Regen am Samstag", "medium", "medium"),
+                &[],
+                SOURCE,
+                "im Mai 2030"
+            ),
+        ]),
+    );
+    arguments["id"] = json!(changeset_id);
+    let body = mcp.propose_with(&token, arguments).await;
+    assert_eq!(body["result"]["isError"], false, "{body}");
+    let stored = |id: Uuid| {
+        tada_app::proposals::ProposalStore::get(
+            &mcp.test.database,
+            mcp.owner.scope(),
+            tada_app::domain::ids::ChangesetId::from_uuid(id),
+        )
+    };
+    let stored_changeset = stored(changeset_id).await.unwrap().unwrap().0;
+    mcp.apply(&stored_changeset, &[first, second]).await;
+    let risks = mcp
+        .result("list_risks", json!({"event_key": "SECRET30"}))
+        .await;
+    let order: Vec<&str> = risks["risks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|risk| risk["local_id"].as_str().unwrap())
+        .collect();
+    assert_eq!(order, ["RSK-002", "RSK-001"], "{risks}");
+
+    // The agent raises the likelihood of the first risk: it comes first. A status change keeps the rating.
+    let changeset_id = Uuid::now_v7();
+    let mut arguments = changeset(
+        mcp.secret,
+        SOURCE,
+        json!([
+            proposal(
+                third,
+                json!({
+                    "kind": "change-risk-rating", "event_id": mcp.secret.as_uuid(), "risk_id": risk_id,
+                    "likelihood": "high", "impact": "high", "expected_version": 1,
+                }),
+                &[],
+                SOURCE,
+                "Der Ort ist noch offen"
+            ),
+            proposal(
+                fourth,
+                json!({
+                    "kind": "change-risk-status", "event_id": mcp.secret.as_uuid(), "risk_id": risk_id,
+                    "status": "occurred", "expected_version": 2,
+                }),
+                &[third],
+                SOURCE,
+                "im Mai 2030"
+            ),
+        ]),
+    );
+    arguments["id"] = json!(changeset_id);
+    let body = mcp.propose_with(&token, arguments).await;
+    assert_eq!(body["result"]["isError"], false, "{body}");
+    let stored_changeset = stored(changeset_id).await.unwrap().unwrap().0;
+    mcp.apply(&stored_changeset, &[third, fourth]).await;
+    let risks = mcp
+        .result("list_risks", json!({"event_key": "SECRET30"}))
+        .await;
+    let first_risk = &risks["risks"][0];
+    assert_eq!(first_risk["local_id"], "RSK-001", "{risks}");
+    assert_eq!(
+        (
+            &first_risk["likelihood"],
+            &first_risk["impact"],
+            &first_risk["status"]
+        ),
+        (&json!("high"), &json!("high"), &json!("occurred"))
+    );
+    assert_eq!(first_risk["evidence"].as_array().unwrap().len(), 3);
 }

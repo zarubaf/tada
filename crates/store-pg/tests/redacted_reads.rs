@@ -91,6 +91,7 @@ fn work_ports(test: &TestDatabase) -> WorkPorts<'_> {
         work: &test.database,
         milestones: &test.database,
         decisions: &test.database,
+        risks: &test.database,
         workstreams: &test.database,
         parties: &test.database,
         clock: &FixedClock,

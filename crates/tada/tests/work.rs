@@ -955,3 +955,203 @@ async fn decisions_round_trip_over_http() {
         json!([{"pointer": "/decided_by", "code": "required"}])
     );
 }
+
+#[tokio::test]
+async fn risks_round_trip_over_http() {
+    let api = Api::start().await;
+    let e = api.event().await;
+    let risks = format!("/api/v1/events/{}/risks", e.id);
+    let create = |title: &str, likelihood: &str, impact: &str| {
+        json!({
+            "title": title, "description": "Das Zelt steht\nauf der Wiese.",
+            "likelihood": likelihood, "impact": impact, "mitigation": "Zweiter Eingang",
+            "owner_user_id": e.ben.as_uuid(),
+        })
+    };
+    // A contributor records a risk; the lines of the texts stay.
+    let risk = api
+        .created(
+            &e.ben_cookie,
+            &risks,
+            &create("Hoch mal gering", "high", "low"),
+        )
+        .await;
+    assert_eq!(risk["local_id"], "RSK-001");
+    assert_eq!(risk["status"], "open");
+    assert_eq!(
+        (&risk["likelihood"], &risk["impact"]),
+        (&json!("high"), &json!("low"))
+    );
+    assert_eq!(risk["description"], "Das Zelt steht\nauf der Wiese.");
+    assert_eq!(risk["mitigation"], "Zweiter Eingang");
+    assert_eq!(risk["version"], 1);
+    assert_eq!(risk["evidence"], json!([]));
+    assert_eq!(
+        risk["next_statuses"],
+        json!(["mitigated", "occurred", "closed"])
+    );
+    api.created(
+        &e.ben_cookie,
+        &risks,
+        &create("Mittel mal mittel", "medium", "medium"),
+    )
+    .await;
+    api.created(
+        &e.ben_cookie,
+        &risks,
+        &create("Mittel mal hoch", "medium", "high"),
+    )
+    .await;
+    api.created(
+        &e.ben_cookie,
+        &risks,
+        &create("Hoch mal mittel", "high", "medium"),
+    )
+    .await;
+
+    // The list shows the worst first: 6 (impact high), 6, 4, 3. Pages follow the same order.
+    let titles = |page: &Value| -> Vec<String> {
+        page["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["local_id"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let (status, page) = api.get(&e.viewer, &format!("{risks}?limit=3")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(titles(&page), ["RSK-003", "RSK-004", "RSK-002"]);
+    let cursor = page["next_cursor"].as_str().unwrap();
+    let (_, rest) = api
+        .get(&e.viewer, &format!("{risks}?limit=3&cursor={cursor}"))
+        .await;
+    assert_eq!(titles(&rest), ["RSK-001"]);
+    assert!(rest.get("next_cursor").is_none(), "{rest}");
+
+    // The owner lowers the last risk of a page before the next page: no other risk is skipped. The cursor holds
+    // the rating that the page showed, so the lowered risk moves to the end instead of hiding the rest.
+    let (_, first) = api.get(&e.viewer, &format!("{risks}?limit=2")).await;
+    assert_eq!(titles(&first), ["RSK-003", "RSK-004"]);
+    let cursor = first["next_cursor"].as_str().unwrap();
+    let fourth = format!("{risks}/{}", first["items"][1]["id"].as_str().unwrap());
+    let (status, lowered) = api
+        .patch(
+            &e.ben_cookie,
+            &fourth,
+            &json!({"likelihood": "low", "impact": "low", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{lowered}");
+    let (_, rest) = api
+        .get(&e.viewer, &format!("{risks}?limit=10&cursor={cursor}"))
+        .await;
+    assert_eq!(titles(&rest), ["RSK-002", "RSK-001", "RSK-004"]);
+
+    // A cursor that the server did not make is refused as a problem, not a failure.
+    for forged in ["bm90IGEgY3Vyc29y", "NA", "aGlnaCBodWdlIDM"] {
+        let (status, problem) = api
+            .get(&e.viewer, &format!("{risks}?cursor={forged}"))
+            .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{forged}: {problem}");
+    }
+
+    // A status change keeps the rating; the rating changes with its own fields; a request needs a field.
+    let path = record(&e, "risks", &risk);
+    let (status, changed) = api
+        .patch(
+            &e.ben_cookie,
+            &path,
+            &json!({"status": "mitigated", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{changed}");
+    assert_eq!(
+        (
+            &changed["status"],
+            &changed["likelihood"],
+            &changed["impact"]
+        ),
+        (&json!("mitigated"), &json!("high"), &json!("low"))
+    );
+    assert_eq!(
+        changed["next_statuses"],
+        json!(["open", "occurred", "closed"])
+    );
+    let (status, rated) = api
+        .patch(
+            &e.ben_cookie,
+            &path,
+            &json!({"impact": "high", "mitigation": null, "expected_version": 2}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{rated}");
+    assert_eq!(
+        (&rated["likelihood"], &rated["impact"], &rated["mitigation"]),
+        (&json!("high"), &json!("high"), &Value::Null)
+    );
+    let (status, problem) = api
+        .patch(&e.ben_cookie, &path, &json!({"expected_version": 3}))
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+
+    // closed reopens; occurred does not go back to open.
+    for (status_name, expected_version) in [("closed", 3), ("open", 4)] {
+        let (status, body) = api
+            .patch(
+                &e.ben_cookie,
+                &path,
+                &json!({"status": status_name, "expected_version": expected_version}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    }
+    let (_, occurred) = api
+        .patch(
+            &e.ben_cookie,
+            &path,
+            &json!({"status": "occurred", "expected_version": 5}),
+        )
+        .await;
+    assert_eq!(occurred["status"], "occurred");
+    let (status, problem) = api
+        .patch(
+            &e.ben_cookie,
+            &path,
+            &json!({"status": "open", "expected_version": 6}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+    assert_eq!(problem["code"], "invalid-transition");
+
+    // A viewer reads but changes nothing.
+    let (status, read) = api.get(&e.viewer, &path).await;
+    assert_eq!(status, StatusCode::OK, "{read}");
+    assert_eq!(read["can_change"], false);
+    assert_eq!(read["next_statuses"], json!([]));
+    let (status, problem) = api
+        .post(&e.viewer, &risks, &create("X", "low", "low"))
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    let (status, page) = api
+        .get(&e.viewer, &format!("{risks}?status=occurred"))
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(page["items"].as_array().unwrap().len(), 1);
+
+    // The limits of the texts and an unknown level.
+    let mut long = create(&"a".repeat(201), "low", "low");
+    long["mitigation"] = json!("m".repeat(4001));
+    let (status, problem) = api.post(&e.ben_cookie, &risks, &long).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    assert_eq!(
+        problem["errors"],
+        json!([
+            {"pointer": "/title", "code": "too-long"},
+            {"pointer": "/mitigation", "code": "too-long"},
+        ])
+    );
+    let (status, problem) = api
+        .post(&e.ben_cookie, &risks, &create("X", "extreme", "low"))
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{problem}");
+}

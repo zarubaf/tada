@@ -74,7 +74,9 @@ pub(super) async fn check_work(
             }
         }
         match &proposal.operation {
-            Operation::CreateAction { .. } | Operation::CreateMilestone { .. } => {}
+            Operation::CreateAction { .. }
+            | Operation::CreateMilestone { .. }
+            | Operation::CreateRisk { .. } => {}
             Operation::CreateCommitment { promisor, .. } => {
                 if !party_exists(scope, *promisor, proposals, stores).await? {
                     refuse(operation("promisor"), "unknown-record");
@@ -219,6 +221,30 @@ pub(super) async fn check_work(
                 }
                 Some(_) => {}
             },
+            Operation::ChangeRiskStatus {
+                event_id,
+                risk_id,
+                status,
+                ..
+            } => match stores.risks.risk(scope, *event_id, *risk_id).await? {
+                None => refuse(operation("risk_id"), "unknown-record"),
+                Some(current) if current.fields.status.change_to(*status).is_err() => {
+                    refuse(operation("status"), "invalid-transition");
+                }
+                Some(_) => {}
+            },
+            Operation::ChangeRiskRating {
+                event_id, risk_id, ..
+            } => {
+                if stores
+                    .risks
+                    .risk(scope, *event_id, *risk_id)
+                    .await?
+                    .is_none()
+                {
+                    refuse(operation("risk_id"), "unknown-record");
+                }
+            }
             // These operations create or change no work record: other checks of the changeset cover them.
             Operation::CreateEvent { .. }
             | Operation::SetFact { .. }

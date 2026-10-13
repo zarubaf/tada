@@ -1,4 +1,4 @@
-//! Actions, commitments, milestones and decisions (ADR 0068, ADR 0080): the work records of an event, with their
+//! Actions, commitments, milestones, decisions and risks (ADR 0068, ADR 0080): the work records of an event, with their
 //! direct commands. A member creates and changes them without review; an accepted proposal does the same (ADR 0050).
 
 mod actions;
@@ -6,6 +6,7 @@ mod checks;
 mod commitments;
 mod decisions;
 mod milestones;
+mod risks;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -42,6 +43,10 @@ pub use self::milestones::{
     MilestoneChange, MilestoneFields, MilestoneStore, MilestoneView, MilestoneWarning,
     NewMilestone, NewMilestoneRecord, change_milestone, create_milestone, get_milestone,
     list_milestones,
+};
+pub use self::risks::{
+    NewRisk, NewRiskRecord, RiskChange, RiskCursor, RiskFields, RiskStore, RiskView, change_risk,
+    create_risk, get_risk, list_risks,
 };
 use crate::access::{AccessError, EventClosed, EventLevel, EventReach};
 use crate::audit::AuditEvent;
@@ -181,11 +186,11 @@ pub struct NewCommitmentRecord {
 
 /// The records of an event that a list shows, in the order of their numbers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WorkFilter<S> {
+pub struct WorkFilter<S, C = NumberCursor> {
     pub owner: Option<UserId>,
     pub status: Option<S>,
     pub workstream: Option<WorkstreamId>,
-    pub after: Option<NumberCursor>,
+    pub after: Option<C>,
     pub limit: u32,
 }
 
@@ -320,6 +325,7 @@ pub struct WorkPorts<'a> {
     pub work: &'a dyn WorkStore,
     pub milestones: &'a dyn MilestoneStore,
     pub decisions: &'a dyn DecisionStore,
+    pub risks: &'a dyn RiskStore,
     pub workstreams: &'a dyn WorkstreamStore,
     pub parties: &'a dyn PartyStore,
     pub clock: &'a dyn Clock,
@@ -427,17 +433,17 @@ pub fn may_change_work(
 
 /// The filter of a list as the caller gives it, with the page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WorkQuery<S> {
+pub struct WorkQuery<S, C = NumberCursor> {
     pub owner: Option<UserId>,
     pub status: Option<S>,
     pub workstream: Option<WorkstreamId>,
-    pub after: Option<NumberCursor>,
+    pub after: Option<C>,
     pub limit: PageLimit,
 }
 
-impl<S> WorkQuery<S> {
+impl<S, C> WorkQuery<S, C> {
     /// The store filter with one more record, to see if a next page exists.
-    fn filter(self) -> WorkFilter<S> {
+    fn filter(self) -> WorkFilter<S, C> {
         WorkFilter {
             owner: self.owner,
             status: self.status,

@@ -32,7 +32,11 @@ fn action(event: EventId, id: Uuid, owner: UserId, workstream: Option<Uuid>) -> 
 }
 
 /// The record version, the proposal and the quote of each passage of `record_evidence` for the record `id`.
-async fn record_evidence(test: &TestDatabase, column: &str, id: Uuid) -> Vec<(i64, Uuid, String)> {
+pub(super) async fn record_evidence(
+    test: &TestDatabase,
+    column: &str,
+    id: Uuid,
+) -> Vec<(i64, Uuid, String)> {
     sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT record_version, proposal_id, quote FROM record_evidence WHERE {column} = $1
          ORDER BY record_version, id"
@@ -43,7 +47,7 @@ async fn record_evidence(test: &TestDatabase, column: &str, id: Uuid) -> Vec<(i6
     .unwrap()
 }
 
-async fn audit_actions(test: &TestDatabase, subject: Uuid) -> Vec<String> {
+pub(super) async fn audit_actions(test: &TestDatabase, subject: Uuid) -> Vec<String> {
     sqlx::query_scalar("SELECT action FROM audit_event WHERE record_id = $1 ORDER BY id")
         .bind(subject)
         .fetch_all(&test.database.pool)
@@ -483,7 +487,7 @@ async fn accepted_milestone_gets_a_readable_id_and_evidence() {
     assert_eq!(evidence.len(), 2);
 }
 
-fn edit(id: Uuid, fields: Value) -> Edit {
+pub(super) fn edit(id: Uuid, fields: Value) -> Edit {
     Edit {
         proposal_id: ProposalId::from_uuid(id),
         state: None,
@@ -491,7 +495,7 @@ fn edit(id: Uuid, fields: Value) -> Edit {
     }
 }
 
-fn invalid(result: Result<Applied, ApplyError>) -> Vec<(String, &'static str)> {
+pub(super) fn invalid(result: Result<Applied, ApplyError>) -> Vec<(String, &'static str)> {
     let Err(ApplyError::Invalid(errors)) = result else {
         panic!("not invalid: {result:?}");
     };
@@ -729,7 +733,11 @@ async fn an_edited_owner_must_be_a_contributor() {
     assert_eq!(audit_actions(&test, action_id).await, ["action.create"]);
 }
 
-async fn insert_workstream(test: &TestDatabase, open_day: &OpenDay, status: &str) -> Uuid {
+pub(super) async fn insert_workstream(
+    test: &TestDatabase,
+    open_day: &OpenDay,
+    status: &str,
+) -> Uuid {
     let id = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO workstream (id, organization_id, event_id, name, lead_user_id, status, version, created_at, updated_at)

@@ -29,8 +29,9 @@ use uuid::Uuid;
 
 pub use self::input::{
     ActionStatusInput, ChoiceInput, CommitmentStatusInput, DecisionStatusInput, DraftDocumentInput,
-    FactStateInput, GranularityInput, InstitutionKindInput, NewChangeset, NewProposal,
-    OperationInput, PartyInput, PassageInput, ReferenceTargetInput, ValueInput, ValueTypeInput,
+    FactStateInput, GranularityInput, InstitutionKindInput, LevelInput, NewChangeset, NewProposal,
+    OperationInput, PartyInput, PassageInput, ReferenceTargetInput, RiskStatusInput, ValueInput,
+    ValueTypeInput,
 };
 pub(crate) use self::input::{parse_date, state_from_input, value_error_code};
 pub(crate) use self::work::{owner_refusal, workstream_refusal};
@@ -48,7 +49,7 @@ use crate::records::text_error_code;
 use crate::sources::SourceStore;
 use crate::store::StoreError;
 use crate::tokens::TokenScope;
-use crate::work::{DecisionStore, MilestoneStore, WorkStore};
+use crate::work::{DecisionStore, MilestoneStore, RiskStore, WorkStore};
 use crate::workstreams::WorkstreamStore;
 
 /// A caller that can create proposals (ADR 0039): a member, or an AI client of a member.
@@ -216,6 +217,8 @@ pub struct ProposeStores<'a> {
     pub milestones: &'a dyn MilestoneStore,
     /// The decisions that a proposal supersedes or revokes, and their successors.
     pub decisions: &'a dyn DecisionStore,
+    /// The risks whose status or rating a proposal changes.
+    pub risks: &'a dyn RiskStore,
 }
 
 #[derive(Debug, thiserror::Error)]

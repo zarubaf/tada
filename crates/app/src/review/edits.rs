@@ -11,7 +11,7 @@ use tada_domain::identity::Email;
 use tada_domain::ids::{MilestoneId, UserId, WorkstreamId};
 use tada_domain::parties::{PartyName, PhoneNumber};
 use tada_domain::proposals::Operation;
-use tada_domain::records::MilestoneTitle;
+use tada_domain::records::{Level, MilestoneTitle, RiskRating, RiskTitle};
 use tada_domain::work::{
     ActionTitle, CommitmentText, ConditionText, RecordDescription, dates_in_order,
 };
@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use crate::parties::email_code;
 use crate::problem::FieldError;
-use crate::proposals::parse_date;
+use crate::proposals::{LevelInput, parse_date};
 use crate::records::{START_AFTER_DUE, text_error_code};
 
 /// The fields of a proposed record that the reviewer replaces. An absent field keeps the proposed value;
@@ -32,6 +32,8 @@ use crate::records::{START_AFTER_DUE, text_error_code};
 /// - `create-person` and `create-institution`: `name`, `email`, `phone`.
 /// - `create-milestone`: `title`, `description`, `date`, `owner`, `workstream`.
 /// - `create-decision`: `owner`, `workstream`. The wording, the date and the parties stay as proposed.
+/// - `create-risk`: `title`, `description`, `mitigation`, `likelihood`, `impact`, `owner`, `workstream`.
+///   A level that the edit leaves out stays as proposed.
 #[derive(Clone, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RecordEditInput {
@@ -57,6 +59,15 @@ pub struct RecordEditInput {
     /// An active workstream of the event.
     #[serde(default, deserialize_with = "present")]
     pub workstream: Option<Option<Uuid>>,
+    /// The mitigation of a risk.
+    #[serde(default, deserialize_with = "present")]
+    pub mitigation: Option<Option<String>>,
+    /// The likelihood of a risk.
+    #[serde(default)]
+    pub likelihood: Option<LevelInput>,
+    /// The impact of a risk.
+    #[serde(default)]
+    pub impact: Option<LevelInput>,
     #[serde(default)]
     pub text: Option<String>,
     #[serde(default, deserialize_with = "present")]
@@ -105,6 +116,15 @@ pub(super) fn editable_fields(operation: &Operation) -> &'static [&'static str] 
             &["title", "description", "date", "owner", "workstream"]
         }
         Operation::CreateDecision { .. } => &["owner", "workstream"],
+        Operation::CreateRisk { .. } => &[
+            "title",
+            "description",
+            "mitigation",
+            "likelihood",
+            "impact",
+            "owner",
+            "workstream",
+        ],
         Operation::CreateEvent { .. }
         | Operation::SetFact { .. }
         | Operation::AddFieldDefinition { .. }
@@ -119,7 +139,9 @@ pub(super) fn editable_fields(operation: &Operation) -> &'static [&'static str] 
         | Operation::CreateWorkstream { .. }
         | Operation::ChangeMilestoneStatus { .. }
         | Operation::SupersedeDecision { .. }
-        | Operation::RevokeDecision { .. } => &[],
+        | Operation::RevokeDecision { .. }
+        | Operation::ChangeRiskStatus { .. }
+        | Operation::ChangeRiskRating { .. } => &[],
     }
 }
 
@@ -190,6 +212,9 @@ pub(super) fn edit_record(
         ("date", edit.date.is_some()),
         ("owner", edit.owner.is_some()),
         ("workstream", edit.workstream.is_some()),
+        ("mitigation", edit.mitigation.is_some()),
+        ("likelihood", edit.likelihood.is_some()),
+        ("impact", edit.impact.is_some()),
         ("text", edit.text.is_some()),
         ("condition", edit.condition.is_some()),
         ("name", edit.name.is_some()),
@@ -211,6 +236,9 @@ pub(super) fn edit_record(
         date,
         owner,
         workstream,
+        mitigation,
+        likelihood,
+        impact,
         text,
         condition,
         name,
@@ -410,6 +438,46 @@ pub(super) fn edit_record(
             wording,
             decided_on,
             decided_by,
+            owner: owner.map_or(current_owner, UserId::from_uuid),
+            workstream: workstream.map_or(current_workstream, |id| id.map(WorkstreamId::from_uuid)),
+        },
+        Operation::CreateRisk {
+            id,
+            event_id,
+            title: current_title,
+            description: current_description,
+            rating: current_rating,
+            mitigation: current_mitigation,
+            owner: current_owner,
+            workstream: current_workstream,
+        } => Operation::CreateRisk {
+            id,
+            event_id,
+            title: errors.replace(
+                "title",
+                current_title,
+                title,
+                RiskTitle::parse,
+                text_error_code,
+            ),
+            description: errors.replace_optional(
+                "description",
+                current_description,
+                description,
+                RecordDescription::parse,
+                text_error_code,
+            ),
+            rating: RiskRating {
+                likelihood: likelihood.map_or(current_rating.likelihood, Level::from),
+                impact: impact.map_or(current_rating.impact, Level::from),
+            },
+            mitigation: errors.replace_optional(
+                "mitigation",
+                current_mitigation,
+                mitigation,
+                RecordDescription::parse,
+                text_error_code,
+            ),
             owner: owner.map_or(current_owner, UserId::from_uuid),
             workstream: workstream.map_or(current_workstream, |id| id.map(WorkstreamId::from_uuid)),
         },

@@ -923,3 +923,70 @@ async fn person_export_lists_the_decisions_of_a_person() {
     assert_eq!(mentions[0]["kind"], "decision");
     assert_eq!(mentions[0]["text"], "Beat Muster leitet den Aufbau.");
 }
+
+/// A risk whose title, description or mitigation names a person is a mention (ADR 0080). The export lists it.
+#[tokio::test]
+async fn person_export_lists_the_risks_that_name_a_person() {
+    let world = World::start().await;
+    let person = world.person(json!({"name": "Beat Muster"})).await;
+    let risks = format!("/api/v1/events/{}/risks", world.event);
+    let risk = |title: &str, description: Option<&str>, mitigation: Option<&str>| {
+        json!({"title": title, "description": description, "mitigation": mitigation,
+               "likelihood": "medium", "impact": "high",
+               "owner_user_id": world.owner_id.as_uuid()})
+    };
+    let in_title = world
+        .owner
+        .post(&risks, &risk("Beat Muster fällt aus", None, None))
+        .await;
+    let in_description = world
+        .owner
+        .post(
+            &risks,
+            &risk("Der Aufbau", Some("Ohne beat muster fehlt der Plan."), None),
+        )
+        .await;
+    let in_mitigation = world
+        .owner
+        .post(
+            &risks,
+            &risk("Der Ort", None, Some("Frage bei Beat Muster nach.")),
+        )
+        .await;
+    world
+        .owner
+        .post(
+            &risks,
+            &risk("Starkregen", Some("Das Zelt."), Some("Kies.")),
+        )
+        .await;
+
+    let mentions = world.mentions(&person).await;
+    assert_eq!(kinds(&mentions), ["risk", "risk", "risk"], "{mentions:?}");
+    let ids: Vec<&Value> = mentions.iter().map(|m| &m["id"]).collect();
+    for found in [&in_title, &in_description, &in_mitigation] {
+        assert!(ids.contains(&&found["id"]), "{found} not in {ids:?}");
+    }
+    // A risk is a text that names the person, not a reference by ID.
+    let request = support::request(Method::GET, &format!("/api/v1/persons/{person}/export"))
+        .header(
+            header::COOKIE,
+            format!("{SESSION_COOKIE}={}", world.owner.cookie),
+        )
+        .body(Body::empty())
+        .unwrap();
+    let response = tower::ServiceExt::oneshot(world.owner.router.clone(), request)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let export: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(
+        export["references"].as_array().unwrap().len(),
+        0,
+        "{export}"
+    );
+    assert_eq!(export["mentions"].as_array().unwrap().len(), 3, "{export}");
+}

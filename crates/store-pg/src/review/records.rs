@@ -1,7 +1,7 @@
 //! The apply of the proposals that create or change work records and parties (ADR 0068, ADR 0069).
 //!
 //! Each write copies the passages of the proposal into `record_evidence` with the record version that it produced.
-//! A new record takes the next readable number of its scope: `ACT`, `COM`, `MIL` and `DEC` in the event, `PER` and
+//! A new record takes the next readable number of its scope: `ACT`, `COM`, `MIL`, `DEC` and `RSK` in the event, `PER` and
 //! `INS` in the organization.
 
 use std::collections::HashMap;
@@ -33,6 +33,7 @@ use crate::parties::{insert_institution, insert_person};
 use crate::proposals::operation_to_json;
 use crate::work::decisions::{decision_in, end_decision, insert_decision};
 use crate::work::milestones::{insert_milestone, milestone_in, update_milestone};
+use crate::work::risks::{RiskEdit, change_risk_in_plan, create_risk_in_plan};
 use crate::work::{
     action_in, commitment_in, insert_action, insert_commitment, update_action, update_commitment,
 };
@@ -446,6 +447,46 @@ pub(super) async fn write_record(
             .await?;
             (RecordRef::Decision(*decision_id), version)
         }
+        Operation::CreateRisk {
+            id,
+            event_id,
+            title,
+            description,
+            rating,
+            mitigation,
+            owner,
+            workstream,
+        } => {
+            let number = create_risk_in_plan(
+                conn,
+                scope,
+                (*id, *event_id),
+                title,
+                description.as_ref(),
+                *rating,
+                mitigation.as_ref(),
+                (*owner, *workstream),
+                plan.now,
+            )
+            .await?;
+            written.local_id = Some(local_id(LocalRecord::Risk(*id), number)?);
+            (RecordRef::Risk(*id), 1)
+        }
+        Operation::ChangeRiskStatus { .. } | Operation::ChangeRiskRating { .. } => {
+            let (event_id, risk_id, edit, expected_version) = RiskEdit::of(&step.operation)
+                .ok_or_else(|| sqlx::Error::Protocol("the step changes no risk".into()))?;
+            let version = change_risk_in_plan(
+                conn,
+                scope,
+                event_id,
+                risk_id,
+                edit,
+                expected_version,
+                plan.now,
+            )
+            .await?;
+            (RecordRef::Risk(risk_id), version)
+        }
         Operation::CreateEvent { .. }
         | Operation::SetFact { .. }
         | Operation::AddFieldDefinition { .. }
@@ -578,11 +619,18 @@ pub(super) async fn matches(
             successor != decision_id
                 && takes_successor(conn, scope, *event_id, *successor, new_records).await?
         }
-        Operation::RevokeDecision { .. } => true,
-        Operation::ChangeActionStatus { .. }
+        Operation::CreateRisk {
+            event_id,
+            workstream,
+            ..
+        } => takes_records(conn, scope, *event_id, *workstream, new_records).await?,
+        Operation::RevokeDecision { .. }
+        | Operation::ChangeActionStatus { .. }
         | Operation::ChangeActionDue { .. }
         | Operation::ChangeCommitmentStatus { .. }
-        | Operation::ChangeMilestoneStatus { .. } => true,
+        | Operation::ChangeMilestoneStatus { .. }
+        | Operation::ChangeRiskStatus { .. }
+        | Operation::ChangeRiskRating { .. } => true,
         Operation::CreateEvent { .. }
         | Operation::SetFact { .. }
         | Operation::AddFieldDefinition { .. }
@@ -705,6 +753,14 @@ pub(super) async fn id_free(
             .fetch_one(&mut *conn)
             .await?
         }
+        NewRecord::Risk(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM risk WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
     };
     Ok(!taken)
 }
@@ -756,6 +812,16 @@ async fn record_version(
         RecordKind::Decision => {
             sqlx::query_scalar!(
                 "SELECT version FROM decision WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+                organization,
+                event,
+                id,
+            )
+            .fetch_optional(&mut *conn)
+            .await
+        }
+        RecordKind::Risk => {
+            sqlx::query_scalar!(
+                "SELECT version FROM risk WHERE organization_id = $1 AND event_id = $2 AND id = $3",
                 organization,
                 event,
                 id,
@@ -944,7 +1010,12 @@ impl WorkLocks {
                 self.successors.push(successor.as_uuid());
                 None
             }
+            Operation::CreateRisk { event_id, .. } => {
+                Some((event_id.as_uuid(), LocalIdKind::Risk.prefix()))
+            }
             Operation::RevokeDecision { .. }
+            | Operation::ChangeRiskStatus { .. }
+            | Operation::ChangeRiskRating { .. }
             | Operation::ChangeActionStatus { .. }
             | Operation::ChangeActionDue { .. }
             | Operation::ChangeCommitmentStatus { .. }
@@ -1049,6 +1120,15 @@ async fn lock_for_update(
         RecordKind::Decision => {
             sqlx::query_scalar!(
                 "SELECT id FROM decision WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+                organization,
+                ids,
+            )
+            .fetch_all(&mut *conn)
+            .await?;
+        }
+        RecordKind::Risk => {
+            sqlx::query_scalar!(
+                "SELECT id FROM risk WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
                 organization,
                 ids,
             )

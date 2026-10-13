@@ -526,6 +526,124 @@ async fn event_redaction_clears_milestone_text() {
     );
 }
 
+/// A risk of the event loses its title, description and mitigation, and its evidence loses its quote (ADR 0080).
+#[tokio::test]
+async fn event_redaction_clears_risk_text() {
+    let test = database().await;
+    let risk = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO risk
+             (id, organization_id, event_id, local_number, title, description, likelihood, impact, mitigation,
+              owner_user_id, status, version, created_at, updated_at)
+         VALUES ($1, $2, $3, 1, 'Absage durch Max Muster', 'Max Muster ruft an.', 'medium', 'high',
+                 'Max Muster fragt nach.', $4, 'open', 1, now(), now())",
+    )
+    .bind(risk)
+    .bind(uuid(ORGANIZATION))
+    .bind(uuid(EVENT))
+    .bind(uuid(OWNER))
+    .execute(test.pool())
+    .await
+    .unwrap();
+    // The evidence cites the words of another event: only the risk, not its source, makes the quote fall.
+    let (other_event, item, version) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+    sqlx::query(
+        "INSERT INTO event (id, organization_id, key, name, time_zone, version, created_at)
+         VALUES ($1, $2, 'FLYIN', 'Fly-in', 'Europe/Zurich', 1, now())",
+    )
+    .bind(other_event)
+    .bind(uuid(ORGANIZATION))
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO source_item (id, organization_id, event_id, kind, created_at)
+         VALUES ($1, $2, $3, 'member-text', now())",
+    )
+    .bind(item)
+    .bind(uuid(ORGANIZATION))
+    .bind(other_event)
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO source_version
+             (id, organization_id, source_item_id, kind, channel, author_actor, text, sha256, captured_at)
+         VALUES ($1, $2, $3, 'member-text', 'web',
+                 jsonb_build_object('kind', 'member', 'id', $4::uuid, 'principal', NULL, 'channel', 'web',
+                                    'request_id', NULL),
+                 $5, sha256(convert_to($5, 'UTF8')), now())",
+    )
+    .bind(version)
+    .bind(uuid(ORGANIZATION))
+    .bind(item)
+    .bind(uuid(OWNER))
+    .bind("Der Fly-in braucht eine Bewilligung.")
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO record_evidence
+             (id, organization_id, risk_id, record_version, proposal_id, source_version_id,
+              start_offset, end_offset, quote)
+         VALUES ($1, $2, $3, 1, '0190a000-0000-7000-8000-000000000042', $4, 23, 35, 'Bewilligung')",
+    )
+    .bind(Uuid::now_v7())
+    .bind(uuid(ORGANIZATION))
+    .bind(risk)
+    .bind(version)
+    .execute(test.pool())
+    .await
+    .unwrap();
+    sqlx::query("UPDATE event SET status = 'closed', closed_at = now() WHERE id = $1")
+        .bind(uuid(EVENT))
+        .execute(test.pool())
+        .await
+        .unwrap();
+
+    redact(
+        &test,
+        &[target(RedactionTargetKind::Event, EVENT)],
+        RedactionReason::Request,
+    )
+    .await;
+
+    assert_eq!(
+        count(
+            &test,
+            &format!(
+                "SELECT count(*) FROM risk
+                 WHERE id = '{risk}' AND title IS NULL AND description IS NULL AND mitigation IS NULL
+                   AND redacted_at IS NOT NULL AND version = 2 AND likelihood = 'medium' AND impact = 'high'
+                   AND status = 'open'"
+            )
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &test,
+            &format!(
+                "SELECT count(*) FROM record_evidence
+                 WHERE risk_id = '{risk}' AND quote IS NULL AND redacted_at IS NOT NULL"
+            )
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &test,
+            &format!(
+                "SELECT count(*) FROM source_version WHERE id = '{version}' AND redacted_at IS NULL"
+            )
+        )
+        .await,
+        1
+    );
+}
+
 /// A decision of the event loses its wording and its reason, and its evidence loses its quote (ADR 0080).
 /// The date, the parties and the status stay.
 #[tokio::test]

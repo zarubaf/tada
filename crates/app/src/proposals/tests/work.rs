@@ -2,12 +2,13 @@
 
 use jiff::civil::Date;
 use tada_domain::ids::{
-    ActionId, CommitmentId, DecisionId, InstitutionId, LocalIdKind, MilestoneId, PersonId,
+    ActionId, CommitmentId, DecisionId, InstitutionId, LocalIdKind, MilestoneId, PersonId, RiskId,
     WorkstreamId,
 };
 use tada_domain::parties::{Party, PartyName};
 use tada_domain::records::{
-    DecisionParties, DecisionStatus, DecisionWording, MilestoneStatus, RecordReason,
+    DecisionParties, DecisionStatus, DecisionWording, Level, MilestoneStatus, RecordReason,
+    RiskRating, RiskStatus, RiskTitle,
 };
 use tada_domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, WorkstreamName,
@@ -22,7 +23,8 @@ use crate::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 use crate::work::{
     ActionFields, CommitmentFields, DecisionFields, DecisionState, DecisionStore, MilestoneFields,
     MilestoneStore, MyWork, NewActionRecord, NewCommitmentRecord, NewDecisionRecord,
-    NewMilestoneRecord, Superseded, WorkFilter, WorkOwners,
+    NewMilestoneRecord, NewRiskRecord, RiskCursor, RiskFields, RiskStore, Superseded, WorkFilter,
+    WorkOwners,
 };
 use crate::workstreams::{
     Changed as WorkstreamChanged, Created as WorkstreamCreated, WorkstreamUpdate,
@@ -439,6 +441,58 @@ impl DecisionStore for Memory {
         _: EventId,
         _: &WorkFilter<DecisionStatus>,
     ) -> Result<Vec<DecisionView>, StoreError> {
+        unreachable!()
+    }
+}
+
+/// The proposal checks only read risks.
+#[async_trait]
+impl RiskStore for Memory {
+    async fn create_risk(
+        &self,
+        _: OrgScope,
+        _: &NewRiskRecord,
+        _: Timestamp,
+        _: &AuditEvent,
+    ) -> Result<Created<RiskView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn change_risk(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: RiskId,
+        _: &RiskFields,
+        _: RecordVersion,
+        _: Timestamp,
+        _: &AuditEvent,
+    ) -> Result<Changed<RiskView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn risk(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+        id: RiskId,
+    ) -> Result<Option<RiskView>, StoreError> {
+        let found = scope.organization_id() == testwil();
+        Ok(self
+            .risks
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|risk| found && risk.event_id == event && risk.id == id)
+            .cloned())
+    }
+
+    async fn risks(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: &WorkFilter<RiskStatus, RiskCursor>,
+    ) -> Result<Vec<RiskView>, StoreError> {
         unreachable!()
     }
 }
@@ -1221,4 +1275,158 @@ async fn a_decision_names_known_parties_and_keeps_its_line_breaks() {
         decided_by,
         &DecisionParties::new(vec![Party::Person(PersonId::from_uuid(known))]).unwrap()
     );
+}
+
+fn existing_risk(memory: &Memory, status: RiskStatus) -> RiskId {
+    let id = RiskId::from_uuid(Uuid::now_v7());
+    memory.risks.lock().unwrap().push(RiskView {
+        id,
+        local_number: 1,
+        event_id: open_day(),
+        fields: RiskFields {
+            title: tada_domain::redaction::Redactable::Present(
+                RiskTitle::parse("Starkregen am Festtag").unwrap(),
+            ),
+            description: None,
+            rating: RiskRating {
+                likelihood: Level::Medium,
+                impact: Level::High,
+            },
+            mitigation: None,
+            owner: anna(),
+            workstream_id: None,
+            status,
+        },
+        version: RecordVersion::new(2).unwrap(),
+    });
+    id
+}
+
+fn new_risk(id: Uuid) -> Value {
+    json!({
+        "kind": "create-risk", "id": id, "event_id": open_day().as_uuid(),
+        "title": "Starkregen am Festtag", "description": "Das Zelt steht\nauf der Wiese.",
+        "likelihood": "medium", "impact": "high", "mitigation": "Zweiter Eingang",
+        "owner": anna().as_uuid(),
+    })
+}
+
+#[tokio::test]
+async fn a_risk_proposal_checks_its_texts_owner_and_transitions() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let created = create_changeset(
+        &anna,
+        one(new_risk(Uuid::now_v7()), "Der Wetterdienst warnt."),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert!(created.is_ok(), "{created:?}");
+
+    // The limits, an owner who does not contribute, and a level that does not exist.
+    let mut bad = new_risk(Uuid::now_v7());
+    bad["title"] = json!("a".repeat(201));
+    bad["mitigation"] = json!("c".repeat(4001));
+    let result = create_changeset(&anna, one(bad, "Fehler."), stores(&memory), &FixedClock).await;
+    let mut codes = invalid_fields(result);
+    codes.sort();
+    assert_eq!(
+        codes,
+        [
+            ("proposals/0/operation/mitigation".to_owned(), "too-long"),
+            ("proposals/0/operation/title".to_owned(), "too-long"),
+        ]
+    );
+    let mut stranger = new_risk(Uuid::now_v7());
+    stranger["owner"] = json!(Uuid::now_v7());
+    let result = create_changeset(
+        &anna,
+        one(stranger, "Fehler."),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/0/operation/owner".to_owned(), "unknown-member")]
+    );
+    let mut level = new_risk(Uuid::now_v7());
+    level["impact"] = json!("extreme");
+    let rejected = serde_json::from_value::<crate::proposals::OperationInput>(level);
+    assert!(rejected.is_err());
+
+    let open = existing_risk(&memory, RiskStatus::Open);
+    let closed = existing_risk(&memory, RiskStatus::Closed);
+    let status = |id: RiskId, status: &str| {
+        json!({
+            "kind": "change-risk-status", "event_id": open_day().as_uuid(),
+            "risk_id": id.as_uuid(), "status": status, "expected_version": 2,
+        })
+    };
+    // closed does not change to mitigated; a risk that is unknown is refused.
+    let result = create_changeset(
+        &anna,
+        one(status(closed, "mitigated"), "Doch nicht."),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert_eq!(
+        invalid_fields(result),
+        [(
+            "proposals/0/operation/status".to_owned(),
+            "invalid-transition"
+        )]
+    );
+    let result = create_changeset(
+        &anna,
+        one(status(RiskId::from_uuid(Uuid::now_v7()), "closed"), "Weg."),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/0/operation/risk_id".to_owned(), "unknown-record")]
+    );
+    for ok in [status(closed, "open"), status(open, "mitigated")] {
+        let result = create_changeset(
+            &anna,
+            one(ok, "Es hat sich geändert."),
+            stores(&memory),
+            &FixedClock,
+        )
+        .await;
+        assert!(result.is_ok(), "{result:?}");
+    }
+    // A rating change names a known risk and has no transition.
+    let rating = |id: RiskId| {
+        json!({
+            "kind": "change-risk-rating", "event_id": open_day().as_uuid(),
+            "risk_id": id.as_uuid(), "likelihood": "high", "impact": "high", "expected_version": 2,
+        })
+    };
+    let result = create_changeset(
+        &anna,
+        one(
+            rating(RiskId::from_uuid(Uuid::now_v7())),
+            "Es wird schlimmer.",
+        ),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/0/operation/risk_id".to_owned(), "unknown-record")]
+    );
+    let result = create_changeset(
+        &anna,
+        one(rating(closed), "Es wird schlimmer."),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert!(result.is_ok(), "{result:?}");
 }
