@@ -409,10 +409,20 @@
 
   /*
    * Every milestone darkens its border on hover. The fill (reached) and the dashes (canceled)
-   * keep the status. The border rests lighter than this (see .diamond), so the change shows.
+   * keep the status. The border rests in a different tone (see .diamond), so the change shows.
    */
   .mark:hover .diamond {
     border-color: var(--color-text);
+  }
+
+  /*
+   * With more contrast, the muted tone of a canceled milestone is the text tone, so a change of
+   * tone alone does not show: the border also gets wider on hover, inside the same box.
+   */
+  @media (prefers-contrast: more) {
+    .mark:hover .diamond {
+      border-width: 2.5px;
+    }
   }
 
   /* The list grouped by week: narrow containers. */

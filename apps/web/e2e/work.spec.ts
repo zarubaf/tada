@@ -557,20 +557,39 @@ test("a bar opens its row in the register of actions", async ({ page }) => {
   await expect(page.locator("tr#ACT-001")).toBeFocused();
 });
 
-test("hovering a milestone diamond changes its border, whatever its status", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await fakeSession(page, sessionWithRole("member"));
-  await fakeTimeline(page);
-  await page.goto(`/events/${event?.id}/timeline`);
-  const axis = page.getByRole("region", { name: "Zeitachse" });
-  // MIL-001 is open, MIL-002 is reached; a screenshot cannot show a hover, so read the styles.
-  for (const id of ["MIL-001", "MIL-002"]) {
-    const link = axis.getByRole("link", { name: new RegExp(id) });
-    const diamond = link.locator("[data-status]");
-    const border = () => diamond.evaluate((el) => getComputedStyle(el).borderTopColor);
-    await page.mouse.move(0, 0);
-    const rest = await border();
-    await link.hover();
-    await expect.poll(border).not.toBe(rest);
-  }
-});
+for (const contrast of ["no-preference", "more"] as const) {
+  test(`hovering a milestone diamond changes its border, whatever its status (contrast ${contrast})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ contrast });
+    await fakeSession(page, sessionWithRole("member"));
+    await fakeTimeline(page);
+    const canceled = {
+      ...milestones[1],
+      id: "0199b8e0-0000-7000-8000-000000000109",
+      local_id: "MIL-009",
+      title: "Flugtag abgesagt",
+      date: "2030-04-20",
+      status: "canceled",
+      next_statuses: ["open"],
+    };
+    await fulfill(page, "**/api/v1/events/*/milestones*", { items: [...milestones, canceled] });
+    await page.goto(`/events/${event?.id}/timeline`);
+    const axis = page.getByRole("region", { name: "Zeitachse" });
+    // Open, reached and canceled. A screenshot cannot show a hover, so read the styles.
+    for (const id of ["MIL-001", "MIL-002", "MIL-009"]) {
+      const link = axis.getByRole("link", { name: new RegExp(id) });
+      const diamond = link.locator("[data-status]");
+      const border = () =>
+        diamond.evaluate((el) => {
+          const style = getComputedStyle(el);
+          return `${style.borderTopColor} ${style.borderTopWidth}`;
+        });
+      await page.mouse.move(0, 0);
+      const rest = await border();
+      await link.hover();
+      await expect.poll(border).not.toBe(rest);
+    }
+  });
+}
