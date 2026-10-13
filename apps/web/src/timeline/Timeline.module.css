@@ -225,7 +225,7 @@
     min-width: 0;
   }
 
-  .weekLabel {
+  .axisLabel {
     position: absolute;
     inset-block: 0;
     left: calc(var(--at) / var(--days) * 100%);
@@ -385,12 +385,9 @@
   }
 
   .diamond {
-    position: absolute;
-    top: 50%;
-    left: calc((var(--at) + 0.5) / var(--days) * 100%);
+    flex: none;
     width: var(--space-3);
     height: var(--space-3);
-    translate: -50% -50%;
     rotate: 45deg;
     border: 1.5px solid var(--color-text);
     border-radius: var(--radius-sm);
@@ -407,13 +404,8 @@
     border-color: var(--color-text-muted);
   }
 
-  .hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  .mark:hover .diamond {
+    border-color: var(--color-accent);
   }
 
   /* The list grouped by week: narrow containers. */

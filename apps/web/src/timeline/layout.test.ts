@@ -233,10 +233,19 @@ describe("a span of centuries", () => {
     expect(far.weeks[0]).toBe("2030-05-06");
   });
 
-  it("groups by week without a pass over the weeks for each entry", () => {
-    const started = performance.now();
-    const groups = weekGroups(far);
-    expect(performance.now() - started).toBeLessThan(250);
+  it("groups by week without reading the weeks that hold no entry", () => {
+    let reads = 0;
+    const weeks = new Proxy(far.weeks, {
+      get(target, key, receiver) {
+        if (typeof key === "string" && /^\d+$/.test(key)) {
+          reads += 1;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    const groups = weekGroups({ ...far, weeks });
+    // 202 entries sit in a few weeks: a pass over 14 000 weeks would read each of them.
+    expect(reads).toBeLessThanOrEqual(202);
     expect(groups.at(-1)?.week).toBe("2300-04-30");
     expect(groups.reduce((sum, group) => sum + group.entries.length, 0)).toBe(202);
   });
@@ -245,14 +254,14 @@ describe("a span of centuries", () => {
     const labels = axisLabels(far.weeks);
     expect(labels.length).toBeLessThanOrEqual(45);
     expect(labels.length).toBeGreaterThan(1);
-    for (const label of labels) {
-      expect(label.date.endsWith("-01") || Number(label.date.slice(8)) <= 7).toBe(true);
+    for (const label of labels.slice(1)) {
+      expect(label.date.endsWith("-01")).toBe(true);
     }
   });
 });
 
 describe("axisLabels", () => {
-  it("labels the first week and the first week of each month, with the year at a new year", () => {
+  it("labels the first week and each month on its 1st, with the year at a new year", () => {
     const result = layout({
       ...base,
       actions: [action("1", { start_date: "2030-12-16", due_date: "2031-02-10" })],
@@ -260,11 +269,14 @@ describe("axisLabels", () => {
     const labels = axisLabels(result.weeks);
     expect(labels.map((label) => [label.date, label.withYear])).toEqual([
       ["2030-12-16", true],
-      ["2031-01-06", true],
-      ["2031-02-03", false],
+      ["2031-01-01", true],
+      ["2031-02-01", false],
     ]);
     expect(labels[0]?.at).toBe(0);
-    expect(labels[1]?.at).toBe(21);
+    // The 1st of January is a Wednesday in the week of 2030-12-30, the third week.
+    expect(labels[1]?.at).toBe(16);
+    // The 1st of February is a Saturday in the week of 2031-01-27, the seventh week.
+    expect(labels[2]?.at).toBe(47);
   });
 
   it("gives none for an axis without weeks", () => {

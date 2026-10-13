@@ -112,6 +112,26 @@ describe("TimelinePage", () => {
     expect(point).toHaveAttribute("href", `/events/${EVENT.id}/actions#ACT-002`);
   });
 
+  it("each milestone diamond is a link to the milestone", async () => {
+    render();
+    const timeline = await axis();
+    const diamond = within(timeline).getByRole("link", { name: /MIL-001/ });
+    expect(diamond).toHaveAttribute("href", `/events/${EVENT.id}/milestones#MIL-001`);
+    expect(diamond).not.toHaveAttribute("tabindex", "-1");
+  });
+
+  it("shows one message, not two, when the filters hide every action", async () => {
+    widen(500);
+    render({ lists: { "/milestones": [] } });
+    await axis();
+    await user.click(screen.getByRole("button", { name: /Verantwortlich/ }));
+    await user.click(screen.getByRole("option", { name: "Bernd Beispiel" }));
+    await user.click(screen.getByRole("button", { name: /Status/ }));
+    await user.click(screen.getByRole("option", { name: "offen" }));
+    expect(screen.getByText("Keine Treffer für diese Filter.")).toBeInTheDocument();
+    expect(screen.queryByText("Keine Einträge in dieser Ansicht.")).not.toBeInTheDocument();
+  });
+
   it("shows the lanes, the milestones, the event window and the undated count", async () => {
     render();
     const timeline = await axis();
@@ -120,7 +140,9 @@ describe("TimelinePage", () => {
       within(timeline).getByRole("heading", { name: "ohne Arbeitsbereich" }),
     ).toBeInTheDocument();
     expect(
-      within(timeline).getByText("MIL-001 Bewilligung liegt vor, 15.05.2030, offen"),
+      within(timeline).getByRole("link", {
+        name: "MIL-001 Bewilligung liegt vor, 15.05.2030, offen",
+      }),
     ).toBeInTheDocument();
     // The window is an assumption: the legend says so with its label.
     const legend = screen.getByRole("list", { name: "Legende" });
@@ -134,12 +156,13 @@ describe("TimelinePage", () => {
 
   it("filters by owner and by status and resets the filters", async () => {
     render();
+    // Two actions and one milestone.
     const timeline = await axis();
-    expect(within(timeline).getAllByRole("link")).toHaveLength(2);
+    expect(within(timeline).getAllByRole("link")).toHaveLength(3);
 
     await user.click(screen.getByRole("button", { name: /Verantwortlich/ }));
     await user.click(screen.getByRole("option", { name: "Bernd Beispiel" }));
-    expect(within(timeline).getAllByRole("link")).toHaveLength(1);
+    expect(within(timeline).getAllByRole("link")).toHaveLength(2);
     expect(within(timeline).getByRole("link", { name: /ACT-002/ })).toBeInTheDocument();
     const filters = screen.getByRole("group", { name: "Filter" });
     expect(within(filters).getByText("2 Aufgaben ausgeblendet")).toBeInTheDocument();
@@ -150,7 +173,7 @@ describe("TimelinePage", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Filter zurücksetzen" })[0] as Element);
     const again = await axis();
-    expect(within(again).getAllByRole("link")).toHaveLength(2);
+    expect(within(again).getAllByRole("link")).toHaveLength(3);
   });
 
   it("the narrow list groups the items by week", async () => {
@@ -214,7 +237,9 @@ describe("TimelinePage", () => {
     const timeline = await axis();
     expect(screen.queryByText("Noch nichts im Zeitplan")).not.toBeInTheDocument();
     expect(
-      within(timeline).getByText("MIL-001 Bewilligung liegt vor, 15.05.2030, offen"),
+      within(timeline).getByRole("link", {
+        name: "MIL-001 Bewilligung liegt vor, 15.05.2030, offen",
+      }),
     ).toBeInTheDocument();
     expect(document.querySelector("[data-band]")).not.toBeNull();
   });
@@ -320,7 +345,7 @@ describe("TimelinePage", () => {
     });
     const timeline = await axis();
     expect(timeline.querySelectorAll("[class*='weekLine']")).toHaveLength(0);
-    const labels = timeline.querySelectorAll("[class*='weekLabel']").length;
+    const labels = timeline.querySelectorAll("[class*='axisLabel']").length;
     expect(labels).toBeGreaterThan(10);
     expect(labels).toBeLessThanOrEqual(45);
   });

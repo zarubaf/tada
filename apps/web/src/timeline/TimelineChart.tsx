@@ -71,7 +71,7 @@ export function TimelineChart({
           <div className={styles.label} />
           <div className={styles.track}>
             {labels.map((label) => (
-              <span key={label.date} className={styles.weekLabel} style={place({ at: label.at })}>
+              <span key={label.date} className={styles.axisLabel} style={place({ at: label.at })}>
                 {labelText(label)}
               </span>
             ))}
@@ -93,11 +93,18 @@ export function TimelineChart({
                   </span>
                   <span className={styles.track}>
                     <span
-                      className={styles.diamond}
+                      className={styles.point}
                       data-status={milestone.status}
                       style={place({ at })}
-                    />
-                    <span className={styles.hidden}>{milestoneLabel(milestone)}</span>
+                    >
+                      <Link
+                        to={`${base}/milestones#${milestone.local_id}`}
+                        className={styles.mark}
+                        aria-label={milestoneLabel(milestone)}
+                      >
+                        <span className={styles.diamond} data-status={milestone.status} />
+                      </Link>
+                    </span>
                   </span>
                 </li>
               ))}

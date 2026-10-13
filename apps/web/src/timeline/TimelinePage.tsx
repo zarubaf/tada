@@ -160,6 +160,7 @@ function Timeline({ directory }: { directory: Directory }) {
                 base={base}
                 nameOf={directory.nameOf}
                 focusable={!wide}
+                filtered={filtered}
               />
             </>
           )}

@@ -17,6 +17,7 @@ export function TimelineList({
   base,
   nameOf,
   focusable,
+  filtered,
 }: {
   timeline: TimelineLayout;
   /** The path of the event. */
@@ -24,13 +25,17 @@ export function TimelineList({
   nameOf: (userId: string) => string;
   /** False where the axis shows the same items and takes the keyboard: the links leave the tab order. */
   focusable: boolean;
+  /** The filters are active: the page already says that they hide everything. */
+  filtered: boolean;
 }) {
   const id = useId();
   const groups = weekGroups(timeline);
   const tabIndex = focusable ? undefined : -1;
   return (
     <section className={styles.list} aria-label={t("timeline-by-week")}>
-      {groups.length === 0 && <p className={styles.noMatch}>{t("timeline-list-empty")}</p>}
+      {groups.length === 0 && !filtered && (
+        <p className={styles.noMatch}>{t("timeline-list-empty")}</p>
+      )}
       {groups.map(({ week, entries }) => (
         <div key={week} className={styles.week}>
           <h3 id={`${id}-${week}`} className={styles.weekHeading}>
