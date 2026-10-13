@@ -215,16 +215,18 @@ async fn new_record_workstream_refusal(
     proposals: &[Proposal],
     store: &dyn WorkstreamStore,
 ) -> Result<Option<&'static str>, StoreError> {
-    let created = workstream.is_some_and(|id| {
-        proposals.iter().any(|proposal| {
-            proposal.operation.event_id() == Some(event)
-                && proposal.operation.new_record() == Some(NewRecord::Workstream(id))
-        })
-    });
-    if created {
+    if workstream.is_some_and(|id| created_in(proposals, Some(event), NewRecord::Workstream(id))) {
         return Ok(None);
     }
     workstream_refusal(scope, event, workstream, store).await
+}
+
+/// True if a proposal of the changeset creates `record` in `event`. A record of another event of the same
+/// organization changeset does not count.
+fn created_in(proposals: &[Proposal], event: Option<EventId>, record: NewRecord) -> bool {
+    proposals.iter().any(|proposal| {
+        proposal.operation.event_id() == event && proposal.operation.new_record() == Some(record)
+    })
 }
 
 /// True if a workstream of the event, or one of the `earlier` proposals, has the name, whatever its case.
@@ -261,7 +263,7 @@ async fn name_taken<'a>(
 }
 
 /// The code that refuses `milestone` for an action of the event (`unknown-record`), or `None`: a new milestone of
-/// the changeset passes; `check_structure` checks that the proposal depends on the proposal that creates it.
+/// the event in the changeset passes; `check_structure` checks that the proposal depends on the proposal that creates it.
 async fn milestone_refusal_in(
     scope: OrgScope,
     event: EventId,
@@ -270,10 +272,7 @@ async fn milestone_refusal_in(
     stores: ProposeStores<'_>,
     now: Timestamp,
 ) -> Result<Option<&'static str>, StoreError> {
-    let created = proposals
-        .iter()
-        .any(|proposal| proposal.operation.new_record() == Some(NewRecord::Milestone(milestone)));
-    if created {
+    if created_in(proposals, Some(event), NewRecord::Milestone(milestone)) {
         return Ok(None);
     }
     milestone_refusal(scope, event, milestone, stores.milestones, now).await

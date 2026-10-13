@@ -4,7 +4,7 @@
 //! A new record takes the next readable number of its scope: `ACT`, `COM` and `MIL` in the event, `PER` and `INS` in
 //! the organization.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
@@ -392,6 +392,9 @@ fn local_id(record: LocalRecord, number: i64) -> Result<NewLocalId, sqlx::Error>
     })
 }
 
+/// The records that the steps of a plan create, each with its event. A person or an institution has no event.
+pub(super) type NewRecords = HashMap<Uuid, Option<EventId>>;
+
 /// The version check of `check_versions` for one work step: a new record whose ID is free and whose workstream
 /// and promisor can take it, or a changed record with the expected version.
 /// `new_records` holds the records that earlier steps of the plan create; `versions` the versions that earlier
@@ -400,7 +403,7 @@ pub(super) async fn matches(
     conn: &mut PgConnection,
     scope: OrgScope,
     operation: &Operation,
-    new_records: &HashSet<Uuid>,
+    new_records: &NewRecords,
     versions: &mut HashMap<Uuid, i64>,
 ) -> Result<bool, sqlx::Error> {
     if let Some(record) = operation.new_record()
@@ -425,7 +428,7 @@ pub(super) async fn matches(
             promisor,
             ..
         } => {
-            let promisor_exists = new_records.contains(&promisor.as_uuid())
+            let promisor_exists = new_records.contains_key(&promisor.as_uuid())
                 || party_exists(conn, scope, *promisor).await?;
             promisor_exists
                 && takes_records(conn, scope, *event_id, *workstream, new_records).await?
@@ -623,7 +626,8 @@ async fn record_version(
     }
 }
 
-/// True if a new record of the event can have the workstream: none, a new workstream of an earlier step of the plan,
+/// True if a new record of the event can have the workstream: none, a new workstream of the event in an earlier step
+/// of the plan,
 /// or an active workstream of the event (ADR 0067).
 /// `lock_targets` locked the workstream, so it cannot close before the commit.
 async fn takes_records(
@@ -631,12 +635,12 @@ async fn takes_records(
     scope: OrgScope,
     event: EventId,
     workstream: Option<WorkstreamId>,
-    new_records: &HashSet<Uuid>,
+    new_records: &NewRecords,
 ) -> Result<bool, sqlx::Error> {
     let Some(workstream) = workstream else {
         return Ok(true);
     };
-    if new_records.contains(&workstream.as_uuid()) {
+    if new_records.get(&workstream.as_uuid()) == Some(&Some(event)) {
         return Ok(true);
     }
     sqlx::query_scalar!(
@@ -653,19 +657,19 @@ async fn takes_records(
 }
 
 /// True if a new action of the event, or an action that changes its milestone, can name `milestone` (ADR 0080):
-/// none, a new milestone of the plan, or a milestone of the event that is not canceled.
+/// none, a new milestone of the event in the plan, or a milestone of the event that is not canceled.
 /// `lock_targets` locked the milestone, so it cannot be canceled before the commit.
 async fn takes_actions(
     conn: &mut PgConnection,
     scope: OrgScope,
     event: EventId,
     milestone: Option<MilestoneId>,
-    new_records: &HashSet<Uuid>,
+    new_records: &NewRecords,
 ) -> Result<bool, sqlx::Error> {
     let Some(milestone) = milestone else {
         return Ok(true);
     };
-    if new_records.contains(&milestone.as_uuid()) {
+    if new_records.get(&milestone.as_uuid()) == Some(&Some(event)) {
         return Ok(true);
     }
     sqlx::query_scalar!(

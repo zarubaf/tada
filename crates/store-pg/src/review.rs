@@ -3,7 +3,7 @@
 //! Each write locks its changeset first, so two reviews of one changeset run one after the other.
 //! Review results are append-only: the store never updates or deletes them.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use async_trait::async_trait;
 use jiff::Timestamp;
@@ -468,7 +468,7 @@ async fn check_versions(
     steps: &[ApplyStep],
 ) -> Result<Vec<ProposalId>, sqlx::Error> {
     let organization = scope.organization_id().as_uuid();
-    let mut new_records: HashSet<Uuid> = HashSet::new();
+    let mut new_records = records::NewRecords::new();
     let mut fact_versions: HashMap<(EventId, FieldDefinitionId), Option<i64>> = HashMap::new();
     let mut document_versions: HashMap<DocumentId, i64> = HashMap::new();
     let mut record_versions: HashMap<Uuid, i64> = HashMap::new();
@@ -498,8 +498,8 @@ async fn check_versions(
                 expected_version,
                 ..
             } => {
-                let new_scope = new_records.contains(&event_id.as_uuid())
-                    || new_records.contains(&field_id.as_uuid());
+                let new_scope = new_records.contains_key(&event_id.as_uuid())
+                    || new_records.contains_key(&field_id.as_uuid());
                 let current = match fact_versions.get(&(*event_id, *field_id)) {
                     Some(version) => *version,
                     None if new_scope => None,
@@ -517,7 +517,7 @@ async fn check_versions(
                     }
                 };
                 // A deprecated field takes no new facts (ADR 0049). `lock_targets` locked a field of the event.
-                let active = new_records.contains(&field_id.as_uuid())
+                let active = new_records.contains_key(&field_id.as_uuid())
                         || sqlx::query_scalar!(
                             r#"SELECT EXISTS (
                                    SELECT 1 FROM field_definition
@@ -540,7 +540,7 @@ async fn check_versions(
                 ..
             } => {
                 // A deprecated field takes no new choices either.
-                if new_records.contains(&field_id.as_uuid()) {
+                if new_records.contains_key(&field_id.as_uuid()) {
                     true
                 } else {
                     match field_of_event(conn, scope, *event_id, *field_id).await? {
@@ -552,7 +552,7 @@ async fn check_versions(
                 }
             }
             Operation::DeprecateField { event_id, field_id } => {
-                new_records.contains(&field_id.as_uuid())
+                new_records.contains_key(&field_id.as_uuid())
                     || matches!(
                         field_of_event(conn, scope, *event_id, *field_id).await?,
                         Some((_, FieldStatus::Active))
@@ -603,7 +603,7 @@ async fn check_versions(
             }
         };
         if let Some(record) = step.operation.new_record() {
-            new_records.insert(record.as_uuid());
+            new_records.insert(record.as_uuid(), step.operation.event_id());
         }
         if !matches {
             conflicts.push(step.proposal_id);
