@@ -20,7 +20,7 @@ use crate::audit::AuditAction;
 use crate::caller::MemberCaller;
 use crate::paging::Page;
 use crate::problem::FieldError;
-use crate::proposals::text_error_code;
+use crate::records::text_error_code;
 use crate::records::{Checker, NumberCursor, Shown, audit, page, record_id};
 
 /// The input of `create_commitment`, as the caller gives it.

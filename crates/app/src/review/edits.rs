@@ -19,7 +19,8 @@ use uuid::Uuid;
 
 use crate::parties::email_code;
 use crate::problem::FieldError;
-use crate::proposals::{START_AFTER_DUE, parse_date, text_error_code};
+use crate::proposals::parse_date;
+use crate::records::{START_AFTER_DUE, text_error_code};
 
 /// The fields of a proposed record that the reviewer replaces. An absent field keeps the proposed value;
 /// `null` clears an optional field.
