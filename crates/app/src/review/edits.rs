@@ -31,6 +31,7 @@ use crate::records::{START_AFTER_DUE, text_error_code};
 ///   A condition makes the commitment start `conditional`. An edit cannot remove the condition of a proposed commitment.
 /// - `create-person` and `create-institution`: `name`, `email`, `phone`.
 /// - `create-milestone`: `title`, `description`, `date`, `owner`, `workstream`.
+/// - `create-decision`: `owner`, `workstream`. The wording, the date and the parties stay as proposed.
 #[derive(Clone, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RecordEditInput {
@@ -103,6 +104,7 @@ pub(super) fn editable_fields(operation: &Operation) -> &'static [&'static str] 
         Operation::CreateMilestone { .. } => {
             &["title", "description", "date", "owner", "workstream"]
         }
+        Operation::CreateDecision { .. } => &["owner", "workstream"],
         Operation::CreateEvent { .. }
         | Operation::SetFact { .. }
         | Operation::AddFieldDefinition { .. }
@@ -115,7 +117,9 @@ pub(super) fn editable_fields(operation: &Operation) -> &'static [&'static str] 
         | Operation::ChangeActionMilestone { .. }
         | Operation::ChangeCommitmentStatus { .. }
         | Operation::CreateWorkstream { .. }
-        | Operation::ChangeMilestoneStatus { .. } => &[],
+        | Operation::ChangeMilestoneStatus { .. }
+        | Operation::SupersedeDecision { .. }
+        | Operation::RevokeDecision { .. } => &[],
     }
 }
 
@@ -389,6 +393,23 @@ pub(super) fn edit_record(
                 text_error_code,
             ),
             date: errors.replace("date", current_date, date, parse_date, |_| "date"),
+            owner: owner.map_or(current_owner, UserId::from_uuid),
+            workstream: workstream.map_or(current_workstream, |id| id.map(WorkstreamId::from_uuid)),
+        },
+        Operation::CreateDecision {
+            id,
+            event_id,
+            wording,
+            decided_on,
+            decided_by,
+            owner: current_owner,
+            workstream: current_workstream,
+        } => Operation::CreateDecision {
+            id,
+            event_id,
+            wording,
+            decided_on,
+            decided_by,
             owner: owner.map_or(current_owner, UserId::from_uuid),
             workstream: workstream.map_or(current_workstream, |id| id.map(WorkstreamId::from_uuid)),
         },

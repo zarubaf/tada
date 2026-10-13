@@ -9,12 +9,14 @@ use tada_app::domain::events::{EventKey, EventName, EventTimeZone};
 use tada_app::domain::facts::{ChoiceKey, Description, FieldKey, ModuleKey, ShortText};
 use tada_app::domain::identity::Email;
 use tada_app::domain::ids::{
-    ActionId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId, MilestoneId,
-    OpenQuestionId, PersonId, UserId, WorkstreamId,
+    ActionId, CommitmentId, DecisionId, DocumentId, EventId, FieldDefinitionId, InstitutionId,
+    MilestoneId, OpenQuestionId, PersonId, UserId, WorkstreamId,
 };
 use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_app::domain::proposals::{DraftDocument, Operation, QuestionText};
-use tada_app::domain::records::{MilestoneStatus, MilestoneTitle, RecordRef};
+use tada_app::domain::records::{
+    DecisionParties, DecisionWording, MilestoneStatus, MilestoneTitle, RecordReason, RecordRef,
+};
 use tada_app::domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
     WorkstreamName,
@@ -155,6 +157,45 @@ enum OperationRecord {
         status: String,
         expected_version: i64,
     },
+    CreateDecision {
+        id: Uuid,
+        event_id: Uuid,
+        wording: String,
+        decided_on: String,
+        decided_by: Vec<PartyRecord>,
+        owner: Uuid,
+        workstream: Option<Uuid>,
+    },
+    SupersedeDecision {
+        event_id: Uuid,
+        decision_id: Uuid,
+        successor: Uuid,
+        expected_version: i64,
+    },
+    RevokeDecision {
+        event_id: Uuid,
+        decision_id: Uuid,
+        reason: String,
+        expected_version: i64,
+    },
+}
+
+impl From<Party> for PartyRecord {
+    fn from(party: Party) -> Self {
+        match party {
+            Party::Person(id) => Self::Person(id.as_uuid()),
+            Party::Institution(id) => Self::Institution(id.as_uuid()),
+        }
+    }
+}
+
+impl From<PartyRecord> for Party {
+    fn from(record: PartyRecord) -> Self {
+        match record {
+            PartyRecord::Person(id) => Self::Person(PersonId::from_uuid(id)),
+            PartyRecord::Institution(id) => Self::Institution(InstitutionId::from_uuid(id)),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -328,10 +369,7 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             id: id.as_uuid(),
             event_id: event_id.as_uuid(),
             text: text.as_str().to_owned(),
-            promisor: match promisor {
-                Party::Person(id) => PartyRecord::Person(id.as_uuid()),
-                Party::Institution(id) => PartyRecord::Institution(id.as_uuid()),
-            },
+            promisor: PartyRecord::from(*promisor),
             owner: owner.as_uuid(),
             workstream: workstream.map(WorkstreamId::as_uuid),
             due_date: due_date.map(|date| date.to_string()),
@@ -418,6 +456,50 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             event_id: event_id.as_uuid(),
             milestone_id: milestone_id.as_uuid(),
             status: status.as_str().to_owned(),
+            expected_version: expected_version.get(),
+        },
+        Operation::CreateDecision {
+            id,
+            event_id,
+            wording,
+            decided_on,
+            decided_by,
+            owner,
+            workstream,
+        } => OperationRecord::CreateDecision {
+            id: id.as_uuid(),
+            event_id: event_id.as_uuid(),
+            wording: wording.as_str().to_owned(),
+            decided_on: decided_on.to_string(),
+            decided_by: decided_by
+                .as_slice()
+                .iter()
+                .copied()
+                .map(PartyRecord::from)
+                .collect(),
+            owner: owner.as_uuid(),
+            workstream: workstream.map(WorkstreamId::as_uuid),
+        },
+        Operation::SupersedeDecision {
+            event_id,
+            decision_id,
+            successor,
+            expected_version,
+        } => OperationRecord::SupersedeDecision {
+            event_id: event_id.as_uuid(),
+            decision_id: decision_id.as_uuid(),
+            successor: successor.as_uuid(),
+            expected_version: expected_version.get(),
+        },
+        Operation::RevokeDecision {
+            event_id,
+            decision_id,
+            reason,
+            expected_version,
+        } => OperationRecord::RevokeDecision {
+            event_id: event_id.as_uuid(),
+            decision_id: decision_id.as_uuid(),
+            reason: reason.as_str().to_owned(),
             expected_version: expected_version.get(),
         },
     };
@@ -583,10 +665,7 @@ pub(crate) fn operation_from_json(
             id: CommitmentId::from_uuid(id),
             event_id: EventId::from_uuid(event_id),
             text: CommitmentText::parse(&text).map_err(|_| invalid())?,
-            promisor: match promisor {
-                PartyRecord::Person(id) => Party::Person(PersonId::from_uuid(id)),
-                PartyRecord::Institution(id) => Party::Institution(InstitutionId::from_uuid(id)),
-            },
+            promisor: Party::from(promisor),
             owner: UserId::from_uuid(owner),
             workstream: workstream.map(WorkstreamId::from_uuid),
             due_date: parsed(due_date, |text| text.parse())?,
@@ -675,6 +754,46 @@ pub(crate) fn operation_from_json(
             status: MilestoneStatus::parse(&status).ok_or_else(invalid)?,
             expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
         },
+        OperationRecord::CreateDecision {
+            id,
+            event_id,
+            wording,
+            decided_on,
+            decided_by,
+            owner,
+            workstream,
+        } => Operation::CreateDecision {
+            id: DecisionId::from_uuid(id),
+            event_id: EventId::from_uuid(event_id),
+            wording: DecisionWording::parse(&wording).map_err(|_| invalid())?,
+            decided_on: decided_on.parse().map_err(|_| invalid())?,
+            decided_by: DecisionParties::new(decided_by.into_iter().map(Party::from).collect())
+                .map_err(|_| invalid())?,
+            owner: UserId::from_uuid(owner),
+            workstream: workstream.map(WorkstreamId::from_uuid),
+        },
+        OperationRecord::SupersedeDecision {
+            event_id,
+            decision_id,
+            successor,
+            expected_version,
+        } => Operation::SupersedeDecision {
+            event_id: EventId::from_uuid(event_id),
+            decision_id: DecisionId::from_uuid(decision_id),
+            successor: DecisionId::from_uuid(successor),
+            expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+        },
+        OperationRecord::RevokeDecision {
+            event_id,
+            decision_id,
+            reason,
+            expected_version,
+        } => Operation::RevokeDecision {
+            event_id: EventId::from_uuid(event_id),
+            decision_id: DecisionId::from_uuid(decision_id),
+            reason: RecordReason::parse(&reason).map_err(|_| invalid())?,
+            expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+        },
     })
 }
 
@@ -707,6 +826,7 @@ pub(super) fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>)
         Operation::CreateAction { id, .. } => record(RecordRef::Action(*id)),
         Operation::CreateCommitment { id, .. } => record(RecordRef::Commitment(*id)),
         Operation::CreateMilestone { id, .. } => record(RecordRef::Milestone(*id)),
+        Operation::CreateDecision { id, .. } => record(RecordRef::Decision(*id)),
         Operation::ChangeActionStatus { action_id, .. }
         | Operation::ChangeActionDue { action_id, .. }
         | Operation::ChangeActionMilestone { action_id, .. } => {
@@ -717,6 +837,10 @@ pub(super) fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>)
         }
         Operation::ChangeMilestoneStatus { milestone_id, .. } => {
             record(RecordRef::Milestone(*milestone_id))
+        }
+        Operation::SupersedeDecision { decision_id, .. }
+        | Operation::RevokeDecision { decision_id, .. } => {
+            record(RecordRef::Decision(*decision_id))
         }
     };
     (

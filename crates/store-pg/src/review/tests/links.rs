@@ -256,6 +256,106 @@ async fn linking_uses_the_existing_institution_and_creates_none() {
     assert_eq!(creations, 0);
 }
 
+/// A changeset of the contributor with a new person and a decision of `decided_by`, which names that person.
+async fn decision_of_a_new_person(
+    test: &TestDatabase,
+    open_day: &OpenDay,
+    decided_by: impl FnOnce(Uuid) -> Value,
+) -> (Changeset, [Uuid; 4]) {
+    let [person_id, decision_id, first, second] = [
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+    ];
+    let changeset = propose(
+        test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![
+            proposal(
+                first,
+                json!({"kind": "create-person", "id": person_id, "name": "Anna Beispiel"}),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(
+                second,
+                json!({
+                    "kind": "create-decision", "id": decision_id, "event_id": open_day.event.as_uuid(),
+                    "wording": "Das Open Day findet statt.", "decided_on": "2030-03-01",
+                    "decided_by": decided_by(person_id), "owner": open_day.contributor.user_id().as_uuid(),
+                }),
+                &[first],
+                "im Mai 2030",
+            ),
+        ],
+    )
+    .await;
+    (changeset, [person_id, decision_id, first, second])
+}
+
+/// The persons that decided the decision `id`, in order.
+async fn deciders(test: &TestDatabase, id: Uuid) -> Vec<Uuid> {
+    sqlx::query_scalar(
+        "SELECT person_id FROM decision_party WHERE decision_id = $1 ORDER BY position",
+    )
+    .bind(id)
+    .fetch_all(&test.database.pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn linking_a_person_gives_a_decision_the_existing_person() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let existing = existing_person(&test, &open_day.owner, "Anna Beispiel").await;
+    let (changeset, [person_id, decision_id, first, second]) =
+        decision_of_a_new_person(&test, &open_day, |person| json!([{"person": person}])).await;
+
+    apply(
+        &test,
+        &open_day.manager,
+        &changeset,
+        linked(&[first, second], vec![link(first, existing)]),
+    )
+    .await
+    .unwrap();
+    assert_eq!(deciders(&test, decision_id).await, [existing]);
+    let none: i64 = sqlx::query_scalar("SELECT count(*) FROM person WHERE id = $1")
+        .bind(person_id)
+        .fetch_one(&test.database.pool)
+        .await
+        .unwrap();
+    assert_eq!(none, 0);
+}
+
+/// The decision names the new person and the existing one: after the link both are the existing one, once.
+#[tokio::test]
+async fn linking_a_person_next_to_the_linked_record_names_it_once() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let existing = existing_person(&test, &open_day.owner, "Anna Beispiel").await;
+    let other = existing_person(&test, &open_day.owner, "Berta Muster").await;
+    let (changeset, [_, decision_id, first, second]) = decision_of_a_new_person(
+        &test,
+        &open_day,
+        |person| json!([{"person": person}, {"person": other}, {"person": existing}]),
+    )
+    .await;
+
+    apply(
+        &test,
+        &open_day.manager,
+        &changeset,
+        linked(&[first, second], vec![link(first, existing)]),
+    )
+    .await
+    .unwrap();
+    assert_eq!(deciders(&test, decision_id).await, [existing, other]);
+}
+
 #[tokio::test]
 async fn a_link_to_a_record_of_another_organization_fails_and_changes_nothing() {
     let test = TestDatabase::start().await;

@@ -38,7 +38,8 @@ fn pattern(term: &str) -> String {
     pattern
 }
 
-/// The rows of each table with free text that match a pattern of `$2`, and the commitments whose promisor is `$3`.
+/// The rows of each table with free text that match a pattern of `$2`, and the commitments and decisions that name
+/// the person `$3` by ID: as promisor, or as a party that decided.
 /// A matched row has content; a reference by ID can be redacted. The text columns of a row are joined by lines.
 /// A document version also matches by the name of its document and by the file name of the upload.
 const MENTIONS: &str = "
@@ -88,10 +89,22 @@ const MENTIONS: &str = "
         FROM milestone m
         WHERE m.organization_id = $1 AND (m.title ILIKE ANY ($2) OR m.description ILIKE ANY ($2))
         UNION ALL
-        SELECT 10, 'promisor', c.id, c.event_id,
+        SELECT 10, 'decision', d.id, d.event_id, concat_ws(E'\\n', d.wording, d.revoked_reason), d.created_at
+        FROM decision d
+        WHERE d.organization_id = $1 AND (d.wording ILIKE ANY ($2) OR d.revoked_reason ILIKE ANY ($2))
+        UNION ALL
+        SELECT 11, 'promisor', c.id, c.event_id,
                CASE WHEN c.redacted_at IS NULL THEN concat_ws(E'\\n', c.text, c.condition, c.firm_reason) END,
                c.created_at
         FROM commitment c WHERE c.organization_id = $1 AND c.person_id = $3
+        UNION ALL
+        SELECT 12, 'decision-party', d.id, d.event_id,
+               CASE WHEN d.redacted_at IS NULL THEN concat_ws(E'\\n', d.wording, d.revoked_reason) END,
+               d.created_at
+        FROM decision d
+        WHERE d.organization_id = $1
+          AND EXISTS (SELECT 1 FROM decision_party p
+                      WHERE p.organization_id = d.organization_id AND p.decision_id = d.id AND p.person_id = $3)
     ) AS m
     ORDER BY m.sort, m.at, m.id";
 

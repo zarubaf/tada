@@ -286,10 +286,26 @@ impl ChangeRights {
         let lead = workstream.and_then(|id| self.leads.get(&id).copied());
         self.access.is_writable() && may_change_work(self.access.level(), self.caller, owner, lead)
     }
+
+    /// True if the caller can change `record` by the rule of its kind: only an event manager changes a record that
+    /// only the managers change (`WorkRecord::managers_only`), else `allow`.
+    pub(crate) fn allow_record(&self, record: &(impl WorkRecord + ?Sized)) -> bool {
+        if record.managers_only() {
+            self.access.is_writable() && self.access.can_review()
+        } else {
+            self.allow(record.owner(), record.workstream())
+        }
+    }
 }
 
-/// The parts of an action or a commitment that its view for a caller needs.
+/// The parts of a work record that its view for a caller needs.
 pub(crate) trait WorkRecord {
+    /// True if only an event manager changes a record of the kind, whoever owns it or leads its workstream: a
+    /// decision (ADR 0080).
+    fn managers_only(&self) -> bool {
+        false
+    }
+
     fn record_ref(&self) -> RecordRef;
     fn owner(&self) -> UserId;
     fn workstream(&self) -> Option<WorkstreamId>;
@@ -336,7 +352,7 @@ pub(super) async fn show<T: WorkRecord>(
         caller,
         records,
         WorkRecord::record_ref,
-        |record| rights.allow(record.owner(), record.workstream()),
+        |record| rights.allow_record(record),
         ports.identity,
         ports.work,
     )
@@ -351,15 +367,9 @@ pub(super) async fn show_one<T: WorkRecord>(
     record: T,
     ports: WorkPorts<'_>,
 ) -> Result<Shown<T>, StoreError> {
-    let can_change = may_change(
-        caller,
-        access,
-        event,
-        record.owner(),
-        record.workstream(),
-        ports.workstreams,
-    )
-    .await?;
+    let can_change = ChangeRights::of_event(caller, access, event, ports.workstreams)
+        .await?
+        .allow_record(&record);
     let record_ref = record.record_ref();
     shown_one(
         caller,
@@ -381,15 +391,9 @@ pub(super) async fn show_created<T: WorkRecord>(
     ports: WorkPorts<'_>,
 ) -> Result<Shown<T>, WorkError> {
     let record = created(result)?;
-    let can_change = may_change(
-        caller,
-        access,
-        event,
-        record.owner(),
-        record.workstream(),
-        ports.workstreams,
-    )
-    .await?;
+    let can_change = ChangeRights::of_event(caller, access, event, ports.workstreams)
+        .await?
+        .allow_record(&record);
     Ok(Shown::created(record, can_change))
 }
 

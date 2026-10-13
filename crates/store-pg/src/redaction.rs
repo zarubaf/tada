@@ -57,6 +57,7 @@ struct Rows {
     actions: Vec<Uuid>,
     commitments: Vec<Uuid>,
     milestones: Vec<Uuid>,
+    decisions: Vec<Uuid>,
     events: Vec<Uuid>,
 }
 
@@ -333,6 +334,13 @@ async fn rows_of(
                 &id,
             )
             .await?;
+            rows.decisions = ids(
+                conn,
+                "SELECT id FROM decision WHERE organization_id = $1 AND event_id = ANY($2)",
+                organization,
+                &id,
+            )
+            .await?;
             rows.document_versions = ids(
                 conn,
                 "SELECT id FROM document_version WHERE organization_id = $1 AND document_id = ANY($2)",
@@ -470,7 +478,8 @@ async fn tombstone(
         "UPDATE record_evidence SET quote = NULL, redacted_at = now()
          WHERE organization_id = $1 AND redacted_at IS NULL
            AND (source_version_id = ANY($2) OR action_id = ANY($3) OR commitment_id = ANY($4)
-                OR person_id = ANY($5) OR institution_id = ANY($6) OR milestone_id = ANY($7))",
+                OR person_id = ANY($5) OR institution_id = ANY($6) OR milestone_id = ANY($7)
+                OR decision_id = ANY($8))",
         organization,
         &[
             &rows.source_versions,
@@ -479,6 +488,7 @@ async fn tombstone(
             &rows.persons,
             &rows.institutions,
             &rows.milestones,
+            &rows.decisions,
         ],
     )
     .await?;
@@ -560,6 +570,16 @@ async fn tombstone(
          WHERE organization_id = $1 AND id = ANY($2) AND redacted_at IS NULL",
         organization,
         &[&rows.milestones],
+    )
+    .await?;
+    // The date, the parties and the successor stay: they are no text of a member (ADR 0080).
+    update(
+        conn,
+        "UPDATE decision
+         SET wording = NULL, revoked_reason = NULL, version = version + 1, updated_at = now(), redacted_at = now()
+         WHERE organization_id = $1 AND id = ANY($2) AND redacted_at IS NULL",
+        organization,
+        &[&rows.decisions],
     )
     .await?;
     update(

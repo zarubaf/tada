@@ -50,7 +50,8 @@ impl ProposalStore for Database {
                UNION SELECT id FROM workstream WHERE id = ANY($1)
                UNION SELECT id FROM action WHERE id = ANY($1)
                UNION SELECT id FROM commitment WHERE id = ANY($1)
-               UNION SELECT id FROM milestone WHERE id = ANY($1)"#,
+               UNION SELECT id FROM milestone WHERE id = ANY($1)
+               UNION SELECT id FROM decision WHERE id = ANY($1)"#,
             ids,
         )
         .fetch_all(&self.pool)
@@ -525,6 +526,7 @@ mod tests {
             parties: &test.database,
             work: &test.database,
             milestones: &test.database,
+            decisions: &test.database,
         }
     }
 

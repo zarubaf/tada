@@ -2,10 +2,13 @@
 
 use jiff::civil::Date;
 use tada_domain::ids::{
-    ActionId, CommitmentId, InstitutionId, LocalIdKind, MilestoneId, PersonId, WorkstreamId,
+    ActionId, CommitmentId, DecisionId, InstitutionId, LocalIdKind, MilestoneId, PersonId,
+    WorkstreamId,
 };
 use tada_domain::parties::{Party, PartyName};
-use tada_domain::records::MilestoneStatus;
+use tada_domain::records::{
+    DecisionParties, DecisionStatus, DecisionWording, MilestoneStatus, RecordReason,
+};
 use tada_domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, WorkstreamName,
     WorkstreamStatus,
@@ -17,8 +20,9 @@ use crate::parties::{InstitutionFields, InstitutionView, PartyRef, PersonFields,
 use crate::records::{Changed, Created, NumberCursor};
 use crate::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 use crate::work::{
-    ActionFields, CommitmentFields, MilestoneFields, MilestoneStore, MyWork, NewActionRecord,
-    NewCommitmentRecord, NewMilestoneRecord, WorkFilter, WorkOwners,
+    ActionFields, CommitmentFields, DecisionFields, DecisionState, DecisionStore, MilestoneFields,
+    MilestoneStore, MyWork, NewActionRecord, NewCommitmentRecord, NewDecisionRecord,
+    NewMilestoneRecord, Superseded, WorkFilter, WorkOwners,
 };
 use crate::workstreams::{
     Changed as WorkstreamChanged, Created as WorkstreamCreated, WorkstreamUpdate,
@@ -357,6 +361,84 @@ impl MilestoneStore for Memory {
         _: &WorkFilter<MilestoneStatus>,
         _: Timestamp,
     ) -> Result<Vec<MilestoneView>, StoreError> {
+        unreachable!()
+    }
+}
+
+/// The proposal checks only read decisions.
+#[async_trait]
+impl DecisionStore for Memory {
+    async fn create_decision(
+        &self,
+        _: OrgScope,
+        _: &NewDecisionRecord,
+        _: Timestamp,
+        _: &AuditEvent,
+    ) -> Result<Created<DecisionView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn change_decision(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: DecisionId,
+        _: &DecisionFields,
+        _: RecordVersion,
+        _: Timestamp,
+        _: &AuditEvent,
+    ) -> Result<Changed<DecisionView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn supersede_decision(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: DecisionId,
+        _: &NewDecisionRecord,
+        _: RecordVersion,
+        _: Timestamp,
+        _: &[AuditEvent],
+    ) -> Result<Created<Changed<Superseded>>, StoreError> {
+        unreachable!()
+    }
+
+    async fn revoke_decision(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: DecisionId,
+        _: &RecordReason,
+        _: RecordVersion,
+        _: Timestamp,
+        _: &AuditEvent,
+    ) -> Result<Changed<DecisionView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn decision(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+        id: DecisionId,
+    ) -> Result<Option<DecisionView>, StoreError> {
+        let found = scope.organization_id() == testwil();
+        Ok(self
+            .decisions
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|decision| found && decision.event_id == event && decision.id == id)
+            .cloned())
+    }
+
+    async fn decisions(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: &WorkFilter<DecisionStatus>,
+    ) -> Result<Vec<DecisionView>, StoreError> {
         unreachable!()
     }
 }
@@ -901,4 +983,242 @@ async fn a_person_belongs_to_no_event_and_fits_each_changeset() {
     );
     let result = create_changeset(&owner, organization, stores(&memory), &FixedClock).await;
     assert!(result.is_ok(), "{result:?}");
+}
+
+/// A decision of `event` in `state`, decided by a person of Testwil.
+fn existing_decision(memory: &Memory, event: EventId, state: DecisionState) -> DecisionId {
+    let id = DecisionId::from_uuid(Uuid::now_v7());
+    let person = PersonId::from_uuid(Uuid::now_v7());
+    memory.decisions.lock().unwrap().push(DecisionView {
+        id,
+        local_number: 1,
+        event_id: event,
+        wording: tada_domain::redaction::Redactable::Present(
+            DecisionWording::parse("Das Fest findet bei jedem Wetter statt.").unwrap(),
+        ),
+        decided_on: jiff::civil::date(2030, 3, 1),
+        parties: vec![PartyRef {
+            party: Party::Person(person),
+            local_id: LocalIdKind::Person.readable_id(1),
+            name: tada_domain::redaction::Redactable::Present(
+                PartyName::parse("Moritz Muster").unwrap(),
+            ),
+        }],
+        fields: DecisionFields {
+            owner: anna(),
+            workstream_id: None,
+        },
+        state,
+        version: RecordVersion::FIRST,
+    });
+    id
+}
+
+fn supersede(old: DecisionId, successor: Uuid) -> Value {
+    json!({
+        "kind": "supersede-decision", "event_id": open_day().as_uuid(),
+        "decision_id": old.as_uuid(), "successor": successor, "expected_version": 1,
+    })
+}
+
+fn new_decision(id: Uuid, decided_by: Value) -> Value {
+    json!({
+        "kind": "create-decision", "id": id, "event_id": open_day().as_uuid(),
+        "wording": "Das Fest findet nur bei trockenem Wetter statt.\nSonst fällt es aus.",
+        "decided_on": "2030-03-01", "decided_by": decided_by, "owner": anna().as_uuid(),
+    })
+}
+
+/// A supersede names a successor in force of the same event, or a new decision of its changeset (ADR 0080).
+/// A decision of another event, the decision itself, an unknown one and an ended one give `unknown-record`.
+#[tokio::test]
+async fn supersede_refuses_foreign_self_and_ended_decisions() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let old = existing_decision(&memory, open_day(), DecisionState::InForce);
+    let live = existing_decision(&memory, open_day(), DecisionState::InForce);
+    let foreign = existing_decision(&memory, other_event(), DecisionState::InForce);
+    let superseded = existing_decision(&memory, open_day(), DecisionState::Superseded { by: live });
+    let revoked = existing_decision(
+        &memory,
+        open_day(),
+        DecisionState::Revoked {
+            reason: tada_domain::redaction::Redactable::Present(
+                RecordReason::parse("Die Gemeinde verbietet es.").unwrap(),
+            ),
+        },
+    );
+    for successor in [
+        foreign.as_uuid(),
+        old.as_uuid(),
+        superseded.as_uuid(),
+        revoked.as_uuid(),
+        Uuid::now_v7(),
+    ] {
+        let result = create_changeset(
+            &anna,
+            one(supersede(old, successor), "Der neue Entscheid gilt."),
+            stores(&memory),
+            &FixedClock,
+        )
+        .await;
+        assert_eq!(
+            invalid_fields(result),
+            [(
+                "proposals/0/operation/successor".to_owned(),
+                "unknown-record"
+            )],
+            "{successor}"
+        );
+    }
+    // An ended decision takes no successor either.
+    let result = create_changeset(
+        &anna,
+        one(
+            supersede(revoked, live.as_uuid()),
+            "Der neue Entscheid gilt.",
+        ),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert_eq!(
+        invalid_fields(result),
+        [(
+            "proposals/0/operation/decision_id".to_owned(),
+            "invalid-transition"
+        )]
+    );
+    let accepted = create_changeset(
+        &anna,
+        one(supersede(old, live.as_uuid()), "Der neue Entscheid gilt."),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert!(accepted.is_ok(), "{accepted:?}");
+
+    // A new successor of the changeset needs the dependency on its proposal.
+    let person = Uuid::now_v7();
+    memory.parties.lock().unwrap().push(person);
+    let (successor, proposals) = (Uuid::now_v7(), [Uuid::now_v7(), Uuid::now_v7()]);
+    let intake = |depends_on: &[Uuid]| {
+        changeset(
+            Some(open_day()),
+            vec![
+                proposal(
+                    proposals[0],
+                    new_decision(successor, json!([{"person": person}])),
+                    &[],
+                    "Das Open Day",
+                ),
+                proposal(
+                    proposals[1],
+                    supersede(old, successor),
+                    depends_on,
+                    "Das Open Day",
+                ),
+            ],
+        )
+    };
+    let result = create_changeset(&anna, intake(&[]), stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/1/depends_on".to_owned(), "dependency-missing")]
+    );
+    let result =
+        create_changeset(&anna, intake(&[proposals[0]]), stores(&memory), &FixedClock).await;
+    assert!(result.is_ok(), "{result:?}");
+}
+
+/// The parties of a new decision are persons or institutions of the organization, or new ones of the changeset.
+#[tokio::test]
+async fn a_decision_names_known_parties_and_keeps_its_line_breaks() {
+    let memory = Memory::default();
+    let anna = contributor(&memory);
+    let known = Uuid::now_v7();
+    memory.parties.lock().unwrap().push(known);
+    let unknown = Uuid::now_v7();
+    let result = create_changeset(
+        &anna,
+        one(
+            new_decision(
+                Uuid::now_v7(),
+                json!([{"person": known}, {"institution": unknown}]),
+            ),
+            "Der Vorstand hat entschieden.",
+        ),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert_eq!(
+        invalid_fields(result),
+        [(
+            "proposals/0/operation/decided_by/1".to_owned(),
+            "unknown-record"
+        )]
+    );
+    // The path of an error counts the position in the given list, also after the duplicates are dropped.
+    let result = create_changeset(
+        &anna,
+        one(
+            new_decision(
+                Uuid::now_v7(),
+                json!([{"person": known}, {"person": known}, {"institution": unknown}]),
+            ),
+            "Der Vorstand hat entschieden.",
+        ),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert_eq!(
+        invalid_fields(result),
+        [(
+            "proposals/0/operation/decided_by/2".to_owned(),
+            "unknown-record"
+        )]
+    );
+    let result = create_changeset(
+        &anna,
+        one(
+            new_decision(Uuid::now_v7(), json!([])),
+            "Der Vorstand hat entschieden.",
+        ),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/0/operation/decided_by".to_owned(), "required")]
+    );
+    let created = create_changeset(
+        &anna,
+        one(
+            new_decision(Uuid::now_v7(), json!([{"person": known}])),
+            "Der Vorstand hat entschieden.",
+        ),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await
+    .unwrap();
+    let Operation::CreateDecision {
+        wording,
+        decided_by,
+        ..
+    } = &changeset_of(created).proposals[0].operation
+    else {
+        panic!("not a decision");
+    };
+    assert_eq!(
+        wording.as_str(),
+        "Das Fest findet nur bei trockenem Wetter statt.\nSonst fällt es aus."
+    );
+    assert_eq!(
+        decided_by,
+        &DecisionParties::new(vec![Party::Person(PersonId::from_uuid(known))]).unwrap()
+    );
 }

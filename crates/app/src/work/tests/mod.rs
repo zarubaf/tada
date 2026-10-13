@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use tada_domain::identity::{EventRole, OrganizationRole};
-use tada_domain::ids::{InstitutionId, MilestoneId, OrganizationId, PersonId};
+use tada_domain::ids::{DecisionId, InstitutionId, MilestoneId, OrganizationId, PersonId};
 use tada_domain::parties::PartyName;
-use tada_domain::records::MilestoneStatus;
+use tada_domain::records::{DecisionChange, DecisionStatus, MilestoneStatus, RecordReason};
 use tada_domain::work::{WorkstreamName, WorkstreamStatus};
 
 use super::*;
@@ -70,6 +70,7 @@ struct Memory {
     actions: Mutex<Vec<ActionView>>,
     commitments: Mutex<Vec<CommitmentView>>,
     milestones: Mutex<Vec<MilestoneView>>,
+    decisions: Mutex<Vec<DecisionView>>,
     workstreams: Mutex<Vec<Workstream>>,
     audit: Mutex<Vec<AuditAction>>,
 }
@@ -88,6 +89,7 @@ impl Default for Memory {
             actions: Mutex::default(),
             commitments: Mutex::default(),
             milestones: Mutex::default(),
+            decisions: Mutex::default(),
             workstreams: Mutex::new(vec![
                 workstream(ground(), "Gelände", WorkstreamStatus::Active),
                 workstream(kitchen(), "Küche", WorkstreamStatus::Closed),
@@ -103,6 +105,7 @@ impl Memory {
             identity: self,
             work: self,
             milestones: self,
+            decisions: self,
             workstreams: self,
             parties: self,
             clock: &FixedClock,
@@ -464,6 +467,195 @@ impl MilestoneStore for Memory {
     }
 }
 
+impl Memory {
+    fn new_decision_view(&self, decision: &NewDecisionRecord, number: u64) -> DecisionView {
+        DecisionView {
+            id: decision.id,
+            local_number: number,
+            event_id: decision.event_id,
+            wording: tada_domain::redaction::Redactable::Present(decision.wording.clone()),
+            decided_on: decision.decided_on,
+            parties: decision
+                .parties
+                .as_slice()
+                .iter()
+                .map(|party| PartyRef {
+                    party: *party,
+                    local_id: "PER-001".to_owned(),
+                    name: person_view(supplier()).name,
+                })
+                .collect(),
+            fields: decision.fields,
+            state: DecisionState::InForce,
+            version: RecordVersion::FIRST,
+        }
+    }
+
+    /// Ends the decision with `change` like the store: only a decision in force with the expected version.
+    fn end(
+        &self,
+        event: EventId,
+        id: DecisionId,
+        change: &DecisionChange,
+        expected: RecordVersion,
+    ) -> Changed<DecisionView> {
+        let mut all = self.decisions.lock().unwrap();
+        let Some(known) = all
+            .iter_mut()
+            .find(|known| known.id == id && known.event_id == event)
+        else {
+            return Changed::NotFound;
+        };
+        if known.version != expected || known.state != DecisionState::InForce {
+            return Changed::VersionConflict;
+        }
+        known.state = match change {
+            DecisionChange::Supersede { successor } => DecisionState::Superseded { by: *successor },
+            DecisionChange::Revoke { reason } => DecisionState::Revoked {
+                reason: tada_domain::redaction::Redactable::Present(reason.clone()),
+            },
+        };
+        known.version = next(known.version);
+        Changed::Changed(known.clone())
+    }
+}
+
+#[async_trait]
+impl DecisionStore for Memory {
+    async fn create_decision(
+        &self,
+        _: OrgScope,
+        decision: &NewDecisionRecord,
+        _: Timestamp,
+        audit: &AuditEvent,
+    ) -> Result<Created<DecisionView>, StoreError> {
+        let mut all = self.decisions.lock().unwrap();
+        if all.iter().any(|known| known.id == decision.id) {
+            return Ok(Created::IdTaken);
+        }
+        let view = self.new_decision_view(decision, all.len() as u64 + 1);
+        all.push(view.clone());
+        self.audit.lock().unwrap().push(audit.action());
+        Ok(Created::Created(view))
+    }
+
+    async fn change_decision(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        id: DecisionId,
+        fields: &DecisionFields,
+        expected: RecordVersion,
+        _: Timestamp,
+        audit: &AuditEvent,
+    ) -> Result<Changed<DecisionView>, StoreError> {
+        let mut all = self.decisions.lock().unwrap();
+        let Some(known) = all
+            .iter_mut()
+            .find(|known| known.id == id && known.event_id == event)
+        else {
+            return Ok(Changed::NotFound);
+        };
+        if known.version != expected {
+            return Ok(Changed::VersionConflict);
+        }
+        known.fields = *fields;
+        known.version = next(known.version);
+        self.audit.lock().unwrap().push(audit.action());
+        Ok(Changed::Changed(known.clone()))
+    }
+
+    async fn supersede_decision(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        old: DecisionId,
+        successor: &NewDecisionRecord,
+        expected: RecordVersion,
+        _: Timestamp,
+        audit: &[AuditEvent],
+    ) -> Result<Created<Changed<Superseded>>, StoreError> {
+        let number = {
+            let all = self.decisions.lock().unwrap();
+            if all.iter().any(|known| known.id == successor.id) {
+                return Ok(Created::IdTaken);
+            }
+            all.len() as u64 + 1
+        };
+        let change = DecisionChange::Supersede {
+            successor: successor.id,
+        };
+        let old = match self.end(event, old, &change, expected) {
+            Changed::Changed(old) => old,
+            Changed::NotFound => return Ok(Created::Created(Changed::NotFound)),
+            Changed::VersionConflict => return Ok(Created::Created(Changed::VersionConflict)),
+        };
+        let successor = self.new_decision_view(successor, number);
+        self.decisions.lock().unwrap().push(successor.clone());
+        self.audit
+            .lock()
+            .unwrap()
+            .extend(audit.iter().map(AuditEvent::action));
+        Ok(Created::Created(Changed::Changed(Superseded {
+            old,
+            successor,
+        })))
+    }
+
+    async fn revoke_decision(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        id: DecisionId,
+        reason: &RecordReason,
+        expected: RecordVersion,
+        _: Timestamp,
+        audit: &AuditEvent,
+    ) -> Result<Changed<DecisionView>, StoreError> {
+        let change = DecisionChange::Revoke {
+            reason: reason.clone(),
+        };
+        let result = self.end(event, id, &change, expected);
+        if matches!(result, Changed::Changed(_)) {
+            self.audit.lock().unwrap().push(audit.action());
+        }
+        Ok(result)
+    }
+
+    async fn decision(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        id: DecisionId,
+    ) -> Result<Option<DecisionView>, StoreError> {
+        let all = self.decisions.lock().unwrap();
+        Ok(all
+            .iter()
+            .find(|known| known.id == id && known.event_id == event)
+            .cloned())
+    }
+
+    async fn decisions(
+        &self,
+        _: OrgScope,
+        event: EventId,
+        filter: &WorkFilter<DecisionStatus>,
+    ) -> Result<Vec<DecisionView>, StoreError> {
+        let all = self.decisions.lock().unwrap();
+        Ok(all
+            .iter()
+            .filter(|known| known.event_id == event)
+            .filter(|known| {
+                filter
+                    .status
+                    .is_none_or(|status| known.state.status() == status)
+            })
+            .take(filter.limit as usize)
+            .cloned()
+            .collect())
+    }
+}
+
 #[async_trait]
 impl WorkStore for Memory {
     async fn create_action(
@@ -756,4 +948,5 @@ async fn firm_by(
 
 mod actions;
 mod commitments;
+mod decisions;
 mod milestones;

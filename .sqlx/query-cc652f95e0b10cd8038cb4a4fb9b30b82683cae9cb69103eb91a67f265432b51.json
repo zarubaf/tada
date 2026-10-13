@@ -1,0 +1,155 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, event_id, local_number, wording, decided_on AS \"decided_on: jiff_sqlx::Date\",\n                  owner_user_id, workstream_id, status, superseded_by, revoked_reason, version\n           FROM decision\n           WHERE organization_id = $1\n             AND ($2::uuid IS NULL OR event_id = $2)\n             AND ($3::uuid IS NULL OR id = $3)\n             AND ($4::uuid IS NULL OR owner_user_id = $4)\n             AND ($5::text IS NULL OR status = $5)\n             AND ($6::uuid IS NULL OR workstream_id = $6)\n             AND local_number > $7\n           ORDER BY event_id, local_number\n           LIMIT $8",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "local_number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "local_number"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "wording",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "wording"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "decided_on: jiff_sqlx::Date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "decided_on"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "owner_user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "owner_user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "workstream_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "workstream_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "superseded_by",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "superseded_by"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "revoked_reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "revoked_reason"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "cc652f95e0b10cd8038cb4a4fb9b30b82683cae9cb69103eb91a67f265432b51"
+}

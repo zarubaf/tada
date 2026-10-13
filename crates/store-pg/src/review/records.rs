@@ -1,8 +1,8 @@
 //! The apply of the proposals that create or change work records and parties (ADR 0068, ADR 0069).
 //!
 //! Each write copies the passages of the proposal into `record_evidence` with the record version that it produced.
-//! A new record takes the next readable number of its scope: `ACT`, `COM` and `MIL` in the event, `PER` and `INS` in
-//! the organization.
+//! A new record takes the next readable number of its scope: `ACT`, `COM`, `MIL` and `DEC` in the event, `PER` and
+//! `INS` in the organization.
 
 use std::collections::HashMap;
 
@@ -10,18 +10,20 @@ use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
-use tada_app::domain::ids::{EventId, LocalIdKind, MilestoneId, SourceVersionId, WorkstreamId};
+use tada_app::domain::ids::{
+    DecisionId, EventId, LocalIdKind, MilestoneId, SourceVersionId, WorkstreamId,
+};
 use tada_app::domain::parties::Party;
 use tada_app::domain::proposals::{NewRecord, Operation};
-use tada_app::domain::records::{MilestoneStatus, RecordKind};
+use tada_app::domain::records::{DecisionChange, DecisionStatus, MilestoneStatus, RecordKind};
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus, dates_in_order};
 use tada_app::parties::{InstitutionFields, PersonFields};
 use tada_app::records::RecordRef;
 use tada_app::review::{ApplyPlan, ApplyStep, LocalRecord, NewLocalId, StepEvidence};
 use tada_app::work::{
-    ActionFields, CommitmentFields, MilestoneFields, NewActionRecord, NewCommitmentRecord,
-    NewMilestoneRecord,
+    ActionFields, CommitmentFields, DecisionFields, MilestoneFields, NewActionRecord,
+    NewCommitmentRecord, NewDecisionRecord, NewMilestoneRecord,
 };
 use tada_app::workstreams::Workstream;
 
@@ -29,6 +31,7 @@ use super::insert_review_text;
 use crate::evidence::{ids_of, insert_evidence};
 use crate::parties::{insert_institution, insert_person};
 use crate::proposals::operation_to_json;
+use crate::work::decisions::{decision_in, end_decision, insert_decision};
 use crate::work::milestones::{insert_milestone, milestone_in, update_milestone};
 use crate::work::{
     action_in, commitment_in, insert_action, insert_commitment, update_action, update_commitment,
@@ -368,6 +371,81 @@ pub(super) async fn write_record(
             .ok_or(sqlx::Error::RowNotFound)?;
             (RecordRef::Milestone(*milestone_id), version)
         }
+        Operation::CreateDecision {
+            id,
+            event_id,
+            wording,
+            decided_on,
+            decided_by,
+            owner,
+            workstream,
+        } => {
+            let decision = NewDecisionRecord {
+                id: *id,
+                event_id: *event_id,
+                wording: wording.clone(),
+                decided_on: *decided_on,
+                parties: decided_by.clone(),
+                fields: DecisionFields {
+                    owner: *owner,
+                    workstream_id: *workstream,
+                },
+            };
+            let number = insert_decision(conn, scope, &decision, plan.now).await?;
+            written.local_id = Some(local_id(LocalRecord::Decision(*id), number)?);
+            (RecordRef::Decision(*id), 1)
+        }
+        Operation::SupersedeDecision {
+            event_id,
+            decision_id,
+            successor,
+            expected_version,
+        } => {
+            // The successor must still be in force when the old decision ends: an earlier step of the plan can end
+            // it, and `lock_targets` locked it against the other writers. A refusal is a conflict.
+            let usable = *successor != *decision_id
+                && decision_in(conn, scope, *event_id, *successor)
+                    .await?
+                    .is_some_and(|decision| decision.state.status() == DecisionStatus::InForce);
+            if !usable {
+                return Err(sqlx::Error::RowNotFound);
+            }
+            let change = DecisionChange::Supersede {
+                successor: *successor,
+            };
+            let version = end_of_decision(
+                conn,
+                scope,
+                plan,
+                *event_id,
+                *decision_id,
+                &change,
+                *expected_version,
+            )
+            .await?;
+            (RecordRef::Decision(*decision_id), version)
+        }
+        Operation::RevokeDecision {
+            event_id,
+            decision_id,
+            reason,
+            expected_version,
+        } => {
+            let change = DecisionChange::Revoke {
+                reason: reason.clone(),
+            };
+            let version = end_of_decision(
+                conn,
+                scope,
+                plan,
+                *event_id,
+                *decision_id,
+                &change,
+                *expected_version,
+            )
+            .await?;
+            (RecordRef::Decision(*decision_id), version)
+        }
         Operation::CreateEvent { .. }
         | Operation::SetFact { .. }
         | Operation::AddFieldDefinition { .. }
@@ -382,6 +460,30 @@ pub(super) async fn write_record(
     };
     insert_evidence(conn, scope, record, version, step.proposal_id, &evidence).await?;
     Ok(written)
+}
+
+/// Ends a decision of the event with `change` and returns its new version. As for an action, a refused transition
+/// of a changed decision and another version are conflicts.
+async fn end_of_decision(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    plan: &ApplyPlan,
+    event: EventId,
+    id: DecisionId,
+    change: &DecisionChange,
+    expected: RecordVersion,
+) -> Result<i64, sqlx::Error> {
+    let current = decision_in(conn, scope, event, id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?;
+    current
+        .state
+        .status()
+        .apply(change)
+        .map_err(|_| sqlx::Error::RowNotFound)?;
+    end_decision(conn, scope, event, id, change, expected, plan.now)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)
 }
 
 fn local_id(record: LocalRecord, number: i64) -> Result<NewLocalId, sqlx::Error> {
@@ -454,6 +556,29 @@ pub(super) async fn matches(
             milestone,
             ..
         } => takes_actions(conn, scope, *event_id, *milestone, new_records).await?,
+        Operation::CreateDecision {
+            event_id,
+            workstream,
+            decided_by,
+            ..
+        } => {
+            let mut parties_exist = true;
+            for party in decided_by.as_slice() {
+                parties_exist &= new_records.contains_key(&party.as_uuid())
+                    || party_exists(conn, scope, *party).await?;
+            }
+            parties_exist && takes_records(conn, scope, *event_id, *workstream, new_records).await?
+        }
+        Operation::SupersedeDecision {
+            event_id,
+            decision_id,
+            successor,
+            ..
+        } => {
+            successor != decision_id
+                && takes_successor(conn, scope, *event_id, *successor, new_records).await?
+        }
+        Operation::RevokeDecision { .. } => true,
         Operation::ChangeActionStatus { .. }
         | Operation::ChangeActionDue { .. }
         | Operation::ChangeCommitmentStatus { .. }
@@ -572,6 +697,14 @@ pub(super) async fn id_free(
             .fetch_one(&mut *conn)
             .await?
         }
+        NewRecord::Decision(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM decision WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
     };
     Ok(!taken)
 }
@@ -613,6 +746,16 @@ async fn record_version(
         RecordKind::Milestone => {
             sqlx::query_scalar!(
                 "SELECT version FROM milestone WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+                organization,
+                event,
+                id,
+            )
+            .fetch_optional(&mut *conn)
+            .await
+        }
+        RecordKind::Decision => {
+            sqlx::query_scalar!(
+                "SELECT version FROM decision WHERE organization_id = $1 AND event_id = $2 AND id = $3",
                 organization,
                 event,
                 id,
@@ -685,6 +828,31 @@ async fn takes_actions(
     .await
 }
 
+/// True if a superseded decision of the event can name `successor` (ADR 0080): a new decision of the event in the
+/// plan, or a decision of the event in force. `lock_targets` locked the successor, so it cannot end before the commit.
+async fn takes_successor(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    event: EventId,
+    successor: DecisionId,
+    new_records: &NewRecords,
+) -> Result<bool, sqlx::Error> {
+    if new_records.get(&successor.as_uuid()) == Some(&Some(event)) {
+        return Ok(true);
+    }
+    sqlx::query_scalar!(
+        r#"SELECT EXISTS (
+               SELECT 1 FROM decision
+               WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND status = 'in-force'
+           ) AS "in_force!""#,
+        scope.organization_id().as_uuid(),
+        event.as_uuid(),
+        successor.as_uuid(),
+    )
+    .fetch_one(&mut *conn)
+    .await
+}
+
 pub(super) async fn party_exists(
     conn: &mut PgConnection,
     scope: OrgScope,
@@ -721,6 +889,8 @@ pub(super) struct WorkLocks {
     pub changed: Vec<RecordRef>,
     /// The milestones that actions of the plan name. They stay open for the transaction.
     pub named_milestones: Vec<Uuid>,
+    /// The successors that superseded decisions of the plan name. They stay in force for the transaction.
+    pub successors: Vec<Uuid>,
 }
 
 impl WorkLocks {
@@ -767,7 +937,15 @@ impl WorkLocks {
             Operation::CreateMilestone { event_id, .. } => {
                 Some((event_id.as_uuid(), LocalIdKind::Milestone.prefix()))
             }
-            Operation::ChangeActionStatus { .. }
+            Operation::CreateDecision { event_id, .. } => {
+                Some((event_id.as_uuid(), LocalIdKind::Decision.prefix()))
+            }
+            Operation::SupersedeDecision { successor, .. } => {
+                self.successors.push(successor.as_uuid());
+                None
+            }
+            Operation::RevokeDecision { .. }
+            | Operation::ChangeActionStatus { .. }
             | Operation::ChangeActionDue { .. }
             | Operation::ChangeCommitmentStatus { .. }
             | Operation::ChangeMilestoneStatus { .. }
@@ -783,7 +961,9 @@ impl WorkLocks {
     }
 
     /// Locks the workstreams and the named milestones for share, then the changed records for update:
-    /// kind by kind, each kind in the order of its IDs.
+    /// kind by kind, each kind in the order of its IDs. The successors of decisions take the update lock together with
+    /// the changed decisions, in one order: two applies that supersede decisions with each other then wait, and do not
+    /// deadlock on a share lock that each would have to upgrade.
     pub async fn lock(&self, conn: &mut PgConnection, scope: OrgScope) -> Result<(), sqlx::Error> {
         let organization = scope.organization_id().as_uuid();
         sqlx::query_scalar!(
@@ -801,7 +981,10 @@ impl WorkLocks {
         .fetch_all(&mut *conn)
         .await?;
         for kind in RecordKind::ALL {
-            let ids = ids_of(&self.changed, kind);
+            let mut ids = ids_of(&self.changed, kind);
+            if kind == RecordKind::Decision {
+                ids.extend(&self.successors);
+            }
             if !ids.is_empty() {
                 lock_for_update(conn, organization, kind, &ids).await?;
             }
@@ -857,6 +1040,15 @@ async fn lock_for_update(
         RecordKind::Milestone => {
             sqlx::query_scalar!(
                 "SELECT id FROM milestone WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+                organization,
+                ids,
+            )
+            .fetch_all(&mut *conn)
+            .await?;
+        }
+        RecordKind::Decision => {
+            sqlx::query_scalar!(
+                "SELECT id FROM decision WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
                 organization,
                 ids,
             )

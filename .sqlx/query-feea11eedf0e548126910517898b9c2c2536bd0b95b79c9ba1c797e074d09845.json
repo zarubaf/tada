@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE decision\n         SET owner_user_id = $5, workstream_id = $6, version = version + 1, updated_at = $7\n         WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4\n         RETURNING version",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "decision",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "feea11eedf0e548126910517898b9c2c2536bd0b95b79c9ba1c797e074d09845"
+}

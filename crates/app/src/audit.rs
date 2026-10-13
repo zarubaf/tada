@@ -67,6 +67,14 @@ pub enum AuditAction {
     MilestoneCreate,
     /// The owner, the workstream lead or a manager changed a milestone (ADR 0080).
     MilestoneChange,
+    /// An event manager recorded a decision (ADR 0080).
+    DecisionCreate,
+    /// An event manager changed the owner or the workstream of a decision (ADR 0080).
+    DecisionChange,
+    /// An event manager replaced a decision with a newer one (ADR 0080).
+    DecisionSupersede,
+    /// An event manager revoked a decision. The decision keeps the reason; the event holds no text (ADR 0080).
+    DecisionRevoke,
     /// An event manager, owner or admin closed an event (ADR 0071).
     EventClose,
     /// An owner or admin reopened a closed event (ADR 0071).
@@ -140,6 +148,10 @@ impl AuditAction {
             Self::CommitmentFirm => "commitment.firm",
             Self::MilestoneCreate => "milestone.create",
             Self::MilestoneChange => "milestone.change",
+            Self::DecisionCreate => "decision.create",
+            Self::DecisionChange => "decision.change",
+            Self::DecisionSupersede => "decision.supersede",
+            Self::DecisionRevoke => "decision.revoke",
             Self::EventClose => "event.close",
             Self::EventReopen => "event.reopen",
             Self::OrganizationSetRetention => "organization.set_retention",
@@ -223,6 +235,10 @@ impl AuditAction {
             Self::ActionCreate | Self::ActionChange => "action",
             Self::CommitmentCreate | Self::CommitmentChange | Self::CommitmentFirm => "commitment",
             Self::MilestoneCreate | Self::MilestoneChange => "milestone",
+            Self::DecisionCreate
+            | Self::DecisionChange
+            | Self::DecisionSupersede
+            | Self::DecisionRevoke => "decision",
         }
     }
 }

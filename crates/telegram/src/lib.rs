@@ -42,7 +42,7 @@ use tada_app::telegram::{
     claim_link_code, is_linked_account, member_for, propose_fact, unlink_account,
 };
 
-use tada_app::work::{MilestoneStore, WorkStore};
+use tada_app::work::{DecisionStore, MilestoneStore, WorkStore};
 use tada_app::workstreams::WorkstreamStore;
 
 use crate::bot_error::{BotFailure, salvage};
@@ -68,6 +68,7 @@ pub trait Ports:
     + PartyStore
     + WorkStore
     + MilestoneStore
+    + DecisionStore
     + DigestAnswers
 {
 }
@@ -84,6 +85,7 @@ impl<T> Ports for T where
         + PartyStore
         + WorkStore
         + MilestoneStore
+        + DecisionStore
         + DigestAnswers
 {
 }
@@ -462,6 +464,7 @@ impl Gateway {
                 parties: ports,
                 work: ports,
                 milestones: ports,
+                decisions: ports,
             };
             let message = FactMessage {
                 source,

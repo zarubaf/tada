@@ -1,0 +1,67 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.decision_id, d.person_id, d.institution_id,\n                  COALESCE(p.local_number, i.local_number) AS \"number?\",\n                  COALESCE(p.name, i.name) AS \"name?\"\n           FROM decision_party d\n           LEFT JOIN person p ON p.organization_id = d.organization_id AND p.id = d.person_id\n           LEFT JOIN institution i ON i.organization_id = d.organization_id AND i.id = d.institution_id\n           WHERE d.organization_id = $1 AND d.decision_id = ANY($2)\n           ORDER BY d.decision_id, d.position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "decision_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "decision_party",
+            "name": "decision_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "person_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "decision_party",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "institution_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "decision_party",
+            "name": "institution_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "number?",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "name?",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "8d78181c347a9cf38c46a840d16593a739cdf6fc0d028be9d2b73069e426d127"
+}

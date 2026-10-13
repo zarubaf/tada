@@ -798,3 +798,160 @@ async fn action_dates_and_milestone_round_trip() {
         json!([{"pointer": "/milestone", "code": "unknown-record"}])
     );
 }
+
+#[tokio::test]
+async fn decisions_round_trip_over_http() {
+    let api = Api::start().await;
+    let e = api.event().await;
+    let person = api
+        .created(&e.owner, "/api/v1/persons", &json!({"name": "Beat Muster"}))
+        .await;
+    let decisions = format!("/api/v1/events/{}/decisions", e.id);
+    // The wording keeps its line breaks.
+    let wording =
+        "Das Fest findet bei jedem Wetter statt.\nBei Sturm entscheidet das OK am Vortag.";
+    let body = json!({
+        "wording": wording,
+        "decided_on": "2030-03-01",
+        "decided_by": [{"kind": "person", "id": person["id"]}],
+        "owner_user_id": e.ben.as_uuid(),
+    });
+    // Only an event manager records a decision, even for a contributor who would own it.
+    let (status, problem) = api.post(&e.ben_cookie, &decisions, &body).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    let decision = api.created(&e.owner, &decisions, &body).await;
+    assert_eq!(decision["local_id"], "DEC-001");
+    assert_eq!(decision["wording"], wording);
+    assert_eq!(decision["status"], "in-force");
+    assert_eq!(decision["decided_on"], "2030-03-01");
+    assert_eq!(decision["decided_by"][0]["local_id"], "PER-001");
+    assert_eq!(decision["decided_by"][0]["name"], "Beat Muster");
+    assert_eq!(decision["superseded_by"], Value::Null);
+    assert_eq!(
+        (&decision["can_change"], &decision["can_end"]),
+        (&json!(true), &json!(true))
+    );
+
+    // The owner reads it but changes nothing.
+    let path = record(&e, "decisions", &decision);
+    let (status, read) = api.get(&e.ben_cookie, &path).await;
+    assert_eq!(status, StatusCode::OK, "{read}");
+    assert_eq!(
+        (&read["can_change"], &read["can_end"]),
+        (&json!(false), &json!(false))
+    );
+    let (status, problem) = api
+        .post(
+            &e.ben_cookie,
+            &format!("{path}/revoke"),
+            &json!({"reason": "Darum.", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+
+    // A manager changes the owner or the workstream. The wording is no field of a change, so this request changes
+    // nothing.
+    let (status, problem) = api
+        .patch(
+            &e.owner,
+            &path,
+            &json!({"wording": "Anders.", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    let (_, unchanged) = api.get(&e.viewer, &path).await;
+    assert_eq!(
+        (&unchanged["wording"], &unchanged["version"]),
+        (&json!(wording), &json!(1))
+    );
+    let (status, changed) = api
+        .patch(
+            &e.owner,
+            &path,
+            &json!({"workstream_id": null, "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{changed}");
+    assert_eq!(changed["version"], 2);
+
+    // A supersede creates the successor and ends the old decision.
+    let (status, successor) = api
+        .post(
+            &e.owner,
+            &format!("{path}/supersede"),
+            &json!({"successor": {
+                        "wording": "Das Fest findet nur bei trockenem Wetter statt.",
+                        "decided_on": "2030-04-01",
+                        "decided_by": [{"kind": "person", "id": person["id"]}],
+                        "owner_user_id": e.ben.as_uuid()},
+                    "expected_version": 2}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{successor}");
+    assert_eq!(successor["local_id"], "DEC-002");
+    let (_, old) = api.get(&e.viewer, &path).await;
+    assert_eq!(old["status"], "superseded");
+    assert_eq!(old["superseded_by"], successor["id"]);
+    assert_eq!(old["can_end"], false);
+    // An ended decision takes no second supersede.
+    let (status, problem) = api
+        .post(
+            &e.owner,
+            &format!("{path}/supersede"),
+            &json!({"successor": {
+                        "wording": "Noch einmal.", "decided_on": "2030-04-02",
+                        "decided_by": [{"kind": "person", "id": person["id"]}],
+                        "owner_user_id": e.ben.as_uuid()},
+                    "expected_version": 3}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+    assert_eq!(problem["code"], "invalid-transition");
+
+    // A revoke needs a reason.
+    let successor_path = record(&e, "decisions", &successor);
+    let (status, problem) = api
+        .post(
+            &e.owner,
+            &format!("{successor_path}/revoke"),
+            &json!({"reason": "", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    assert_eq!(
+        problem["errors"],
+        json!([{"pointer": "/reason", "code": "empty"}])
+    );
+    let (status, revoked) = api
+        .post(
+            &e.owner,
+            &format!("{successor_path}/revoke"),
+            &json!({"reason": "Die Gemeinde verbietet es.", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{revoked}");
+    assert_eq!(revoked["status"], "revoked");
+    assert_eq!(revoked["revoked_reason"], "Die Gemeinde verbietet es.");
+
+    let (status, page) = api
+        .get(&e.viewer, &format!("{decisions}?status=superseded"))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(page["items"].as_array().unwrap().len(), 1);
+    assert_eq!(page["items"][0]["id"], decision["id"]);
+
+    // A decision needs a party.
+    let (status, problem) = api
+        .post(
+            &e.owner,
+            &decisions,
+            &json!({"wording": "X", "decided_on": "2030-03-01", "decided_by": [],
+                    "owner_user_id": e.ben.as_uuid()}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    assert_eq!(
+        problem["errors"],
+        json!([{"pointer": "/decided_by", "code": "required"}])
+    );
+}

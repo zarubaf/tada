@@ -5126,6 +5126,464 @@
         ]
       }
     },
+    "/api/v1/events/{event_id}/decisions": {
+      "get": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Lists the decisions of an event in the order of their numbers. Each reader of the event can do it.",
+        "operationId": "list_decisions",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "owner",
+            "in": "query",
+            "description": "`me`, or the ID of a member: only the decisions that this member owns.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DecisionStatus"
+            }
+          },
+          {
+            "name": "workstream",
+            "in": "query",
+            "description": "Only the decisions of this workstream.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of decisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Records a decision. Only an event manager can do it; another member gets `forbidden`.\nAn owner without the contributor or manager role gives `validation-failed` with the field code `unknown-member`.\nA closed workstream gives the field code `closed`.",
+        "operationId": "create_decision",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new decision, in force.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decision"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "event-closed",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/decisions/{id}": {
+      "get": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Reads one decision of the event, with its evidence.",
+        "operationId": "get_decision",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the decision.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The decision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decision"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Changes the owner or the workstream of a decision. Only an event manager can do it.\nThe wording, the date and the parties never change: supersede the decision instead.",
+        "operationId": "change_decision",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the decision.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed decision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decision"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "event-closed",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/decisions/{id}/supersede": {
+      "post": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Records a new decision that replaces a decision in force, in one step. Only an event manager can do it.\nThe old decision becomes `superseded` and names the new one. A decision that is not in force gives\n`invalid-transition`. The new decision follows the rules of `create_decision`.",
+        "operationId": "supersede_decision",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the decision that ends.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupersedeDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new decision, in force.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decision"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "event-closed",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/decisions/{id}/revoke": {
+      "post": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Revokes a decision in force for a reason. Only an event manager can do it.\nA decision that is not in force gives `invalid-transition`.",
+        "operationId": "revoke_decision",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the decision.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The revoked decision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decision"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "event-closed",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/persons/{person_id}/mentions": {
       "get": {
         "tags": [
@@ -6401,6 +6859,35 @@
                 "type": "null"
               }
             ]
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "ChangeDecisionRequest": {
+        "type": "object",
+        "description": "The input of `ChangeDecision`: only the owner and the workstream change. An absent field stays as it is.\n`null` clears the workstream. A request needs at least one field to change.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "owner_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "workstream_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "An active workstream of the event. A record keeps a workstream that closes later."
           },
           "expected_version": {
             "type": "integer",
@@ -8443,6 +8930,165 @@
                             "expected_version"
                           ],
                           "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Record a decision that was made in the event: what, when and by whom. It starts `in-force`.\nOnly the event managers review it. Its wording, its date and its parties never change after the acceptance:\na reviewer who wants other words rejects it.",
+                          "properties": {
+                            "decided_by": {
+                              "description": "The persons and institutions that decided, 1 to 50, in their order.\nEach is one of the organization, or a new person or institution of the same changeset;\nthen the proposal depends on the proposal that creates it.",
+                              "items": {
+                                "description": "The party that makes a commitment: `{\"person\": \"<uuid>\"}` or `{\"institution\": \"<uuid>\"}`.",
+                                "oneOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "person": {
+                                        "format": "uuid",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "person"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "institution": {
+                                        "format": "uuid",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "institution"
+                                    ],
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "maxItems": 50,
+                              "minItems": 1,
+                              "type": "array"
+                            },
+                            "decided_on": {
+                              "description": "The date of the decision as `YYYY-MM-DD`.",
+                              "type": "string"
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "id": {
+                              "description": "The UUIDv7 of the new decision.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create-decision",
+                              "type": "string"
+                            },
+                            "owner": {
+                              "description": "The user ID of the member who follows the decision up: a contributor or manager of the event.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "wording": {
+                              "description": "The words of the decision as it was made, 1 to 2000 characters.\nIt can have several lines: line breaks (`\\n`) and tabs are allowed, other control characters are not.",
+                              "type": "string"
+                            },
+                            "workstream": {
+                              "description": "An active workstream of the event, or a new workstream of this changeset;\nthen the proposal depends on the proposal that creates it.",
+                              "format": "uuid",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "event_id",
+                            "wording",
+                            "decided_on",
+                            "decided_by",
+                            "owner"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Replace a decision in force with a newer decision: the old one becomes `superseded` and names the successor.\nOnly the event managers review it.",
+                          "properties": {
+                            "decision_id": {
+                              "description": "The decision that ends. It must be in force.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "description": "The current version of the decision that ends.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "kind": {
+                              "const": "supersede-decision",
+                              "type": "string"
+                            },
+                            "successor": {
+                              "description": "The newer decision: another decision of the event in force, or a new decision of the same changeset;\nthen the proposal depends on the proposal that creates it. A changed decision is a new decision.",
+                              "format": "uuid",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "decision_id",
+                            "successor",
+                            "expected_version"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Revoke a decision in force without a successor. Only the event managers review it.",
+                          "properties": {
+                            "decision_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "description": "The current version of the decision.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "kind": {
+                              "const": "revoke-decision",
+                              "type": "string"
+                            },
+                            "reason": {
+                              "description": "Why the decision ends, 1 to 500 characters. The decision keeps it.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "decision_id",
+                            "reason",
+                            "expected_version"
+                          ],
+                          "type": "object"
                         }
                       ]
                     },
@@ -8525,6 +9171,56 @@
               "null"
             ],
             "format": "date"
+          }
+        }
+      },
+      "CreateDecisionRequest": {
+        "type": "object",
+        "description": "The input of `CreateDecision`, and the new decision of `SupersedeDecision`.",
+        "required": [
+          "wording",
+          "decided_on",
+          "decided_by",
+          "owner_user_id"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The UUIDv7 of the new decision. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry."
+          },
+          "wording": {
+            "type": "string",
+            "description": "The words of the decision, 1 to 2000 characters. It can have several lines: line breaks and tabs are allowed,\nother control characters are not.",
+            "example": "Das Fest findet bei jedem Wetter statt.\nBei Sturm entscheidet das OK am Vortag."
+          },
+          "decided_on": {
+            "type": "string",
+            "format": "date",
+            "description": "The date of the decision."
+          },
+          "decided_by": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromisorInput"
+            },
+            "description": "The persons and institutions of the organization that decided: 1 to 50. A duplicate counts once.\nNone gives the field code `required`, more than 50 `too-long`, and an unknown one `unknown-record`."
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A member with the contributor or manager role in the event."
+          },
+          "workstream_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "An active workstream of the event."
           }
         }
       },
@@ -8941,6 +9637,140 @@
             "description": "The dispute notes about the current fact version (ADR 0073), oldest first.\nIt is absent if there is none."
           }
         }
+      },
+      "Decision": {
+        "type": "object",
+        "description": "A decision of an event.",
+        "required": [
+          "id",
+          "local_id",
+          "event_id",
+          "wording",
+          "redacted",
+          "decided_on",
+          "decided_by",
+          "owner_user_id",
+          "status",
+          "version",
+          "evidence",
+          "can_change",
+          "can_end"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_id": {
+            "type": "string",
+            "description": "The readable ID, for example `DEC-001`."
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wording": {
+            "type": "string",
+            "description": "The words of the decision. It can have line breaks. Empty after a legal redaction (ADR 0072)."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
+          },
+          "decided_on": {
+            "type": "string",
+            "format": "date",
+            "description": "The date of the decision."
+          },
+          "decided_by": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartyRef"
+            },
+            "description": "The persons and institutions that decided, in their order."
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The member who follows the decision up: a contributor or manager of the event."
+          },
+          "workstream_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DecisionStatus"
+          },
+          "superseded_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The decision that replaced this one. Only a `superseded` decision has it."
+          },
+          "revoked_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the decision was revoked. Only a `revoked` decision has it; a legal redaction removes it."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. A change, a supersede and a revoke need it."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordEvidence"
+            },
+            "description": "The evidence of the accepted proposals that created or ended the decision."
+          },
+          "can_change": {
+            "type": "boolean",
+            "description": "True if the caller can change the owner and the workstream now: an event manager."
+          },
+          "can_end": {
+            "type": "boolean",
+            "description": "True if the caller can supersede or revoke the decision now: an event manager, and a decision in force."
+          }
+        }
+      },
+      "DecisionPage": {
+        "type": "object",
+        "description": "One page of decisions.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page. It is absent on the last page."
+          }
+        }
+      },
+      "DecisionStatus": {
+        "type": "string",
+        "description": "The status of a decision. Only a supersede or a revoke ends a decision in force; both ends are final.",
+        "enum": [
+          "in-force",
+          "superseded",
+          "revoked"
+        ]
       },
       "Digest": {
         "type": "object",
@@ -10630,7 +11460,7 @@
           },
           "local_id": {
             "type": "string",
-            "description": "The readable ID, for example `ACT-001`, `COM-001`, `PER-001`, `INS-001` or `MIL-001` (ADR 0038)."
+            "description": "The readable ID, for example `ACT-001`, `COM-001`, `PER-001`, `INS-001`, `MIL-001` or `DEC-001`\n(ADR 0038)."
           }
         }
       },
@@ -11470,6 +12300,134 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "A new decision of the event. It starts `in-force`. Only the event managers review it.",
+            "required": [
+              "id",
+              "event_id",
+              "wording",
+              "decided_on",
+              "decided_by",
+              "owner",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "wording": {
+                "type": "string",
+                "description": "The words of the decision. It can have line breaks."
+              },
+              "decided_on": {
+                "type": "string",
+                "format": "date"
+              },
+              "decided_by": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ProposalPromisor"
+                },
+                "description": "The persons and institutions that decided, in their order."
+              },
+              "owner": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The user ID of the member who follows the decision up."
+              },
+              "workstream": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create-decision"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The successor replaces a decision in force. Only the event managers review it.",
+            "required": [
+              "event_id",
+              "decision_id",
+              "successor",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "decision_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "successor": {
+                "type": "string",
+                "format": "uuid",
+                "description": "A decision of the event in force, or a new decision of the same changeset."
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The version of the decision that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "supersede-decision"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A decision in force ends without a successor. Only the event managers review it.",
+            "required": [
+              "event_id",
+              "decision_id",
+              "reason",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "decision_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The version of the decision that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "revoke-decision"
+                ]
+              }
+            }
           }
         ],
         "description": "The change that a proposal suggests. `kind` names the operation. The list of kinds is open."
@@ -11682,7 +12640,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "description": "`source-item`, `fact-version`, `proposal`, `open-question`, `action`, `commitment`, `workstream`,\n`document-version`, `milestone`, or `promisor` for a commitment whose promisor is the person.\nThe list of kinds is open."
+            "description": "`source-item`, `fact-version`, `proposal`, `open-question`, `action`, `commitment`, `workstream`,\n`document-version`, `milestone`, `decision`, `promisor` for a commitment whose promisor is the person, or\n`decision-party` for a decision that the person took.\nThe list of kinds is open."
           },
           "id": {
             "type": "string",
@@ -11929,7 +12887,7 @@
       },
       "PromisorInput": {
         "type": "object",
-        "description": "The promisor of a new commitment: a person or an institution of the organization.",
+        "description": "A person or an institution of the organization: the promisor of a new commitment, or a party of a new decision.",
         "required": [
           "kind",
           "id"
@@ -12413,7 +13371,8 @@
           "commitments",
           "persons",
           "institutions",
-          "milestones"
+          "milestones",
+          "decisions"
         ],
         "properties": {
           "proposals": {
@@ -12470,6 +13429,13 @@
               "$ref": "#/components/schemas/NewLocalRecord"
             },
             "description": "The new milestones with their event-local IDs."
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewLocalRecord"
+            },
+            "description": "The new decisions with their event-local IDs."
           }
         }
       },
@@ -12487,6 +13453,26 @@
           },
           "status": {
             "$ref": "#/components/schemas/ProposalStatus"
+          }
+        }
+      },
+      "RevokeDecisionRequest": {
+        "type": "object",
+        "description": "The input of `RevokeDecision`.",
+        "required": [
+          "reason",
+          "expected_version"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why the decision ends: 1 to 500 characters. The decision keeps it.",
+            "example": "Die Gemeinde verbietet das Feuerwerk."
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
           }
         }
       },
@@ -12750,6 +13736,25 @@
           "email": {
             "type": "string",
             "description": "The email address of the member."
+          }
+        }
+      },
+      "SupersedeDecisionRequest": {
+        "type": "object",
+        "description": "The input of `SupersedeDecision`: the new decision, and the version of the decision that it replaces.",
+        "required": [
+          "successor",
+          "expected_version"
+        ],
+        "properties": {
+          "successor": {
+            "$ref": "#/components/schemas/CreateDecisionRequest"
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The current version of the decision that ends.",
+            "minimum": 1
           }
         }
       },

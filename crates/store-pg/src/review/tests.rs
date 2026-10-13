@@ -63,6 +63,7 @@ fn propose_stores(test: &TestDatabase) -> ProposeStores<'_> {
         parties: &test.database,
         work: &test.database,
         milestones: &test.database,
+        decisions: &test.database,
     }
 }
 

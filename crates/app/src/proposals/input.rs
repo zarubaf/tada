@@ -19,15 +19,17 @@ use tada_domain::facts::{
 };
 use tada_domain::identity::Email;
 use tada_domain::ids::{
-    ActionId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId, MilestoneId,
-    OpenQuestionId, PersonId, UserId, WorkstreamId,
+    ActionId, CommitmentId, DecisionId, DocumentId, EventId, FieldDefinitionId, InstitutionId,
+    MilestoneId, OpenQuestionId, PersonId, UserId, WorkstreamId,
 };
 use tada_domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_domain::proposals::{DraftDocument, Operation, QuestionText};
-use tada_domain::records::{MilestoneStatus, MilestoneTitle};
+use tada_domain::records::{
+    DecisionParties, DecisionStatus, DecisionWording, MilestoneStatus, MilestoneTitle,
+};
 use tada_domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
-    WorkstreamName, dates_in_order,
+    RecordReason, WorkstreamName, dates_in_order,
 };
 use uuid::Uuid;
 
@@ -35,7 +37,7 @@ use super::{MAX_PASSAGES, MAX_PROPOSALS};
 use crate::events::{key_error_code, name_error_code};
 use crate::parties::email_code;
 use crate::problem::FieldError;
-use crate::records::{START_AFTER_DUE, text_error_code};
+use crate::records::{START_AFTER_DUE, parties_code, text_error_code};
 
 /// A new changeset: the text of one intake and the proposals that it supports.
 #[derive(Clone, Deserialize, JsonSchema)]
@@ -336,6 +338,51 @@ pub enum OperationInput {
         /// The current version of the action.
         expected_version: i64,
     },
+    /// Record a decision that was made in the event: what, when and by whom. It starts `in-force`.
+    /// Only the event managers review it. Its wording, its date and its parties never change after the acceptance:
+    /// a reviewer who wants other words rejects it.
+    CreateDecision {
+        /// The UUIDv7 of the new decision.
+        id: Uuid,
+        event_id: Uuid,
+        /// The words of the decision as it was made, 1 to 2000 characters.
+        /// It can have several lines: line breaks (`\n`) and tabs are allowed, other control characters are not.
+        wording: String,
+        /// The date of the decision as `YYYY-MM-DD`.
+        decided_on: String,
+        /// The persons and institutions that decided, 1 to 50, in their order.
+        /// Each is one of the organization, or a new person or institution of the same changeset;
+        /// then the proposal depends on the proposal that creates it.
+        #[schemars(length(min = 1, max = DecisionParties::MAX))]
+        decided_by: Vec<PartyInput>,
+        /// The user ID of the member who follows the decision up: a contributor or manager of the event.
+        owner: Uuid,
+        /// An active workstream of the event, or a new workstream of this changeset;
+        /// then the proposal depends on the proposal that creates it.
+        #[serde(default)]
+        workstream: Option<Uuid>,
+    },
+    /// Replace a decision in force with a newer decision: the old one becomes `superseded` and names the successor.
+    /// Only the event managers review it.
+    SupersedeDecision {
+        event_id: Uuid,
+        /// The decision that ends. It must be in force.
+        decision_id: Uuid,
+        /// The newer decision: another decision of the event in force, or a new decision of the same changeset;
+        /// then the proposal depends on the proposal that creates it. A changed decision is a new decision.
+        successor: Uuid,
+        /// The current version of the decision that ends.
+        expected_version: i64,
+    },
+    /// Revoke a decision in force without a successor. Only the event managers review it.
+    RevokeDecision {
+        event_id: Uuid,
+        decision_id: Uuid,
+        /// Why the decision ends, 1 to 500 characters. The decision keeps it.
+        reason: String,
+        /// The current version of the decision.
+        expected_version: i64,
+    },
 }
 
 /// The party that makes a commitment: `{"person": "<uuid>"}` or `{"institution": "<uuid>"}`.
@@ -381,6 +428,15 @@ pub enum MilestoneStatusInput {
     Open,
     Reached,
     Canceled,
+}
+
+/// The status of a decision. Only a supersede or a revoke changes it.
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum DecisionStatusInput {
+    InForce,
+    Superseded,
+    Revoked,
 }
 
 /// The document of a draft.
@@ -544,7 +600,8 @@ redacted_debug!(
     InstitutionKindInput,
     ActionStatusInput,
     CommitmentStatusInput,
-    MilestoneStatusInput
+    MilestoneStatusInput,
+    DecisionStatusInput
 );
 
 /// Collects the invalid fields of one input, with paths relative to it.
@@ -1016,6 +1073,65 @@ impl TryFrom<OperationInput> for Operation {
                     expected_version,
                 }
             }),
+            OperationInput::CreateDecision {
+                id,
+                event_id,
+                wording,
+                decided_on,
+                decided_by,
+                owner,
+                workstream,
+            } => {
+                let wording =
+                    errors.take("wording", DecisionWording::parse(&wording), text_error_code);
+                let decided_on = errors.take("decided_on", parse_date(&decided_on), |_| "date");
+                let decided_by = errors.take(
+                    "decided_by",
+                    DecisionParties::new(decided_by.into_iter().map(Party::from).collect()),
+                    parties_code,
+                );
+                (|| {
+                    Some(Operation::CreateDecision {
+                        id: DecisionId::from_uuid(id),
+                        event_id: EventId::from_uuid(event_id),
+                        wording: wording?,
+                        decided_on: decided_on?,
+                        decided_by: decided_by?,
+                        owner: UserId::from_uuid(owner),
+                        workstream: workstream.map(WorkstreamId::from_uuid),
+                    })
+                })()
+            }
+            OperationInput::SupersedeDecision {
+                event_id,
+                decision_id,
+                successor,
+                expected_version,
+            } => errors.version(expected_version).map(|expected_version| {
+                Operation::SupersedeDecision {
+                    event_id: EventId::from_uuid(event_id),
+                    decision_id: DecisionId::from_uuid(decision_id),
+                    successor: DecisionId::from_uuid(successor),
+                    expected_version,
+                }
+            }),
+            OperationInput::RevokeDecision {
+                event_id,
+                decision_id,
+                reason,
+                expected_version,
+            } => {
+                let reason = errors.take("reason", RecordReason::parse(&reason), text_error_code);
+                let expected_version = errors.version(expected_version);
+                (|| {
+                    Some(Operation::RevokeDecision {
+                        event_id: EventId::from_uuid(event_id),
+                        decision_id: DecisionId::from_uuid(decision_id),
+                        reason: reason?,
+                        expected_version: expected_version?,
+                    })
+                })()
+            }
         };
         errors.finish(operation)
     }
@@ -1064,6 +1180,16 @@ impl From<MilestoneStatusInput> for MilestoneStatus {
             MilestoneStatusInput::Open => Self::Open,
             MilestoneStatusInput::Reached => Self::Reached,
             MilestoneStatusInput::Canceled => Self::Canceled,
+        }
+    }
+}
+
+impl From<DecisionStatusInput> for DecisionStatus {
+    fn from(input: DecisionStatusInput) -> Self {
+        match input {
+            DecisionStatusInput::InForce => Self::InForce,
+            DecisionStatusInput::Superseded => Self::Superseded,
+            DecisionStatusInput::Revoked => Self::Revoked,
         }
     }
 }

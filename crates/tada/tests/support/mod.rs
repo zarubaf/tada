@@ -104,6 +104,7 @@ pub fn api_state_on(
         workstreams: database.clone(),
         work: database.clone(),
         milestones: database.clone(),
+        decisions: database.clone(),
         person_data: database.clone(),
         dispute_notes: database.clone(),
         redaction: database.clone(),

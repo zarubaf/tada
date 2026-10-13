@@ -19,7 +19,7 @@ use std::sync::Arc;
 use tada_domain::events::{Event, EventKey};
 use tada_domain::facts::FieldDefinition;
 use tada_domain::ids::{DocumentVersionId, EventId};
-use tada_domain::records::MilestoneStatus;
+use tada_domain::records::{DecisionStatus, MilestoneStatus};
 use tada_domain::work::{ActionStatus, CommitmentStatus};
 
 use crate::access::AccessError;
@@ -40,8 +40,8 @@ use crate::records::{NumberCursor, Shown};
 use crate::search::{self, SearchError, SearchRequest};
 use crate::sources::{self, PassageError, PassageRequest, SourceHit, SourcePassage, SourceStore};
 use crate::work::{
-    self, ActionView, CommitmentView, MilestoneStore, MilestoneView, WorkError, WorkPorts,
-    WorkQuery, WorkStore,
+    self, ActionView, CommitmentView, DecisionStore, DecisionView, MilestoneStore, MilestoneView,
+    WorkError, WorkPorts, WorkQuery, WorkStore,
 };
 use crate::workstreams::{self, Workstream, WorkstreamError, WorkstreamStore};
 
@@ -63,6 +63,7 @@ pub struct AiToolStores {
     pub parties: Arc<dyn PartyStore>,
     pub work: Arc<dyn WorkStore>,
     pub milestones: Arc<dyn MilestoneStore>,
+    pub decisions: Arc<dyn DecisionStore>,
 }
 
 /// The ports of the AI tools. The stores stay inside: only the functions of this module use them.
@@ -88,6 +89,7 @@ impl AiToolPorts {
             identity: &*self.0.identity,
             work: &*self.0.work,
             milestones: &*self.0.milestones,
+            decisions: &*self.0.decisions,
             workstreams: &*self.0.workstreams,
             parties: &*self.0.parties,
             clock: &*self.0.clock,
@@ -229,6 +231,16 @@ pub async fn list_milestones(
     work::list_milestones(caller, event, query, ports.work_ports()).await
 }
 
+/// `work::list_decisions`.
+pub async fn list_decisions(
+    caller: &AiCaller,
+    event: EventId,
+    query: WorkQuery<DecisionStatus>,
+    ports: &AiToolPorts,
+) -> Result<Page<Shown<DecisionView>, NumberCursor>, WorkError> {
+    work::list_decisions(caller, event, query, ports.work_ports()).await
+}
+
 /// `parties::list_persons`.
 pub async fn list_persons(
     caller: &AiCaller,
@@ -269,6 +281,7 @@ pub async fn create_changeset(
         parties: &*ports.0.parties,
         work: &*ports.0.work,
         milestones: &*ports.0.milestones,
+        decisions: &*ports.0.decisions,
     };
     proposals::create_changeset(caller, input, stores, &*ports.0.clock).await
 }

@@ -52,7 +52,7 @@ pub async fn my_work(
     let can_change = |record: &dyn WorkRecord, event: EventId| {
         rights
             .get(&event)
-            .is_some_and(|rights| rights.allow(record.owner(), record.workstream()))
+            .is_some_and(|rights| rights.allow_record(record))
     };
     let actions = shown(
         caller,
