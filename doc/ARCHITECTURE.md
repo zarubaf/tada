@@ -199,7 +199,8 @@ Rules and database queries do counting, deadlines, permissions, reservation over
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | Ingest, deduplicate and index authorized sources                          | Automatic                                                              |
 | Personal draft, summary or suggested label                                | Automatic within the granted scope                                     |
-| New commitment, decision or requirement, or a consequential status change | Review by the named owner                                              |
+| New decision, or a change of a decision                                   | Review by the event managers                                           |
+| New commitment or new requirement, or another consequential status change | Review by the named owner                                              |
 | Repeated low-impact workflow                                              | Automatic only through an explicit rule with an audit record           |
 | Internal Telegram reminders and check-ins                                 | Automatic under a configured policy, for verified members who opted in |
 | Supplier or public communication, spend or calendar invitation            | Explicit authority and the applicable approval policy                  |
