@@ -10,12 +10,10 @@ text_type!(
 
 status_enum!(
     /// The status of a requirement.
-    RequirementStatus { Open => "open", Met => "met", Waived => "waived" }
+    RequirementStatus: transitions { Open => "open", Met => "met", Waived => "waived" }
 );
 
 impl RequirementStatus {
-    pub const ALL: [Self; 3] = [Self::Open, Self::Met, Self::Waived];
-
     /// The one decision of a status change of a requirement. `waived` is final and needs a reason,
     /// which the caller checks.
     pub fn change_to(self, next: Self) -> Result<Self, InvalidTransition> {
@@ -26,14 +24,6 @@ impl RequirementStatus {
         } else {
             Err(InvalidTransition)
         }
-    }
-
-    /// The statuses that a record in this status can change to.
-    pub fn next_statuses(self) -> Vec<Self> {
-        Self::ALL
-            .into_iter()
-            .filter(|next| self.change_to(*next).is_ok())
-            .collect()
     }
 }
 

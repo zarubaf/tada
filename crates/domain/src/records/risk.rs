@@ -16,8 +16,6 @@ status_enum!(
 );
 
 impl Level {
-    pub const ALL: [Self; 3] = [Self::Low, Self::Medium, Self::High];
-
     /// The weight in a score: 1, 2 or 3.
     pub const fn weight(self) -> u8 {
         match self {
@@ -49,7 +47,7 @@ impl RiskRating {
 
 status_enum!(
     /// The status of a risk.
-    RiskStatus {
+    RiskStatus: transitions {
         Open => "open",
         Mitigated => "mitigated",
         Occurred => "occurred",
@@ -58,8 +56,6 @@ status_enum!(
 );
 
 impl RiskStatus {
-    pub const ALL: [Self; 4] = [Self::Open, Self::Mitigated, Self::Occurred, Self::Closed];
-
     /// The one decision of a status change of a risk.
     pub fn change_to(self, next: Self) -> Result<Self, InvalidTransition> {
         use RiskStatus::{Closed, Mitigated, Occurred, Open};
@@ -76,14 +72,6 @@ impl RiskStatus {
         } else {
             Err(InvalidTransition)
         }
-    }
-
-    /// The statuses that a record in this status can change to.
-    pub fn next_statuses(self) -> Vec<Self> {
-        Self::ALL
-            .into_iter()
-            .filter(|next| self.change_to(*next).is_ok())
-            .collect()
     }
 }
 

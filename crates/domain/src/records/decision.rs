@@ -11,12 +11,10 @@ text_type!(
 
 status_enum!(
     /// The status of a decision.
-    DecisionStatus { InForce => "in-force", Superseded => "superseded", Revoked => "revoked" }
+    DecisionStatus: transitions { InForce => "in-force", Superseded => "superseded", Revoked => "revoked" }
 );
 
 impl DecisionStatus {
-    pub const ALL: [Self; 3] = [Self::InForce, Self::Superseded, Self::Revoked];
-
     /// The one decision of a status change of a decision. `superseded` and `revoked` are final.
     /// A supersede also names the new decision and a revoke gives a reason; the caller checks both.
     pub fn change_to(self, next: Self) -> Result<Self, InvalidTransition> {
@@ -27,14 +25,6 @@ impl DecisionStatus {
         } else {
             Err(InvalidTransition)
         }
-    }
-
-    /// The statuses that a record in this status can change to.
-    pub fn next_statuses(self) -> Vec<Self> {
-        Self::ALL
-            .into_iter()
-            .filter(|next| self.change_to(*next).is_ok())
-            .collect()
     }
 }
 
