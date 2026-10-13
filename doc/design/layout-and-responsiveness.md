@@ -64,11 +64,12 @@ Sidebar, from top to bottom:
 1. Organization switcher (only if the member belongs to more than one organization).
 2. Search and command menu (`Ctrl+K` or `⌘K`).
 3. „Portfolio“, „Meine Arbeit“ and „Eingang“.
-4. „Anlässe“: the list of the events of the member.
+4. „Anlässe“: a link to the list of the events of the member.
    The sidebar does not expand the current event.
    The event page shows the sub-navigation of the event: „Übersicht“, „Aufgaben“, „Zeitplan“, „Register“, „Dokumente“, „Mitglieder“ and „Arbeitsbereiche“.
 5. „Personen“ and „Institutionen“: the persons and institutions of the organization.
-   On narrow layouts, the member menu has them.
+   The member menu holds them on all layouts.
+   The sidebar hides them on narrow layouts.
 6. At the bottom: „Einstellungen“, „Datenschutz“, the build of the web client and the member menu.
    The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
    On narrow layouts, the member menu has the build.

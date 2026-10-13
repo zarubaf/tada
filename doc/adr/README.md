@@ -67,7 +67,7 @@ The ADRs are the authority for the decisions in this project.
 | [0049](0049-entities-and-fact-model.md)                         | Typed entities and a field catalog for facts             | Accepted, amended by 0080          |
 | [0050](0050-proposals-and-review.md)                            | Proposals and review                                     | Accepted                           |
 | [0051](0051-document-drafts-and-provenance.md)                  | Document drafts and provenance                           | Accepted                           |
-| [0052](0052-event-roles-and-ownership.md)                       | Event roles and record ownership                         | Accepted, amended by 0080          |
+| [0052](0052-event-roles-and-ownership.md)                       | Event roles and record ownership                         | Accepted, amended by 0067 and 0080 |
 | [0053](0053-development-authenticator.md)                       | Development authenticator for the walking skeleton       | Superseded by 0056                 |
 | [0054](0054-job-queue-implementation.md)                        | Job queue in store-pg                                    | Accepted                           |
 | [0055](0055-office-format-detection.md)                         | Detection of office formats in ZIP containers            | Accepted                           |
