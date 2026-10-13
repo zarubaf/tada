@@ -10,7 +10,7 @@ import type { Register } from "./useRegister";
 import type { RegisterPaging } from "./useRegisterPage";
 
 /** Whether a fragment reads as the ID of a row (`ACT-001`); other fragments, such as `#main`, name no row. */
-export const isRowId = (fragment: string) => /^[A-Z]{3}-\d+$/.test(fragment);
+const isRowId = (fragment: string) => /^[A-Z]{3}-\d+$/.test(fragment);
 
 /** The most pages the search for a linked row loads before it gives up. */
 const MAX_SEARCH_PAGES = 100;
@@ -118,13 +118,16 @@ function useLinkedRow<T extends { id: string }>(
   const latestHash = useRef(hash);
   latestHash.current = hash;
   const [searching, setSearching] = useState(false);
-  const searched = useRef({ hash: "", pages: 0, cursor: undefined as string | undefined });
+  const fresh = { hash: "", pages: 0, cursor: undefined as string | undefined };
+  const searched = useRef(fresh);
   const { setConfirmation, setFailure } = page;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `register` changes with each render; the state is the trigger
   useEffect(() => {
     if (hash === "") {
       handled.current = undefined;
+      // A later return to the same row starts a new search.
+      searched.current = fresh;
       return;
     }
     if (state.kind !== "loaded" || handled.current === hash) {
@@ -132,6 +135,7 @@ function useLinkedRow<T extends { id: string }>(
     }
     if (present) {
       handled.current = hash;
+      searched.current = fresh;
       const row = document.getElementById(hash);
       row?.scrollIntoView?.({ block: "center" });
       row?.focus({ preventScroll: true });
@@ -161,6 +165,7 @@ function useLinkedRow<T extends { id: string }>(
       // A result for a fragment that is no longer the address is dropped.
       if ("failure" in result && latestHash.current === hash) {
         handled.current = hash;
+        searched.current = fresh;
         setFailure(result.failure);
       }
     });

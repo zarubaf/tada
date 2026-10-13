@@ -108,7 +108,7 @@ describe("ActionsPage", () => {
     expect(screen.queryByText(/nicht gefunden/)).not.toBeInTheDocument();
   });
 
-  it("shows the button as pending while the search runs and appends each page once", async () => {
+  it("shows the button as pending while the search runs and appends the page of the search once", async () => {
     let release: (response: Response) => void = () => {};
     const second = new Promise<Response>((resolve) => {
       release = resolve;
@@ -173,6 +173,9 @@ describe("ActionsPage", () => {
     await act(async () => {});
     expect(screen.getAllByText("ACT-002")).toHaveLength(1);
     expect(calls.filter((c) => c.call.endsWith("/actions"))).toHaveLength(2);
+    // The last page also moves focus to the heading, but the row of the address wins.
+    expect(screen.getByText("ACT-002").closest("tr")).toHaveFocus();
+    expect(screen.getByRole("heading", { level: 2, name: "Aufgaben" })).not.toHaveFocus();
   });
 
   it("stops the search when the server repeats a cursor", async () => {
@@ -187,7 +190,46 @@ describe("ActionsPage", () => {
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent("ACT-099 nicht gefunden"),
     );
-    expect(calls.filter((c) => c.call.endsWith("/actions")).length).toBeLessThanOrEqual(3);
+    expect(calls.filter((c) => c.call.endsWith("/actions"))).toHaveLength(2);
+  });
+
+  it("searches again for a row after a failed search, a non-row fragment and a return", async () => {
+    let served = 0;
+    const { calls } = render({
+      hash: "#ACT-050",
+      answers: {
+        "GET /actions": () => {
+          served += 1;
+          if (served === 1) {
+            return json(200, {
+              items: [action({ id: "a1", local_id: "ACT-001" })],
+              next_cursor: "p1",
+            });
+          }
+          if (served === 2) {
+            return problem(500, "internal");
+          }
+          return json(200, {
+            items: [action({ id: "a50", local_id: "ACT-050", title: "Zelt aufbauen" })],
+            next_cursor: null,
+          });
+        },
+      },
+    });
+    // The alert region is always there: wait until it holds the failure of the second request.
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/\S/));
+    const go = (hash: string) =>
+      act(() => {
+        window.history.pushState(null, "", `${window.location.pathname}${hash}`);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+    go("#main");
+    go("#ACT-050");
+
+    const row = (await screen.findByText("Zelt aufbauen")).closest("tr");
+    await waitFor(() => expect(row).toHaveFocus());
+    expect(screen.queryByText(/nicht gefunden/)).not.toBeInTheDocument();
+    expect(calls.filter((c) => c.call.endsWith("/actions"))).toHaveLength(3);
   });
 
   it("loads further pages until the row named by the hash appears", async () => {
@@ -267,7 +309,33 @@ describe("ActionsPage", () => {
     await user.click(await screen.findByRole("button", { name: "Erneut versuchen" }));
     const row = (await screen.findByText("Generator bestellen")).closest("tr");
     await waitFor(() => expect(row).toHaveAttribute("data-linked"));
+    // The row that the address names wins focus over the heading that a retry moves it to.
+    await waitFor(() => expect(row).toHaveFocus());
+    expect(screen.getByRole("heading", { level: 2, name: "Aufgaben" })).not.toHaveFocus();
     expect(screen.queryByText(/nicht gefunden/)).not.toBeInTheDocument();
+  });
+
+  it("does not focus the row again when a conflict loads the rows again", async () => {
+    const { calls } = render({
+      hash: "#ACT-001",
+      answers: { "PATCH /actions/a1": () => problem(409, "record-version-conflict") },
+      lists: { "/actions": [action()] },
+    });
+    const row = (await screen.findByText("Generator bestellen")).closest("tr");
+    await waitFor(() => expect(row).toHaveFocus());
+    await user.click(screen.getByRole("button", { name: "ACT-001 bearbeiten" }));
+    await user.clear(screen.getByRole("textbox", { name: "Titel (Pflichtfeld)" }));
+    await user.type(screen.getByRole("textbox", { name: "Titel (Pflichtfeld)" }), "Neu");
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(calls.filter((c) => c.call === `GET /api/v1/events/${EVENT.id}/actions`)).toHaveLength(
+        2,
+      ),
+    );
+    await act(async () => {});
+    expect(screen.getByRole("heading", { name: "Aufgabe erfassen" })).toBeInTheDocument();
+    expect(row).not.toHaveFocus();
   });
 
   it("focuses the new row when the hash changes on the mounted page", async () => {

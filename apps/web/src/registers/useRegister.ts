@@ -36,6 +36,8 @@ export function useRegister<T extends { id: string }>(
 
   const reload = useCallback(async () => {
     const request = ++latest.current;
+    // A page that is on its way belongs to the list that this load replaces.
+    pending.current = undefined;
     let next: RegisterState<T>;
     try {
       const { data, error } = await fetchPage(undefined);
@@ -62,7 +64,10 @@ export function useRegister<T extends { id: string }>(
     const request = fetchNext();
     pending.current = request;
     const clear = () => {
-      pending.current = undefined;
+      // A reload may have cleared this request and a newer one may be open.
+      if (pending.current === request) {
+        pending.current = undefined;
+      }
     };
     request.then(clear, clear);
     return request;
@@ -72,14 +77,17 @@ export function useRegister<T extends { id: string }>(
     if (state.kind !== "loaded" || state.nextCursor === undefined) {
       return { last: true };
     }
+    const generation = latest.current;
+    const cursor = state.nextCursor;
     try {
-      const { data, error } = await fetchPage(state.nextCursor);
+      const { data, error } = await fetchPage(cursor);
       if (!data) {
         return { failure: problemMessage(error) };
       }
       const added = data.items;
       setState((current) =>
-        current.kind === "loaded"
+        // The list may have reloaded meanwhile: the page then belongs to the old list.
+        generation === latest.current && current.kind === "loaded" && current.nextCursor === cursor
           ? {
               kind: "loaded",
               items: [...current.items, ...added],
