@@ -1,0 +1,3 @@
+# Changes that oasdiff reports as warnings but that ADR 0017 allows. Each line names the method, the path and the
+# change as oasdiff prints them.
+# Remove an entry when main contains the change.

@@ -6,7 +6,8 @@
 """Fail on a breaking change of the API contract (ADR 0017).
 
 The script compares contracts/openapi.json with the same file at a base revision through oasdiff.
-It ignores the changes in contracts/oasdiff-err-ignore.txt: new values of lists that the contract marks as open.
+It ignores the errors in contracts/oasdiff-err-ignore.txt, for example new values of lists that the contract marks as
+open, and the warnings in contracts/oasdiff-warn-ignore.txt.
 The environment variable CONTRACT_BASE names the base revision. The default is origin/main.
 If the base has no contract yet, there is nothing to compare.
 
@@ -21,7 +22,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = "contracts/openapi.json"
-IGNORE = "contracts/oasdiff-err-ignore.txt"
+ERR_IGNORE = "contracts/oasdiff-err-ignore.txt"
+WARN_IGNORE = "contracts/oasdiff-warn-ignore.txt"
 
 
 def main() -> int:
@@ -39,8 +41,9 @@ def main() -> int:
         base_file.write(show.stdout)
         base_file.flush()
         # WARN also fails, for example on a new value in a response enum (ADR 0017).
-        # IGNORE lists the new values of the lists that the contract marks as open.
-        command = ["oasdiff", "breaking", "--fail-on", "WARN", "--err-ignore", IGNORE]
+        # The ignore files list the changes that ADR 0017 allows, such as new values of open lists.
+        command = ["oasdiff", "breaking", "--fail-on", "WARN"]
+        command += ["--err-ignore", ERR_IGNORE, "--warn-ignore", WARN_IGNORE]
         command += [base_file.name, CONTRACT]
         return subprocess.run(command, cwd=ROOT).returncode  # noqa: S603
 
