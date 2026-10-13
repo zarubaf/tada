@@ -62,6 +62,17 @@
     white-space: nowrap;
   }
 
+  /*
+   * From 28rem, where the headers show, a header breaks only between words: `break-word`, unlike
+   * `anywhere`, keeps the longest word in the minimum width of the column, so „Offene Aufgaben“
+   * never splits into „Aufgab en“.
+   */
+  @container (width >= 28rem) {
+    .table th {
+      overflow-wrap: break-word;
+    }
+  }
+
   /* Below 28rem: two-line list rows (doc/design/layout-and-responsiveness.md, „Container queries“). */
   @container (width < 28rem) {
     .table,
