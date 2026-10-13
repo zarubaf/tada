@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -52,11 +52,19 @@ interface Setup {
   /** The organization role of the caller. */
   role?: "owner" | "admin" | "member";
   /** Answers by `METHOD /path-suffix`. */
-  answers?: Record<string, () => Response | Promise<Response>>;
+  answers?: Record<string, (url: URL) => Response | Promise<Response>>;
+  /** The fragment of the address, for a link to a row. */
+  hash?: string;
 }
 
 /** A fake server that filters the list by `q`. It records `METHOD path?query` and the body. */
-function setup({ kind = "person", canChange = true, role = "member", answers = {} }: Setup = {}) {
+function setup({
+  kind = "person",
+  canChange = true,
+  role = "member",
+  answers = {},
+  hash = "",
+}: Setup = {}) {
   const calls: { call: string; body: unknown }[] = [];
   const own = { organization_id: "o1", name: "Fliegergruppe Testwil", role };
   const session = {
@@ -81,7 +89,7 @@ function setup({ kind = "person", canChange = true, role = "member", answers = {
       return request.method === method && url.pathname.endsWith(suffix);
     });
     if (answer) {
-      return answer[1]();
+      return answer[1](url);
     }
     if (url.pathname.endsWith("/session")) {
       return json(200, session);
@@ -104,7 +112,7 @@ function setup({ kind = "person", canChange = true, role = "member", answers = {
   };
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
   const path = kind === "person" ? "/persons" : "/institutions";
-  window.history.replaceState(null, "", path);
+  window.history.replaceState(null, "", `${path}${hash}`);
   render(
     <Router>
       <SessionProvider api={api}>
@@ -120,6 +128,17 @@ function setup({ kind = "person", canChange = true, role = "member", answers = {
 }
 
 const user = userEvent.setup({ delay: null });
+
+const spaet = { ...clara, id: "p9", local_id: "PER-009", name: "Spät" };
+
+/** An answer that the test sends when it calls `release`. */
+function held() {
+  let release: (response: Response) => void = () => {};
+  const response = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  return { response, release };
+}
 
 afterEach(() => window.history.replaceState(null, "", "/"));
 
@@ -160,23 +179,52 @@ describe("PartiesPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Personen" })).toHaveFocus();
   });
 
-  it("drops a next page that arrives after the search changed the list", async () => {
-    let release: (response: Response) => void = () => {};
-    const late = new Promise<Response>((resolve) => {
-      release = resolve;
-    });
-    let requests = 0;
+  it("ignores a next page that arrives after the search changed the list", async () => {
+    const late = held();
     const { calls } = setup({
       answers: {
-        "GET /persons": () => {
-          requests += 1;
-          if (requests === 1) {
-            return json(200, { items: [beat], next_cursor: "old" });
-          }
-          if (requests === 2) {
-            return late;
+        "GET /persons": (url) => {
+          const cursor = url.searchParams.get("cursor");
+          if (!url.searchParams.has("q")) {
+            return cursor ? late.response : json(200, { items: [beat], next_cursor: "old" });
           }
           return json(200, { items: [clara], next_cursor: "filtered" });
+        },
+      },
+    });
+    const table = await screen.findByRole("table", { name: "Personen" });
+    const box = screen.getByRole("searchbox", { name: "Nach Name suchen" });
+
+    await user.click(screen.getByRole("button", { name: "Weitere Einträge laden" }));
+    await user.type(box, "probst");
+    await within(table).findByText("Clara Probst");
+    // The page on its way belongs to the old list: the button of the new list is not pending.
+    expect(screen.getByRole("button", { name: "Weitere Einträge laden" })).not.toHaveAttribute(
+      "aria-disabled",
+    );
+    late.release(json(200, { items: [spaet] }));
+    await act(async () => {});
+
+    expect(within(table).queryByText("Spät")).not.toBeInTheDocument();
+    expect(within(table).queryByText("Beat Muster")).not.toBeInTheDocument();
+    // The late page is the last of the old list, but it neither announces nor moves focus.
+    expect(box).toHaveFocus();
+    expect(screen.queryByText("Weitere Einträge geladen.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Weitere Einträge laden" }));
+    expect(calls.at(-1)?.call).toBe("GET /api/v1/persons?q=probst&cursor=filtered");
+  });
+
+  it("loads the next page of the new list while a page of the old list is on its way", async () => {
+    const late = held();
+    const next = held();
+    const { calls } = setup({
+      answers: {
+        "GET /persons": (url) => {
+          const cursor = url.searchParams.get("cursor");
+          if (!url.searchParams.has("q")) {
+            return cursor ? late.response : json(200, { items: [beat], next_cursor: "old" });
+          }
+          return cursor ? next.response : json(200, { items: [clara], next_cursor: "filtered" });
         },
       },
     });
@@ -184,16 +232,87 @@ describe("PartiesPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Weitere Einträge laden" }));
     await user.type(screen.getByRole("searchbox", { name: "Nach Name suchen" }), "probst");
-    await waitFor(() => expect(calls.some((c) => c.call.endsWith("?q=probst"))).toBe(true));
     await within(table).findByText("Clara Probst");
-    release(json(200, { items: [{ ...clara, id: "p9", local_id: "PER-009", name: "Spät" }] }));
+    const more = screen.getByRole("button", { name: "Weitere Einträge laden" });
+    await user.click(more);
+    expect(calls.at(-1)?.call).toBe("GET /api/v1/persons?q=probst&cursor=filtered");
+    late.release(json(200, { items: [spaet] }));
+    await act(async () => {});
+
+    // The late page of the old list ends nothing: the page of the new list is still on its way.
+    expect(more).toHaveAttribute("aria-disabled", "true");
+    expect(within(table).queryByText("Spät")).not.toBeInTheDocument();
+    next.release(
+      json(200, { items: [{ ...clara, id: "p4", local_id: "PER-004", name: "Dora Probst" }] }),
+    );
+    expect(await within(table).findByText("Dora Probst")).toBeInTheDocument();
+    expect(screen.getByText("Weitere Einträge geladen.")).toBeInTheDocument();
+  });
+
+  it("asks for no next page of the old list while the new list loads", async () => {
+    const filtered = held();
+    const { calls } = setup({
+      answers: {
+        "GET /persons": (url) => {
+          if (!url.searchParams.has("q")) {
+            return url.searchParams.has("cursor")
+              ? json(200, { items: [spaet], next_cursor: "same" })
+              : json(200, { items: [beat], next_cursor: "same" });
+          }
+          return url.searchParams.has("cursor")
+            ? json(200, { items: [spaet], next_cursor: "same" })
+            : filtered.response;
+        },
+      },
+    });
+    const table = await screen.findByRole("table", { name: "Personen" });
+    await user.click(screen.getByRole("searchbox", { name: "Nach Name suchen" }));
+    await user.paste("probst");
+    await waitFor(() => expect(calls.at(-1)?.call).toBe("GET /api/v1/persons?q=probst"));
+
+    // Both lists end on a cursor that reads the same.
+    await user.click(screen.getByRole("button", { name: "Weitere Einträge laden" }));
+    filtered.release(json(200, { items: [clara], next_cursor: "same" }));
+    await within(table).findByText("Clara Probst");
+    await act(async () => {});
+
+    expect(calls.some((c) => c.call.includes("cursor="))).toBe(false);
+    expect(within(table).queryByText("Spät")).not.toBeInTheDocument();
+    expect(screen.queryByText("Weitere Einträge geladen.")).not.toBeInTheDocument();
+  });
+
+  it("searches the linked row in the new list when the search changes during the search", async () => {
+    const late = held();
+    const linked = { ...clara, id: "p3", local_id: "PER-003", name: "Carla Probst" };
+    setup({
+      hash: "#PER-003",
+      answers: {
+        "GET /persons": (url) => {
+          const cursor = url.searchParams.get("cursor");
+          if (!url.searchParams.has("q")) {
+            return cursor ? late.response : json(200, { items: [beat], next_cursor: "c1" });
+          }
+          // The cursor of the new list reads the same as the one of the old list.
+          return cursor
+            ? json(200, { items: [linked] })
+            : json(200, { items: [clara], next_cursor: "c1" });
+        },
+      },
+    });
+    const table = await screen.findByRole("table", { name: "Personen" });
+    // One change, without the change event that user-event sends when the box loses focus to the
+    // row: that event would arrive inside the commit that moves focus.
+    fireEvent.change(screen.getByRole("searchbox", { name: "Nach Name suchen" }), {
+      target: { value: "probst" },
+    });
+
+    const row = (await within(table).findByText("Carla Probst")).closest("tr");
+    await waitFor(() => expect(row).toHaveFocus());
+    late.release(json(200, { items: [spaet] }));
     await act(async () => {});
 
     expect(within(table).queryByText("Spät")).not.toBeInTheDocument();
-    expect(within(table).queryByText("Beat Muster")).not.toBeInTheDocument();
-    // The next page that the button asks for is the one of the filtered list.
-    await user.click(screen.getByRole("button", { name: "Weitere Einträge laden" }));
-    expect(calls.at(-1)?.call).toBe("GET /api/v1/persons?q=probst&cursor=filtered");
+    expect(screen.queryByText(/nicht gefunden/)).not.toBeInTheDocument();
   });
 
   it("lists institutions with their kind", async () => {

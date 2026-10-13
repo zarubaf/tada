@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Event } from "../api/client";
@@ -97,6 +97,9 @@ describe("the registers of a closed event", () => {
     await user.click(await screen.findByRole("button", { name: "ACT-001 bearbeiten" }));
     await user.click(await screen.findByRole("button", { name: "Speichern" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Dieser Anlass ist abgeschlossen");
+    // The alert region is always there: wait for the text, not for the region.
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("Dieser Anlass ist abgeschlossen"),
+    );
   });
 });
