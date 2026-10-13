@@ -1,7 +1,8 @@
 //! The apply of the proposals that create or change work records and parties (ADR 0068, ADR 0069).
 //!
 //! Each write copies the passages of the proposal into `record_evidence` with the record version that it produced.
-//! A new record takes the next readable number of its scope: `ACT` and `COM` in the event, `PER` and `INS` in the organization.
+//! A new record takes the next readable number of its scope: `ACT`, `COM` and `MIL` in the event, `PER` and `INS` in
+//! the organization.
 
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
@@ -10,18 +11,23 @@ use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{EventId, LocalIdKind, SourceVersionId, WorkstreamId};
 use tada_app::domain::parties::Party;
 use tada_app::domain::proposals::Operation;
+use tada_app::domain::records::MilestoneStatus;
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus};
 use tada_app::parties::{InstitutionFields, PersonFields};
 use tada_app::records::RecordRef;
 use tada_app::review::{ApplyPlan, ApplyStep, LocalRecord, NewLocalId, StepEvidence};
-use tada_app::work::{ActionFields, CommitmentFields, NewActionRecord, NewCommitmentRecord};
+use tada_app::work::{
+    ActionFields, CommitmentFields, MilestoneFields, NewActionRecord, NewCommitmentRecord,
+    NewMilestoneRecord,
+};
 use tada_app::workstreams::Workstream;
 
 use super::insert_review_text;
 use crate::evidence::insert_evidence;
 use crate::parties::{insert_institution, insert_person};
 use crate::proposals::operation_to_json;
+use crate::work::milestones::{insert_milestone, milestone_in, update_milestone};
 use crate::work::{
     action_in, commitment_in, insert_action, insert_commitment, update_action, update_commitment,
 };
@@ -269,6 +275,63 @@ pub(super) async fn write_record(
             .ok_or(sqlx::Error::RowNotFound)?;
             (RecordRef::Commitment(*commitment_id), version)
         }
+        Operation::CreateMilestone {
+            id,
+            event_id,
+            title,
+            description,
+            date,
+            owner,
+            workstream,
+        } => {
+            let milestone = NewMilestoneRecord {
+                id: *id,
+                event_id: *event_id,
+                fields: MilestoneFields {
+                    title: Redactable::Present(title.clone()),
+                    description: description.clone(),
+                    date: *date,
+                    owner: *owner,
+                    workstream_id: *workstream,
+                    status: MilestoneStatus::Open,
+                },
+            };
+            let number = insert_milestone(conn, scope, &milestone, plan.now).await?;
+            written.local_id = Some(local_id(LocalRecord::Milestone(*id), number)?);
+            (RecordRef::Milestone(*id), 1)
+        }
+        Operation::ChangeMilestoneStatus {
+            event_id,
+            milestone_id,
+            status,
+            expected_version,
+        } => {
+            let current = milestone_in(conn, scope, *event_id, *milestone_id, plan.now)
+                .await?
+                .ok_or(sqlx::Error::RowNotFound)?;
+            // As for an action: a refused transition of a changed record is a conflict.
+            let status = current
+                .fields
+                .status
+                .change_to(*status)
+                .map_err(|_| sqlx::Error::RowNotFound)?;
+            let fields = MilestoneFields {
+                status,
+                ..current.fields
+            };
+            let version = update_milestone(
+                conn,
+                scope,
+                *event_id,
+                *milestone_id,
+                &fields,
+                *expected_version,
+                plan.now,
+            )
+            .await?
+            .ok_or(sqlx::Error::RowNotFound)?;
+            (RecordRef::Milestone(*milestone_id), version)
+        }
         _ => {
             return Err(sqlx::Error::Protocol(
                 "the step does not write a work record".into(),
@@ -413,6 +476,42 @@ pub(super) async fn matches(
             versions.insert(commitment_id.as_uuid(), expected_version.get() + 1);
             current == Some(expected_version.get())
         }
+        Operation::CreateMilestone {
+            id,
+            event_id,
+            workstream,
+            ..
+        } => {
+            let free = !sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM milestone WHERE id = $1) AS "exists!""#,
+                id.as_uuid(),
+            )
+            .fetch_one(&mut *conn)
+            .await?;
+            free && takes_records(conn, scope, *event_id, *workstream, new_records).await?
+        }
+        Operation::ChangeMilestoneStatus {
+            event_id,
+            milestone_id,
+            expected_version,
+            ..
+        } => {
+            let current = match versions.get(&milestone_id.as_uuid()) {
+                Some(version) => Some(*version),
+                None => {
+                    sqlx::query_scalar!(
+                        "SELECT version FROM milestone WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+                        organization,
+                        event_id.as_uuid(),
+                        milestone_id.as_uuid(),
+                    )
+                    .fetch_optional(&mut *conn)
+                    .await?
+                }
+            };
+            versions.insert(milestone_id.as_uuid(), expected_version.get() + 1);
+            current == Some(expected_version.get())
+        }
         _ => false,
     })
 }
@@ -480,6 +579,7 @@ pub(super) struct WorkLocks {
     pub workstreams: Vec<Uuid>,
     pub actions: Vec<Uuid>,
     pub commitments: Vec<Uuid>,
+    pub milestones: Vec<Uuid>,
 }
 
 impl WorkLocks {
@@ -518,11 +618,25 @@ impl WorkLocks {
                 self.commitments.push(commitment_id.as_uuid());
                 None
             }
+            Operation::CreateMilestone {
+                event_id,
+                workstream,
+                ..
+            } => {
+                self.workstreams
+                    .extend(workstream.map(WorkstreamId::as_uuid));
+                Some((event_id.as_uuid(), LocalIdKind::Milestone.prefix()))
+            }
+            Operation::ChangeMilestoneStatus { milestone_id, .. } => {
+                self.milestones.push(milestone_id.as_uuid());
+                None
+            }
             _ => None,
         }
     }
 
-    /// Locks the workstreams for share, then the actions and the commitments for update, each in the order of its IDs.
+    /// Locks the workstreams for share, then the actions, the commitments and the milestones for update, each in the
+    /// order of its IDs.
     pub async fn lock(&self, conn: &mut PgConnection, scope: OrgScope) -> Result<(), sqlx::Error> {
         let organization = scope.organization_id().as_uuid();
         sqlx::query_scalar!(
@@ -543,6 +657,13 @@ impl WorkLocks {
             "SELECT id FROM commitment WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
             organization,
             &self.commitments,
+        )
+        .fetch_all(&mut *conn)
+        .await?;
+        sqlx::query_scalar!(
+            "SELECT id FROM milestone WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+            organization,
+            &self.milestones,
         )
         .fetch_all(&mut *conn)
         .await?;

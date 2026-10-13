@@ -56,6 +56,7 @@ struct Rows {
     workstreams: Vec<Uuid>,
     actions: Vec<Uuid>,
     commitments: Vec<Uuid>,
+    milestones: Vec<Uuid>,
     events: Vec<Uuid>,
 }
 
@@ -325,6 +326,13 @@ async fn rows_of(
                 &id,
             )
             .await?;
+            rows.milestones = ids(
+                conn,
+                "SELECT id FROM milestone WHERE organization_id = $1 AND event_id = ANY($2)",
+                organization,
+                &id,
+            )
+            .await?;
             rows.document_versions = ids(
                 conn,
                 "SELECT id FROM document_version WHERE organization_id = $1 AND document_id = ANY($2)",
@@ -462,7 +470,7 @@ async fn tombstone(
         "UPDATE record_evidence SET quote = NULL, redacted_at = now()
          WHERE organization_id = $1 AND redacted_at IS NULL
            AND (source_version_id = ANY($2) OR action_id = ANY($3) OR commitment_id = ANY($4)
-                OR person_id = ANY($5) OR institution_id = ANY($6))",
+                OR person_id = ANY($5) OR institution_id = ANY($6) OR milestone_id = ANY($7))",
         organization,
         &[
             &rows.source_versions,
@@ -470,6 +478,7 @@ async fn tombstone(
             &rows.commitments,
             &rows.persons,
             &rows.institutions,
+            &rows.milestones,
         ],
     )
     .await?;
@@ -542,6 +551,15 @@ async fn tombstone(
          WHERE organization_id = $1 AND id = ANY($2) AND redacted_at IS NULL",
         organization,
         &[&rows.commitments],
+    )
+    .await?;
+    update(
+        conn,
+        "UPDATE milestone
+         SET title = NULL, description = NULL, version = version + 1, updated_at = now(), redacted_at = now()
+         WHERE organization_id = $1 AND id = ANY($2) AND redacted_at IS NULL",
+        organization,
+        &[&rows.milestones],
     )
     .await?;
     update(

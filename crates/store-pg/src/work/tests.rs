@@ -7,8 +7,13 @@ use tada_app::domain::parties::InstitutionKind;
 use tada_app::parties::{InstitutionFields, PartyStore};
 
 use tada_app::access::{EventReach, SourceReach};
+use tada_app::domain::ids::MilestoneId;
 use tada_app::domain::ids::{ProposalId, SourceVersionId};
+use tada_app::domain::records::{MilestoneStatus, MilestoneTitle};
 use tada_app::records::{EvidenceStore, RecordEvidenceView, RecordRef};
+use tada_app::work::{
+    MilestoneFields, MilestoneStore, MilestoneView, MilestoneWarning, NewMilestoneRecord,
+};
 
 use super::*;
 use crate::testing::TestDatabase;
@@ -165,6 +170,43 @@ impl Fixture {
             )
             .await
             .unwrap()
+    }
+
+    async fn milestone(&self, date: jiff::civil::Date) -> MilestoneView {
+        let record = NewMilestoneRecord {
+            id: MilestoneId::from_uuid(Uuid::now_v7()),
+            event_id: self.event,
+            fields: MilestoneFields {
+                title: Redactable::Present(MilestoneTitle::parse("Bewilligung liegt vor").unwrap()),
+                description: None,
+                date,
+                owner: self.owner,
+                workstream_id: None,
+                status: MilestoneStatus::Open,
+            },
+        };
+        let audit = self.audit(AuditAction::MilestoneCreate, record.id.as_uuid());
+        match self
+            .test
+            .database
+            .create_milestone(self.scope, &record, AT.parse().unwrap(), &audit)
+            .await
+            .unwrap()
+        {
+            Created::Created(view) => view,
+            Created::IdTaken => panic!("id taken"),
+        }
+    }
+
+    /// The warnings of the milestone `id` at `now`.
+    async fn warnings(&self, id: MilestoneId, now: &str) -> Vec<MilestoneWarning> {
+        self.test
+            .database
+            .milestone(self.scope, self.event, id, now.parse().unwrap())
+            .await
+            .unwrap()
+            .unwrap()
+            .warnings
     }
 
     async fn audit_actions(&self) -> Vec<String> {
@@ -582,11 +624,13 @@ async fn owners_reads_only_the_records_of_the_given_event() {
     let f = Fixture::start().await;
     let action = f.action("Generator bestellen", None).await;
     let commitment = f.commitment(None).await;
+    let milestone = f.milestone(date(2030, 5, 1)).await;
     let db = &f.test.database;
 
     let records = [
         RecordRef::Action(action.id),
         RecordRef::Commitment(commitment.id),
+        RecordRef::Milestone(milestone.id),
     ];
 
     let owners = db.owners(f.scope, f.event, &records).await.unwrap();
@@ -595,6 +639,7 @@ async fn owners_reads_only_the_records_of_the_given_event() {
         WorkOwners::from([
             (RecordRef::Action(action.id), f.owner),
             (RecordRef::Commitment(commitment.id), f.owner),
+            (RecordRef::Milestone(milestone.id), f.owner),
         ])
     );
 
@@ -602,4 +647,69 @@ async fn owners_reads_only_the_records_of_the_given_event() {
     let other_event = f.test.create_event(testwil, "TEST31").await;
     let elsewhere = db.owners(f.scope, other_event, &records).await.unwrap();
     assert_eq!(elsewhere, WorkOwners::default());
+}
+
+/// "Today" is the date in the time zone of the event (Europe/Zurich), not in UTC.
+#[tokio::test]
+async fn milestone_in_the_past_and_open_is_overdue() {
+    let f = Fixture::start().await;
+    let milestone = f.milestone(date(2030, 5, 17)).await;
+    assert_eq!(milestone.local_id(), "MIL-001");
+    // 23:30 in Zurich on its date: not yet overdue. 00:30 on the next day: overdue.
+    assert!(
+        f.warnings(milestone.id, "2030-05-17T21:30:00Z")
+            .await
+            .is_empty()
+    );
+    assert_eq!(
+        f.warnings(milestone.id, "2030-05-17T22:30:00Z").await,
+        [MilestoneWarning::Overdue]
+    );
+    let page = f
+        .test
+        .database
+        .milestones(
+            f.scope,
+            f.event,
+            &WorkFilter {
+                owner: None,
+                status: Some(MilestoneStatus::Open),
+                workstream: None,
+                after: None,
+                limit: 10,
+            },
+            "2030-05-17T22:30:00Z".parse().unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(page.len(), 1);
+    assert_eq!(page[0].warnings, [MilestoneWarning::Overdue]);
+
+    // A reached milestone is not overdue.
+    let fields = MilestoneFields {
+        status: MilestoneStatus::Reached,
+        ..milestone.fields.clone()
+    };
+    let changed = f
+        .test
+        .database
+        .change_milestone(
+            f.scope,
+            f.event,
+            milestone.id,
+            &fields,
+            milestone.version,
+            "2030-05-20T08:00:00Z".parse().unwrap(),
+            &f.audit(AuditAction::MilestoneChange, milestone.id.as_uuid()),
+        )
+        .await
+        .unwrap();
+    let Changed::Changed(reached) = changed else {
+        panic!("not changed: {changed:?}");
+    };
+    assert!(reached.warnings.is_empty());
+    assert_eq!(
+        f.audit_actions().await,
+        ["institution.create", "milestone.create", "milestone.change"]
+    );
 }

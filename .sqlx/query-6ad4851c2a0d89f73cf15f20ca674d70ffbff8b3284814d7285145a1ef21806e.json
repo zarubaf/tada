@@ -1,0 +1,162 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.id, m.event_id, m.local_number, m.title, m.description,\n                  m.date AS \"date: jiff_sqlx::Date\", m.owner_user_id, m.workstream_id, m.status, m.version,\n                  e.time_zone,\n                  ARRAY(SELECT a.id FROM action a\n                        WHERE a.organization_id = m.organization_id AND a.event_id = m.event_id\n                          AND a.milestone_id = m.id AND a.status IN ('open', 'in-progress', 'blocked')\n                          AND a.due_date > m.date\n                        ORDER BY a.local_number) AS \"late_actions!\"\n           FROM milestone m\n           JOIN event e ON e.organization_id = m.organization_id AND e.id = m.event_id\n           WHERE m.organization_id = $1\n             AND ($2::uuid IS NULL OR m.event_id = $2)\n             AND ($3::uuid IS NULL OR m.id = $3)\n             AND ($4::uuid IS NULL OR m.owner_user_id = $4)\n             AND ($5::text IS NULL OR m.status = $5)\n             AND ($6::uuid IS NULL OR m.workstream_id = $6)\n             AND m.local_number > $7\n           ORDER BY m.event_id, m.local_number\n           LIMIT $8",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "local_number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "local_number"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "date: jiff_sqlx::Date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "date"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "owner_user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "owner_user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "workstream_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "workstream_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "time_zone",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event",
+            "name": "time_zone"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "late_actions!",
+        "type_info": "UuidArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "6ad4851c2a0d89f73cf15f20ca674d70ffbff8b3284814d7285145a1ef21806e"
+}

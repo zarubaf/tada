@@ -3,6 +3,7 @@
 //! The same rules as the direct commands apply: the owner of a work record is a contributor or a manager of its event,
 //! a new record takes only an active workstream of its event, and a status changes only along its transitions.
 
+use jiff::Timestamp;
 use tada_domain::ids::{EventId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::proposals::{NewRecord, Operation, Proposal};
@@ -22,6 +23,7 @@ pub(super) async fn check_work(
     scope: OrgScope,
     proposals: &[Proposal],
     stores: ProposeStores<'_>,
+    now: Timestamp,
 ) -> Result<Vec<FieldError>, StoreError> {
     let mut errors = Vec::new();
     for (index, proposal) in proposals.iter().enumerate() {
@@ -30,6 +32,12 @@ pub(super) async fn check_work(
             |field: String, code: &'static str| errors.push(FieldError::new(field, code));
         match &proposal.operation {
             Operation::CreateAction {
+                event_id,
+                owner,
+                workstream,
+                ..
+            }
+            | Operation::CreateMilestone {
                 event_id,
                 owner,
                 workstream,
@@ -140,6 +148,22 @@ pub(super) async fn check_work(
                     refuse(format!("proposals/{index}/reason"), text_error_code(error));
                 }
             }
+            Operation::ChangeMilestoneStatus {
+                event_id,
+                milestone_id,
+                status,
+                ..
+            } => match stores
+                .milestones
+                .milestone(scope, *event_id, *milestone_id, now)
+                .await?
+            {
+                None => refuse(operation("milestone_id"), "unknown-record"),
+                Some(current) if current.fields.status.change_to(*status).is_err() => {
+                    refuse(operation("status"), "invalid-transition");
+                }
+                Some(_) => {}
+            },
             _ => {}
         }
     }

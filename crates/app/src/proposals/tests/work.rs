@@ -2,9 +2,10 @@
 
 use jiff::civil::Date;
 use tada_domain::ids::{
-    ActionId, CommitmentId, InstitutionId, LocalIdKind, PersonId, WorkstreamId,
+    ActionId, CommitmentId, InstitutionId, LocalIdKind, MilestoneId, PersonId, WorkstreamId,
 };
 use tada_domain::parties::{Party, PartyName};
+use tada_domain::records::MilestoneStatus;
 use tada_domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, WorkstreamName,
     WorkstreamStatus,
@@ -16,8 +17,8 @@ use crate::parties::{InstitutionFields, InstitutionView, PartyRef, PersonFields,
 use crate::records::{Changed, Created, NumberCursor};
 use crate::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 use crate::work::{
-    ActionFields, CommitmentFields, MyWork, NewActionRecord, NewCommitmentRecord, WorkFilter,
-    WorkOwners,
+    ActionFields, CommitmentFields, MilestoneFields, MilestoneStore, MyWork, NewActionRecord,
+    NewCommitmentRecord, NewMilestoneRecord, WorkFilter, WorkOwners,
 };
 use crate::workstreams::{
     Changed as WorkstreamChanged, Created as WorkstreamCreated, WorkstreamUpdate,
@@ -303,6 +304,59 @@ impl WorkStore for Memory {
         _: UserId,
         _: &crate::access::EventReach,
     ) -> Result<MyWork, StoreError> {
+        unreachable!()
+    }
+}
+
+#[async_trait]
+impl MilestoneStore for Memory {
+    async fn create_milestone(
+        &self,
+        _: OrgScope,
+        _: &NewMilestoneRecord,
+        _: Timestamp,
+        _: &AuditEvent,
+    ) -> Result<Created<MilestoneView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn change_milestone(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: MilestoneId,
+        _: &MilestoneFields,
+        _: RecordVersion,
+        _: Timestamp,
+        _: &AuditEvent,
+    ) -> Result<Changed<MilestoneView>, StoreError> {
+        unreachable!()
+    }
+
+    async fn milestone(
+        &self,
+        scope: OrgScope,
+        event: EventId,
+        id: MilestoneId,
+        _: Timestamp,
+    ) -> Result<Option<MilestoneView>, StoreError> {
+        let found = scope.organization_id() == testwil();
+        Ok(self
+            .milestones
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|milestone| found && milestone.event_id == event && milestone.id == id)
+            .cloned())
+    }
+
+    async fn milestones(
+        &self,
+        _: OrgScope,
+        _: EventId,
+        _: &WorkFilter<MilestoneStatus>,
+        _: Timestamp,
+    ) -> Result<Vec<MilestoneView>, StoreError> {
         unreachable!()
     }
 }

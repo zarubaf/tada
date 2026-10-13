@@ -1628,6 +1628,246 @@
     }
   },
   {
+    "name": "list_milestones",
+    "description": "List the milestones of an event: the dates that its plan holds, each with its owner, status, warnings and the evidence of the accepted proposals that made it. An action can name one milestone. The list holds at most 200 records, in the order of their numbers, and has no next page. If more is true, the event has more milestones than this tool can show: tell the member.",
+    "inputSchema": {
+      "$defs": {
+        "MilestoneStatusInput": {
+          "enum": [
+            "open",
+            "reached",
+            "canceled"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "event_key": {
+          "description": "The key of the event, for example `FLY28`, from `list_events`.",
+          "pattern": "^[A-Z0-9]{2,8}$",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MilestoneStatusInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only the milestones with this status."
+        }
+      },
+      "required": [
+        "event_key"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DisputeNoteView": {
+          "description": "A dispute note: the objection of a person to a fact version or to a source (ADR 0073).",
+          "properties": {
+            "created_at": {
+              "description": "RFC 3339.",
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "EvidenceItem": {
+          "description": "A passage that supports one version of a record, from a source that the member can read.",
+          "properties": {
+            "dispute_notes": {
+              "description": "The dispute notes about the source (ADR 0073), oldest first: a person objects to it. Empty if there is none.",
+              "items": {
+                "$ref": "#/$defs/DisputeNoteView"
+              },
+              "type": "array"
+            },
+            "end": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "quote": {
+              "description": "Empty after a legal redaction of the source (ADR 0072).",
+              "type": "string"
+            },
+            "record_version": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "redacted": {
+              "description": "True after a legal redaction of the source: the quote is empty (ADR 0072).",
+              "type": "boolean"
+            },
+            "source_version_id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "start": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "record_version",
+            "source_version_id",
+            "start",
+            "end",
+            "quote",
+            "redacted",
+            "dispute_notes"
+          ],
+          "type": "object"
+        },
+        "MilestoneItem": {
+          "properties": {
+            "date": {
+              "description": "The date as `YYYY-MM-DD`.",
+              "type": "string"
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "evidence": {
+              "items": {
+                "$ref": "#/$defs/EvidenceItem"
+              },
+              "type": "array"
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "local_id": {
+              "description": "The readable ID, for example `MIL-001`.",
+              "type": "string"
+            },
+            "owner_user_id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "redacted": {
+              "description": "True after a legal redaction: the texts are empty (ADR 0072).",
+              "type": "boolean"
+            },
+            "status": {
+              "description": "`open`, `reached` or `canceled`.",
+              "type": "string"
+            },
+            "title": {
+              "description": "Empty after a legal redaction (ADR 0072).",
+              "type": "string"
+            },
+            "version": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "warnings": {
+              "items": {
+                "$ref": "#/$defs/WarningItem"
+              },
+              "type": "array"
+            },
+            "workstream_id": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "local_id",
+            "title",
+            "redacted",
+            "date",
+            "owner_user_id",
+            "status",
+            "warnings",
+            "version",
+            "evidence"
+          ],
+          "type": "object"
+        },
+        "WarningItem": {
+          "description": "A warning about a milestone at the time of the read.",
+          "oneOf": [
+            {
+              "description": "The milestone is open and its date is before today in the time zone of the event.",
+              "properties": {
+                "kind": {
+                  "const": "overdue",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "An action of the milestone is open, in progress or blocked, and it is due after the date of the milestone.",
+              "properties": {
+                "action_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "late-action",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "action_id"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "milestones": {
+          "items": {
+            "$ref": "#/$defs/MilestoneItem"
+          },
+          "type": "array"
+        },
+        "more": {
+          "description": "True if the event has more milestones than the list shows.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "milestones",
+        "more"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true
+    }
+  },
+  {
     "name": "list_workstreams",
     "description": "List the workstreams of an event: its areas of work, each with its lead. A work record names a workstream by its ID. Propose a record in an active workstream, or in a new workstream of the same changeset (create-workstream); a closed workstream takes no new records.",
     "inputSchema": {
@@ -1886,6 +2126,14 @@
             "company",
             "club",
             "other"
+          ],
+          "type": "string"
+        },
+        "MilestoneStatusInput": {
+          "enum": [
+            "open",
+            "reached",
+            "canceled"
           ],
           "type": "string"
         },
@@ -2530,6 +2778,98 @@
                 "event_id",
                 "name",
                 "lead"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Create a milestone of the event: a date that the plan of the event holds. It starts `open`.",
+              "properties": {
+                "date": {
+                  "description": "The date as `YYYY-MM-DD`.",
+                  "type": "string"
+                },
+                "description": {
+                  "default": null,
+                  "description": "1 to 4000 characters.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The UUIDv7 of the new milestone.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "create-milestone",
+                  "type": "string"
+                },
+                "owner": {
+                  "description": "The user ID of a member with the contributor or manager role in the event.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "title": {
+                  "description": "1 to 200 characters.",
+                  "type": "string"
+                },
+                "workstream": {
+                  "default": null,
+                  "description": "An active workstream of the event.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "event_id",
+                "title",
+                "date",
+                "owner"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Change the status of a milestone of the event.\n`open` changes to `reached` or `canceled`; `reached` changes back to `open`; `canceled` is final.",
+              "properties": {
+                "event_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "expected_version": {
+                  "description": "The current version of the milestone.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "change-milestone-status",
+                  "type": "string"
+                },
+                "milestone_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/$defs/MilestoneStatusInput"
+                }
+              },
+              "required": [
+                "kind",
+                "event_id",
+                "milestone_id",
+                "status",
+                "expected_version"
               ],
               "type": "object"
             }

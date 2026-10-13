@@ -18,10 +18,11 @@ use tada_app::domain::facts::{ChoiceKey, Description, FieldKey, ModuleKey, Short
 use tada_app::domain::identity::Email;
 use tada_app::domain::ids::{
     ActionId, ChangesetId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId,
-    OpenQuestionId, PersonId, ProposalId, SourceVersionId, UserId, WorkstreamId,
+    MilestoneId, OpenQuestionId, PersonId, ProposalId, SourceVersionId, UserId, WorkstreamId,
 };
 use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_app::domain::proposals::{DraftDocument, Operation, Proposal, QuestionText, Reason};
+use tada_app::domain::records::{MilestoneStatus, MilestoneTitle};
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::domain::work::{
@@ -144,6 +145,21 @@ enum OperationRecord {
         event_id: Uuid,
         name: String,
         lead: Uuid,
+    },
+    CreateMilestone {
+        id: Uuid,
+        event_id: Uuid,
+        title: String,
+        description: Option<String>,
+        date: String,
+        owner: Uuid,
+        workstream: Option<Uuid>,
+    },
+    ChangeMilestoneStatus {
+        event_id: Uuid,
+        milestone_id: Uuid,
+        status: String,
+        expected_version: i64,
     },
 }
 
@@ -367,6 +383,34 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             name: name.as_str().to_owned(),
             lead: lead.as_uuid(),
         },
+        Operation::CreateMilestone {
+            id,
+            event_id,
+            title,
+            description,
+            date,
+            owner,
+            workstream,
+        } => OperationRecord::CreateMilestone {
+            id: id.as_uuid(),
+            event_id: event_id.as_uuid(),
+            title: title.as_str().to_owned(),
+            description: description.as_ref().map(|text| text.as_str().to_owned()),
+            date: date.to_string(),
+            owner: owner.as_uuid(),
+            workstream: workstream.map(WorkstreamId::as_uuid),
+        },
+        Operation::ChangeMilestoneStatus {
+            event_id,
+            milestone_id,
+            status,
+            expected_version,
+        } => OperationRecord::ChangeMilestoneStatus {
+            event_id: event_id.as_uuid(),
+            milestone_id: milestone_id.as_uuid(),
+            status: status.as_str().to_owned(),
+            expected_version: expected_version.get(),
+        },
     };
     serde_json::to_value(record).expect("an operation record is valid JSON")
 }
@@ -579,6 +623,34 @@ pub(crate) fn operation_from_json(
             name: WorkstreamName::parse(&name).map_err(|_| invalid())?,
             lead: UserId::from_uuid(lead),
         },
+        OperationRecord::CreateMilestone {
+            id,
+            event_id,
+            title,
+            description,
+            date,
+            owner,
+            workstream,
+        } => Operation::CreateMilestone {
+            id: MilestoneId::from_uuid(id),
+            event_id: EventId::from_uuid(event_id),
+            title: MilestoneTitle::parse(&title).map_err(|_| invalid())?,
+            description: parsed(description, ActionDescription::parse)?,
+            date: date.parse().map_err(|_| invalid())?,
+            owner: UserId::from_uuid(owner),
+            workstream: workstream.map(WorkstreamId::from_uuid),
+        },
+        OperationRecord::ChangeMilestoneStatus {
+            event_id,
+            milestone_id,
+            status,
+            expected_version,
+        } => Operation::ChangeMilestoneStatus {
+            event_id: EventId::from_uuid(event_id),
+            milestone_id: MilestoneId::from_uuid(milestone_id),
+            status: MilestoneStatus::parse(&status).ok_or_else(invalid)?,
+            expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
+        },
     })
 }
 
@@ -634,6 +706,16 @@ fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>) {
             commitment_id.as_uuid(),
             Some(expected_version.get()),
         ),
+        Operation::CreateMilestone { id, .. } => ("milestone", id.as_uuid(), None),
+        Operation::ChangeMilestoneStatus {
+            milestone_id,
+            expected_version,
+            ..
+        } => (
+            "milestone",
+            milestone_id.as_uuid(),
+            Some(expected_version.get()),
+        ),
         Operation::CreateDocumentDraft { document, .. } => match document {
             DraftDocument::New { id, .. } => ("document", id.as_uuid(), None),
             DraftDocument::Existing {
@@ -669,7 +751,8 @@ impl ProposalStore for Database {
                UNION SELECT id FROM institution WHERE id = ANY($1)
                UNION SELECT id FROM workstream WHERE id = ANY($1)
                UNION SELECT id FROM action WHERE id = ANY($1)
-               UNION SELECT id FROM commitment WHERE id = ANY($1)"#,
+               UNION SELECT id FROM commitment WHERE id = ANY($1)
+               UNION SELECT id FROM milestone WHERE id = ANY($1)"#,
             ids,
         )
         .fetch_all(&self.pool)
@@ -1130,6 +1213,7 @@ mod tests {
             workstreams: &test.database,
             parties: &test.database,
             work: &test.database,
+            milestones: &test.database,
         }
     }
 
@@ -1864,6 +1948,21 @@ mod tests {
                 event_id: event,
                 name: WorkstreamName::parse("Zelt").unwrap(),
                 lead: UserId::from_uuid(Uuid::now_v7()),
+            },
+            Operation::CreateMilestone {
+                id: MilestoneId::from_uuid(Uuid::now_v7()),
+                event_id: event,
+                title: MilestoneTitle::parse("Bewilligung liegt vor").unwrap(),
+                description: Some(ActionDescription::parse("Von der Gemeinde.").unwrap()),
+                date: jiff::civil::date(2030, 5, 1),
+                owner: UserId::from_uuid(Uuid::now_v7()),
+                workstream: None,
+            },
+            Operation::ChangeMilestoneStatus {
+                event_id: event,
+                milestone_id: MilestoneId::from_uuid(Uuid::now_v7()),
+                status: MilestoneStatus::Reached,
+                expected_version: RecordVersion::FIRST,
             },
         ];
         for operation in operations {

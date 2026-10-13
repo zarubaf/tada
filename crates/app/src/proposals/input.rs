@@ -19,11 +19,12 @@ use tada_domain::facts::{
 };
 use tada_domain::identity::Email;
 use tada_domain::ids::{
-    ActionId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId, OpenQuestionId,
-    PersonId, UserId, WorkstreamId,
+    ActionId, CommitmentId, DocumentId, EventId, FieldDefinitionId, InstitutionId, MilestoneId,
+    OpenQuestionId, PersonId, UserId, WorkstreamId,
 };
 use tada_domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_domain::proposals::{DraftDocument, Operation, QuestionText};
+use tada_domain::records::{MilestoneStatus, MilestoneTitle};
 use tada_domain::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
     WorkstreamName,
@@ -288,6 +289,33 @@ pub enum OperationInput {
         /// The user ID of a member with the contributor or manager role in the event.
         lead: Uuid,
     },
+    /// Create a milestone of the event: a date that the plan of the event holds. It starts `open`.
+    CreateMilestone {
+        /// The UUIDv7 of the new milestone.
+        id: Uuid,
+        event_id: Uuid,
+        /// 1 to 200 characters.
+        title: String,
+        /// 1 to 4000 characters.
+        #[serde(default)]
+        description: Option<String>,
+        /// The date as `YYYY-MM-DD`.
+        date: String,
+        /// The user ID of a member with the contributor or manager role in the event.
+        owner: Uuid,
+        /// An active workstream of the event.
+        #[serde(default)]
+        workstream: Option<Uuid>,
+    },
+    /// Change the status of a milestone of the event.
+    /// `open` changes to `reached` or `canceled`; `reached` changes back to `open`; `canceled` is final.
+    ChangeMilestoneStatus {
+        event_id: Uuid,
+        milestone_id: Uuid,
+        status: MilestoneStatusInput,
+        /// The current version of the milestone.
+        expected_version: i64,
+    },
 }
 
 /// The party that makes a commitment: `{"person": "<uuid>"}` or `{"institution": "<uuid>"}`.
@@ -325,6 +353,14 @@ pub enum CommitmentStatusInput {
     Fulfilled,
     Broken,
     Withdrawn,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum MilestoneStatusInput {
+    Open,
+    Reached,
+    Canceled,
 }
 
 /// The document of a draft.
@@ -487,7 +523,8 @@ redacted_debug!(
     PartyInput,
     InstitutionKindInput,
     ActionStatusInput,
-    CommitmentStatusInput
+    CommitmentStatusInput,
+    MilestoneStatusInput
 );
 
 /// Collects the invalid fields of one input, with paths relative to it.
@@ -902,6 +939,48 @@ impl TryFrom<OperationInput> for Operation {
                     lead: UserId::from_uuid(lead),
                 })
             }
+            OperationInput::CreateMilestone {
+                id,
+                event_id,
+                title,
+                description,
+                date,
+                owner,
+                workstream,
+            } => {
+                let title = errors.take("title", MilestoneTitle::parse(&title), text_error_code);
+                let description = errors.optional(
+                    "description",
+                    description,
+                    ActionDescription::parse,
+                    text_error_code,
+                );
+                let date = errors.take("date", parse_date(&date), |_| "date");
+                (|| {
+                    Some(Operation::CreateMilestone {
+                        id: MilestoneId::from_uuid(id),
+                        event_id: EventId::from_uuid(event_id),
+                        title: title?,
+                        description: description?,
+                        date: date?,
+                        owner: UserId::from_uuid(owner),
+                        workstream: workstream.map(WorkstreamId::from_uuid),
+                    })
+                })()
+            }
+            OperationInput::ChangeMilestoneStatus {
+                event_id,
+                milestone_id,
+                status,
+                expected_version,
+            } => errors.version(expected_version).map(|expected_version| {
+                Operation::ChangeMilestoneStatus {
+                    event_id: EventId::from_uuid(event_id),
+                    milestone_id: MilestoneId::from_uuid(milestone_id),
+                    status: status.into(),
+                    expected_version,
+                }
+            }),
         };
         errors.finish(operation)
     }
@@ -940,6 +1019,16 @@ impl From<ActionStatusInput> for ActionStatus {
             ActionStatusInput::Blocked => Self::Blocked,
             ActionStatusInput::Done => Self::Done,
             ActionStatusInput::Canceled => Self::Canceled,
+        }
+    }
+}
+
+impl From<MilestoneStatusInput> for MilestoneStatus {
+    fn from(input: MilestoneStatusInput) -> Self {
+        match input {
+            MilestoneStatusInput::Open => Self::Open,
+            MilestoneStatusInput::Reached => Self::Reached,
+            MilestoneStatusInput::Canceled => Self::Canceled,
         }
     }
 }

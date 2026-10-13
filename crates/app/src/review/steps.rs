@@ -129,6 +129,10 @@ pub(super) fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEven
             },
             commitment_id.as_uuid(),
         )),
+        Operation::CreateMilestone { id, .. } => Some((AuditAction::MilestoneCreate, id.as_uuid())),
+        Operation::ChangeMilestoneStatus { milestone_id, .. } => {
+            Some((AuditAction::MilestoneChange, milestone_id.as_uuid()))
+        }
         _ => None,
     };
     if let Some((action, id)) = record {

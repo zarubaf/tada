@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT 'action' AS \"kind!\", id AS \"id!\", owner_user_id AS \"owner_user_id!\" FROM action\n               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($3)\n               UNION ALL\n               SELECT 'commitment', id, owner_user_id FROM commitment\n               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($4)",
+  "query": "SELECT 'action' AS \"kind!\", id AS \"id!\", owner_user_id AS \"owner_user_id!\" FROM action\n               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($3)\n               UNION ALL\n               SELECT 'commitment', id, owner_user_id FROM commitment\n               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($4)\n               UNION ALL\n               SELECT 'milestone', id, owner_user_id FROM milestone\n               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($5)",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,7 @@
         "Uuid",
         "Uuid",
         "UuidArray",
+        "UuidArray",
         "UuidArray"
       ]
     },
@@ -36,5 +37,5 @@
       null
     ]
   },
-  "hash": "b71c7e75f098afef74924085e124046bdf5d444aea0051dbcd13072eea9c6827"
+  "hash": "ddc85d112583e4f3f60af0bd38a98114517972acfbb90043c788a449564d7fa6"
 }

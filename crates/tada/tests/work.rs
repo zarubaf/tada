@@ -625,3 +625,88 @@ async fn my_work_includes_events_without_membership_for_an_admin() {
     assert_eq!(work["actions"].as_array().unwrap().len(), 1);
     assert_eq!(work["actions"][0]["event_key"], "TEST30");
 }
+
+#[tokio::test]
+async fn milestones_round_trip_over_http() {
+    let api = Api::start().await;
+    let e = api.event().await;
+    let milestones = format!("/api/v1/events/{}/milestones", e.id);
+    let milestone = api
+        .created(
+            &e.ben_cookie,
+            &milestones,
+            &json!({
+                "title": "Bewilligung liegt vor",
+                "description": "Von der Gemeinde Testwil.",
+                "date": "2030-05-01",
+                "owner_user_id": e.ben.as_uuid(),
+            }),
+        )
+        .await;
+    assert_eq!(milestone["local_id"], "MIL-001");
+    assert_eq!(milestone["status"], "open");
+    assert_eq!(milestone["date"], "2030-05-01");
+    assert_eq!(milestone["version"], 1);
+    assert_eq!(milestone["evidence"], json!([]));
+    assert_eq!(milestone["next_statuses"], json!(["reached", "canceled"]));
+    // The date lies ahead, so the milestone has no warning.
+    assert_eq!(milestone["warnings"], json!([]));
+
+    let path = record(&e, "milestones", &milestone);
+    let (status, changed) = api
+        .patch(
+            &e.ben_cookie,
+            &path,
+            &json!({"status": "reached", "description": null, "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{changed}");
+    assert_eq!(changed["status"], "reached");
+    assert_eq!(changed["description"], Value::Null);
+    assert_eq!(changed["version"], 2);
+    assert_eq!(changed["next_statuses"], json!(["open"]));
+
+    // `reached` is not a status that `reached` can change to.
+    let (status, problem) = api
+        .patch(
+            &e.ben_cookie,
+            &path,
+            &json!({"status": "reached", "expected_version": 2}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+    assert_eq!(problem["code"], "invalid-transition");
+
+    // A viewer reads but changes nothing.
+    let (status, read) = api.get(&e.viewer, &path).await;
+    assert_eq!(status, StatusCode::OK, "{read}");
+    assert_eq!(read["can_change"], false);
+    assert_eq!(read["next_statuses"], json!([]));
+    let (status, page) = api
+        .get(&e.viewer, &format!("{milestones}?status=reached"))
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(page["items"].as_array().unwrap().len(), 1);
+    let (status, problem) = api
+        .post(
+            &e.viewer,
+            &milestones,
+            &json!({"title": "X", "date": "2030-05-01", "owner_user_id": e.ben.as_uuid()}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+
+    // A title over 200 characters and an owner without the contributor role are invalid.
+    let (status, problem) = api
+        .post(
+            &e.ben_cookie,
+            &milestones,
+            &json!({"title": "a".repeat(201), "date": "2030-05-01", "owner_user_id": e.ben.as_uuid()}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    assert_eq!(
+        problem["errors"],
+        json!([{"pointer": "/title", "code": "too-long"}])
+    );
+}

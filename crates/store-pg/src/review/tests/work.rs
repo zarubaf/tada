@@ -2,9 +2,9 @@
 
 use tada_app::access::SourceReach;
 use tada_app::caller::TestScope;
-use tada_app::domain::ids::{CommitmentId, LocalIdKind, PersonId};
+use tada_app::domain::ids::{CommitmentId, LocalIdKind, MilestoneId, PersonId};
 use tada_app::records::{EvidenceStore, RecordRef};
-use tada_app::review::{LocalRecord, RecordEditInput};
+use tada_app::review::{LocalRecord, NewLocalId, RecordEditInput};
 
 use super::*;
 
@@ -379,6 +379,108 @@ async fn applying_gives_readable_ids_act_com_per_ins() {
         .scalar("SELECT count(*) FROM commitment WHERE status = 'conditional'")
         .await;
     assert_eq!(conditional, 2);
+}
+
+fn milestone(event: EventId, id: Uuid, owner: UserId) -> Value {
+    json!({
+        "kind": "create-milestone", "id": id, "event_id": event.as_uuid(),
+        "title": "Bewilligung liegt vor", "date": "2030-05-01", "owner": owner.as_uuid(),
+    })
+}
+
+#[tokio::test]
+async fn accepted_milestone_gets_a_readable_id_and_evidence() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let anna = open_day.contributor.user_id();
+    let [milestone_id, first, second] = [Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7()];
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            first,
+            milestone(open_day.event, milestone_id, anna),
+            &[],
+            "im Mai 2030",
+        )],
+    )
+    .await;
+    let applied = apply(&test, &open_day.manager, &changeset, select(&[first]))
+        .await
+        .unwrap();
+    assert_eq!(
+        applied.local_ids,
+        [NewLocalId {
+            record: LocalRecord::Milestone(MilestoneId::from_uuid(milestone_id)),
+            local_number: 1,
+        }]
+    );
+    let (status, date, version): (String, String, i64) =
+        sqlx::query_as("SELECT status, date::text, version FROM milestone WHERE id = $1")
+            .bind(milestone_id)
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (status.as_str(), date.as_str(), version),
+        ("open", "2030-05-01", 1)
+    );
+    assert_eq!(
+        record_evidence(&test, "milestone_id", milestone_id).await,
+        [(1, first, "im Mai 2030".to_owned())]
+    );
+    assert_eq!(
+        audit_actions(&test, milestone_id).await,
+        ["milestone.create"]
+    );
+
+    // A status change goes to the owner, writes evidence with the new version and an audit event.
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            second,
+            json!({
+                "kind": "change-milestone-status", "event_id": open_day.event.as_uuid(),
+                "milestone_id": milestone_id, "status": "reached", "expected_version": 1,
+            }),
+            &[],
+            "Das Open Day",
+        )],
+    )
+    .await;
+    apply(&test, &open_day.contributor, &changeset, select(&[second]))
+        .await
+        .unwrap();
+    let status: String = test
+        .scalar(&format!(
+            "SELECT status FROM milestone WHERE id = '{milestone_id}'"
+        ))
+        .await;
+    assert_eq!(status, "reached");
+    assert_eq!(
+        record_evidence(&test, "milestone_id", milestone_id).await,
+        [
+            (1, first, "im Mai 2030".to_owned()),
+            (2, second, "Das Open Day".to_owned()),
+        ]
+    );
+    assert_eq!(
+        audit_actions(&test, milestone_id).await,
+        ["milestone.create", "milestone.change"]
+    );
+    let evidence = test
+        .database
+        .evidence_of(
+            open_day.manager.scope(),
+            &[RecordRef::Milestone(MilestoneId::from_uuid(milestone_id))],
+            &SourceReach::Organization,
+        )
+        .await
+        .unwrap();
+    assert_eq!(evidence.len(), 2);
 }
 
 fn edit(id: Uuid, fields: Value) -> Edit {

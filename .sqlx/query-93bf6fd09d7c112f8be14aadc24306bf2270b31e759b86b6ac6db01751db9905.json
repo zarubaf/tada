@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE milestone\n         SET title = $5, description = $6, date = $7, owner_user_id = $8, workstream_id = $9,\n             status = $10, version = version + 1, updated_at = $11\n         WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND version = $4\n         RETURNING version",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "milestone",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Text",
+        "Text",
+        "Date",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "93bf6fd09d7c112f8be14aadc24306bf2270b31e759b86b6ac6db01751db9905"
+}

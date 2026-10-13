@@ -1,5 +1,7 @@
 //! Milestones: a dated point of an event (Slice 2d).
 
+use jiff::civil::Date;
+
 use crate::work::InvalidTransition;
 
 text_type!(
@@ -25,6 +27,12 @@ impl MilestoneStatus {
         } else {
             Err(InvalidTransition)
         }
+    }
+
+    /// True if a milestone with this status and `date` is overdue on `today` (ADR 0080):
+    /// it is still open, and its date is before today in the time zone of the event.
+    pub fn is_overdue(self, date: Date, today: Date) -> bool {
+        self == Self::Open && date < today
     }
 
     /// The statuses that a record in this status can change to.
@@ -73,6 +81,16 @@ mod tests {
             vec![MilestoneStatus::Reached, MilestoneStatus::Canceled]
         );
         assert!(MilestoneStatus::Canceled.next_statuses().is_empty());
+    }
+
+    #[test]
+    fn only_an_open_milestone_before_today_is_overdue() {
+        let today = jiff::civil::date(2030, 5, 18);
+        let yesterday = jiff::civil::date(2030, 5, 17);
+        assert!(MilestoneStatus::Open.is_overdue(yesterday, today));
+        assert!(!MilestoneStatus::Open.is_overdue(today, today));
+        assert!(!MilestoneStatus::Reached.is_overdue(yesterday, today));
+        assert!(!MilestoneStatus::Canceled.is_overdue(yesterday, today));
     }
 
     #[test]

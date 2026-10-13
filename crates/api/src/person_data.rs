@@ -41,7 +41,8 @@ pub(crate) fn problem_codes() -> Vec<(&'static str, Vec<ProblemCode>)> {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct PersonMention {
     /// `source-item`, `fact-version`, `proposal`, `open-question`, `action`, `commitment`, `workstream`,
-    /// `document-version`, or `promisor` for a commitment whose promisor is the person. The list of kinds is open.
+    /// `document-version`, `milestone`, or `promisor` for a commitment whose promisor is the person.
+    /// The list of kinds is open.
     pub kind: String,
     /// The ID of the record of the kind. A redaction or a dispute note of a `source-item`, `fact-version`,
     /// `document-version` or `proposal` takes it as the target.

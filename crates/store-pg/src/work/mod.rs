@@ -1,4 +1,4 @@
-//! The `WorkStore` adapter: actions and commitments (ADR 0068).
+//! The `WorkStore` adapter: actions and commitments (ADR 0068). `milestones` holds the `MilestoneStore` adapter.
 
 use std::collections::HashMap;
 
@@ -13,7 +13,8 @@ use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::events::EventKey;
 use tada_app::domain::ids::{
-    ActionId, CommitmentId, EventId, InstitutionId, LocalIdKind, PersonId, UserId, WorkstreamId,
+    ActionId, CommitmentId, EventId, InstitutionId, LocalIdKind, MilestoneId, PersonId, UserId,
+    WorkstreamId,
 };
 use tada_app::domain::parties::{Party, PartyName};
 use tada_app::domain::redaction::Redactable;
@@ -702,30 +703,39 @@ impl WorkStore for Database {
             RecordRef::Commitment(id) => Some(id.as_uuid()),
             _ => None,
         });
+        let milestones = ids(|record| match record {
+            RecordRef::Milestone(id) => Some(id.as_uuid()),
+            _ => None,
+        });
         let rows = sqlx::query!(
             r#"SELECT 'action' AS "kind!", id AS "id!", owner_user_id AS "owner_user_id!" FROM action
                WHERE organization_id = $1 AND event_id = $2 AND id = ANY($3)
                UNION ALL
                SELECT 'commitment', id, owner_user_id FROM commitment
-               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($4)"#,
+               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($4)
+               UNION ALL
+               SELECT 'milestone', id, owner_user_id FROM milestone
+               WHERE organization_id = $1 AND event_id = $2 AND id = ANY($5)"#,
             scope.organization_id().as_uuid(),
             event.as_uuid(),
             &actions,
             &commitments,
+            &milestones,
         )
         .fetch_all(&self.pool)
         .await
         .map_err(store_error)?;
-        Ok(rows
-            .into_iter()
+        rows.into_iter()
             .map(|row| {
                 let record = match row.kind.as_str() {
                     "action" => RecordRef::Action(ActionId::from_uuid(row.id)),
-                    _ => RecordRef::Commitment(CommitmentId::from_uuid(row.id)),
+                    "commitment" => RecordRef::Commitment(CommitmentId::from_uuid(row.id)),
+                    "milestone" => RecordRef::Milestone(MilestoneId::from_uuid(row.id)),
+                    _ => return Err(InvalidRow("owner.kind").into()),
                 };
-                (record, UserId::from_uuid(row.owner_user_id))
+                Ok((record, UserId::from_uuid(row.owner_user_id)))
             })
-            .collect())
+            .collect()
     }
 
     async fn my_open_work(
@@ -757,6 +767,8 @@ impl WorkStore for Database {
         })
     }
 }
+
+pub(crate) mod milestones;
 
 #[cfg(test)]
 mod tests;

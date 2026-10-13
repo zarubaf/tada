@@ -33,7 +33,10 @@ use tada_app::sources::SourceStore;
 use tada_app::tokens::{
     NOTICE_VERSION, TokenAuthenticator, TokenError, TokenRequest, TokenScope, create_token,
 };
-use tada_app::work::{NewAction, NewCommitment, WorkPorts, create_action, create_commitment};
+use tada_app::work::{
+    NewAction, NewCommitment, NewMilestone, WorkPorts, create_action, create_commitment,
+    create_milestone,
+};
 use tada_app::workstreams::{NewWorkstream, create_workstream};
 use tada_mcp::McpState;
 use tada_store_pg::testing::TestDatabase;
@@ -160,7 +163,8 @@ impl Mcp {
                 clock: clock.clone(),
                 workstreams: database.clone(),
                 parties: database.clone(),
-                work: database,
+                work: database.clone(),
+                milestones: database,
             }),
             version: tada::BUILD.version,
         };
@@ -250,6 +254,7 @@ impl Mcp {
             workstreams: &self.test.database,
             parties: &self.test.database,
             work: &self.test.database,
+            milestones: &self.test.database,
         };
         match create_changeset(&self.owner, input, stores, &*self.clock)
             .await
@@ -425,7 +430,7 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 13, "{names:?}");
+    assert_eq!(names.len(), 14, "{names:?}");
     for name in [
         "list_events",
         "list_members",
@@ -438,6 +443,7 @@ async fn a_request_without_a_valid_token_or_with_a_foreign_origin_is_rejected() 
         "list_workstreams",
         "list_actions",
         "list_commitments",
+        "list_milestones",
         "search_parties",
         "propose_changeset",
     ] {
@@ -817,7 +823,7 @@ async fn a_client_completes_the_handshake_and_calls_a_tool() {
     let (status, body) = client_post(&mcp, Some(PROTOCOL_VERSION), &list).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     let tools = body["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 13);
+    assert_eq!(tools.len(), 14);
     for tool in tools {
         assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
         assert_eq!(tool["outputSchema"]["type"], "object", "{tool}");
@@ -1464,6 +1470,7 @@ impl Mcp {
         let ports = WorkPorts {
             identity: database,
             work: database,
+            milestones: database,
             workstreams: database,
             parties: database,
             clock: &*self.clock,
@@ -1554,6 +1561,7 @@ async fn mcp_lists_workstreams_and_actions() {
     let ports = WorkPorts {
         identity: database,
         work: database,
+        milestones: database,
         workstreams: database,
         parties: database,
         clock: &*mcp.clock,
@@ -1785,6 +1793,7 @@ async fn each_tool_result_matches_its_output_schema() {
     let ports = WorkPorts {
         identity: database,
         work: database,
+        milestones: database,
         workstreams: database,
         parties: database,
         clock: &*mcp.clock,
@@ -1798,6 +1807,18 @@ async fn each_tool_result_matches_its_output_schema() {
         due_date: None,
     };
     create_action(&mcp.owner, mcp.open_day, action, ports)
+        .await
+        .unwrap();
+    // A milestone with a past date is overdue, so its warnings are not empty.
+    let milestone = NewMilestone {
+        id: None,
+        title: "Bewilligung liegt vor".to_owned(),
+        description: None,
+        date: jiff::civil::date(2000, 1, 1),
+        owner: mcp.owner.user_id(),
+        workstream: Some(workstream.id),
+    };
+    create_milestone(&mcp.owner, mcp.open_day, milestone, ports)
         .await
         .unwrap();
     let institution = Party::Institution(mcp.institution().await);
@@ -1851,6 +1872,7 @@ async fn each_tool_result_matches_its_output_schema() {
         ("list_workstreams", json!({"event_key": "OPEN30"})),
         ("list_actions", json!({"event_key": "OPEN30"})),
         ("list_commitments", json!({"event_key": "OPEN30"})),
+        ("list_milestones", json!({"event_key": "OPEN30"})),
         ("search_parties", json!({"q": "gemeinde"})),
     ];
 

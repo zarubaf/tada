@@ -4824,6 +4824,308 @@
         ]
       }
     },
+    "/api/v1/events/{event_id}/milestones": {
+      "get": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Lists the milestones of an event in the order of their numbers, with their warnings. Each reader of the event can do it.",
+        "operationId": "list_milestones",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The page size: 1 to 200. The default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "owner",
+            "in": "query",
+            "description": "`me`, or the ID of a member: only the milestones that this member owns.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MilestoneStatus"
+            }
+          },
+          {
+            "name": "workstream",
+            "in": "query",
+            "description": "Only the milestones of this workstream.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of milestones.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MilestonePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "post": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Creates a milestone. A contributor or manager of the event can do it.\nAn owner without the contributor or manager role gives `validation-failed` with the field code `unknown-member`.\nA closed workstream gives the field code `closed`.",
+        "operationId": "create_milestone",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMilestoneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new milestone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Milestone"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "event-closed",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/milestones/{id}": {
+      "get": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Reads one milestone of the event, with its evidence and its warnings.",
+        "operationId": "get_milestone",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the milestone.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The milestone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Milestone"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "not-found",
+          "unavailable",
+          "internal"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "work"
+        ],
+        "summary": "Changes a milestone. Its owner, the lead of its workstream or an event manager can do it.\nA status that the current status cannot change to gives `invalid-transition`; so does the current status itself.\n`canceled` is final.",
+        "operationId": "change_milestone",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The ID of the event.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the milestone.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeMilestoneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed milestone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Milestone"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A problem (ADR 0037).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-tada-problem-codes": [
+          "malformed-request",
+          "unauthenticated",
+          "organization-required",
+          "forbidden",
+          "not-found",
+          "record-version-conflict",
+          "invalid-transition",
+          "event-closed",
+          "payload-too-large",
+          "unsupported-media-type",
+          "validation-failed",
+          "unavailable",
+          "internal"
+        ]
+      }
+    },
     "/api/v1/persons/{person_id}/mentions": {
       "get": {
         "tags": [
@@ -5360,6 +5662,13 @@
                       "description": "The fields of the new record that the reviewer replaces.",
                       "properties": {
                         "condition": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "date": {
+                          "description": "The date of a milestone as `YYYY-MM-DD`.",
                           "type": [
                             "string",
                             "null"
@@ -6115,6 +6424,64 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "ChangeMilestoneRequest": {
+        "type": "object",
+        "description": "The input of `ChangeMilestone`. An absent field stays as it is. `null` clears an optional field.\nA request needs at least one field to change.",
+        "required": [
+          "expected_version"
+        ],
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "owner_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "workstream_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "An active workstream of the event. A record keeps a workstream that closes later."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MilestoneStatus"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "expected_version": {
@@ -7865,6 +8232,101 @@
                             "lead"
                           ],
                           "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Create a milestone of the event: a date that the plan of the event holds. It starts `open`.",
+                          "properties": {
+                            "date": {
+                              "description": "The date as `YYYY-MM-DD`.",
+                              "type": "string"
+                            },
+                            "description": {
+                              "description": "1 to 4000 characters.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "id": {
+                              "description": "The UUIDv7 of the new milestone.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "create-milestone",
+                              "type": "string"
+                            },
+                            "owner": {
+                              "description": "The user ID of a member with the contributor or manager role in the event.",
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "title": {
+                              "description": "1 to 200 characters.",
+                              "type": "string"
+                            },
+                            "workstream": {
+                              "description": "An active workstream of the event.",
+                              "format": "uuid",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "event_id",
+                            "title",
+                            "date",
+                            "owner"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Change the status of a milestone of the event.\n`open` changes to `reached` or `canceled`; `reached` changes back to `open`; `canceled` is final.",
+                          "properties": {
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "description": "The current version of the milestone.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "kind": {
+                              "const": "change-milestone-status",
+                              "type": "string"
+                            },
+                            "milestone_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "status": {
+                              "enum": [
+                                "open",
+                                "reached",
+                                "canceled"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "milestone_id",
+                            "status",
+                            "expected_version"
+                          ],
+                          "type": "object"
                         }
                       ]
                     },
@@ -8048,6 +8510,54 @@
               "null"
             ],
             "description": "1 to 50 characters, as written."
+          }
+        }
+      },
+      "CreateMilestoneRequest": {
+        "type": "object",
+        "description": "The input of `CreateMilestone`.",
+        "required": [
+          "title",
+          "date",
+          "owner_user_id"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The UUIDv7 of the new milestone. Without it, the server chooses one. An ID that a record holds gives the field code `taken`, also on a retry."
+          },
+          "title": {
+            "type": "string",
+            "description": "1 to 200 characters.",
+            "example": "Bewilligung liegt vor"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "1 to 4000 characters."
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A member with the contributor or manager role in the event."
+          },
+          "workstream_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "An active workstream of the event."
           }
         }
       },
@@ -9773,6 +10283,134 @@
           }
         }
       },
+      "Milestone": {
+        "type": "object",
+        "description": "A milestone of an event.",
+        "required": [
+          "id",
+          "local_id",
+          "event_id",
+          "title",
+          "redacted",
+          "date",
+          "owner_user_id",
+          "status",
+          "warnings",
+          "version",
+          "evidence",
+          "can_change",
+          "next_statuses"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_id": {
+            "type": "string",
+            "description": "The readable ID, for example `MIL-001`."
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Empty after a legal redaction (ADR 0072)."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absent after a legal redaction."
+          },
+          "redacted": {
+            "type": "boolean",
+            "description": "True after a legal redaction (ADR 0072): the texts are empty or absent."
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The member who owns the milestone: a contributor or manager of the event."
+          },
+          "workstream_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MilestoneStatus"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Warning"
+            },
+            "description": "The warnings at the time of the read: an overdue milestone first, then the late actions in the order of\ntheir numbers."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The record version. A change needs it."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordEvidence"
+            },
+            "description": "The evidence of the accepted proposals that created or changed the milestone."
+          },
+          "can_change": {
+            "type": "boolean",
+            "description": "True if the caller can change the milestone now: its owner, the lead of its workstream or an event manager."
+          },
+          "next_statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MilestoneStatus"
+            },
+            "description": "The statuses that the caller can set with a change now. Empty without `can_change`."
+          }
+        }
+      },
+      "MilestonePage": {
+        "type": "object",
+        "description": "One page of milestones.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Milestone"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page. It is absent on the last page."
+          }
+        }
+      },
+      "MilestoneStatus": {
+        "type": "string",
+        "description": "The status of a milestone.",
+        "enum": [
+          "open",
+          "reached",
+          "canceled"
+        ]
+      },
       "MyAction": {
         "allOf": [
           {
@@ -9876,7 +10514,7 @@
           },
           "local_id": {
             "type": "string",
-            "description": "The readable ID, for example `ACT-001`, `COM-001`, `PER-001` or `INS-001` (ADR 0038)."
+            "description": "The readable ID, for example `ACT-001`, `COM-001`, `PER-001`, `INS-001` or `MIL-001` (ADR 0038)."
           }
         }
       },
@@ -10575,6 +11213,94 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "A new milestone of the event. It starts `open`.",
+            "required": [
+              "id",
+              "event_id",
+              "title",
+              "date",
+              "owner",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "owner": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The user ID of the member who owns the milestone."
+              },
+              "workstream": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "create-milestone"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "milestone_id",
+              "status",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "milestone_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "description": "`open`, `reached` or `canceled`."
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The version of the milestone that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "change-milestone-status"
+                ]
+              }
+            }
           }
         ],
         "description": "The change that a proposal suggests. `kind` names the operation. The list of kinds is open."
@@ -10787,7 +11513,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "description": "`source-item`, `fact-version`, `proposal`, `open-question`, `action`, `commitment`, `workstream`,\n`document-version`, or `promisor` for a commitment whose promisor is the person. The list of kinds is open."
+            "description": "`source-item`, `fact-version`, `proposal`, `open-question`, `action`, `commitment`, `workstream`,\n`document-version`, `milestone`, or `promisor` for a commitment whose promisor is the person.\nThe list of kinds is open."
           },
           "id": {
             "type": "string",
@@ -11517,7 +12243,8 @@
           "actions",
           "commitments",
           "persons",
-          "institutions"
+          "institutions",
+          "milestones"
         ],
         "properties": {
           "proposals": {
@@ -11567,6 +12294,13 @@
               "$ref": "#/components/schemas/NewLocalRecord"
             },
             "description": "The new institutions with their organization-local IDs."
+          },
+          "milestones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewLocalRecord"
+            },
+            "description": "The new milestones with their event-local IDs."
           }
         }
       },
@@ -12183,6 +12917,46 @@
             "$ref": "#/components/schemas/FactDiff"
           }
         }
+      },
+      "Warning": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The milestone is open and its date is before today in the time zone of the event.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "overdue"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "An action of the milestone is open, in progress or blocked, and it is due after the date of the milestone.",
+            "required": [
+              "action_id",
+              "kind"
+            ],
+            "properties": {
+              "action_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "late-action"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "A warning about a milestone. tada calculates it at each read and does not store it."
       },
       "Workstream": {
         "type": "object",
