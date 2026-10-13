@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use jiff::Timestamp;
 use tada_domain::facts::{ChoiceValue, FactState, Label, ValueType, Valued};
 use tada_domain::ids::{FieldDefinitionId, MilestoneId, ProposalId};
-use tada_domain::proposals::{NewRecord, Operation};
+use tada_domain::proposals::{NewRecord, NewWorkRecord, Operation};
 
 use super::{ApplyError, ApplyStep, Edit, ReviewStores, edits, finish};
 use crate::caller::OrgScope;
@@ -27,21 +27,10 @@ pub(super) async fn stale_owners(
 ) -> Result<Vec<ProposalId>, StoreError> {
     let mut stale = Vec::new();
     for step in steps {
-        if let Operation::CreateAction {
+        if let Some(NewWorkRecord {
             event_id, owner, ..
-        }
-        | Operation::CreateCommitment {
-            event_id, owner, ..
-        }
-        | Operation::CreateWorkstream {
-            event_id,
-            lead: owner,
-            ..
-        }
-        | Operation::CreateMilestone {
-            event_id, owner, ..
-        } = &step.operation
-            && owner_refusal(scope, *event_id, *owner, identity)
+        }) = step.operation.new_work_record()
+            && owner_refusal(scope, event_id, owner, identity)
                 .await?
                 .is_some()
         {
@@ -273,29 +262,16 @@ pub(super) async fn edited_work_refusals(
     edited: &Operation,
     stores: ReviewStores<'_>,
 ) -> Result<Vec<(&'static str, &'static str)>, StoreError> {
-    let work = |operation: &Operation| match operation {
-        Operation::CreateAction {
-            event_id,
-            owner,
-            workstream,
-            ..
-        }
-        | Operation::CreateCommitment {
-            event_id,
-            owner,
-            workstream,
-            ..
-        }
-        | Operation::CreateMilestone {
-            event_id,
-            owner,
-            workstream,
-            ..
-        } => Some((*event_id, *owner, *workstream)),
-        _ => None,
-    };
-    let (Some((event, old_owner, old_workstream)), Some((_, owner, workstream))) =
-        (work(proposed), work(edited))
+    let (
+        Some(NewWorkRecord {
+            event_id: event,
+            owner: old_owner,
+            workstream: old_workstream,
+        }),
+        Some(NewWorkRecord {
+            owner, workstream, ..
+        }),
+    ) = (proposed.new_work_record(), edited.new_work_record())
     else {
         return Ok(Vec::new());
     };
