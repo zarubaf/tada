@@ -892,6 +892,9 @@ work-edit-of = { $id } bearbeiten
 work-create = Erfassen
 work-save = Speichern
 work-cancel = Abbrechen
+work-evidence = Beleg
+# $id: the readable ID of the record.
+work-evidence-of = Beleg zu { $id }
 # $name: the readable ID or the name of the saved record.
 register-saved = „{ $name }“ gespeichert.
 register-conflict = Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.
@@ -957,9 +960,6 @@ commitment-status-firm = verbindlich
 commitment-status-fulfilled = erfüllt
 commitment-status-broken = gebrochen
 commitment-status-withdrawn = zurückgezogen
-commitment-evidence = Beleg
-# $id: the readable ID of the commitment.
-commitment-evidence-of = Beleg zu { $id }
 # $version: the record version that the evidence supports.
 commitment-evidence-version = Stützt die Version { $version } der Zusage
 make-firm = Verbindlich machen

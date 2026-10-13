@@ -11,10 +11,10 @@ import { Button } from "../ui/Button";
 import type { Column } from "../ui/DataTable";
 import { LiveRegion } from "../ui/LiveRegion";
 import { redactedOr } from "../ui/Redacted";
-import { CommitmentEvidence } from "./CommitmentEvidence";
 import { CommitmentForm } from "./CommitmentForm";
 import { DirectoryGate } from "./DirectoryGate";
 import { type Directory, useDirectory } from "./directory";
+import { EvidenceSheet } from "./EvidenceSheet";
 import { MakeFirmDialog } from "./MakeFirmDialog";
 import styles from "./Work.module.css";
 import { CommitmentStatusLabel } from "./WorkStatus";
@@ -109,10 +109,10 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
         <span className={styles.rowActions}>
           {row.evidence.length > 0 && (
             <Button
-              aria-label={t("commitment-evidence-of", { id: row.local_id })}
+              aria-label={t("work-evidence-of", { id: row.local_id })}
               onPress={() => setShowing(row)}
             >
-              {t("commitment-evidence")}
+              {t("work-evidence")}
             </Button>
           )}
           {writable && row.can_change && !row.redacted && (
@@ -198,10 +198,11 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
         />
       )}
       {showing && (
-        <CommitmentEvidence
-          title={t("commitment-evidence-of", { id: showing.local_id })}
+        <EvidenceSheet
+          title={t("work-evidence-of", { id: showing.local_id })}
           evidence={showing.evidence}
           timeZone={event.time_zone}
+          versionText={(version) => t("commitment-evidence-version", { version })}
           onClose={() => setShowing(undefined)}
         />
       )}
