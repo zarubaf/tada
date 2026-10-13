@@ -8,12 +8,12 @@ use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
-use tada_app::domain::ids::{EventId, LocalIdKind, SourceVersionId, WorkstreamId};
+use tada_app::domain::ids::{EventId, LocalIdKind, MilestoneId, SourceVersionId, WorkstreamId};
 use tada_app::domain::parties::Party;
 use tada_app::domain::proposals::Operation;
 use tada_app::domain::records::MilestoneStatus;
 use tada_app::domain::redaction::Redactable;
-use tada_app::domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus};
+use tada_app::domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus, dates_in_order};
 use tada_app::parties::{InstitutionFields, PersonFields};
 use tada_app::records::RecordRef;
 use tada_app::review::{ApplyPlan, ApplyStep, LocalRecord, NewLocalId, StepEvidence};
@@ -114,7 +114,9 @@ pub(super) async fn write_record(
             description,
             owner,
             workstream,
+            start_date,
             due_date,
+            milestone,
         } => {
             let action = NewActionRecord {
                 id: *id,
@@ -124,7 +126,9 @@ pub(super) async fn write_record(
                     description: description.clone(),
                     owner: *owner,
                     workstream_id: *workstream,
+                    start_date: *start_date,
                     due_date: *due_date,
+                    milestone_id: *milestone,
                     status: ActionStatus::Open,
                 },
             };
@@ -222,6 +226,36 @@ pub(super) async fn write_record(
                 .ok_or(sqlx::Error::RowNotFound)?;
             let fields = ActionFields {
                 due_date: *due_date,
+                ..current.fields
+            };
+            // The start date of the action is not after the new due date (ADR 0080); a refusal is a conflict.
+            if !dates_in_order(fields.start_date, fields.due_date) {
+                return Err(sqlx::Error::RowNotFound);
+            }
+            let version = update_action(
+                conn,
+                scope,
+                *event_id,
+                *action_id,
+                &fields,
+                *expected_version,
+                plan.now,
+            )
+            .await?
+            .ok_or(sqlx::Error::RowNotFound)?;
+            (RecordRef::Action(*action_id), version)
+        }
+        Operation::ChangeActionMilestone {
+            event_id,
+            action_id,
+            milestone,
+            expected_version,
+        } => {
+            let current = action_in(conn, scope, *event_id, *action_id)
+                .await?
+                .ok_or(sqlx::Error::RowNotFound)?;
+            let fields = ActionFields {
+                milestone_id: *milestone,
                 ..current.fields
             };
             let version = update_action(
@@ -383,6 +417,7 @@ pub(super) async fn matches(
             id,
             event_id,
             workstream,
+            milestone,
             ..
         } => {
             let free = !sqlx::query_scalar!(
@@ -392,6 +427,7 @@ pub(super) async fn matches(
             .fetch_one(&mut *conn)
             .await?;
             free && takes_records(conn, scope, *event_id, *workstream, new_records).await?
+                && takes_actions(conn, scope, *event_id, *milestone, new_records).await?
         }
         Operation::CreateCommitment {
             id,
@@ -437,7 +473,18 @@ pub(super) async fn matches(
             action_id,
             expected_version,
             ..
+        }
+        | Operation::ChangeActionMilestone {
+            event_id,
+            action_id,
+            expected_version,
+            ..
         } => {
+            if let Operation::ChangeActionMilestone { milestone, .. } = operation
+                && !takes_actions(conn, scope, *event_id, *milestone, new_records).await?
+            {
+                return Ok(false);
+            }
             let current = match versions.get(&action_id.as_uuid()) {
                 Some(version) => Some(*version),
                 None => {
@@ -545,6 +592,35 @@ async fn takes_records(
     .await
 }
 
+/// True if a new action of the event, or an action that changes its milestone, can name `milestone` (ADR 0080):
+/// none, a new milestone of the plan, or a milestone of the event that is not canceled.
+/// `lock_targets` locked the milestone, so it cannot be canceled before the commit.
+async fn takes_actions(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    event: EventId,
+    milestone: Option<MilestoneId>,
+    new_records: &std::collections::HashSet<Uuid>,
+) -> Result<bool, sqlx::Error> {
+    let Some(milestone) = milestone else {
+        return Ok(true);
+    };
+    if new_records.contains(&milestone.as_uuid()) {
+        return Ok(true);
+    }
+    sqlx::query_scalar!(
+        r#"SELECT EXISTS (
+               SELECT 1 FROM milestone
+               WHERE organization_id = $1 AND event_id = $2 AND id = $3 AND status <> 'canceled'
+           ) AS "usable!""#,
+        scope.organization_id().as_uuid(),
+        event.as_uuid(),
+        milestone.as_uuid(),
+    )
+    .fetch_one(&mut *conn)
+    .await
+}
+
 pub(super) async fn party_exists(
     conn: &mut PgConnection,
     scope: OrgScope,
@@ -580,9 +656,21 @@ pub(super) struct WorkLocks {
     pub actions: Vec<Uuid>,
     pub commitments: Vec<Uuid>,
     pub milestones: Vec<Uuid>,
+    /// The milestones that actions of the plan name. They stay open for the transaction.
+    pub named_milestones: Vec<Uuid>,
 }
 
 impl WorkLocks {
+    /// The named milestones that no step changes. A changed milestone takes only the update lock: a share lock first
+    /// would be upgraded later, and two applies that upgrade the same row deadlock.
+    fn shared_milestones(&self) -> Vec<Uuid> {
+        self.named_milestones
+            .iter()
+            .filter(|id| !self.milestones.contains(id))
+            .copied()
+            .collect()
+    }
+
     /// Adds the targets of one step. Returns the counter `(scope, kind)` that a new record moves.
     pub fn add(&mut self, scope: OrgScope, operation: &Operation) -> Option<(Uuid, &'static str)> {
         let organization = scope.organization_id().as_uuid();
@@ -594,11 +682,24 @@ impl WorkLocks {
             Operation::CreateAction {
                 event_id,
                 workstream,
+                milestone,
                 ..
             } => {
                 self.workstreams
                     .extend(workstream.map(WorkstreamId::as_uuid));
+                self.named_milestones
+                    .extend(milestone.map(MilestoneId::as_uuid));
                 Some((event_id.as_uuid(), LocalIdKind::Action.prefix()))
+            }
+            Operation::ChangeActionMilestone {
+                action_id,
+                milestone,
+                ..
+            } => {
+                self.actions.push(action_id.as_uuid());
+                self.named_milestones
+                    .extend(milestone.map(MilestoneId::as_uuid));
+                None
             }
             Operation::CreateCommitment {
                 event_id,
@@ -635,14 +736,21 @@ impl WorkLocks {
         }
     }
 
-    /// Locks the workstreams for share, then the actions, the commitments and the milestones for update, each in the
-    /// order of its IDs.
+    /// Locks the workstreams and the named milestones for share, then the actions, the commitments and the changed
+    /// milestones for update, each in the order of its IDs.
     pub async fn lock(&self, conn: &mut PgConnection, scope: OrgScope) -> Result<(), sqlx::Error> {
         let organization = scope.organization_id().as_uuid();
         sqlx::query_scalar!(
             "SELECT id FROM workstream WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR SHARE",
             organization,
             &self.workstreams,
+        )
+        .fetch_all(&mut *conn)
+        .await?;
+        sqlx::query_scalar!(
+            "SELECT id FROM milestone WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR SHARE",
+            organization,
+            &self.shared_milestones(),
         )
         .fetch_all(&mut *conn)
         .await?;
@@ -668,5 +776,21 @@ impl WorkLocks {
         .fetch_all(&mut *conn)
         .await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_changed_milestone_is_not_share_locked() {
+        let (changed, named) = (Uuid::from_u128(1), Uuid::from_u128(2));
+        let locks = WorkLocks {
+            milestones: vec![changed],
+            named_milestones: vec![changed, named],
+            ..WorkLocks::default()
+        };
+        assert_eq!(locks.shared_milestones(), [named]);
     }
 }

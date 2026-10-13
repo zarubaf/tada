@@ -4,18 +4,18 @@
 //! a new record takes only an active workstream of its event, and a status changes only along its transitions.
 
 use jiff::Timestamp;
-use tada_domain::ids::{EventId, UserId, WorkstreamId};
+use tada_domain::ids::{EventId, MilestoneId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
 use tada_domain::proposals::{NewRecord, Operation, Proposal};
-use tada_domain::work::{CommitmentStatus, FirmReason, WorkstreamName};
+use tada_domain::work::{CommitmentStatus, FirmReason, WorkstreamName, dates_in_order};
 
 use super::ProposeStores;
-use super::input::text_error_code;
+use super::input::{START_AFTER_DUE, text_error_code};
 use crate::caller::OrgScope;
 use crate::identity::IdentityStore;
 use crate::problem::FieldError;
 use crate::store::StoreError;
-use crate::work::is_possible_owner;
+use crate::work::{is_possible_owner, milestone_refusal};
 use crate::workstreams::{ActiveWorkstreamError, WorkstreamStore, active_workstream};
 
 /// The field errors of the work proposals of a changeset, with paths from the changeset.
@@ -30,6 +30,21 @@ pub(super) async fn check_work(
         let operation = |field: &str| format!("proposals/{index}/operation/{field}");
         let mut refuse =
             |field: String, code: &'static str| errors.push(FieldError::new(field, code));
+        if let Operation::CreateAction {
+            event_id,
+            milestone: Some(milestone),
+            ..
+        }
+        | Operation::ChangeActionMilestone {
+            event_id,
+            milestone: Some(milestone),
+            ..
+        } = &proposal.operation
+            && let Some(code) =
+                milestone_refusal_in(scope, *event_id, *milestone, proposals, stores, now).await?
+        {
+            refuse(operation("milestone"), code);
+        }
         match &proposal.operation {
             Operation::CreateAction {
                 event_id,
@@ -111,6 +126,19 @@ pub(super) async fn check_work(
                 Some(_) => {}
             },
             Operation::ChangeActionDue {
+                event_id,
+                action_id,
+                due_date,
+                ..
+            } => match stores.work.action(scope, *event_id, *action_id).await? {
+                None => refuse(operation("action_id"), "unknown-record"),
+                // The start date of the action is not after the new due date (ADR 0080).
+                Some(current) if !dates_in_order(current.fields.start_date, *due_date) => {
+                    refuse(operation("due_date"), START_AFTER_DUE);
+                }
+                Some(_) => {}
+            },
+            Operation::ChangeActionMilestone {
                 event_id,
                 action_id,
                 ..
@@ -250,6 +278,25 @@ async fn name_taken<'a>(
                 .as_present()
                 .is_some_and(|n| same(n.as_str()))
         }))
+}
+
+/// The code that refuses `milestone` for an action of the event (`unknown-record`), or `None`: a new milestone of
+/// the changeset passes; `check_structure` checks that the proposal depends on the proposal that creates it.
+async fn milestone_refusal_in(
+    scope: OrgScope,
+    event: EventId,
+    milestone: MilestoneId,
+    proposals: &[Proposal],
+    stores: ProposeStores<'_>,
+    now: Timestamp,
+) -> Result<Option<&'static str>, StoreError> {
+    let created = proposals
+        .iter()
+        .any(|proposal| proposal.operation.new_record() == Some(NewRecord::Milestone(milestone)));
+    if created {
+        return Ok(None);
+    }
+    milestone_refusal(scope, event, milestone, stores.milestones, now).await
 }
 
 /// True if the promisor is a person or an institution of the organization, or a new one of the changeset.

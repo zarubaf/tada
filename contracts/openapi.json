@@ -5436,12 +5436,28 @@
             ],
             "format": "uuid"
           },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "Not after `due_date`."
+          },
           "due_date": {
             "type": [
               "string",
               "null"
             ],
             "format": "date"
+          },
+          "milestone_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "A milestone of the event. The link stays when the milestone is canceled later."
           },
           "status": {
             "$ref": "#/components/schemas/ActionStatus"
@@ -5693,6 +5709,14 @@
                             "null"
                           ]
                         },
+                        "milestone": {
+                          "description": "A milestone of the event that is not canceled.",
+                          "format": "uuid",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "name": {
                           "type": [
                             "string",
@@ -5708,6 +5732,13 @@
                           ]
                         },
                         "phone": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "start_date": {
+                          "description": "A date as `YYYY-MM-DD`.",
                           "type": [
                             "string",
                             "null"
@@ -6287,12 +6318,28 @@
             "format": "uuid",
             "description": "An active workstream of the event. A record keeps a workstream that closes later."
           },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "Not after the due date that the action has after the change, else the field code is `start-after-due`."
+          },
           "due_date": {
             "type": [
               "string",
               "null"
             ],
             "format": "date"
+          },
+          "milestone_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "A milestone of the event that is not canceled, else the field code is `unknown-record`."
           },
           "status": {
             "oneOf": [
@@ -6869,12 +6916,28 @@
             "format": "uuid",
             "description": "An active workstream of the event."
           },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "Not after `due_date`, else the field code is `start-after-due`."
+          },
           "due_date": {
             "type": [
               "string",
               "null"
             ],
             "format": "date"
+          },
+          "milestone_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "A milestone of the event that is not canceled, else the field code is `unknown-record`."
           }
         }
       },
@@ -7961,10 +8024,25 @@
                               "const": "create-action",
                               "type": "string"
                             },
+                            "milestone": {
+                              "description": "A milestone of the event that is not canceled, or a new milestone of the same changeset;\nthen the proposal depends on the proposal that creates it.",
+                              "format": "uuid",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "owner": {
                               "description": "The user ID of a member with the contributor or manager role in the event.",
                               "format": "uuid",
                               "type": "string"
+                            },
+                            "start_date": {
+                              "description": "The start date as `YYYY-MM-DD`. It is not after the due date.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
                             },
                             "title": {
                               "description": "1 to 200 characters.",
@@ -8324,6 +8402,44 @@
                             "event_id",
                             "milestone_id",
                             "status",
+                            "expected_version"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Set or clear the milestone of an action of the event.",
+                          "properties": {
+                            "action_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "event_id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "expected_version": {
+                              "description": "The current version of the action.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "kind": {
+                              "const": "change-action-milestone",
+                              "type": "string"
+                            },
+                            "milestone": {
+                              "description": "A milestone of the event that is not canceled, or a new milestone of the same changeset.\nLeave it out to clear the milestone.",
+                              "format": "uuid",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "event_id",
+                            "action_id",
                             "expected_version"
                           ],
                           "type": "object"
@@ -10997,12 +11113,27 @@
                 ],
                 "format": "uuid"
               },
+              "start_date": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              },
               "due_date": {
                 "type": [
                   "string",
                   "null"
                 ],
                 "format": "date"
+              },
+              "milestone": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "A milestone of the event, or a new milestone of the same changeset."
               },
               "kind": {
                 "type": "string",
@@ -11298,6 +11429,44 @@
                 "type": "string",
                 "enum": [
                   "change-milestone-status"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_id",
+              "action_id",
+              "expected_version",
+              "kind"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "action_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "milestone": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The new milestone. It is absent if the proposal clears the milestone."
+              },
+              "expected_version": {
+                "type": "integer",
+                "format": "int64",
+                "description": "The version of the action that the proposal expects."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "change-action-milestone"
                 ]
               }
             }

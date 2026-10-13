@@ -222,7 +222,9 @@ async fn change_action_status(
         description: None,
         owner: None,
         workstream: None,
+        start_date: None,
         due_date: None,
+        milestone: None,
         status: Some(status),
         expected_version: item.version,
     };

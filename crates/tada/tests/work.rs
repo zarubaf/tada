@@ -710,3 +710,91 @@ async fn milestones_round_trip_over_http() {
         json!([{"pointer": "/title", "code": "too-long"}])
     );
 }
+
+#[tokio::test]
+async fn action_dates_and_milestone_round_trip() {
+    let api = Api::start().await;
+    let e = api.event().await;
+    let milestone = api
+        .created(
+            &e.ben_cookie,
+            &format!("/api/v1/events/{}/milestones", e.id),
+            &json!({"title": "Bewilligung liegt vor", "date": "2030-05-01", "owner_user_id": e.ben.as_uuid()}),
+        )
+        .await;
+    let actions = format!("/api/v1/events/{}/actions", e.id);
+    let action = api
+        .created(
+            &e.ben_cookie,
+            &actions,
+            &json!({
+                "title": "Gesuch einreichen",
+                "owner_user_id": e.ben.as_uuid(),
+                "start_date": "2030-04-01",
+                "due_date": "2030-05-10",
+                "milestone_id": milestone["id"],
+            }),
+        )
+        .await;
+    assert_eq!(action["start_date"], "2030-04-01");
+    assert_eq!(action["milestone_id"], milestone["id"]);
+
+    // The milestone warns about the action that is due after it.
+    let (status, read) = api
+        .get(&e.viewer, &record(&e, "milestones", &milestone))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{read}");
+    assert_eq!(
+        read["warnings"],
+        json!([{"kind": "late-action", "action_id": action["id"]}])
+    );
+
+    // A start date after the due date is refused.
+    let (status, problem) = api
+        .patch(
+            &e.ben_cookie,
+            &record(&e, "actions", &action),
+            &json!({"start_date": "2030-06-01", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    assert_eq!(
+        problem["errors"],
+        json!([{"pointer": "/start_date", "code": "start-after-due"}])
+    );
+
+    // `null` clears the milestone and the start date.
+    let (status, changed) = api
+        .patch(
+            &e.ben_cookie,
+            &record(&e, "actions", &action),
+            &json!({"start_date": null, "milestone_id": null, "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{changed}");
+    assert_eq!(changed["start_date"], Value::Null);
+    assert_eq!(changed["milestone_id"], Value::Null);
+    assert_eq!(changed["version"], 2);
+
+    // A canceled milestone takes no action.
+    let (status, canceled) = api
+        .patch(
+            &e.ben_cookie,
+            &record(&e, "milestones", &milestone),
+            &json!({"status": "canceled", "expected_version": 1}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{canceled}");
+    let (status, problem) = api
+        .patch(
+            &e.ben_cookie,
+            &record(&e, "actions", &action),
+            &json!({"milestone_id": milestone["id"], "expected_version": 2}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    assert_eq!(
+        problem["errors"],
+        json!([{"pointer": "/milestone", "code": "unknown-record"}])
+    );
+}

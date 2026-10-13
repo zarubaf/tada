@@ -1321,3 +1321,136 @@ async fn an_apply_that_loses_the_race_for_a_workstream_name_conflicts() {
         ProposalStatus::Conflict
     );
 }
+
+/// A milestone of `event` with `status`, written directly.
+async fn insert_milestone(
+    test: &TestDatabase,
+    open_day: &OpenDay,
+    event: EventId,
+    status: &str,
+) -> Uuid {
+    let id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO milestone
+             (id, organization_id, event_id, local_number, title, date, owner_user_id, status, version,
+              created_at, updated_at)
+         VALUES ($1, $2, $3,
+                 (SELECT coalesce(max(local_number), 0) + 1 FROM milestone WHERE event_id = $3),
+                 'Bewilligung liegt vor', '2030-05-01', $4, $5, 1, now(), now())",
+    )
+    .bind(id)
+    .bind(open_day.organization.as_uuid())
+    .bind(event.as_uuid())
+    .bind(open_day.manager.user_id().as_uuid())
+    .bind(status)
+    .execute(&test.database.pool)
+    .await
+    .unwrap();
+    id
+}
+
+#[tokio::test]
+async fn edited_action_cannot_name_a_foreign_or_canceled_milestone() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let other_event = test.create_event(open_day.organization, "OTHER30").await;
+    let foreign = insert_milestone(&test, &open_day, other_event, "open").await;
+    let canceled = insert_milestone(&test, &open_day, open_day.event, "canceled").await;
+    let open = insert_milestone(&test, &open_day, open_day.event, "open").await;
+    let (action_id, first) = (Uuid::now_v7(), Uuid::now_v7());
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            first,
+            action(
+                open_day.event,
+                action_id,
+                open_day.contributor.user_id(),
+                None,
+            ),
+            &[],
+            "im Mai 2030",
+        )],
+    )
+    .await;
+    for milestone in [foreign, canceled, Uuid::now_v7()] {
+        let input = ApplyInput {
+            edits: vec![edit(first, json!({"milestone": milestone}))],
+            ..select(&[first])
+        };
+        let result = apply(&test, &open_day.manager, &changeset, input).await;
+        assert_eq!(
+            invalid(result),
+            [("edits/0/fields/milestone".to_owned(), "unknown-record")]
+        );
+    }
+    // A start date after the due date is refused too.
+    let input = ApplyInput {
+        edits: vec![edit(
+            first,
+            json!({"start_date": "2030-06-01", "due_date": "2030-05-01"}),
+        )],
+        ..select(&[first])
+    };
+    let result = apply(&test, &open_day.manager, &changeset, input).await;
+    assert_eq!(
+        invalid(result),
+        [("edits/0/fields/start_date".to_owned(), "start-after-due")]
+    );
+    assert_eq!(count(&test, "action").await, 0);
+
+    // An open milestone of the event applies with the edit.
+    let input = ApplyInput {
+        edits: vec![edit(
+            first,
+            json!({"milestone": open, "start_date": "2030-04-01", "due_date": "2030-04-20"}),
+        )],
+        ..select(&[first])
+    };
+    apply(&test, &open_day.manager, &changeset, input)
+        .await
+        .unwrap();
+    let (milestone, start): (Option<Uuid>, Option<String>) =
+        sqlx::query_as("SELECT milestone_id, start_date::text FROM action WHERE id = $1")
+            .bind(action_id)
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (milestone, start.as_deref()),
+        (Some(open), Some("2030-04-01"))
+    );
+}
+
+/// A proposal that names a milestone that is canceled before the apply conflicts and applies nothing.
+#[tokio::test]
+async fn a_milestone_that_is_canceled_after_the_proposal_makes_the_apply_conflict() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let milestone = insert_milestone(&test, &open_day, open_day.event, "open").await;
+    let (action_id, first) = (Uuid::now_v7(), Uuid::now_v7());
+    let mut named = action(
+        open_day.event,
+        action_id,
+        open_day.contributor.user_id(),
+        None,
+    );
+    named["milestone"] = json!(milestone);
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(first, named, &[], "im Mai 2030")],
+    )
+    .await;
+    sqlx::query("UPDATE milestone SET status = 'canceled' WHERE id = $1")
+        .bind(milestone)
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
+    let result = apply(&test, &open_day.manager, &changeset, select(&[first])).await;
+    assert!(matches!(result, Err(ApplyError::Conflict(_))), "{result:?}");
+    assert_eq!(count(&test, "action").await, 0);
+}

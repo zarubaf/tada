@@ -375,7 +375,9 @@ mod tests {
             description: None,
             owner: user(OTHER),
             workstream,
+            start_date: None,
             due_date: None,
+            milestone: None,
         }
     }
 
@@ -564,6 +566,61 @@ mod tests {
         assert_eq!(
             reviewers(&new_milestone(None), Some(event()), &facts),
             Reviewers::EventManagers
+        );
+    }
+
+    /// Rule 5 of ADR 0067 (ADR 0080): a new action that names a new milestone gives its reviewers to the milestone.
+    #[test]
+    fn new_action_with_a_new_milestone_brings_the_milestone_to_the_lead() {
+        let milestone_op = new_milestone(None);
+        let action_op = Operation::CreateAction {
+            id: ActionId::from_uuid(Uuid::from_u128(34)),
+            event_id: event(),
+            title: ActionTitle::parse("Gesuch einreichen").unwrap(),
+            description: None,
+            owner: user(OTHER),
+            workstream: Some(workstream()),
+            start_date: None,
+            due_date: None,
+            milestone: Some(milestone()),
+        };
+        let other_op = new_action(Some(workstream()));
+        let (m, a, o) = (proposal_id(1), proposal_id(2), proposal_id(3));
+        let depends_on_milestone = [m];
+        let routes = ChangesetRoutes::new(
+            [
+                RoutedProposal {
+                    id: m,
+                    operation: &milestone_op,
+                    depends_on: &[],
+                    open: true,
+                },
+                RoutedProposal {
+                    id: a,
+                    operation: &action_op,
+                    depends_on: &depends_on_milestone,
+                    open: true,
+                },
+                RoutedProposal {
+                    id: o,
+                    operation: &other_op,
+                    depends_on: &depends_on_milestone,
+                    open: true,
+                },
+            ],
+            Some(event()),
+            &facts(),
+        );
+        let lead = (user(LEAD), EventLevel::Contributor);
+        // The milestone has no workstream, so alone it would go to the managers.
+        assert!(routes.routed_to(lead.0, lead.1, m));
+        assert!(routes.may_review(lead.0, lead.1, a));
+        assert!(!routes.in_inbox_of(user(MANAGER), EventLevel::Manager, m, false));
+        // A dependency that does not name the milestone does not pass it on.
+        assert!(
+            !other_op
+                .references()
+                .contains(&tada_domain::proposals::NewRecord::Milestone(milestone()))
         );
     }
 

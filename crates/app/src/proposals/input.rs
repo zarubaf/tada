@@ -27,7 +27,7 @@ use tada_domain::proposals::{DraftDocument, Operation, QuestionText};
 use tada_domain::records::{MilestoneStatus, MilestoneTitle};
 use tada_domain::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
-    WorkstreamName,
+    WorkstreamName, dates_in_order,
 };
 use uuid::Uuid;
 
@@ -220,9 +220,16 @@ pub enum OperationInput {
         /// then the proposal depends on the proposal that creates it.
         #[serde(default)]
         workstream: Option<Uuid>,
+        /// The start date as `YYYY-MM-DD`. It is not after the due date.
+        #[serde(default)]
+        start_date: Option<String>,
         /// The due date as `YYYY-MM-DD`.
         #[serde(default)]
         due_date: Option<String>,
+        /// A milestone of the event that is not canceled, or a new milestone of the same changeset;
+        /// then the proposal depends on the proposal that creates it.
+        #[serde(default)]
+        milestone: Option<Uuid>,
     },
     /// Create a commitment of the event. With a condition it starts `conditional`, else `firm`.
     /// Never invent a signature or an approval: a commitment with an open condition stays conditional.
@@ -314,6 +321,17 @@ pub enum OperationInput {
         milestone_id: Uuid,
         status: MilestoneStatusInput,
         /// The current version of the milestone.
+        expected_version: i64,
+    },
+    /// Set or clear the milestone of an action of the event.
+    ChangeActionMilestone {
+        event_id: Uuid,
+        action_id: Uuid,
+        /// A milestone of the event that is not canceled, or a new milestone of the same changeset.
+        /// Leave it out to clear the milestone.
+        #[serde(default)]
+        milestone: Option<Uuid>,
+        /// The current version of the action.
         expected_version: i64,
     },
 }
@@ -584,6 +602,9 @@ impl Errors {
     }
 }
 
+/// The field code of a start date after the due date of an action (ADR 0080).
+pub(crate) const START_AFTER_DUE: &str = "start-after-due";
+
 pub(crate) fn text_error_code(error: TextError) -> &'static str {
     match error {
         TextError::Empty => "empty",
@@ -829,7 +850,9 @@ impl TryFrom<OperationInput> for Operation {
                 description,
                 owner,
                 workstream,
+                start_date,
                 due_date,
+                milestone,
             } => {
                 let title = errors.take("title", ActionTitle::parse(&title), text_error_code);
                 let description = errors.optional(
@@ -838,7 +861,13 @@ impl TryFrom<OperationInput> for Operation {
                     ActionDescription::parse,
                     text_error_code,
                 );
+                let start_date = errors.optional("start_date", start_date, parse_date, |_| "date");
                 let due_date = errors.optional("due_date", due_date, parse_date, |_| "date");
+                if let (Some(start), Some(due)) = (start_date, due_date)
+                    && !dates_in_order(start, due)
+                {
+                    errors.push("start_date", START_AFTER_DUE);
+                }
                 (|| {
                     Some(Operation::CreateAction {
                         id: ActionId::from_uuid(id),
@@ -847,7 +876,9 @@ impl TryFrom<OperationInput> for Operation {
                         description: description?,
                         owner: UserId::from_uuid(owner),
                         workstream: workstream.map(WorkstreamId::from_uuid),
+                        start_date: start_date?,
                         due_date: due_date?,
+                        milestone: milestone.map(MilestoneId::from_uuid),
                     })
                 })()
             }
@@ -912,6 +943,19 @@ impl TryFrom<OperationInput> for Operation {
                     })
                 })()
             }
+            OperationInput::ChangeActionMilestone {
+                event_id,
+                action_id,
+                milestone,
+                expected_version,
+            } => errors.version(expected_version).map(|expected_version| {
+                Operation::ChangeActionMilestone {
+                    event_id: EventId::from_uuid(event_id),
+                    action_id: ActionId::from_uuid(action_id),
+                    milestone: milestone.map(MilestoneId::from_uuid),
+                    expected_version,
+                }
+            }),
             OperationInput::ChangeCommitmentStatus {
                 event_id,
                 commitment_id,

@@ -45,7 +45,7 @@ use crate::problem::{CommandError, FieldError, ProblemCode};
 use crate::proposals::{Changeset, FactStateInput, ProposalStore};
 use crate::sources::SourceStore;
 use crate::store::StoreError;
-use crate::work::WorkStore;
+use crate::work::{MilestoneStore, WorkStore};
 use crate::workstreams::WorkstreamStore;
 
 use self::checks::{check_edits, parse_edits, stale_owners};
@@ -256,6 +256,7 @@ impl Debug for ApplyStep {
             Operation::CreateCommitment { .. } => "CreateCommitment",
             Operation::ChangeActionStatus { .. } => "ChangeActionStatus",
             Operation::ChangeActionDue { .. } => "ChangeActionDue",
+            Operation::ChangeActionMilestone { .. } => "ChangeActionMilestone",
             Operation::ChangeCommitmentStatus { .. } => "ChangeCommitmentStatus",
             Operation::CreateWorkstream { .. } => "CreateWorkstream",
             Operation::CreateMilestone { .. } => "CreateMilestone",
@@ -410,6 +411,8 @@ pub struct ReviewStores<'a> {
     pub workstreams: &'a dyn WorkstreamStore,
     /// The owners of actions and commitments that the routing reads (ADR 0067).
     pub work: &'a dyn WorkStore,
+    /// The milestones that an edit gives a new action (ADR 0080).
+    pub milestones: &'a dyn MilestoneStore,
     /// The existing persons and institutions that a review shows as duplicates and links to (ADR 0069).
     pub parties: &'a dyn PartyStore,
 }
@@ -572,7 +575,7 @@ pub async fn apply_changeset(
     reviewable.require(caller, &selected)?;
     let changeset = reviewable.changeset;
     let edits = parse_edits(&changeset, &selected, input.edits)?;
-    check_edits(scope, &changeset, &selected, &edits, stores).await?;
+    check_edits(scope, &changeset, &selected, &edits, stores, clock.now()).await?;
     let links = check_links(
         scope,
         &changeset,

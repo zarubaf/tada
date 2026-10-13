@@ -2,14 +2,15 @@
 
 use jiff::civil::Date;
 use tada_domain::RecordVersion;
-use tada_domain::ids::{ActionId, EventId, UserId, WorkstreamId};
+use tada_domain::ids::{ActionId, EventId, MilestoneId, UserId, WorkstreamId};
 use tada_domain::redaction::Redactable;
 use tada_domain::work::ActionStatus;
 use uuid::Uuid;
 
 use super::checks::{
-    changed, check_owner, check_workstream, created, may_change, parse_description, parse_title,
-    require_change, require_create, show, show_one, writable_access,
+    changed, check_dates, check_milestone, check_owner, check_workstream, created, may_change,
+    parse_description, parse_title, require_change, require_create, show, show_one,
+    writable_access,
 };
 use super::{ActionFields, ActionView, NewActionRecord, WorkError, WorkPorts, WorkQuery};
 use crate::access::{self, Principal};
@@ -27,7 +28,9 @@ pub struct NewAction {
     pub description: Option<String>,
     pub owner: UserId,
     pub workstream: Option<WorkstreamId>,
+    pub start_date: Option<Date>,
     pub due_date: Option<Date>,
+    pub milestone: Option<MilestoneId>,
 }
 
 /// The input of `change_action`. A field that is `None` stays as it is; `Some(None)` clears it.
@@ -37,7 +40,9 @@ pub struct ActionChange {
     pub description: Option<Option<String>>,
     pub owner: Option<UserId>,
     pub workstream: Option<Option<WorkstreamId>>,
+    pub start_date: Option<Option<Date>>,
     pub due_date: Option<Option<Date>>,
+    pub milestone: Option<Option<MilestoneId>>,
     pub status: Option<ActionStatus>,
     pub expected_version: RecordVersion,
 }
@@ -60,6 +65,12 @@ pub async fn create_action(
     if let Some(workstream) = input.workstream {
         check_workstream(&mut check, scope, event, workstream, ports.workstreams).await?;
     }
+    if let Err(error) = check_dates(input.start_date, input.due_date) {
+        check.add(error);
+    }
+    if let Some(milestone) = input.milestone {
+        check_milestone(&mut check, scope, event, milestone, ports).await?;
+    }
     let (title, description) = check
         .finish(title.zip(description))
         .map_err(WorkError::Invalid)?;
@@ -71,7 +82,9 @@ pub async fn create_action(
             description,
             owner: input.owner,
             workstream_id: input.workstream,
+            start_date: input.start_date,
             due_date: input.due_date,
+            milestone_id: input.milestone,
             status: ActionStatus::Open,
         },
     };
@@ -128,7 +141,9 @@ pub async fn change_action(
         description,
         owner,
         workstream,
+        start_date,
         due_date,
+        milestone,
         status,
         expected_version,
     } = change;
@@ -136,7 +151,9 @@ pub async fn change_action(
         && description.is_none()
         && owner.is_none()
         && workstream.is_none()
+        && start_date.is_none()
         && due_date.is_none()
+        && milestone.is_none()
         && status.is_none()
     {
         return Err(WorkError::Invalid(Vec::new()));
@@ -163,6 +180,18 @@ pub async fn change_action(
     {
         check_workstream(&mut check, scope, event, new, ports.workstreams).await?;
     }
+    let start_date = start_date.unwrap_or(old.start_date);
+    let due_date = due_date.unwrap_or(old.due_date);
+    if let Err(error) = check_dates(start_date, due_date) {
+        check.add(error);
+    }
+    // A link to a milestone that is canceled later stays; only a new milestone is checked (ADR 0080).
+    let milestone_id = milestone.unwrap_or(old.milestone_id);
+    if let Some(new) = milestone_id
+        && milestone_id != old.milestone_id
+    {
+        check_milestone(&mut check, scope, event, new, ports).await?;
+    }
     let (title, description) = check
         .finish(title.zip(description))
         .map_err(WorkError::Invalid)?;
@@ -175,7 +204,9 @@ pub async fn change_action(
         description,
         owner,
         workstream_id,
-        due_date: due_date.unwrap_or(old.due_date),
+        start_date,
+        due_date,
+        milestone_id,
         status,
     };
     let audit = audit(caller, AuditAction::ActionChange, id.as_uuid());

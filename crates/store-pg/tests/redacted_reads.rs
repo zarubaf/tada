@@ -262,7 +262,9 @@ async fn redacted_work_records_and_questions_read_as_redacted() {
         description: None,
         owner: None,
         workstream: None,
+        start_date: None,
         due_date: None,
+        milestone: None,
         status: Some(tada_app::domain::work::ActionStatus::Done),
         expected_version: RecordVersion::FIRST,
     };

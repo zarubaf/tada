@@ -390,6 +390,7 @@ async fn lock_targets(
             | Operation::CreateCommitment { .. }
             | Operation::ChangeActionStatus { .. }
             | Operation::ChangeActionDue { .. }
+            | Operation::ChangeActionMilestone { .. }
             | Operation::ChangeCommitmentStatus { .. }
             | Operation::CreateWorkstream { .. }
             | Operation::CreateMilestone { .. }
@@ -613,6 +614,7 @@ async fn check_versions(
             | Operation::CreateCommitment { .. }
             | Operation::ChangeActionStatus { .. }
             | Operation::ChangeActionDue { .. }
+            | Operation::ChangeActionMilestone { .. }
             | Operation::ChangeCommitmentStatus { .. }
             | Operation::CreateWorkstream { .. }
             | Operation::CreateMilestone { .. }
@@ -864,6 +866,7 @@ async fn write_step(
         | Operation::CreateCommitment { .. }
         | Operation::ChangeActionStatus { .. }
         | Operation::ChangeActionDue { .. }
+        | Operation::ChangeActionMilestone { .. }
         | Operation::ChangeCommitmentStatus { .. }
         | Operation::CreateWorkstream { .. }
         | Operation::CreateMilestone { .. }

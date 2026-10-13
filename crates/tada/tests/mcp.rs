@@ -275,6 +275,7 @@ impl Mcp {
             sources: &self.test.database,
             workstreams: &self.test.database,
             work: &self.test.database,
+            milestones: &self.test.database,
             parties: &self.test.database,
         };
         let input = ApplyInput {
@@ -1572,7 +1573,9 @@ async fn mcp_lists_workstreams_and_actions() {
         description: None,
         owner: mcp.owner.user_id(),
         workstream: Some(workstream.id),
+        start_date: None,
         due_date: None,
+        milestone: None,
     };
     create_action(&mcp.owner, mcp.open_day, action, ports)
         .await
@@ -1804,7 +1807,9 @@ async fn each_tool_result_matches_its_output_schema() {
         description: None,
         owner: mcp.owner.user_id(),
         workstream: Some(workstream.id),
+        start_date: None,
         due_date: None,
+        milestone: None,
     };
     create_action(&mcp.owner, mcp.open_day, action, ports)
         .await
@@ -1906,4 +1911,74 @@ async fn each_tool_result_matches_its_output_schema() {
     expected.sort_unstable();
     called.sort_unstable();
     assert_eq!(called, expected, "a read-only tool has no case");
+}
+
+/// An agent proposes a new milestone and a new action of it; the action names the milestone and depends on it.
+#[tokio::test]
+async fn propose_a_milestone_and_an_action_that_names_it() {
+    let mcp = Mcp::start().await;
+    let (_, token) = mcp.contributor_token().await;
+    let (milestone_id, action_id) = (Uuid::now_v7(), Uuid::now_v7());
+    let (first, second, changeset_id) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+    let milestone = json!({
+        "kind": "create-milestone", "id": milestone_id, "event_id": mcp.secret.as_uuid(),
+        "title": "Ort steht fest", "date": "2030-04-30", "owner": mcp.anna.as_uuid(),
+    });
+    let action = |depends_on: &[Uuid]| {
+        proposal(
+            second,
+            json!({
+                "kind": "create-action", "id": action_id, "event_id": mcp.secret.as_uuid(),
+                "title": "Ort klären", "owner": mcp.anna.as_uuid(),
+                "start_date": "2030-04-01", "due_date": "2030-04-20", "milestone": milestone_id,
+            }),
+            depends_on,
+            SOURCE,
+            "Der Ort ist noch offen",
+        )
+    };
+    let milestone = proposal(first, milestone, &[], SOURCE, "im Mai 2030");
+
+    // Without the dependency on the new milestone, the changeset is refused.
+    let arguments = changeset(mcp.secret, SOURCE, json!([milestone, action(&[])]));
+    let body = mcp.propose_with(&token, arguments).await;
+    assert_eq!(
+        problem(&body)["errors"],
+        json!([{"pointer": "/proposals/1/depends_on", "code": "dependency-missing"}]),
+        "{body}"
+    );
+
+    let mut arguments = changeset(mcp.secret, SOURCE, json!([milestone, action(&[first])]));
+    arguments["id"] = json!(changeset_id);
+    let body = mcp.propose_with(&token, arguments).await;
+    assert_eq!(body["result"]["isError"], false, "{body}");
+    let changeset = tada_app::proposals::ProposalStore::get(
+        &mcp.test.database,
+        mcp.owner.scope(),
+        tada_app::domain::ids::ChangesetId::from_uuid(changeset_id),
+    )
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+    // Selecting the action also applies the milestone that it depends on.
+    mcp.apply(&changeset, &[second]).await;
+
+    let milestones = mcp
+        .result("list_milestones", json!({"event_key": "SECRET30"}))
+        .await;
+    assert_eq!(
+        milestones["milestones"][0]["local_id"], "MIL-001",
+        "{milestones}"
+    );
+    assert_eq!(milestones["milestones"][0]["date"], "2030-04-30");
+    let actions = mcp
+        .result("list_actions", json!({"event_key": "SECRET30"}))
+        .await;
+    assert_eq!(
+        actions["actions"][0]["milestone_id"],
+        json!(milestone_id),
+        "{actions}"
+    );
+    assert_eq!(actions["actions"][0]["start_date"], "2030-04-01");
 }

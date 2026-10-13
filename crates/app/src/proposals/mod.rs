@@ -18,9 +18,11 @@ use tada_domain::facts::{
     ValueType,
 };
 use tada_domain::ids::{
-    self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId, WorkstreamId,
+    self, ChangesetId, EventId, FieldDefinitionId, ProposalId, SourceVersionId,
 };
-use tada_domain::proposals::{DependencyError, Operation, Proposal, Reason, check_dependencies};
+use tada_domain::proposals::{
+    DependencyError, NewRecord, Operation, Proposal, Reason, check_dependencies,
+};
 use tada_domain::redaction::Redactable;
 use tada_domain::sources::{Evidence, Passage, PassageError, SourceText};
 use uuid::Uuid;
@@ -30,7 +32,9 @@ pub use self::input::{
     GranularityInput, InstitutionKindInput, NewChangeset, NewProposal, OperationInput, PartyInput,
     PassageInput, ReferenceTargetInput, ValueInput, ValueTypeInput,
 };
-pub(crate) use self::input::{parse_date, state_from_input, text_error_code, value_error_code};
+pub(crate) use self::input::{
+    START_AFTER_DUE, parse_date, state_from_input, text_error_code, value_error_code,
+};
 pub(crate) use self::work::{owner_refusal, workstream_refusal};
 use crate::access::{self, AccessError, EventClosed, Principal};
 use crate::audit::{AuditAction, AuditEvent};
@@ -789,12 +793,12 @@ fn check_structure(event_id: Option<EventId>, proposals: &[Proposal]) -> Result<
                 .field_id()
                 .filter(|_| !matches!(operation, Operation::AddFieldDefinition { .. }))
                 .map(FieldDefinitionId::as_uuid),
-            operation.promisor().map(|promisor| promisor.as_uuid()),
-            operation.workstream().map(WorkstreamId::as_uuid),
         ];
+        let referenced = operation.references().into_iter().map(NewRecord::as_uuid);
         let record_creators = uses
             .into_iter()
             .flatten()
+            .chain(referenced)
             .filter_map(|record| creators.get(&record));
         let choice_creators =
             used_choices(operation).filter_map(|(field, key)| choice_creators.get(&(field, key)));

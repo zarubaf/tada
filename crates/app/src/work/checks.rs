@@ -2,17 +2,20 @@
 
 use std::collections::HashMap;
 
-use tada_domain::ids::{EventId, UserId, WorkstreamId};
+use jiff::Timestamp;
+use jiff::civil::Date;
+use tada_domain::ids::{EventId, MilestoneId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
-use tada_domain::work::{ActionDescription, ActionTitle, CommitmentText};
+use tada_domain::records::MilestoneStatus;
+use tada_domain::work::{ActionDescription, ActionTitle, CommitmentText, dates_in_order};
 
-use super::{ActionView, CommitmentView, WorkError, WorkPorts, may_change_work};
+use super::{ActionView, CommitmentView, MilestoneStore, WorkError, WorkPorts, may_change_work};
 use crate::access::{self, EventAccess, EventLevel, Principal};
 use crate::caller::{MemberCaller, OrgScope};
 use crate::identity::IdentityStore;
 use crate::parties::PartyStore;
 use crate::problem::FieldError;
-use crate::proposals::text_error_code;
+use crate::proposals::{START_AFTER_DUE, text_error_code};
 use crate::records::{Changed, Checker, Created, RecordRef, Shown, shown, shown_one};
 use crate::store::StoreError;
 use crate::workstreams::{ActiveWorkstreamError, WorkstreamStore, active_workstream};
@@ -84,6 +87,47 @@ pub(super) async fn check_workstream(
         }
         Err(ActiveWorkstreamError::Store(error)) => Err(error),
     }
+}
+
+/// The start date of an action is not after its due date (ADR 0080).
+pub(super) fn check_dates(start: Option<Date>, due: Option<Date>) -> Result<(), FieldError> {
+    if dates_in_order(start, due) {
+        Ok(())
+    } else {
+        Err(FieldError::new("start_date", START_AFTER_DUE))
+    }
+}
+
+/// A new milestone of an action must be a milestone of the event that is not canceled (ADR 0080).
+pub(super) async fn check_milestone(
+    check: &mut Checker,
+    scope: OrgScope,
+    event: EventId,
+    id: MilestoneId,
+    ports: WorkPorts<'_>,
+) -> Result<(), StoreError> {
+    if let Some(code) =
+        milestone_refusal(scope, event, id, ports.milestones, ports.clock.now()).await?
+    {
+        check.push("milestone", code);
+    }
+    Ok(())
+}
+
+/// The code that refuses `id` as the milestone of an action of the event (`unknown-record`), or `None`:
+/// a milestone of another event, an unknown one and a canceled one are refused alike.
+pub(crate) async fn milestone_refusal(
+    scope: OrgScope,
+    event: EventId,
+    id: MilestoneId,
+    milestones: &dyn MilestoneStore,
+    now: Timestamp,
+) -> Result<Option<&'static str>, StoreError> {
+    let usable = milestones
+        .milestone(scope, event, id, now)
+        .await?
+        .is_some_and(|milestone| milestone.fields.status != MilestoneStatus::Canceled);
+    Ok((!usable).then_some("unknown-record"))
 }
 
 /// The promisor must be a person or an institution of the organization (ADR 0069).

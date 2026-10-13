@@ -94,7 +94,9 @@ impl Fixture {
             description: None,
             owner: self.owner,
             workstream_id: None,
+            start_date: None,
             due_date: due,
+            milestone_id: None,
             status: ActionStatus::Open,
         }
     }
@@ -712,4 +714,40 @@ async fn milestone_in_the_past_and_open_is_overdue() {
         f.audit_actions().await,
         ["institution.create", "milestone.create", "milestone.change"]
     );
+}
+
+#[tokio::test]
+async fn milestone_warns_about_late_open_actions() {
+    let f = Fixture::start().await;
+    let milestone = f.milestone(date(2030, 5, 1)).await;
+    // Each action of the milestone with its status and due date.
+    let mut late = Vec::new();
+    for (status, due) in [
+        (ActionStatus::Open, Some(date(2030, 5, 10))),
+        (ActionStatus::Done, Some(date(2030, 5, 10))),
+        (ActionStatus::Open, Some(date(2030, 5, 1))),
+        (ActionStatus::Blocked, Some(date(2030, 6, 1))),
+        (ActionStatus::InProgress, None),
+    ] {
+        let action = f.action("Zelt bestellen", due).await;
+        let fields = ActionFields {
+            status,
+            milestone_id: Some(milestone.id),
+            ..action.fields.clone()
+        };
+        let Changed::Changed(changed) = f
+            .change_action(f.scope, f.event, action.id, &fields, action.version)
+            .await
+        else {
+            panic!("not changed");
+        };
+        if status != ActionStatus::Done && due > Some(date(2030, 5, 1)) {
+            late.push(MilestoneWarning::LateAction(changed.id));
+        }
+    }
+    // A late action without the milestone does not count.
+    f.action("Bühne bauen", Some(date(2030, 7, 1))).await;
+    assert_eq!(late.len(), 2);
+    // Before the date of the milestone, so it is not overdue.
+    assert_eq!(f.warnings(milestone.id, "2030-04-01T08:00:00Z").await, late);
 }
