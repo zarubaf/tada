@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { Link, Redirect, Route, Router, Routes, useNavigate, useParams } from "./Router";
+import { Link, Redirect, Route, Router, Routes, useHash, useNavigate, useParams } from "./Router";
 
 function Event() {
   const { eventId } = useParams();
@@ -153,5 +153,25 @@ describe("Router", () => {
     renderAt("/events");
     fireEvent.click(screen.getByRole("link", { name: "Andere" }), { altKey: true });
     expect(window.location.pathname).toBe("/events");
+  });
+
+  it("reads the hash of the address and follows its changes", async () => {
+    function Hash() {
+      return <p>Hash: {useHash()}</p>;
+    }
+    window.history.replaceState(null, "", "/events#ACT-002");
+    render(
+      <Router>
+        <Link to="/events#ACT-003">Weiter</Link>
+        <Hash />
+      </Router>,
+    );
+    expect(screen.getByText("Hash: ACT-002")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: "Weiter" }));
+    expect(screen.getByText("Hash: ACT-003")).toBeInTheDocument();
+    expect(window.location.hash).toBe("#ACT-003");
+    window.history.replaceState(null, "", "/events");
+    fireEvent.popState(window);
+    expect(screen.getByText("Hash:")).toBeInTheDocument();
   });
 });

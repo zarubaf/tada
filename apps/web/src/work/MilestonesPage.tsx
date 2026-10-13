@@ -251,6 +251,7 @@ function Milestones({ api, directory }: { api: Api; directory: Directory }) {
         page={page}
         label={t("milestones-title")}
         columns={columns}
+        rowId={(row) => row.local_id}
         loadingLabel={t("milestones-loading")}
         empty={{ title: t("milestones-empty-title"), text: t("milestones-empty-text") }}
       />

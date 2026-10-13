@@ -29,6 +29,8 @@ export interface NavigateOptions {
 
 interface Location {
   pathname: string;
+  /** The fragment of the address without `#`, for example the readable ID of a row. */
+  hash: string;
   navigate: (to: string, options?: NavigateOptions) => void;
 }
 
@@ -43,9 +45,18 @@ function useLocation(): Location {
   return location;
 }
 
+function readHash(): string {
+  try {
+    return decodeURIComponent(window.location.hash.slice(1));
+  } catch {
+    return "";
+  }
+}
+
 /** Keeps the path of the address in state and changes it with `history.pushState`. */
 export function Router({ children }: { children: ReactNode }) {
   const [pathname, setPathname] = useState(() => window.location.pathname);
+  const [hash, setHash] = useState(() => readHash());
   // Focus moves to the new page after a navigation, not after a redirect or the first render.
   const moveFocus = useRef(false);
 
@@ -53,6 +64,7 @@ export function Router({ children }: { children: ReactNode }) {
     const sync = () => {
       moveFocus.current = true;
       setPathname(window.location.pathname);
+      setHash(readHash());
     };
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
@@ -70,7 +82,7 @@ export function Router({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   const navigate = useCallback((to: string, options?: NavigateOptions) => {
-    if (to === window.location.pathname) {
+    if (to === window.location.pathname + window.location.hash) {
       return;
     }
     moveFocus.current = options?.moveFocus ?? true;
@@ -80,13 +92,19 @@ export function Router({ children }: { children: ReactNode }) {
       window.history.pushState(null, "", to);
     }
     setPathname(window.location.pathname);
+    setHash(readHash());
   }, []);
 
-  return <LocationContext value={{ pathname, navigate }}>{children}</LocationContext>;
+  return <LocationContext value={{ pathname, hash, navigate }}>{children}</LocationContext>;
 }
 
 export function usePathname(): string {
   return useLocation().pathname;
+}
+
+/** The fragment of the address without `#`; a link to a row of a register names the row in it. */
+export function useHash(): string {
+  return useLocation().hash;
 }
 
 export function useNavigate(): Location["navigate"] {

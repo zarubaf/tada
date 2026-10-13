@@ -60,6 +60,33 @@ describe("ActionsPage", () => {
     expect(within(table).getByText("offen")).toBeInTheDocument();
   });
 
+  it("opens the row named by the hash of the address and focuses it", async () => {
+    render({
+      hash: "#ACT-002",
+      lists: {
+        "/actions": [
+          action({ id: "a1", local_id: "ACT-001" }),
+          action({ id: "a2", local_id: "ACT-002", title: "Zelt aufbauen" }),
+        ],
+      },
+    });
+
+    const table = await screen.findByRole("table", { name: "Aufgaben" });
+    const row = within(table).getByText("Zelt aufbauen").closest("tr");
+    expect(row).toHaveAttribute("id", "ACT-002");
+    await waitFor(() => expect(row).toHaveFocus());
+    expect(row).toHaveAttribute("data-linked");
+    expect(within(table).getByText("Generator bestellen").closest("tr")).not.toHaveAttribute(
+      "data-linked",
+    );
+  });
+
+  it("ignores a hash that names no row", async () => {
+    render({ hash: "#ACT-099", lists: { "/actions": [action()] } });
+    await screen.findByRole("table", { name: "Aufgaben" });
+    expect(document.querySelector("[data-linked]")).toBeNull();
+  });
+
   it("shows the edit control where the server says the caller can change the action", async () => {
     render({
       lists: {

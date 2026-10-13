@@ -116,6 +116,7 @@ function Actions({ api, eventId, directory }: { api: Api; eventId: string; direc
         page={page}
         label={t("actions-title")}
         columns={columns}
+        rowId={(row) => row.local_id}
         loadingLabel={t("actions-loading")}
         empty={{ title: t("actions-empty-title"), text: t("actions-empty-text") }}
       />

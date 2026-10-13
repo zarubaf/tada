@@ -74,6 +74,8 @@ export interface Setup {
   lists?: Record<string, unknown[]>;
   /** The profile of the event that the event page has loaded. The default is still loading. */
   profile?: ProfileState;
+  /** The fragment of the address, for a link to a row of a register. */
+  hash?: string;
 }
 
 /** Renders `page` for the event with the fake server. It records `METHOD path` and the body. */
@@ -87,6 +89,7 @@ export function renderWork(
     answers = {},
     lists = {},
     profile = { kind: "loading" },
+    hash = "",
   }: Setup = {},
 ) {
   const calls: { call: string; query: string; body: unknown }[] = [];
@@ -136,7 +139,7 @@ export function renderWork(
     throw new Error(`unexpected ${request.method} ${path}`);
   };
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
-  window.history.replaceState(null, "", `/events/${EVENT.id}`);
+  window.history.replaceState(null, "", `/events/${EVENT.id}${hash}`);
   render(
     <Router>
       <SessionProvider api={api}>
