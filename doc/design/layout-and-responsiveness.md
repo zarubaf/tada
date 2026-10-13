@@ -64,9 +64,12 @@ Sidebar, from top to bottom:
 1. Organization switcher (only if the member belongs to more than one organization).
 2. Search and command menu (`Ctrl+K` or `⌘K`).
 3. „Portfolio“, „Meine Arbeit“ and „Eingang“.
-4. „Anlässe“: the events of the member, with the current event expanded:
-   „Übersicht“, „Aufgaben“, „Zeitplan“, „Register“, „Dokumente“, „Mitglieder“ and „Arbeitsbereiche“.
-5. At the bottom: „Einstellungen“, „Datenschutz“, the build of the web client and the member menu.
+4. „Anlässe“: the list of the events of the member.
+   The sidebar does not expand the current event.
+   The event page shows the sub-navigation of the event: „Übersicht“, „Aufgaben“, „Zeitplan“, „Register“, „Dokumente“, „Mitglieder“ and „Arbeitsbereiche“.
+5. „Personen“ and „Institutionen“: the persons and institutions of the organization.
+   On narrow layouts, the member menu has them.
+6. At the bottom: „Einstellungen“, „Datenschutz“, the build of the web client and the member menu.
    The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
    On narrow layouts, the member menu has the build.
 
@@ -100,7 +103,8 @@ Each template uses the `Page` component for the `main` element, the page gutters
 ### Timeline
 
 The „Zeitplan“ page shows the plan of one event.
-It is read-only. It has no drag.
+It is read-only.
+It has no drag.
 
 - One lane for each workstream, and one lane „ohne Arbeitsbereich“.
 - An action with a start date and a due date is a bar.
@@ -114,8 +118,10 @@ It is read-only. It has no drag.
 - The axis shows weeks.
   It runs from the earliest date to the later of the end of the event window and the last due date.
   A long span scrolls inside the timeline. The page itself never scrolls horizontally.
-- Filters: owner and status. Each bar and point links to its action.
-- Bars, points and markers do not rely on color alone. Each has a label, and the status shows as text in the list.
+- Filters: owner and status.
+  Each bar and point links to its action.
+- Bars, points and markers do not rely on color alone.
+  Each has a label, and the status shows as text in the list.
 - Narrow layouts and screen readers get a list of the same items, grouped by week.
 - An event with no dated actions shows the empty state of the page, not an empty axis.
 
