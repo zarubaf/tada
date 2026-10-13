@@ -82,10 +82,112 @@ describe("ActionsPage", () => {
     );
   });
 
-  it("ignores a hash that names no row", async () => {
+  it("says that a hash which names no row is not found, and marks no row", async () => {
     render({ hash: "#ACT-099", lists: { "/actions": [action()] } });
     await screen.findByRole("table", { name: "Aufgaben" });
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("ACT-099 nicht gefunden"),
+    );
     expect(document.querySelector("[data-linked]")).toBeNull();
+  });
+
+  it("does not search for a fragment that is no row ID, such as the skip link", async () => {
+    const { calls } = render({
+      hash: "#main",
+      answers: {
+        "GET /actions": pagedList([
+          [action({ id: "a1", local_id: "ACT-001" })],
+          [action({ id: "a2", local_id: "ACT-002" })],
+        ]),
+      },
+    });
+
+    await screen.findByRole("table", { name: "Aufgaben" });
+    await act(async () => {});
+    expect(calls.filter((c) => c.call.endsWith("/actions"))).toHaveLength(1);
+    expect(screen.queryByText(/nicht gefunden/)).not.toBeInTheDocument();
+  });
+
+  it("shows the button as pending while the search runs and appends each page once", async () => {
+    let release: (response: Response) => void = () => {};
+    const second = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    let served = 0;
+    const { calls } = render({
+      hash: "#ACT-002",
+      answers: {
+        "GET /actions": () => {
+          served += 1;
+          if (served === 1) {
+            return json(200, {
+              items: [action({ id: "a1", local_id: "ACT-001" })],
+              next_cursor: "p1",
+            });
+          }
+          return second;
+        },
+      },
+    });
+
+    const more = await screen.findByRole("button", { name: "Weitere Einträge laden" });
+    await waitFor(() => expect(more).toHaveAttribute("aria-disabled", "true"));
+    await user.click(more);
+    release(json(200, { items: [action({ id: "a2", local_id: "ACT-002" })], next_cursor: null }));
+
+    await screen.findByText("ACT-002");
+    expect(screen.getAllByText("ACT-002")).toHaveLength(1);
+    expect(calls.filter((c) => c.call.endsWith("/actions"))).toHaveLength(2);
+  });
+
+  it("does not fetch a page twice when the search continues during an open request", async () => {
+    let release: (response: Response) => void = () => {};
+    const second = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    let served = 0;
+    const { calls } = render({
+      answers: {
+        "GET /actions": () => {
+          served += 1;
+          if (served === 1) {
+            return json(200, {
+              items: [action({ id: "a1", local_id: "ACT-001" })],
+              next_cursor: "p1",
+            });
+          }
+          return second;
+        },
+      },
+    });
+
+    const more = await screen.findByRole("button", { name: "Weitere Einträge laden" });
+    await user.click(more);
+    act(() => {
+      window.history.pushState(null, "", `${window.location.pathname}#ACT-002`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    release(json(200, { items: [action({ id: "a2", local_id: "ACT-002" })], next_cursor: null }));
+
+    await screen.findByText("ACT-002");
+    await act(async () => {});
+    expect(screen.getAllByText("ACT-002")).toHaveLength(1);
+    expect(calls.filter((c) => c.call.endsWith("/actions"))).toHaveLength(2);
+  });
+
+  it("stops the search when the server repeats a cursor", async () => {
+    const { calls } = render({
+      hash: "#ACT-099",
+      answers: {
+        "GET /actions": () =>
+          json(200, { items: [action({ id: "a1", local_id: "ACT-001" })], next_cursor: "same" }),
+      },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("ACT-099 nicht gefunden"),
+    );
+    expect(calls.filter((c) => c.call.endsWith("/actions")).length).toBeLessThanOrEqual(3);
   });
 
   it("loads further pages until the row named by the hash appears", async () => {
@@ -132,6 +234,7 @@ describe("ActionsPage", () => {
         "GET /actions": pagedList([
           [action({ id: "a1", local_id: "ACT-001" })],
           [action({ id: "a2", local_id: "ACT-002" })],
+          [action({ id: "a3", local_id: "ACT-003" })],
         ]),
       },
     });
@@ -142,7 +245,29 @@ describe("ActionsPage", () => {
     more.focus();
     await user.click(more);
     await screen.findByText("ACT-002");
+    // The button stays, because a third page follows: focus stays on it.
+    expect(screen.getByRole("button", { name: "Weitere Einträge laden" })).toHaveFocus();
     expect(row).not.toHaveFocus();
+  });
+
+  it("opens the row of the hash after a retry of the first load", async () => {
+    let served = 0;
+    render({
+      hash: "#ACT-001",
+      answers: {
+        "GET /actions": () => {
+          served += 1;
+          return served === 1
+            ? problem(500, "internal")
+            : json(200, { items: [action()], next_cursor: null });
+        },
+      },
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Erneut versuchen" }));
+    const row = (await screen.findByText("Generator bestellen")).closest("tr");
+    await waitFor(() => expect(row).toHaveAttribute("data-linked"));
+    expect(screen.queryByText(/nicht gefunden/)).not.toBeInTheDocument();
   });
 
   it("focuses the new row when the hash changes on the mounted page", async () => {
