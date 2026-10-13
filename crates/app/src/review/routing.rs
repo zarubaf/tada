@@ -120,10 +120,13 @@ pub fn in_inbox_of(
 /// a new commitment whose promisor is a new person or a new institution of the changeset.
 /// Only then the reviewers of the dependent decide on the dependency too.
 /// Any other dependency keeps its own reviewers, so a `depends_on` entry cannot move a proposal to another reviewer.
+/// A dependency that only the event managers review, for example a new workstream, gets no reviewers from its
+/// dependents (ADR 0080).
 fn refers_to_new_record(dependent: &Operation, dependency: &Operation) -> bool {
-    dependency
-        .new_record()
-        .is_some_and(|record| dependent.references().contains(&record))
+    !dependency.managers_only()
+        && dependency
+            .new_record()
+            .is_some_and(|record| dependent.references().contains(&record))
 }
 
 /// One proposal of a changeset as the routing sees it.
@@ -622,6 +625,98 @@ mod tests {
                 .references()
                 .contains(&tada_domain::proposals::NewRecord::Milestone(milestone()))
         );
+    }
+
+    /// Rule 5 gives no member reviewer to a proposal that only the event managers review (ADR 0080), also through
+    /// a chain: a new action of an existing workstream names a new milestone, and the milestone names a new workstream.
+    #[test]
+    fn a_chain_of_new_records_keeps_a_new_workstream_with_the_managers() {
+        let new_stream = WorkstreamId::from_uuid(Uuid::from_u128(42));
+        let workstream_op = Operation::CreateWorkstream {
+            id: new_stream,
+            event_id: event(),
+            name: WorkstreamName::parse("Logistik").unwrap(),
+            lead: user(OTHER),
+        };
+        let milestone_op = new_milestone(Some(new_stream));
+        let action_op = Operation::CreateAction {
+            id: ActionId::from_uuid(Uuid::from_u128(34)),
+            event_id: event(),
+            title: ActionTitle::parse("Gesuch einreichen").unwrap(),
+            description: None,
+            owner: user(OTHER),
+            workstream: Some(workstream()),
+            start_date: None,
+            due_date: None,
+            milestone: Some(milestone()),
+        };
+        let (w, m, a) = (proposal_id(1), proposal_id(2), proposal_id(3));
+        let depends_on_workstream = [w];
+        let depends_on_milestone = [m];
+        let routes = ChangesetRoutes::new(
+            [
+                RoutedProposal {
+                    id: w,
+                    operation: &workstream_op,
+                    depends_on: &[],
+                    open: true,
+                },
+                RoutedProposal {
+                    id: m,
+                    operation: &milestone_op,
+                    depends_on: &depends_on_workstream,
+                    open: true,
+                },
+                RoutedProposal {
+                    id: a,
+                    operation: &action_op,
+                    depends_on: &depends_on_milestone,
+                    open: true,
+                },
+            ],
+            Some(event()),
+            &facts(),
+        );
+        let lead = (user(LEAD), EventLevel::Contributor);
+        assert!(!routes.routed_to(lead.0, lead.1, w));
+        assert!(!routes.may_review(lead.0, lead.1, w));
+        assert!(routes.in_inbox_of(user(MANAGER), EventLevel::Manager, w, false));
+        // The milestone still goes to the lead of the action, as before.
+        assert!(routes.routed_to(lead.0, lead.1, m));
+        assert!(routes.routed_to(lead.0, lead.1, a));
+        assert!(!routes.in_inbox_of(user(MANAGER), EventLevel::Manager, m, false));
+    }
+
+    /// A new workstream with the ID of an existing one does not go to the lead of the existing one through a new
+    /// action in it.
+    #[test]
+    fn a_new_workstream_with_an_existing_id_stays_with_the_managers() {
+        let create = new_workstream();
+        let action_op = new_action(Some(workstream()));
+        let (w, a) = (proposal_id(1), proposal_id(2));
+        let depends_on_workstream = [w];
+        let routes = ChangesetRoutes::new(
+            [
+                RoutedProposal {
+                    id: w,
+                    operation: &create,
+                    depends_on: &[],
+                    open: true,
+                },
+                RoutedProposal {
+                    id: a,
+                    operation: &action_op,
+                    depends_on: &depends_on_workstream,
+                    open: true,
+                },
+            ],
+            Some(event()),
+            &facts(),
+        );
+        let lead = (user(LEAD), EventLevel::Contributor);
+        assert!(!routes.routed_to(lead.0, lead.1, w));
+        assert!(!routes.may_review(lead.0, lead.1, w));
+        assert!(routes.in_inbox_of(user(MANAGER), EventLevel::Manager, w, false));
     }
 
     #[test]
