@@ -257,6 +257,7 @@ impl Debug for ApplyStep {
             Operation::ChangeActionStatus { .. } => "ChangeActionStatus",
             Operation::ChangeActionDue { .. } => "ChangeActionDue",
             Operation::ChangeCommitmentStatus { .. } => "ChangeCommitmentStatus",
+            Operation::CreateWorkstream { .. } => "CreateWorkstream",
         };
         f.debug_struct("ApplyStep")
             .field("proposal_id", &self.proposal_id)

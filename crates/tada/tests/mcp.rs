@@ -1695,3 +1695,64 @@ async fn a_viewer_token_reads_but_a_read_token_cannot_propose_a_commitment() {
     let body = mcp.propose_with(&propose, arguments).await;
     assert_eq!(body["result"]["isError"], false, "{body}");
 }
+
+/// An agent groups the first actions of a new event in a workstream that it proposes in the same changeset.
+#[tokio::test]
+async fn propose_a_workstream_and_its_first_action() {
+    let mcp = Mcp::start().await;
+    let (_, propose) = mcp.contributor_token().await;
+    let (stream, action) = (Uuid::now_v7(), Uuid::now_v7());
+    let (stream_proposal, action_proposal) = (Uuid::now_v7(), Uuid::now_v7());
+    let arguments = |depends_on: &[Uuid]| {
+        changeset(
+            mcp.secret,
+            SOURCE,
+            json!([
+                proposal(
+                    stream_proposal,
+                    json!({
+                        "kind": "create-workstream", "id": stream, "event_id": mcp.secret.as_uuid(),
+                        "name": "Programm", "lead": mcp.anna.as_uuid(),
+                    }),
+                    &[],
+                    SOURCE,
+                    "im Mai 2030"
+                ),
+                proposal(
+                    action_proposal,
+                    json!({
+                        "kind": "create-action", "id": action, "event_id": mcp.secret.as_uuid(),
+                        "title": "Programm festlegen", "owner": mcp.anna.as_uuid(),
+                        "workstream": stream,
+                    }),
+                    depends_on,
+                    SOURCE,
+                    "im Mai 2030"
+                ),
+            ]),
+        )
+    };
+    // The action names the new workstream, so it depends on the proposal that creates it.
+    let body = mcp.propose_with(&propose, arguments(&[])).await;
+    assert_eq!(problem(&body)["code"], "validation-failed", "{body}");
+    let body = mcp
+        .propose_with(&propose, arguments(&[stream_proposal]))
+        .await;
+    assert_eq!(body["result"]["isError"], false, "{body}");
+
+    let kind: String = mcp
+        .test
+        .scalar(&format!(
+            "SELECT target_kind FROM proposal WHERE id = '{stream_proposal}'"
+        ))
+        .await;
+    assert_eq!(kind, "workstream");
+    // A proposal changes no record before a reviewer accepts it.
+    let created: i64 = mcp
+        .test
+        .scalar(&format!(
+            "SELECT count(*) FROM workstream WHERE id = '{stream}'"
+        ))
+        .await;
+    assert_eq!(created, 0);
+}

@@ -26,6 +26,7 @@ use tada_domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_domain::proposals::{DraftDocument, Operation, QuestionText};
 use tada_domain::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
+    WorkstreamName,
 };
 use uuid::Uuid;
 
@@ -271,6 +272,18 @@ pub enum OperationInput {
         status: CommitmentStatusInput,
         /// The current version of the commitment.
         expected_version: i64,
+    },
+    /// Create a workstream of the event: a named part with a lead, to group the actions and commitments of the event.
+    /// Actions and commitments of the same changeset can name it; then they depend on this proposal.
+    /// Only the event managers review it.
+    CreateWorkstream {
+        /// The UUIDv7 of the new workstream.
+        id: Uuid,
+        event_id: Uuid,
+        /// 1 to 200 characters. No other workstream of the event has this name, whatever its case.
+        name: String,
+        /// The user ID of a member with the contributor or manager role in the event.
+        lead: Uuid,
     },
 }
 
@@ -872,6 +885,20 @@ impl TryFrom<OperationInput> for Operation {
                     expected_version,
                 }
             }),
+            OperationInput::CreateWorkstream {
+                id,
+                event_id,
+                name,
+                lead,
+            } => {
+                let name = errors.take("name", WorkstreamName::parse(&name), text_error_code);
+                name.map(|name| Operation::CreateWorkstream {
+                    id: WorkstreamId::from_uuid(id),
+                    event_id: EventId::from_uuid(event_id),
+                    name,
+                    lead: UserId::from_uuid(lead),
+                })
+            }
         };
         errors.finish(operation)
     }

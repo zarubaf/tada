@@ -26,6 +26,7 @@ use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::domain::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
+    WorkstreamName,
 };
 use tada_app::drafts::DraftProvenance;
 use tada_app::facts::{OpenProposalRef, OpenQuestionRef};
@@ -137,6 +138,12 @@ enum OperationRecord {
         commitment_id: Uuid,
         status: String,
         expected_version: i64,
+    },
+    CreateWorkstream {
+        id: Uuid,
+        event_id: Uuid,
+        name: String,
+        lead: Uuid,
     },
 }
 
@@ -349,6 +356,17 @@ pub(crate) fn operation_to_json(operation: &Operation) -> serde_json::Value {
             status: status.as_str().to_owned(),
             expected_version: expected_version.get(),
         },
+        Operation::CreateWorkstream {
+            id,
+            event_id,
+            name,
+            lead,
+        } => OperationRecord::CreateWorkstream {
+            id: id.as_uuid(),
+            event_id: event_id.as_uuid(),
+            name: name.as_str().to_owned(),
+            lead: lead.as_uuid(),
+        },
     };
     serde_json::to_value(record).expect("an operation record is valid JSON")
 }
@@ -550,6 +568,17 @@ pub(crate) fn operation_from_json(
             status: CommitmentStatus::parse(&status).ok_or_else(invalid)?,
             expected_version: RecordVersion::new(expected_version).ok_or_else(invalid)?,
         },
+        OperationRecord::CreateWorkstream {
+            id,
+            event_id,
+            name,
+            lead,
+        } => Operation::CreateWorkstream {
+            id: WorkstreamId::from_uuid(id),
+            event_id: EventId::from_uuid(event_id),
+            name: WorkstreamName::parse(&name).map_err(|_| invalid())?,
+            lead: UserId::from_uuid(lead),
+        },
     })
 }
 
@@ -585,6 +614,7 @@ fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>) {
         Operation::CreateInstitution { id, .. } => ("institution", id.as_uuid(), None),
         Operation::CreateAction { id, .. } => ("action", id.as_uuid(), None),
         Operation::CreateCommitment { id, .. } => ("commitment", id.as_uuid(), None),
+        Operation::CreateWorkstream { id, .. } => ("workstream", id.as_uuid(), None),
         Operation::ChangeActionStatus {
             action_id,
             expected_version,
@@ -1828,6 +1858,12 @@ mod tests {
                 commitment_id: CommitmentId::from_uuid(Uuid::now_v7()),
                 status: CommitmentStatus::Firm,
                 expected_version: RecordVersion::FIRST,
+            },
+            Operation::CreateWorkstream {
+                id: WorkstreamId::from_uuid(Uuid::now_v7()),
+                event_id: event,
+                name: WorkstreamName::parse("Zelt").unwrap(),
+                lead: UserId::from_uuid(Uuid::now_v7()),
             },
         ];
         for operation in operations {

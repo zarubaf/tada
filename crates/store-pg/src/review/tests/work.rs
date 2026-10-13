@@ -979,3 +979,243 @@ async fn a_status_chain_that_breaks_a_transition_conflicts_and_applies_nothing()
     assert!(result.is_ok(), "{result:?}");
     assert_eq!(action_state(&test, action_id).await, ("done".to_owned(), 3));
 }
+
+fn workstream_proposal(event: EventId, id: Uuid, name: &str, lead: UserId) -> Value {
+    json!({
+        "kind": "create-workstream", "id": id, "event_id": event.as_uuid(),
+        "name": name, "lead": lead.as_uuid(),
+    })
+}
+
+#[tokio::test]
+async fn action_in_a_new_workstream_applies_with_it() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let anna = open_day.contributor.user_id();
+    let [workstream, action_id, first, second] = [
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+        Uuid::now_v7(),
+    ];
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![
+            proposal(
+                first,
+                workstream_proposal(open_day.event, workstream, "Programm", anna),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(
+                second,
+                action(open_day.event, action_id, anna, Some(workstream)),
+                &[first],
+                "im Mai 2030",
+            ),
+        ],
+    )
+    .await;
+
+    // The contributor who leads the workstream cannot apply it: the managers review the new workstream.
+    let result = apply(&test, &open_day.contributor, &changeset, select(&[second])).await;
+    assert!(matches!(result, Err(ApplyError::Forbidden)), "{result:?}");
+    assert_eq!(count(&test, "workstream").await, 0);
+
+    // Selecting the action also applies the workstream that it depends on.
+    let applied = apply(&test, &open_day.manager, &changeset, select(&[second]))
+        .await
+        .unwrap();
+    assert_eq!(applied.local_ids.len(), 1);
+    let (name, lead, status, version): (String, Uuid, String, i64) =
+        sqlx::query_as("SELECT name, lead_user_id, status, version FROM workstream WHERE id = $1")
+            .bind(workstream)
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (name.as_str(), lead, status.as_str(), version),
+        ("Programm", anna.as_uuid(), "active", 1)
+    );
+    let in_workstream: Option<Uuid> =
+        sqlx::query_scalar("SELECT workstream_id FROM action WHERE id = $1")
+            .bind(action_id)
+            .fetch_one(&test.database.pool)
+            .await
+            .unwrap();
+    assert_eq!(in_workstream, Some(workstream));
+    assert_eq!(
+        audit_actions(&test, workstream).await,
+        ["workstream.create"]
+    );
+}
+
+#[tokio::test]
+async fn a_lead_who_lost_the_role_makes_the_workstream_apply_conflict() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let anna = open_day.contributor.user_id();
+    let id = Uuid::now_v7();
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            id,
+            workstream_proposal(open_day.event, Uuid::now_v7(), "Programm", anna),
+            &[],
+            "Das Open Day",
+        )],
+    )
+    .await;
+    sqlx::query("DELETE FROM event_membership WHERE event_id = $1 AND user_id = $2")
+        .bind(open_day.event.as_uuid())
+        .bind(anna.as_uuid())
+        .execute(&test.database.pool)
+        .await
+        .unwrap();
+    let result = apply(&test, &open_day.manager, &changeset, select(&[id])).await;
+    assert!(
+        matches!(result, Err(ApplyError::Conflict(ref ids)) if ids == &[ProposalId::from_uuid(id)]),
+        "{result:?}"
+    );
+    assert_eq!(count(&test, "workstream").await, 0);
+}
+
+#[tokio::test]
+async fn a_review_edit_cannot_change_a_workstream_proposal() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let id = Uuid::now_v7();
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            id,
+            workstream_proposal(
+                open_day.event,
+                Uuid::now_v7(),
+                "Programm",
+                open_day.contributor.user_id(),
+            ),
+            &[],
+            "Das Open Day",
+        )],
+    )
+    .await;
+    let input = ApplyInput {
+        selected: vec![ProposalId::from_uuid(id)],
+        links: Vec::new(),
+        edits: vec![edit(id, json!({"name": "Bühne"}))],
+    };
+    let result = apply(&test, &open_day.manager, &changeset, input).await;
+    assert_eq!(
+        invalid(result),
+        [("edits/0/proposal_id".to_owned(), "not-editable")]
+    );
+    assert_eq!(count(&test, "workstream").await, 0);
+}
+
+#[tokio::test]
+async fn a_workstream_name_taken_after_the_proposal_makes_the_apply_conflict() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let id = Uuid::now_v7();
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            id,
+            workstream_proposal(
+                open_day.event,
+                Uuid::now_v7(),
+                "Programm",
+                open_day.contributor.user_id(),
+            ),
+            &[],
+            "Das Open Day",
+        )],
+    )
+    .await;
+    sqlx::query(
+        "INSERT INTO workstream (id, organization_id, event_id, name, lead_user_id, status, version, created_at, updated_at)
+         VALUES ($1, $2, $3, 'PROGRAMM', $4, 'active', 1, now(), now())",
+    )
+    .bind(Uuid::now_v7())
+    .bind(open_day.organization.as_uuid())
+    .bind(open_day.event.as_uuid())
+    .bind(open_day.manager.user_id().as_uuid())
+    .execute(&test.database.pool)
+    .await
+    .unwrap();
+    let result = apply(&test, &open_day.manager, &changeset, select(&[id])).await;
+    assert!(matches!(result, Err(ApplyError::Conflict(_))), "{result:?}");
+    assert_eq!(count(&test, "workstream").await, 1);
+}
+
+/// A concurrent transaction creates the same name after the check of the apply: the apply waits on the unique
+/// index, loses the race when the other transaction commits, and returns a conflict, not an internal error.
+#[tokio::test]
+async fn an_apply_that_loses_the_race_for_a_workstream_name_conflicts() {
+    let test = TestDatabase::start().await;
+    let open_day = open_day(&test).await;
+    let id = Uuid::now_v7();
+    let changeset = propose(
+        &test,
+        &open_day.contributor,
+        Some(open_day.event),
+        vec![proposal(
+            id,
+            workstream_proposal(
+                open_day.event,
+                Uuid::now_v7(),
+                "Programm",
+                open_day.contributor.user_id(),
+            ),
+            &[],
+            "Das Open Day",
+        )],
+    )
+    .await;
+    let mut holder = test.database.pool.begin().await.unwrap();
+    sqlx::query(
+        "INSERT INTO workstream (id, organization_id, event_id, name, lead_user_id, status, version, created_at, updated_at)
+         VALUES ($1, $2, $3, 'PROGRAMM', $4, 'active', 1, now(), now())",
+    )
+    .bind(Uuid::now_v7())
+    .bind(open_day.organization.as_uuid())
+    .bind(open_day.event.as_uuid())
+    .bind(open_day.manager.user_id().as_uuid())
+    .execute(&mut *holder)
+    .await
+    .unwrap();
+    let release = async {
+        let waiting = "SELECT count(DISTINCT pid) FROM pg_locks WHERE NOT granted";
+        let wait_for_apply = async {
+            while test.scalar::<i64>(waiting).await < 1 {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        };
+        tokio::time::timeout(std::time::Duration::from_secs(30), wait_for_apply)
+            .await
+            .expect("the apply waits for the name");
+        holder.commit().await.unwrap();
+    };
+    let (result, ()) = tokio::join!(
+        apply(&test, &open_day.manager, &changeset, select(&[id])),
+        release,
+    );
+    let Err(ApplyError::Conflict(conflicts)) = result else {
+        panic!("not a conflict: {result:?}");
+    };
+    assert_eq!(conflicts, [ProposalId::from_uuid(id)]);
+    assert_eq!(count(&test, "workstream").await, 1);
+    assert_eq!(
+        status_of(&test, &open_day, changeset.id, id).await,
+        ProposalStatus::Conflict
+    );
+}

@@ -25,6 +25,7 @@ use crate::records::RecordRef;
 use crate::sources::Evidence;
 use crate::work::{
     ActionDescription, ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
+    WorkstreamName,
 };
 
 /// The change that a proposal suggests.
@@ -138,6 +139,14 @@ pub enum Operation {
         status: CommitmentStatus,
         expected_version: RecordVersion,
     },
+    /// Create a workstream of an event with its lead (ADR 0080). It starts `active`.
+    /// Only the event managers review it.
+    CreateWorkstream {
+        id: WorkstreamId,
+        event_id: EventId,
+        name: WorkstreamName,
+        lead: UserId,
+    },
 }
 
 /// The document of a draft: a new document, or an existing document of the event at its current version.
@@ -174,6 +183,7 @@ pub enum NewRecord {
     Institution(InstitutionId),
     Action(ActionId),
     Commitment(CommitmentId),
+    Workstream(WorkstreamId),
 }
 
 impl NewRecord {
@@ -187,6 +197,7 @@ impl NewRecord {
             Self::Institution(id) => id.as_uuid(),
             Self::Action(id) => id.as_uuid(),
             Self::Commitment(id) => id.as_uuid(),
+            Self::Workstream(id) => id.as_uuid(),
         }
     }
 }
@@ -206,6 +217,7 @@ impl Operation {
             Self::CreateInstitution { id, .. } => Some(NewRecord::Institution(*id)),
             Self::CreateAction { id, .. } => Some(NewRecord::Action(*id)),
             Self::CreateCommitment { id, .. } => Some(NewRecord::Commitment(*id)),
+            Self::CreateWorkstream { id, .. } => Some(NewRecord::Workstream(*id)),
             Self::SetFact { .. }
             | Self::AddChoiceValue { .. }
             | Self::DeprecateField { .. }
@@ -229,6 +241,7 @@ impl Operation {
             | Self::CreateDocumentDraft { event_id, .. }
             | Self::CreateAction { event_id, .. }
             | Self::CreateCommitment { event_id, .. }
+            | Self::CreateWorkstream { event_id, .. }
             | Self::ChangeActionStatus { event_id, .. }
             | Self::ChangeActionDue { event_id, .. }
             | Self::ChangeCommitmentStatus { event_id, .. } => Some(*event_id),
@@ -262,7 +275,8 @@ impl Operation {
             | Self::CreatePerson { .. }
             | Self::CreateInstitution { .. }
             | Self::CreateAction { .. }
-            | Self::CreateCommitment { .. } => None,
+            | Self::CreateCommitment { .. }
+            | Self::CreateWorkstream { .. } => None,
         }
     }
 
@@ -281,6 +295,7 @@ impl Operation {
             | Self::CreateDocumentDraft { .. }
             | Self::CreatePerson { .. }
             | Self::CreateInstitution { .. }
+            | Self::CreateWorkstream { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
             | Self::ChangeCommitmentStatus { .. } => None,
@@ -313,6 +328,7 @@ impl Operation {
             | Self::CreateInstitution { .. }
             | Self::CreateAction { .. }
             | Self::CreateCommitment { .. }
+            | Self::CreateWorkstream { .. }
             | Self::ChangeActionStatus { .. }
             | Self::ChangeActionDue { .. }
             | Self::ChangeCommitmentStatus { .. } => None,
@@ -569,6 +585,21 @@ mod tests {
         assert_eq!(create.changed_record(), None);
         assert_eq!(create.workstream(), Some(workstream));
         assert_eq!(new_commitment(person, None).workstream(), None);
+    }
+
+    #[test]
+    fn a_new_workstream_changes_no_record_and_names_no_workstream() {
+        let workstream = WorkstreamId::from_uuid(Uuid::from_u128(40));
+        let create = Operation::CreateWorkstream {
+            id: workstream,
+            event_id: event(),
+            name: WorkstreamName::parse("Programm").unwrap(),
+            lead: UserId::from_uuid(Uuid::from_u128(1)),
+        };
+        assert_eq!(create.changed_record(), None);
+        assert_eq!(create.workstream(), None);
+        assert_eq!(create.new_record(), Some(NewRecord::Workstream(workstream)));
+        assert_eq!(create.event_id(), Some(event()));
     }
 
     #[test]

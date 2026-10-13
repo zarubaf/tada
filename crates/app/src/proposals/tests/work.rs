@@ -64,8 +64,16 @@ impl WorkstreamStore for Memory {
             .cloned())
     }
 
-    async fn list(&self, _: OrgScope, _: EventId) -> Result<Vec<Workstream>, StoreError> {
-        unreachable!()
+    async fn list(&self, scope: OrgScope, event: EventId) -> Result<Vec<Workstream>, StoreError> {
+        let found = scope.organization_id() == testwil();
+        Ok(self
+            .workstreams
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|workstream| found && workstream.event_id == event)
+            .cloned()
+            .collect())
     }
 }
 
@@ -483,6 +491,150 @@ async fn a_proposal_cannot_set_a_closed_workstream() {
     };
     assert_eq!(*due_date, Some(Date::constant(2030, 4, 30)));
     assert_eq!(*workstream, Some(active));
+}
+
+fn new_workstream(id: Uuid, name: &str, lead: UserId) -> Value {
+    json!({
+        "kind": "create-workstream", "id": id, "event_id": open_day().as_uuid(),
+        "name": name, "lead": lead.as_uuid(),
+    })
+}
+
+#[tokio::test]
+async fn a_workstream_proposal_checks_its_lead_and_name() {
+    let memory = Memory::default();
+    let proposer = contributor(&memory);
+    workstream(&memory, open_day(), WorkstreamStatus::Active);
+    let intake = |name: &str, lead: UserId| {
+        changeset(
+            Some(open_day()),
+            vec![proposal(
+                Uuid::now_v7(),
+                new_workstream(Uuid::now_v7(), name, lead),
+                &[],
+                "Das Open Day",
+            )],
+        )
+    };
+    for (name, lead, field, code) in [
+        ("Programm", bruno(), "lead", "unknown-member"),
+        (
+            "Programm",
+            UserId::from_uuid(Uuid::from_u128(99)),
+            "lead",
+            "unknown-member",
+        ),
+        ("bodenbetrieb", anna(), "name", "taken"),
+        (&"a".repeat(201), anna(), "name", "too-long"),
+        ("", anna(), "name", "empty"),
+    ] {
+        let result =
+            create_changeset(&proposer, intake(name, lead), stores(&memory), &FixedClock).await;
+        assert_eq!(
+            invalid_fields(result),
+            [(format!("proposals/0/operation/{field}"), code)]
+        );
+    }
+    let result = create_changeset(
+        &proposer,
+        intake("Programm", anna()),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    let stored = changeset_of(result.unwrap());
+    assert!(matches!(
+        stored.proposals[0].operation,
+        Operation::CreateWorkstream { .. }
+    ));
+}
+
+#[tokio::test]
+async fn a_closed_workstream_keeps_its_name() {
+    let memory = Memory::default();
+    let proposer = contributor(&memory);
+    workstream(&memory, open_day(), WorkstreamStatus::Closed);
+    let intake = changeset(
+        Some(open_day()),
+        vec![proposal(
+            Uuid::now_v7(),
+            new_workstream(Uuid::now_v7(), "Bodenbetrieb", anna()),
+            &[],
+            "Das Open Day",
+        )],
+    );
+    let result = create_changeset(&proposer, intake, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/0/operation/name".to_owned(), "taken")]
+    );
+}
+
+#[tokio::test]
+async fn two_workstreams_of_a_changeset_cannot_differ_only_in_case() {
+    let memory = Memory::default();
+    let proposer = contributor(&memory);
+    let intake = changeset(
+        Some(open_day()),
+        vec![
+            proposal(
+                Uuid::now_v7(),
+                new_workstream(Uuid::now_v7(), "Programm", anna()),
+                &[],
+                "Das Open Day",
+            ),
+            proposal(
+                Uuid::now_v7(),
+                new_workstream(Uuid::now_v7(), "PROGRAMM", anna()),
+                &[],
+                "Das Open Day",
+            ),
+        ],
+    );
+    let result = create_changeset(&proposer, intake, stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/1/operation/name".to_owned(), "taken")]
+    );
+}
+
+#[tokio::test]
+async fn an_action_can_name_a_workstream_of_its_changeset_as_a_dependency() {
+    let memory = Memory::default();
+    let proposer = contributor(&memory);
+    let (new, proposals) = (Uuid::now_v7(), [Uuid::now_v7(), Uuid::now_v7()]);
+    let intake = |depends_on: &[Uuid]| {
+        changeset(
+            Some(open_day()),
+            vec![
+                proposal(
+                    proposals[0],
+                    new_workstream(new, "Programm", anna()),
+                    &[],
+                    "Das Open Day",
+                ),
+                proposal(
+                    proposals[1],
+                    action(Uuid::now_v7(), Some(WorkstreamId::from_uuid(new))),
+                    depends_on,
+                    "Das Open Day",
+                ),
+            ],
+        )
+    };
+    let result = create_changeset(&proposer, intake(&[]), stores(&memory), &FixedClock).await;
+    assert_eq!(
+        invalid_fields(result),
+        [("proposals/1/depends_on".to_owned(), "dependency-missing")]
+    );
+    let result = create_changeset(
+        &proposer,
+        intake(&[proposals[0]]),
+        stores(&memory),
+        &FixedClock,
+    )
+    .await;
+    assert!(result.is_ok(), "{result:?}");
 }
 
 #[tokio::test]

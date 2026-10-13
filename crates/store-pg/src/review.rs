@@ -46,6 +46,7 @@ const OPEN_QUESTION_PREFIX: &str = LocalIdKind::OpenQuestion.prefix();
 const KEY_CONSTRAINTS: &[&str] = &["event_key_unique", "field_definition_event_key_unique"];
 
 /// The constraints that a concurrent apply of the same record breaks, after the version checks.
+/// The readable numbers need none: the counter row of each scope makes the applies wait for each other.
 const RECORD_CONSTRAINTS: &[&str] = &[
     "event_pkey",
     "field_definition_pkey",
@@ -54,6 +55,8 @@ const RECORD_CONSTRAINTS: &[&str] = &[
     "document_pkey",
     "person_pkey",
     "institution_pkey",
+    "workstream_pkey",
+    "workstream_name",
     "action_pkey",
     "commitment_pkey",
 ];
@@ -387,7 +390,8 @@ async fn lock_targets(
             | Operation::CreateCommitment { .. }
             | Operation::ChangeActionStatus { .. }
             | Operation::ChangeActionDue { .. }
-            | Operation::ChangeCommitmentStatus { .. } => {}
+            | Operation::ChangeCommitmentStatus { .. }
+            | Operation::CreateWorkstream { .. } => {}
         }
     }
     // Shipped fields have no organization and change only with `tada migrate`, so they need no lock.
@@ -607,7 +611,8 @@ async fn check_versions(
             | Operation::CreateCommitment { .. }
             | Operation::ChangeActionStatus { .. }
             | Operation::ChangeActionDue { .. }
-            | Operation::ChangeCommitmentStatus { .. }) => {
+            | Operation::ChangeCommitmentStatus { .. }
+            | Operation::CreateWorkstream { .. }) => {
                 records::matches(conn, scope, operation, &new_records, &mut record_versions).await?
             }
         };
@@ -855,7 +860,8 @@ async fn write_step(
         | Operation::CreateCommitment { .. }
         | Operation::ChangeActionStatus { .. }
         | Operation::ChangeActionDue { .. }
-        | Operation::ChangeCommitmentStatus { .. } => {
+        | Operation::ChangeCommitmentStatus { .. }
+        | Operation::CreateWorkstream { .. } => {
             let written = records::write_record(conn, scope, plan, step).await?;
             local_id = written.local_id;
             edit_source = written.edit_source;

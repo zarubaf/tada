@@ -6,15 +6,17 @@
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
+use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{EventId, LocalIdKind, SourceVersionId, WorkstreamId};
 use tada_app::domain::parties::Party;
 use tada_app::domain::proposals::Operation;
 use tada_app::domain::redaction::Redactable;
-use tada_app::domain::work::{ActionStatus, CommitmentStatus};
+use tada_app::domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus};
 use tada_app::parties::{InstitutionFields, PersonFields};
 use tada_app::records::RecordRef;
 use tada_app::review::{ApplyPlan, ApplyStep, LocalRecord, NewLocalId, StepEvidence};
 use tada_app::work::{ActionFields, CommitmentFields, NewActionRecord, NewCommitmentRecord};
+use tada_app::workstreams::Workstream;
 
 use super::insert_review_text;
 use crate::evidence::insert_evidence;
@@ -23,6 +25,7 @@ use crate::proposals::operation_to_json;
 use crate::work::{
     action_in, commitment_in, insert_action, insert_commitment, update_action, update_commitment,
 };
+use crate::workstreams::insert_workstream;
 
 /// What a step wrote besides the record: the readable ID of a new record, and the review text of an edit.
 #[derive(Debug, Default)]
@@ -150,6 +153,24 @@ pub(super) async fn write_record(
             let number = insert_commitment(conn, scope, &commitment, plan.now).await?;
             written.local_id = Some(local_id(LocalRecord::Commitment(*id), number)?);
             (RecordRef::Commitment(*id), 1)
+        }
+        Operation::CreateWorkstream {
+            id,
+            event_id,
+            name,
+            lead,
+        } => {
+            let workstream = Workstream {
+                id: *id,
+                event_id: *event_id,
+                name: Redactable::Present(name.clone()),
+                lead: *lead,
+                status: WorkstreamStatus::Active,
+                version: RecordVersion::FIRST,
+            };
+            insert_workstream(conn, scope, &workstream, plan.now).await?;
+            // A workstream has no readable ID and keeps no evidence: the proposal holds it (ADR 0067).
+            return Ok(written);
         }
         Operation::ChangeActionStatus {
             event_id,
@@ -307,7 +328,7 @@ pub(super) async fn matches(
             )
             .fetch_one(&mut *conn)
             .await?;
-            free && takes_records(conn, scope, *event_id, *workstream).await?
+            free && takes_records(conn, scope, *event_id, *workstream, new_records).await?
         }
         Operation::CreateCommitment {
             id,
@@ -324,7 +345,23 @@ pub(super) async fn matches(
             .await?;
             let promisor_exists = new_records.contains(&promisor.as_uuid())
                 || party_exists(conn, scope, *promisor).await?;
-            free && promisor_exists && takes_records(conn, scope, *event_id, *workstream).await?
+            free && promisor_exists
+                && takes_records(conn, scope, *event_id, *workstream, new_records).await?
+        }
+        Operation::CreateWorkstream {
+            id, event_id, name, ..
+        } => {
+            sqlx::query_scalar!(
+                r#"SELECT NOT EXISTS (
+                       SELECT 1 FROM workstream
+                       WHERE id = $1 OR (event_id = $2 AND lower(name) = lower($3))
+                   ) AS "free!""#,
+                id.as_uuid(),
+                event_id.as_uuid(),
+                name.as_str(),
+            )
+            .fetch_one(&mut *conn)
+            .await?
         }
         Operation::ChangeActionStatus {
             event_id,
@@ -380,17 +417,22 @@ pub(super) async fn matches(
     })
 }
 
-/// True if a new record of the event can have the workstream: none, or an active workstream of the event (ADR 0067).
+/// True if a new record of the event can have the workstream: none, a new workstream of an earlier step of the plan,
+/// or an active workstream of the event (ADR 0067).
 /// `lock_targets` locked the workstream, so it cannot close before the commit.
 async fn takes_records(
     conn: &mut PgConnection,
     scope: OrgScope,
     event: EventId,
     workstream: Option<WorkstreamId>,
+    new_records: &std::collections::HashSet<Uuid>,
 ) -> Result<bool, sqlx::Error> {
     let Some(workstream) = workstream else {
         return Ok(true);
     };
+    if new_records.contains(&workstream.as_uuid()) {
+        return Ok(true);
+    }
     sqlx::query_scalar!(
         r#"SELECT EXISTS (
                SELECT 1 FROM workstream
