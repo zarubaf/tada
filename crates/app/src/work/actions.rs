@@ -8,9 +8,9 @@ use tada_domain::work::ActionStatus;
 use uuid::Uuid;
 
 use super::checks::{
-    Assignment, changed, check_assignment, check_dates, check_milestone, created, may_change,
-    parse_description, parse_title, require_any_change, require_change, require_create, show,
-    show_one, writable_access,
+    Assignment, changed, check_assignment, check_dates, check_milestone, parse_description,
+    parse_title, require_any_change, require_change, require_create, show, show_created, show_one,
+    writable_access,
 };
 use super::{ActionFields, ActionView, NewActionRecord, WorkError, WorkPorts, WorkQuery};
 use crate::access::{self, Principal};
@@ -87,22 +87,11 @@ pub async fn create_action(
         },
     };
     let audit = audit(caller, AuditAction::ActionCreate, id.as_uuid());
-    let action = created(
-        ports
-            .work
-            .create_action(scope, &action, ports.clock.now(), &audit)
-            .await?,
-    )?;
-    let can_change = may_change(
-        caller,
-        access,
-        event,
-        action.fields.owner,
-        action.fields.workstream_id,
-        ports.workstreams,
-    )
-    .await?;
-    Ok(Shown::created(action, can_change))
+    let result = ports
+        .work
+        .create_action(scope, &action, ports.clock.now(), &audit)
+        .await?;
+    show_created(caller, access, event, result, ports).await
 }
 
 /// Changes an action: its owner, the lead of its workstream or an event manager can do it.

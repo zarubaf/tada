@@ -15,8 +15,8 @@ use tada_domain::work::RecordDescription;
 use uuid::Uuid;
 
 use super::checks::{
-    Assignment, WorkRecord, changed, check_assignment, created, may_change, parse_description,
-    require_any_change, require_change, require_create, show, show_one, writable_access,
+    Assignment, WorkRecord, changed, check_assignment, parse_description, require_any_change,
+    require_change, require_create, show, show_created, show_one, writable_access,
 };
 use super::{WorkError, WorkFilter, WorkPorts, WorkQuery};
 use crate::access::{self, Principal};
@@ -213,22 +213,11 @@ pub async fn create_milestone(
         },
     };
     let audit = audit(caller, AuditAction::MilestoneCreate, id.as_uuid());
-    let milestone = created(
-        ports
-            .milestones
-            .create_milestone(scope, &milestone, ports.clock.now(), &audit)
-            .await?,
-    )?;
-    let can_change = may_change(
-        caller,
-        access,
-        event,
-        milestone.fields.owner,
-        milestone.fields.workstream_id,
-        ports.workstreams,
-    )
-    .await?;
-    Ok(Shown::created(milestone, can_change))
+    let result = ports
+        .milestones
+        .create_milestone(scope, &milestone, ports.clock.now(), &audit)
+        .await?;
+    show_created(caller, access, event, result, ports).await
 }
 
 /// Changes a milestone: its owner, the lead of its workstream or an event manager can do it.

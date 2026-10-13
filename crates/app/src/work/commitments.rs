@@ -9,8 +9,8 @@ use tada_domain::work::{CommitmentStatus, ConditionText, RecordReason};
 use uuid::Uuid;
 
 use super::checks::{
-    Assignment, changed, check_assignment, check_promisor, created, may_change, parse_text,
-    require_any_change, require_change, require_create, show, show_one, writable_access,
+    Assignment, changed, check_assignment, check_promisor, parse_text, require_any_change,
+    require_change, require_create, show, show_created, show_one, writable_access,
 };
 use super::{
     CommitmentFields, CommitmentView, NewCommitmentRecord, WorkError, WorkPorts, WorkQuery,
@@ -99,22 +99,11 @@ pub async fn create_commitment(
         },
     };
     let audit = audit(caller, AuditAction::CommitmentCreate, id.as_uuid());
-    let commitment = created(
-        ports
-            .work
-            .create_commitment(scope, &commitment, ports.clock.now(), &audit)
-            .await?,
-    )?;
-    let can_change = may_change(
-        caller,
-        access,
-        event,
-        commitment.fields.owner,
-        commitment.fields.workstream_id,
-        ports.workstreams,
-    )
-    .await?;
-    Ok(Shown::created(commitment, can_change))
+    let result = ports
+        .work
+        .create_commitment(scope, &commitment, ports.clock.now(), &audit)
+        .await?;
+    show_created(caller, access, event, result, ports).await
 }
 
 /// The current commitment and the access of the caller, if the caller can change the commitment.

@@ -372,8 +372,29 @@ pub(super) async fn show_one<T: WorkRecord>(
     .await
 }
 
+/// The record of a direct create as the caller reads it: without evidence, with the right of the caller to change it.
+pub(super) async fn show_created<T: WorkRecord>(
+    caller: &MemberCaller,
+    access: EventAccess,
+    event: EventId,
+    result: Created<T>,
+    ports: WorkPorts<'_>,
+) -> Result<Shown<T>, WorkError> {
+    let record = created(result)?;
+    let can_change = may_change(
+        caller,
+        access,
+        event,
+        record.owner(),
+        record.workstream(),
+        ports.workstreams,
+    )
+    .await?;
+    Ok(Shown::created(record, can_change))
+}
+
 /// The record of a create, or `taken` for its ID.
-pub(super) fn created<T>(result: Created<T>) -> Result<T, WorkError> {
+fn created<T>(result: Created<T>) -> Result<T, WorkError> {
     match result {
         Created::Created(view) => Ok(view),
         Created::IdTaken => Err(WorkError::Invalid(vec![FieldError::new("id", "taken")])),
