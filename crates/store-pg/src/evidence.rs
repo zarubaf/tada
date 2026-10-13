@@ -11,6 +11,7 @@ use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{
     ActionId, CommitmentId, InstitutionId, MilestoneId, PersonId, ProposalId, SourceVersionId,
 };
+use tada_app::domain::records::RecordKind;
 use tada_app::domain::sources::Evidence;
 use tada_app::records::{EvidenceStore, RecordEvidenceView, RecordRef};
 use tada_app::store::StoreError;
@@ -19,42 +20,13 @@ use crate::error::{InvalidRow, store_error};
 use crate::sources::readable_source_ids;
 use crate::{Database, redacted};
 
-/// The value of one record column of `record_evidence` for a record: its ID if the record has the kind of the column.
-type Column = fn(RecordRef) -> Option<Uuid>;
-
-fn action(record: RecordRef) -> Option<Uuid> {
-    match record {
-        RecordRef::Action(id) => Some(id.as_uuid()),
-        _ => None,
-    }
-}
-
-fn commitment(record: RecordRef) -> Option<Uuid> {
-    match record {
-        RecordRef::Commitment(id) => Some(id.as_uuid()),
-        _ => None,
-    }
-}
-
-fn person(record: RecordRef) -> Option<Uuid> {
-    match record {
-        RecordRef::Person(id) => Some(id.as_uuid()),
-        _ => None,
-    }
-}
-
-fn institution(record: RecordRef) -> Option<Uuid> {
-    match record {
-        RecordRef::Institution(id) => Some(id.as_uuid()),
-        _ => None,
-    }
-}
-
-fn milestone(record: RecordRef) -> Option<Uuid> {
-    match record {
-        RecordRef::Milestone(id) => Some(id.as_uuid()),
-        _ => None,
-    }
+/// The IDs of the records of `kind` in `records`, for the column or the table of that kind.
+pub(crate) fn ids_of(records: &[RecordRef], kind: RecordKind) -> Vec<Uuid> {
+    records
+        .iter()
+        .filter(|record| record.kind() == kind)
+        .map(|record| record.as_uuid())
+        .collect()
 }
 
 struct EvidenceRow {
@@ -122,10 +94,10 @@ impl EvidenceStore for Database {
         records: &[RecordRef],
         reach: &SourceReach,
     ) -> Result<Vec<(RecordRef, RecordEvidenceView)>, StoreError> {
-        let ids =
-            |column: Column| -> Vec<Uuid> { records.iter().copied().filter_map(column).collect() };
-        let (actions, commitments, persons) = (ids(action), ids(commitment), ids(person));
-        let (institutions, milestones) = (ids(institution), ids(milestone));
+        let ids = |kind| ids_of(records, kind);
+        let (actions, commitments) = (ids(RecordKind::Action), ids(RecordKind::Commitment));
+        let (persons, institutions) = (ids(RecordKind::Person), ids(RecordKind::Institution));
+        let milestones = ids(RecordKind::Milestone);
         let organization = scope.organization_id().as_uuid();
         // A person or an institution belongs to the organization, but the source of its evidence belongs to an event:
         // the caller sees only the passages of the sources that it can read (ADR 0050). The filter comes before the
@@ -195,6 +167,8 @@ pub(crate) async fn insert_evidence(
 ) -> Result<(), sqlx::Error> {
     let offset =
         |value: u32| i32::try_from(value).map_err(|error| sqlx::Error::Encode(Box::new(error)));
+    // The value of one record column: the ID if the record has the kind of the column.
+    let column = |kind| (record.kind() == kind).then(|| record.as_uuid());
     for Evidence {
         source_version_id,
         passage,
@@ -209,11 +183,11 @@ pub(crate) async fn insert_evidence(
                      CASE WHEN $13::text IS NULL THEN now() END)",
             Uuid::now_v7(),
             scope.organization_id().as_uuid(),
-            action(record),
-            commitment(record),
-            person(record),
-            institution(record),
-            milestone(record),
+            column(RecordKind::Action),
+            column(RecordKind::Commitment),
+            column(RecordKind::Person),
+            column(RecordKind::Institution),
+            column(RecordKind::Milestone),
             version,
             proposal.as_uuid(),
             source_version_id.as_uuid(),
