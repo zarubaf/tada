@@ -14,7 +14,7 @@ use tada_app::domain::ids::{
 };
 use tada_app::domain::parties::{InstitutionKind, Party, PartyName, PhoneNumber};
 use tada_app::domain::proposals::{DraftDocument, Operation, QuestionText};
-use tada_app::domain::records::{MilestoneStatus, MilestoneTitle};
+use tada_app::domain::records::{MilestoneStatus, MilestoneTitle, RecordRef};
 use tada_app::domain::work::{
     ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText, RecordDescription,
     WorkstreamName,
@@ -690,71 +690,43 @@ fn parsed<T, E>(
 /// The columns `target_kind`, `target_id` and `expected_version` of a proposal.
 /// A fact has no ID before its first version, so the target of a fact is its field.
 pub(super) fn target(operation: &Operation) -> (&'static str, Uuid, Option<i64>) {
-    match operation {
-        Operation::CreateEvent { id, .. } => ("event", id.as_uuid(), None),
-        Operation::SetFact {
-            field_id,
-            expected_version,
-            ..
-        } => (
-            "fact",
-            field_id.as_uuid(),
-            expected_version.map(RecordVersion::get),
-        ),
-        Operation::AddFieldDefinition { id, .. } => ("field_definition", id.as_uuid(), None),
+    let (kind, id) = match operation {
+        Operation::CreateEvent { id, .. } => ("event", id.as_uuid()),
+        Operation::SetFact { field_id, .. } => ("fact", field_id.as_uuid()),
+        Operation::AddFieldDefinition { id, .. } => ("field_definition", id.as_uuid()),
         Operation::AddChoiceValue { field_id, .. } | Operation::DeprecateField { field_id, .. } => {
-            ("field_definition", field_id.as_uuid(), None)
+            ("field_definition", field_id.as_uuid())
         }
-        Operation::CreateOpenQuestion { id, .. } => ("open_question", id.as_uuid(), None),
-        Operation::CreatePerson { id, .. } => ("person", id.as_uuid(), None),
-        Operation::CreateInstitution { id, .. } => ("institution", id.as_uuid(), None),
-        Operation::CreateAction { id, .. } => ("action", id.as_uuid(), None),
-        Operation::CreateCommitment { id, .. } => ("commitment", id.as_uuid(), None),
-        Operation::CreateWorkstream { id, .. } => ("workstream", id.as_uuid(), None),
-        Operation::ChangeActionStatus {
-            action_id,
-            expected_version,
-            ..
+        Operation::CreateOpenQuestion { id, .. } => ("open_question", id.as_uuid()),
+        Operation::CreateDocumentDraft { document, .. } => {
+            ("document", document.document_id().as_uuid())
         }
-        | Operation::ChangeActionDue {
-            action_id,
-            expected_version,
-            ..
+        Operation::CreateWorkstream { id, .. } => ("workstream", id.as_uuid()),
+        Operation::CreatePerson { id, .. } => record(RecordRef::Person(*id)),
+        Operation::CreateInstitution { id, .. } => record(RecordRef::Institution(*id)),
+        Operation::CreateAction { id, .. } => record(RecordRef::Action(*id)),
+        Operation::CreateCommitment { id, .. } => record(RecordRef::Commitment(*id)),
+        Operation::CreateMilestone { id, .. } => record(RecordRef::Milestone(*id)),
+        Operation::ChangeActionStatus { action_id, .. }
+        | Operation::ChangeActionDue { action_id, .. }
+        | Operation::ChangeActionMilestone { action_id, .. } => {
+            record(RecordRef::Action(*action_id))
         }
-        | Operation::ChangeActionMilestone {
-            action_id,
-            expected_version,
-            ..
-        } => ("action", action_id.as_uuid(), Some(expected_version.get())),
-        Operation::ChangeCommitmentStatus {
-            commitment_id,
-            expected_version,
-            ..
-        } => (
-            "commitment",
-            commitment_id.as_uuid(),
-            Some(expected_version.get()),
-        ),
-        Operation::CreateMilestone { id, .. } => ("milestone", id.as_uuid(), None),
-        Operation::ChangeMilestoneStatus {
-            milestone_id,
-            expected_version,
-            ..
-        } => (
-            "milestone",
-            milestone_id.as_uuid(),
-            Some(expected_version.get()),
-        ),
-        Operation::CreateDocumentDraft { document, .. } => match document {
-            DraftDocument::New { id, .. } => ("document", id.as_uuid(), None),
-            DraftDocument::Existing {
-                document_id,
-                expected_version,
-            } => (
-                "document",
-                document_id.as_uuid(),
-                Some(expected_version.get()),
-            ),
-        },
-    }
+        Operation::ChangeCommitmentStatus { commitment_id, .. } => {
+            record(RecordRef::Commitment(*commitment_id))
+        }
+        Operation::ChangeMilestoneStatus { milestone_id, .. } => {
+            record(RecordRef::Milestone(*milestone_id))
+        }
+    };
+    (
+        kind,
+        id,
+        operation.expected_version().map(RecordVersion::get),
+    )
+}
+
+/// The target kind of a record is the name of its table.
+fn record(record: RecordRef) -> (&'static str, Uuid) {
+    (record.kind().as_str(), record.as_uuid())
 }

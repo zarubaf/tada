@@ -231,6 +231,14 @@ impl NewRecord {
     }
 }
 
+/// The event, the owner and the workstream of a new work record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NewWorkRecord {
+    pub event_id: EventId,
+    pub owner: UserId,
+    pub workstream: Option<WorkstreamId>,
+}
+
 impl Operation {
     /// The record that the operation creates, if it creates one.
     pub fn new_record(&self) -> Option<NewRecord> {
@@ -288,7 +296,23 @@ impl Operation {
     pub fn promisor(&self) -> Option<Party> {
         match self {
             Self::CreateCommitment { promisor, .. } => Some(*promisor),
-            _ => None,
+            Self::CreateEvent { .. }
+            | Self::SetFact { .. }
+            | Self::AddFieldDefinition { .. }
+            | Self::AddChoiceValue { .. }
+            | Self::DeprecateField { .. }
+            | Self::CreateOpenQuestion { .. }
+            | Self::CreateDocumentDraft { .. }
+            | Self::CreatePerson { .. }
+            | Self::CreateInstitution { .. }
+            | Self::CreateAction { .. }
+            | Self::ChangeActionStatus { .. }
+            | Self::ChangeActionDue { .. }
+            | Self::ChangeActionMilestone { .. }
+            | Self::ChangeCommitmentStatus { .. }
+            | Self::CreateWorkstream { .. }
+            | Self::CreateMilestone { .. }
+            | Self::ChangeMilestoneStatus { .. } => None,
         }
     }
 
@@ -317,6 +341,101 @@ impl Operation {
             | Self::CreateCommitment { .. }
             | Self::CreateWorkstream { .. }
             | Self::CreateMilestone { .. } => None,
+        }
+    }
+
+    /// The version of its target that the operation expects: the record that it changes, the fact that it sets
+    /// (`None` if the event has no fact of the field yet) or the existing document of a draft.
+    pub fn expected_version(&self) -> Option<RecordVersion> {
+        match self {
+            Self::SetFact {
+                expected_version, ..
+            } => *expected_version,
+            Self::CreateDocumentDraft {
+                document:
+                    DraftDocument::Existing {
+                        expected_version, ..
+                    },
+                ..
+            }
+            | Self::ChangeActionStatus {
+                expected_version, ..
+            }
+            | Self::ChangeActionDue {
+                expected_version, ..
+            }
+            | Self::ChangeActionMilestone {
+                expected_version, ..
+            }
+            | Self::ChangeCommitmentStatus {
+                expected_version, ..
+            }
+            | Self::ChangeMilestoneStatus {
+                expected_version, ..
+            } => Some(*expected_version),
+            Self::CreateDocumentDraft {
+                document: DraftDocument::New { .. },
+                ..
+            }
+            | Self::CreateEvent { .. }
+            | Self::AddFieldDefinition { .. }
+            | Self::AddChoiceValue { .. }
+            | Self::DeprecateField { .. }
+            | Self::CreateOpenQuestion { .. }
+            | Self::CreatePerson { .. }
+            | Self::CreateInstitution { .. }
+            | Self::CreateAction { .. }
+            | Self::CreateCommitment { .. }
+            | Self::CreateWorkstream { .. }
+            | Self::CreateMilestone { .. } => None,
+        }
+    }
+
+    /// The event, the owner and the workstream of the work record that the operation creates (ADR 0067, ADR 0068).
+    /// The owner of a new workstream is its lead, and a workstream has no workstream.
+    pub fn new_work_record(&self) -> Option<NewWorkRecord> {
+        match self {
+            Self::CreateAction {
+                event_id,
+                owner,
+                workstream,
+                ..
+            }
+            | Self::CreateCommitment {
+                event_id,
+                owner,
+                workstream,
+                ..
+            }
+            | Self::CreateMilestone {
+                event_id,
+                owner,
+                workstream,
+                ..
+            } => Some(NewWorkRecord {
+                event_id: *event_id,
+                owner: *owner,
+                workstream: *workstream,
+            }),
+            Self::CreateWorkstream { event_id, lead, .. } => Some(NewWorkRecord {
+                event_id: *event_id,
+                owner: *lead,
+                workstream: None,
+            }),
+            Self::CreateEvent { .. }
+            | Self::SetFact { .. }
+            | Self::AddFieldDefinition { .. }
+            | Self::AddChoiceValue { .. }
+            | Self::DeprecateField { .. }
+            | Self::CreateOpenQuestion { .. }
+            | Self::CreateDocumentDraft { .. }
+            | Self::CreatePerson { .. }
+            | Self::CreateInstitution { .. }
+            | Self::ChangeActionStatus { .. }
+            | Self::ChangeActionDue { .. }
+            | Self::ChangeActionMilestone { .. }
+            | Self::ChangeCommitmentStatus { .. }
+            | Self::ChangeMilestoneStatus { .. } => None,
         }
     }
 
@@ -378,7 +497,22 @@ impl Operation {
         let milestone = match self {
             Self::CreateAction { milestone, .. }
             | Self::ChangeActionMilestone { milestone, .. } => milestone.map(NewRecord::Milestone),
-            _ => None,
+            Self::CreateEvent { .. }
+            | Self::SetFact { .. }
+            | Self::AddFieldDefinition { .. }
+            | Self::AddChoiceValue { .. }
+            | Self::DeprecateField { .. }
+            | Self::CreateOpenQuestion { .. }
+            | Self::CreateDocumentDraft { .. }
+            | Self::CreatePerson { .. }
+            | Self::CreateInstitution { .. }
+            | Self::CreateCommitment { .. }
+            | Self::ChangeActionStatus { .. }
+            | Self::ChangeActionDue { .. }
+            | Self::ChangeCommitmentStatus { .. }
+            | Self::CreateWorkstream { .. }
+            | Self::CreateMilestone { .. }
+            | Self::ChangeMilestoneStatus { .. } => None,
         };
         promisor
             .into_iter()

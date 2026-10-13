@@ -134,7 +134,13 @@ pub(super) fn audit_of(caller: &MemberCaller, step: &ApplyStep) -> Vec<AuditEven
         Operation::ChangeMilestoneStatus { milestone_id, .. } => {
             Some((AuditAction::MilestoneChange, milestone_id.as_uuid()))
         }
-        _ => None,
+        // These records have their own audit, or none (ADR 0050).
+        Operation::SetFact { .. }
+        | Operation::AddFieldDefinition { .. }
+        | Operation::AddChoiceValue { .. }
+        | Operation::DeprecateField { .. }
+        | Operation::CreateOpenQuestion { .. }
+        | Operation::CreateDocumentDraft { .. } => None,
     };
     if let Some((action, id)) = record {
         events.push(AuditEvent::new(caller.actor(), action, Some(id), scope));

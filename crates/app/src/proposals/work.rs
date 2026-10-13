@@ -6,7 +6,7 @@
 use jiff::Timestamp;
 use tada_domain::ids::{EventId, MilestoneId, UserId, WorkstreamId};
 use tada_domain::parties::Party;
-use tada_domain::proposals::{NewRecord, Operation, Proposal};
+use tada_domain::proposals::{NewRecord, NewWorkRecord, Operation, Proposal};
 use tada_domain::work::{CommitmentStatus, FirmReason, WorkstreamName, dates_in_order};
 
 use super::ProposeStores;
@@ -45,70 +45,41 @@ pub(super) async fn check_work(
         {
             refuse(operation("milestone"), code);
         }
+        if let Some(NewWorkRecord {
+            event_id,
+            owner,
+            workstream,
+        }) = proposal.operation.new_work_record()
+        {
+            // The owner of a new workstream is its lead.
+            let owner_field = if matches!(proposal.operation, Operation::CreateWorkstream { .. }) {
+                "lead"
+            } else {
+                "owner"
+            };
+            if let Some(code) = owner_refusal(scope, event_id, owner, stores.identity).await? {
+                refuse(operation(owner_field), code);
+            }
+            if let Some(code) = new_record_workstream_refusal(
+                scope,
+                event_id,
+                workstream,
+                proposals,
+                stores.workstreams,
+            )
+            .await?
+            {
+                refuse(operation("workstream"), code);
+            }
+        }
         match &proposal.operation {
-            Operation::CreateAction {
-                event_id,
-                owner,
-                workstream,
-                ..
-            }
-            | Operation::CreateMilestone {
-                event_id,
-                owner,
-                workstream,
-                ..
-            } => {
-                if let Some(code) = owner_refusal(scope, *event_id, *owner, stores.identity).await?
-                {
-                    refuse(operation("owner"), code);
-                }
-                if let Some(code) = new_record_workstream_refusal(
-                    scope,
-                    *event_id,
-                    *workstream,
-                    proposals,
-                    stores.workstreams,
-                )
-                .await?
-                {
-                    refuse(operation("workstream"), code);
-                }
-            }
-            Operation::CreateCommitment {
-                event_id,
-                promisor,
-                owner,
-                workstream,
-                ..
-            } => {
-                if let Some(code) = owner_refusal(scope, *event_id, *owner, stores.identity).await?
-                {
-                    refuse(operation("owner"), code);
-                }
-                if let Some(code) = new_record_workstream_refusal(
-                    scope,
-                    *event_id,
-                    *workstream,
-                    proposals,
-                    stores.workstreams,
-                )
-                .await?
-                {
-                    refuse(operation("workstream"), code);
-                }
+            Operation::CreateAction { .. } | Operation::CreateMilestone { .. } => {}
+            Operation::CreateCommitment { promisor, .. } => {
                 if !promisor_exists(scope, *promisor, proposals, stores).await? {
                     refuse(operation("promisor"), "unknown-record");
                 }
             }
-            Operation::CreateWorkstream {
-                event_id,
-                name,
-                lead,
-                ..
-            } => {
-                if let Some(code) = owner_refusal(scope, *event_id, *lead, stores.identity).await? {
-                    refuse(operation("lead"), code);
-                }
+            Operation::CreateWorkstream { event_id, name, .. } => {
                 if name_taken(scope, *event_id, name, proposals[..index].iter(), stores).await? {
                     refuse(operation("name"), "taken");
                 }
@@ -192,7 +163,16 @@ pub(super) async fn check_work(
                 }
                 Some(_) => {}
             },
-            _ => {}
+            // These operations create or change no work record: other checks of the changeset cover them.
+            Operation::CreateEvent { .. }
+            | Operation::SetFact { .. }
+            | Operation::AddFieldDefinition { .. }
+            | Operation::AddChoiceValue { .. }
+            | Operation::DeprecateField { .. }
+            | Operation::CreateOpenQuestion { .. }
+            | Operation::CreateDocumentDraft { .. }
+            | Operation::CreatePerson { .. }
+            | Operation::CreateInstitution { .. } => {}
         }
     }
     Ok(errors)

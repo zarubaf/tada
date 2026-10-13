@@ -20,7 +20,7 @@ use tada_app::domain::ids::{
     ChangesetId, DocumentId, EventId, FieldDefinitionId, LocalIdKind, OpenQuestionId, ProposalId,
     SourceVersionId,
 };
-use tada_app::domain::proposals::{DraftDocument, Operation};
+use tada_app::domain::proposals::{DraftDocument, NewRecord, Operation};
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::sources::{Evidence, Passage, SourceText};
 use tada_app::review::{
@@ -482,30 +482,15 @@ async fn check_versions(
             continue;
         }
         let matches = match &step.operation {
+            // An ID is unique in the whole installation (ADR 0038).
             Operation::CreateEvent { id, .. } => {
-                // An event ID is unique in the whole installation (ADR 0038).
-                !sqlx::query_scalar!(
-                    r#"SELECT EXISTS (SELECT 1 FROM event WHERE id = $1) AS "exists!""#,
-                    id.as_uuid(),
-                )
-                .fetch_one(&mut *conn)
-                .await?
+                records::id_free(conn, NewRecord::Event(*id)).await?
             }
             Operation::AddFieldDefinition { id, .. } => {
-                !sqlx::query_scalar!(
-                    r#"SELECT EXISTS (SELECT 1 FROM field_definition WHERE id = $1) AS "exists!""#,
-                    id.as_uuid(),
-                )
-                .fetch_one(&mut *conn)
-                .await?
+                records::id_free(conn, NewRecord::Field(*id)).await?
             }
             Operation::CreateOpenQuestion { id, .. } => {
-                !sqlx::query_scalar!(
-                    r#"SELECT EXISTS (SELECT 1 FROM open_question WHERE id = $1) AS "exists!""#,
-                    id.as_uuid(),
-                )
-                .fetch_one(&mut *conn)
-                .await?
+                records::id_free(conn, NewRecord::OpenQuestion(*id)).await?
             }
             Operation::SetFact {
                 event_id,
@@ -578,12 +563,7 @@ async fn check_versions(
             } => match document {
                 DraftDocument::New { id, .. } => {
                     document_versions.insert(*id, 1);
-                    !sqlx::query_scalar!(
-                        r#"SELECT EXISTS (SELECT 1 FROM document WHERE id = $1) AS "exists!""#,
-                        id.as_uuid(),
-                    )
-                    .fetch_one(&mut *conn)
-                    .await?
+                    records::id_free(conn, NewRecord::Document(*id)).await?
                 }
                 DraftDocument::Existing {
                     document_id,

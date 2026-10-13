@@ -4,14 +4,16 @@
 //! A new record takes the next readable number of its scope: `ACT`, `COM` and `MIL` in the event, `PER` and `INS` in
 //! the organization.
 
+use std::collections::{HashMap, HashSet};
+
 use sqlx::PgConnection;
 use sqlx::types::Uuid;
 use tada_app::caller::OrgScope;
 use tada_app::domain::RecordVersion;
 use tada_app::domain::ids::{EventId, LocalIdKind, MilestoneId, SourceVersionId, WorkstreamId};
 use tada_app::domain::parties::Party;
-use tada_app::domain::proposals::Operation;
-use tada_app::domain::records::MilestoneStatus;
+use tada_app::domain::proposals::{NewRecord, Operation};
+use tada_app::domain::records::{MilestoneStatus, RecordKind};
 use tada_app::domain::redaction::Redactable;
 use tada_app::domain::work::{ActionStatus, CommitmentStatus, WorkstreamStatus, dates_in_order};
 use tada_app::parties::{InstitutionFields, PersonFields};
@@ -24,7 +26,7 @@ use tada_app::work::{
 use tada_app::workstreams::Workstream;
 
 use super::insert_review_text;
-use crate::evidence::insert_evidence;
+use crate::evidence::{ids_of, insert_evidence};
 use crate::parties::{insert_institution, insert_person};
 use crate::proposals::operation_to_json;
 use crate::work::milestones::{insert_milestone, milestone_in, update_milestone};
@@ -366,7 +368,13 @@ pub(super) async fn write_record(
             .ok_or(sqlx::Error::RowNotFound)?;
             (RecordRef::Milestone(*milestone_id), version)
         }
-        _ => {
+        Operation::CreateEvent { .. }
+        | Operation::SetFact { .. }
+        | Operation::AddFieldDefinition { .. }
+        | Operation::AddChoiceValue { .. }
+        | Operation::DeprecateField { .. }
+        | Operation::CreateOpenQuestion { .. }
+        | Operation::CreateDocumentDraft { .. } => {
             return Err(sqlx::Error::Protocol(
                 "the step does not write a work record".into(),
             ));
@@ -392,175 +400,227 @@ pub(super) async fn matches(
     conn: &mut PgConnection,
     scope: OrgScope,
     operation: &Operation,
-    new_records: &std::collections::HashSet<Uuid>,
-    versions: &mut std::collections::HashMap<Uuid, i64>,
+    new_records: &HashSet<Uuid>,
+    versions: &mut HashMap<Uuid, i64>,
 ) -> Result<bool, sqlx::Error> {
-    let organization = scope.organization_id().as_uuid();
-    Ok(match operation {
-        Operation::CreatePerson { id, .. } => {
-            !sqlx::query_scalar!(
-                r#"SELECT EXISTS (SELECT 1 FROM person WHERE id = $1) AS "exists!""#,
-                id.as_uuid(),
-            )
-            .fetch_one(&mut *conn)
-            .await?
-        }
-        Operation::CreateInstitution { id, .. } => {
-            !sqlx::query_scalar!(
-                r#"SELECT EXISTS (SELECT 1 FROM institution WHERE id = $1) AS "exists!""#,
-                id.as_uuid(),
-            )
-            .fetch_one(&mut *conn)
-            .await?
-        }
+    if let Some(record) = operation.new_record()
+        && !id_free(conn, record).await?
+    {
+        return Ok(false);
+    }
+    let fits = match operation {
+        Operation::CreatePerson { .. } | Operation::CreateInstitution { .. } => true,
         Operation::CreateAction {
-            id,
             event_id,
             workstream,
             milestone,
             ..
         } => {
-            let free = !sqlx::query_scalar!(
-                r#"SELECT EXISTS (SELECT 1 FROM action WHERE id = $1) AS "exists!""#,
-                id.as_uuid(),
-            )
-            .fetch_one(&mut *conn)
-            .await?;
-            free && takes_records(conn, scope, *event_id, *workstream, new_records).await?
+            takes_records(conn, scope, *event_id, *workstream, new_records).await?
                 && takes_actions(conn, scope, *event_id, *milestone, new_records).await?
         }
         Operation::CreateCommitment {
-            id,
             event_id,
             workstream,
             promisor,
             ..
         } => {
-            let free = !sqlx::query_scalar!(
-                r#"SELECT EXISTS (SELECT 1 FROM commitment WHERE id = $1) AS "exists!""#,
-                id.as_uuid(),
-            )
-            .fetch_one(&mut *conn)
-            .await?;
             let promisor_exists = new_records.contains(&promisor.as_uuid())
                 || party_exists(conn, scope, *promisor).await?;
-            free && promisor_exists
+            promisor_exists
                 && takes_records(conn, scope, *event_id, *workstream, new_records).await?
         }
-        Operation::CreateWorkstream {
-            id, event_id, name, ..
-        } => {
+        Operation::CreateWorkstream { event_id, name, .. } => {
             sqlx::query_scalar!(
                 r#"SELECT NOT EXISTS (
-                       SELECT 1 FROM workstream
-                       WHERE id = $1 OR (event_id = $2 AND lower(name) = lower($3))
+                       SELECT 1 FROM workstream WHERE event_id = $1 AND lower(name) = lower($2)
                    ) AS "free!""#,
-                id.as_uuid(),
                 event_id.as_uuid(),
                 name.as_str(),
             )
             .fetch_one(&mut *conn)
             .await?
         }
-        Operation::ChangeActionStatus {
-            event_id,
-            action_id,
-            expected_version,
-            ..
-        }
-        | Operation::ChangeActionDue {
-            event_id,
-            action_id,
-            expected_version,
-            ..
-        }
-        | Operation::ChangeActionMilestone {
-            event_id,
-            action_id,
-            expected_version,
-            ..
-        } => {
-            if let Operation::ChangeActionMilestone { milestone, .. } = operation
-                && !takes_actions(conn, scope, *event_id, *milestone, new_records).await?
-            {
-                return Ok(false);
-            }
-            let current = match versions.get(&action_id.as_uuid()) {
-                Some(version) => Some(*version),
-                None => {
-                    sqlx::query_scalar!(
-                        "SELECT version FROM action WHERE organization_id = $1 AND event_id = $2 AND id = $3",
-                        organization,
-                        event_id.as_uuid(),
-                        action_id.as_uuid(),
-                    )
-                    .fetch_optional(&mut *conn)
-                    .await?
-                }
-            };
-            versions.insert(action_id.as_uuid(), expected_version.get() + 1);
-            current == Some(expected_version.get())
-        }
-        Operation::ChangeCommitmentStatus {
-            event_id,
-            commitment_id,
-            expected_version,
-            ..
-        } => {
-            let current = match versions.get(&commitment_id.as_uuid()) {
-                Some(version) => Some(*version),
-                None => {
-                    sqlx::query_scalar!(
-                        "SELECT version FROM commitment WHERE organization_id = $1 AND event_id = $2 AND id = $3",
-                        organization,
-                        event_id.as_uuid(),
-                        commitment_id.as_uuid(),
-                    )
-                    .fetch_optional(&mut *conn)
-                    .await?
-                }
-            };
-            versions.insert(commitment_id.as_uuid(), expected_version.get() + 1);
-            current == Some(expected_version.get())
-        }
         Operation::CreateMilestone {
-            id,
             event_id,
             workstream,
             ..
-        } => {
-            let free = !sqlx::query_scalar!(
-                r#"SELECT EXISTS (SELECT 1 FROM milestone WHERE id = $1) AS "exists!""#,
-                id.as_uuid(),
+        } => takes_records(conn, scope, *event_id, *workstream, new_records).await?,
+        Operation::ChangeActionMilestone {
+            event_id,
+            milestone,
+            ..
+        } => takes_actions(conn, scope, *event_id, *milestone, new_records).await?,
+        Operation::ChangeActionStatus { .. }
+        | Operation::ChangeActionDue { .. }
+        | Operation::ChangeCommitmentStatus { .. }
+        | Operation::ChangeMilestoneStatus { .. } => true,
+        Operation::CreateEvent { .. }
+        | Operation::SetFact { .. }
+        | Operation::AddFieldDefinition { .. }
+        | Operation::AddChoiceValue { .. }
+        | Operation::DeprecateField { .. }
+        | Operation::CreateOpenQuestion { .. }
+        | Operation::CreateDocumentDraft { .. } => false,
+    };
+    if !fits {
+        return Ok(false);
+    }
+    // A record that an earlier step of the plan changes counts with its new version.
+    let (Some(record), Some(expected), Some(event)) = (
+        operation.changed_record(),
+        operation.expected_version(),
+        operation.event_id(),
+    ) else {
+        return Ok(true);
+    };
+    let current = match versions.get(&record.as_uuid()) {
+        Some(version) => Some(*version),
+        None => record_version(conn, scope, event, record).await?,
+    };
+    versions.insert(record.as_uuid(), expected.get() + 1);
+    Ok(current == Some(expected.get()))
+}
+
+/// True if no record has the ID of the new record. IDs are unique in the whole installation (ADR 0038).
+pub(super) async fn id_free(
+    conn: &mut PgConnection,
+    record: NewRecord,
+) -> Result<bool, sqlx::Error> {
+    let id = record.as_uuid();
+    let taken = match record {
+        NewRecord::Event(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM event WHERE id = $1) AS "exists!""#,
+                id,
             )
             .fetch_one(&mut *conn)
-            .await?;
-            free && takes_records(conn, scope, *event_id, *workstream, new_records).await?
+            .await?
         }
-        Operation::ChangeMilestoneStatus {
-            event_id,
-            milestone_id,
-            expected_version,
-            ..
-        } => {
-            let current = match versions.get(&milestone_id.as_uuid()) {
-                Some(version) => Some(*version),
-                None => {
-                    sqlx::query_scalar!(
-                        "SELECT version FROM milestone WHERE organization_id = $1 AND event_id = $2 AND id = $3",
-                        organization,
-                        event_id.as_uuid(),
-                        milestone_id.as_uuid(),
-                    )
-                    .fetch_optional(&mut *conn)
-                    .await?
-                }
-            };
-            versions.insert(milestone_id.as_uuid(), expected_version.get() + 1);
-            current == Some(expected_version.get())
+        NewRecord::Field(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM field_definition WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
         }
-        _ => false,
-    })
+        NewRecord::OpenQuestion(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM open_question WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
+        NewRecord::Document(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM document WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
+        NewRecord::Person(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM person WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
+        NewRecord::Institution(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM institution WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
+        NewRecord::Action(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM action WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
+        NewRecord::Commitment(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM commitment WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
+        NewRecord::Workstream(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM workstream WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
+        NewRecord::Milestone(_) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM milestone WHERE id = $1) AS "exists!""#,
+                id,
+            )
+            .fetch_one(&mut *conn)
+            .await?
+        }
+    };
+    Ok(!taken)
+}
+
+/// The current version of an existing record of the event, or `None`.
+/// A person or an institution belongs to no event, and no proposal changes one.
+async fn record_version(
+    conn: &mut PgConnection,
+    scope: OrgScope,
+    event: EventId,
+    record: RecordRef,
+) -> Result<Option<i64>, sqlx::Error> {
+    let (organization, event, id) = (
+        scope.organization_id().as_uuid(),
+        event.as_uuid(),
+        record.as_uuid(),
+    );
+    match record.kind() {
+        RecordKind::Action => {
+            sqlx::query_scalar!(
+                "SELECT version FROM action WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+                organization,
+                event,
+                id,
+            )
+            .fetch_optional(&mut *conn)
+            .await
+        }
+        RecordKind::Commitment => {
+            sqlx::query_scalar!(
+                "SELECT version FROM commitment WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+                organization,
+                event,
+                id,
+            )
+            .fetch_optional(&mut *conn)
+            .await
+        }
+        RecordKind::Milestone => {
+            sqlx::query_scalar!(
+                "SELECT version FROM milestone WHERE organization_id = $1 AND event_id = $2 AND id = $3",
+                organization,
+                event,
+                id,
+            )
+            .fetch_optional(&mut *conn)
+            .await
+        }
+        RecordKind::Person | RecordKind::Institution => Err(sqlx::Error::Protocol(
+            "no proposal changes a person or an institution".into(),
+        )),
+    }
 }
 
 /// True if a new record of the event can have the workstream: none, a new workstream of an earlier step of the plan,
@@ -571,7 +631,7 @@ async fn takes_records(
     scope: OrgScope,
     event: EventId,
     workstream: Option<WorkstreamId>,
-    new_records: &std::collections::HashSet<Uuid>,
+    new_records: &HashSet<Uuid>,
 ) -> Result<bool, sqlx::Error> {
     let Some(workstream) = workstream else {
         return Ok(true);
@@ -600,7 +660,7 @@ async fn takes_actions(
     scope: OrgScope,
     event: EventId,
     milestone: Option<MilestoneId>,
-    new_records: &std::collections::HashSet<Uuid>,
+    new_records: &HashSet<Uuid>,
 ) -> Result<bool, sqlx::Error> {
     let Some(milestone) = milestone else {
         return Ok(true);
@@ -649,13 +709,12 @@ pub(super) async fn party_exists(
     }
 }
 
-/// The IDs that `lock_targets` locks for the work steps of a plan.
+/// The rows that `lock_targets` locks for the work steps of a plan.
 #[derive(Debug, Default)]
 pub(super) struct WorkLocks {
     pub workstreams: Vec<Uuid>,
-    pub actions: Vec<Uuid>,
-    pub commitments: Vec<Uuid>,
-    pub milestones: Vec<Uuid>,
+    /// The existing records that the steps change.
+    pub changed: Vec<RecordRef>,
     /// The milestones that actions of the plan name. They stay open for the transaction.
     pub named_milestones: Vec<Uuid>,
 }
@@ -664,15 +723,20 @@ impl WorkLocks {
     /// The named milestones that no step changes. A changed milestone takes only the update lock: a share lock first
     /// would be upgraded later, and two applies that upgrade the same row deadlock.
     fn shared_milestones(&self) -> Vec<Uuid> {
+        let changed = ids_of(&self.changed, RecordKind::Milestone);
         self.named_milestones
             .iter()
-            .filter(|id| !self.milestones.contains(id))
+            .filter(|id| !changed.contains(id))
             .copied()
             .collect()
     }
 
     /// Adds the targets of one step. Returns the counter `(scope, kind)` that a new record moves.
     pub fn add(&mut self, scope: OrgScope, operation: &Operation) -> Option<(Uuid, &'static str)> {
+        self.changed.extend(operation.changed_record());
+        if let Some(workstream) = operation.workstream() {
+            self.workstreams.push(workstream.as_uuid());
+        }
         let organization = scope.organization_id().as_uuid();
         match operation {
             Operation::CreatePerson { .. } => Some((organization, LocalIdKind::Person.prefix())),
@@ -681,63 +745,41 @@ impl WorkLocks {
             }
             Operation::CreateAction {
                 event_id,
-                workstream,
                 milestone,
                 ..
             } => {
-                self.workstreams
-                    .extend(workstream.map(WorkstreamId::as_uuid));
                 self.named_milestones
                     .extend(milestone.map(MilestoneId::as_uuid));
                 Some((event_id.as_uuid(), LocalIdKind::Action.prefix()))
             }
-            Operation::ChangeActionMilestone {
-                action_id,
-                milestone,
-                ..
-            } => {
-                self.actions.push(action_id.as_uuid());
+            Operation::ChangeActionMilestone { milestone, .. } => {
                 self.named_milestones
                     .extend(milestone.map(MilestoneId::as_uuid));
                 None
             }
-            Operation::CreateCommitment {
-                event_id,
-                workstream,
-                ..
-            } => {
-                self.workstreams
-                    .extend(workstream.map(WorkstreamId::as_uuid));
+            Operation::CreateCommitment { event_id, .. } => {
                 Some((event_id.as_uuid(), LocalIdKind::Commitment.prefix()))
             }
-            Operation::ChangeActionStatus { action_id, .. }
-            | Operation::ChangeActionDue { action_id, .. } => {
-                self.actions.push(action_id.as_uuid());
-                None
-            }
-            Operation::ChangeCommitmentStatus { commitment_id, .. } => {
-                self.commitments.push(commitment_id.as_uuid());
-                None
-            }
-            Operation::CreateMilestone {
-                event_id,
-                workstream,
-                ..
-            } => {
-                self.workstreams
-                    .extend(workstream.map(WorkstreamId::as_uuid));
+            Operation::CreateMilestone { event_id, .. } => {
                 Some((event_id.as_uuid(), LocalIdKind::Milestone.prefix()))
             }
-            Operation::ChangeMilestoneStatus { milestone_id, .. } => {
-                self.milestones.push(milestone_id.as_uuid());
-                None
-            }
-            _ => None,
+            Operation::ChangeActionStatus { .. }
+            | Operation::ChangeActionDue { .. }
+            | Operation::ChangeCommitmentStatus { .. }
+            | Operation::ChangeMilestoneStatus { .. }
+            | Operation::CreateWorkstream { .. }
+            | Operation::CreateEvent { .. }
+            | Operation::SetFact { .. }
+            | Operation::AddFieldDefinition { .. }
+            | Operation::AddChoiceValue { .. }
+            | Operation::DeprecateField { .. }
+            | Operation::CreateOpenQuestion { .. }
+            | Operation::CreateDocumentDraft { .. } => None,
         }
     }
 
-    /// Locks the workstreams and the named milestones for share, then the actions, the commitments and the changed
-    /// milestones for update, each in the order of its IDs.
+    /// Locks the workstreams and the named milestones for share, then the changed records for update:
+    /// kind by kind, each kind in the order of its IDs.
     pub async fn lock(&self, conn: &mut PgConnection, scope: OrgScope) -> Result<(), sqlx::Error> {
         let organization = scope.organization_id().as_uuid();
         sqlx::query_scalar!(
@@ -754,29 +796,71 @@ impl WorkLocks {
         )
         .fetch_all(&mut *conn)
         .await?;
-        sqlx::query_scalar!(
-            "SELECT id FROM action WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
-            organization,
-            &self.actions,
-        )
-        .fetch_all(&mut *conn)
-        .await?;
-        sqlx::query_scalar!(
-            "SELECT id FROM commitment WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
-            organization,
-            &self.commitments,
-        )
-        .fetch_all(&mut *conn)
-        .await?;
-        sqlx::query_scalar!(
-            "SELECT id FROM milestone WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
-            organization,
-            &self.milestones,
-        )
-        .fetch_all(&mut *conn)
-        .await?;
+        for kind in RecordKind::ALL {
+            let ids = ids_of(&self.changed, kind);
+            if !ids.is_empty() {
+                lock_for_update(conn, organization, kind, &ids).await?;
+            }
+        }
         Ok(())
     }
+}
+
+/// Locks the records of `kind` with the IDs for update, in the order of the IDs.
+async fn lock_for_update(
+    conn: &mut PgConnection,
+    organization: Uuid,
+    kind: RecordKind,
+    ids: &[Uuid],
+) -> Result<(), sqlx::Error> {
+    match kind {
+        RecordKind::Action => {
+            sqlx::query_scalar!(
+                "SELECT id FROM action WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+                organization,
+                ids,
+            )
+            .fetch_all(&mut *conn)
+            .await?;
+        }
+        RecordKind::Commitment => {
+            sqlx::query_scalar!(
+                "SELECT id FROM commitment WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+                organization,
+                ids,
+            )
+            .fetch_all(&mut *conn)
+            .await?;
+        }
+        RecordKind::Person => {
+            sqlx::query_scalar!(
+                "SELECT id FROM person WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+                organization,
+                ids,
+            )
+            .fetch_all(&mut *conn)
+            .await?;
+        }
+        RecordKind::Institution => {
+            sqlx::query_scalar!(
+                "SELECT id FROM institution WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+                organization,
+                ids,
+            )
+            .fetch_all(&mut *conn)
+            .await?;
+        }
+        RecordKind::Milestone => {
+            sqlx::query_scalar!(
+                "SELECT id FROM milestone WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
+                organization,
+                ids,
+            )
+            .fetch_all(&mut *conn)
+            .await?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -787,7 +871,7 @@ mod tests {
     fn a_changed_milestone_is_not_share_locked() {
         let (changed, named) = (Uuid::from_u128(1), Uuid::from_u128(2));
         let locks = WorkLocks {
-            milestones: vec![changed],
+            changed: vec![RecordRef::Milestone(MilestoneId::from_uuid(changed))],
             named_milestones: vec![changed, named],
             ..WorkLocks::default()
         };
