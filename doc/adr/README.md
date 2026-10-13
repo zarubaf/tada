@@ -95,6 +95,7 @@ The ADRs are the authority for the decisions in this project.
 | [0077](0077-agent-runner.md)                                    | Agent runner in Rust                                     | Accepted                           |
 | [0078](0078-opaque-build-id-in-the-web-client.md)               | Opaque build ID in the web client                        | Accepted                           |
 | [0079](0079-changesets-without-member-words.md)                 | Changesets without member words                          | Accepted                           |
+| [0080](0080-workstream-proposals.md)                            | Workstream proposals                                     | Proposed                           |
 
 ## New ADR
 
