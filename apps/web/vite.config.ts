@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
+import optimizeLocales from "@react-aria/optimize-locales-plugin";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vitest/config";
 
@@ -48,6 +49,14 @@ function layerOrderFirst(): Plugin {
   };
 }
 
+// React Aria ships the strings of 34 locales for each component. The client is German only (the page
+// is `lang="de-CH"` and `App` fixes the locale), so the build keeps German and drops the rest. The
+// unit tests keep all locales: they run in the locale of the machine.
+const germanOnly: Plugin = {
+  ...optimizeLocales.vite({ locales: ["de-DE"] }),
+  apply: "build",
+};
+
 /** The fixed build ID of the unit tests and the browser checks; their fake servers answer with it. */
 const TEST_BUILD_ID = "0123456789abcdef0123456789abcdef";
 
@@ -66,7 +75,7 @@ function defines(mode: string) {
 // The API and the MCP server run on `tada serve` (TADA_PORT 8080). In production, serve delivers the built files itself (ADR 0005).
 // An MCP client in development uses `http://localhost:5173/mcp`, the URL that the token page shows (ADR 0040).
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), layerOrderFirst()],
+  plugins: [react(), germanOnly, layerOrderFirst()],
   define: defines(mode),
   // One CSS file for all chunks: the settings pages load on demand, and the order of the CSS layers
   // must stay the same as without the split.

@@ -8,6 +8,7 @@ import { Route, Router, Routes } from "./router/Router";
 import { SessionProvider } from "./session/SessionProvider";
 import { SettingsRoute } from "./settings/SettingsRoute";
 import { Shell } from "./shell/Shell";
+import { LocaleProvider } from "./ui/LocaleProvider";
 import { RouteSuspense } from "./ui/RouteSuspense";
 import { SkipLink } from "./ui/SkipLink";
 import { MyWorkPage } from "./work/MyWorkPage";
@@ -124,190 +125,192 @@ function RegisterPage({ api, children }: { api: Api; children: ReactNode }) {
 
 export function App({ api = defaultApi }: { api?: Api }) {
   return (
-    <Router>
-      <SkipLink />
-      <Routes>
-        {Gallery && (
-          <Route path="/_gallery">
-            <RouteSuspense>
-              <Gallery />
-            </RouteSuspense>
+    <LocaleProvider>
+      <Router>
+        <SkipLink />
+        <Routes>
+          {Gallery && (
+            <Route path="/_gallery">
+              <RouteSuspense>
+                <Gallery />
+              </RouteSuspense>
+            </Route>
+          )}
+          <Route path="*">
+            <SessionProvider api={api}>
+              <InboxProvider api={api}>
+                <Shell api={api}>
+                  <Routes>
+                    <Route path="/">
+                      <MyWorkPage api={api} />
+                    </Route>
+                    <Route path="/events">
+                      <RouteSuspense>
+                        <EventsPage api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    {/* The pages of the sign-in */}
+                    <Route path="/sign-in">
+                      <RouteSuspense width="form">
+                        <SignInPage api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    <Route path="/sign-in/link">
+                      <RouteSuspense width="form">
+                        <MagicLinkPage api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    <Route path="/invitation">
+                      <RouteSuspense width="form">
+                        <InvitationPage api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    <Route path="/choose-organization">
+                      <RouteSuspense width="form">
+                        <ChooseOrganizationPage api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    {/* The event screens */}
+                    <Route path="/events/new">
+                      <RouteSuspense>
+                        <CreateEventForm api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    <Route path="/events/:eventId">
+                      <EventPage api={api}>
+                        <RouteSuspense bare>
+                          <EventOverview api={api} />
+                        </RouteSuspense>
+                      </EventPage>
+                    </Route>
+                    <Route path="/events/:eventId/members">
+                      <EventPage api={api}>
+                        <RouteSuspense bare>
+                          <EventMembersPage api={api} />
+                        </RouteSuspense>
+                      </EventPage>
+                    </Route>
+                    <Route path="/events/:eventId/documents">
+                      <EventPage api={api}>
+                        <RouteSuspense bare>
+                          <DocumentsPage api={api} />
+                        </RouteSuspense>
+                      </EventPage>
+                    </Route>
+                    <Route path="/events/:eventId/actions">
+                      <EventPage api={api}>
+                        <RouteSuspense bare>
+                          <ActionsPage api={api} />
+                        </RouteSuspense>
+                      </EventPage>
+                    </Route>
+                    <Route path="/events/:eventId/timeline">
+                      <EventPage api={api}>
+                        <RouteSuspense bare>
+                          <TimelinePage api={api} />
+                        </RouteSuspense>
+                      </EventPage>
+                    </Route>
+                    <Route path="/events/:eventId/commitments">
+                      <RegisterPage api={api}>
+                        <CommitmentsPage api={api} />
+                      </RegisterPage>
+                    </Route>
+                    <Route path="/events/:eventId/milestones">
+                      <RegisterPage api={api}>
+                        <MilestonesPage api={api} />
+                      </RegisterPage>
+                    </Route>
+                    <Route path="/events/:eventId/decisions">
+                      <RegisterPage api={api}>
+                        <DecisionsPage api={api} />
+                      </RegisterPage>
+                    </Route>
+                    <Route path="/events/:eventId/workstreams">
+                      <EventPage api={api}>
+                        <RouteSuspense bare>
+                          <WorkstreamsPage api={api} />
+                        </RouteSuspense>
+                      </EventPage>
+                    </Route>
+                    <Route path="/documents/:documentId">
+                      <RouteSuspense>
+                        <DocumentPage api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    <Route path="/documents/:documentId/diff">
+                      <RouteSuspense>
+                        <DocumentDiffPage api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    <Route path="/privacy">
+                      <RouteSuspense>
+                        <PrivacyPage api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    {/* The register of persons and institutions */}
+                    <Route path="/persons">
+                      <RouteSuspense>
+                        <PartiesPage api={api} kind="person" />
+                      </RouteSuspense>
+                    </Route>
+                    <Route path="/institutions">
+                      <RouteSuspense>
+                        <PartiesPage api={api} kind="institution" />
+                      </RouteSuspense>
+                    </Route>
+                    {/* The Review Inbox */}
+                    <Route path="/inbox">
+                      <RouteSuspense>
+                        <ReviewInbox api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    <Route path="/inbox/:changesetId">
+                      <RouteSuspense>
+                        <ReviewInbox api={api} />
+                      </RouteSuspense>
+                    </Route>
+                    {/* The settings */}
+                    <Route path="/settings/members">
+                      <SettingsRoute>
+                        <MembersPage api={api} />
+                      </SettingsRoute>
+                    </Route>
+                    <Route path="/settings/telegram">
+                      <SettingsRoute>
+                        <TelegramPage api={api} />
+                      </SettingsRoute>
+                    </Route>
+                    <Route path="/settings/tokens">
+                      <SettingsRoute>
+                        <TokensPage api={api} />
+                      </SettingsRoute>
+                    </Route>
+                    <Route path="/settings/organization">
+                      <SettingsRoute>
+                        <OrganizationPage api={api} />
+                      </SettingsRoute>
+                    </Route>
+                    <Route path="/settings/ai-pm">
+                      <SettingsRoute>
+                        <PmPage api={api} />
+                      </SettingsRoute>
+                    </Route>
+                    <Route path="/settings/account">
+                      <SettingsRoute>
+                        <AccountPage api={api} />
+                      </SettingsRoute>
+                    </Route>
+                    <Route path="*">
+                      <NotFoundPage />
+                    </Route>
+                  </Routes>
+                </Shell>
+              </InboxProvider>
+            </SessionProvider>
           </Route>
-        )}
-        <Route path="*">
-          <SessionProvider api={api}>
-            <InboxProvider api={api}>
-              <Shell api={api}>
-                <Routes>
-                  <Route path="/">
-                    <MyWorkPage api={api} />
-                  </Route>
-                  <Route path="/events">
-                    <RouteSuspense>
-                      <EventsPage api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  {/* The pages of the sign-in */}
-                  <Route path="/sign-in">
-                    <RouteSuspense width="form">
-                      <SignInPage api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  <Route path="/sign-in/link">
-                    <RouteSuspense width="form">
-                      <MagicLinkPage api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  <Route path="/invitation">
-                    <RouteSuspense width="form">
-                      <InvitationPage api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  <Route path="/choose-organization">
-                    <RouteSuspense width="form">
-                      <ChooseOrganizationPage api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  {/* The event screens */}
-                  <Route path="/events/new">
-                    <RouteSuspense>
-                      <CreateEventForm api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  <Route path="/events/:eventId">
-                    <EventPage api={api}>
-                      <RouteSuspense bare>
-                        <EventOverview api={api} />
-                      </RouteSuspense>
-                    </EventPage>
-                  </Route>
-                  <Route path="/events/:eventId/members">
-                    <EventPage api={api}>
-                      <RouteSuspense bare>
-                        <EventMembersPage api={api} />
-                      </RouteSuspense>
-                    </EventPage>
-                  </Route>
-                  <Route path="/events/:eventId/documents">
-                    <EventPage api={api}>
-                      <RouteSuspense bare>
-                        <DocumentsPage api={api} />
-                      </RouteSuspense>
-                    </EventPage>
-                  </Route>
-                  <Route path="/events/:eventId/actions">
-                    <EventPage api={api}>
-                      <RouteSuspense bare>
-                        <ActionsPage api={api} />
-                      </RouteSuspense>
-                    </EventPage>
-                  </Route>
-                  <Route path="/events/:eventId/timeline">
-                    <EventPage api={api}>
-                      <RouteSuspense bare>
-                        <TimelinePage api={api} />
-                      </RouteSuspense>
-                    </EventPage>
-                  </Route>
-                  <Route path="/events/:eventId/commitments">
-                    <RegisterPage api={api}>
-                      <CommitmentsPage api={api} />
-                    </RegisterPage>
-                  </Route>
-                  <Route path="/events/:eventId/milestones">
-                    <RegisterPage api={api}>
-                      <MilestonesPage api={api} />
-                    </RegisterPage>
-                  </Route>
-                  <Route path="/events/:eventId/decisions">
-                    <RegisterPage api={api}>
-                      <DecisionsPage api={api} />
-                    </RegisterPage>
-                  </Route>
-                  <Route path="/events/:eventId/workstreams">
-                    <EventPage api={api}>
-                      <RouteSuspense bare>
-                        <WorkstreamsPage api={api} />
-                      </RouteSuspense>
-                    </EventPage>
-                  </Route>
-                  <Route path="/documents/:documentId">
-                    <RouteSuspense>
-                      <DocumentPage api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  <Route path="/documents/:documentId/diff">
-                    <RouteSuspense>
-                      <DocumentDiffPage api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  <Route path="/privacy">
-                    <RouteSuspense>
-                      <PrivacyPage api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  {/* The register of persons and institutions */}
-                  <Route path="/persons">
-                    <RouteSuspense>
-                      <PartiesPage api={api} kind="person" />
-                    </RouteSuspense>
-                  </Route>
-                  <Route path="/institutions">
-                    <RouteSuspense>
-                      <PartiesPage api={api} kind="institution" />
-                    </RouteSuspense>
-                  </Route>
-                  {/* The Review Inbox */}
-                  <Route path="/inbox">
-                    <RouteSuspense>
-                      <ReviewInbox api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  <Route path="/inbox/:changesetId">
-                    <RouteSuspense>
-                      <ReviewInbox api={api} />
-                    </RouteSuspense>
-                  </Route>
-                  {/* The settings */}
-                  <Route path="/settings/members">
-                    <SettingsRoute>
-                      <MembersPage api={api} />
-                    </SettingsRoute>
-                  </Route>
-                  <Route path="/settings/telegram">
-                    <SettingsRoute>
-                      <TelegramPage api={api} />
-                    </SettingsRoute>
-                  </Route>
-                  <Route path="/settings/tokens">
-                    <SettingsRoute>
-                      <TokensPage api={api} />
-                    </SettingsRoute>
-                  </Route>
-                  <Route path="/settings/organization">
-                    <SettingsRoute>
-                      <OrganizationPage api={api} />
-                    </SettingsRoute>
-                  </Route>
-                  <Route path="/settings/ai-pm">
-                    <SettingsRoute>
-                      <PmPage api={api} />
-                    </SettingsRoute>
-                  </Route>
-                  <Route path="/settings/account">
-                    <SettingsRoute>
-                      <AccountPage api={api} />
-                    </SettingsRoute>
-                  </Route>
-                  <Route path="*">
-                    <NotFoundPage />
-                  </Route>
-                </Routes>
-              </Shell>
-            </InboxProvider>
-          </SessionProvider>
-        </Route>
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </LocaleProvider>
   );
 }
