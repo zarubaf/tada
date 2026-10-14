@@ -1011,6 +1011,7 @@ work-error-owner = Wählen Sie ein Mitglied des Anlasses mit Mitarbeit oder Anla
 work-error-workstream = Wählen Sie einen aktiven Arbeitsbereich dieses Anlasses.
 work-error-workstream-closed = Dieser Arbeitsbereich ist geschlossen.
 work-error-due = Das ist kein gültiges Datum.
+work-error-due_date = Das ist kein gültiges Datum.
 work-error-date = Geben Sie ein gültiges Datum an.
 work-error-start_date = Das ist kein gültiges Datum.
 work-error-start_date-start-after-due = Das Startdatum liegt nach dem Fälligkeitsdatum. Wählen Sie ein früheres Startdatum.
@@ -1417,3 +1418,14 @@ record-not-found-title = Eintrag nicht gefunden
 record-not-found-text = Den Eintrag { $id } gibt es in diesem Anlass nicht.
 # $version: the record version that the evidence supports.
 action-evidence-version = Stützt die Version { $version } der Aufgabe
+# $field: the name of the field. $value: its value, or the words for no value.
+record-edit-field = { $field } bearbeiten: { $value }
+# $field: the name of the field. $id: the readable ID of the record.
+record-saved = { $field } von { $id } gespeichert.
+# $message: why the field was not saved.
+record-save-failed = { $field } von { $id } nicht gespeichert. { $message }
+record-conflict = Der Eintrag wurde inzwischen geändert und ist neu geladen. Ihre Eingabe ist noch da. Speichern Sie sie erneut, wenn sie noch gilt.
+record-save = Speichern
+record-cancel = Abbrechen
+record-retry = Erneut versuchen
+record-discard = Verwerfen
