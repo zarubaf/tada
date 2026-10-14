@@ -14,6 +14,7 @@ import { LiveRegion } from "../ui/LiveRegion";
 import { Menu } from "../ui/Menu";
 import { NavLink } from "../ui/NavLink";
 import { Select } from "../ui/Select";
+import { ThemeToggle } from "../ui/ThemeToggle";
 import styles from "./Shell.module.css";
 import { VersionButton, VersionSheet } from "./VersionFooter";
 import { footerText, outdated as isOutdated, useServerVersion } from "./version";
@@ -89,6 +90,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           <footer className={styles.footer}>
             <NavLink to="/privacy">{t("nav-privacy")}</NavLink>
             <VersionButton server={server} onPress={() => setVersionsOpen(true)} />
+            {/* Until the top bar of ADR 0082 exists. It is not on narrow layouts, like the rest of the footer. */}
+            <ThemeToggle />
           </footer>
           <Menu
             trigger={user.displayName}

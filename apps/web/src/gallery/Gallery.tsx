@@ -11,6 +11,7 @@ import { KnowledgeState } from "../ui/KnowledgeState";
 import { Markdown } from "../ui/Markdown";
 import { Skeleton } from "../ui/Skeleton";
 import { Switch } from "../ui/Switch";
+import { ThemeToggle } from "../ui/ThemeToggle";
 import styles from "./Gallery.module.css";
 
 const colors = [
@@ -128,6 +129,7 @@ export function Gallery() {
             Anlass erfassen
           </Button>
           <Button isDisabled>Erneut versuchen</Button>
+          <ThemeToggle />
         </div>
       </section>
 

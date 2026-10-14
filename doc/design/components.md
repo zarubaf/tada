@@ -11,17 +11,18 @@ The gallery (`apps/web/src/gallery/`) is a development tool that shows the compo
 
 ### Actions
 
-| Component    | Variants                          | Rules                                                                                                                |
-| ------------ | --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Button       | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap.                      |
-| IconButton   | quiet                             | Only in toolbars and rows. Always an accessible name and a tooltip.                                                  |
-| Link         | inline, standalone                | Inline links are underlined. A link never does what a button does.                                                   |
-| LinkButton   | primary                           | A link in the style of a button. Only for an action that opens a page, for example a form.                           |
-| FileButton   | primary                           | A button that opens the file picker. It shows `isPending` while the upload runs and keeps focus.                     |
-| FileLink     | secondary                         | A plain link to a file on the server, in the style of a button, for a download or a preview. The browser loads it.   |
-| Menu         |                                   | For more than three secondary actions, or the member menu. The trigger is `dots-vertical` or a text.                 |
-| ChoiceButton |                                   | A full-width button for one option of a choice, with a title and a detail line. For example the organization choice. |
-| CommandMenu  |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                                         |
+| Component    | Variants                          | Rules                                                                                                                                                              |
+| ------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Button       | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap.                                                                    |
+| IconButton   | quiet                             | Only in toolbars and rows. Always an accessible name and a tooltip.                                                                                                |
+| Link         | inline, standalone                | Inline links are underlined. A link never does what a button does.                                                                                                 |
+| LinkButton   | primary                           | A link in the style of a button. Only for an action that opens a page, for example a form.                                                                         |
+| FileButton   | primary                           | A button that opens the file picker. It shows `isPending` while the upload runs and keeps focus.                                                                   |
+| FileLink     | secondary                         | A plain link to a file on the server, in the style of a button, for a download or a preview. The browser loads it.                                                 |
+| Menu         |                                   | For more than three secondary actions, or the member menu. The trigger is `dots-vertical` or a text.                                                               |
+| ChoiceButton |                                   | A full-width button for one option of a choice, with a title and a detail line. For example the organization choice.                                               |
+| CommandMenu  |                                   | Global search and actions, `Ctrl+K`. Shows the shortcut next to each action.                                                                                       |
+| ThemeToggle  | quiet                             | One button that cycles system, light and dark. It shows an icon and the current choice as its label. Until the top bar exists, it sits at the foot of the sidebar. |
 
 Button sizes follow `--control-height-*` of the density. The primary button uses `--color-accent` and `--color-text-on-accent`.
 The danger button is secondary in style with `--color-danger` text.
