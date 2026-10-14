@@ -61,6 +61,13 @@
   /* The target of an interactive chip: 44 px with a coarse pointer, none with a fine one. */
   .chip[data-interactive] {
     cursor: pointer;
+
+    /*
+     * The hit area is taller than the chip by the same amount above and below. The chip keeps that
+     * amount free as a margin, so the hit areas of wrapped chips do not overlap. It is 0 with a
+     * fine pointer, where the hit area is 0.
+     */
+    margin-block: var(--size-chip-hit-margin);
     transition-property: background-color;
     transition-duration: var(--duration-fast);
     transition-timing-function: var(--ease-out);
@@ -71,7 +78,7 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    min-width: 100%;
+    min-width: max(100%, var(--size-hit-target));
     height: var(--size-hit-target);
     translate: -50% -50%;
   }

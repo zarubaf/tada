@@ -51,7 +51,7 @@ function DueDate({ date, today }: { date: string | null | undefined; today: stri
       <time dateTime={date}>{formatDate(date)}</time>
       {isOverdue(date, today) && (
         <StatusLabel icon={IconClockExclamation} tone="danger">
-          {t("my-work-overdue")}
+          {t("overdue")}
         </StatusLabel>
       )}
     </>

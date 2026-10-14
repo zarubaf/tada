@@ -1,14 +1,33 @@
 import { type Icon, IconCalendar, IconCalendarExclamation, IconStack2 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Button as AriaButton } from "react-aria-components";
+import { isOverdue, todayLocal } from "../facts/dueDate";
+import { formatDate } from "../facts/formatValue";
 import { t } from "../i18n";
 import styles from "./Chip.module.css";
 import { KNOWLEDGE_ICONS, type KnowledgeStateName } from "./KnowledgeState";
 
 export type ChipVariant = "neutral" | "date" | "workstream" | "proposal" | "assumption" | "unknown";
 
-export interface ChipProps {
-  variant?: ChipVariant;
+interface ChipBase {
+  /** Makes the chip a button. A static chip has no handler. */
+  onPress?: () => void;
+}
+
+/**
+ * A date. The chip formats it and says „überfällig“ in words when it lies before `today`, so no
+ * caller keeps the rule. A date chip has no children and no icon: the date and its icon follow.
+ */
+export interface DateChipProps extends ChipBase {
+  variant: "date";
+  /** A civil date, for example `2026-10-15`. */
+  date: string;
+  /** The civil date of today. Default: the day of the browser. */
+  today?: string;
+}
+
+export interface TextChipProps extends ChipBase {
+  variant?: Exclude<ChipVariant, "date">;
   /**
    * The text. For a proposal, an assumption or an unknown value it is the detail after the label,
    * for example the proposed date, and may be empty.
@@ -16,13 +35,9 @@ export interface ChipProps {
   children?: ReactNode;
   /** An icon for a neutral chip. The other variants have their own. */
   icon?: Icon;
-  /** A date chip: the machine-readable date for the `time` element. */
-  dateTime?: string;
-  /** A date chip: the date is past. The chip says so in words, not only by color. */
-  overdue?: boolean;
-  /** Makes the chip a button. A static chip has no handler. */
-  onPress?: () => void;
 }
+
+export type ChipProps = DateChipProps | TextChipProps;
 
 function iconOf(variant: ChipVariant, state: KnowledgeStateName | undefined, overdue: boolean) {
   if (state !== undefined) {
@@ -41,26 +56,23 @@ const KNOWLEDGE = { proposal: "proposed", assumption: "assumption", unknown: "un
  * 20 px high, 12 px text, 12 px icon (ADR 0082). An interactive chip is a button whose hit area,
  * not the chip, grows to 44 px on a coarse pointer.
  */
-export function Chip({
-  variant = "neutral",
-  children,
-  icon,
-  dateTime,
-  overdue = false,
-  onPress,
-}: ChipProps) {
+export function Chip(props: ChipProps) {
+  const { variant = "neutral", onPress } = props;
+  const overdue = props.variant === "date" && isOverdue(props.date, props.today ?? todayLocal());
   const state = variant in KNOWLEDGE ? KNOWLEDGE[variant as keyof typeof KNOWLEDGE] : undefined;
-  const Icon = icon ?? iconOf(variant, state, overdue);
+  const Icon =
+    (props.variant === "date" ? undefined : props.icon) ?? iconOf(variant, state, overdue);
+  const children = props.variant === "date" ? undefined : props.children;
   const content =
-    state !== undefined ? (
+    props.variant === "date" ? (
+      <>
+        <time dateTime={props.date}>{formatDate(props.date)}</time>
+        {overdue && <span className={styles.hidden}>, {t("overdue")}</span>}
+      </>
+    ) : state !== undefined ? (
       <>
         {t(`knowledge-${state}`)}
         {children ? ` · ${children}` : null}
-      </>
-    ) : variant === "date" ? (
-      <>
-        <time dateTime={dateTime}>{children}</time>
-        {overdue && <span className={styles.hidden}>, {t("chip-overdue")}</span>}
       </>
     ) : variant === "workstream" ? (
       <>

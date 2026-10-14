@@ -191,16 +191,17 @@ Rules:
 
 ## Density and sizes
 
-| Token                 | Use                                                                                                  |
-| --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `--control-height-sm` | Small buttons, tabs and inputs in toolbars (28 px compact)                                           |
-| `--control-height-md` | Buttons and inputs (32 px compact, 44 px comfortable)                                                |
-| `--control-height-lg` | Primary actions on mobile pages (36 px compact)                                                      |
-| `--row-height`        | Table and list rows (28 px compact)                                                                  |
-| `--size-chip-height`  | Chips (20 px)                                                                                        |
-| `--size-hit-target`   | The height of the hit area of an interactive chip (0 with a fine pointer, 44 px with a coarse one)   |
-| `--font-size-ui`      | UI text: `--font-size-md` in compact density, `--font-size-base` in comfortable density              |
-| `--font-size-dense`   | Text of dense rows and cards: `--font-size-sm` in compact, `--font-size-base` in comfortable density |
+| Token                    | Use                                                                                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--control-height-sm`    | Small buttons, tabs and inputs in toolbars (28 px compact)                                                                                                       |
+| `--control-height-md`    | Buttons and inputs (32 px compact, 44 px comfortable)                                                                                                            |
+| `--control-height-lg`    | Primary actions on mobile pages (36 px compact)                                                                                                                  |
+| `--row-height`           | Table and list rows (28 px compact)                                                                                                                              |
+| `--size-chip-height`     | Chips (20 px)                                                                                                                                                    |
+| `--size-hit-target`      | The height of the hit area of an interactive chip (0 with a fine pointer, 44 px with a coarse one)                                                               |
+| `--size-chip-hit-margin` | The space that an interactive chip keeps above and below, so that the hit areas of wrapped chips do not overlap (0 with a fine pointer, 12 px with a coarse one) |
+| `--font-size-ui`         | UI text: `--font-size-md` in compact density, `--font-size-base` in comfortable density                                                                          |
+| `--font-size-dense`      | Text of dense rows and cards: `--font-size-sm` in compact, `--font-size-base` in comfortable density                                                             |
 
 - In compact density, body text and panel text are 14 px, and dense rows and cards are 13 px.
   In comfortable density, body text and inputs are 16 px, because iOS zooms into inputs below 16 px.

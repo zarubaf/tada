@@ -88,6 +88,7 @@
     --row-height: 28px;
     --size-chip-height: 20px;
     --size-hit-target: 0px; /* The hit area of a chip: 0 with a fine pointer. */
+    --size-chip-hit-margin: max(0px, calc((var(--size-hit-target) - var(--size-chip-height)) / 2));
     --font-size-ui: var(--font-size-md);
     --line-height-ui: var(--line-height-md);
     --font-size-dense: var(--font-size-sm);
