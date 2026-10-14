@@ -46,7 +46,7 @@ const status: FieldSpec = {
   pointer: "status",
   required: true,
   read: (item) => asAction(item).status,
-  statuses: (item) => [asAction(item).status, ...record(item).next_statuses],
+  options: (item) => [asAction(item).status, ...record(item).next_statuses],
   save: (commands, item, value) =>
     commands.action.changeStatus(target(item), value as ActionStatus),
 };

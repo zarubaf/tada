@@ -1417,6 +1417,8 @@ record-no-date = Kein Datum
 record-no-area = Kein Bereich
 record-no-milestone = Kein Meilenstein
 record-no-description = Keine Beschreibung
+record-unknown-area = Unbekannter Bereich
+record-unknown-milestone = Unbekannter Meilenstein
 record-sources = Quellen
 record-not-found-title = Eintrag nicht gefunden
 # $id: the readable ID from the address.
