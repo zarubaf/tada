@@ -511,6 +511,70 @@ describe("WorkPage", () => {
     });
   });
 
+  describe("the Filter control", () => {
+    const filterButton = () => screen.getByRole("button", { name: /^Filter(, \d+ gesetzt)?$/ });
+
+    it("says that it opens a dialog and whether it is open", async () => {
+      open();
+      await ready();
+      expect(filterButton()).toHaveAttribute("aria-haspopup", "dialog");
+      expect(filterButton()).toHaveAttribute("aria-expanded", "false");
+      await userEvent.click(filterButton());
+      expect(filterButton()).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("puts focus in the search when it opens", async () => {
+      open();
+      await ready();
+      await userEvent.click(filterButton());
+      expect(await screen.findByRole("searchbox")).toHaveFocus();
+    });
+
+    it("leaves the board alone and shows the result of a search behind it", async () => {
+      open();
+      await ready();
+      await userEvent.click(filterButton());
+      await userEvent.type(await screen.findByRole("searchbox"), "Festzelt bes");
+      // A wide layout has a popover, not a modal sheet: the board stays in the accessibility tree.
+      await waitFor(() => expect(shown()).toEqual(["ACT-003"]));
+      expect(screen.getByRole("heading", { level: 2, name: /^Offen/ })).toBeInTheDocument();
+    });
+
+    it("closes with Escape and returns focus to the button", async () => {
+      open();
+      await ready();
+      await userEvent.click(filterButton());
+      await screen.findByRole("searchbox");
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("searchbox")).not.toBeInTheDocument());
+      await waitFor(() => expect(filterButton()).toHaveFocus());
+    });
+
+    it("opens with the key „/“, with focus in the search", async () => {
+      open();
+      await ready();
+      await userEvent.keyboard("/");
+      expect(await screen.findByRole("searchbox")).toHaveFocus();
+      expect(filterButton()).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("does not take the key „/“ out of a text field", async () => {
+      open();
+      await ready();
+      await userEvent.click(filterButton());
+      await userEvent.type(await screen.findByRole("searchbox"), "a/b");
+      expect(screen.getByRole("searchbox")).toHaveValue("a/b");
+    });
+
+    it("opens the sheet of a phone with „/“, with focus in the search", async () => {
+      open("", { narrow: true });
+      await screen.findByRole("button", { name: /Offen \(\d+\)/ });
+      await userEvent.keyboard("/");
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByRole("searchbox")).toHaveFocus();
+    });
+  });
+
   describe("narrow, focus after a reset", () => {
     it("keeps focus in the search of the open sheet", async () => {
       open("?q=Plakat", { narrow: true });

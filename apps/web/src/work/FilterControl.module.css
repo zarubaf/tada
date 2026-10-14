@@ -1,0 +1,15 @@
+@layer components {
+  .controls {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .controls > * {
+    min-width: 0;
+  }
+
+  .badge {
+    color: var(--color-accent-text);
+    font-variant-numeric: tabular-nums;
+  }
+}
