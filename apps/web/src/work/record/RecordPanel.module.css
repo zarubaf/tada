@@ -154,6 +154,25 @@
     min-width: 0;
   }
 
+  /* A save is running: the value dims and the words appear, after a moment so that a quick save
+     does not flicker. */
+  .editing[aria-busy="true"] :is(input, textarea),
+  .picker[aria-busy="true"] > button {
+    opacity: 0.6;
+  }
+
+  .saving {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    animation: saving-in var(--duration-fast) var(--ease-out) 300ms backwards;
+  }
+
+  @keyframes saving-in {
+    from {
+      opacity: 0;
+    }
+  }
+
   /* The value that the server holds after a conflict, beside the draft. */
   .theirs {
     color: var(--color-text-muted);
