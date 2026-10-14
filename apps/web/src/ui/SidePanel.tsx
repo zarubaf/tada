@@ -2,6 +2,7 @@ import { IconChevronDown, IconChevronUp, IconX } from "@tabler/icons-react";
 import { type KeyboardEvent, type ReactNode, useId, useLayoutEffect, useRef } from "react";
 import { t } from "../i18n";
 import { Button } from "./Button";
+import { makeOutsideInert } from "./inertOutside";
 import styles from "./SidePanel.module.css";
 
 /** `--bp-medium` (CSS custom properties do not work in media queries). */
@@ -27,12 +28,10 @@ export interface SidePanelProps {
 /**
  * The details of one record beside the list (ADR 0082). From 40rem the panel is non-modal, so it
  * never traps focus and the list stays usable: docked as a column from 80rem, an overlay from the
- * right below that. Below 40rem it is a full-screen sheet, and its siblings (the list) are inert.
+ * right below that. Below 40rem it is a full-screen sheet, and everything outside it is inert.
  * CSS places it, so the layout does not flash on load. It is open while it is mounted. Focus moves
  * into it on open and, if it is still inside on close, back to the element that opened it. Load
- * it lazily, as a page does with a route.
- *
- * The parent holds the list and the panel and nothing else: it is a flex row for the docked layout.
+ * it lazily, as a page does with a route. The parent is a flex row for the docked layout.
  */
 export function SidePanel({
   title,
@@ -66,31 +65,27 @@ export function SidePanel({
     };
   }, []);
 
-  // Below the medium breakpoint the panel covers the page, so the page behind it is inert: out of
-  // the tab order, out of the reading order and out of the scroll.
+  // Below the medium breakpoint the panel covers the page, so everything outside it is inert: out
+  // of the tab order, out of the reading order and out of the scroll.
   useLayoutEffect(() => {
+    const panel = region.current;
     const narrow = window.matchMedia?.(NARROW);
-    const behind = [...(region.current?.parentElement?.children ?? [])].filter(
-      (element): element is HTMLElement =>
-        element instanceof HTMLElement && element !== region.current,
-    );
-    if (!narrow) {
+    if (!panel || !narrow) {
       return;
     }
+    let release: (() => void) | undefined;
     function apply() {
-      for (const element of behind) {
-        element.inert = narrow?.matches ?? false;
+      release?.();
+      release = undefined;
+      if (panel && narrow?.matches) {
+        release = makeOutsideInert(panel);
       }
-      document.documentElement.style.overflow = narrow?.matches ? "hidden" : "";
     }
     apply();
     narrow.addEventListener("change", apply);
     return () => {
       narrow.removeEventListener("change", apply);
-      for (const element of behind) {
-        element.inert = false;
-      }
-      document.documentElement.style.overflow = "";
+      release?.();
     };
   }, []);
 
