@@ -147,6 +147,21 @@ describe("DataTable scrolling", () => {
     expect(document.querySelector("[tabindex='0']")).toBeNull();
   });
 
+  it("watches the table inside the scroller too, because the table can grow alone", () => {
+    const watched: Element[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe(target: Element) {
+          watched.push(target);
+        }
+        disconnect() {}
+      },
+    );
+    table({ stacked: false });
+    expect(watched.some((target) => target.tagName === "TABLE")).toBe(true);
+  });
+
   it("follows the width: the region goes away when the columns fit again", () => {
     mockObserver();
     table({ stacked: false });

@@ -67,6 +67,10 @@ function useScrolls<E extends HTMLElement>(active: boolean) {
       setScrolls(element.scrollWidth > element.clientWidth),
     );
     observer.observe(element);
+    // The table can grow (a column joins, a font arrives) without the scroller changing its box.
+    if (element.firstElementChild) {
+      observer.observe(element.firstElementChild);
+    }
     return () => observer.disconnect();
   }, [active]);
   return [ref, scrolls] as const;
