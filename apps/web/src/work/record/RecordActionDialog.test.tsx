@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { TextField } from "../../ui/TextField";
@@ -37,6 +37,13 @@ describe("RecordActionDialog", () => {
     expect(screen.getByText("1 bis 500 Zeichen.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Widerrufen" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Abbrechen" })).toBeVisible();
+  });
+
+  it("keeps a readable ID on one line in the title and in the description", () => {
+    open({ description: "Der neue Entscheid ersetzt DEC-001." });
+    const title = screen.getByRole("heading", { name: "DEC-001 widerrufen" });
+    expect(within(title).getByText("DEC-001").tagName).toBe("SPAN");
+    expect(screen.getByText("DEC-001", { selector: "p span" })).toBeVisible();
   });
 
   it("needs a reason and puts focus on the field", async () => {

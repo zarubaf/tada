@@ -7,6 +7,7 @@ import { type FormEvent, type ReactNode, useLayoutEffect, useRef, useState } fro
 import { t } from "../../i18n";
 import { Button } from "../../ui/Button";
 import { firstInvalidField, useFocusAfterCommit } from "../../ui/focus";
+import { KeepIds } from "../../ui/KeepIds";
 import { LiveRegion } from "../../ui/LiveRegion";
 import { TaskDialog, TaskDialogActions } from "../../ui/TaskDialog";
 import { TextField } from "../../ui/TextField";
@@ -104,7 +105,11 @@ export function RecordActionDialog({
 
   return (
     <TaskDialog title={title} onCancel={() => !busy && onCancel()}>
-      {description && <p>{description}</p>}
+      {description && (
+        <p>
+          <KeepIds>{description}</KeepIds>
+        </p>
+      )}
       <form ref={form} className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
         {(children || reasonField) && (
           <div className={styles.fields}>
