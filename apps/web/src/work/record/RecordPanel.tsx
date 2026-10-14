@@ -163,15 +163,12 @@ export default function RecordPanel({
     ...(previous && { onPrevious: () => onOpen(previous) }),
     ...(next && { onNext: () => onOpen(next) }),
   };
+  // One region for every state, outside the switch: it stays mounted when the create state turns
+  // into the record that it made, so that the text it gains then is spoken.
   const live = (
-    <>
-      <LiveRegion kind="status" visuallyHidden>
-        {status}
-      </LiveRegion>
-      <LiveRegion kind="alert" visuallyHidden>
-        {alert}
-      </LiveRegion>
-    </>
+    <LiveRegion kind="status" visuallyHidden>
+      {status}
+    </LiveRegion>
   );
 
   if (route.mode === "create") {
@@ -192,10 +189,7 @@ export default function RecordPanel({
         ) : (
           <p>{t("record-create-forbidden")}</p>
         )}
-        {/* The form says its own failures. */}
-        <LiveRegion kind="status" visuallyHidden>
-          {status}
-        </LiveRegion>
+        {live}
       </SidePanel>
     );
   }
@@ -211,6 +205,7 @@ export default function RecordPanel({
           <h2 className={styles.title}>{t("record-not-found-title")}</h2>
           <p>{t("record-not-found-text", { id: readableId })}</p>
         </div>
+        {live}
       </SidePanel>
     );
   }
@@ -234,6 +229,10 @@ export default function RecordPanel({
         focusTitle={focusTitle}
       />
       {live}
+      {/* The failure of a save: at once, and only where a field can fail. */}
+      <LiveRegion kind="alert" visuallyHidden>
+        {alert}
+      </LiveRegion>
     </SidePanel>
   );
 }
