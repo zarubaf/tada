@@ -35,9 +35,10 @@ export interface WorkToolbarProps {
   onCreate?: (() => void) | undefined;
 }
 
-function NewButton({ onCreate }: { onCreate: () => void }) {
+/** Sized like the Filter button beside it: 44 px targets in the phone row, compact in the wide row. */
+function NewButton({ onCreate, narrow }: { onCreate: () => void; narrow: boolean }) {
   return (
-    <Button variant="primary" size="sm" onPress={onCreate}>
+    <Button variant="primary" size={narrow ? "md" : "sm"} onPress={onCreate}>
       <IconPlus size={14} stroke={1.5} aria-hidden="true" />
       {t("work-new")}
     </Button>
@@ -117,7 +118,7 @@ export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): W
             onChange={(id) => setType(filters, onChange, id)}
           />
           {filter}
-          {onCreate && <NewButton onCreate={onCreate} />}
+          {onCreate && <NewButton onCreate={onCreate} narrow />}
         </div>
       ),
     };
@@ -137,7 +138,7 @@ export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): W
     end: (
       <>
         {filter}
-        {onCreate && <NewButton onCreate={onCreate} />}
+        {onCreate && <NewButton onCreate={onCreate} narrow={false} />}
       </>
     ),
   };
