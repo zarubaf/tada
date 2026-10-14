@@ -119,6 +119,13 @@
     white-space: nowrap;
   }
 
+  /* A secondary column leaves where the container is narrow, so that the title keeps its room. */
+  @container (width < 56rem) {
+    .table[data-fixed] [data-secondary] {
+      display: none;
+    }
+  }
+
   /*
    * The scroller sits inside the container and follows the width of the container, not of the page:
    * a docked panel or a column to select can leave the table less than its columns need at any
