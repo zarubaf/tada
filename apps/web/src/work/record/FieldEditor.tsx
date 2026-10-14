@@ -244,7 +244,13 @@ export function FieldEditor({
     return heading ? (
       titled(<span id={valueElement}>{view}</span>, true)
     ) : (
-      <span className={styles.plain}>{view}</span>
+      <span
+        className={
+          spec.control === "text" || spec.control === "party" ? styles.plainText : styles.plain
+        }
+      >
+        {view}
+      </span>
     );
   }
 

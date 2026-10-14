@@ -293,6 +293,17 @@
     max-width: 100%;
   }
 
+  /*
+   * A plain text starts at the height of the first line of the label: the text is centered in the
+   * height of a control, and a text that wraps grows downward from there.
+   */
+  .plainText {
+    --slack: calc((var(--control-height-md) - 1lh) / 2);
+
+    display: block;
+    padding-block: var(--slack);
+  }
+
   /* The title is a heading: it keeps the size and the weight of the heading. */
   .displayTitle {
     display: block;
