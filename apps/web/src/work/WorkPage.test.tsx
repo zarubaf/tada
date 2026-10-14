@@ -550,6 +550,30 @@ describe("WorkPage", () => {
       await waitFor(() => expect(filterButton()).toHaveFocus());
     });
 
+    it("clears the text with the first Escape in the search and closes with the second", async () => {
+      open();
+      await ready();
+      await userEvent.keyboard("/");
+      await userEvent.type(await screen.findByRole("searchbox"), "Festzelt");
+      await waitFor(() => expect(shown()).toEqual(["ACT-003"]));
+      await userEvent.keyboard("{Escape}");
+      expect(screen.getByRole("searchbox")).toHaveValue("");
+      expect(filterButton()).toHaveAttribute("aria-expanded", "true");
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("searchbox")).not.toBeInTheDocument());
+      await waitFor(() => expect(filterButton()).toHaveFocus());
+    });
+
+    it("opens and closes with the same press on the button", async () => {
+      open();
+      await ready();
+      await userEvent.click(filterButton());
+      await screen.findByRole("searchbox");
+      await userEvent.click(filterButton());
+      await waitFor(() => expect(screen.queryByRole("searchbox")).not.toBeInTheDocument());
+      expect(filterButton()).toHaveAttribute("aria-expanded", "false");
+    });
+
     it("opens with the key „/“, with focus in the search", async () => {
       open();
       await ready();
