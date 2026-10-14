@@ -113,12 +113,15 @@ export function FieldEditor({
   item,
   env,
   heading = false,
+  focusOnMount = false,
 }: {
   spec: FieldSpec;
   item: WorkItem;
   env: FieldEnv;
   /** The field is the heading of the panel, so its text is the display button. */
   heading?: boolean;
+  /** Focus goes to the display button once, for the title of a record that was just created. */
+  focusOnMount?: boolean;
 }) {
   const edit = useFieldEdit(spec, item, env);
   const value = spec.read(item);
@@ -133,6 +136,13 @@ export function FieldEditor({
   const display = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
   const errorId = useId();
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the field appears
+  useEffect(() => {
+    if (focusOnMount) {
+      display.current?.focus();
+    }
+  }, []);
 
   // After an edit by keyboard the display button is back; focus goes to it.
   const idle = edit.phase === "idle";

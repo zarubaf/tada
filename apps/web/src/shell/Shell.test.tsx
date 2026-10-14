@@ -978,7 +978,7 @@ describe("command palette", () => {
     expect(within(palette).queryByRole("menuitem", { name: "Neue Aufgabe" })).toBeNull();
   });
 
-  it("offers a new action only inside an event and opens its actions", async () => {
+  it("offers a new action only inside an event and opens the create state of the work page", async () => {
     eventItems = [open];
     renderShellAt(`/events/${open.id}`, json(200, info([first], first)));
     await screen.findByRole("button", { name: "Anlass wechseln: Sommerfest 2030" });
@@ -986,7 +986,8 @@ describe("command palette", () => {
     await openPalette();
     await userEvent.click(await screen.findByRole("menuitem", { name: "Neue Aufgabe" }));
 
-    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}/actions`));
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}/work`));
+    expect(window.location.search).toBe("?new=action");
   });
 
   it("jumps to an event", async () => {
