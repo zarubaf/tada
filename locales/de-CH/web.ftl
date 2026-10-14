@@ -75,6 +75,9 @@ value-reference-event = Anlass
 
 ## The sheet and the evidence panel.
 sheet-close = Schliessen
+side-panel-close = Schliessen
+side-panel-previous = Vorheriger Eintrag
+side-panel-next = Nächster Eintrag
 evidence-accepted-by = Angenommen von
 evidence-accepted-at = Angenommen am
 evidence-sources = Belege
