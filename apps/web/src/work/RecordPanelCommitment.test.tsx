@@ -486,6 +486,24 @@ describe("a commitment in the panel", () => {
       expect(view.getByText("wenn der Auftrag unterschrieben ist")).toBeVisible();
     });
 
+    it("shows why the commitment is firm, only once it is", async () => {
+      openWork("#COM-001");
+      const step = await openStep();
+      expect(screen.queryByText("Verbindlich, weil")).toBeNull();
+      await user.type(step.getByRole("textbox", { name: /^Grund/ }), "Auftrag ist unterschrieben");
+      await user.click(step.getByRole("button", { name: "Verbindlich machen" }));
+
+      const view = await region();
+      expect(await view.findByText("Verbindlich, weil")).toBeVisible();
+      expect(view.getByText("Auftrag ist unterschrieben")).toBeVisible();
+    });
+
+    it("shows no reason for a commitment that started firm", async () => {
+      openWork("#COM-001", {}, {}, { status: "firm", can_make_firm: false, condition: null });
+      const view = await region();
+      expect(view.queryByText("Verbindlich, weil")).toBeNull();
+    });
+
     it("moves focus into the panel when the menu leaves with the action", async () => {
       openWork("#COM-001");
       const step = await openStep();
