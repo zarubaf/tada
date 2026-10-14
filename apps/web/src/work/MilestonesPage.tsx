@@ -5,7 +5,6 @@ import {
   type Api,
   type Milestone,
   type MilestoneStatus,
-  type MilestoneWarning,
   problemMessage,
 } from "../api/client";
 import { useEventContext, useEventWritable } from "../events/eventContext";
@@ -25,6 +24,7 @@ import { DirectoryGate } from "./DirectoryGate";
 import { type Directory, useDirectory } from "./directory";
 import { EvidenceSheet } from "./EvidenceSheet";
 import { MilestoneForm } from "./MilestoneForm";
+import { milestoneWarningText } from "./milestoneWarnings";
 import styles from "./Work.module.css";
 import { MilestoneStatusLabel } from "./WorkStatus";
 
@@ -126,14 +126,6 @@ function Milestones({ api, directory }: { api: Api; directory: Directory }) {
         action.milestone_id === milestone.id && OPEN_ACTION_STATUSES.includes(action.status),
     ).length;
 
-  const warningText = (warning: MilestoneWarning) => {
-    if (warning.kind === "overdue") {
-      return t("milestone-warning-overdue");
-    }
-    const id = localIds.get(warning.action_id);
-    return id ? t("milestone-warning-late-action", { id }) : t("milestone-warning-late-unknown");
-  };
-
   const columns: Column<Milestone>[] = [
     { id: "id", header: t("work-column-id"), cell: (row) => row.local_id, mono: true },
     {
@@ -155,7 +147,7 @@ function Milestones({ api, directory }: { api: Api; directory: Directory }) {
                     stroke={1.5}
                     aria-hidden="true"
                   />
-                  {warningText(warning)}
+                  {milestoneWarningText(warning, (id) => localIds.get(id))}
                 </li>
               ))}
             </ul>
