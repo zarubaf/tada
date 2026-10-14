@@ -2,9 +2,14 @@ import { IconArrowDown, IconArrowUp } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import styles from "./DataTable.module.css";
 
-export interface Column<T> {
+/**
+ * The header of a column: text, or a node such as a checkbox that selects all rows. A node has no
+ * text of its own, so the column needs a `label`: its accessible name, and its name in a two-line row.
+ */
+type ColumnHeader = { header: string; label?: string } | { header: ReactNode; label: string };
+
+export type Column<T> = ColumnHeader & {
   id: string;
-  header: string;
   cell: (row: T) => ReactNode;
   /** Monospace text, for IDs and keys. */
   mono?: boolean;
@@ -14,7 +19,7 @@ export interface Column<T> {
   grow?: boolean;
   /** The header is a button that sorts by this column. It needs `onSort` on the table. */
   sortable?: boolean;
-}
+};
 
 export interface TableSort {
   columnId: string;
@@ -37,9 +42,15 @@ export interface DataTableProps<T> {
   onSort?: (columnId: string) => void;
   /**
    * Below 28rem each row becomes a two-line list row (the default). A table whose headers must stay
-   * reachable, for example to sort, sets `false`: it keeps its columns and scrolls inside itself.
+   * reachable, for example to sort, sets `false`: it keeps its columns and, in a container narrower
+   * than they are, scrolls sideways inside itself, in a region that the keyboard reaches.
    */
   stacked?: boolean;
+}
+
+/** The text that names a column: its label, or its header when that is text. */
+function nameOf<T>(column: Column<T>): string | undefined {
+  return column.label ?? (typeof column.header === "string" ? column.header : undefined);
 }
 
 function ariaSort<T>(column: Column<T>, sort: TableSort | undefined) {
@@ -58,7 +69,9 @@ function SortIcon({ sort }: { sort: TableSort | undefined }) {
 /**
  * A read-only table with a sticky header (doc/design/components.md, „Registers and tables“).
  * In a container below 28rem, each row is a two-line list row: the first column, then the other
- * columns with their names as visible labels. The table never scrolls sideways (ADR 0023).
+ * columns with their names as visible labels, and so it never scrolls sideways (ADR 0023). A
+ * table with `stacked={false}` keeps its columns and scrolls inside itself where they do not fit,
+ * in a region that the keyboard reaches.
  */
 export function DataTable<T>({
   label,
@@ -71,57 +84,73 @@ export function DataTable<T>({
   onSort,
   stacked = true,
 }: DataTableProps<T>) {
+  const table = (
+    <table
+      className={styles.table}
+      data-stacked={stacked ? "" : undefined}
+      data-fixed={stacked ? undefined : ""}
+    >
+      <caption className={styles.caption}>{label}</caption>
+      <thead>
+        <tr>
+          {columns.map((column) => (
+            <th
+              key={column.id}
+              scope="col"
+              aria-label={column.label}
+              aria-sort={ariaSort(column, sort)}
+            >
+              {column.sortable && onSort ? (
+                <button type="button" className={styles.sort} onClick={() => onSort(column.id)}>
+                  {column.header}
+                  <SortIcon sort={sort?.columnId === column.id ? sort : undefined} />
+                </button>
+              ) : (
+                column.header
+              )}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => {
+          const id = rowId?.(row);
+          return (
+            <tr
+              key={rowKey(row)}
+              id={id}
+              tabIndex={id === undefined ? undefined : -1}
+              data-linked={id !== undefined && id === linkedId ? "" : undefined}
+            >
+              {columns.map((column) => (
+                <td
+                  key={column.id}
+                  data-mono={column.mono || undefined}
+                  data-numeric={column.numeric || undefined}
+                  data-grow={column.grow || undefined}
+                >
+                  {/* Shown only in a two-line row, where the column headers are not visible. */}
+                  <span className={styles.label}>{nameOf(column)}</span>
+                  {column.cell(row)}
+                </td>
+              ))}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
   return (
-    <div className={styles.container} data-fixed={stacked ? undefined : ""}>
-      <table
-        className={styles.table}
-        data-stacked={stacked ? "" : undefined}
-        data-fixed={stacked ? undefined : ""}
-      >
-        <caption className={styles.caption}>{label}</caption>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column.id} scope="col" aria-sort={ariaSort(column, sort)}>
-                {column.sortable && onSort ? (
-                  <button type="button" className={styles.sort} onClick={() => onSort(column.id)}>
-                    {column.header}
-                    <SortIcon sort={sort?.columnId === column.id ? sort : undefined} />
-                  </button>
-                ) : (
-                  column.header
-                )}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const id = rowId?.(row);
-            return (
-              <tr
-                key={rowKey(row)}
-                id={id}
-                tabIndex={id === undefined ? undefined : -1}
-                data-linked={id !== undefined && id === linkedId ? "" : undefined}
-              >
-                {columns.map((column) => (
-                  <td
-                    key={column.id}
-                    data-mono={column.mono || undefined}
-                    data-numeric={column.numeric || undefined}
-                    data-grow={column.grow || undefined}
-                  >
-                    {/* Shown only in a two-line row, where the column headers are not visible. */}
-                    <span className={styles.label}>{column.header}</span>
-                    {column.cell(row)}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className={styles.container}>
+      {stacked ? (
+        table
+      ) : (
+        // A region that scrolls takes focus, so that the keyboard reaches the columns it hides.
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: the region is a scroll container
+        <section className={styles.scroller} aria-label={label} tabIndex={0}>
+          {table}
+        </section>
+      )}
     </div>
   );
 }
