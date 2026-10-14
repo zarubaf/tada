@@ -92,6 +92,14 @@ export function statusPresentation<K extends RecordKind>(
   return { glyph, tone, labelKey: `${kind}-status-${status}` };
 }
 
+/** The presentation of a record that holds its kind and its status together, for example an item. */
+export function presentationOf<K extends RecordKind>(record: {
+  kind: K;
+  status: StatusOf[K];
+}): StatusPresentation {
+  return statusPresentation(record.kind, record.status);
+}
+
 /** The board column of a record: a card is in the column of its status group (ADR 0082). */
 export function columnOf<K extends RecordKind>(kind: K, status: StatusOf[K]): BoardColumn {
   return row(kind, status).column;
