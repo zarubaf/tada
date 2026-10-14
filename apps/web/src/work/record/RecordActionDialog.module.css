@@ -1,0 +1,24 @@
+@layer components {
+  .form {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  /*
+   * The fields scroll inside the dialog, so that a form with a picker still shows its buttons on a
+   * small screen. The padding keeps the focus ring of a field inside the scroll area.
+   */
+  .fields {
+    --room: var(--space-1);
+    --out: calc(-1 * var(--space-1));
+
+    display: grid;
+    gap: var(--space-3);
+    max-height: min(60dvh, 34rem);
+    margin: var(--out);
+    padding: var(--room);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
