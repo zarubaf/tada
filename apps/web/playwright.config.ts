@@ -9,12 +9,16 @@ export default defineConfig({
   forbidOnly: true,
   reporter: [["list"]],
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.001 } },
-  // The member sees de-CH. The headless shell of Chromium still shows an empty date input as
-  // mm/dd/yyyy; only the new headless mode (`channel: "chromium"`) follows the locale there.
+  // The member sees de-CH. The locale of the context does not reach the date input of the headless
+  // shell, which then shows mm/dd/yyyy; the language switch and the environment of the browser do.
   use: {
     baseURL: "http://127.0.0.1:4173",
     ...devices["Desktop Chrome"],
     locale: "de-CH",
+    launchOptions: {
+      args: ["--lang=de-CH"],
+      env: { ...process.env, LANG: "de_CH.UTF-8", LANGUAGE: "de_CH" },
+    },
   },
   webServer: {
     // The e2e build has the gallery and the pseudo-locale; the production build has neither.
