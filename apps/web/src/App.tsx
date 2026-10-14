@@ -117,7 +117,7 @@ function RegisterPage({ api, children }: { api: Api; children: ReactNode }) {
   return (
     <EventPage api={api}>
       <RegisterNav />
-      <RouteSuspense>{children}</RouteSuspense>
+      <RouteSuspense bare>{children}</RouteSuspense>
     </EventPage>
   );
 }
@@ -149,22 +149,22 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   {/* The pages of the sign-in */}
                   <Route path="/sign-in">
-                    <RouteSuspense>
+                    <RouteSuspense width="form">
                       <SignInPage api={api} />
                     </RouteSuspense>
                   </Route>
                   <Route path="/sign-in/link">
-                    <RouteSuspense>
+                    <RouteSuspense width="form">
                       <MagicLinkPage api={api} />
                     </RouteSuspense>
                   </Route>
                   <Route path="/invitation">
-                    <RouteSuspense>
+                    <RouteSuspense width="form">
                       <InvitationPage api={api} />
                     </RouteSuspense>
                   </Route>
                   <Route path="/choose-organization">
-                    <RouteSuspense>
+                    <RouteSuspense width="form">
                       <ChooseOrganizationPage api={api} />
                     </RouteSuspense>
                   </Route>
@@ -176,35 +176,35 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   <Route path="/events/:eventId">
                     <EventPage api={api}>
-                      <RouteSuspense>
+                      <RouteSuspense bare>
                         <EventOverview api={api} />
                       </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/members">
                     <EventPage api={api}>
-                      <RouteSuspense>
+                      <RouteSuspense bare>
                         <EventMembersPage api={api} />
                       </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/documents">
                     <EventPage api={api}>
-                      <RouteSuspense>
+                      <RouteSuspense bare>
                         <DocumentsPage api={api} />
                       </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/actions">
                     <EventPage api={api}>
-                      <RouteSuspense>
+                      <RouteSuspense bare>
                         <ActionsPage api={api} />
                       </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/timeline">
                     <EventPage api={api}>
-                      <RouteSuspense>
+                      <RouteSuspense bare>
                         <TimelinePage api={api} />
                       </RouteSuspense>
                     </EventPage>
@@ -226,7 +226,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   <Route path="/events/:eventId/workstreams">
                     <EventPage api={api}>
-                      <RouteSuspense>
+                      <RouteSuspense bare>
                         <WorkstreamsPage api={api} />
                       </RouteSuspense>
                     </EventPage>

@@ -1,15 +1,6 @@
-import {
-  Component,
-  type ComponentType,
-  lazy,
-  type ReactNode,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ComponentType, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { problemMessage } from "../api/client";
+import { ChunkBoundary } from "./ChunkBoundary";
 import { InlineError } from "./InlineError";
 import type { MarkdownProps } from "./Markdown";
 import { Skeleton } from "./Skeleton";
@@ -19,22 +10,6 @@ type Loader = () => Promise<{ Markdown: ComponentType<MarkdownProps> }>;
 // The Markdown parser is large. It loads with the first text, so that it stays out of the
 // initial JavaScript (ADR 0024).
 const loadMarkdown: Loader = () => import("./Markdown");
-
-/** Catches the failure of the chunk, for example after a new release removed it. */
-class ChunkBoundary extends Component<
-  { children: ReactNode; fallback: ReactNode },
-  { failed: boolean }
-> {
-  override state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  override render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
-  }
-}
 
 /** Reports that the text is in the page. */
 function Shown({ onShown }: { onShown: () => void }) {
