@@ -1,8 +1,8 @@
 @layer components {
   /*
-   * Four columns and the rail of the canceled ones. A column has a least width; below it
-   * the board scrolls inside itself and not the page. Below 40rem the board
-   * is a list (see `.narrow`).
+   * Four columns and the rail of the canceled ones. A column is 16rem to 22.5rem wide; below the
+   * least width the board scrolls inside itself and not the page. Below 40rem the board is a list
+   * (see `.narrow`).
    */
   .board {
     display: flex;
@@ -13,9 +13,11 @@
   }
 
   .column {
-    flex: 1 1 14rem;
-    min-width: 14rem;
-    border-radius: var(--radius-xl);
+    flex: 1 1 0;
+    min-width: 16rem;
+    max-width: 22.5rem;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
     background: var(--color-bg-sunken);
   }
 
@@ -23,7 +25,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    min-height: var(--topbar-height);
+    min-height: var(--size-column-head);
     padding-inline: var(--space-3);
   }
 
@@ -72,8 +74,9 @@
   .rail {
     flex: none;
     box-sizing: border-box;
-    width: var(--topbar-height);
-    border-radius: var(--radius-xl);
+    width: var(--size-column-head);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
     background: var(--color-bg-sunken);
   }
 
@@ -88,7 +91,7 @@
     gap: var(--space-2);
     box-sizing: border-box;
     width: 100%;
-    min-height: var(--topbar-height);
+    min-height: var(--size-column-head);
     padding: 0 var(--space-3);
     border: 0;
     border-radius: inherit;
@@ -144,10 +147,19 @@
     min-width: 0;
   }
 
+  /* The list has no column around it, so its cards line up with the controls above. */
+  .narrow .cards {
+    padding: 0;
+  }
+
+  .narrow .skeletonCard {
+    margin-inline: 0;
+  }
+
   @media (forced-colors: active) {
     .column,
     .rail {
-      border: 1px solid CanvasText;
+      border-color: CanvasText;
     }
 
     .toggle:focus-visible {
