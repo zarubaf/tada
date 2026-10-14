@@ -105,4 +105,30 @@ describe("PeopleField", () => {
     );
     expect(screen.getByText("Bernd Beispiel (PER-009)")).toBeVisible();
   });
+
+  it("takes the initials of the plain name, not of the readable ID, in the list and in the results", async () => {
+    render(
+      <PeopleField
+        label="Beschlossen von"
+        api={fakeApi()}
+        value="institution:i1"
+        onChange={() => undefined}
+        seed={[
+          {
+            id: "institution:i1",
+            label: "Testwil Generatoren AG (INS-001)",
+            name: "Testwil Generatoren AG",
+          },
+        ]}
+      />,
+    );
+    const chosen = screen.getByRole("list", { name: "Beschlossen von: gewählt" });
+    expect(chosen).toHaveTextContent(/^TA/);
+    const option = await screen.findByRole(
+      "option",
+      { name: "Testwil Generatoren AG (INS-001)" },
+      { timeout: 3000 },
+    );
+    expect(option).toHaveTextContent(/^TA/);
+  });
 });

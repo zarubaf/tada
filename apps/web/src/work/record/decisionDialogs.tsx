@@ -103,6 +103,7 @@ export function SupersedeDecisionDialog({ item, env, onDone, onCancel }: ActionD
   const seed = old.decided_by.map((party) => ({
     id: partyId(party),
     label: party.redacted ? party.local_id : `${party.name} (${party.local_id})`,
+    ...(!party.redacted && { name: party.name }),
   }));
 
   const confirm = async (): Promise<Refusal | undefined> => {
