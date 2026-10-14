@@ -33,22 +33,21 @@
     gap: var(--space-0-5);
     min-height: var(--size-toolbar);
     padding: 0 var(--space-1-5) 0 var(--space-3);
+    font-size: var(--font-size-dense);
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
     background: var(--color-bg-raised);
     box-shadow: var(--shadow-2);
   }
 
-  /* The buttons are 28 px high in the bar, and 44 px with a coarse pointer or the comfortable density. */
-  @media (pointer: fine) {
-    :root:not([data-density="comfortable"]) .bar {
-      --control-height-md: var(--control-height-sm);
-    }
+  /* 30 px high with a fine pointer; the hit target grows them to 44 px, as the tokens of the density say. */
+  .bar button[data-size="sm"] {
+    min-height: max(var(--size-bulk-button), var(--size-hit-target));
   }
 
   .count {
     min-width: 0;
-    padding-inline-start: var(--space-0-5);
+    margin-inline-end: var(--space-2);
     font-weight: var(--font-weight-semibold);
     font-variant-numeric: tabular-nums;
   }
@@ -58,8 +57,17 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-0-5);
-    padding-inline: var(--space-1-5);
-    border-inline: 1px solid var(--color-border-subtle);
+  }
+
+  /* A rule of 20 px with 6 px at each side, before and after the buttons. */
+  .actions::before,
+  .actions::after {
+    content: "";
+    align-self: center;
+    inline-size: 1px;
+    block-size: var(--space-5);
+    margin-inline: var(--space-1-5);
+    background: var(--color-border-subtle);
   }
 
   /* Twenty failures must not make the dock taller than the screen: the list scrolls. */
@@ -88,14 +96,18 @@
     }
 
     .count {
+      margin-inline-end: 0;
       padding-inline-start: var(--space-2);
     }
 
     .actions {
       grid-column: 1 / -1;
       grid-row: 2;
-      padding-inline: 0;
-      border-inline: 0;
+    }
+
+    .actions::before,
+    .actions::after {
+      display: none;
     }
 
     .actions > span {

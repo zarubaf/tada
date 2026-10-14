@@ -88,15 +88,13 @@
     --sidebar-width: 14.5rem;
     --size-toolbar: 44px; /* The toolbar row of a page, the bulk bar. */
     --size-tile: 28px; /* The tile with the initials of an event. */
-    --dock-offset: var(
-      --space-5
-    ); /* The distance of the floating bulk bar from the bottom of the window. */
 
-    --dock-height: var(--size-toolbar); /* The height of the bulk bar: one row. */
-    --dock-room: calc(
-      var(--dock-height) +
-      var(--dock-offset)
-    ); /* What the end of a view keeps free for the bar. */
+    /* The bulk bar: its buttons (the mock gives them 30 px, 2 px more than a small control), its distance
+       from the bottom of the window, its height and the room that the end of a view keeps for it. */
+    --size-bulk-button: 30px;
+    --dock-offset: var(--space-5);
+    --dock-height: var(--size-toolbar);
+    --dock-room: calc(var(--dock-height) + var(--dock-offset));
 
     /* Density: compact */
     --control-height-sm: 28px;

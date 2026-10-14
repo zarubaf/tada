@@ -180,6 +180,9 @@ test.describe("a mouse", () => {
     // The bar is 44 px high and floats 20 px above the bottom of the window (the approved mock).
     expect(frame?.height).toBeCloseTo(44, 0);
     expect(900 - ((frame?.y ?? 0) + (frame?.height ?? 0))).toBeCloseTo(20, 0);
+    // Its buttons are 30 px high, and the rules between the groups are 20 px high (the mock).
+    const status = await bar(page).getByRole("button", { name: "Status" }).boundingBox();
+    expect(status?.height).toBeCloseTo(30, 0);
 
     await bar(page).getByRole("button", { name: "Status" }).click();
     await page.getByRole("option", { name: "Erledigt" }).click();
