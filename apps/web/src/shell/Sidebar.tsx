@@ -16,6 +16,8 @@ export interface SidebarProps {
   eventSwitcher: ReactNode;
   server: SystemVersion | undefined;
   onOpenVersions: () => void;
+  /** Called when a link starts a navigation: the drawer closes then. */
+  onNavigate: () => void;
   member: { id: string; name: string; role: string };
 }
 
@@ -24,6 +26,7 @@ export function Sidebar({
   eventSwitcher,
   server,
   onOpenVersions,
+  onNavigate,
   member,
 }: SidebarProps) {
   return (
@@ -35,6 +38,7 @@ export function Sidebar({
         {MAIN.map((destination) => (
           <NavLink
             key={destination.id}
+            onNavigate={onNavigate}
             to={destination.to}
             icon={destination.icon}
             {...(destination.exact ? { exact: true } : {})}
@@ -46,10 +50,15 @@ export function Sidebar({
         ))}
       </nav>
       <div className={styles.foot}>
-        <NavLink to={SETTINGS.to} icon={SETTINGS.icon} within={SETTINGS.within}>
+        <NavLink
+          to={SETTINGS.to}
+          onNavigate={onNavigate}
+          icon={SETTINGS.icon}
+          within={SETTINGS.within}
+        >
           {SETTINGS.label}
         </NavLink>
-        <NavLink to={PRIVACY.to} icon={PRIVACY.icon}>
+        <NavLink to={PRIVACY.to} onNavigate={onNavigate} icon={PRIVACY.icon}>
           {PRIVACY.label}
         </NavLink>
         <VersionButton server={server} onPress={onOpenVersions} />

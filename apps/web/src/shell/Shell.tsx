@@ -98,6 +98,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   };
 
   const openEvent = (item: string) => {
+    // The drawer closes before the router moves focus to the new page.
+    setDrawerOpen(false);
     const eventId = eventIdOfItem(item);
     if (eventId !== undefined) {
       navigate(`/events/${encodeURIComponent(eventId)}`);
@@ -160,6 +162,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       }
       server={server}
       onOpenVersions={openVersions}
+      onNavigate={() => setDrawerOpen(false)}
       member={{ id: user.id, name: user.displayName, role: t(`role-${organization.role}`) }}
     />
   );
