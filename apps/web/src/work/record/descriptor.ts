@@ -17,13 +17,22 @@ export type ControlKind =
   | "enum"
   | "person"
   | "area"
-  | "milestone";
+  | "milestone"
+  | "people";
 
 /** The icon of a value of an enum: a Tabler icon or a drawing of the same shape. */
 export type EnumIcon = ComponentType<{ size?: number; "aria-hidden"?: "true" }>;
 
 /** The text of a field, or the ID of a choice, or a civil date; nothing means the field is empty. */
 export type FieldValue = string | null;
+
+/** The IDs of the people of a `people` field. A person or an institution is `person:{uuid}` or `institution:{uuid}`. */
+export const peopleIds = (value: FieldValue): string[] =>
+  value === null || value === "" ? [] : value.split(",");
+
+/** The value of a `people` field for these IDs: nobody is no value. */
+export const peopleValue = (ids: readonly string[]): FieldValue =>
+  ids.length === 0 ? null : ids.join(",");
 
 /** What a command returns that the panel reads: the readable ID of a new record. */
 export interface Saved {
@@ -67,6 +76,11 @@ export interface FieldSpec {
   overdue?: boolean;
   /** The value of the item. */
   read: (item: WorkItem) => FieldValue;
+  /**
+   * The people that a `people` field shows, with the IDs that its value holds. A field that the
+   * member cannot change (the parties of a decision) lists them as text.
+   */
+  people?: (item: WorkItem) => { id: string; label: string }[];
   /**
    * The values of a status that the item can have now: its own and the next ones. An `enum`
    * control has `values` instead, for they do not depend on the item.

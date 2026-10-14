@@ -10,13 +10,15 @@ import type { WorkCommands } from "../workCommands";
 import { type ChoiceSources, choicesOf } from "./choices";
 import type { FieldSpec, FieldValue, RecordDescriptor } from "./descriptor";
 import { fieldError } from "./fieldError";
+import { PeopleField } from "./PeopleField";
 import styles from "./RecordPanel.module.css";
 
 type Values = Record<string, FieldValue>;
 type Errors = Record<string, string>;
 
 /** A field of text goes in a stacked field; the others (dates, pickers) are rows of the list. */
-const isStacked = (spec: FieldSpec) => spec.control === "text" || spec.control === "multiline";
+const isStacked = (spec: FieldSpec) =>
+  spec.control === "text" || spec.control === "multiline" || spec.control === "people";
 
 /** The fields of the form in order, in runs of the same layout. */
 function runsOf(specs: FieldSpec[]): { stacked: boolean; specs: FieldSpec[] }[] {
@@ -222,19 +224,34 @@ export function RecordCreate({
     <form ref={form} className={styles.body} onSubmit={(event) => void submit(event)} noValidate>
       {runsOf(shown).map((run) =>
         run.stacked ? (
-          run.specs.map((spec) => (
-            <TextField
-              key={spec.id}
-              label={
-                spec.required ? `${t(spec.labelKey)} ${t("record-required")}` : t(spec.labelKey)
-              }
-              value={values[spec.id] ?? ""}
-              onChange={(text) => set(spec.id, text)}
-              error={errors[spec.id]}
-              autoComplete="off"
-              {...(spec.control === "multiline" && { rows: 4 })}
-            />
-          ))
+          run.specs.map((spec) =>
+            spec.control === "people" ? (
+              sources.api && (
+                <PeopleField
+                  key={spec.id}
+                  label={
+                    spec.required ? `${t(spec.labelKey)} ${t("record-required")}` : t(spec.labelKey)
+                  }
+                  api={sources.api}
+                  value={values[spec.id] ?? null}
+                  onChange={(value) => set(spec.id, value)}
+                  error={errors[spec.id]}
+                />
+              )
+            ) : (
+              <TextField
+                key={spec.id}
+                label={
+                  spec.required ? `${t(spec.labelKey)} ${t("record-required")}` : t(spec.labelKey)
+                }
+                value={values[spec.id] ?? ""}
+                onChange={(text) => set(spec.id, text)}
+                error={errors[spec.id]}
+                autoComplete="off"
+                {...(spec.control === "multiline" && { rows: 4 })}
+              />
+            ),
+          )
         ) : (
           <dl key={run.specs[0]?.id} className={styles.props}>
             {run.specs.map((spec) => (

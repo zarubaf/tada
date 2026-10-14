@@ -176,7 +176,9 @@ export function FieldEditor({
     spec.control === "milestone";
   const shown = edit.phase === "idle" ? value : edit.draft;
   const choices = choicesOf(spec, env.sources, item, shown);
-  const editable = env.editable && spec.save !== undefined && choices.offered;
+  // The people of a record are listed, not edited here: the create form and the dialogs pick them.
+  const editable =
+    env.editable && spec.save !== undefined && choices.offered && spec.control !== "people";
   const display = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
   const errorId = useId();
