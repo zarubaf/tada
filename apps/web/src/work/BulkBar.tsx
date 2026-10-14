@@ -190,6 +190,7 @@ export function BulkBar({
             options={statusOptions}
             disabledReason={busyReason ?? statusReason}
             searchable={false}
+            size="sm"
             narrow={narrow}
             onChoose={(id) => apply({ field: "status", status: id })}
           />
@@ -198,6 +199,7 @@ export function BulkBar({
             icon={IconUser}
             options={ownerOptions}
             disabledReason={busyReason ?? directoryReason ?? unsupported("owner")}
+            size="sm"
             narrow={narrow}
             onChoose={(id) => apply({ field: "owner", userId: id })}
           />
@@ -206,12 +208,14 @@ export function BulkBar({
             icon={IconLayersSubtract}
             options={areaOptions}
             disabledReason={busyReason ?? directoryReason ?? unsupported("area")}
+            size="sm"
             narrow={narrow}
             onChoose={(id) => apply({ field: "area", workstreamId: id === NO_AREA ? null : id })}
           />
         </div>
         <Button
           variant="quiet"
+          size="sm"
           isRefused={selection.locked}
           aria-describedby={selection.locked ? clearReason : undefined}
           onPress={selection.clear}
