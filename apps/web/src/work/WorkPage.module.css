@@ -27,11 +27,18 @@
     min-width: 0;
   }
 
-  /* The board and its bulk bar: the bar sticks to the bottom of the screen while the board shows. */
+  /*
+   * The view and its bulk bar: the bar sticks to the bottom of the screen. While it shows, the end
+   * of every view keeps the room that it needs, so that it never covers the last row or card.
+   */
   .scope {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
     min-width: 0;
+  }
+
+  .scope[data-bulk] {
+    padding-block-end: var(--dock-room);
   }
 }

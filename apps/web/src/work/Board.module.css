@@ -65,7 +65,7 @@
     gap: var(--space-1-5);
     margin: 0;
 
-    /* The bottom is room for the bulk bar, so that it never covers the last card. */
+    /* The mock keeps room under the last card of a column. */
     padding: 0 var(--space-1-5) var(--space-16);
     list-style: none;
   }
@@ -192,12 +192,6 @@
   /* The list has no column around it, so its cards line up with the controls above. */
   .narrow .cards {
     padding: 0;
-  }
-
-  /* While cards are selected the bulk bar floats over the end of the list, in two rows. */
-  .narrow[data-selecting]::after {
-    content: "";
-    block-size: calc(2 * var(--size-toolbar) + var(--space-4));
   }
 
   .narrow .skeletonCard {
