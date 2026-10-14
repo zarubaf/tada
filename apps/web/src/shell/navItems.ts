@@ -8,11 +8,12 @@ import {
   IconLayoutKanban,
   IconSettings,
   IconShieldLock,
+  IconTimeline,
   IconUser,
   IconUsers,
 } from "@tabler/icons-react";
 import { t } from "../i18n";
-import { isAtOrBelow } from "../router/Router";
+import { isAtOrBelow, passesQueryRules, type QueryRule } from "../router/Router";
 
 export interface Destination {
   id: string;
@@ -25,7 +26,14 @@ export interface Destination {
   within?: string;
   /** Another item claims this path and the paths below it, so this item is not current there. */
   yieldsTo?: string;
+  /** Current only while the query has this value: „Zeitplan“ is a view of the work page. */
+  onlyWith?: QueryRule;
+  /** Not current while the query has this value: the sibling of `onlyWith`. */
+  unlessWith?: QueryRule;
 }
+
+/** The view of the work page that the „Zeitplan“ item opens. */
+const TIMELINE: QueryRule = { name: "view", value: "timeline" };
 
 const inbox: Destination = { id: "inbox", to: "/inbox", label: t("nav-inbox"), icon: IconInbox };
 const myWork: Destination = {
@@ -74,6 +82,18 @@ function work(eventId: string): Destination {
     to: `/events/${encodeURIComponent(eventId)}/work`,
     label: t("nav-work"),
     icon: IconLayoutKanban,
+    unlessWith: TIMELINE,
+  };
+}
+
+/** „Zeitplan“ of one event: the timeline view of the work page (ADR 0082). */
+function timeline(eventId: string): Destination {
+  return {
+    id: "timeline",
+    to: `/events/${encodeURIComponent(eventId)}/work?view=${TIMELINE.value}`,
+    label: t("nav-timeline"),
+    icon: IconTimeline,
+    onlyWith: TIMELINE,
   };
 }
 
@@ -90,7 +110,7 @@ export function mainItems(eventId: string | undefined): Destination[] {
   return [
     inbox,
     myWork,
-    ...(eventId === undefined ? [] : [work(eventId)]),
+    ...(eventId === undefined ? [] : [work(eventId), timeline(eventId)]),
     eventsItem(eventId),
     persons,
     institutions,
@@ -121,13 +141,18 @@ export const PRIVACY = privacy;
 export const ALL: Destination[] = [...MAIN, settings, privacy];
 
 /** True when the path belongs to the destination. */
-export function isCurrent(destination: Destination, pathname: string): boolean {
+export function isCurrent(destination: Destination, pathname: string, search = ""): boolean {
   if (destination.yieldsTo !== undefined && isAtOrBelow(pathname, destination.yieldsTo)) {
     return false;
   }
+  if (!passesQueryRules(search, destination)) {
+    return false;
+  }
+  // A query in `to` names a view; the path decides which page the item belongs to.
+  const target = destination.to.split(/[?#]/, 1)[0] ?? destination.to;
   return (
-    pathname === destination.to ||
-    (!destination.exact && pathname.startsWith(`${destination.to}/`)) ||
+    pathname === target ||
+    (!destination.exact && pathname.startsWith(`${target}/`)) ||
     (destination.within !== undefined && pathname.startsWith(`${destination.within}/`))
   );
 }
