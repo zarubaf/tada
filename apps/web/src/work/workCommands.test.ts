@@ -231,6 +231,68 @@ describe("the commands of an action beyond the first set", () => {
   });
 });
 
+describe("the commands of a risk beyond the first set", () => {
+  it("changes the rating, the mitigation and the description, and can clear a text", async () => {
+    const { sent, commands } = server();
+    const t = { id: "r1", version: 1 };
+    const calls = [
+      commands.risk.changeImpact(t, "high"),
+      commands.risk.changeLikelihood(t, "low"),
+      commands.risk.changeMitigation(t, "Zelt bestellen"),
+      commands.risk.changeMitigation(t, null),
+      commands.risk.changeDescription(t, "Text"),
+      commands.risk.changeDescription(t, null),
+    ];
+    for (let i = 0; i < calls.length; i++) {
+      await tick();
+      sent[i]?.answer(record("r1", i + 2));
+    }
+    await Promise.all(calls);
+    expect(sent.map((s) => [s.path, s.body])).toEqual([
+      ["/api/v1/events/e1/risks/r1", { impact: "high", expected_version: 1 }],
+      ["/api/v1/events/e1/risks/r1", { likelihood: "low", expected_version: 2 }],
+      ["/api/v1/events/e1/risks/r1", { mitigation: "Zelt bestellen", expected_version: 3 }],
+      ["/api/v1/events/e1/risks/r1", { mitigation: null, expected_version: 4 }],
+      ["/api/v1/events/e1/risks/r1", { description: "Text", expected_version: 5 }],
+      ["/api/v1/events/e1/risks/r1", { description: null, expected_version: 6 }],
+    ]);
+  });
+
+  it("creates a risk and returns it", async () => {
+    const { sent, commands } = server();
+    const body = {
+      id: "r9",
+      title: "Regen",
+      impact: "high",
+      likelihood: "medium",
+      owner_user_id: "u1",
+    } as const;
+    const result = commands.risk.create(body);
+    await tick();
+    expect(sent[0]).toMatchObject({ method: "POST", path: "/api/v1/events/e1/risks", body });
+    sent[0]?.answer(json(201, { id: "r9", version: 1 }));
+    expect(await result).toEqual({ ok: true, record: { id: "r9", version: 1 } });
+  });
+
+  it("keeps the problem of a refused create, so that a form can show the invalid fields", async () => {
+    const { sent, commands } = server();
+    const result = commands.risk.create({
+      title: "Regen",
+      impact: "high",
+      likelihood: "low",
+      owner_user_id: "u1",
+    });
+    await tick();
+    sent[0]?.answer(
+      problem(422, "validation-failed", [{ pointer: "/owner", code: "unknown-member" }]),
+    );
+    expect(await result).toMatchObject({
+      ok: false,
+      failure: { reason: "validation", problem: { errors: [{ pointer: "/owner" }] } },
+    });
+  });
+});
+
 describe("what a kind does not offer", () => {
   it("has no command for a field that the API does not take", () => {
     const { commands } = server();
