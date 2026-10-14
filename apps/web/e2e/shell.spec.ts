@@ -151,6 +151,26 @@ test("at 375 px the drawer holds the sidebar, traps focus and returns it on Esca
   await expect(toggle).toBeFocused();
 });
 
+test("at 375 px a destination of the drawer leaves focus on the h1 of the new page", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await fakeSession(page);
+  await fakeEvents(page, 200, { items: events });
+  await page.goto("/events");
+
+  await page.getByRole("button", { name: "Navigation öffnen" }).click();
+  const drawer = page.getByRole("dialog", { name: "Navigation" });
+  await drawer.getByRole("link", { name: /^Eingang/ }).click();
+
+  await expect(page).toHaveURL(/\/inbox$/);
+  await expect(drawer).toHaveCount(0);
+  // The drawer restores focus to its toggle on a closing; the new page must keep it.
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+  await page.waitForTimeout(300);
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+});
+
 for (const width of [320, 375, 768]) {
   test.describe(`at ${width} px, touch`, () => {
     // ADR 0022: targets are 44 px with a coarse pointer.

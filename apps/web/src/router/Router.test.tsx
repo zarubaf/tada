@@ -471,3 +471,24 @@ describe("Router", () => {
     });
   });
 });
+
+describe("Link onNavigate", () => {
+  it("runs before the path changes, and not for a click with a modifier key", async () => {
+    window.history.replaceState(null, "", "/events");
+    const seen: string[] = [];
+    render(
+      <Router>
+        <Link to="/other" onNavigate={() => seen.push(window.location.pathname)}>
+          Andere
+        </Link>
+      </Router>,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Andere" }), { ctrlKey: true });
+    expect(seen).toEqual([]);
+    fireEvent.click(screen.getByRole("link", { name: "Andere" }));
+
+    expect(seen).toEqual(["/events"]);
+    expect(window.location.pathname).toBe("/other");
+  });
+});

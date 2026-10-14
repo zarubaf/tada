@@ -59,6 +59,8 @@ let versionsPending = false;
 let openChangesets = 0;
 /** The events that the fake server lists; the first page only. */
 let eventItems: ReturnType<typeof event>[] = [];
+/** While true, the page of the test has an h1, which the router focuses after a navigation. */
+let pageHeading = false;
 /** The path of each request that the fake server received. */
 let requested: string[] = [];
 /** The key of the remembered event of the first organization. */
@@ -120,6 +122,7 @@ function renderShellAt(path: string, ...responses: Response[]) {
         <InboxProvider api={api}>
           <Shell api={api}>
             <p>Seiteninhalt</p>
+            {pageHeading && <h1>Seitentitel</h1>}
           </Shell>
         </InboxProvider>
       </SessionProvider>
@@ -149,6 +152,7 @@ afterEach(() => {
   openChangesets = 0;
   eventItems = [];
   requested = [];
+  pageHeading = false;
   localStorage.clear();
   document.documentElement.removeAttribute("data-theme");
 });
@@ -680,6 +684,21 @@ describe("narrow layout", () => {
 
     await screen.findByRole("button", { name: "Navigation öffnen" });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("leaves focus on the new page when a destination of the drawer opens", async () => {
+    stubNarrow(true);
+    pageHeading = true;
+    renderShell(json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Navigation öffnen" }));
+    const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+    await userEvent.click(within(drawer).getByRole("link", { name: "Personen" }));
+
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    // The drawer restores focus to the toggle on its own; the heading must keep it.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getByRole("heading", { name: "Seitentitel" })).toHaveFocus();
   });
 
   it("closes the drawer with its close button", async () => {

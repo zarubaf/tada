@@ -307,6 +307,11 @@ export interface LinkProps {
   "aria-label"?: string;
   /** `-1` takes the link out of the tab order, where another link of the page does the same. */
   tabIndex?: number;
+  /**
+   * Called when a click starts a navigation, before the path changes. A modal that the click
+   * leaves behind closes here, so its focus handling ends before the router moves focus.
+   */
+  onNavigate?: () => void;
   children: ReactNode;
 }
 
@@ -323,6 +328,7 @@ export function Link({
   alsoCurrentOn = [],
   "aria-label": ariaLabel,
   tabIndex,
+  onNavigate,
   children,
 }: LinkProps) {
   const { pathname, navigate } = useLocation();
@@ -342,6 +348,7 @@ export function Link({
       !event.currentTarget.target;
     if (plain) {
       event.preventDefault();
+      onNavigate?.();
       navigate(to);
     }
   };
