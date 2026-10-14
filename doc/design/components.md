@@ -1,5 +1,7 @@
 # Components and patterns
 
+Under change by ADR 0082: values and screens move to the new design task by task.
+
 Screens use only the components in `apps/web/src/ui/` (ADR 0020).
 This document lists the core components and the patterns for the main screens.
 A new component needs an entry here in the same pull request.

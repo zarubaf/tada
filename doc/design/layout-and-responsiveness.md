@@ -1,5 +1,7 @@
 # Layout and responsiveness
 
+Under change by ADR 0082: values and screens move to the new design task by task.
+
 ADR 0023 defines the strategy. This document gives the layouts, the navigation and the page templates.
 
 ## App shell

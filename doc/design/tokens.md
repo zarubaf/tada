@@ -1,5 +1,7 @@
 # Design tokens
 
+Under change by ADR 0082: values and screens move to the new design task by task.
+
 [tokens.css](../../apps/web/src/styles/tokens.css) is the authority for the token names and values (ADR 0018).
 This document gives the uses, the rules and the reasons.
 The values are only in tokens.css. The breakpoints are the exception (see below).
