@@ -1364,6 +1364,10 @@ work-empty-filtered-text = Ändern Sie die Filter oder setzen Sie sie zurück.
 work-card-owner = Verantwortlich: { $name }
 work-card-due = Fällig
 work-card-decided = Entschieden am
+# $level: niedrig, mittel or hoch.
+work-card-impact = Wirkung { $level }
+# $level: niedrig, mittel or hoch.
+work-card-likelihood = Wahrscheinlich { $level }
 # $id: the readable ID, $title: the title of the record. The name of the checkbox on a card.
 work-select-item = { $id } { $title } auswählen
 work-select-column = Alle in Spalte auswählen
