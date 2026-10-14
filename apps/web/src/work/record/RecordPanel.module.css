@@ -9,16 +9,34 @@
     color: var(--color-text-muted);
   }
 
+  /*
+   * Title, labels, values and descriptions start at the same x. A value that the member can
+   * change has a hover box, which reaches out of the column by its padding (a negative margin), so
+   * that its text still starts where the text of a plain value starts.
+   */
   .body {
+    /* How far a hover box reaches out of the column, and what is left of its padding after 1 px of border. */
+    --reach: calc(-1 * var(--space-2));
+    --reach-title: calc(-1 * var(--space-1-5));
+    --edge: calc(var(--space-2) - 1px);
+
+    /* An input in edit state has a 1 px border, so its box reaches out one pixel further. */
+    --reach-edit: calc(-1 * var(--space-2) - 1px);
+    --grow-edit: calc(var(--space-2) + 1px);
+
+    /* The height of a value that edits: a compact row, and 44 px on a touch screen. */
+    --hit: var(--control-height-sm);
+
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .title {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
-    line-height: var(--line-height-lg);
+    line-height: var(--line-height-base);
     letter-spacing: var(--letter-spacing-tight);
     overflow-wrap: anywhere;
   }
@@ -26,9 +44,15 @@
   /* Label and value in two columns; a row is as high as a control. */
   .props {
     display: grid;
-    grid-template-columns: 8rem minmax(0, 1fr);
+    grid-template-columns: 7.25rem minmax(0, 1fr);
     column-gap: var(--space-2);
     align-items: start;
+  }
+
+  @media (pointer: coarse) {
+    .body {
+      --hit: var(--control-height-md);
+    }
   }
 
   .label,
@@ -57,26 +81,76 @@
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
+    max-width: 100%;
   }
 
-  /* The element that names the value of a display button; it adds no box of its own. */
-  .valueText {
-    display: contents;
+  /* A long area or milestone ends in an ellipsis; the full text is the title and the name. */
+  .valueName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* A date: the icon and the text, with no box. */
+  .date {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .date[data-overdue] {
+    color: var(--color-danger);
+  }
+
+  .hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .empty {
     color: var(--color-text-muted);
   }
 
+  /* A group after the properties: 8 px more than the gap, a line, then 16 px to its first line. */
   .section {
     display: grid;
     gap: var(--space-2);
+    margin-block-start: var(--space-2);
+    padding-block-start: var(--space-4);
+    border-block-start: 1px solid var(--color-border-subtle);
+    font-weight: var(--font-weight-medium);
   }
 
   .sectionHeading {
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
     color: var(--color-text-muted);
+  }
+
+  /* The sources: each passage is a card, with its version and time inside. */
+  .sources > ul {
+    gap: var(--space-2);
+  }
+
+  .sources li {
+    display: grid;
+    gap: var(--space-1-5);
+    padding: var(--space-2-5) var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    font-weight: var(--font-weight-regular);
+  }
+
+  .sources blockquote {
+    padding: 0;
+    border-inline-start: 0;
+    background: none;
   }
 
   /* A long text keeps its line breaks. */
@@ -91,6 +165,11 @@
     gap: var(--space-2);
   }
 
+  /* The element that names the value of a display button; it adds no box of its own. */
+  .valueText {
+    display: contents;
+  }
+
   /* The text of a field that the member can change: it looks like text and edits on a click. */
   .display {
     display: inline-flex;
@@ -98,9 +177,10 @@
     align-items: center;
     gap: var(--space-1) var(--space-2);
     min-width: 0;
-    min-height: var(--control-height-md);
-    padding: 0 var(--space-3);
-    border: 1px solid transparent;
+    min-height: var(--hit);
+    margin-inline-start: var(--reach);
+    padding: 0 var(--space-2);
+    border: 0;
     border-radius: var(--radius-md);
     background: none;
     color: inherit;
@@ -119,51 +199,84 @@
 
   .display:focus-visible {
     outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
+    outline-offset: 0;
   }
 
-  /* A value that is plain text starts where the text of a value that edits starts. */
+  /* A value that is plain text has no box and starts at the column. */
   .plain {
     display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-1) var(--space-2);
-    padding: 0 var(--space-3);
-    border: 1px solid transparent;
+    min-width: 0;
+    max-width: 100%;
   }
 
   /* The title is a heading: it keeps the size and the weight of the heading. */
   .displayTitle {
     display: block;
-    width: 100%;
-    padding-inline: var(--space-1);
+    width: calc(100% + var(--space-3));
+    margin-inline-start: var(--reach-title);
+    padding: var(--space-0-5) var(--space-1-5);
     font-weight: inherit;
     letter-spacing: inherit;
   }
 
-  /* A long name wraps inside the trigger of a picker and does not run out of the panel. */
+  /*
+   * The trigger of a picker fits its content, with the caret after the text, and reaches out of the
+   * column like the box of a text. A long name stays on one line.
+   */
   .picker > button {
-    max-width: 100%;
-    white-space: normal;
-    text-align: start;
+    justify-self: start;
+    min-height: var(--hit);
+    max-width: calc(100% + var(--space-2));
+    margin-inline-start: var(--reach);
+    padding-inline: var(--edge);
+  }
+
+  /* A date in the create form looks like the quiet pickers and starts at the same x. */
+  .picker input[type="date"] {
+    justify-self: start;
+    min-height: var(--hit);
+    margin-inline-start: var(--reach);
+    padding-inline: var(--edge);
+    border-color: transparent;
+    background: none;
+  }
+
+  .picker input[type="date"]:hover {
+    background: var(--color-bg-hover);
+  }
+
+  .picker input[type="date"][data-invalid] {
+    border-color: var(--color-danger);
   }
 
   /* A text that is being edited grows with its content, so that no line hides. */
   .editing textarea {
     field-sizing: content;
+    resize: none;
+  }
+
+  /* One column that may shrink, so that a long value ends in an ellipsis and does not push out. */
+
+  /* The box of an input that is being edited starts where the hover box of the text started. */
+  .editing {
+    width: calc(100% + var(--grow-edit));
+    margin-inline-start: var(--reach-edit);
   }
 
   .editing,
   .picker {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-1);
     min-width: 0;
   }
 
   /* A save is running: the value dims and the words appear, after a moment so that a quick save
      does not flicker. */
-  .editing[aria-busy="true"] :is(input, textarea),
-  .picker[aria-busy="true"] > button {
+  .editing[aria-busy="true"] :is(input, textarea) {
     opacity: 0.6;
   }
 
