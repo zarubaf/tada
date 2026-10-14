@@ -86,7 +86,7 @@
   @media (width >= 40rem) {
     .command {
       justify-content: flex-start;
-      width: 18rem;
+      flex: 0 1 22rem;
       padding-inline: var(--space-2);
       border-color: var(--color-border-control);
       background: var(--color-bg-canvas);

@@ -42,7 +42,9 @@ export function TopBar({
         aria-expanded={expanded}
         onPress={onToggle}
       />
-      <p className={styles.title}>{title}</p>
+      <p className={styles.title} title={title}>
+        {title}
+      </p>
       <button
         type="button"
         className={styles.command}

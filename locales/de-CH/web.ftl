@@ -169,7 +169,6 @@ theme-toggle = Farbschema: { $name }
 theme-announcement = Farbschema geändert: { $name }
 
 # The event switcher at the head of the sidebar.
-event-switcher-none = Kein Anlass gewählt
 event-switcher-pick = Anlass wählen
 # $name: the name of the current event.
 event-switcher-label = Anlass wechseln: { $name }
