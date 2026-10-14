@@ -136,6 +136,20 @@ describe("the create state", () => {
     expect(screen.getByText("ACT-020 erfasst.")).toBeInTheDocument();
   });
 
+  it("has the live region before the record is created, so that its text is spoken", async () => {
+    openWork("?new=action");
+    const view = await form();
+    const region = view.getByRole("status");
+    expect(region).toBeEmptyDOMElement();
+    await user.type(view.getByRole("textbox", { name: /^Titel/ }), "Banner");
+    await user.click(view.getByRole("button", { name: "Erstellen" }));
+
+    const open = await screen.findByRole("complementary", { name: /ACT-020/ });
+    // The same element, which only gained its text: a region that remounts with its text is not read.
+    expect(within(open).getByRole("status")).toBe(region);
+    expect(region).toHaveTextContent("ACT-020 erfasst.");
+  });
+
   it("shows the invalid fields that the server names, and keeps the draft", async () => {
     const server = openWork("?new=action", {}, () =>
       problem(422, "validation-failed", [
