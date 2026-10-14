@@ -84,8 +84,7 @@ export function Chip(props: ChipProps) {
       </>
     ) : variant === "workstream" ? (
       <>
-        <span className={styles.hidden}>{t("chip-workstream")}: </span>
-        {children}
+        <span className={styles.hidden}>{t("chip-workstream")}:</span> {children}
       </>
     ) : (
       children
