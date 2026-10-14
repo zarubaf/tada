@@ -75,6 +75,11 @@ describe("the record panel", () => {
       expect(screen.queryByRole("complementary")).toBeNull();
     });
 
+    it("finds a record when the address writes its ID in lower case", async () => {
+      open("#act-001");
+      await panel("ACT-001 Plakat gestalten");
+    });
+
     it("closes without an error when the hash holds a quote and a bracket", async () => {
       // The decoded hash is `x"]`; as a selector it would be a syntax error.
       open("#x%22%5D");
