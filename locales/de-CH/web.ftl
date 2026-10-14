@@ -78,6 +78,8 @@ sheet-close = Schliessen
 side-panel-close = Schliessen
 side-panel-previous = Vorheriger Eintrag
 side-panel-next = Nächster Eintrag
+# $index: the place of the record in the list, from 1. $total: the number of records in the list.
+side-panel-position = { $index } von { $total }
 evidence-accepted-by = Angenommen von
 evidence-accepted-at = Angenommen am
 evidence-sources = Belege
