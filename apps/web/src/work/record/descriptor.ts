@@ -9,7 +9,11 @@ import type { CommandResult, WorkCommands } from "../workCommands";
 import type { WorkItem } from "../workItem";
 import type { FieldEnv } from "./FieldEditor";
 
-/** How a field is shown and edited. Each kind uses these and adds none. */
+/**
+ * How a field is shown and edited. Each kind uses these and adds none. A `party` (a person or an
+ * institution) is chosen in the create form only; in the panel it is the plain name, and in a form
+ * its value is `person:{uuid}` or `institution:{uuid}`.
+ */
 export type ControlKind =
   | "text"
   | "multiline"
@@ -17,6 +21,7 @@ export type ControlKind =
   | "status"
   | "enum"
   | "person"
+  | "party"
   | "area"
   | "milestone"
   | "people"
@@ -67,8 +72,6 @@ export interface FieldSpec {
   validate?: (item: WorkItem, value: FieldValue) => string | undefined;
   /** The field must have a value. */
   required?: boolean;
-  /** The Fluent key of a help text under the field in the create form. */
-  helpKey?: string;
   /**
    * The Fluent key of the words for no value, for example „Kein Bereich“. A field with it can be
    * cleared; the words are the choice that clears a picker and the text of an empty field.
@@ -76,6 +79,8 @@ export interface FieldSpec {
   emptyKey?: string;
   /** The Fluent key of the words on a picker that has no choice and cannot be cleared. */
   promptKey?: string;
+  /** A hint under the field in the create form, as the Fluent key of its text. */
+  helpKey?: string;
   /** A date that is marked overdue, as the due date of a task. */
   overdue?: boolean;
   /** The kind of record that a `record` field refers to. Its value is the UUID of that record. */

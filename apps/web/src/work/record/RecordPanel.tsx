@@ -24,9 +24,9 @@ import styles from "./RecordPanel.module.css";
 export type PanelMode = { mode: "open"; readableId: string } | { mode: "create"; kind: RecordKind };
 
 export interface RecordPanelProps {
-  work: Work;
   /** For the pickers that search on the server. */
   api: Api;
+  work: Work;
   eventId: string;
   route: PanelMode;
   /** The member who is signed in: the owner that a new record starts with, if they can own one. */
@@ -217,8 +217,8 @@ function Body({
  * descriptor.
  */
 export default function RecordPanel({
-  work,
   api,
+  work,
   eventId,
   route,
   me,
@@ -273,6 +273,7 @@ export default function RecordPanel({
         {descriptor && create && mayCreate && !managersOnly ? (
           <RecordCreate
             descriptor={descriptor}
+            api={api}
             commands={work.commands}
             sources={sourcesOf(work, api)}
             owner={assignees.some((member) => member.id === me) ? me : undefined}
