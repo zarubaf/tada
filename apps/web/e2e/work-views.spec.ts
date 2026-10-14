@@ -31,6 +31,8 @@ const near = actions.map((action: Record<string, unknown>) =>
 async function open(page: Page, search: string) {
   await fakeWork(page, search.includes("view=timeline") ? { actions: near } : {});
   await fakeProfile(page, { facts: [eventWindow], proposals: [], open_questions: [] }, []);
+  // The baselines must not depend on the real date: today is on the axis and decides what is overdue.
+  await page.clock.setFixedTime(new Date("2030-05-08T10:00:00Z"));
   await page.goto(`${work}${search}`);
   await expect(page.getByRole("heading", { level: 1, name: "Arbeit" })).toBeVisible();
 }
