@@ -1,5 +1,8 @@
 # Design principles
 
+Under change by [ADR 0082](../adr/0082-redesign-of-the-web-client.md): the look moves to a dense design with a dark and a light theme.
+The principles stay. The checklist below already allows status icons, chips and dense cards.
+
 tada is a work tool for volunteers.
 The interface must disappear into the task: a member opens it, finds the open item, acts and leaves.
 
@@ -35,14 +38,14 @@ Surfaces and color:
 - [ ] No gradient backgrounds and no gradient text.
 - [ ] No glow, no glass or blur effect, no noise texture.
 - [ ] One accent color only (`--color-accent`), used only for primary actions, selection, links and focus.
-- [ ] Status colors appear only with a real status, and always with an icon or a label.
+- [ ] Status colors appear only with a real status, and always with an icon and a label. A status icon is allowed because it carries the meaning, not decoration.
 - [ ] Shadows only on overlays (menus, popovers, dialogs, sheets). Panels use borders.
 - [ ] No colored side border thicker than 1 px on cards, list items or alerts.
 - [ ] Radius values follow [tokens.md](tokens.md). No pill-shaped buttons.
 
 Layout and structure:
 
-- [ ] No grid of identical cards with icon, heading and text as the page structure.
+- [ ] No grid of identical cards with icon, heading and text as the page structure. Dense cards of work records on a board are allowed, because each card is a real record with its own status.
 - [ ] No cards inside cards.
 - [ ] No small uppercase label ("eyebrow") above a heading.
 - [ ] No big-number tiles unless the number leads to an action and links to the items behind it.
@@ -53,7 +56,7 @@ Content:
 
 - [ ] Sentence case for all headings, labels and buttons.
 - [ ] No exclamation marks, no "Oops", no jokes in system messages.
-- [ ] No emoji and no decorative icons. Each icon has a meaning that the label repeats.
+- [ ] No emoji and no decorative icons. Each icon has a meaning that the label repeats. Chips for status, date and workstream carry an icon of 12 px.
 - [ ] No sparkle or magic icon for AI content. AI output is a proposal and uses the proposal style.
 - [ ] No lorem ipsum. Fixtures use invented but realistic content: long German names, umlauts, long titles and empty fields.
 - [ ] No invented numbers that look like real data in demos or screenshots.
@@ -70,14 +73,15 @@ States and motion:
 
 These products show the quality we want. We take principles from them, not their look.
 
-| Reference                                                    | What we learn from it                                                          |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| [Linear](https://linear.app)                                 | Keyboard-first work, a command menu, restraint, dense lists that stay readable |
-| [GitHub Primer](https://primer.style)                        | Accessible tokens, data tables, review flows, clear status labels              |
-| [GOV.UK Design System](https://design-system.service.gov.uk) | Forms, error summaries, plain-language messages, tested accessibility          |
-| [Stripe Dashboard](https://dashboard.stripe.com)             | Tables with numbers, detail panels next to lists, calm color                   |
-| [Things](https://culturedcode.com/things/)                   | A calm mobile task interface with few, clear actions                           |
-| [Vercel Geist](https://vercel.com/geist)                     | Disciplined tokens for type and color                                          |
+| Reference                                                                        | What we learn from it                                                                  |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [Linear](https://linear.app)                                                     | Keyboard-first work, a command menu, restraint, dense lists that stay readable         |
+| [GitHub Primer](https://primer.style)                                            | Accessible tokens, data tables, review flows, clear status labels                      |
+| [GOV.UK Design System](https://design-system.service.gov.uk)                     | Forms, error summaries, plain-language messages, tested accessibility                  |
+| [Stripe Dashboard](https://dashboard.stripe.com)                                 | Tables with numbers, detail panels next to lists, calm color                           |
+| `itsaplan` (planning app, [ADR 0082](../adr/0082-redesign-of-the-web-client.md)) | Dense lists and boards, a side panel for the record, dark and light themes, one accent |
+| [Things](https://culturedcode.com/things/)                                       | A calm mobile task interface with few, clear actions                                   |
+| [Vercel Geist](https://vercel.com/geist)                                         | Disciplined tokens for type and color                                                  |
 
 ## Sources of the agent guidance
 
