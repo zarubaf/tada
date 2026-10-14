@@ -1,7 +1,18 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
-import { Link, Redirect, Route, Router, Routes, useHash, useNavigate, useParams } from "./Router";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  Link,
+  Redirect,
+  Route,
+  Router,
+  Routes,
+  useHash,
+  useNavigate,
+  useParams,
+  useSearch,
+  useSetSearch,
+} from "./Router";
 
 function Event() {
   const { eventId } = useParams();
@@ -173,5 +184,183 @@ describe("Router", () => {
     window.history.replaceState(null, "", "/events");
     fireEvent.popState(window);
     expect(screen.getByText("Hash:")).toBeInTheDocument();
+  });
+
+  describe("query string", () => {
+    function Filters() {
+      const search = useSearch();
+      const setSearch = useSetSearch();
+      return (
+        <>
+          <p>
+            Filter: {search.get("type") ?? "none"} / {search.getAll("tag").join(",")} /{" "}
+            {search.has("view") ? "view" : "no view"}
+          </p>
+          <button type="button" onClick={() => setSearch({ type: "talk" }, { replace: true })}>
+            filter
+          </button>
+          <button type="button" onClick={() => setSearch({ view: "board" })}>
+            tab
+          </button>
+          <button type="button" onClick={() => setSearch({ type: null, view: undefined })}>
+            clear
+          </button>
+          <button type="button" onClick={() => setSearch({ tag: ["a", "b"] })}>
+            tags
+          </button>
+        </>
+      );
+    }
+
+    function renderFilters(path: string) {
+      window.history.replaceState(null, "", path);
+      return render(
+        <Router>
+          <Link to="/events?type=party">Party</Link>
+          <Link to="/events">Anlässe</Link>
+          <Filters />
+          <Routes>
+            <Route path="/events">
+              <h1>Liste</h1>
+            </Route>
+            <Route path="/other">
+              <h1>Andere Seite</h1>
+            </Route>
+          </Routes>
+        </Router>,
+      );
+    }
+
+    it("reads the parameters of the address", () => {
+      renderFilters("/events?type=party&tag=x&tag=y&view=");
+      expect(screen.getByText("Filter: party / x,y / view")).toBeInTheDocument();
+    });
+
+    it("re-renders consumers when only the query changes", async () => {
+      renderFilters("/events?type=party");
+      await userEvent.click(screen.getByRole("button", { name: "filter" }));
+      expect(screen.getByText(/Filter: talk/)).toBeInTheDocument();
+      expect(window.location.search).toBe("?type=talk");
+    });
+
+    it("keeps the path and the hash when it sets parameters", async () => {
+      renderFilters("/events?type=party#ACT-012");
+      await userEvent.click(screen.getByRole("button", { name: "tab" }));
+      expect(window.location.pathname).toBe("/events");
+      expect(window.location.search).toBe("?type=party&view=board");
+      expect(window.location.hash).toBe("#ACT-012");
+    });
+
+    it("replaces or pushes the history entry as the caller chooses", async () => {
+      renderFilters("/events");
+      const length = window.history.length;
+      await userEvent.click(screen.getByRole("button", { name: "filter" }));
+      expect(window.history.length).toBe(length);
+      await userEvent.click(screen.getByRole("button", { name: "tab" }));
+      expect(window.history.length).toBe(length + 1);
+    });
+
+    it("removes parameters set to null or undefined and sets repeated values", async () => {
+      renderFilters("/events?type=party&view=board");
+      await userEvent.click(screen.getByRole("button", { name: "clear" }));
+      expect(window.location.search).toBe("");
+      await userEvent.click(screen.getByRole("button", { name: "tags" }));
+      expect(window.location.search).toBe("?tag=a&tag=b");
+    });
+
+    it("follows back and forward across query changes", async () => {
+      renderFilters("/events");
+      await userEvent.click(screen.getByRole("button", { name: "tab" }));
+      await userEvent.click(screen.getByRole("link", { name: "Party" }));
+      expect(screen.getByText(/Filter: party/)).toBeInTheDocument();
+      window.history.back();
+      expect(await screen.findByText(/Filter: none \/ \/ view/)).toBeInTheDocument();
+      window.history.back();
+      expect(await screen.findByText(/Filter: none \/ \/ no view/)).toBeInTheDocument();
+      window.history.forward();
+      expect(await screen.findByText(/Filter: none \/ \/ view/)).toBeInTheDocument();
+    });
+
+    it("does not push an entry when the whole address is equal", async () => {
+      renderFilters("/events?type=party#ACT-012");
+      const length = window.history.length;
+      function Same() {
+        const navigate = useNavigate();
+        return (
+          <button type="button" onClick={() => navigate("/events?type=party#ACT-012")}>
+            same
+          </button>
+        );
+      }
+      render(
+        <Router>
+          <Same />
+        </Router>,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "same" }));
+      expect(window.history.length).toBe(length);
+    });
+
+    it("handles a malformed or unknown query without throwing", () => {
+      renderFilters("/events?%E0%A4%A=1&type=%E0%A4%A&&=&unknown");
+      expect(screen.getByText(/Filter:/)).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Liste" })).toBeInTheDocument();
+    });
+
+    it("marks a link current by its path alone, whatever the query", () => {
+      renderFilters("/events?type=talk");
+      expect(screen.getByRole("link", { name: "Party" })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("link", { name: "Anlässe" })).toHaveAttribute("aria-current", "page");
+    });
+
+    it("keeps focus where it is on a query-only change", async () => {
+      renderFilters("/events");
+      const button = screen.getByRole("button", { name: "filter" });
+      await userEvent.click(button);
+      expect(button).toHaveFocus();
+      await userEvent.click(screen.getByRole("link", { name: "Party" }));
+      expect(screen.getByRole("link", { name: "Party" })).toHaveFocus();
+    });
+
+    it("does not leave a focus request behind for a later page", async () => {
+      renderFilters("/events");
+      await userEvent.click(screen.getByRole("button", { name: "filter" }));
+      expect(document.querySelector("h1")).not.toHaveFocus();
+    });
+
+    it("does not reset the scroll on a query-only change", async () => {
+      const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+      renderFilters("/events");
+      await userEvent.click(screen.getByRole("button", { name: "tab" }));
+      expect(scrollTo).not.toHaveBeenCalled();
+      scrollTo.mockRestore();
+    });
+
+    it("still moves focus when the path changes together with the query", async () => {
+      function ToOther() {
+        const navigate = useNavigate();
+        return (
+          <button type="button" onClick={() => navigate("/other?type=talk")}>
+            other
+          </button>
+        );
+      }
+      window.history.replaceState(null, "", "/events?type=talk");
+      render(
+        <Router>
+          <ToOther />
+          <Routes>
+            <Route path="/events">
+              <h1>Liste</h1>
+            </Route>
+            <Route path="/other">
+              <h1>Andere Seite</h1>
+            </Route>
+          </Routes>
+        </Router>,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "other" }));
+      expect(screen.getByRole("heading", { name: "Andere Seite" })).toHaveFocus();
+    });
   });
 });

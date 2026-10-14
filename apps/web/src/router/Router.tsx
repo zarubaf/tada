@@ -1,4 +1,6 @@
 // A small router of our own, without a new dependency. It maps the path of the address to a page.
+// The query string holds the state of a view (tabs, filters); the hash names the open record.
+// Only a change of the path is a new page: a change of the query or the hash keeps focus and scroll.
 // It has no loaders and no nesting rules: a page that needs data loads it itself.
 // Replace it with a library when the pages need nested layouts or data loading in the router.
 import {
@@ -11,6 +13,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -27,10 +30,30 @@ export interface NavigateOptions {
   moveFocus?: boolean;
 }
 
-interface Location {
+/** The parts of the address that the router follows. */
+interface Address {
   pathname: string;
+  /** The query string as the address has it, with the leading `?` or empty. */
+  search: string;
   /** The fragment of the address without `#`, for example the readable ID of a row. */
   hash: string;
+}
+
+/** The read side of the query string. It never changes: a new location gives a new accessor. */
+export interface SearchParams {
+  get: (name: string) => string | null;
+  getAll: (name: string) => string[];
+  has: (name: string) => boolean;
+}
+
+/**
+ * Changes by name: a string sets the parameter, an array sets it once for each value, `null` or
+ * `undefined` removes it. The caller drops a parameter with its default value; the router does not
+ * know the defaults.
+ */
+export type SearchUpdate = Record<string, string | readonly string[] | null | undefined>;
+
+interface Location extends Address {
   navigate: (to: string, options?: NavigateOptions) => void;
 }
 
@@ -66,22 +89,44 @@ function readHash(): string {
   }
 }
 
-/** Keeps the path of the address in state and changes it with `history.pushState`. */
+function readAddress(): Address {
+  const { pathname, search } = window.location;
+  return { pathname, search, hash: readHash() };
+}
+
+function sameAddress(a: Address, b: Address): boolean {
+  return a.pathname === b.pathname && a.search === b.search && a.hash === b.hash;
+}
+
+/** Keeps the address in state and changes it with `history.pushState`. */
 export function Router({ children }: { children: ReactNode }) {
-  const [pathname, setPathname] = useState(() => window.location.pathname);
-  const [hash, setHash] = useState(() => readHash());
+  const [address, setAddress] = useState(readAddress);
+  const { pathname, search, hash } = address;
   // Focus moves to the new page after a navigation, not after a redirect or the first render.
   const moveFocus = useRef(false);
 
-  useEffect(() => {
-    const sync = () => {
-      moveFocus.current = true;
-      setPathname(window.location.pathname);
-      setHash(readHash());
-    };
-    window.addEventListener("popstate", sync);
-    return () => window.removeEventListener("popstate", sync);
+  // Takes the address of the window. A new page asks for focus; a new query or hash does not.
+  const shown = useRef(address);
+  const sync = useCallback((focus: boolean) => {
+    const next = readAddress();
+    const previous = shown.current;
+    if (sameAddress(previous, next)) {
+      return;
+    }
+    shown.current = next;
+    moveFocus.current = focus && previous.pathname !== next.pathname;
+    setAddress(next);
   }, []);
+
+  useEffect(() => {
+    const onChange = () => sync(true);
+    window.addEventListener("popstate", onChange);
+    window.addEventListener("hashchange", onChange);
+    return () => {
+      window.removeEventListener("popstate", onChange);
+      window.removeEventListener("hashchange", onChange);
+    };
+  }, [sync]);
 
   const settleFocus = useCallback(() => {
     // A fallback in the page is no target: the request waits until the page mounts.
@@ -97,22 +142,24 @@ export function Router({ children }: { children: ReactNode }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: the path change is the trigger
   useEffect(settleFocus, [pathname]);
 
-  const navigate = useCallback((to: string, options?: NavigateOptions) => {
-    if (to === window.location.pathname + window.location.hash) {
-      return;
-    }
-    moveFocus.current = options?.moveFocus ?? true;
-    if (options?.replace) {
-      window.history.replaceState(null, "", to);
-    } else {
-      window.history.pushState(null, "", to);
-    }
-    setPathname(window.location.pathname);
-    setHash(readHash());
-  }, []);
+  const navigate = useCallback(
+    (to: string, options?: NavigateOptions) => {
+      const { pathname: path, search: query, hash: fragment } = window.location;
+      if (to === path + query + fragment) {
+        return;
+      }
+      if (options?.replace) {
+        window.history.replaceState(null, "", to);
+      } else {
+        window.history.pushState(null, "", to);
+      }
+      sync(options?.moveFocus ?? true);
+    },
+    [sync],
+  );
 
   return (
-    <LocationContext value={{ pathname, hash, navigate }}>
+    <LocationContext value={{ pathname, search, hash, navigate }}>
       <SettleFocusContext value={settleFocus}>{children}</SettleFocusContext>
     </LocationContext>
   );
@@ -125,6 +172,41 @@ export function usePathname(): string {
 /** The fragment of the address without `#`; a link to a row of a register names the row in it. */
 export function useHash(): string {
   return useLocation().hash;
+}
+
+/**
+ * The parameters of the query string. The accessor stays the same while the query does, so it can
+ * be a dependency of an effect or a memo. A malformed escape reads as the raw text, never throws.
+ */
+export function useSearch(): SearchParams {
+  const { search } = useLocation();
+  return useMemo(() => new URLSearchParams(search), [search]);
+}
+
+/**
+ * Returns the function that changes parameters and keeps the path and the hash. The caller picks
+ * `replace` (a filter) or a new entry (a view tab). Other parameters stay as they are.
+ */
+export function useSetSearch(): (update: SearchUpdate, options?: NavigateOptions) => void {
+  const { navigate } = useLocation();
+  return useCallback(
+    (update, options) => {
+      const params = new URLSearchParams(window.location.search);
+      for (const [name, value] of Object.entries(update)) {
+        params.delete(name);
+        for (const item of typeof value === "string" ? [value] : (value ?? [])) {
+          params.append(name, item);
+        }
+      }
+      const query = params.toString();
+      const { pathname, hash } = window.location;
+      navigate(`${pathname}${query ? `?${query}` : ""}${hash}`, {
+        moveFocus: false,
+        ...options,
+      });
+    },
+    [navigate],
+  );
 }
 
 export function useNavigate(): Location["navigate"] {
@@ -195,6 +277,7 @@ export function Redirect({ to }: { to: string }) {
 }
 
 export interface LinkProps {
+  /** A path with an optional `?query` and `#hash`. */
   to: string;
   className?: string;
   /** The link is current only for its own path, not for the paths below it. */
@@ -228,9 +311,11 @@ export function Link({
   children,
 }: LinkProps) {
   const { pathname, navigate } = useLocation();
+  // A query or a hash in `to` does not count: the link is current for its path.
+  const target = to.split(/[?#]/, 1)[0] ?? to;
   const current =
-    pathname === to ||
-    (!exact && pathname.startsWith(`${to}/`)) ||
+    pathname === target ||
+    (!exact && pathname.startsWith(`${target}/`)) ||
     (within !== undefined && pathname.startsWith(`${within}/`)) ||
     alsoCurrentOn.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
