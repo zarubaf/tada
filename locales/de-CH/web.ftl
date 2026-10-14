@@ -1109,7 +1109,7 @@ decision-replace-ended = { $id } lässt sich nicht mehr ersetzen.
 decision-replace-stale = Die Fassung von { $id } ist nicht mehr aktuell. Kopieren Sie den Text, und brechen Sie dann ab. Öffnen Sie { $id } danach neu.
 # $id: the readable ID of the decision that the new one replaces.
 decision-replace-decided-on = Entschieden am
-decision-replace-inherit = Verantwortlich und Bereich übernimmt der neue Entscheid.
+decision-replace-inherit = Verantwortlich und Bereich sind die des bisherigen Entscheids. Sie lassen sich hier ändern.
 decision-replace-note = Der neue Entscheid ersetzt { $id }. Der Wortlaut von { $id } bleibt unverändert; { $id } gilt danach als ersetzt.
 decision-field-wording = Wortlaut (Pflichtfeld)
 decision-field-wording-help = Mehrere Zeilen sind möglich. Der Wortlaut lässt sich später nicht ändern. Ein neuer Entscheid ersetzt ihn. 1 bis 2000 Zeichen.

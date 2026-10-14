@@ -4,13 +4,17 @@
 import { useState } from "react";
 import { uuidv7 } from "../../api/uuid";
 import { hasMessage, t } from "../../i18n";
+import { SearchSelect } from "../../ui/SearchSelect";
 import { TextField } from "../../ui/TextField";
 import { fieldErrors } from "../fieldErrors";
 import type { WorkItem } from "../workItem";
+import { choicesOf } from "./choices";
+import { areaField, ownerField } from "./commonFields";
 import { partiesOf, partyId, wordingError } from "./decisionInput";
-import { type ActionDialogProps, type FieldValue, peopleValue } from "./descriptor";
+import { type ActionDialogProps, type FieldSpec, type FieldValue, peopleValue } from "./descriptor";
 import { PeopleField } from "./PeopleField";
 import { RecordActionDialog, type Refusal } from "./RecordActionDialog";
+import styles from "./RecordActionDialog.module.css";
 
 const target = (item: WorkItem) => ({ id: item.id, version: item.version });
 
@@ -50,20 +54,64 @@ export function RevokeDecisionDialog({ item, env, onDone, onCancel }: ActionDial
   );
 }
 
-type Field = "wording" | "decidedOn" | "parties";
+type Field = "wording" | "decidedOn" | "parties" | "owner" | "area";
 type Errors = Partial<Record<Field, string>>;
 
-/** The form field behind a pointer of the server; those of a successor start with `/successor`. */
+/** The form field behind a pointer of the server; those of a successor may start with `/successor`. */
 const FIELDS: Record<string, Field> = {
   wording: "wording",
   decided_on: "decidedOn",
   decided_by: "parties",
+  owner: "owner",
+  owner_user_id: "owner",
+  workstream: "area",
+  workstream_id: "area",
 };
 const POINTERS: Record<Field, string> = {
   wording: "wording",
   decidedOn: "decided_on",
   parties: "decided_by",
+  owner: "owner",
+  area: "workstream",
 };
+
+/** The owner and the area as fields: the successor starts with those of the old decision. */
+const OWNER = ownerField(() => null);
+const AREA = areaField(() => null);
+
+/** A picker with a label above it, for a field of a dialog that is a choice from a list. */
+function Pick({
+  spec,
+  choices,
+  value,
+  onChange,
+  error,
+}: {
+  spec: FieldSpec;
+  choices: ReturnType<typeof choicesOf>;
+  value: string | null;
+  onChange: (value: string | null) => void;
+  error: string | undefined;
+}) {
+  const label = t(spec.labelKey);
+  const empty = spec.emptyKey ? t(spec.emptyKey) : "";
+  return (
+    <div className={styles.pick} {...(error && { "data-invalid": "" })}>
+      <span className={styles.pickLabel} aria-hidden="true">
+        {label}
+      </span>
+      <SearchSelect
+        label={label}
+        options={choices.options}
+        value={value ?? undefined}
+        onChange={(id) => onChange(id ?? null)}
+        placeholder={empty}
+        {...(spec.emptyKey && { clearLabel: empty })}
+      />
+      {error && <p className={styles.pickError}>{error}</p>}
+    </div>
+  );
+}
 
 /** The message for a field: the one for its code if the catalog has it, else the general one. */
 function message(field: Field, code?: string): string {
@@ -85,9 +133,10 @@ function refused(errors: { pointer: string; code: string }[] | undefined): Error
 }
 
 /**
- * „Ersetzen“: the new decision starts with the wording and the parties of the old one; the day is
- * new. It takes the owner and the area of the old decision, and a manager can change them on the
- * new decision afterwards. The old decision keeps its wording and becomes „ersetzt“.
+ * „Ersetzen“: the new decision starts with the wording, the parties, the owner and the area of the
+ * old one; the day is new. The owner and the area are fields, because the old ones may no longer
+ * be allowed (the area closed, the owner lost the role). The old decision keeps its wording and
+ * becomes „ersetzt“.
  */
 export function SupersedeDecisionDialog({ item, env, onDone, onCancel }: ActionDialogProps) {
   const old = asDecision(item).record;
@@ -99,7 +148,10 @@ export function SupersedeDecisionDialog({ item, env, onDone, onCancel }: ActionD
   const [parties, setParties] = useState<FieldValue>(() =>
     peopleValue(old.decided_by.map(partyId)),
   );
+  const [owner, setOwner] = useState<string | null>(old.owner_user_id);
+  const [area, setArea] = useState<string | null>(old.workstream_id ?? null);
   const [errors, setErrors] = useState<Errors>({});
+  const directory = env.sources.directory;
   const seed = old.decided_by.map((party) => ({
     id: partyId(party),
     label: party.redacted ? party.local_id : `${party.name} (${party.local_id})`,
@@ -122,8 +174,8 @@ export function SupersedeDecisionDialog({ item, env, onDone, onCancel }: ActionD
       wording: wording.trim(),
       decided_on: decidedOn,
       decided_by: partiesOf(parties),
-      owner_user_id: old.owner_user_id,
-      ...(old.workstream_id && { workstream_id: old.workstream_id }),
+      owner_user_id: owner ?? old.owner_user_id,
+      ...(area && { workstream_id: area }),
     });
     if (result.ok) {
       // The replaced decision changed too.
@@ -174,6 +226,24 @@ export function SupersedeDecisionDialog({ item, env, onDone, onCancel }: ActionD
           seed={seed}
           error={errors.parties}
         />
+      )}
+      {directory && (
+        <>
+          <Pick
+            spec={OWNER}
+            choices={choicesOf(OWNER, env.sources, item, owner)}
+            value={owner}
+            onChange={setOwner}
+            error={errors.owner}
+          />
+          <Pick
+            spec={AREA}
+            choices={choicesOf(AREA, env.sources, item, area)}
+            value={area}
+            onChange={setArea}
+            error={errors.area}
+          />
+        </>
       )}
     </RecordActionDialog>
   );
