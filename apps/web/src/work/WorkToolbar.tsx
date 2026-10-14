@@ -7,6 +7,7 @@ import { Select } from "../ui/Select";
 import { Sheet } from "../ui/Sheet";
 import { Toolbar } from "../ui/Toolbar";
 import { TypeFilter } from "../ui/TypeFilter";
+import { TypeIcon } from "../ui/TypeIcon";
 import type { DirectoryState } from "./directory";
 import { RECORD_KINDS } from "./recordStatus";
 import {
@@ -45,6 +46,7 @@ function typeOptions(counts: Counts | undefined) {
     ...RECORD_KINDS.map((kind) => ({
       id: kind,
       label: t(`work-type-${kind}`),
+      icon: <TypeIcon kind={kind} size={14} decorative />,
       ...(counts ? { count: counts.kinds[kind] } : {}),
     })),
   ];
@@ -96,6 +98,7 @@ function NarrowToolbar({
       <Select
         label={t("work-type-label")}
         labelHidden
+        variant="toolbar"
         options={typeOptions(counts).map(({ id, label, count }) => ({
           id,
           label: count === undefined ? label : `${label} (${count})`,
