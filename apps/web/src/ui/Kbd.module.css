@@ -1,0 +1,18 @@
+@layer components {
+  .kbd {
+    display: inline-grid;
+    place-items: center;
+    box-sizing: border-box;
+    min-width: var(--size-chip-height);
+    height: var(--size-chip-height);
+    padding: 0 var(--space-1);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-hover);
+    color: var(--color-text-muted);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
+    line-height: 1;
+    white-space: nowrap;
+  }
+}
