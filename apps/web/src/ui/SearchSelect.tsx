@@ -21,6 +21,10 @@ export interface SearchSelectProps {
   placeholder: string;
   /** The text of the button that clears the choice. Without it the choice cannot be cleared. */
   clearLabel?: string;
+  /** False for a short list, where a search field is noise. */
+  searchable?: boolean;
+  /** `quiet` has no border until hover, for a value in a list of properties. */
+  variant?: "secondary" | "quiet";
 }
 
 /**
@@ -35,6 +39,8 @@ export function SearchSelect({
   onChange,
   placeholder,
   clearLabel,
+  searchable = true,
+  variant = "secondary",
 }: SearchSelectProps) {
   const [isOpen, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -52,7 +58,11 @@ export function SearchSelect({
         }
       }}
     >
-      <Button ref={trigger} aria-label={`${label}: ${chosen?.label ?? placeholder}`}>
+      <Button
+        ref={trigger}
+        variant={variant}
+        aria-label={`${label}: ${chosen?.label ?? placeholder}`}
+      >
         {chosen?.leading}
         <span className={styles.value}>{chosen?.label ?? placeholder}</span>
         <IconChevronDown size={14} aria-hidden="true" />
@@ -63,6 +73,7 @@ export function SearchSelect({
             label={label}
             options={options}
             value={value}
+            searchable={searchable}
             onChoose={(id) => {
               // Pressing the chosen option again deselects it: the choice stays, the popover closes.
               if (id !== undefined) {
