@@ -1,6 +1,7 @@
 import { type ReactNode, type RefObject, useRef } from "react";
 import { Dialog, DialogTrigger, Popover } from "react-aria-components";
 import { useFocusAfterCommit } from "./focus";
+import { MODELESS } from "./overlay";
 import popover from "./Popover.module.css";
 import styles from "./PopoverDialog.module.css";
 import { Sheet } from "./Sheet";
@@ -64,7 +65,7 @@ export function PopoverDialog({
           placement="bottom end"
           className={`${popover.popover} ${styles.popover}`}
         >
-          <Dialog ref={dialog} className={styles.dialog} aria-label={title}>
+          <Dialog ref={dialog} className={styles.dialog} aria-label={title} {...{ [MODELESS]: "" }}>
             {children}
           </Dialog>
         </Popover>
