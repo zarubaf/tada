@@ -37,6 +37,8 @@ const rec = (id: string, over: object = {}) => ({
 /** A fake server: the lists answer by `event/kind`, and the test can replace an answer. */
 function server(answers: Record<string, Answer> = {}) {
   const calls: string[] = [];
+  /** The requests of the directory, apart from the five lists. */
+  const directory: string[] = [];
   const table: Record<string, Answer> = { ...answers };
   const fetch = async (request: Request) => {
     const url = new URL(request.url);
@@ -45,12 +47,22 @@ function server(answers: Record<string, Answer> = {}) {
       return json(200, session);
     }
     if (path.endsWith("/api/v1/members")) {
+      directory.push("members");
       return json(200, {
         items: [{ user_id: ME, display_name: "Anna Muster", role: "member", version: 1 }],
       });
     }
     if (path.endsWith("/memberships") || path.endsWith("/workstreams")) {
+      directory.push(path.split("/").pop() ?? "");
       return json(200, { items: [] });
+    }
+    const patch = /events\/([^/]+)\/([a-z]+)\/([^/]+)$/.exec(path);
+    if (request.method === "PATCH" && patch) {
+      const answer = table[`PATCH ${patch[1]}/${patch[2]}/${patch[3]}`];
+      if (!answer) {
+        throw new Error(`unexpected ${request.method} ${path}`);
+      }
+      return answer(url);
     }
     const match = /events\/([^/]+)\/([a-z]+)$/.exec(path);
     if (match) {
@@ -61,7 +73,7 @@ function server(answers: Record<string, Answer> = {}) {
     throw new Error(`unexpected ${request.method} ${path}`);
   };
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
-  return { api, calls, table };
+  return { api, calls, directory, table };
 }
 
 function mount(api: ReturnType<typeof createApi>, initial = "ea") {
@@ -211,7 +223,7 @@ describe("useWork", () => {
   });
 
   it("refreshes a kind without the loading state, and replaces a record", async () => {
-    const { api, table } = server({
+    const { api, calls, table } = server({
       "ea/actions": () => json(200, { items: [rec("act-1")] }),
     });
     const { result } = mount(api);
@@ -222,15 +234,50 @@ describe("useWork", () => {
     });
     expect(result.current.items[0]).toMatchObject({ title: "Neu", version: 2 });
 
-    table["ea/actions"] = () => json(200, { items: [rec("act-1", { title: "Server" })] });
-    let during: string | undefined;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    table["ea/actions"] = async () => {
+      await gate;
+      return json(200, { items: [rec("act-1", { title: "Server" })] });
+    };
+    const before = calls.length;
+    let done: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      done = result.current.refresh("action");
+    });
+    await waitFor(() => expect(calls.length).toBeGreaterThan(before));
+    // The request is pending: the list stays on screen.
+    expect(result.current.kinds.action.kind).toBe("loaded");
+    expect(result.current.items[0]?.title).toBe("Neu");
+    release();
     await act(async () => {
-      const done = result.current.refresh("action");
-      during = result.current.kinds.action.kind;
       await done;
     });
-    expect(during).toBe("loaded");
     expect(result.current.items[0]?.title).toBe("Server");
+  });
+
+  it("puts the record of a successful command into the list, and leaves it after a failure", async () => {
+    const { api, table } = server({
+      "ea/actions": () => json(200, { items: [rec("act-1")] }),
+      "PATCH ea/actions/act-1": () => json(200, rec("act-1", { title: "Neu", version: 2 })),
+    });
+    const { result } = mount(api);
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    let outcome: { ok: boolean } | undefined;
+    await act(async () => {
+      outcome = await result.current.commands.action.rename({ id: "act-1", version: 1 }, "Neu");
+    });
+    expect(outcome?.ok).toBe(true);
+    expect(result.current.items[0]).toMatchObject({ title: "Neu", version: 2 });
+
+    table["PATCH ea/actions/act-1"] = () => problem(422, "validation-failed");
+    await act(async () => {
+      outcome = await result.current.commands.action.rename({ id: "act-1", version: 2 }, "");
+    });
+    expect(outcome?.ok).toBe(false);
+    expect(result.current.items[0]).toMatchObject({ title: "Neu", version: 2 });
   });
 
   it("keeps the list when a refresh fails", async () => {
@@ -249,13 +296,24 @@ describe("useWork", () => {
   });
 
   it("reloads the five kinds and the directory", async () => {
-    const { api, calls } = server();
+    const { api, calls, directory } = server();
     const { result } = mount(api);
+    await waitFor(() => expect(result.current.directory.kind).toBe("loaded"));
     await waitFor(() => expect(states(result.current).risk).toBe("loaded"));
+    // The first load asks for the directory once, not once per kind.
+    expect(directory.sort()).toEqual(["members", "memberships", "workstreams"]);
     const before = calls.length;
     await act(async () => {
       await result.current.reload();
     });
     expect(calls.length - before).toBe(5);
+    expect(directory.sort()).toEqual([
+      "members",
+      "members",
+      "memberships",
+      "memberships",
+      "workstreams",
+      "workstreams",
+    ]);
   });
 });

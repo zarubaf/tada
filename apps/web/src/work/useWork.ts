@@ -8,7 +8,7 @@ import { loadAll } from "../registers/loadAll";
 import { type Directory, type DirectoryState, query, useDirectory } from "./directory";
 import { RECORD_KINDS } from "./recordStatus";
 import { listRisks } from "./risks";
-import { createWorkCommands, type WorkCommands } from "./workCommands";
+import { type CommandResult, createWorkCommands, type WorkCommands } from "./workCommands";
 import { type RecordOf, toWorkItem, type WorkItem } from "./workItem";
 
 export type KindState<R> =
@@ -23,6 +23,7 @@ export interface Work {
   kinds: KindStates;
   /** The records of the kinds that loaded, mapped. Unsorted: see `sortWork`. */
   items: WorkItem[];
+  /** The commands, each putting the record of a success into the list (see `replace`). */
   commands: WorkCommands;
   /** Loads the directory and the five kinds again. */
   reload: () => Promise<void>;
@@ -149,7 +150,10 @@ export function useWork(api: Api, eventId: string): Work {
     [eventId],
   );
 
-  const commands = useMemo(() => createWorkCommands(api, eventId), [api, eventId]);
+  const commands = useMemo(
+    () => listening(createWorkCommands(api, eventId), replace),
+    [api, eventId, replace],
+  );
 
   const kinds = useMemo(
     () =>
@@ -175,6 +179,37 @@ export function useWork(api: Api, eventId: string): Work {
   }, [kinds, directory]);
 
   return { directory, kinds, items, commands, reload, reloadKind, refresh, replace };
+}
+
+/**
+ * Wraps each command so that a success puts the returned record into the list. The bulk bar, the
+ * inline edit and the side panel then need no `replace` of their own. The shape and the types of
+ * the commands stay as they are, so a command that the API lacks is still a type error.
+ */
+function listening(commands: WorkCommands, replace: Work["replace"]): WorkCommands {
+  const wrap = <K extends RecordKind, G extends Record<string, (...args: never[]) => unknown>>(
+    kind: K,
+    group: G,
+  ): G =>
+    Object.fromEntries(
+      Object.entries(group).map(([name, command]) => [
+        name,
+        async (...args: never[]) => {
+          const result = (await command(...args)) as CommandResult<RecordOf[K]>;
+          if (result.ok) {
+            replace(kind, result.record);
+          }
+          return result;
+        },
+      ]),
+    ) as G;
+  return {
+    action: wrap("action", commands.action),
+    commitment: wrap("commitment", commands.commitment),
+    milestone: wrap("milestone", commands.milestone),
+    decision: wrap("decision", commands.decision),
+    risk: wrap("risk", commands.risk),
+  };
 }
 
 /** The names show as soon as the directory has loaded; before, the owner has no name. */
