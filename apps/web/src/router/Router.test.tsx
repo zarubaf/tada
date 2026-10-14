@@ -436,6 +436,13 @@ describe("Router", () => {
       expect(window.location.search).toBe("?type=a%20b&view=board");
     });
 
+    it("does not push an entry when the written key only moves to the end of the query", async () => {
+      renderFilters("/events?view=board&type=talk");
+      const length = window.history.length;
+      await userEvent.click(screen.getByRole("button", { name: "board" }));
+      expect(window.history.length).toBe(length);
+    });
+
     it("still moves focus when the path changes together with the query", async () => {
       function ToOther() {
         const navigate = useNavigate();

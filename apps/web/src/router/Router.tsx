@@ -179,7 +179,7 @@ export function useHash(): string {
 
 /**
  * The parameters of the query string. The accessor stays the same while the query does, so it can
- * be a dependency of an effect or a memo. An incomplete escape decodes to U+FFFD, and the parser never throws.
+ * be a dependency of an effect or a memo. A percent sequence that is not valid UTF-8 decodes to U+FFFD, an incomplete escape stays literal text, and the parser never throws.
  */
 export function useSearch(): SearchParams {
   const { search } = useLocation();
@@ -202,8 +202,12 @@ export function useSetSearch(): (update: SearchUpdate, options?: NavigateOptions
         }
       }
       const query = params.toString();
-      // Compare the standard forms: `%20` reads as `+` and a bare `?view` as `view=` after a round trip.
-      if (query === new URLSearchParams(window.location.search).toString()) {
+      // Compare the sorted standard forms: `%20` reads as `+`, a bare `?view` as `view=`, and a written key moves to the end.
+      const before = new URLSearchParams(window.location.search);
+      const after = new URLSearchParams(params);
+      before.sort();
+      after.sort();
+      if (before.toString() === after.toString()) {
         return;
       }
       const { pathname, hash } = window.location;
