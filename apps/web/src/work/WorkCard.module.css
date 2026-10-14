@@ -62,7 +62,7 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    min-height: var(--line-height-dense);
+    min-height: var(--line-height-card-title);
   }
 
   /* The clamp is paint only: the whole title stays in the accessible name. */
@@ -72,6 +72,7 @@
     min-width: 0;
     overflow: hidden;
     font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-card-title);
     overflow-wrap: anywhere;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
