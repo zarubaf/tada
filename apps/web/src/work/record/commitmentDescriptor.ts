@@ -3,6 +3,7 @@ import {
   IconCircleCheck,
   IconCircleDashed,
   IconHourglass,
+  IconLock,
   IconStack2,
   IconUser,
   IconUserCheck,
@@ -106,6 +107,17 @@ const condition: FieldSpec = {
   read: (item) => record(item).condition ?? null,
 };
 
+/** The reason of „Verbindlich machen“. A commitment that started firm has none, so the row is absent. */
+const firmReason: FieldSpec = {
+  id: "firmReason",
+  labelKey: "record-field-firm-reason",
+  icon: IconLock,
+  control: "text",
+  pointer: "reason",
+  hideEmpty: true,
+  read: (item) => record(item).firm_reason ?? null,
+};
+
 const area: FieldSpec = {
   id: "area",
   labelKey: "record-field-area",
@@ -163,7 +175,7 @@ function body(values: Record<string, FieldValue>, id: string): CreateCommitmentR
 export const commitmentDescriptor: RecordDescriptor = {
   kind: "commitment",
   title: text,
-  properties: [status, promisor, owner, due, condition, area],
+  properties: [status, promisor, owner, due, condition, firmReason, area],
   evidenceVersionKey: "commitment-evidence-version",
   menu: [makeFirm],
   create: {

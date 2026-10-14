@@ -79,6 +79,8 @@ export interface FieldSpec {
   emptyKey?: string;
   /** The Fluent key of the words on a picker that has no choice and cannot be cleared. */
   promptKey?: string;
+  /** The row is absent while the field has no value, for a fact that only some records have. */
+  hideEmpty?: boolean;
   /** A hint under the field in the create form, as the Fluent key of its text. */
   helpKey?: string;
   /** A date that is marked overdue, as the due date of a task. */

@@ -1453,6 +1453,7 @@ record-field-mitigation = Gegenmassnahme
 record-field-commitment-text = Zusage
 record-field-promisor = Zugesagt von
 record-field-condition = Bedingung
+record-field-firm-reason = Verbindlich, weil
 record-no-date = Kein Datum
 record-no-area = Kein Bereich
 record-no-milestone = Kein Meilenstein
