@@ -44,6 +44,8 @@ function open(search = "", setup: Setup & { narrow?: boolean } = {}) {
   );
 }
 
+/** The text of a failure banner. A hidden polite region repeats it for screen readers. */
+const bannerText = { selector: "strong" };
 const ready = () => screen.findByRole("heading", { level: 2, name: /^Offen/ });
 const region = (name: RegExp) => screen.getByRole("region", { name });
 const query = () => new URLSearchParams(window.location.search);
@@ -295,7 +297,9 @@ describe("WorkPage", () => {
             fail ? problem(500, "internal") : json(200, { items: [r.risk("RSK-009")] }),
         },
       });
-      expect(await screen.findByText("Risiken konnten nicht geladen werden.")).toBeInTheDocument();
+      expect(
+        await screen.findByText("Risiken konnten nicht geladen werden.", bannerText),
+      ).toBeInTheDocument();
       expect(screen.getByText("ACT-001")).toBeInTheDocument();
       expect(screen.queryByText("RSK-001")).not.toBeInTheDocument();
 
@@ -303,7 +307,9 @@ describe("WorkPage", () => {
       const before = calls.filter((c) => c.call.endsWith("/actions")).length;
       await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
       expect(await screen.findByText("RSK-009")).toBeInTheDocument();
-      expect(screen.queryByText("Risiken konnten nicht geladen werden.")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Risiken konnten nicht geladen werden.", bannerText),
+      ).not.toBeInTheDocument();
       // The retry loads that kind only.
       expect(calls.filter((c) => c.call.endsWith("/actions")).length).toBe(before);
     });
@@ -311,7 +317,7 @@ describe("WorkPage", () => {
     it("keeps the board and the focus while a retry runs, also when it fails again", async () => {
       let answer: () => Response | Promise<Response> = () => problem(500, "internal");
       open("", { answers: { "GET /risks": () => answer() } });
-      await screen.findByText("Risiken konnten nicht geladen werden.");
+      await screen.findByText("Risiken konnten nicht geladen werden.", bannerText);
 
       let fail: (response: Response) => void = () => {};
       answer = () => new Promise<Response>((resolve) => (fail = resolve));
@@ -324,7 +330,9 @@ describe("WorkPage", () => {
 
       await act(async () => fail(problem(503, "unavailable")));
       await waitFor(() => expect(retry.closest("[aria-busy='true']")).toBeNull());
-      expect(screen.getByText("Risiken konnten nicht geladen werden.")).toBeInTheDocument();
+      expect(
+        screen.getByText("Risiken konnten nicht geladen werden.", bannerText),
+      ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Erneut versuchen" })).toHaveFocus();
     });
 
@@ -335,24 +343,65 @@ describe("WorkPage", () => {
           "GET /api/v1/members": () => (fail ? problem(500, "internal") : json(200, { items: [] })),
         },
       });
-      await screen.findByText("Personen und Bereiche konnten nicht geladen werden.");
+      await screen.findByText("Personen und Bereiche konnten nicht geladen werden.", bannerText);
       const lists = () => calls.filter((c) => /\/(actions|risks)$/.test(c.call)).length;
       const before = lists();
       fail = false;
       await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
       await waitFor(() =>
         expect(
-          screen.queryByText("Personen und Bereiche konnten nicht geladen werden."),
+          screen.queryByText("Personen und Bereiche konnten nicht geladen werden.", bannerText),
         ).not.toBeInTheDocument(),
       );
       expect(lists()).toBe(before);
       expect(screen.getByText("ACT-001")).toBeInTheDocument();
     });
 
+    it("announces the failures in the polite region and has no alert of its own", async () => {
+      open("", {
+        answers: {
+          "GET /risks": () => problem(500, "internal"),
+          "GET /commitments": () => problem(500, "internal"),
+          "GET /api/v1/members": () => problem(500, "internal"),
+        },
+      });
+      await screen.findByText("Risiken konnten nicht geladen werden.", bannerText);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      const polite = screen.getByRole("status");
+      await waitFor(() =>
+        expect(polite).toHaveTextContent("Risiken konnten nicht geladen werden."),
+      );
+      expect(polite).toHaveTextContent("Zusagen konnten nicht geladen werden.");
+      expect(polite).toHaveTextContent("Personen und Bereiche konnten nicht geladen werden.");
+      expect(screen.getAllByRole("button", { name: "Erneut versuchen" })).toHaveLength(3);
+    });
+
+    it("says so for an event that is unknown or forbidden, and retries", async () => {
+      let known = false;
+      open("", {
+        answers: {
+          [`GET /api/v1/events/${EVENT.id}`]: () =>
+            known ? json(200, EVENT) : problem(404, "not-found"),
+        },
+      });
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("Das gibt es nicht, oder Sie dürfen es nicht sehen.");
+      // The failures of the lists do not pile up behind it.
+      expect(
+        screen.queryByText("Risiken konnten nicht geladen werden.", bannerText),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("ACT-001")).not.toBeInTheDocument();
+
+      known = true;
+      await userEvent.click(within(alert).getByRole("button", { name: "Erneut versuchen" }));
+      expect(await ready()).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Arbeit" })).toHaveFocus();
+    });
+
     it("shows a banner when the people and areas fail, and the work still shows", async () => {
       open("", { answers: { "GET /api/v1/members": () => problem(500, "internal") } });
       expect(
-        await screen.findByText("Personen und Bereiche konnten nicht geladen werden."),
+        await screen.findByText("Personen und Bereiche konnten nicht geladen werden.", bannerText),
       ).toBeInTheDocument();
       expect(screen.getByText("ACT-001")).toBeInTheDocument();
     });
