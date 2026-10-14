@@ -1,11 +1,10 @@
 import { IconFilter, IconPlus } from "@tabler/icons-react";
-import { type Ref, useState } from "react";
+import { type ReactNode, type Ref, useState } from "react";
 import type { RecordKind } from "../api/client";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
 import { Sheet } from "../ui/Sheet";
-import { Toolbar } from "../ui/Toolbar";
 import { TypeFilter } from "../ui/TypeFilter";
 import { TypeIcon } from "../ui/TypeIcon";
 import type { DirectoryState } from "./directory";
@@ -33,7 +32,9 @@ export interface WorkToolbarProps {
   directory: DirectoryState;
   /** The ID of the signed-in member. */
   me: string;
-  /** Below 40rem the type is a select and the other filters sit in a sheet (ADR 0023). */
+  /** The `h1` of the page: it sits at the left of the row. */
+  title: ReactNode;
+  /** Below 40rem the type is a select in a second row (ADR 0023). */
   narrow: boolean;
   /** Clears all filters. The page moves focus afterwards, because the reset button leaves. */
   onReset: () => void;
@@ -45,7 +46,7 @@ export interface WorkToolbarProps {
 
 function NewButton({ onCreate }: { onCreate: () => void }) {
   return (
-    <Button variant="primary" onPress={onCreate}>
+    <Button variant="primary" size="sm" onPress={onCreate}>
       <IconPlus size={14} stroke={1.5} aria-hidden="true" />
       {t("work-new")}
     </Button>
@@ -83,7 +84,7 @@ function Controls({
   onReset,
   searchRef,
   field,
-}: Omit<WorkToolbarProps, "counts" | "narrow"> & { field: DebouncedText }) {
+}: Omit<WorkToolbarProps, "counts" | "narrow" | "title" | "onCreate"> & { field: DebouncedText }) {
   const props = { filters, onChange };
   return (
     <>
@@ -96,33 +97,25 @@ function Controls({
   );
 }
 
-function NarrowToolbar({
-  filters,
-  onChange,
-  counts,
-  directory,
-  me,
-  onReset,
-  searchRef,
-  onCreate,
-  field,
-}: Omit<WorkToolbarProps, "narrow"> & { field: DebouncedText }) {
+/**
+ * The „Filter“ button and the sheet behind it, which holds the search and the other filters
+ * (ADR 0082). The button says how many of them are set; the type has its own control.
+ */
+function FilterSheet({
+  compact,
+  ...props
+}: Omit<WorkToolbarProps, "counts" | "narrow" | "title" | "onCreate"> & {
+  field: DebouncedText;
+  /** The ghost button of the toolbar row; a phone has the plain button. */
+  compact: boolean;
+}) {
   const [open, setOpen] = useState(false);
-  const active = countOtherFilters(filters);
+  const active = countOtherFilters(props.filters);
   return (
-    <div className={styles.narrow}>
-      <Select
-        label={t("work-type-label")}
-        labelHidden
-        variant="toolbar"
-        options={typeOptions(counts).map(({ id, label, count }) => ({
-          id,
-          label: count === undefined ? label : `${label} (${count})`,
-        }))}
-        value={typeValue(filters)}
-        onChange={(id) => setType(filters, onChange, id)}
-      />
+    <>
       <Button
+        variant={compact ? "quiet" : "secondary"}
+        size={compact ? "sm" : "md"}
         onPress={() => setOpen(true)}
         {...(active > 0 ? { "aria-label": t("work-filter-open-active", { count: active }) } : {})}
       >
@@ -130,57 +123,81 @@ function NarrowToolbar({
         {t("work-filter-open")}
         {active > 0 && <span className={styles.badge}>{active}</span>}
       </Button>
-      {onCreate && <NewButton onCreate={onCreate} />}
       {open && (
         <Sheet title={t("work-filter-title")} onClose={() => setOpen(false)}>
           <div className={styles.sheet}>
-            <Controls
-              filters={filters}
-              onChange={onChange}
-              directory={directory}
-              me={me}
-              onReset={onReset}
-              searchRef={searchRef}
-              field={field}
-            />
+            <Controls {...props} />
           </div>
         </Sheet>
       )}
-    </div>
+    </>
   );
 }
 
+/** What the view tabs place around their own list: the toolbar row is one row (ADR 0082). */
+export interface WorkToolbarSlots {
+  before: ReactNode;
+  after?: ReactNode;
+}
+
 /**
- * The toolbar of the „Arbeit“ page: the type filter, then the search and the filters. The view tabs
- * join it when a second view exists (ADR 0082). On narrow layouts it is a select and a button.
+ * The toolbar of the „Arbeit“ page as the two slots of its row, which the view tabs complete: the
+ * title and the type filter, then the filter button, then the tabs. On a phone the type is a
+ * select, and it sits with the button in a second row below the title and the tabs. It is a hook
+ * because the pending text of the search must outlive a sheet that closes.
  */
-export function WorkToolbar({ narrow, ...props }: WorkToolbarProps) {
-  // Here and not in the sheet: the pending text must outlive a sheet that closes.
+export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): WorkToolbarSlots {
   const field = useSearchText(props);
-  if (narrow) {
-    return <NarrowToolbar {...props} field={field} />;
-  }
   const { filters, onChange, counts, directory, me, onReset, searchRef, onCreate } = props;
-  return (
-    <div className={styles.wide}>
-      <div className={styles.top}>
-        <TypeFilter
-          label={t("work-type-label")}
-          options={typeOptions(counts)}
-          value={typeValue(filters)}
-          onChange={(id) => setType(filters, onChange, id)}
-        />
-        {onCreate && <NewButton onCreate={onCreate} />}
-      </div>
-      <div className={styles.filters}>
-        <SearchBox field={field} inputRef={searchRef} />
-        <Toolbar label={t("work-toolbar")}>
-          <OwnerFilter filters={filters} onChange={onChange} directory={directory} me={me} />
-          <StreamFilter filters={filters} onChange={onChange} directory={directory} />
-          <DueFilter filters={filters} onChange={onChange} />
-          <ResetFilters filters={filters} onReset={onReset} />
-        </Toolbar>
-      </div>
-    </div>
+  const sheet = (compact: boolean) => (
+    <FilterSheet
+      compact={compact}
+      filters={filters}
+      onChange={onChange}
+      directory={directory}
+      me={me}
+      onReset={onReset}
+      searchRef={searchRef}
+      field={field}
+    />
   );
+  if (narrow) {
+    return {
+      before: <div className={styles.lead}>{title}</div>,
+      after: (
+        <div className={styles.narrow}>
+          <Select
+            label={t("work-type-label")}
+            labelHidden
+            variant="toolbar"
+            options={typeOptions(counts).map(({ id, label, count }) => ({
+              id,
+              label: count === undefined ? label : `${label} (${count})`,
+            }))}
+            value={typeValue(filters)}
+            onChange={(id) => setType(filters, onChange, id)}
+          />
+          {sheet(false)}
+          {onCreate && <NewButton onCreate={onCreate} />}
+        </div>
+      ),
+    };
+  }
+  return {
+    before: (
+      <>
+        <div className={styles.lead}>
+          {title}
+          <TypeFilter
+            label={t("work-type-label")}
+            options={typeOptions(counts)}
+            value={typeValue(filters)}
+            onChange={(id) => setType(filters, onChange, id)}
+          />
+        </div>
+        <div className={styles.filter}>{sheet(true)}</div>
+      </>
+    ),
+    after: onCreate ? <NewButton onCreate={onCreate} /> : undefined,
+  };
 }

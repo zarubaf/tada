@@ -58,6 +58,8 @@ const pick = (title: string) =>
 const BAR = { name: "Aktionen für die Auswahl" };
 const bar = () => screen.getByRole("toolbar", BAR);
 const noBar = () => expect(screen.queryByRole("toolbar", BAR)).not.toBeInTheDocument();
+/** A control outside the bar: the „Filter“ button of the toolbar row. */
+const filterButton = () => screen.getByRole("button", { name: /^Filter/ });
 const inBar = (name: string | RegExp) => within(bar()).getByRole("button", { name });
 /** Answers a change of an action with its record at the next version. */
 const patched =
@@ -547,20 +549,20 @@ describe("the bulk bar", () => {
 
     it("leaves focus where it is when the run ends outside the bar", async () => {
       const gates = await running();
-      screen.getByRole("searchbox").focus();
+      filterButton().focus();
       await act(async () => gates[0]?.(patched("rec-act-001", { status: "done" })()));
       await act(async () => gates[1]?.(patched("rec-act-002", { status: "done" })()));
       await screen.findByText("2 Einträge geändert");
-      expect(screen.getByRole("searchbox")).toHaveFocus();
+      expect(filterButton()).toHaveFocus();
     });
 
     it("leaves focus where it is when a failed run ends outside the bar", async () => {
       const gates = await running();
-      screen.getByRole("searchbox").focus();
+      filterButton().focus();
       await act(async () => gates[0]?.(problem(403, "forbidden")));
       await act(async () => gates[1]?.(problem(403, "forbidden")));
       await screen.findByText("2 von 2 Einträgen nicht geändert");
-      expect(screen.getByRole("searchbox")).toHaveFocus();
+      expect(filterButton()).toHaveFocus();
     });
 
     it("says why in the description of every control while the run is busy", async () => {
@@ -607,7 +609,9 @@ describe("the bulk bar", () => {
       const retry = screen.getByRole("button", { name: "Erneut versuchen" });
       await waitFor(() => expect(retry).toBeEnabled());
       // A search hides the second record: it leaves the selection, so it leaves the list.
+      await userEvent.click(filterButton());
       await userEvent.type(screen.getByRole("searchbox"), "Plakat");
+      await userEvent.click(screen.getByRole("button", { name: "Schliessen" }));
       await waitFor(() => expect(within(bar()).getByText("1 ausgewählt")).toBeInTheDocument());
       const list = screen.getByRole("list", { name: "Nicht geändert" });
       expect(

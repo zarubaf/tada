@@ -27,11 +27,34 @@
     }
   }
 
+  /* The gutter belongs to the rows of the page: 16 px on a phone, 12 px from --bp-medium. */
+  .page[data-width="flush"] {
+    --page-gutter: var(--space-4);
+
+    gap: 0;
+    padding: 0;
+  }
+
+  @media (width >= 40rem) {
+    .page[data-width="flush"] {
+      --page-gutter: var(--space-3);
+    }
+  }
+
   .title {
     font-size: var(--font-size-2xl);
     font-weight: var(--font-weight-semibold);
     letter-spacing: var(--letter-spacing-tight);
     line-height: var(--line-height-2xl);
     overflow-wrap: anywhere;
+  }
+
+  /* The title of a toolbar row: the size of the interface text, so that the row stays 44 px. */
+  .title[data-compact] {
+    flex: none;
+    white-space: nowrap;
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-base);
+    padding-inline-end: var(--space-2);
   }
 }

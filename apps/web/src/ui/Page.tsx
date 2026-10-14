@@ -2,8 +2,12 @@ import type { ReactNode, Ref } from "react";
 import styles from "./Page.module.css";
 
 export interface PageProps {
-  /** `form` keeps the page in one column of at most 40rem, as the public page template needs. */
-  width?: "full" | "form";
+  /**
+   * `form` keeps the page in one column of at most 40rem, as the public page template needs.
+   * `flush` has no gutter of its own: the page template sets `--page-gutter` for its rows and
+   * keeps its toolbar edge to edge, as the „Arbeit“ page does.
+   */
+  width?: "full" | "form" | "flush";
   children: ReactNode;
 }
 
@@ -19,19 +23,30 @@ export function Page({ width = "full", children }: PageProps) {
   );
 }
 
-/** The `h1` of a page. Focus moves to it by script, for example after a route change. */
+/**
+ * The `h1` of a page. Focus moves to it by script, for example after a route change. A `compact`
+ * title is the size of the interface text, for a title that sits in a toolbar row.
+ */
 export function PageTitle({
   id,
   children,
+  compact,
   ref,
 }: {
   /** For a section that the heading names with `aria-labelledby`. */
   id?: string;
   children: ReactNode;
+  compact?: boolean;
   ref?: Ref<HTMLHeadingElement>;
 }) {
   return (
-    <h1 id={id} ref={ref} tabIndex={-1} className={styles.title}>
+    <h1
+      id={id}
+      ref={ref}
+      tabIndex={-1}
+      className={styles.title}
+      {...(compact && { "data-compact": "" })}
+    >
       {children}
     </h1>
   );
