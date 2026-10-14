@@ -36,6 +36,13 @@ describe("SearchSelect", () => {
     expect(screen.getByRole("button", { name: "Zuständig: Bernd Beispiel" })).toBeInTheDocument();
   });
 
+  it("gives the trigger the full text as its title, for a value that the layout cuts short", () => {
+    render(<Harness initial="b" />);
+
+    const trigger = screen.getByRole("button", { name: "Zuständig: Bernd Beispiel" });
+    expect(within(trigger).getByText("Bernd Beispiel")).toHaveAttribute("title", "Bernd Beispiel");
+  });
+
   it("filters the options by the typed text and picks one", async () => {
     render(<Harness />);
 

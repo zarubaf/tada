@@ -61,8 +61,9 @@ describe("the record panel", () => {
       ).toBeVisible();
       expect(within(region).getByText("Bernd Beispiel")).toBeVisible();
       expect(within(region).getByText("Bodenbetrieb")).toBeVisible();
-      // The status shows in the head and in the list of properties.
-      expect(within(region).getAllByText("offen")).toHaveLength(2);
+      // The head names the kind; the status shows once, in the list of properties.
+      expect(within(region).getByText("Aufgabe")).toBeVisible();
+      expect(within(region).getAllByText("offen")).toHaveLength(1);
     });
 
     it("shows a not-found state with a close button for an ID that does not exist", async () => {

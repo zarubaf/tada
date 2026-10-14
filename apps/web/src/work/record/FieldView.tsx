@@ -1,3 +1,6 @@
+import { IconCalendar, IconCalendarExclamation } from "@tabler/icons-react";
+import { isOverdue } from "../../facts/dueDate";
+import { formatDate } from "../../facts/formatValue";
 import { t } from "../../i18n";
 import { Chip } from "../../ui/Chip";
 import { Redacted } from "../../ui/Redacted";
@@ -9,6 +12,22 @@ import styles from "./RecordPanel.module.css";
 /** The words for a field without a value. */
 export function Empty({ spec }: { spec: FieldSpec }) {
   return <span className={styles.empty}>{spec.emptyKey ? t(spec.emptyKey) : ""}</span>;
+}
+
+/**
+ * A date as text with its icon: the panel shows it as a value among values, not as a chip among
+ * chips. An overdue date is in the danger color and says „überfällig“ in words.
+ */
+function DateValue({ date, today, overdue }: { date: string; today: string; overdue: boolean }) {
+  const late = overdue && isOverdue(date, today);
+  const Icon = late ? IconCalendarExclamation : IconCalendar;
+  return (
+    <span className={styles.date} data-overdue={late || undefined}>
+      <Icon size={14} stroke={1.5} aria-hidden="true" />
+      <time dateTime={date}>{formatDate(date)}</time>
+      {late && <span className={styles.hidden}>, {t("overdue")}</span>}
+    </span>
+  );
 }
 
 /**
@@ -38,8 +57,7 @@ export function FieldView({
   switch (spec.control) {
     case "date":
       return (
-        <Chip
-          variant="date"
+        <DateValue
           date={value}
           today={today}
           overdue={spec.overdue === true && mayBeOverdue(item)}
@@ -56,7 +74,9 @@ export function FieldView({
       return (
         <span className={styles.value}>
           {chosen?.leading}
-          <span>{chosen?.label ?? ""}</span>
+          <span className={styles.valueName} title={chosen?.label}>
+            {chosen?.label ?? ""}
+          </span>
         </span>
       );
     }
