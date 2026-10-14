@@ -9,9 +9,6 @@
     display: flex;
     gap: var(--space-0-5);
     overflow-x: auto;
-  }
-
-  .list[data-look="view"] {
     border-bottom: 1px solid var(--color-border-subtle);
   }
 
@@ -48,25 +45,15 @@
     outline-offset: -2px;
   }
 
-  /* The view look: an underline marks the selected tab, a border of the tab, above the line of the list. */
-  .list[data-look="view"] .tab {
+  /* An underline marks the selected tab, a border of the tab, above the line of the list. */
+  .tab {
     border-bottom: 2px solid transparent;
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   }
 
-  .list[data-look="view"] .tab[data-selected] {
+  .tab[data-selected] {
     border-bottom-color: var(--color-accent);
     color: var(--color-text);
-  }
-
-  /* The filter look: a pill marks the selected tab. */
-  .list[data-look="filter"] .tab {
-    border-radius: var(--radius-md);
-  }
-
-  .list[data-look="filter"] .tab[data-selected] {
-    background: var(--color-accent-subtle);
-    color: var(--color-accent-text);
   }
 
   .count {
