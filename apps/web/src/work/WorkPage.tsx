@@ -1,4 +1,3 @@
-import { IconAlertTriangle } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Api } from "../api/client";
 import { EventLoadError } from "../events/EventLoadError";
@@ -8,7 +7,6 @@ import { t } from "../i18n";
 import { useParams } from "../router/Router";
 import { useSession } from "../session/SessionProvider";
 import { useNarrow } from "../shell/useNarrow";
-import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
@@ -16,6 +14,7 @@ import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import { BoardSkeleton } from "./BoardSkeleton";
+import { FailureBanner } from "./FailureBanner";
 import { RECORD_KINDS } from "./recordStatus";
 import { type KindState, useWork } from "./useWork";
 import { useWorkFilters } from "./useWorkFilters";
@@ -234,28 +233,4 @@ function useRetrying(
 
 function failureMessage(state: KindState<unknown>): string | undefined {
   return state.kind === "failed" ? state.message : undefined;
-}
-
-function FailureBanner({
-  message,
-  detail,
-  busy,
-  onRetry,
-}: {
-  message: string;
-  detail: string | undefined;
-  /** True while the retry runs. */
-  busy: boolean;
-  onRetry: () => void;
-}) {
-  return (
-    <div aria-busy={busy}>
-      <Banner icon={IconAlertTriangle} action={<Button onPress={onRetry}>{t("retry")}</Button>}>
-        <p>
-          <strong>{message}</strong>
-        </p>
-        {detail && <p>{detail}</p>}
-      </Banner>
-    </div>
-  );
 }
