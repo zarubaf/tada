@@ -14,6 +14,7 @@ import type { ChoiceSources } from "./choices";
 import type { FieldSpec, RecordDescriptor, RecordLookup } from "./descriptor";
 import { descriptorOf } from "./descriptors";
 import { FieldEditor, type FieldEnv } from "./FieldEditor";
+import { RecordActions } from "./RecordActions";
 import { RecordCreate } from "./RecordCreate";
 import { RecordHints } from "./RecordHints";
 import styles from "./RecordPanel.module.css";
@@ -132,6 +133,9 @@ function Body({
           <Property key={spec.id} spec={spec} item={item} env={env} />
         ))}
       </dl>
+      {descriptor.actions && !item.redacted && (
+        <RecordActions actions={descriptor.actions} item={item} env={env} announce={env.announce} />
+      )}
       <RecordHints hints={descriptor.hints?.(item, lookup) ?? []} />
       {!item.redacted &&
         [description, ...(descriptor.texts ?? [])].map(
@@ -257,6 +261,7 @@ export default function RecordPanel({
     sources: sourcesOf(work),
     today,
     editable: canEdit(item, writable),
+    writable,
   };
   const lookup: RecordLookup = {
     readableId: (kind, id) =>

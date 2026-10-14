@@ -7,6 +7,7 @@ import type { ComponentType } from "react";
 import type { RecordKind } from "../../api/client";
 import type { CommandResult, WorkCommands } from "../workCommands";
 import type { WorkItem } from "../workItem";
+import type { FieldEnv } from "./FieldEditor";
 
 /** How a field is shown and edited. Each kind uses these and adds none. */
 export type ControlKind =
@@ -130,6 +131,33 @@ export interface RecordLookup {
   readableId: (kind: RecordKind, id: string) => string | undefined;
 }
 
+/** What the dialog of a record action gets from the panel. */
+export interface ActionDialogProps {
+  item: WorkItem;
+  env: FieldEnv;
+  /** The action ran. The dialog says in one sentence what happened; the panel announces it and closes the dialog. */
+  onDone: (message: string) => void;
+  /** The member gave up. */
+  onCancel: () => void;
+}
+
+/**
+ * An action on a record that a click does not run, for example „Widerrufen“ of a decision: a
+ * button in the panel that opens a dialog. The dialog is the component of the kind; it is open while
+ * it is mounted.
+ */
+export interface RecordActionSpec {
+  /** Stable key of the action. */
+  id: string;
+  /** The Fluent key of the button. */
+  labelKey: string;
+  /** The action ends something for good. */
+  danger?: boolean;
+  /** True if the member may run it now. The server checks the right again. */
+  available: (item: WorkItem, env: FieldEnv) => boolean;
+  dialog: ComponentType<ActionDialogProps>;
+}
+
 export interface RecordDescriptor {
   kind: RecordKind;
   /** The title of the record. It is the heading of the panel. */
@@ -140,6 +168,8 @@ export interface RecordDescriptor {
   description?: FieldSpec;
   /** Further long texts under the description, each in its own section, for example a mitigation. */
   texts?: readonly FieldSpec[];
+  /** The actions under the properties, in order. */
+  actions?: readonly RecordActionSpec[];
   /**
    * Sentences about the record that the member should know, for a read-only section „Hinweise“
    * between the properties and the description. Nothing means no section.
