@@ -80,8 +80,11 @@ export interface Setup {
   /** The event of the page. The default is an active event. */
   event?: Event;
   workstreams?: unknown[];
-  /** Answers by `METHOD /path-suffix`; the first match wins. */
-  answers?: Record<string, (url: URL) => Response | Promise<Response>>;
+  /**
+   * Answers by `METHOD /path-suffix`; the first match wins. A function gets the address and the
+   * parsed body of the request, if it has one.
+   */
+  answers?: Record<string, (url: URL, body?: unknown) => Response | Promise<Response>>;
   /** The default answers of the lists, by path suffix. */
   lists?: Record<string, unknown[]>;
   /** The profile of the event that the event page has loaded. The default is still loading. */
@@ -118,17 +121,14 @@ export function renderWork(
   const fetch = async (request: Request) => {
     const url = new URL(request.url);
     const text = request.method === "GET" ? "" : await request.clone().text();
-    calls.push({
-      call: `${request.method} ${url.pathname}`,
-      query: url.search,
-      body: text === "" ? undefined : JSON.parse(text),
-    });
+    const body = text === "" ? undefined : JSON.parse(text);
+    calls.push({ call: `${request.method} ${url.pathname}`, query: url.search, body });
     const answer = Object.entries(answers).find(([key]) => {
       const [method, suffix = ""] = key.split(" ");
       return request.method === method && url.pathname.endsWith(suffix);
     });
     if (answer) {
-      return answer[1](url);
+      return answer[1](url, body);
     }
     const path = url.pathname;
     if (path.endsWith("/session")) {

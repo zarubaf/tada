@@ -33,7 +33,10 @@ export interface FieldSpec {
   /** The icon before the label of a property. The title and the description have none. */
   icon?: Icon;
   control: ControlKind;
-  /** The name of the field in the API, to place an error of the server at the field. */
+  /**
+   * The name of the field in the errors of the server (`/due_date`, `/owner`), to place an error at
+   * the field. It is not always the name in the request.
+   */
   pointer: string;
   /** The field must have a value. */
   required?: boolean;

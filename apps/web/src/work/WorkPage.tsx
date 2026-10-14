@@ -311,6 +311,7 @@ export function WorkPage({ api }: { api: Api }) {
           <RecordPanel
             work={work}
             readableId={openId}
+            writable={writable}
             timeZone={event.state.event.time_zone}
             today={today}
             previous={around.previous}

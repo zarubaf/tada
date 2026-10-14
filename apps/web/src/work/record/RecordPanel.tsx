@@ -1,5 +1,6 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { t } from "../../i18n";
+import { LiveRegion } from "../../ui/LiveRegion";
 import { RecordId } from "../../ui/RecordId";
 import { SidePanel } from "../../ui/SidePanel";
 import { StatusLabel } from "../../ui/StatusLabel";
@@ -8,16 +9,19 @@ import { EvidenceList } from "../EvidenceList";
 import { presentationOf } from "../recordStatus";
 import type { Work } from "../useWork";
 import type { WorkItem } from "../workItem";
-import { type ChoiceSources, choicesOf } from "./choices";
+import { canEdit } from "../workPermissions";
+import type { ChoiceSources } from "./choices";
 import type { FieldSpec, RecordDescriptor } from "./descriptor";
 import { descriptorOf } from "./descriptors";
-import { FieldView } from "./FieldView";
+import { FieldEditor, type FieldEnv } from "./FieldEditor";
 import styles from "./RecordPanel.module.css";
 
 export interface RecordPanelProps {
   work: Work;
   /** The readable ID that the address names. */
   readableId: string;
+  /** False in a closed event: then no field has a control. */
+  writable: boolean;
   /** The time zone of the event, for the times of the evidence. */
   timeZone: string;
   /** The civil date of today. */
@@ -52,19 +56,7 @@ function Head({ item }: { item: WorkItem }) {
   );
 }
 
-function Property({
-  spec,
-  item,
-  sources,
-  today,
-}: {
-  spec: FieldSpec;
-  item: WorkItem;
-  sources: ChoiceSources;
-  today: string;
-}) {
-  const value = spec.read(item);
-  const choices = choicesOf(spec, sources, item, value);
+function Property({ spec, item, env }: { spec: FieldSpec; item: WorkItem; env: FieldEnv }) {
   const Icon = spec.icon;
   return (
     <>
@@ -73,7 +65,7 @@ function Property({
         {t(spec.labelKey)}
       </dt>
       <dd className={styles.field}>
-        <FieldView spec={spec} value={value} choices={choices} item={item} today={today} />
+        <FieldEditor spec={spec} item={item} env={env} />
       </dd>
     </>
   );
@@ -82,15 +74,13 @@ function Property({
 function Body({
   item,
   descriptor,
-  sources,
+  env,
   timeZone,
-  today,
 }: {
   item: WorkItem;
   descriptor: RecordDescriptor;
-  sources: ChoiceSources;
+  env: FieldEnv;
   timeZone: string;
-  today: string;
 }) {
   const descriptionId = useId();
   const sourcesId = useId();
@@ -98,17 +88,11 @@ function Body({
   return (
     <div className={styles.body}>
       <h2 className={styles.title}>
-        <FieldView
-          spec={title}
-          value={title.read(item)}
-          choices={choicesOf(title, sources, item, title.read(item))}
-          item={item}
-          today={today}
-        />
+        <FieldEditor spec={title} item={item} env={env} heading />
       </h2>
       <dl className={styles.props}>
         {descriptor.properties.map((spec) => (
-          <Property key={spec.id} spec={spec} item={item} sources={sources} today={today} />
+          <Property key={spec.id} spec={spec} item={item} env={env} />
         ))}
       </dl>
       {description && !item.redacted && (
@@ -116,13 +100,7 @@ function Body({
           <h3 id={descriptionId} className={styles.sectionHeading}>
             {t(description.labelKey)}
           </h3>
-          <FieldView
-            spec={description}
-            value={description.read(item)}
-            choices={choicesOf(description, sources, item, description.read(item))}
-            item={item}
-            today={today}
-          />
+          <FieldEditor spec={description} item={item} env={env} />
         </section>
       )}
       {item.record.evidence.length > 0 && (
@@ -149,6 +127,7 @@ function Body({
 export default function RecordPanel({
   work,
   readableId,
+  writable,
   timeZone,
   today,
   previous,
@@ -157,6 +136,8 @@ export default function RecordPanel({
   onClose,
   returnFocusTo,
 }: RecordPanelProps) {
+  const [status, setStatus] = useState<string>();
+  const [alert, setAlert] = useState<string>();
   const item = work.items.find((candidate) => candidate.readableId === readableId);
   // A kind without a descriptor has no panel yet, so its record counts as not found.
   const descriptor = item && descriptorOf(item.kind);
@@ -176,17 +157,24 @@ export default function RecordPanel({
       </SidePanel>
     );
   }
+  const env: FieldEnv = {
+    commands: work.commands,
+    refresh: work.refresh,
+    announce: (text, urgency) => (urgency === "alert" ? setAlert(text) : setStatus(text)),
+    sources: sourcesOf(work),
+    today,
+    editable: canEdit(item, writable),
+  };
   const name = item.redacted ? item.readableId : `${item.readableId} ${item.title}`;
   return (
     <SidePanel title={name} heading={<Head item={item} />} {...frame}>
-      <Body
-        key={item.id}
-        item={item}
-        descriptor={descriptor}
-        sources={sourcesOf(work)}
-        timeZone={timeZone}
-        today={today}
-      />
+      <Body key={item.id} item={item} descriptor={descriptor} env={env} timeZone={timeZone} />
+      <LiveRegion kind="status" visuallyHidden>
+        {status}
+      </LiveRegion>
+      <LiveRegion kind="alert" visuallyHidden>
+        {alert}
+      </LiveRegion>
     </SidePanel>
   );
 }
