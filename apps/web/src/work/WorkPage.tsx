@@ -284,7 +284,10 @@ export function WorkPage({ api }: { api: Api }) {
               />
             )}
             {!loading && shown.length > 0 && (
-              <div className={styles.scope}>
+              <div
+                className={styles.scope}
+                {...(route.mode !== "closed" && { "data-panel-open": "" })}
+              >
                 <div
                   className={styles.view}
                   {...(barShown && !boardFillsColumns && { "data-dock-room": "" })}
