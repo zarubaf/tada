@@ -13,7 +13,7 @@ export const NEW_EVENT = "new";
 const EVENT_PREFIX = "event:";
 
 /** The menu item ID of an event, and back. */
-export const eventItemId = (id: string) => `${EVENT_PREFIX}${id}`;
+const eventItemId = (id: string) => `${EVENT_PREFIX}${id}`;
 export const eventIdOfItem = (item: string) =>
   item.startsWith(EVENT_PREFIX) ? item.slice(EVENT_PREFIX.length) : undefined;
 

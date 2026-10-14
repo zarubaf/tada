@@ -65,6 +65,20 @@
     background: var(--color-bg-hover);
   }
 
+  .more[aria-current] {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
+  }
+
+  /* Forced colors replace the background: the current item keeps a mark of its own. */
+  @media (forced-colors: active) {
+    .more[aria-current] {
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+    }
+  }
+
   .more[data-focus-visible] {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;

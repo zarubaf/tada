@@ -3,11 +3,11 @@
 import { IconDots } from "@tabler/icons-react";
 import { t } from "../i18n";
 import { InboxCount } from "../review/InboxCount";
-import { useNavigate } from "../router/Router";
+import { useNavigate, usePathname } from "../router/Router";
 import { MenuButton } from "../ui/MenuButton";
 import { NavLink } from "../ui/NavLink";
 import styles from "./BottomBar.module.css";
-import { BOTTOM, MORE } from "./navItems";
+import { BOTTOM, isCurrent, MORE } from "./navItems";
 
 const VERSIONS = "versions";
 
@@ -20,6 +20,7 @@ export function BottomBar({
   onOpenVersions: () => void;
 }) {
   const navigate = useNavigate();
+  const pathname = usePathname();
   return (
     <nav className={styles.bar} aria-label={t("shell-nav")}>
       {BOTTOM.map((destination) => (
@@ -47,6 +48,7 @@ export function BottomBar({
         }
         triggerLabel={t("nav-more")}
         triggerClassName={styles.more}
+        current={MORE.some((destination) => isCurrent(destination, pathname))}
         label={t("nav-more-menu")}
         items={[
           ...MORE.map((destination) => ({

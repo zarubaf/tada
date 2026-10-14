@@ -31,6 +31,8 @@ export interface MenuButtonProps {
   /** The accessible name of the trigger button. */
   triggerLabel: string;
   triggerClassName: string | undefined;
+  /** The trigger stands for the current page, for example „Mehr“ when the page is one of its items. */
+  current?: boolean;
   /** The accessible name of the menu. */
   label: string;
   items: MenuButtonItem[];
@@ -48,6 +50,7 @@ export function MenuButton({
   trigger,
   triggerLabel,
   triggerClassName,
+  current,
   label,
   items,
   onAction,
@@ -62,7 +65,11 @@ export function MenuButton({
         }
       }}
     >
-      <Button className={triggerClassName} aria-label={triggerLabel}>
+      <Button
+        className={triggerClassName}
+        aria-label={triggerLabel}
+        {...(current ? { "aria-current": true } : {})}
+      >
         {trigger}
       </Button>
       <Popover className={popover.popover} {...(placement ? { placement } : {})}>

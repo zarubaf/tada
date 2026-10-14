@@ -198,6 +198,9 @@ Rules:
 | `--control-height-lg`    | Primary actions on mobile pages (36 px compact)                                                                                                                  |
 | `--row-height`           | Table and list rows (28 px compact)                                                                                                                              |
 | `--size-panel-width`     | Width of the side panel: 480 px, as an overlay and as a docked column                                                                                            |
+| `--topbar-height`        | Height of the top bar of the shell (48 px)                                                                                                                       |
+| `--sidebar-width`        | Width of the docked sidebar of the shell (232 px)                                                                                                                |
+| `--size-tile`            | The tile with the initials of an event in the event switcher (28 px)                                                                                             |
 | `--size-chip-height`     | Chips (20 px)                                                                                                                                                    |
 | `--size-hit-target`      | The height of the hit area of an interactive chip (0 with a fine pointer, 44 px with a coarse one)                                                               |
 | `--size-chip-hit-margin` | The space that an interactive chip keeps above and below, so that the hit areas of wrapped chips do not overlap (0 with a fine pointer, 12 px with a coarse one) |

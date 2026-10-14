@@ -122,6 +122,8 @@ session-loading = Sitzung wird geladen
 page-loading = Seite wird geladen
 skip-link = Zum Inhalt springen
 shell-nav = Hauptnavigation
+# The labelled region around the content of the sidebar: the brand, the switchers and the links.
+shell-sidebar = Seitenleiste
 # The toggle of the sidebar in the top bar. On narrow layouts it opens the drawer.
 shell-sidebar-close = Seitenleiste ausblenden
 shell-sidebar-open = Seitenleiste einblenden
@@ -140,6 +142,8 @@ nav-inbox = Eingang
 nav-inbox-count = { $count } offen
 organization-switcher = Organisation
 member-menu = Mitgliedermenü
+# $name: the name of the member. The button of the member menu in the top bar.
+member-menu-trigger = Konto von { $name }
 member-menu-versions = Versionen ({ $build })
 sign-out = Abmelden
 nav-privacy = Datenschutz
@@ -158,7 +162,6 @@ command-results = { $count ->
     [one] 1 Treffer
    *[other] { $count } Treffer
 }
-command-close = Schliessen
 # The three choices of the color theme.
 theme-system = System
 theme-light = Hell
