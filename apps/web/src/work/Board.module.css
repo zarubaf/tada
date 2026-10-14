@@ -65,8 +65,8 @@
     gap: var(--space-1-5);
     margin: 0;
 
-    /* The mock keeps room under the last card of a column. */
-    padding: 0 var(--space-1-5) var(--space-16);
+    /* The mock keeps 72 px under the last card of a column. */
+    padding: 0 var(--space-1-5) var(--space-18);
     list-style: none;
   }
 

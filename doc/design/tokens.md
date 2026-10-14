@@ -187,6 +187,7 @@ Rules:
 The spacing scale has a base of 4 px.
 The number in the name times 4 px gives the size, for example `--space-4` and `--space-0-5`.
 `--space-2-5` (10 px) is the one step between 8 and 12 px: the inset of a card and the side padding of a type filter option.
+`--space-18` (72 px) is the room under the last card of a board column.
 
 Rules:
 
