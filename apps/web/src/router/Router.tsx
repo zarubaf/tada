@@ -310,6 +310,10 @@ export interface LinkProps {
   yieldsTo?: string;
   /** For a link whose words do not name its target alone, for example in a table. */
   "aria-label"?: string;
+  /** The IDs of the elements that name the link, for a card whose name is only a part of its text. */
+  "aria-labelledby"?: string;
+  /** The IDs of the elements that describe the link. */
+  "aria-describedby"?: string;
   /** `-1` takes the link out of the tab order, where another link of the page does the same. */
   tabIndex?: number;
   /**
@@ -333,6 +337,8 @@ export function Link({
   alsoCurrentOn = [],
   yieldsTo,
   "aria-label": ariaLabel,
+  "aria-labelledby": labelledBy,
+  "aria-describedby": describedBy,
   tabIndex,
   onNavigate,
   children,
@@ -366,6 +372,8 @@ export function Link({
       href={to}
       className={className}
       aria-label={ariaLabel}
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
       tabIndex={tabIndex}
       aria-current={current ? "page" : undefined}
       onClick={onClick}

@@ -113,8 +113,8 @@ describe("WorkPage", () => {
     open();
     await ready();
     const link = screen.getByRole("link", { name: /ACT-001/ });
-    expect(link).toHaveAccessibleName(/Bernd Beispiel/);
-    expect(link).toHaveAccessibleName(/Bodenbetrieb/);
+    expect(link).toHaveAccessibleDescription(/Verantwortlich: Bernd Beispiel/);
+    expect(link).toHaveAccessibleDescription(/Bereich: Bodenbetrieb/);
   });
 
   it("shows the tombstone of a redacted record", async () => {

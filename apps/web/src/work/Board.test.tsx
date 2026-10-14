@@ -89,14 +89,13 @@ describe("Board, wide", () => {
       make("commitment", r.commitment("COM-001")),
       make("action", r.action("ACT-002", { status: "blocked" })),
     ]);
-    const heads = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(heads).toEqual([
-      "Offen2, 2 Einträge",
-      "In Arbeit0, 0 Einträge",
-      "Blockiert1, 1 Eintrag",
-      "Erledigt0, 0 Einträge",
-      "Abgebrochen0, 0 Einträge",
-    ]);
+    const heads = screen.getAllByRole("heading", { level: 2 });
+    const names = ["Offen", "In Arbeit", "Blockiert", "Erledigt", "Abgebrochen"];
+    const counts = ["2 Einträge", "0 Einträge", "1 Eintrag", "0 Einträge", "0 Einträge"];
+    expect(heads).toHaveLength(5);
+    heads.forEach((head, index) => {
+      expect(head).toHaveAccessibleName(`${names[index]}, ${counts[index]}`);
+    });
   });
 
   it("names a column with a separator before its count, and shows the count as a number", () => {
