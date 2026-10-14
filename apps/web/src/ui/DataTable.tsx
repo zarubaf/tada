@@ -17,6 +17,11 @@ export type Column<T> = ColumnHeader & {
   numeric?: boolean;
   /** The column takes the width that is left, and a long text ends in an ellipsis (`stacked={false}`). */
   grow?: boolean;
+  /**
+   * The column is of less use than the others: a table that does not stack hides it in a container
+   * narrower than 56rem, for example beside a docked panel, so that the title keeps its room.
+   */
+  secondary?: boolean;
   /** The header is a button that sorts by this column. It needs `onSort` on the table. */
   sortable?: boolean;
 };
@@ -130,6 +135,7 @@ export function DataTable<T>({
               scope="col"
               aria-label={column.label}
               aria-sort={ariaSort(column, sort)}
+              data-secondary={column.secondary || undefined}
             >
               {column.sortable && onSort ? (
                 <button type="button" className={styles.sort} onClick={() => onSort(column.id)}>
@@ -160,6 +166,7 @@ export function DataTable<T>({
                   data-mono={column.mono || undefined}
                   data-numeric={column.numeric || undefined}
                   data-grow={column.grow || undefined}
+                  data-secondary={column.secondary || undefined}
                 >
                   {/* Shown only in a two-line row, where the column headers are not visible. */}
                   <span className={styles.label}>{nameOf(column)}</span>
