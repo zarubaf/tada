@@ -34,7 +34,10 @@ export interface Work {
   reloadKind: (kind: RecordKind) => Promise<boolean>;
   /** Loads one kind again without the loading state, after a command. */
   refresh: (kind: RecordKind) => Promise<boolean>;
-  /** Puts the record that a command returned into the list, without a request. */
+  /**
+   * Puts the record that a command returned into the list, without a request. It replaces the
+   * record with the same ID, or adds it at the end when the list lacks it (a new record).
+   */
   replace: <K extends RecordKind>(kind: K, record: RecordOf[K]) => void;
 }
 
@@ -172,9 +175,10 @@ export function useWork(api: Api, eventId: string): Work {
         if (slot?.eventId !== eventId || slot.state.kind !== "loaded") {
           return slots;
         }
-        const records = (slot.state.records as RecordOf[K][]).map((r) =>
-          r.id === record.id ? record : r,
-        );
+        const known = slot.state.records as RecordOf[K][];
+        const records = known.some((r) => r.id === record.id)
+          ? known.map((r) => (r.id === record.id ? record : r))
+          : [...known, record];
         return { ...slots, [kind]: { eventId, state: { kind: "loaded", records } } };
       }),
     [eventId],

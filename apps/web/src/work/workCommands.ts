@@ -10,7 +10,7 @@
 // - commitment: `changeStatus` cannot set `firm` (only "make firm" does), and the condition never
 //   changes.
 // - milestone: `changeDue` sets the date, which cannot be cleared.
-// A milestone, risk or decision has no `start_date`; an action's start date has no command here.
+// A milestone, risk or decision has no `start_date`.
 //
 // Commands on one record run one after the other and each takes the version from the answer of the
 // one before; commands on different records run at the same time.
@@ -25,6 +25,7 @@ import type {
   ChangeRiskRequest,
   Commitment,
   CommitmentStatus,
+  CreateActionRequest,
   Decision,
   Milestone,
   MilestoneStatus,
@@ -43,6 +44,8 @@ export interface WorkFailure {
   reason: FailureReason;
   /** The German message (ADR 0037). */
   message: string;
+  /** The problem of the server, for a form that maps its invalid fields. */
+  problem?: Problem | undefined;
 }
 
 export type CommandResult<R> = { ok: true; record: R } | { ok: false; failure: WorkFailure };
@@ -74,6 +77,12 @@ type Answer<R> = Promise<{
   response?: Response | undefined;
 }>;
 
+/** The failure of an answer without data. */
+function refused(answer: Awaited<Answer<unknown>>): { ok: false; failure: WorkFailure } {
+  const { message } = saveFailure(answer);
+  return { ok: false, failure: { reason: reasonOf(answer.error), message, problem: answer.error } };
+}
+
 /** Runs the commands of each record one after the other, with the newest version it knows. */
 class RecordQueue {
   private tails = new Map<string, Promise<unknown>>();
@@ -93,14 +102,13 @@ class RecordQueue {
         answer = {};
       }
       if (!answer.data) {
-        const reason = reasonOf(answer.error);
+        const result = refused(answer);
         // Only a conflict or a missing record proves the remembered version wrong; a refused value,
         // a refusal or a lost connection leaves the record as the last answer left it.
-        if (reason === "conflict" || reason === "not-found") {
+        if (result.failure.reason === "conflict" || result.failure.reason === "not-found") {
           this.versions.delete(target.id);
         }
-        const { message } = saveFailure(answer);
-        return { ok: false, failure: { reason, message } };
+        return result;
       }
       this.versions.set(target.id, answer.data.version);
       return { ok: true, record: answer.data };
@@ -157,12 +165,30 @@ export function createWorkCommands(api: Api, eventId: string) {
       }),
     );
 
+  /** A new record has no version to guard and no commands before it, so it needs no queue. */
+  const createAction = async (body: CreateActionRequest): Promise<CommandResult<Action>> => {
+    let answer: Awaited<Answer<Action>>;
+    try {
+      answer = await api.POST("/api/v1/events/{event_id}/actions", {
+        params: { path: { event_id: eventId } },
+        body,
+      });
+    } catch {
+      answer = {};
+    }
+    return answer.data ? { ok: true, record: answer.data } : refused(answer);
+  };
+
   return {
     action: {
+      create: createAction,
       changeStatus: (t: Target, status: ActionStatus) => action(t, { status }),
       changeOwner: (t: Target, userId: string) => action(t, { owner_user_id: userId }),
       changeDue: (t: Target, due: string | null) => action(t, { due_date: due }),
+      changeStart: (t: Target, start: string | null) => action(t, { start_date: start }),
       changeWorkstream: (t: Target, id: string | null) => action(t, { workstream_id: id }),
+      changeMilestone: (t: Target, id: string | null) => action(t, { milestone_id: id }),
+      changeDescription: (t: Target, text: string | null) => action(t, { description: text }),
       rename: (t: Target, title: string) => action(t, { title }),
     },
     commitment: {
