@@ -16,6 +16,24 @@ describe("IconButton", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Schliessen");
   });
 
+  it("closes the tooltip with Escape", async () => {
+    render(<IconButton icon={IconX} label="Schliessen" onPress={() => {}} />);
+    await userEvent.tab();
+    await screen.findByRole("tooltip");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("is named by its label only, so a screen reader does not read the name twice", async () => {
+    render(<IconButton icon={IconX} label="Schliessen" onPress={() => {}} />);
+    await userEvent.tab();
+    await screen.findByRole("tooltip");
+    const description = screen.getByRole("button").getAttribute("aria-describedby");
+    expect(description ?? "").toBe("");
+    expect(screen.getByRole("button")).toHaveAccessibleName("Schliessen");
+    expect(screen.getByRole("button")).not.toHaveAccessibleDescription();
+  });
+
   it("hides the icon from a screen reader", () => {
     render(<IconButton icon={IconX} label="Schliessen" onPress={() => {}} />);
     expect(screen.getByRole("button").querySelector("svg")).toHaveAttribute("aria-hidden", "true");

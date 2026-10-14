@@ -15,8 +15,8 @@ export interface TooltipProps {
 }
 
 /**
- * A short text that opens on hover and on keyboard focus (doc/design/components.md). It repeats a
- * name or adds a hint; no information lives only here, because touch has no hover.
+ * A short text that opens on hover after 500 ms and at once on keyboard focus, and closes with Esc
+ * (doc/design/components.md). It repeats a name or adds a hint; no information lives only here, because touch has no hover.
  */
 export function Tooltip({ children, text, placement = "bottom" }: TooltipProps) {
   return (
