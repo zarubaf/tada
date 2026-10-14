@@ -362,6 +362,23 @@ describe("the commands of a milestone and a decision beyond the first set", () =
     expect(await result).toEqual({ ok: true, record: { id: "d2", version: 1 } });
   });
 
+  it("does not take the version of the successor for the one of the replaced decision", async () => {
+    const { sent, commands } = server();
+    const replace = commands.decision.supersede(
+      { id: "d1", version: 3 },
+      { wording: "Neu", decided_on: "2030-04-01", decided_by: [], owner_user_id: "u1" },
+    );
+    // Queued behind the replacement, with the version that its caller knows.
+    const owner = commands.decision.changeOwner({ id: "d1", version: 5 }, "u2");
+    await tick();
+    sent[0]?.answer(json(201, { id: "d2", version: 7 }));
+    await replace;
+    await tick();
+    expect(sent[1]).toMatchObject({ body: { owner_user_id: "u2", expected_version: 5 } });
+    sent[1]?.answer(json(409, { code: "record-version-conflict" }));
+    await owner;
+  });
+
   it("revokes a decision with the reason and the version, and keeps a refused reason", async () => {
     const { sent, commands } = server();
     const result = commands.decision.revoke({ id: "d1", version: 3 }, "Nicht mehr aktuell");
