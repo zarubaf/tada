@@ -209,6 +209,26 @@ describe("a commitment in the panel", () => {
     });
   });
 
+  describe("a redacted person on a commitment", () => {
+    /** The text of the row that the label names. */
+    const rowOf = (view: ReturnType<typeof within>, label: string) =>
+      view.getByText(label).closest("dt")?.nextElementSibling;
+
+    it("shows the tombstone for the promisor only, on a commitment that is not redacted", async () => {
+      openWork("#COM-001", {}, {}, { promisor: { ...BAKERY, name: "", redacted: true } });
+      const view = await region();
+      expect(rowOf(view, "Zugesagt von")).toHaveTextContent("entfernt");
+      expect(rowOf(view, "Bedingung")).toHaveTextContent("wenn der Auftrag unterschrieben ist");
+    });
+
+    it("shows the name of the promisor on a redacted commitment whose promisor is not redacted", async () => {
+      openWork("#COM-001", {}, {}, { text: "", condition: null, redacted: true });
+      const view = await region();
+      expect(rowOf(view, "Zugesagt von")).toHaveTextContent("Bäckerei Zopf AG");
+      expect(rowOf(view, "Bedingung")).toHaveTextContent("entfernt");
+    });
+  });
+
   describe("permissions", () => {
     it("shows plain text to a member who may not change the commitment", async () => {
       openWork("#COM-001", {}, {}, { can_change: false, can_make_firm: false, next_statuses: [] });

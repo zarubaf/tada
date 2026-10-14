@@ -37,6 +37,7 @@ function DateValue({ date, today, overdue }: { date: string; today: string; over
 export function FieldView({
   spec,
   value,
+  removed,
   choices,
   item,
   today,
@@ -44,15 +45,17 @@ export function FieldView({
 }: {
   spec: FieldSpec;
   value: FieldValue;
+  /** The field reads a value that was removed by itself, so the tombstone stands for it. */
+  removed: boolean;
   choices: Choices;
   item: WorkItem;
   today: string;
   /** Shows another record in the panel, for a field that refers to one. */
   onOpen?: ((readableId: string) => void) | undefined;
 }) {
-  const isText =
-    spec.control === "text" || spec.control === "multiline" || spec.control === "party";
-  if (isText && item.redacted) {
+  // The record hides its text; a party control hides itself, as its field reads.
+  const isText = spec.control === "text" || spec.control === "multiline";
+  if (removed || (isText && item.redacted)) {
     return <Redacted />;
   }
   if (value === null || value === "") {
