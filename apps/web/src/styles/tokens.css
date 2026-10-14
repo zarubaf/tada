@@ -81,6 +81,9 @@
     --space-12: 48px;
     --space-16: 64px;
 
+    /* Layout */
+    --size-panel-width: 480px;
+
     /* Density: compact */
     --control-height-sm: 28px;
     --control-height-md: 32px;
