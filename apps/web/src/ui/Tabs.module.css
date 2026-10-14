@@ -5,6 +5,22 @@
     min-width: 0;
   }
 
+  /*
+   * The toolbar row of a page (ADR 0082): 44 px high with one line of controls, edge to edge with
+   * the border below, the gutter of the page at both sides. It wraps, and never overflows.
+   */
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1-5) var(--space-2);
+    box-sizing: border-box;
+    min-height: var(--size-toolbar);
+    padding: var(--space-1-5) var(--page-gutter, var(--space-3));
+    border-bottom: 1px solid var(--color-border-subtle);
+    min-width: 0;
+  }
+
   .list {
     display: flex;
     gap: var(--space-0-5);
@@ -37,6 +53,37 @@
     }
   }
 
+  /* The segmented switch: a frame with the views inside, 30 px high, buttons of 24 px. */
+  .list[data-variant="segmented"] {
+    flex: none;
+    gap: var(--space-0-5);
+    padding: var(--space-0-5);
+    overflow: visible;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .list[data-variant="segmented"] .tab {
+    min-height: calc(var(--control-height-sm) - var(--space-1));
+    padding: 0 var(--space-2);
+    border-bottom: 0;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  @media (pointer: coarse) {
+    .list[data-variant="segmented"] {
+      gap: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .list[data-variant="segmented"] .tab {
+      min-height: var(--control-height-md);
+      font-size: var(--font-size-ui);
+    }
+  }
+
   .tab[data-hovered] {
     background: var(--color-bg-hover);
     color: var(--color-text);
@@ -51,6 +98,11 @@
   .tab[data-selected] {
     border-bottom-color: var(--color-accent);
     color: var(--color-text);
+  }
+
+  .list[data-variant="segmented"] .tab[data-selected] {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
   }
 
   .count {
@@ -68,7 +120,11 @@
     }
   }
 
+  /* The content of a tab stands apart from what is above it: one gap for every child. */
   .panel {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
     outline: none;
   }
 

@@ -1,33 +1,23 @@
 @layer components {
-  .wide {
-    display: grid;
-    gap: var(--space-2);
-    min-width: 0;
-  }
-
-  .top {
+  /* The title and the type filter: the part of the row that takes the room the tabs leave. */
+  .lead {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    min-width: 0;
-  }
-
-  .filters {
-    display: flex;
-    flex-wrap: wrap;
+    flex: 1 1 auto;
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
   }
 
-  .filters > :first-child {
-    flex: 0 1 16rem;
+  /* The button sits at the right, also when the row wraps and it is alone in a line. */
+  .filter {
+    display: flex;
+    margin-inline-start: auto;
   }
 
+  /* A phone: the type select and the button share the second row. */
   .narrow {
     display: flex;
+    flex: 1 1 100%;
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
