@@ -1,0 +1,24 @@
+import { describe, expect, it } from "vitest";
+import type { RecordKind } from "../api/client";
+import { recordHref } from "./workLinks";
+
+const item = (kind: RecordKind, readableId: string) => ({ kind, readableId });
+
+describe("recordHref", () => {
+  it.each([
+    ["action", "ACT-012", "/events/e1/actions#ACT-012"],
+    ["commitment", "COM-003", "/events/e1/commitments#COM-003"],
+    ["milestone", "MIL-001", "/events/e1/milestones#MIL-001"],
+    ["decision", "DEC-004", "/events/e1/decisions#DEC-004"],
+  ] as const)("links a %s to the page of its kind", (kind, id, href) => {
+    expect(recordHref("e1", item(kind, id))).toBe(href);
+  });
+
+  it("has no link for a risk, which has no page yet", () => {
+    expect(recordHref("e1", item("risk", "RSK-001"))).toBeUndefined();
+  });
+
+  it("escapes the event ID", () => {
+    expect(recordHref("a b", item("action", "ACT-001"))).toBe("/events/a%20b/actions#ACT-001");
+  });
+});

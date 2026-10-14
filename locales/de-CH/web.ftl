@@ -134,6 +134,7 @@ shell-drawer-close = Navigation schliessen
 nav-more = Mehr
 nav-more-menu = Weitere Bereiche
 nav-my-work = Meine Arbeit
+nav-work = Arbeit
 nav-events = Anlässe
 nav-persons = Personen
 nav-institutions = Institutionen
@@ -1269,3 +1270,61 @@ org-retention-error-out-of-range = Geben Sie eine Zahl von 1 bis 120 ein.
 org-retention-conflict = Jemand hat die Fristen inzwischen geändert. Das Formular zeigt jetzt die neuen Werte.
 org-retention-owner-only = Nur die Organisationsleitung ändert die Fristen.
 org-retention-owner-only-hidden = Nur die Organisationsleitung sieht und ändert die Fristen.
+
+## The „Arbeit“ page: all work records of an event (ADR 0082)
+
+work-title = Arbeit
+work-loading-board = Arbeit wird geladen
+work-toolbar = Filter
+work-type-label = Typ
+work-type-all = Alle
+work-type-action = Aufgaben
+work-type-commitment = Zusagen
+work-type-milestone = Meilensteine
+work-type-decision = Entscheide
+work-type-risk = Risiken
+work-search = Arbeit durchsuchen
+work-search-clear = Suche leeren
+work-owner = Verantwortlich
+work-owner-any = Alle Personen
+work-owner-me = Ich
+work-stream = Bereich
+work-stream-any = Alle Bereiche
+work-due = Fällig
+work-due-any = Alle Termine
+work-due-overdue = Überfällig
+work-due-week = Diese Woche
+work-due-none = Ohne Datum
+work-filter-reset = Filter zurücksetzen
+work-filter-open = Filter
+# $count: the number of filters that are set.
+work-filter-open-active = Filter, { $count } gesetzt
+work-filter-title = Filter
+# $count: the number of work records that the filters let through.
+work-count =
+    { $count ->
+        [one] 1 Eintrag
+       *[other] { $count } Einträge
+    }
+work-board = Board
+work-board-status = Status
+work-board-column-open = Offen
+work-board-column-in-progress = In Arbeit
+work-board-column-blocked = Blockiert
+work-board-column-done = Erledigt
+work-board-column-canceled = Abgebrochen
+work-board-column-empty = Keine Einträge
+work-board-canceled-show = Abgebrochen einblenden
+work-board-canceled-hide = Abgebrochen ausblenden
+# $kind: the plural name of the kind, for example „Aufgaben“.
+work-kind-failed = { $kind } konnten nicht geladen werden.
+work-directory-failed = Personen und Bereiche konnten nicht geladen werden.
+work-empty-title = Noch keine Arbeit in diesem Anlass
+work-empty-text = Aufgaben, Zusagen, Meilensteine, Entscheide und Risiken erscheinen hier, sobald jemand sie erfasst.
+work-empty-new-action = Neue Aufgabe
+work-empty-filtered-title = Kein Eintrag passt zu den Filtern
+work-empty-filtered-text = Ändern Sie die Filter oder setzen Sie sie zurück.
+# $name: the name of the person who owns the record.
+work-card-owner = Verantwortlich: { $name }
+work-card-due = Fällig
+work-card-decided = Entschieden am
