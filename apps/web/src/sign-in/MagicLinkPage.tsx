@@ -7,7 +7,7 @@ import { useRefreshSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
-import { takeFragmentToken } from "./fragment";
+import { useFragmentToken } from "./fragment";
 import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
 
 /**
@@ -17,8 +17,8 @@ import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
  * else sees it before the click (login CSRF).
  */
 export function MagicLinkPage({ api }: { api: Api }) {
-  // The first render reads and removes the fragment. A later render must keep the token.
-  const [token] = useState(takeFragmentToken);
+  // The token stays in state; the hook removes the fragment from the address (ADR 0056).
+  const token = useFragmentToken();
   const [failure, setFailure] = useState<Failure | undefined>(() =>
     token ? undefined : invalidFailure(t("magic-link-invalid")),
   );
