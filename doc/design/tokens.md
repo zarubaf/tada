@@ -1,6 +1,6 @@
 # Design tokens
 
-Under change by [ADR 0082](../adr/0082-redesign-of-the-web-client.md): values and screens move to the new design step by step.
+Under change by [ADR 0082](../adr/0082-redesign-of-the-web-client.md).
 
 [tokens.css](../../apps/web/src/styles/tokens.css) is the authority for the token names and values (ADR 0018).
 This document gives the uses, the rules and the reasons.
