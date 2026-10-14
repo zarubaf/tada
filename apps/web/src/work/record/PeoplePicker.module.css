@@ -54,7 +54,7 @@
     outline-offset: 2px;
   }
 
-  .picker[data-invalid] .search {
+  .search[aria-invalid="true"] {
     border-color: var(--color-danger);
   }
 

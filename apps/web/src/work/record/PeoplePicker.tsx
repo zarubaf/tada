@@ -138,7 +138,7 @@ export function PeoplePicker({
   const describedBy = [error && errorId, value.length > 0 && countId].filter(Boolean).join(" ");
 
   return (
-    <div className={styles.picker} data-invalid={error ? "" : undefined}>
+    <div className={styles.picker}>
       <label className={styles.label} htmlFor={`${id}-search`}>
         {label}
       </label>

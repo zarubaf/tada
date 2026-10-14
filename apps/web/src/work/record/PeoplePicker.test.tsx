@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { firstInvalidField } from "../../ui/focus";
 import { PeoplePicker, type Person } from "./PeoplePicker";
 
 const user = userEvent.setup({ delay: null });
@@ -207,6 +208,21 @@ describe("the people picker", () => {
     );
     expect(input()).toBeInvalid();
     expect(input()).toHaveAccessibleDescription(/Wählen Sie mindestens eine Person/);
+  });
+
+  it("makes the search, not a remove button, the first invalid field when people are chosen", () => {
+    const { container } = render(
+      <PeoplePicker
+        label="Beteiligte"
+        options={[]}
+        value={[{ id: "p1", label: "Cäcilia Probst" }]}
+        onChange={() => undefined}
+        search=""
+        onSearch={() => undefined}
+        error="Wählen Sie höchstens 50 Personen."
+      />,
+    );
+    expect(firstInvalidField(container)).toBe(input());
   });
 
   it("says that the search runs, and that it failed", () => {
