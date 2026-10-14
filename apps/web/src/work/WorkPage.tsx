@@ -14,15 +14,19 @@ import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import { BoardSkeleton } from "./BoardSkeleton";
+import { BulkBar } from "./BulkBar";
+import { useBoardView, visibleItems } from "./boardView";
 import { FailureBanner } from "./FailureBanner";
 import { RECORD_KINDS } from "./recordStatus";
+import { useBulkChange } from "./useBulkChange";
 import { type KindState, useWork } from "./useWork";
 import { useWorkFilters } from "./useWorkFilters";
+import { lockSelection, useWorkSelection, type WorkSelection } from "./useWorkSelection";
 import styles from "./WorkPage.module.css";
 import { WorkToolbar } from "./WorkToolbar";
 import { WorkViews } from "./WorkViews";
 import { WorkViewTabs } from "./WorkViewTabs";
-import { countsFor, filterWork, NO_FILTERS, serializeFilters } from "./workFilters";
+import { countsFor, filterWork, groupByColumn, NO_FILTERS, serializeFilters } from "./workFilters";
 import { useWorkView } from "./workView";
 
 /**
@@ -49,15 +53,78 @@ export function WorkPage({ api }: { api: Api }) {
     RECORD_KINDS.some((kind) => work.kinds[kind].kind === "loading");
   const ctx = useMemo(() => ({ me, today }), [me, today]);
   const shown = useMemo(() => filterWork(work.items, filters, ctx), [work.items, filters, ctx]);
+  // A closed event is read-only (ADR 0071); the event decides after it has loaded.
+  const writable = event.state.kind === "loaded" && event.state.event.status !== "closed";
+  const [boardView] = useBoardView();
   const counts = useMemo(
     () => (loading ? undefined : countsFor(work.items, filters, ctx)),
     [loading, work.items, filters, ctx],
   );
 
+  const [announcement, setAnnouncement] = useState<string>();
+  // The bulk change lives here and not in the bar: a run goes on when the bar leaves (Escape, a
+  // filter, another event), and its result still has to be said.
+  const banner = useRef<HTMLDivElement>(null);
+  const dock = useRef<HTMLDivElement>(null);
+  // The run is created before the selection, which it locks; its result reaches the selection here.
+  const selectionRef = useRef<WorkSelection>(undefined);
+  // Focus follows the end of a run only if it is in the bar or nowhere: a member who went on to
+  // the search field must not have focus pulled away in the middle of a word.
+  const focusIsFree = () => {
+    const active = document.activeElement;
+    return !active || active === document.body || dock.current?.contains(active) === true;
+  };
+  const bulk = useBulkChange({
+    scope: eventId,
+    commands: work.commands,
+    refresh: work.refresh,
+    items: work.items,
+    onFinished: ({ changed, failedKeys }) => {
+      const selection = selectionRef.current;
+      if (failedKeys.size === 0) {
+        setAnnouncement(t("work-bulk-done", { count: changed }));
+        // The bar leaves with the selection, so focus moves now and not after the commit.
+        if (focusIsFree()) {
+          heading.current?.focus();
+        }
+        selection?.clear();
+        return;
+      }
+      selection?.keepOnly(failedKeys);
+      setAnnouncement(t("work-bulk-failed", { count: failedKeys.size }));
+      focusAfterCommit(() => (focusIsFree() ? banner.current : null));
+    },
+  });
+  const { progress, reloading } = bulk.state;
+  const running = progress !== undefined;
+  // Only what the view shows can stay selected, so the bulk bar never acts on a record out of sight.
+  // The timeline shows none, but a run, and the failures it left, keep their records selected for
+  // the return to the table or the board: the bar is not in the timeline to say them.
+  const pending = running || (progress === undefined && bulk.state.failures.length > 0);
+  const selectIn = view === "timeline" && pending ? "table" : view;
+  const visible = useMemo(
+    () => visibleItems(groupByColumn(shown), boardView, narrow, selectIn),
+    [shown, boardView, narrow, selectIn],
+  );
+  const selection = useWorkSelection(eventId, visible, writable, running);
+  selectionRef.current = selection;
+  // Ending the selection ends the failures that belonged to it, once nothing runs or loads.
+  const idle = !running && !reloading;
+  const { reset: resetBulk } = bulk;
+  useEffect(() => {
+    if (!selection.selecting && idle) {
+      resetBulk();
+    }
+  }, [selection.selecting, idle, resetBulk]);
+  // While the change runs the selection holds still, so that the result meets the same records.
+  const held = useMemo(
+    () => (running ? lockSelection(selection) : selection),
+    [running, selection],
+  );
+
   // The result of a change of the filters is announced; the first view and a load are not.
   const key = serializeFilters(filters).toString();
   const lastKey = useRef(key);
-  const [announcement, setAnnouncement] = useState<string>();
   useEffect(() => {
     if (lastKey.current !== key) {
       lastKey.current = key;
@@ -172,22 +239,36 @@ export function WorkPage({ api }: { api: Api }) {
             />
           )}
           {!loading && shown.length > 0 && (
-            <WorkViews
-              view={view}
-              items={shown}
-              eventId={eventId}
-              today={today}
-              workstreamName={workstreamName}
-              narrow={narrow}
-              timeline={{
-                api,
-                filters,
-                workstreams:
-                  work.directory.kind === "loaded" ? work.directory.directory.workstreams : [],
-                timeZone: event.state.kind === "loaded" ? event.state.event.time_zone : undefined,
-                onReset: reset,
-              }}
-            />
+            <div className={styles.scope}>
+              <WorkViews
+                view={view}
+                items={shown}
+                eventId={eventId}
+                today={today}
+                workstreamName={workstreamName}
+                narrow={narrow}
+                timeline={{
+                  api,
+                  filters,
+                  workstreams:
+                    work.directory.kind === "loaded" ? work.directory.directory.workstreams : [],
+                  timeZone: event.state.kind === "loaded" ? event.state.event.time_zone : undefined,
+                  onReset: reset,
+                }}
+                selection={held}
+              />
+              {view !== "timeline" && (selection.selecting || running) && (
+                <BulkBar
+                  selection={held}
+                  bulk={bulk}
+                  work={work}
+                  narrow={narrow}
+                  announce={setAnnouncement}
+                  bannerRef={banner}
+                  dockRef={dock}
+                />
+              )}
+            </div>
           )}
         </WorkViewTabs>
       </div>

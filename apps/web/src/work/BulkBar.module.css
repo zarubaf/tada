@@ -1,0 +1,112 @@
+@layer components {
+  /*
+   * The bar sticks to the bottom of the work area while the board shows, and sits above the bottom
+   * bar on a phone. The dock itself lets pointers through, so that it never hides a card beside the
+   * bar.
+   */
+  .dock {
+    --dock-offset: var(--space-4);
+
+    position: sticky;
+    inset-block-end: var(--dock-offset);
+    z-index: var(--z-sticky);
+    display: grid;
+    gap: var(--space-2);
+    justify-items: center;
+    margin-block-start: var(--space-4);
+    pointer-events: none;
+  }
+
+  .dock > * {
+    box-sizing: border-box;
+    max-width: 100%;
+    pointer-events: auto;
+  }
+
+  .dock > .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1-5) var(--space-2) var(--space-1-5) var(--space-4);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    box-shadow: var(--shadow-2);
+  }
+
+  .count {
+    min-width: 0;
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
+    padding-inline: var(--space-2);
+    border-inline: 1px solid var(--color-border-subtle);
+  }
+
+  /* Twenty failures must not make the dock taller than the screen: the list scrolls. */
+  .failures {
+    max-block-size: min(12rem, 30dvh);
+    margin: 0;
+    padding-inline-start: var(--space-4);
+    overflow: auto;
+  }
+
+  .failures:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* --bp-medium and narrower: the bar fills the width above the bottom bar, in two rows. */
+  @media (width < 40rem) {
+    .dock {
+      --dock-offset: calc(var(--bottom-bar-height) + var(--space-2));
+
+      justify-items: stretch;
+      margin-block-start: var(--space-2);
+    }
+
+    .dock > .bar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: var(--space-2);
+    }
+
+    .count {
+      padding-inline-start: var(--space-2);
+    }
+
+    .actions {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      padding-inline: 0;
+      border-inline: 0;
+    }
+
+    .actions > span {
+      flex: 1 1 auto;
+    }
+
+    .actions button {
+      flex: 1;
+      justify-content: center;
+      padding-inline: var(--space-2);
+    }
+
+    .actions svg {
+      display: none;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .dock > .bar {
+      border-color: CanvasText;
+    }
+  }
+}
