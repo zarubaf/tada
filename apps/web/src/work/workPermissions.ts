@@ -14,14 +14,19 @@ export function canEdit(item: WorkItem, eventWritable: boolean): boolean {
 }
 
 /**
- * True if the member may create a record. A contributor or manager of the event can (ADR 0052);
- * the directory lists exactly those as owners, so the member can create if they could own a record.
- * A closed event is read-only. The server checks the right again.
+ * True if the member may create a record: an event manager or an owner or admin of the organization
+ * (manager level, also without a membership), or a member who could own a record, which is a
+ * contributor (ADR 0052). The same rule as `require_create` of the server, which checks it again.
+ * A closed event is read-only.
  */
 export function canCreate(
-  directory: Pick<Directory, "assignees"> | undefined,
+  directory: Pick<Directory, "assignees" | "isManager"> | undefined,
   me: string,
   eventWritable: boolean,
 ): boolean {
-  return eventWritable && directory?.assignees.some((member) => member.id === me) === true;
+  return (
+    eventWritable &&
+    directory !== undefined &&
+    (directory.isManager || directory.assignees.some((member) => member.id === me))
+  );
 }
