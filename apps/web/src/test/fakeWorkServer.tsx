@@ -28,15 +28,10 @@ const members = [
   { user_id: CLARA, display_name: "Cäcilia Probst", role: "member", version: 1 },
 ];
 
-/** The event memberships; `manager` is the role of the signed-in member. */
-function memberships(manager: boolean) {
+/** The event memberships; `role` is the event role of the signed-in member. */
+function memberships(role: string) {
   return [
-    {
-      user_id: ME,
-      display_name: "Anna Muster",
-      event_role: manager ? "event-manager" : "event-contributor",
-      version: 1,
-    },
+    { user_id: ME, display_name: "Anna Muster", event_role: role, version: 1 },
     { user_id: BERND, display_name: "Bernd Beispiel", event_role: "event-contributor", version: 1 },
     { user_id: CLARA, display_name: "Cäcilia Probst", event_role: "event-viewer", version: 1 },
   ];
@@ -77,6 +72,8 @@ export interface Setup {
   role?: string;
   /** Whether the signed-in member is an event manager. Otherwise the member is a contributor. */
   eventManager?: boolean;
+  /** Whether the signed-in member is only a viewer of the event. */
+  viewer?: boolean;
   /** The event of the page. The default is an active event. */
   event?: Event;
   workstreams?: unknown[];
@@ -101,6 +98,7 @@ export function renderWork(
   {
     role = "member",
     eventManager = false,
+    viewer = false,
     event = EVENT,
     workstreams = [ground],
     answers = {},
@@ -141,7 +139,11 @@ export function renderWork(
       return json(200, { items: members });
     }
     if (request.method === "GET" && path.endsWith("/memberships")) {
-      return json(200, { items: memberships(eventManager) });
+      return json(200, {
+        items: memberships(
+          viewer ? "event-viewer" : eventManager ? "event-manager" : "event-contributor",
+        ),
+      });
     }
     if (request.method === "GET" && path.endsWith("/workstreams")) {
       return json(200, { items: workstreams });

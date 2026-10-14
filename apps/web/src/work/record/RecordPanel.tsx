@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import type { RecordKind } from "../../api/client";
 import { t } from "../../i18n";
 import { LiveRegion } from "../../ui/LiveRegion";
 import { RecordId } from "../../ui/RecordId";
@@ -14,12 +15,23 @@ import type { ChoiceSources } from "./choices";
 import type { FieldSpec, RecordDescriptor } from "./descriptor";
 import { descriptorOf } from "./descriptors";
 import { FieldEditor, type FieldEnv } from "./FieldEditor";
+import { RecordCreate } from "./RecordCreate";
 import styles from "./RecordPanel.module.css";
+
+/** What the panel shows: a record that the address names, or the form of a new record. */
+export type PanelMode = { mode: "open"; readableId: string } | { mode: "create"; kind: RecordKind };
 
 export interface RecordPanelProps {
   work: Work;
-  /** The readable ID that the address names. */
-  readableId: string;
+  route: PanelMode;
+  /** The member who is signed in: the owner that a new record starts with. */
+  me: string;
+  /** True if the member may create a record. Otherwise the create state says why it is empty. */
+  mayCreate: boolean;
+  /** Focus goes to the title of the record that the create state made. */
+  focusTitle: boolean;
+  /** Shows the record that the create state made. */
+  onCreated: (readableId: string) => void;
   /** False in a closed event: then no field has a control. */
   writable: boolean;
   /** The time zone of the event, for the times of the evidence. */
@@ -76,11 +88,13 @@ function Body({
   descriptor,
   env,
   timeZone,
+  focusTitle,
 }: {
   item: WorkItem;
   descriptor: RecordDescriptor;
   env: FieldEnv;
   timeZone: string;
+  focusTitle: boolean;
 }) {
   const descriptionId = useId();
   const sourcesId = useId();
@@ -88,7 +102,7 @@ function Body({
   return (
     <div className={styles.body}>
       <h2 className={styles.title}>
-        <FieldEditor spec={title} item={item} env={env} heading />
+        <FieldEditor spec={title} item={item} env={env} heading focusOnMount={focusTitle} />
       </h2>
       <dl className={styles.props}>
         {descriptor.properties.map((spec) => (
@@ -121,12 +135,17 @@ function Body({
 
 /**
  * The side panel of a record on the „Arbeit“ page (ADR 0082): the head with the kind, the ID and the
- * status, the title, the properties, the description and the sources. It knows no kind: what a kind
- * shows and changes is in its descriptor.
+ * status, the title, the properties, the description and the sources. In the create state it holds
+ * the form of a new record. It knows no kind: what a kind shows, changes and creates is in its
+ * descriptor.
  */
 export default function RecordPanel({
   work,
-  readableId,
+  route,
+  me,
+  mayCreate,
+  focusTitle,
+  onCreated,
   writable,
   timeZone,
   today,
@@ -138,15 +157,53 @@ export default function RecordPanel({
 }: RecordPanelProps) {
   const [status, setStatus] = useState<string>();
   const [alert, setAlert] = useState<string>();
-  const item = work.items.find((candidate) => candidate.readableId === readableId);
-  // A kind without a descriptor has no panel yet, so its record counts as not found.
-  const descriptor = item && descriptorOf(item.kind);
   const frame = {
     onClose,
     returnFocusTo,
     ...(previous && { onPrevious: () => onOpen(previous) }),
     ...(next && { onNext: () => onOpen(next) }),
   };
+  const live = (
+    <>
+      <LiveRegion kind="status" visuallyHidden>
+        {status}
+      </LiveRegion>
+      <LiveRegion kind="alert" visuallyHidden>
+        {alert}
+      </LiveRegion>
+    </>
+  );
+
+  if (route.mode === "create") {
+    const descriptor = descriptorOf(route.kind);
+    const create = descriptor?.create;
+    return (
+      <SidePanel title={create ? t(create.titleKey) : ""} {...frame}>
+        {descriptor && create && mayCreate ? (
+          <RecordCreate
+            descriptor={descriptor}
+            commands={work.commands}
+            sources={sourcesOf(work)}
+            me={me}
+            onCreated={onCreated}
+            onCancel={onClose}
+            announce={setStatus}
+          />
+        ) : (
+          <p>{t("record-create-forbidden")}</p>
+        )}
+        {/* The form says its own failures. */}
+        <LiveRegion kind="status" visuallyHidden>
+          {status}
+        </LiveRegion>
+      </SidePanel>
+    );
+  }
+
+  const { readableId } = route;
+  const item = work.items.find((candidate) => candidate.readableId === readableId);
+  // A kind without a descriptor has no panel yet, so its record counts as not found.
+  const descriptor = item && descriptorOf(item.kind);
   if (!item || !descriptor) {
     return (
       <SidePanel title={t("record-not-found-title")} {...frame}>
@@ -168,13 +225,15 @@ export default function RecordPanel({
   const name = item.redacted ? item.readableId : `${item.readableId} ${item.title}`;
   return (
     <SidePanel title={name} heading={<Head item={item} />} {...frame}>
-      <Body key={item.id} item={item} descriptor={descriptor} env={env} timeZone={timeZone} />
-      <LiveRegion kind="status" visuallyHidden>
-        {status}
-      </LiveRegion>
-      <LiveRegion kind="alert" visuallyHidden>
-        {alert}
-      </LiveRegion>
+      <Body
+        key={item.id}
+        item={item}
+        descriptor={descriptor}
+        env={env}
+        timeZone={timeZone}
+        focusTitle={focusTitle}
+      />
+      {live}
     </SidePanel>
   );
 }
