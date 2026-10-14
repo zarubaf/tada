@@ -374,15 +374,6 @@ function WorkRows({ operation, names }: { operation: Operation; names: RecordNam
           ]}
         />
       );
-    case "create-workstream":
-      return (
-        <Rows
-          rows={[
-            [t("inbox-row-name"), operation.name],
-            [t("inbox-row-lead"), names.user(operation.lead) ?? unknown],
-          ]}
-        />
-      );
     default:
       return null;
   }

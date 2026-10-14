@@ -151,13 +151,11 @@ export interface RecordEditFormProps {
   api: Api;
   /** The event of the proposal, for the owners and the workstreams. */
   eventId: string | null | undefined;
-  /** The names behind the IDs of the proposal, for a workstream that the event does not have yet. */
-  names: RecordNames;
   proposal: Proposal;
   isPending: boolean;
   /** The fields that the server refused in the last apply. */
   serverErrors: FieldErrors;
-  /** The names behind the IDs of the changeset, for a milestone that the changeset creates. */
+  /** The names behind the IDs of the changeset, for a workstream or a milestone that the changeset creates. */
   names?: RecordNames;
   onSubmit: (fields: Fields) => void;
   onCancel: () => void;
