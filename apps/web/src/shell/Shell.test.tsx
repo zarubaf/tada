@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "../api/client";
+import { InboxProvider } from "../review/InboxProvider";
 import { Router } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 import { Shell } from "./Shell";
@@ -54,6 +55,23 @@ function systemVersion(product = "0.0.0", commit = "1a2b3c4", web_build = CLIENT
 let server = systemVersion();
 /** While true, the fake server does not answer the versions. */
 let versionsPending = false;
+/** The open changesets that the fake server reports; the inbox count shows their number. */
+let openChangesets = 0;
+/** The events that the fake server lists; the first page only. */
+let eventItems: ReturnType<typeof event>[] = [];
+
+function event(id: string, name: string, key: string, status = "active") {
+  return {
+    id,
+    key,
+    name,
+    time_zone: "Europe/Zurich",
+    version: 1,
+    created_at: "2030-01-01T08:00:00Z",
+    status,
+    redacted: false,
+  };
+}
 
 function renderShellAt(path: string, ...responses: Response[]) {
   const calls: { method: string; path: string; body: string }[] = [];
@@ -61,6 +79,22 @@ function renderShellAt(path: string, ...responses: Response[]) {
     // The shell asks for the versions on its own; the other answers keep their order.
     if (new URL(request.url).pathname === "/api/v1/system/version") {
       return versionsPending ? new Promise<Response>(() => {}) : json(200, server);
+    }
+    // The inbox count, the event switcher and the palette ask on their own too.
+    const { pathname } = new URL(request.url);
+    if (pathname === "/api/v1/changesets") {
+      return json(200, {
+        items: Array.from({ length: openChangesets }, (_, index) => ({ id: `c${index}` })),
+        next_cursor: null,
+      });
+    }
+    if (pathname === "/api/v1/events") {
+      return json(200, { items: eventItems, next_cursor: null });
+    }
+    const one = pathname.match(/^\/api\/v1\/events\/([^/]+)$/);
+    if (one) {
+      const found = eventItems.find((item) => item.id === one[1]);
+      return found ? json(200, found) : json(404, { title: "Not found", status: 404 });
     }
     calls.push({
       method: request.method,
@@ -78,9 +112,11 @@ function renderShellAt(path: string, ...responses: Response[]) {
   render(
     <Router>
       <SessionProvider api={api}>
-        <Shell api={api}>
-          <p>Seiteninhalt</p>
-        </Shell>
+        <InboxProvider api={api}>
+          <Shell api={api}>
+            <p>Seiteninhalt</p>
+          </Shell>
+        </InboxProvider>
       </SessionProvider>
     </Router>,
   );
@@ -95,6 +131,10 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
   server = systemVersion();
   versionsPending = false;
+  openChangesets = 0;
+  eventItems = [];
+  localStorage.clear();
+  document.documentElement.removeAttribute("data-theme");
 });
 
 describe("Shell", () => {
@@ -189,18 +229,6 @@ describe("Shell", () => {
     );
   });
 
-  it.each([
-    ["Personen", "/persons"],
-    ["Institutionen", "/institutions"],
-  ])("leads to %s from the member menu", async (name, path) => {
-    renderShell(json(200, info([first], first)));
-
-    await userEvent.click(await screen.findByRole("button", { name: "Anna Muster" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name }));
-
-    await vi.waitFor(() => expect(window.location.pathname).toBe(path));
-  });
-
   it("says „Versionen“ in the footer until the server names its build", async () => {
     versionsPending = true;
     renderShell(json(200, info([first], first)));
@@ -258,5 +286,105 @@ describe("Shell", () => {
         region.textContent?.startsWith("Eine neue Version von tada ist installiert. Diese Seite"),
       );
     expect(announced).toBe(true);
+  });
+});
+
+describe("sidebar", () => {
+  it("lists the destinations in a named navigation, in this order", async () => {
+    renderShell(json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    const names = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+    expect(names).toEqual([
+      "Eingang",
+      "Meine Arbeit",
+      "Anlässe",
+      "Personen",
+      "Institutionen",
+      "Einstellungen",
+    ]);
+  });
+
+  it("shows the number of open proposals at Eingang for a screen reader as text", async () => {
+    openChangesets = 3;
+    renderShell(json(200, info([first], first)));
+
+    const link = await screen.findByRole("link", { name: /^Eingang/ });
+    await vi.waitFor(() => expect(link).toHaveTextContent("3 offen"));
+  });
+
+  it("has Datenschutz, the build and the member at the foot", async () => {
+    renderShell(json(200, info([first], first)));
+
+    const foot = await screen.findByRole("link", { name: "Datenschutz" });
+    expect(foot).toHaveAttribute("href", "/privacy");
+    expect(await screen.findByRole("button", { name: /^tada / })).toBeInTheDocument();
+    expect(screen.getByText("Mitglied")).toBeInTheDocument();
+  });
+
+  it("collapses and opens again with the toggle in the top bar, and remembers the choice", async () => {
+    renderShell(json(200, info([first], first)));
+
+    await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    const toggle = screen.getByRole("button", { name: "Seitenleiste ausblenden" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(toggle);
+
+    expect(screen.queryByRole("navigation", { name: "Hauptnavigation" })).not.toBeInTheDocument();
+    const reopen = screen.getByRole("button", { name: "Seitenleiste einblenden" });
+    expect(reopen).toHaveAttribute("aria-expanded", "false");
+    expect(localStorage.getItem("tada-sidebar")).toBe("collapsed");
+
+    await userEvent.click(reopen);
+    expect(screen.getByRole("navigation", { name: "Hauptnavigation" })).toBeInTheDocument();
+    expect(localStorage.getItem("tada-sidebar")).toBeNull();
+  });
+
+  it("starts collapsed when the member collapsed it before", async () => {
+    localStorage.setItem("tada-sidebar", "collapsed");
+    renderShell(json(200, info([first], first)));
+
+    await screen.findByRole("button", { name: "Seitenleiste einblenden" });
+    expect(screen.queryByRole("navigation", { name: "Hauptnavigation" })).not.toBeInTheDocument();
+  });
+});
+
+describe("top bar", () => {
+  it("is the banner with the title, the command box, the theme toggle and the member menu", async () => {
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    const bar = await screen.findByRole("banner");
+    expect(within(bar).getByText("Eingang")).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Suchen oder Befehl ausführen" })).toBeVisible();
+    expect(within(bar).getByRole("button", { name: "Farbschema: System" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Anna Muster" })).toBeInTheDocument();
+  });
+
+  it("names the context in plain text: the page keeps the only h1", async () => {
+    renderShellAt("/settings/members", json(200, info([first], first)));
+
+    const bar = await screen.findByRole("banner");
+    expect(within(bar).getByText("Einstellungen")).toBeInTheDocument();
+    expect(within(bar).queryByRole("heading")).not.toBeInTheDocument();
+  });
+
+  it("changes the theme from the top bar", async () => {
+    renderShell(json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Farbschema: System" }));
+
+    expect(screen.getByRole("button", { name: "Farbschema: Hell" })).toBeInTheDocument();
+    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+  });
+
+  it("has no theme toggle in the sidebar", async () => {
+    renderShell(json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    expect(
+      within(nav.parentElement as HTMLElement).queryByRole("button", { name: /Farbschema/ }),
+    ).toBeNull();
   });
 });

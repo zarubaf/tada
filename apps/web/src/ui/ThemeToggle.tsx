@@ -3,6 +3,7 @@ import { useState } from "react";
 import { t } from "../i18n";
 import { applyTheme, nextTheme, readTheme, storeTheme, type Theme } from "../theme/theme";
 import { Button } from "./Button";
+import { IconButton } from "./IconButton";
 import { LiveRegion } from "./LiveRegion";
 
 const ICONS = { system: IconDeviceDesktop, light: IconSun, dark: IconMoon };
@@ -10,8 +11,9 @@ const ICONS = { system: IconDeviceDesktop, light: IconSun, dark: IconMoon };
 /**
  * Cycles the color theme through system, light and dark (ADR 0082). The visible label names the
  * current choice, so the accessible name is the same text. A live region announces each change.
+ * `iconOnly` is for the top bar: the icon shows, the same text is the name and the tooltip.
  */
-export function ThemeToggle() {
+export function ThemeToggle({ iconOnly = false }: { iconOnly?: boolean }) {
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [announcement, setAnnouncement] = useState("");
   const Icon = ICONS[theme];
@@ -28,10 +30,14 @@ export function ThemeToggle() {
 
   return (
     <>
-      <Button variant="quiet" onPress={cycle}>
-        <Icon size={16} aria-hidden="true" />
-        {t("theme-toggle", { name: name(theme) })}
-      </Button>
+      {iconOnly ? (
+        <IconButton icon={Icon} label={t("theme-toggle", { name: name(theme) })} onPress={cycle} />
+      ) : (
+        <Button variant="quiet" onPress={cycle}>
+          <Icon size={16} aria-hidden="true" />
+          {t("theme-toggle", { name: name(theme) })}
+        </Button>
+      )}
       <LiveRegion kind="status" visuallyHidden>
         {announcement}
       </LiveRegion>

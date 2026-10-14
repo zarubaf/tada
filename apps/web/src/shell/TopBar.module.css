@@ -1,0 +1,113 @@
+@layer components {
+  .bar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-shell);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    box-sizing: border-box;
+    height: var(--topbar-height);
+    padding-inline: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-surface);
+  }
+
+  .title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--font-size-ui);
+    font-weight: var(--font-weight-semibold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* On narrow layouts the box is an icon button; the text and the hint come back from --bp-medium. */
+  .command {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    box-sizing: border-box;
+    min-width: var(--control-height-md);
+    height: var(--control-height-md);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--color-text-muted);
+    font: inherit;
+    cursor: pointer;
+    transition-property: background-color, border-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .command:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text);
+  }
+
+  .command:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .commandText,
+  .hint {
+    display: none;
+  }
+
+  .member {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: var(--control-height-md);
+    height: var(--control-height-md);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: none;
+    cursor: pointer;
+  }
+
+  .member[data-hovered] {
+    background: var(--color-bg-hover);
+  }
+
+  .member[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* --bp-medium: the command box shows its text and the key hint. */
+  @media (width >= 40rem) {
+    .command {
+      justify-content: flex-start;
+      width: 18rem;
+      padding-inline: var(--space-2);
+      border-color: var(--color-border-control);
+      background: var(--color-bg-canvas);
+    }
+
+    .command:hover {
+      background: var(--color-bg-canvas);
+      border-color: var(--color-text-muted);
+    }
+
+    .commandText {
+      display: block;
+      flex: 1;
+      overflow: hidden;
+      text-align: start;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hint {
+      display: inline-flex;
+    }
+  }
+}
