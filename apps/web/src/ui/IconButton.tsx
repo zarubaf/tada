@@ -15,6 +15,8 @@ export interface IconButtonProps
    * Required: an icon alone has no name.
    */
   label: string;
+  /** `sm` is as high as `--control-height-sm`, for the head of a panel. */
+  size?: "sm" | "md";
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -23,12 +25,13 @@ export interface IconButtonProps
  * with a coarse pointer, as `--control-height-md` sets. The label is the accessible name and the
  * tooltip, which also opens on keyboard focus, unlike the native `title`.
  */
-export function IconButton({ icon: Icon, label, ...props }: IconButtonProps) {
+export function IconButton({ icon: Icon, label, size = "md", ...props }: IconButtonProps) {
   return (
     <Tooltip text={label}>
       <AriaButton
         {...props}
         className={styles.button}
+        data-size={size}
         aria-label={label}
         // The tooltip repeats the name. React Aria points `aria-describedby` at it while it is
         // open; an empty value stops a screen reader from reading the name twice.
