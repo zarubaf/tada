@@ -84,6 +84,19 @@ function Property({ spec, item, env }: { spec: FieldSpec; item: WorkItem; env: F
   );
 }
 
+/** A long text under the properties: its label is the heading of a section. */
+function TextSection({ spec, item, env }: { spec: FieldSpec; item: WorkItem; env: FieldEnv }) {
+  const headingId = useId();
+  return (
+    <section className={styles.section} aria-labelledby={headingId}>
+      <h3 id={headingId} className={styles.sectionHeading}>
+        {t(spec.labelKey)}
+      </h3>
+      <FieldEditor spec={spec} item={item} env={env} />
+    </section>
+  );
+}
+
 function Body({
   item,
   descriptor,
@@ -97,7 +110,6 @@ function Body({
   timeZone: string;
   focusTitle: boolean;
 }) {
-  const descriptionId = useId();
   const sourcesId = useId();
   const titleId = useId();
   const { title, description } = descriptor;
@@ -117,14 +129,10 @@ function Body({
           <Property key={spec.id} spec={spec} item={item} env={env} />
         ))}
       </dl>
-      {description && !item.redacted && (
-        <section className={styles.section} aria-labelledby={descriptionId}>
-          <h3 id={descriptionId} className={styles.sectionHeading}>
-            {t(description.labelKey)}
-          </h3>
-          <FieldEditor spec={description} item={item} env={env} />
-        </section>
-      )}
+      {!item.redacted &&
+        [description, ...(descriptor.texts ?? [])].map(
+          (spec) => spec && <TextSection key={spec.id} spec={spec} item={item} env={env} />,
+        )}
       {item.record.evidence.length > 0 && (
         <section className={`${styles.section} ${styles.sources}`} aria-labelledby={sourcesId}>
           <h3 id={sourcesId} className={styles.sectionHeading}>
