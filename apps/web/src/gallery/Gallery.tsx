@@ -35,6 +35,8 @@ const colors = [
   "warning-subtle",
   "danger",
   "danger-subtle",
+  "proposed",
+  "proposed-subtle",
 ];
 const fontSizes = ["xs", "sm", "md", "base", "lg", "xl", "2xl", "3xl"];
 const spaces = ["0-5", "1", "1-5", "2", "3", "4", "5", "6", "8", "10", "12", "16"];
