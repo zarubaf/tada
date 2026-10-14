@@ -209,6 +209,12 @@ describe("the query string", () => {
     expect(parseFilters(new URLSearchParams(query))).toEqual(full);
   });
 
+  it("reads a repeated parameter and a comma list alike, and writes it back", () => {
+    const repeated = parseFilters(new URLSearchParams("type=action&type=risk&owner=a,b&owner=c"));
+    expect(repeated).toMatchObject({ kinds: ["action", "risk"], owners: ["a", "b", "c"] });
+    expect(parseFilters(serializeFilters(repeated))).toEqual(repeated);
+  });
+
   it("leaves the defaults out", () => {
     expect(serializeFilters(NO_FILTERS).toString()).toBe("");
     expect(parseFilters(new URLSearchParams())).toEqual(NO_FILTERS);
