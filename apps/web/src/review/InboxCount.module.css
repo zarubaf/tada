@@ -1,6 +1,6 @@
 @layer components {
   .count {
-    margin-inline-start: var(--space-2);
+    margin-inline-start: auto;
     padding: 0 var(--space-2);
     border-radius: var(--radius-md);
     background: var(--color-accent-subtle);

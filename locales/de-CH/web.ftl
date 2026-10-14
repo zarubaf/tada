@@ -122,6 +122,14 @@ session-loading = Sitzung wird geladen
 page-loading = Seite wird geladen
 skip-link = Zum Inhalt springen
 shell-nav = Hauptnavigation
+# The toggle of the sidebar in the top bar. On narrow layouts it opens the drawer.
+shell-sidebar-close = Seitenleiste ausblenden
+shell-sidebar-open = Seitenleiste einblenden
+shell-drawer-title = Navigation
+shell-drawer-close = Navigation schliessen
+# The bottom bar on narrow layouts: the fourth item opens a menu with the other destinations.
+nav-more = Mehr
+nav-more-menu = Weitere Bereiche
 nav-my-work = Meine Arbeit
 nav-events = Anlässe
 nav-persons = Personen
@@ -134,6 +142,24 @@ member-menu = Mitgliedermenü
 member-menu-versions = Versionen ({ $build })
 sign-out = Abmelden
 nav-privacy = Datenschutz
+# The command box in the top bar and the command palette it opens.
+command-box = Suchen oder Befehl ausführen…
+command-box-label = Suchen oder Befehl ausführen
+command-palette-label = Befehle
+command-palette-search = Befehl oder Ziel eingeben
+command-group-goto = Gehe zu
+command-group-events = Anlässe
+command-group-actions = Aktionen
+command-group-theme = Farbschema
+command-new-action = Neue Aufgabe
+command-new-event = Neuer Anlass
+command-empty = Keine Treffer
+# $count: the number of results that match the typed text.
+command-results = { $count ->
+    [one] 1 Treffer
+   *[other] { $count } Treffer
+}
+command-close = Schliessen
 # The three choices of the color theme.
 theme-system = System
 theme-light = Hell
@@ -142,6 +168,18 @@ theme-dark = Dunkel
 theme-toggle = Farbschema: { $name }
 # The announcement for screen readers after a change of the choice. $name as above.
 theme-announcement = Farbschema geändert: { $name }
+
+# The event switcher at the head of the sidebar.
+event-switcher-none = Kein Anlass gewählt
+event-switcher-pick = Anlass wählen
+# $name: the name of the current event.
+event-switcher-label = Anlass wechseln: { $name }
+event-switcher-menu = Anlässe
+event-switcher-loading = Anlässe werden geladen …
+event-switcher-failed = Die Anlässe liessen sich nicht laden.
+event-switcher-all = Alle Anlässe
+event-switcher-create = Neuer Anlass
+event-switcher-closed = abgeschlossen
 
 # The versions of tada (ADR 0075): the footer, the list of the components and the prompt to reload.
 version-outdated-title = Eine neue Version von tada ist installiert.

@@ -1,22 +1,22 @@
-// The app shell (doc/design/layout-and-responsiveness.md): a sidebar on medium and wide layouts, a
-// top bar and a bottom bar on narrow layouts. It shows only the items that exist.
+// The app shell (doc/design/layout-and-responsiveness.md): a sidebar, a top bar on all widths, and on
+// narrow layouts a bottom bar. It shows only the items that exist.
 import { IconRefresh } from "@tabler/icons-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { type Api, problemMessage } from "../api/client";
 import { t } from "../i18n";
-import { InboxCount } from "../review/InboxCount";
 import { useNavigate, usePathname } from "../router/Router";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath } from "../session/paths";
 import { useOptionalSession } from "../session/SessionProvider";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
 import { LiveRegion } from "../ui/LiveRegion";
-import { Menu } from "../ui/Menu";
-import { NavLink } from "../ui/NavLink";
 import { Select } from "../ui/Select";
-import { ThemeToggle } from "../ui/ThemeToggle";
+import { sectionTitle } from "./navItems";
+import { readRemembered, SIDEBAR_KEY, writeRemembered } from "./remembered";
 import styles from "./Shell.module.css";
-import { VersionButton, VersionSheet } from "./VersionFooter";
+import { Sidebar } from "./Sidebar";
+import { TopBar } from "./TopBar";
+import { VersionSheet } from "./VersionFooter";
 import { footerText, outdated as isOutdated, useServerVersion } from "./version";
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
@@ -26,6 +26,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const navigate = useNavigate();
   const frameless = isPublicPath(pathname) || pathname === CHOOSE_ORGANIZATION_PATH;
   const [versionsOpen, setVersionsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => readRemembered(SIDEBAR_KEY) !== "collapsed");
   const server = useServerVersion(api, !frameless && session?.organization !== undefined);
   const outdated = server !== undefined && isOutdated(server);
 
@@ -49,77 +50,71 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
     }
   };
 
+  const toggleSidebar = () => {
+    writeRemembered(SIDEBAR_KEY, sidebarOpen ? "collapsed" : undefined);
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const memberItems = [
+    { id: "settings/account", label: t("settings-nav-account") },
+    { id: "privacy", label: t("nav-privacy") },
+    {
+      id: "versions",
+      label: server
+        ? t("member-menu-versions", { build: footerText(server) })
+        : t("versions-title"),
+    },
+    { id: "sign-out", label: t("sign-out") },
+  ];
+
+  const organizationSwitcher = memberships.length > 1 && (
+    <Select
+      label={t("organization-switcher")}
+      options={memberships.map((membership) => ({
+        id: membership.organization_id,
+        label: membership.name,
+      }))}
+      value={organization.organization_id}
+      onChange={(id) => void choose(id)}
+    />
+  );
+
   return (
-    <div className={styles.shell}>
-      <header className={styles.side}>
-        <p className={styles.brand}>{t("app-name")}</p>
-        {memberships.length > 1 && (
-          <div className={styles.switcher}>
-            <Select
-              label={t("organization-switcher")}
-              options={memberships.map((membership) => ({
-                id: membership.organization_id,
-                label: membership.name,
-              }))}
-              value={organization.organization_id}
-              onChange={(id) => void choose(id)}
-            />
-          </div>
-        )}
-        <nav className={styles.nav} aria-label={t("shell-nav")}>
-          <NavLink to="/" exact large>
-            {t("nav-my-work")}
-          </NavLink>
-          <NavLink to="/inbox" large>
-            {t("nav-inbox")}
-            <InboxCount />
-          </NavLink>
-          <NavLink to="/events" large>
-            {t("nav-events")}
-          </NavLink>
-          {/* The bottom bar has room for four items (My Work, Inbox, Events, Settings); on narrow layouts the member menu has these. */}
-          <div className={styles.registers}>
-            <NavLink to="/persons">{t("nav-persons")}</NavLink>
-            <NavLink to="/institutions">{t("nav-institutions")}</NavLink>
-          </div>
-          <NavLink to="/settings/members" within="/settings" large>
-            {t("nav-settings")}
-          </NavLink>
-        </nav>
-        <div className={styles.member}>
-          <footer className={styles.footer}>
-            <NavLink to="/privacy">{t("nav-privacy")}</NavLink>
-            <VersionButton server={server} onPress={() => setVersionsOpen(true)} />
-            {/* Until the top bar of ADR 0082 exists. It is not on narrow layouts, like the rest of the footer. */}
-            <ThemeToggle />
-          </footer>
-          <Menu
-            trigger={user.displayName}
-            label={t("member-menu")}
-            items={[
-              { id: "persons", label: t("nav-persons") },
-              { id: "institutions", label: t("nav-institutions") },
-              { id: "privacy", label: t("nav-privacy") },
-              {
-                id: "versions",
-                label: server
-                  ? t("member-menu-versions", { build: footerText(server) })
-                  : t("versions-title"),
-              },
-              { id: "sign-out", label: t("sign-out") },
-            ]}
-            onAction={(id) => {
-              if (id === "sign-out") {
-                void signOut().then(setFailure);
-              } else if (id === "versions") {
-                setVersionsOpen(true);
-              } else {
-                navigate(`/${id}`);
-              }
+    <div className={styles.shell} data-sidebar={sidebarOpen ? "open" : "closed"}>
+      {sidebarOpen && (
+        <div className={styles.sidebar}>
+          <Sidebar
+            organizationSwitcher={organizationSwitcher}
+            eventSwitcher={null}
+            server={server}
+            onOpenVersions={() => setVersionsOpen(true)}
+            member={{
+              id: user.id,
+              name: user.displayName,
+              role: t(`role-${organization.role}`),
             }}
-            placement="top end"
           />
         </div>
+      )}
+      <div className={styles.workspace}>
+        <TopBar
+          title={sectionTitle(pathname) ?? t("app-name")}
+          toggleLabel={sidebarOpen ? t("shell-sidebar-close") : t("shell-sidebar-open")}
+          expanded={sidebarOpen}
+          onToggle={toggleSidebar}
+          onOpenPalette={() => undefined}
+          member={{ id: user.id, name: user.displayName }}
+          memberItems={memberItems}
+          onMemberAction={(id) => {
+            if (id === "sign-out") {
+              void signOut().then(setFailure);
+            } else if (id === "versions") {
+              setVersionsOpen(true);
+            } else {
+              navigate(`/${id}`);
+            }
+          }}
+        />
         {/* The prompt to load again appears without an action of the member: this region announces it. */}
         <LiveRegion kind="status" visuallyHidden>
           {outdated ? `${t("version-outdated-title")} ${t("version-outdated-text")}` : undefined}
@@ -127,22 +122,24 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
         <LiveRegion kind="alert" className={styles.failure}>
           {failure}
         </LiveRegion>
-      </header>
+        {outdated && (
+          <div className={styles.outdated}>
+            <Banner
+              icon={IconRefresh}
+              action={
+                <Button onPress={() => window.location.reload()}>{t("version-reload")}</Button>
+              }
+            >
+              <p>
+                <strong>{t("version-outdated-title")}</strong>
+              </p>
+              <p>{t("version-outdated-text")}</p>
+            </Banner>
+          </div>
+        )}
+        <Fragment key={organization.organization_id}>{children}</Fragment>
+      </div>
       <VersionSheet api={api} isOpen={versionsOpen} onClose={() => setVersionsOpen(false)} />
-      {outdated && (
-        <div className={styles.outdated}>
-          <Banner
-            icon={IconRefresh}
-            action={<Button onPress={() => window.location.reload()}>{t("version-reload")}</Button>}
-          >
-            <p>
-              <strong>{t("version-outdated-title")}</strong>
-            </p>
-            <p>{t("version-outdated-text")}</p>
-          </Banner>
-        </div>
-      )}
-      <Fragment key={organization.organization_id}>{children}</Fragment>
     </div>
   );
 }

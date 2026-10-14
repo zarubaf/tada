@@ -1,0 +1,25 @@
+@layer components {
+  .line {
+    height: 1px;
+    margin: var(--space-1) 0;
+    background: var(--color-border-subtle);
+  }
+
+  .icon {
+    flex: none;
+    margin-inline-end: var(--space-2);
+    color: var(--color-text-muted);
+  }
+
+  .check {
+    flex: none;
+    margin-inline-start: auto;
+    padding-inline-start: var(--space-2);
+    color: var(--color-accent-text);
+  }
+
+  .label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
