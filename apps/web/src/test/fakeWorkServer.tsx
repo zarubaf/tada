@@ -144,11 +144,8 @@ export function renderWork(
     if (request.method === "GET" && list) {
       return json(200, { items: list[1] });
     }
-    // The lists that a page asks for without a test that fills them.
-    if (
-      request.method === "GET" &&
-      /\/(milestones|actions|commitments|decisions|risks)$/.test(path)
-    ) {
+    // The milestones that the action form offers.
+    if (request.method === "GET" && path.endsWith("/milestones")) {
       return json(200, { items: [] });
     }
     throw new Error(`unexpected ${request.method} ${path}`);

@@ -16,6 +16,12 @@ import { canManage } from "../members/roles";
 import { LARGEST_PAGE, loadAll } from "../registers/loadAll";
 import { useSession } from "../session/SessionProvider";
 
+/** The query of one page of a list: the largest page, from the cursor of the page before. */
+export const query = (cursor: string | undefined) => ({
+  limit: LARGEST_PAGE,
+  ...(cursor && { cursor }),
+});
+
 export interface Choice {
   id: string;
   label: string;
@@ -81,10 +87,6 @@ export function useDirectory(
     const current = () => request === latest.current;
     try {
       const path = { event_id: eventId };
-      const query = (cursor: string | undefined) => ({
-        limit: LARGEST_PAGE,
-        ...(cursor && { cursor }),
-      });
       const [members, workstreams, memberships, milestones, actions] = await Promise.all([
         loadOrganizationMembers(api),
         api.GET("/api/v1/events/{event_id}/workstreams", { params: { path } }),

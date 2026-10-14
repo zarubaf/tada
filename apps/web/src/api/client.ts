@@ -53,7 +53,6 @@ export type ChangeCommitmentRequest = components["schemas"]["ChangeCommitmentReq
 export type ChangeMilestoneRequest = components["schemas"]["ChangeMilestoneRequest"];
 export type ChangeDecisionRequest = components["schemas"]["ChangeDecisionRequest"];
 export type ChangeRiskRequest = components["schemas"]["ChangeRiskRequest"];
-export type Level = components["schemas"]["Level"];
 /** The five kinds of work record (ADR 0082). */
 export type RecordKind = "action" | "commitment" | "milestone" | "decision" | "risk";
 export type PartyRef = components["schemas"]["PartyRef"];

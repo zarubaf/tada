@@ -12,10 +12,3 @@ export function listRisks(api: Api, eventId: string, cursor?: string) {
     },
   });
 }
-
-/** One risk with its evidence. */
-export function getRisk(api: Api, eventId: string, id: string) {
-  return api.GET("/api/v1/events/{event_id}/risks/{id}", {
-    params: { path: { event_id: eventId, id } },
-  });
-}

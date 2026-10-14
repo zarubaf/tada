@@ -2,6 +2,7 @@
 // sort, how the board groups them, what the counts say and how the filters live in the query
 // string. The page keeps the view in the query string too; these functions leave its key alone.
 import type { RecordKind } from "../api/client";
+import { isOverdue } from "../facts/dueDate";
 import { BOARD_COLUMNS, type BoardColumn, RECORD_KINDS } from "./recordStatus";
 import type { WorkItem } from "./workItem";
 
@@ -62,7 +63,7 @@ function inDueWindow(item: WorkItem, window: DueWindow, today: string): boolean 
   if (due === undefined || CLOSED.includes(item.column)) {
     return false;
   }
-  return window === "overdue" ? due < today : due >= today && due <= endOfWeek(today);
+  return window === "overdue" ? isOverdue(due, today) : due >= today && due <= endOfWeek(today);
 }
 
 /** Lower case without accents, so that a search for "cafe" finds "Café". */
