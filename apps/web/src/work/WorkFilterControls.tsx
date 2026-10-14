@@ -29,7 +29,6 @@ export function countOtherFilters(filters: WorkFilters): number {
     filters.owners.length > 0,
     filters.workstreams.length > 0,
     filters.due !== undefined,
-    filters.columns.length > 0,
   ].filter(Boolean).length;
 }
 

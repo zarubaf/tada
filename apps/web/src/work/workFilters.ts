@@ -12,7 +12,6 @@ export type DueWindow = (typeof DUE_WINDOWS)[number];
 export interface WorkFilters {
   /** Empty means every kind. The same holds for the other lists. */
   kinds: RecordKind[];
-  columns: BoardColumn[];
   /** User IDs, or `mine` for the signed-in member. */
   owners: string[];
   workstreams: string[];
@@ -23,7 +22,6 @@ export interface WorkFilters {
 
 export const NO_FILTERS: WorkFilters = {
   kinds: [],
-  columns: [],
   owners: [],
   workstreams: [],
   due: undefined,
@@ -83,9 +81,6 @@ type Skip = "kinds" | undefined;
 
 function matches(item: WorkItem, f: WorkFilters, { me, today }: FilterContext, skip: Skip) {
   if (skip !== "kinds" && f.kinds.length > 0 && !f.kinds.includes(item.kind)) {
-    return false;
-  }
-  if (f.columns.length > 0 && !f.columns.includes(item.column)) {
     return false;
   }
   if (f.owners.length > 0) {
@@ -170,7 +165,6 @@ export function countsFor(items: WorkItem[], filters: WorkFilters, ctx: FilterCo
 
 const KEYS = {
   kinds: "type",
-  columns: "column",
   owners: "owner",
   workstreams: "stream",
   due: "due",
@@ -202,7 +196,6 @@ export function parseFilters(params: Pick<URLSearchParams, "get" | "getAll">): W
   const due = params.get(KEYS.due);
   return {
     kinds: inOrder(RECORD_KINDS, listOf(params, KEYS.kinds)),
-    columns: inOrder(BOARD_COLUMNS, listOf(params, KEYS.columns)),
     owners: ids(listOf(params, KEYS.owners)),
     workstreams: ids(listOf(params, KEYS.workstreams)),
     due: DUE_WINDOWS.find((window) => window === due),
@@ -215,7 +208,6 @@ export function serializeFilters(filters: WorkFilters): URLSearchParams {
   const params = new URLSearchParams();
   const lists = [
     [KEYS.kinds, filters.kinds],
-    [KEYS.columns, filters.columns],
     [KEYS.owners, filters.owners],
     [KEYS.workstreams, filters.workstreams],
   ] as const;
