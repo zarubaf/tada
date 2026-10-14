@@ -5,6 +5,7 @@ import {
   IconBuilding,
   IconCalendarEvent,
   IconInbox,
+  IconLayoutKanban,
   IconSettings,
   IconShieldLock,
   IconUser,
@@ -21,6 +22,8 @@ export interface Destination {
   exact?: boolean;
   /** Current also below this prefix, when the path of the link is not a prefix of its pages. */
   within?: string;
+  /** Another item claims this path and the paths below it, so this item is not current there. */
+  yieldsTo?: string;
 }
 
 const inbox: Destination = { id: "inbox", to: "/inbox", label: t("nav-inbox"), icon: IconInbox };
@@ -63,8 +66,33 @@ const privacy: Destination = {
   icon: IconShieldLock,
 };
 
-/** The items of the sidebar and of the drawer, from top to bottom. Einstellungen sits at the foot. */
-export const MAIN: Destination[] = [inbox, myWork, events, persons, institutions];
+/** „Arbeit“ of one event: all its work records on one page (ADR 0082). */
+function work(eventId: string): Destination {
+  return {
+    id: "work",
+    to: `/events/${encodeURIComponent(eventId)}/work`,
+    label: t("nav-work"),
+    icon: IconLayoutKanban,
+  };
+}
+
+/**
+ * The items of the sidebar and of the drawer, from top to bottom. Einstellungen sits at the foot.
+ * „Arbeit“ belongs to an event, so it appears only while the path names one.
+ */
+export function mainItems(eventId: string | undefined): Destination[] {
+  return [
+    inbox,
+    myWork,
+    ...(eventId === undefined ? [] : [work(eventId)]),
+    // The events item stays current on the other pages of an event, but not on „Arbeit“.
+    eventId === undefined ? events : { ...events, yieldsTo: work(eventId).to },
+    persons,
+    institutions,
+  ];
+}
+/** The items that do not depend on the event. */
+export const MAIN: Destination[] = mainItems(undefined);
 export const SETTINGS = settings;
 /** The bottom bar on narrow layouts has room for these three and „Mehr“. */
 export const BOTTOM: Destination[] = [inbox, myWork, events];
@@ -76,6 +104,12 @@ export const ALL: Destination[] = [...MAIN, settings, privacy];
 
 /** True when the path belongs to the destination. */
 export function isCurrent(destination: Destination, pathname: string): boolean {
+  if (
+    destination.yieldsTo !== undefined &&
+    (pathname === destination.yieldsTo || pathname.startsWith(`${destination.yieldsTo}/`))
+  ) {
+    return false;
+  }
   return (
     pathname === destination.to ||
     (!destination.exact && pathname.startsWith(`${destination.to}/`)) ||

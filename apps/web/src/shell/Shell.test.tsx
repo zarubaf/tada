@@ -320,6 +320,36 @@ describe("sidebar", () => {
     expect(names).toEqual(["Eingang", "Meine Arbeit", "Anlässe", "Personen", "Institutionen"]);
   });
 
+  it("adds Arbeit after Meine Arbeit inside an event, as the current page", async () => {
+    renderShellAt(
+      "/events/0199b8e0-0000-7000-8000-0000000000e1/work",
+      json(200, info([first], first)),
+    );
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Eingang",
+      "Meine Arbeit",
+      "Arbeit",
+      "Anlässe",
+      "Personen",
+      "Institutionen",
+    ]);
+    const work = within(nav).getByRole("link", { name: "Arbeit" });
+    expect(work).toHaveAttribute("href", "/events/0199b8e0-0000-7000-8000-0000000000e1/work");
+    expect(work).toHaveAttribute("aria-current", "page");
+    // Two items are not current at once: Arbeit claims the page.
+    expect(within(nav).getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("has no Arbeit item outside an event", async () => {
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    expect(within(nav).queryByRole("link", { name: "Arbeit" })).not.toBeInTheDocument();
+  });
+
   it("shows the number of open proposals at Eingang for a screen reader as text", async () => {
     openChangesets = 3;
     renderShell(json(200, info([first], first)));

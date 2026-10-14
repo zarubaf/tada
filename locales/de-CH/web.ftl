@@ -1285,6 +1285,7 @@ work-type-milestone = Meilensteine
 work-type-decision = Entscheide
 work-type-risk = Risiken
 work-search = Arbeit durchsuchen
+work-search-placeholder = Titel oder ID
 work-owner = Verantwortlich
 work-owner-any = Alle Personen
 work-owner-me = Ich

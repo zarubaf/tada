@@ -303,6 +303,11 @@ export interface LinkProps {
    * the first page of a group of pages with a navigation of its own.
    */
   alsoCurrentOn?: readonly string[];
+  /**
+   * Another link claims this path and the paths below it, for example the item of one page of an
+   * event, below the item of the events. This link is not current there.
+   */
+  yieldsTo?: string;
   /** For a link whose words do not name its target alone, for example in a table. */
   "aria-label"?: string;
   /** `-1` takes the link out of the tab order, where another link of the page does the same. */
@@ -326,6 +331,7 @@ export function Link({
   exact,
   within,
   alsoCurrentOn = [],
+  yieldsTo,
   "aria-label": ariaLabel,
   tabIndex,
   onNavigate,
@@ -334,8 +340,11 @@ export function Link({
   const { pathname, navigate } = useLocation();
   // A query or a hash in `to` does not count: the link is current for its path.
   const target = to.split(/[?#]/, 1)[0] ?? to;
+  const yielded =
+    yieldsTo !== undefined && (pathname === yieldsTo || pathname.startsWith(`${yieldsTo}/`));
   const current =
     target !== "" &&
+    !yielded &&
     (pathname === target ||
       (!exact && pathname.startsWith(`${target}/`)) ||
       (within !== undefined && pathname.startsWith(`${within}/`)) ||

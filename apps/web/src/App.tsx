@@ -46,6 +46,10 @@ const MilestonesPage = lazy(() =>
 const TimelinePage = lazy(() =>
   import("./timeline/TimelinePage").then((module) => ({ default: module.TimelinePage })),
 );
+// „Arbeit“ is the main screen of an event: the board and its code load on demand.
+const WorkPage = lazy(() =>
+  import("./work/WorkPage").then((module) => ({ default: module.WorkPage })),
+);
 const WorkstreamsPage = lazy(() =>
   import("./work/WorkstreamsPage").then((module) => ({ default: module.WorkstreamsPage })),
 );
@@ -196,6 +200,11 @@ export function App({ api = defaultApi }: { api?: Api }) {
                           <DocumentsPage api={api} />
                         </RouteSuspense>
                       </EventPage>
+                    </Route>
+                    <Route path="/events/:eventId/work">
+                      <RouteSuspense>
+                        <WorkPage api={api} />
+                      </RouteSuspense>
                     </Route>
                     <Route path="/events/:eventId/actions">
                       <EventPage api={api}>

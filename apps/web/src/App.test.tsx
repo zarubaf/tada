@@ -52,6 +52,12 @@ describe("App", () => {
     expect(heading).toHaveFocus();
   });
 
+  it("opens the Arbeit page of an event at /events/:id/work with its own h1", async () => {
+    renderAt("/events/0199b8e0-0000-7000-8000-000000000001/work");
+    expect(await screen.findByRole("heading", { level: 1, name: "Arbeit" })).toBeInTheDocument();
+    expect(await screen.findByText("Noch keine Arbeit in diesem Anlass")).toBeInTheDocument();
+  });
+
   it("keeps the events list at /events", async () => {
     renderAt("/events");
     expect(await screen.findByRole("heading", { name: "Anlässe" })).toBeInTheDocument();
