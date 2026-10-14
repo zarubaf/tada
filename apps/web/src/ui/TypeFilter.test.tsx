@@ -32,6 +32,22 @@ describe("TypeFilter", () => {
     expect(screen.getByRole("radio", { name: "Aufgaben 15" })).not.toBeChecked();
   });
 
+  it("shows an icon before the label without changing the name", () => {
+    render(
+      <TypeFilter
+        label="Typ"
+        options={[
+          { id: "a", label: "Aufgaben", icon: <svg data-testid="icon" aria-hidden="true" /> },
+        ]}
+        value="a"
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole("radio", { name: "Aufgaben" })).toContainElement(
+      screen.getByTestId("icon"),
+    );
+  });
+
   it("reports the choice", async () => {
     render(<Harness />);
 

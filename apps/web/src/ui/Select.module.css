@@ -35,6 +35,14 @@
     border-color: var(--color-danger);
   }
 
+  .value {
+    flex: 1;
+    min-width: 0;
+    text-align: start;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .error {
     color: var(--color-danger);
     font-size: var(--font-size-sm);
