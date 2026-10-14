@@ -41,6 +41,18 @@ export const peopleIds = (value: FieldValue): string[] =>
 export const peopleValue = (ids: readonly string[]): FieldValue =>
   ids.length === 0 ? null : ids.join(",");
 
+/**
+ * What a field reads when its value was removed by itself (ADR 0072), for example the person
+ * behind a promisor on a record that is not redacted. The panel shows the tombstone for it.
+ */
+export const REDACTED = Symbol("redacted");
+
+/** What `read` returns: a value, or the mark of a value that was removed. */
+export type FieldRead = FieldValue | typeof REDACTED;
+
+/** The value of a read; a removed value is no value. */
+export const plainValue = (read: FieldRead): FieldValue => (read === REDACTED ? null : read);
+
 /** What a command returns that the panel reads: the readable ID of a new record. */
 export interface Saved {
   local_id: string;
@@ -90,7 +102,7 @@ export interface FieldSpec {
   /** The field shows only for an item that this accepts, for example the successor of a decision that was replaced. */
   when?: (item: WorkItem) => boolean;
   /** The value of the item. */
-  read: (item: WorkItem) => FieldValue;
+  read: (item: WorkItem) => FieldRead;
   /**
    * The people that a `people` field shows, with the IDs that its value holds. A field that the
    * member cannot change (the parties of a decision) lists them as text. A redacted person shows

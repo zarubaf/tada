@@ -6,7 +6,7 @@ import type { RecordKind } from "../../api/client";
 import { t } from "../../i18n";
 import type { WorkCommands } from "../workCommands";
 import type { WorkItem } from "../workItem";
-import type { FieldSpec, FieldValue } from "./descriptor";
+import { type FieldSpec, type FieldValue, plainValue } from "./descriptor";
 import { fieldError } from "./fieldError";
 
 /**
@@ -70,7 +70,7 @@ export function useFieldEdit(spec: FieldSpec, item: WorkItem, services: FieldSer
   const [error, setError] = useState<string>();
   // A save runs once at a time; blur and Enter together must not send two requests.
   const saving = useRef(false);
-  const saved = spec.read(item);
+  const saved = plainValue(spec.read(item));
 
   const begin = useCallback(() => {
     setDraft(saved);
