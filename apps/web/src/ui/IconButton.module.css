@@ -1,0 +1,39 @@
+@layer components {
+  .button {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: var(--control-height-md);
+    height: var(--control-height-md);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition-property: background-color, color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .button[data-hovered] {
+    background: var(--color-bg-hover);
+    color: var(--color-text);
+  }
+
+  .button[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .button[data-disabled] {
+    cursor: default;
+    opacity: 0.5;
+  }
+
+  @media (forced-colors: active) {
+    .button[data-disabled] {
+      color: GrayText;
+    }
+  }
+}
