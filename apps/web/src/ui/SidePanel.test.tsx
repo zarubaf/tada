@@ -397,4 +397,21 @@ describe("SidePanel below the medium breakpoint, in a shell", () => {
 
     await waitFor(() => expect(inert("empty")).toBe(true));
   });
+
+  it("shows the extra controls of the head between the step buttons and the close button", () => {
+    render(
+      <SidePanel
+        title="Sponsorenliste nachführen"
+        onClose={() => {}}
+        onNext={() => {}}
+        more={<button type="button">Aktionen</button>}
+      >
+        Inhalt
+      </SidePanel>,
+    );
+    const names = screen
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? button.textContent);
+    expect(names).toEqual(["Vorheriger Eintrag", "Nächster Eintrag", "Aktionen", "Schliessen"]);
+  });
 });
