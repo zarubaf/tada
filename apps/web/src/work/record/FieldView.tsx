@@ -96,14 +96,18 @@ export function FieldView({
         <span className={styles.empty}>{t("record-unknown-record")}</span>
       );
     }
-    case "people":
+    case "people": {
+      const redacted = new Set(
+        spec.people?.(item).flatMap((person) => (person.redacted ? [person.id] : [])),
+      );
       return (
         <ul className={styles.people}>
           {peopleIds(value).map((id) => {
             const person = choices.options.find((option) => option.id === id);
             return (
               <li key={id} className={styles.value}>
-                {person?.leading}
+                {!redacted.has(id) && person?.leading}
+                {redacted.has(id) && <Redacted />}
                 <span className={styles.valueName} title={person?.label}>
                   {person?.label ?? ""}
                 </span>
@@ -112,6 +116,7 @@ export function FieldView({
           })}
         </ul>
       );
+    }
     case "area":
       return <Chip variant="workstream">{label(choices, value)}</Chip>;
     default: {

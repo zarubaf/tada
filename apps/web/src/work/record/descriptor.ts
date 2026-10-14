@@ -86,9 +86,10 @@ export interface FieldSpec {
   read: (item: WorkItem) => FieldValue;
   /**
    * The people that a `people` field shows, with the IDs that its value holds. A field that the
-   * member cannot change (the parties of a decision) lists them as text.
+   * member cannot change (the parties of a decision) lists them as text. A redacted person shows
+   * the tombstone (ADR 0072) and the label, which is then the readable ID.
    */
-  people?: (item: WorkItem) => { id: string; label: string }[];
+  people?: (item: WorkItem) => { id: string; label: string; redacted?: boolean }[];
   /**
    * The values of a status that the item can have now: its own and the next ones. An `enum`
    * control has `values` instead, for they do not depend on the item.
