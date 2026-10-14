@@ -11,7 +11,13 @@ import {
 import type { Commitment, CommitmentStatus, CreateCommitmentRequest } from "../../api/client";
 import { t } from "../../i18n";
 import type { WorkItem } from "../workItem";
-import type { FieldSpec, FieldValue, MenuAction, RecordDescriptor } from "./descriptor";
+import {
+  type FieldSpec,
+  type FieldValue,
+  type MenuAction,
+  REDACTED,
+  type RecordDescriptor,
+} from "./descriptor";
 
 type CommitmentItem = Extract<WorkItem, { kind: "commitment" }>;
 
@@ -65,7 +71,7 @@ const promisor: FieldSpec = {
   pointer: "promisor",
   promptKey: "commitment-field-promisor-placeholder",
   required: true,
-  read: (item) => record(item).promisor.name,
+  read: (item) => (record(item).promisor.redacted ? REDACTED : record(item).promisor.name),
 };
 
 const owner: FieldSpec = {

@@ -14,7 +14,7 @@ import { SearchSelect } from "../../ui/SearchSelect";
 import { TextField } from "../../ui/TextField";
 import type { WorkItem } from "../workItem";
 import { type ChoiceSources, choicesOf } from "./choices";
-import type { FieldSpec, FieldValue } from "./descriptor";
+import { type FieldSpec, type FieldValue, plainValue, REDACTED } from "./descriptor";
 import { FieldView } from "./FieldView";
 import styles from "./RecordPanel.module.css";
 import { type FieldServices, useFieldEdit } from "./useFieldEdit";
@@ -178,7 +178,8 @@ export function FieldEditor({
   headingRef?: RefObject<HTMLHeadingElement | null>;
 }) {
   const edit = useFieldEdit(spec, item, env);
-  const value = spec.read(item);
+  const read = spec.read(item);
+  const value = plainValue(read);
   const picker =
     spec.control === "status" ||
     spec.control === "enum" ||
@@ -217,6 +218,7 @@ export function FieldEditor({
     <FieldView
       spec={spec}
       value={shown}
+      removed={read === REDACTED}
       choices={choices}
       item={item}
       today={env.today}
