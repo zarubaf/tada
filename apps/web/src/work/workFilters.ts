@@ -134,7 +134,7 @@ export const SORT_KEYS = ["id", "kind", "title", "status", "owner", "due", "area
 export type SortKey = (typeof SORT_KEYS)[number];
 export type SortDirection = "asc" | "desc";
 
-/** How the table sorts. The default is the order of the board. */
+/** How the table sorts. The default is the date, the soonest first. */
 export interface Sort {
   key: SortKey;
   dir: SortDirection;

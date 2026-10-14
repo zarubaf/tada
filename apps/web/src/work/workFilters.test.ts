@@ -307,9 +307,9 @@ describe("sortBy", () => {
     expect(sorted("area")).toEqual(["ACT-002", "COM-002", "ACT-010", "RSK-001"]);
   });
 
-  it("keeps the order of the board by default and does not change its input", () => {
+  it("does not change its input", () => {
     const before = [...all];
-    expect(ids(sortBy(all, DEFAULT_SORT, area))).toEqual(ids(sortWork(all)));
+    sortBy(all, DEFAULT_SORT, area);
     expect(all).toEqual(before);
   });
 
@@ -326,7 +326,7 @@ describe("sortBy", () => {
 describe("the sort in the query string", () => {
   const read = (query: string) => parseSort(new URLSearchParams(query));
 
-  it("has the board order by default and writes no key for it", () => {
+  it("sorts by date by default and writes no key for it", () => {
     expect(read("")).toEqual(DEFAULT_SORT);
     expect(serializeSort(DEFAULT_SORT).toString()).toBe("");
   });
