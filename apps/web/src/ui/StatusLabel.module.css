@@ -9,18 +9,6 @@
     white-space: nowrap;
   }
 
-  .icon {
-    flex: none;
-  }
-
-  .label[data-tone="progress"] .icon {
-    color: var(--color-warning);
-  }
-
-  .label[data-tone="success"] .icon {
-    color: var(--color-success);
-  }
-
   .label[data-tone="muted"] {
     color: var(--color-text-muted);
   }
@@ -46,15 +34,7 @@
     background: var(--color-warning-subtle);
   }
 
-  .label[data-tone="warning"] .icon {
-    color: var(--color-warning);
-  }
-
   .label[data-tone="danger"] {
     background: var(--color-danger-subtle);
-  }
-
-  .label[data-tone="danger"] .icon {
-    color: var(--color-danger);
   }
 }

@@ -1,0 +1,22 @@
+@layer components {
+  .icon {
+    flex: none;
+  }
+
+  .icon[data-tone="muted"] {
+    color: var(--color-text-muted);
+  }
+
+  .icon[data-tone="progress"],
+  .icon[data-tone="warning"] {
+    color: var(--color-warning);
+  }
+
+  .icon[data-tone="success"] {
+    color: var(--color-success);
+  }
+
+  .icon[data-tone="danger"] {
+    color: var(--color-danger);
+  }
+}
