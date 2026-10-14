@@ -113,4 +113,40 @@ describe("SearchSelect", () => {
     expect(screen.getByTestId("value")).toHaveTextContent("none");
     expect(screen.getByRole("button", { name: "Zuständig: Niemand" })).toHaveFocus();
   });
+
+  it("can leave out the search field for a short list", async () => {
+    render(
+      <SearchSelect
+        label="Status"
+        placeholder="offen"
+        options={PEOPLE}
+        value="a"
+        onChange={() => {}}
+        searchable={false}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Status: Anna Muster" }));
+
+    expect(await screen.findByRole("listbox", { name: "Status" })).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("shows the trigger as a quiet button on request", () => {
+    render(
+      <SearchSelect
+        label="Zuständig"
+        placeholder="Niemand"
+        options={PEOPLE}
+        value="a"
+        onChange={() => {}}
+        variant="quiet"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Zuständig/ })).toHaveAttribute(
+      "data-variant",
+      "quiet",
+    );
+  });
 });
