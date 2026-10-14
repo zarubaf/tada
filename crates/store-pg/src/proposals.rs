@@ -486,7 +486,7 @@ mod tests {
     };
     use tada_app::domain::work::{
         ActionStatus, ActionTitle, CommitmentStatus, CommitmentText, ConditionText,
-        RecordDescription,
+        RecordDescription, WorkstreamName,
     };
 
     use super::*;
