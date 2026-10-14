@@ -1429,3 +1429,10 @@ record-save = Speichern
 record-cancel = Abbrechen
 record-retry = Erneut versuchen
 record-discard = Verwerfen
+record-create-action = Neue Aufgabe
+record-create = Erstellen
+record-create-forbidden = Sie können hier nichts erfassen. Das ist in einem abgeschlossenen Anlass und mit dem Lesezugriff nicht möglich.
+# $id: the readable ID of the new record.
+record-created = { $id } erfasst.
+work-new = Neu
+record-required = (Pflichtfeld)
