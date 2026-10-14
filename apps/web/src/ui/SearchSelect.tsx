@@ -30,6 +30,13 @@ export interface SearchSelectProps {
    * cannot be lost and focus does not drop.
    */
   isPending?: boolean;
+  /**
+   * The ID of the element that shows the error of this select. The trigger points at it, so that
+   * assistive technology reads the error with the name. (`aria-invalid` is not allowed on a
+   * button, and React Aria drops it.) A required select says so in its `label`, as a required
+   * text field does.
+   */
+  errorId?: string | undefined;
 }
 
 /**
@@ -47,6 +54,7 @@ export function SearchSelect({
   searchable = true,
   variant = "secondary",
   isPending = false,
+  errorId,
 }: SearchSelectProps) {
   const [isOpen, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -72,6 +80,7 @@ export function SearchSelect({
         variant={variant}
         aria-label={`${label}: ${chosen?.label ?? placeholder}`}
         isRefused={isPending}
+        {...(errorId && { "aria-describedby": errorId })}
       >
         {chosen?.leading}
         {/* A layout that cuts a long value short still shows it whole on hover. */}

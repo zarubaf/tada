@@ -13,6 +13,7 @@ export type ControlKind =
   | "multiline"
   | "date"
   | "status"
+  | "enum"
   | "person"
   | "area"
   | "milestone";
@@ -63,10 +64,17 @@ export interface FieldSpec {
   /** The value of the item. */
   read: (item: WorkItem) => FieldValue;
   /**
-   * The values of an enumeration that the item can have now, for a choice from a closed list: for
-   * a status its own and the next ones. A control of that kind reads them here.
+   * The values of a status that the item can have now: its own and the next ones. An `enum`
+   * control has `values` instead, for they do not depend on the item.
    */
   options?: (item: WorkItem) => string[];
+  /**
+   * For an `enum` control: the words and the icon of a value. The icon repeats the word and never
+   * replaces it.
+   */
+  present?: (value: string) => { labelKey: string; icon?: Icon };
+  /** For an `enum` control: its values, from low to high, in the order that the list shows. */
+  values?: readonly string[];
   /** Changes the field. Without it the field is plain text for this kind, whatever the member may. */
   save?: (
     commands: WorkCommands,
