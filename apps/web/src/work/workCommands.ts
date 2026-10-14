@@ -7,7 +7,7 @@
 //   successor or a reason), no `changeDue` (the day of a decision never changes) and no `rename`
 //   (the wording never changes).
 // - risk: no `changeDue` (a risk has no date).
-// - commitment: `changeStatus` cannot set `firm` (only "make firm" does), and the condition never
+// - commitment: `changeStatus` cannot set `firm` (only `makeFirm` does), and the condition never
 //   changes.
 // - milestone: `changeDue` sets the date, which cannot be cleared.
 // A milestone, risk or decision has no `start_date`.
@@ -26,6 +26,7 @@ import type {
   Commitment,
   CommitmentStatus,
   CreateActionRequest,
+  CreateCommitmentRequest,
   CreateDecisionRequest,
   CreateMilestoneRequest,
   CreateRiskRequest,
@@ -204,6 +205,18 @@ export function createWorkCommands(api: Api, eventId: string) {
       rename: (t: Target, title: string) => action(t, { title }),
     },
     commitment: {
+      create: (body: CreateCommitmentRequest) =>
+        created<Commitment>(() =>
+          api.POST("/api/v1/events/{event_id}/commitments", { params: { path: events }, body }),
+        ),
+      /** Makes a conditional commitment firm. The commitment keeps the reason (ADR 0068). */
+      makeFirm: (t: Target, reason: string) =>
+        queue.run<Commitment>(t, (expected_version) =>
+          api.POST("/api/v1/events/{event_id}/commitments/{id}/firm", {
+            params: { path: path(t.id) },
+            body: { reason, expected_version },
+          }),
+        ),
       /** Not `firm`: only "make firm" sets it. */
       changeStatus: (t: Target, status: Exclude<CommitmentStatus, "firm">) =>
         commitment(t, { status }),

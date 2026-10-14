@@ -396,6 +396,61 @@ describe("the commands of a milestone and a decision beyond the first set", () =
   });
 });
 
+describe("the commands of a commitment beyond the first set", () => {
+  it("creates a commitment and keeps the problem of a refused create", async () => {
+    const { sent, commands } = server();
+    const body = {
+      text: "Zöpfe liefern",
+      owner_user_id: "u1",
+      promisor: { kind: "person", id: "p1" },
+    } as const;
+    const created = commands.commitment.create(body);
+    await tick();
+    expect(sent[0]).toMatchObject({
+      method: "POST",
+      path: "/api/v1/events/e1/commitments",
+      body,
+    });
+    sent[0]?.answer(json(201, { id: "c9", version: 1 }));
+    expect(await created).toEqual({ ok: true, record: { id: "c9", version: 1 } });
+
+    const refused = commands.commitment.create(body);
+    await tick();
+    sent[1]?.answer(problem(422, "validation-failed", [{ pointer: "/promisor", code: "unknown" }]));
+    expect(await refused).toMatchObject({
+      ok: false,
+      failure: { reason: "validation", problem: { errors: [{ pointer: "/promisor" }] } },
+    });
+  });
+
+  it("makes a commitment firm with a reason, in the queue of the record", async () => {
+    const { sent, commands } = server();
+    const t = { id: "c1", version: 1 };
+    const rename = commands.commitment.rename(t, "Neu");
+    const firm = commands.commitment.makeFirm(t, "Auftrag unterschrieben");
+    await tick();
+    sent[0]?.answer(record("c1", 2));
+    await tick();
+    // It waits for the rename and takes the version of its answer.
+    expect(sent[1]).toMatchObject({
+      method: "POST",
+      path: "/api/v1/events/e1/commitments/c1/firm",
+      body: { reason: "Auftrag unterschrieben", expected_version: 2 },
+    });
+    sent[1]?.answer(record("c1", 3, { status: "firm" }));
+    expect(await rename).toMatchObject({ ok: true });
+    expect(await firm).toEqual({ ok: true, record: { id: "c1", version: 3, status: "firm" } });
+  });
+
+  it("types the failures of make firm like the others", async () => {
+    const { sent, commands } = server();
+    const firm = commands.commitment.makeFirm({ id: "c1", version: 1 }, "x");
+    await tick();
+    sent[0]?.answer(problem(409, "record-version-conflict"));
+    expect(await firm).toMatchObject({ ok: false, failure: { reason: "conflict" } });
+  });
+});
+
 describe("what a kind does not offer", () => {
   it("has no command for a field that the API does not take", () => {
     const { commands } = server();
