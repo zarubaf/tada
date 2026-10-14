@@ -112,7 +112,7 @@
   @media (pointer: coarse) {
     :root:not([data-density="compact"]) {
       --control-height-sm: 32px;
-      --control-height-md: 40px;
+      --control-height-md: 44px;
       --control-height-lg: 44px;
       --row-height: 44px;
       --font-size-ui: var(--font-size-base);
@@ -124,7 +124,7 @@
 
   :root[data-density="comfortable"] {
     --control-height-sm: 32px;
-    --control-height-md: 40px;
+    --control-height-md: 44px;
     --control-height-lg: 44px;
     --row-height: 44px;
     --font-size-ui: var(--font-size-base);

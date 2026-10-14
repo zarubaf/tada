@@ -117,3 +117,14 @@ describe("the dark theme", () => {
     expect(colors(darkBySystem)).toEqual(colors(dark));
   });
 });
+
+describe("the comfortable density", () => {
+  // ADR 0082 amends ADR 0022: a pointer target is at least 44 x 44 px with a coarse pointer.
+  it.each([
+    ["on request", block(':root[data-density="comfortable"]')],
+    ["with a coarse pointer", block(':root:not([data-density="compact"])')],
+  ])("makes buttons and inputs 44 px high %s", (_name, tokens) => {
+    expect(tokens.get("--control-height-md")).toBe("44px");
+    expect(tokens.get("--control-height-lg")).toBe("44px");
+  });
+});
