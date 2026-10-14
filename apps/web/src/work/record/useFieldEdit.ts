@@ -119,6 +119,7 @@ export function useFieldEdit(spec: FieldSpec, item: WorkItem, services: FieldSer
       setDraft(value);
       setError(undefined);
       setPhase("saving");
+      services.announce(t("record-saving"), "status");
       const field = t(spec.labelKey);
       void spec
         .save(services.commands, item, value)

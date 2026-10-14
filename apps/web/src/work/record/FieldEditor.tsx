@@ -31,6 +31,15 @@ function valueText(spec: FieldSpec, value: FieldValue): string {
   return spec.control === "date" ? formatDate(value) : value;
 }
 
+/** The visible sign of a save. A screen reader hears the same words from the live region. */
+function Saving() {
+  return (
+    <span className={styles.saving} aria-hidden="true">
+      {t("record-saving")}
+    </span>
+  );
+}
+
 /** The label of the saved choice of a picker: what the record holds now. */
 function pickedText(spec: FieldSpec, sources: ChoiceSources, item: WorkItem, value: FieldValue) {
   const label = choicesOf(spec, sources, item, value).options.find(
@@ -196,7 +205,8 @@ export function FieldEditor({
           label={t(spec.labelKey)}
           options={choices.options}
           value={shown ?? undefined}
-          onChange={(id) => (busy ? undefined : edit.commit(id ?? null))}
+          onChange={(id) => edit.commit(id ?? null)}
+          isPending={busy}
           placeholder={emptyText}
           variant="quiet"
           searchable={spec.control !== "status"}
@@ -257,6 +267,7 @@ export function FieldEditor({
           edit.cancel();
         }}
       />
+      {busy && <Saving />}
     </div>
   );
 }
