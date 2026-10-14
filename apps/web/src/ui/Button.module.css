@@ -56,6 +56,11 @@
     background: var(--color-bg-hover);
   }
 
+  /* A quiet button that opens something keeps a fill while it is open. */
+  .button[data-variant="quiet"][aria-expanded="true"] {
+    background: var(--color-bg-active);
+  }
+
   /* Secondary in style, with the danger color (doc/design/components.md). */
   .button[data-variant="danger"] {
     color: var(--color-danger);
