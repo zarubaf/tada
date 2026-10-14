@@ -17,6 +17,8 @@ export interface Person {
   id: string;
   /** The name, with the readable ID where the name alone is not unique. */
   label: string;
+  /** The name alone, for the avatar. Without it the label gives the initials. */
+  name?: string;
 }
 
 export interface PeoplePickerProps {
@@ -146,7 +148,7 @@ export function PeoplePicker({
         <ul className={styles.chosen} aria-label={t("people-picker-chosen", { label })}>
           {value.map((person) => (
             <li key={person.id} className={styles.person}>
-              <Avatar name={person.label} id={person.id} decorative />
+              <Avatar name={person.name ?? person.label} id={person.id} decorative />
               <span className={styles.name} title={person.label}>
                 {person.label}
               </span>
@@ -210,7 +212,7 @@ export function PeoplePicker({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => !disabled && toggle(person)}
             >
-              <Avatar name={person.label} id={person.id} decorative />
+              <Avatar name={person.name ?? person.label} id={person.id} decorative />
               <span className={styles.name} title={person.label}>
                 {person.label}
               </span>

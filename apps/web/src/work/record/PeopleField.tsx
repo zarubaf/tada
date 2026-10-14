@@ -27,8 +27,8 @@ export function PeopleField({
   const [text, setText] = useState("");
   const search = usePromisorSearch(api, text, true);
   // A chosen ID has the name that the search showed when the member chose it.
-  const [names] = useState(() => new Map(seed.map((person) => [person.id, person.label])));
-  const people = peopleIds(value).map((id) => ({ id, label: names.get(id) ?? id }));
+  const [known] = useState(() => new Map(seed.map((person) => [person.id, person])));
+  const people = peopleIds(value).map((id) => known.get(id) ?? { id, label: id });
   return (
     <PeoplePicker
       label={label}
@@ -36,7 +36,7 @@ export function PeopleField({
       value={people}
       onChange={(next) => {
         for (const person of next) {
-          names.set(person.id, person.label);
+          known.set(person.id, person);
         }
         onChange(peopleValue(next.map((person) => person.id)));
       }}

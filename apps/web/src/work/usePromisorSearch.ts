@@ -8,8 +8,11 @@ const DEBOUNCE_MS = 250;
 const RESULTS = 6;
 
 export interface PromisorSearch {
-  /** The ID of an option is `person:{uuid}` or `institution:{uuid}`. */
-  options: Choice[];
+  /**
+   * The ID of an option is `person:{uuid}` or `institution:{uuid}`. The label has the readable
+   * ID; `name` is the name alone.
+   */
+  options: (Choice & { name: string })[];
   loading: boolean;
   /** The message of a failed search. */
   failure: string | undefined;
@@ -45,10 +48,12 @@ export function usePromisorSearch(api: Api, text: string, enabled: boolean): Pro
                   ...persons.data.items.map((p) => ({
                     id: `person:${p.id}`,
                     label: `${p.name} (${p.local_id})`,
+                    name: p.name,
                   })),
                   ...institutions.data.items.map((i) => ({
                     id: `institution:${i.id}`,
                     label: `${i.name} (${i.local_id})`,
+                    name: i.name,
                   })),
                 ],
               }
