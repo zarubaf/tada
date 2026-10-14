@@ -9,7 +9,12 @@ import type { WorkCommands } from "../workCommands";
 import type { WorkItem } from "../workItem";
 import type { FieldSpec, FieldValue } from "./descriptor";
 
-export type Phase = "idle" | "editing" | "saving" | "failed";
+/**
+ * `conflict` is a failed save after another person changed the record. The draft then does not
+ * save by itself (a click elsewhere would overwrite the other change): the member saves it on
+ * purpose.
+ */
+export type Phase = "idle" | "editing" | "saving" | "failed" | "conflict";
 
 /** What the panel gives every field: the commands and the two ways to tell the member. */
 export interface FieldServices {
@@ -86,7 +91,10 @@ export function useFieldEdit(spec: FieldSpec, item: WorkItem, services: FieldSer
 
   const commit = useCallback(
     (next?: FieldValue) => {
-      const open = current.current === "editing" || current.current === "failed";
+      const open =
+        current.current === "editing" ||
+        current.current === "failed" ||
+        current.current === "conflict";
       // A picker saves from idle: its choice is the draft.
       const picks = current.current === "idle" && next !== undefined;
       if (saving.current || !spec.save || !(open || picks)) {
@@ -124,7 +132,7 @@ export function useFieldEdit(spec: FieldSpec, item: WorkItem, services: FieldSer
             void services.refresh(item.kind);
           }
           setError(message);
-          setPhase("failed");
+          setPhase(failure.reason === "conflict" ? "conflict" : "failed");
           services.announce(
             t("record-save-failed", { field, id: item.readableId, message }),
             "alert",

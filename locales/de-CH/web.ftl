@@ -1425,6 +1425,8 @@ record-saved = { $field } von { $id } gespeichert.
 # $message: why the field was not saved.
 record-save-failed = { $field } von { $id } nicht gespeichert. { $message }
 record-conflict = Der Eintrag wurde inzwischen geändert und ist neu geladen. Ihre Eingabe ist noch da. Speichern Sie sie erneut, wenn sie noch gilt.
+# $value: what the record holds now, after another person changed it.
+record-now-saved = Jetzt gespeichert: { $value }
 record-save = Speichern
 record-cancel = Abbrechen
 record-retry = Erneut versuchen
