@@ -42,8 +42,8 @@ function openWork(
       url: `/events/${EVENT.id}/work${search}`,
       lists: work,
       workstreams: STREAMS,
-      answers: { "POST /actions": (_url, body) => post(body as Body) },
       ...setup,
+      answers: { "POST /actions": (_url, body) => post(body as Body), ...setup.answers },
     },
   );
   return {
@@ -206,6 +206,44 @@ describe("the create state", () => {
     expect(window.location.hash).toBe("#ACT-020");
     expect(screen.getByText("ACT-020 erfasst.")).toBeInTheDocument();
     expect(server.posts()).toHaveLength(2);
+  });
+
+  it("ignores a press of Erstellen while the list loads to find a record that a lost response made", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let posted = false;
+    let waiting = false;
+    const server = openWork(
+      "?new=action",
+      {
+        answers: {
+          "GET /actions": async () => {
+            if (posted) {
+              waiting = true;
+              await gate;
+            }
+            return json(200, { items: server.work["/actions"] ?? [] });
+          },
+        },
+      },
+      (body) => {
+        posted = true;
+        server.work["/actions"]?.push(created(body));
+        return problem(422, "validation-failed", [{ pointer: "/id", code: "taken" }]);
+      },
+    );
+    const view = await form();
+    await user.type(view.getByRole("textbox", { name: /^Titel/ }), "Banner");
+    const submit = view.getByRole("button", { name: "Erstellen" });
+    await user.click(submit);
+    await waitFor(() => expect(server.posts()).toHaveLength(1));
+    // The list is still loading: a second submit does nothing.
+    await waitFor(() => expect(waiting).toBe(true));
+    act(() => (submit.closest("form") as HTMLFormElement).requestSubmit());
+    release();
+    await screen.findByRole("complementary", { name: /ACT-020/ });
+    expect(server.posts()).toHaveLength(1);
+    expect(screen.getAllByText("ACT-020 erfasst.")).toHaveLength(1);
   });
 
   it("sends one request for a double submit in the same moment", async () => {

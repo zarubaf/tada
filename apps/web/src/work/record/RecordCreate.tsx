@@ -164,9 +164,17 @@ export function RecordCreate({
     }
     sending.current = true;
     setBusy(true);
+    try {
+      await send();
+    } finally {
+      sending.current = false;
+      setBusy(false);
+    }
+  };
+
+  // The guard and the busy state last until this ends, also while the list loads for a taken ID.
+  const send = async () => {
     const result = await create.submit(commands, values, recordId);
-    sending.current = false;
-    setBusy(false);
     if (result.ok) {
       announce(t("record-created", { id: result.record.local_id }));
       onCreated(result.record.local_id);
