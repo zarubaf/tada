@@ -167,7 +167,10 @@ const ID = /^[\w-]{1,64}$/;
 const MAX_TEXT = 200;
 
 function listOf(params: URLSearchParams, key: string): string[] {
-  return (params.get(key) ?? "").split(",").filter((value) => value !== "");
+  return params
+    .getAll(key)
+    .flatMap((value) => value.split(","))
+    .filter((value) => value !== "");
 }
 
 /** The known values, once each, in the order of the table. */
