@@ -70,6 +70,9 @@ const surfaces = ["bg-canvas", "bg-surface", "bg-raised", "bg-sunken", "bg-hover
 const pairs: [string, string, number][] = [
   ...surfaces.map((bg): [string, string, number] => ["text", bg, TEXT]),
   ...surfaces.map((bg): [string, string, number] => ["text-muted", bg, TEXT]),
+  // The neutral fill of a selected option of a segmented switch or a type filter.
+  ["text", "bg-active", TEXT],
+  ["text-muted", "bg-active", TEXT],
   ["text-on-accent", "accent", TEXT],
   ["text-on-accent", "accent-hover", TEXT],
   ...["bg-canvas", "bg-surface", "bg-raised", "bg-sunken", "accent-subtle"].map(

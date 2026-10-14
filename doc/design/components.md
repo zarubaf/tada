@@ -95,8 +95,9 @@ These pieces belong to the „Arbeit“ page and live in `apps/web/src/work/`.
 
 ### Work views
 
-The tabs „Board“, „Tabelle“ and „Zeitplan“ of the „Arbeit“ page use `Tabs` with `variant="segmented"`: a frame of 30 px with buttons of 24 px (44 px on a coarse pointer, without frame).
-`before` and `after` put the toolbar controls in one row with the tab list: the title, the type filter and the „Filter“ button (`Button size="sm"`, 28 px, 44 px on a coarse pointer).
+The tabs „Board“, „Tabelle“ and „Zeitplan“ of the „Arbeit“ page use `Tabs` with `variant="segmented"`: a frame of 30 px with buttons of 24 px, each with a 14 px icon (columns, table, timeline) and 12 px text; with a coarse pointer the buttons grow to 44 px and the frame stays.
+The selected view and the chosen type have the neutral fill `--color-bg-active` and the normal text color; the accent is for actions.
+`PageToolbar` puts the toolbar controls in one row with the tab list (`renderList` of `Tabs` places it): the title and the type filter, the switch and the „Filter“ button (`Button size="sm"`, 28 px, 12 px text, 44 px on a coarse pointer).
 One panel holds the banners and the chosen view with a gap of `--space-3`, and the query key `view` holds the choice (the board has no key).
 The table and the timeline view load lazily.
 

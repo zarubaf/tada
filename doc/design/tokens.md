@@ -19,6 +19,7 @@ The accent marks primary actions, selection, links and focus only.
 | `--color-bg-raised`       | Menus, popovers, dialogs, sheets         |
 | `--color-bg-sunken`       | Sidebar, table header, code              |
 | `--color-bg-hover`        | Hover and selected row without focus     |
+| `--color-bg-active`       | Selected option of a switch or a filter  |
 | `--color-border-subtle`   | Dividers and panel borders               |
 | `--color-border-control`  | Input, checkbox and select borders (3:1) |
 | `--color-text`            | Primary text                             |
@@ -66,12 +67,14 @@ The `avatar-1` to `avatar-6` tokens are the fixed palette of the avatar: a neutr
 | `text`           | `bg-raised`       | 4.5:1   | 17.22:1 | 15.04:1 |
 | `text`           | `bg-sunken`       | 4.5:1   | 15.97:1 | 17.51:1 |
 | `text`           | `bg-hover`        | 4.5:1   | 15.19:1 | 14.04:1 |
+| `text`           | `bg-active`       | 4.5:1   | 13.88:1 | 12.14:1 |
 | `text`           | `accent-subtle`   | 4.5:1   | 14.92:1 | 14.31:1 |
 | `text-muted`     | `bg-canvas`       | 4.5:1   | 6.83:1  | 7.51:1  |
 | `text-muted`     | `bg-surface`      | 4.5:1   | 7.03:1  | 7.06:1  |
 | `text-muted`     | `bg-raised`       | 4.5:1   | 7.09:1  | 6.81:1  |
 | `text-muted`     | `bg-sunken`       | 4.5:1   | 6.57:1  | 7.93:1  |
 | `text-muted`     | `bg-hover`        | 4.5:1   | 6.25:1  | 6.36:1  |
+| `text-muted`     | `bg-active`       | 4.5:1   | 5.71:1  | 5.50:1  |
 | `text-muted`     | `accent-subtle`   | 4.5:1   | 6.14:1  | 6.48:1  |
 | `text-on-accent` | `accent`          | 4.5:1   | 5.71:1  | 5.22:1  |
 | `text-on-accent` | `accent-hover`    | 4.5:1   | 7.44:1  | 6.49:1  |
