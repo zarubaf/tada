@@ -22,6 +22,10 @@
   html {
     accent-color: var(--color-accent);
     caret-color: var(--color-accent);
+  }
+
+  /* The scrollbar properties do not inherit, so every scroll container needs them. */
+  * {
     scrollbar-color: var(--color-border-control) transparent;
     scrollbar-width: thin;
   }
