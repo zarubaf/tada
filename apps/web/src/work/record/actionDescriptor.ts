@@ -7,6 +7,7 @@ import {
   IconUser,
 } from "@tabler/icons-react";
 import type { Action, ActionStatus, CreateActionRequest } from "../../api/client";
+import { t } from "../../i18n";
 import type { WorkItem } from "../workItem";
 import type { FieldSpec, FieldValue, RecordDescriptor } from "./descriptor";
 
@@ -19,6 +20,10 @@ function asAction(item: WorkItem): ActionItem {
   }
   return item;
 }
+
+/** The start of an action is not after its due date (the same rule as in the server). */
+const startAfterDue = (start: FieldValue, due: FieldValue) =>
+  start !== null && due !== null && start > due;
 
 const target = (item: WorkItem) => ({ id: item.id, version: item.version });
 const record = (item: WorkItem): Action => asAction(item).record;
@@ -63,6 +68,11 @@ const due: FieldSpec = {
   icon: IconCalendarEvent,
   control: "date",
   pointer: "due_date",
+  elsewhere: ["start_date"],
+  validate: (item, value) =>
+    startAfterDue(record(item).start_date ?? null, value)
+      ? t("work-error-due_date-start-after-due")
+      : undefined,
   emptyKey: "record-no-date",
   overdue: true,
   read: (item) => record(item).due_date ?? null,
@@ -75,6 +85,10 @@ const start: FieldSpec = {
   icon: IconCalendar,
   control: "date",
   pointer: "start_date",
+  validate: (item, value) =>
+    startAfterDue(value, record(item).due_date ?? null)
+      ? t("work-error-start_date-start-after-due")
+      : undefined,
   emptyKey: "record-no-date",
   read: (item) => record(item).start_date ?? null,
   save: (commands, item, value) => commands.action.changeStart(target(item), value),
@@ -141,6 +155,13 @@ export const actionDescriptor: RecordDescriptor = {
     titleKey: "record-create-action",
     fields: ["title", "owner", "due", "start", "area", "milestone", "description"],
     defaults: (me) => ({ title: "", owner: me }),
+    validate: (values): Record<string, string> =>
+      startAfterDue(optional(values.start ?? null) ?? null, optional(values.due ?? null) ?? null)
+        ? {
+            start: t("work-error-start_date-start-after-due"),
+            due: t("work-error-due_date-start-after-due"),
+          }
+        : {},
     submit: (commands, values) => commands.action.create(body(values)),
   },
 };

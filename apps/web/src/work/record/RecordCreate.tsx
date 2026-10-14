@@ -5,10 +5,10 @@ import { firstInvalidField, useFocusAfterCommit } from "../../ui/focus";
 import { LiveRegion } from "../../ui/LiveRegion";
 import { SearchSelect } from "../../ui/SearchSelect";
 import { TextField } from "../../ui/TextField";
-import { fieldErrors } from "../fieldErrors";
 import type { WorkCommands } from "../workCommands";
 import { type ChoiceSources, choicesOf } from "./choices";
 import type { FieldSpec, FieldValue, RecordDescriptor } from "./descriptor";
+import { fieldError } from "./fieldError";
 import styles from "./RecordPanel.module.css";
 
 type Values = Record<string, FieldValue>;
@@ -142,6 +142,9 @@ export function RecordCreate({
         missing[spec.id] = t(`work-error-${spec.pointer}`);
       }
     }
+    for (const [id, message] of Object.entries(create.validate?.(values) ?? {})) {
+      missing[id] ??= message;
+    }
     setFailure(undefined);
     setErrors(missing);
     if (Object.keys(missing).length > 0) {
@@ -157,16 +160,9 @@ export function RecordCreate({
       return;
     }
     const { problem, message } = result.failure;
-    const named =
-      problem?.code === "validation-failed"
-        ? fieldErrors(
-            problem,
-            shown.map((spec) => spec.pointer),
-          )
-        : {};
     const invalid: Errors = {};
     for (const spec of shown) {
-      const text = named[spec.pointer];
+      const text = fieldError(problem, spec);
       if (text) {
         invalid[spec.id] = text;
       }
