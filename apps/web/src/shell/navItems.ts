@@ -12,6 +12,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { t } from "../i18n";
+import { isAtOrBelow } from "../router/Router";
 
 export interface Destination {
   id: string;
@@ -121,10 +122,7 @@ export const ALL: Destination[] = [...MAIN, settings, privacy];
 
 /** True when the path belongs to the destination. */
 export function isCurrent(destination: Destination, pathname: string): boolean {
-  if (
-    destination.yieldsTo !== undefined &&
-    (pathname === destination.yieldsTo || pathname.startsWith(`${destination.yieldsTo}/`))
-  ) {
+  if (destination.yieldsTo !== undefined && isAtOrBelow(pathname, destination.yieldsTo)) {
     return false;
   }
   return (
