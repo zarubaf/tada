@@ -6,14 +6,29 @@ ADR 0023 defines the strategy. This document gives the layouts, the navigation a
 
 ## App shell
 
-The app shell has three layouts. The viewport width selects the layout.
-If the server runs another build than the web client, a Banner above the page asks the member to load the page again (ADR 0075).
+The shell has a sidebar, a top bar and the page.
+The viewport width selects the layout.
+If the server runs another build than the web client, a Banner below the top bar asks the member to load the page again (ADR 0075).
+
+### Top bar (all widths)
+
+The top bar is 48 px high and sticks to the top of the page. It is the `banner` landmark.
+
+- A toggle for the sidebar. It collapses the docked sidebar on medium and wide layouts and opens the drawer on narrow layouts.
+- The title of the context in plain text, not a heading: the name of the current event on an event page, else the name of the section, for example „Eingang“.
+  Each page keeps its own `h1`.
+  A long name is cut and has the full name as its title.
+- The command box „Suchen oder Befehl ausführen…“ with the key hint (`⌘K` or `Ctrl K`).
+  It opens the command palette, as does `Ctrl+K` or `⌘K` from anywhere in the shell.
+  Below 40rem it is an icon button.
+- The theme toggle as an icon button, then the member menu as an avatar.
+  The member menu has „Konto“, „Datenschutz“, „Versionen“ and „Abmelden“.
 
 ### Narrow (below 40rem)
 
 ```text
 ┌──────────────────────────┐
-│ Top bar: title · search  │
+│ Top bar                  │
 ├──────────────────────────┤
 │                          │
 │ Page content             │
@@ -24,9 +39,14 @@ If the server runs another build than the web client, a Banner above the page as
 └──────────────────────────┘
 ```
 
-- The bottom bar has four items: „Meine Arbeit“, „Eingang“, „Anlässe“ and „Einstellungen“.
-- The member menu holds „Personen“ and „Institutionen“, so the narrow layout reaches them too.
+- The bottom bar has four items: „Eingang“, „Meine Arbeit“, „Anlässe“ and „Mehr“.
+  „Mehr“ is a menu with „Personen“, „Institutionen“, „Einstellungen“, „Datenschutz“ and „Versionen“.
 - The bottom bar shows a count badge on „Eingang“ when proposals wait for the member.
+- The toggle of the top bar opens the sidebar as a drawer from the left edge.
+  The drawer holds the whole sidebar: the switchers, all destinations and the foot.
+  It closes with `Esc`, with its close button, with a press outside and when a destination opens.
+  Focus stays inside while it is open and returns to the toggle.
+- The targets are 44 px high with a coarse pointer, and the page never scrolls sideways.
 - The evidence panel and the filters open as sheets from the bottom, up to 90 % of the screen height.
 - The page gutter is `--space-4`.
 
@@ -34,7 +54,7 @@ If the server runs another build than the web client, a Banner above the page as
 
 ```text
 ┌────────┬─────────────────────────────┐
-│Sidebar │ Top bar: breadcrumb · search│
+│Sidebar │ Top bar                     │
 │        ├─────────────────────────────┤
 │        │                             │
 │        │ Page content                │
@@ -42,7 +62,9 @@ If the server runs another build than the web client, a Banner above the page as
 └────────┴─────────────────────────────┘
 ```
 
-- The sidebar is 240 px wide. A member can collapse it to 56 px (icons with tooltips).
+- The sidebar is 232 px wide, docked, and the full height of the window.
+  The toggle of the top bar collapses it completely.
+  The browser remembers the choice (`tada-sidebar`).
 - The evidence panel opens as a sheet from the right, 400 px wide, over the content.
 - The page gutter is `--space-6`.
 
@@ -50,8 +72,9 @@ If the server runs another build than the web client, a Banner above the page as
 
 ```text
 ┌────────┬──────────────────────┬──────────┐
-│Sidebar │ Page content         │ Evidence │
-│        │                      │ panel    │
+│Sidebar │ Top bar              │          │
+│        ├──────────────────────┤ Evidence │
+│        │ Page content         │ panel    │
 │        │                      │ (docked) │
 └────────┴──────────────────────┴──────────┘
 ```
@@ -61,28 +84,31 @@ If the server runs another build than the web client, a Banner above the page as
 
 ## Navigation
 
+The destinations are defined once in `apps/web/src/shell/navItems.ts`.
+The sidebar, the bottom bar, „Mehr“ and the command palette read that list.
+An item appears only when its page exists.
+
 Sidebar, from top to bottom:
 
-1. Organization switcher (only if the member belongs to more than one organization).
-2. Search and command menu (`Ctrl+K` or `⌘K`).
-3. „Portfolio“, „Meine Arbeit“ and „Eingang“.
-4. „Anlässe“: a link to the list of the events of the member.
-   The sidebar does not expand the current event.
-   The event page shows the sub-navigation of the event: „Übersicht“, „Aufgaben“, „Zeitplan“, „Register“, „Dokumente“, „Mitglieder“ and „Arbeitsbereiche“.
-5. „Personen“ and „Institutionen“: the persons and institutions of the organization.
-   The member menu holds them on all layouts.
-   The sidebar hides them on narrow layouts.
-6. At the bottom: „Einstellungen“, „Datenschutz“, the build of the web client and the member menu.
+1. The app name, then the organization switcher (only if the member belongs to more than one organization).
+2. The event switcher: the name and the key of the current event, and a chevron.
+   The current event is the event of the route, else the event that the member opened last (the browser remembers it as `tada-event`), else none.
+   The menu lists the events of the member and has „Alle Anlässe“ and, for the owner and the administration, „Neuer Anlass“.
+   A closed event shows „abgeschlossen“ in its subtitle.
+3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Anlässe“, „Personen“, „Institutionen“ and „Einstellungen“.
+4. At the foot: „Datenschutz“, the build of the web client and the member block.
    The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
-   On narrow layouts, the member menu has the build.
+   The member block shows the name and the role; the member menu is in the top bar.
 
-The sub-navigation of an event has a second row below „Register“: „Zusagen“, „Meilensteine“, „Entscheide“, „Risiken“ and „Anforderungen“.
-Each tab has its own URL: `/events/:id/commitments`, `/milestones`, `/decisions`, `/risks` and `/requirements`.
+The event page has its own sub-navigation: „Übersicht“, „Aufgaben“, „Zeitplan“, „Register“, „Dokumente“, „Mitglieder“ and „Arbeitsbereiche“ (until ADR 0082 replaces it).
+It has a second row below „Register“: „Zusagen“, „Meilensteine“ and „Entscheide“.
+Each tab has its own URL: `/events/:id/commitments`, `/milestones` and `/decisions`.
 
 Rules:
 
 - The current item has the background `--color-accent-subtle` and the text `--color-accent-text`, and `aria-current="page"`.
-- Each page has a breadcrumb on medium and wide layouts. On narrow layouts, the top bar has a back button.
+- Each item has an icon and a label. No item is an icon alone.
+- The skip link is the first focusable element and leads to `main`.
 - Each page has a stable URL. A member can share a link to any record, filter or sheet.
 
 ## Page templates
