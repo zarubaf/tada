@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import styles from "./ConfirmDialog.module.css";
+import { KeepIds } from "./KeepIds";
 
 export interface TaskDialogProps {
   title: string;
@@ -28,7 +29,7 @@ export function TaskDialog({ title, onCancel, children }: TaskDialogProps) {
       <Modal className={styles.modal}>
         <Dialog className={styles.dialog}>
           <Heading slot="title" className={styles.title}>
-            {title}
+            <KeepIds>{title}</KeepIds>
           </Heading>
           {children}
         </Dialog>
