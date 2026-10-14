@@ -31,10 +31,22 @@ function valueText(spec: FieldSpec, value: FieldValue): string {
   return spec.control === "date" ? formatDate(value) : value;
 }
 
+/** The label of the saved choice of a picker: what the record holds now. */
+function pickedText(spec: FieldSpec, sources: ChoiceSources, item: WorkItem, value: FieldValue) {
+  const label = choicesOf(spec, sources, item, value).options.find(
+    (option) => option.id === value,
+  )?.label;
+  return label ?? (spec.emptyKey ? t(spec.emptyKey) : "");
+}
+
 interface TextEditorProps {
   spec: FieldSpec;
   draft: FieldValue;
   busy: boolean;
+  /** A conflict: the draft saves on purpose only, never by a blur. */
+  conflict: boolean;
+  /** What the record holds now, shown beside the draft in a conflict. */
+  theirs: string;
   error: string | undefined;
   onChange: (draft: FieldValue) => void;
   /** `focus` is true when the member saved by key: focus then returns to the display. */
@@ -42,8 +54,21 @@ interface TextEditorProps {
   onCancel: (focus: boolean) => void;
 }
 
-/** The input of a text, a long text or a date. Enter saves, Escape cancels, a blur saves. */
-function TextEditor({ spec, draft, busy, error, onChange, onCommit, onCancel }: TextEditorProps) {
+/**
+ * The input of a text, a long text or a date. Enter saves, Escape cancels, a blur saves a single
+ * line. After a conflict only Enter and „Speichern“ save.
+ */
+function TextEditor({
+  spec,
+  draft,
+  busy,
+  conflict,
+  theirs,
+  error,
+  onChange,
+  onCommit,
+  onCancel,
+}: TextEditorProps) {
   const multiline = spec.control === "multiline";
   const container = useRef<HTMLDivElement>(null);
 
@@ -62,7 +87,7 @@ function TextEditor({ spec, draft, busy, error, onChange, onCommit, onCancel }: 
   // half typed has no value yet; it is not a request to clear the field.
   const onBlur = (event: FocusEvent<HTMLDivElement>) => {
     const next = event.relatedTarget;
-    if (multiline || (next instanceof Node && container.current?.contains(next))) {
+    if (multiline || conflict || (next instanceof Node && container.current?.contains(next))) {
       return;
     }
     const input = event.target;
@@ -89,7 +114,8 @@ function TextEditor({ spec, draft, busy, error, onChange, onCommit, onCancel }: 
         {...(spec.control === "date" && { type: "date" })}
         {...(spec.control === "date" ? {} : { rows: multiline ? 5 : 2 })}
       />
-      {multiline && (
+      {conflict && <p className={styles.theirs}>{t("record-now-saved", { value: theirs })}</p>}
+      {(multiline || conflict) && (
         <div className={styles.actions}>
           <Button variant="primary" isPending={busy} onPress={() => onCommit(true)}>
             {t("record-save")}
@@ -176,12 +202,17 @@ export function FieldEditor({
           searchable={spec.control !== "status"}
           {...(spec.emptyKey && { clearLabel: emptyText })}
         />
-        {edit.phase === "failed" && (
+        {(edit.phase === "failed" || edit.phase === "conflict") && (
           // biome-ignore lint/a11y/useSemanticElements: a fieldset groups form fields, not a picker with its error
           <div role="group" aria-label={t(spec.labelKey)} aria-describedby={errorId}>
             <p id={errorId} className={styles.error}>
               {edit.error}
             </p>
+            {edit.phase === "conflict" && (
+              <p className={styles.theirs}>
+                {t("record-now-saved", { value: pickedText(spec, env.sources, item, value) })}
+              </p>
+            )}
             <div className={styles.actions}>
               <Button onPress={() => edit.commit()}>{t("record-retry")}</Button>
               <Button onPress={edit.cancel}>{t("record-discard")}</Button>
@@ -213,6 +244,8 @@ export function FieldEditor({
         spec={spec}
         draft={edit.draft}
         busy={busy}
+        conflict={edit.phase === "conflict"}
+        theirs={valueText(spec, value)}
         error={edit.error}
         onChange={edit.change}
         onCommit={(focus) => {

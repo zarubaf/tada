@@ -80,6 +80,8 @@ function openAction(
   );
   return {
     ...result,
+    /** The lists that the fake server serves: change one to play another person's change. */
+    work,
     /** The bodies of the changes that were sent. */
     sent: () => result.calls.filter((c) => c.call.startsWith("PATCH")).map((c) => c.body as Body),
   };
@@ -212,6 +214,59 @@ describe("editing an action in the panel", () => {
     });
   });
 
+  describe("a conflict", () => {
+    /** Opens the title with a draft, and the server answers that another person was faster. */
+    async function conflict() {
+      let calls = 0;
+      const served: { lists?: Record<string, unknown[]> } = {};
+      const server = openAction({}, {}, (body, current) => {
+        if (++calls === 1) {
+          const lists = served.lists ?? {};
+          lists["/actions"] = [{ ...current, title: "Titel von Bernd", version: 2 }];
+          return problem(409, "record-version-conflict");
+        }
+        return json(200, { ...current, ...body, version: 3 });
+      });
+      served.lists = server.work;
+      const view = await region();
+      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.clear(view.getByRole("textbox", { name: "Titel" }));
+      await user.type(view.getByRole("textbox", { name: "Titel" }), "Mein Titel{Enter}");
+      await view.findByText("Jetzt gespeichert: Titel von Bernd");
+      return { server, view };
+    }
+
+    it("shows the value on the server beside the draft", async () => {
+      const { view } = await conflict();
+      expect(view.getByRole("textbox", { name: "Titel" })).toHaveValue("Mein Titel");
+    });
+
+    it("does not save the draft over the other change when the member clicks elsewhere", async () => {
+      const { server, view } = await conflict();
+      await user.click(screen.getByRole("heading", { level: 1 }));
+
+      expect(view.getByRole("textbox", { name: "Titel" })).toHaveValue("Mein Titel");
+      expect(server.sent()).toHaveLength(1);
+    });
+
+    it("saves the draft with Enter, with the version that was loaded after the conflict", async () => {
+      const { server, view } = await conflict();
+      await user.click(view.getByRole("textbox", { name: "Titel" }));
+      await user.keyboard("{Enter}");
+
+      await view.findByRole("button", { name: "Titel bearbeiten: Mein Titel" });
+      expect(server.sent()[1]).toEqual({ title: "Mein Titel", expected_version: 2 });
+    });
+
+    it("saves the draft with Speichern", async () => {
+      const { server, view } = await conflict();
+      await user.click(view.getByRole("button", { name: "Speichern" }));
+
+      await view.findByRole("button", { name: "Titel bearbeiten: Mein Titel" });
+      expect(server.sent()).toHaveLength(2);
+    });
+  });
+
   describe("the pickers", () => {
     it("changes the status among the next ones of the record, without a search field", async () => {
       const server = openAction();
@@ -267,8 +322,6 @@ describe("editing an action in the panel", () => {
       await user.click(within(group).getByRole("button", { name: "Erneut versuchen" }));
       await waitFor(() => expect(view.queryByRole("group", { name: "Verantwortlich" })).toBeNull());
       expect(server.sent()).toHaveLength(2);
-
-      // And a discard goes back to the saved owner.
     });
 
     it("discards a refused choice", async () => {
