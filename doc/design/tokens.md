@@ -203,6 +203,9 @@ Rules:
 | `--sidebar-width`        | Width of the docked sidebar of the shell (232 px)                                                                                                                |
 | `--size-tile`            | The tile with the initials of an event in the event switcher (28 px)                                                                                             |
 | `--size-toolbar`         | The height of the toolbar row of a page and of the bulk bar (44 px)                                                                                              |
+| `--dock-offset`          | The distance of the floating bulk bar from the bottom of the window (20 px; above the bottom bar on a phone)                                                     |
+| `--dock-height`          | The height of the bulk bar (one row of `--size-toolbar`; two rows on a phone)                                                                                    |
+| `--dock-room`            | What the end of a view keeps free while the bar shows: the height of the bar and its distance from the bottom                                                    |
 | `--size-chip-height`     | Chips (20 px)                                                                                                                                                    |
 | `--size-hit-target`      | The height of the hit area of an interactive chip (0 with a fine pointer, 44 px with a coarse one)                                                               |
 | `--size-column-head`     | The height of the head of a board column and the width of the rail of a collapsed one (40 px, 44 px with a coarse pointer)                                       |

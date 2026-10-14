@@ -1,13 +1,11 @@
 @layer components {
   /*
-   * The bar floats 20 px above the bottom of the work area while the board shows, and above the
-   * bottom bar on a phone. The dock has no height, so that it takes no room in the page: its
-   * content rises from the bottom edge. It also lets pointers through, so that it never hides a
-   * card beside the bar; the end of each view has room of its own for the bar.
+   * The bar floats `--dock-offset` above the bottom of the window while the board or the table
+   * shows. The dock has no height, so that it takes no room in the page: its content rises from the
+   * bottom edge. It also lets pointers through, so that it never hides a card beside the bar. The
+   * page keeps room for the bar at its end (`.scope` of the page).
    */
   .dock {
-    --dock-offset: var(--space-5);
-
     position: sticky;
     inset-block-end: var(--dock-offset);
     z-index: var(--z-sticky);
@@ -80,8 +78,6 @@
   /* --bp-medium and narrower: the bar fills the width above the bottom bar, in two rows. */
   @media (width < 40rem) {
     .dock {
-      --dock-offset: calc(var(--bottom-bar-height) + var(--space-2));
-
       align-items: stretch;
     }
 
