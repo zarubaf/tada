@@ -10,9 +10,12 @@
    */
   .board {
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     gap: var(--space-2);
     min-width: 0;
+
+    /* The columns fill the screen below the toolbar, whatever they hold: top bar, toolbar row, gaps. */
+    min-height: calc(100dvh - var(--topbar-height) - var(--size-toolbar) - 2 * var(--space-3));
     overflow-x: auto;
   }
 
@@ -30,7 +33,7 @@
     align-items: center;
     gap: var(--space-2);
     min-height: var(--size-column-head);
-    padding-inline: var(--space-3);
+    padding-inline: var(--space-3) var(--space-1-5);
   }
 
   .name {
@@ -60,7 +63,9 @@
     display: grid;
     gap: var(--space-1-5);
     margin: 0;
-    padding: 0 var(--space-1-5) var(--space-1-5);
+
+    /* The bottom is room for the bulk bar, so that it never covers the last card. */
+    padding: 0 var(--space-1-5) var(--space-16);
     list-style: none;
   }
 
@@ -186,6 +191,12 @@
   /* The list has no column around it, so its cards line up with the controls above. */
   .narrow .cards {
     padding: 0;
+  }
+
+  /* While cards are selected the bulk bar floats over the end of the list, in two rows. */
+  .narrow[data-selecting]::after {
+    content: "";
+    block-size: calc(2 * var(--size-toolbar) + var(--space-4));
   }
 
   .narrow .skeletonCard {
