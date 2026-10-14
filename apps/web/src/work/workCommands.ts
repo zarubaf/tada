@@ -95,6 +95,8 @@ class RecordQueue {
   run<R extends Target>(
     target: Target,
     send: (version: number) => Answer<R>,
+    /** False if the answer is another record than the target (the successor of a decision). */
+    remember = true,
   ): Promise<CommandResult<R>> {
     const step = async (): Promise<CommandResult<R>> => {
       // The answer of the command before knows a newer version than the caller does.
@@ -114,7 +116,12 @@ class RecordQueue {
         }
         return result;
       }
-      this.versions.set(target.id, answer.data.version);
+      if (remember) {
+        this.versions.set(target.id, answer.data.version);
+      } else {
+        // The answer is another record, and the target changed in a way it does not tell.
+        this.versions.delete(target.id);
+      }
       return { ok: true, record: answer.data };
     };
     const result = (this.tails.get(target.id) ?? Promise.resolve()).then(step);
@@ -225,11 +232,14 @@ export function createWorkCommands(api: Api, eventId: string) {
         ),
       /** Records the successor and ends the decision; the answer is the successor, in force. */
       supersede: (t: Target, successor: CreateDecisionRequest) =>
-        queue.run<Decision>(t, (expected_version) =>
-          api.POST("/api/v1/events/{event_id}/decisions/{id}/supersede", {
-            params: { path: path(t.id) },
-            body: { successor, expected_version },
-          }),
+        queue.run<Decision>(
+          t,
+          (expected_version) =>
+            api.POST("/api/v1/events/{event_id}/decisions/{id}/supersede", {
+              params: { path: path(t.id) },
+              body: { successor, expected_version },
+            }),
+          false,
         ),
       /** Ends the decision without a successor; the answer is the revoked decision. */
       revoke: (t: Target, reason: string) =>
