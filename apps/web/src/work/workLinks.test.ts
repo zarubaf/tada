@@ -23,12 +23,11 @@ describe("recordHref", () => {
     );
   });
 
-  it.each([["commitment", "COM-003", "/events/e1/commitments#COM-003"]] as const)(
-    "still links a %s to the old page of its kind",
-    (kind, id, href) => {
-      expect(recordHref("e1", item(kind, id), "view=table")).toBe(href);
-    },
-  );
+  it("opens a commitment in the panel, like an action", () => {
+    expect(recordHref("e1", item("commitment", "COM-003"), "view=table")).toBe(
+      "/events/e1/work?view=table#COM-003",
+    );
+  });
 
   it("opens a risk in the panel, as it has no page of its own", () => {
     expect(recordHref("e1", item("risk", "RSK-001"), "view=table")).toBe(

@@ -11,7 +11,7 @@ import type { WorkItem } from "./workItem";
 /** True for a kind whose records open in the side panel. */
 export const PANEL: Record<RecordKind, boolean> = {
   action: true,
-  commitment: false,
+  commitment: true,
   milestone: true,
   decision: true,
   risk: true,
