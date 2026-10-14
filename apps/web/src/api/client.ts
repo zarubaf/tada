@@ -51,6 +51,7 @@ export type RiskStatus = components["schemas"]["RiskStatus"];
 export type CreateActionRequest = components["schemas"]["CreateActionRequest"];
 export type CreateRiskRequest = components["schemas"]["CreateRiskRequest"];
 export type Level = components["schemas"]["Level"];
+export type CreateCommitmentRequest = components["schemas"]["CreateCommitmentRequest"];
 export type ChangeActionRequest = components["schemas"]["ChangeActionRequest"];
 export type CreateMilestoneRequest = components["schemas"]["CreateMilestoneRequest"];
 export type CreateDecisionRequest = components["schemas"]["CreateDecisionRequest"];
