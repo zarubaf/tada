@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "../api/client";
@@ -313,14 +313,7 @@ describe("sidebar", () => {
     const names = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(names).toEqual([
-      "Eingang",
-      "Meine Arbeit",
-      "Anlässe",
-      "Personen",
-      "Institutionen",
-      "Einstellungen",
-    ]);
+    expect(names).toEqual(["Eingang", "Meine Arbeit", "Anlässe", "Personen", "Institutionen"]);
   });
 
   it("shows the number of open proposals at Eingang for a screen reader as text", async () => {
@@ -336,6 +329,10 @@ describe("sidebar", () => {
 
     const foot = await screen.findByRole("link", { name: "Datenschutz" });
     expect(foot).toHaveAttribute("href", "/privacy");
+    const settings = screen.getByRole("link", { name: "Einstellungen" });
+    expect(settings).toHaveAttribute("href", "/settings/members");
+    expect(settings.closest("nav")).toBeNull();
+    expect(foot.closest("nav")).toBeNull();
     expect(await screen.findByRole("button", { name: /^tada / })).toBeInTheDocument();
     expect(screen.getByText("Mitglied")).toBeInTheDocument();
   });
@@ -633,7 +630,7 @@ describe("narrow layout", () => {
 
     const drawer = await screen.findByRole("dialog", { name: "Navigation" });
     const nav = within(drawer).getByRole("navigation", { name: "Hauptnavigation" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(6);
+    expect(within(nav).getAllByRole("link")).toHaveLength(5);
     expect(within(drawer).getByRole("button", { name: /Organisation/ })).toBeInTheDocument();
     expect(within(drawer).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
     expect(within(drawer).getByRole("link", { name: "Datenschutz" })).toBeInTheDocument();
@@ -653,6 +650,36 @@ describe("narrow layout", () => {
 
     await vi.waitFor(() => expect(window.location.pathname).toBe("/persons"));
     await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("does not reopen the drawer when the layout gets narrow again after a resize", async () => {
+    let narrow = true;
+    const listeners = new Set<() => void>();
+    vi.stubGlobal("matchMedia", () => ({
+      get matches() {
+        return narrow;
+      },
+      addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+      removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+    }));
+    const resize = (value: boolean) => {
+      narrow = value;
+      act(() => {
+        for (const listener of listeners) {
+          listener();
+        }
+      });
+    };
+    renderShell(json(200, info([first], first)));
+    await userEvent.click(await screen.findByRole("button", { name: "Navigation öffnen" }));
+    await screen.findByRole("dialog", { name: "Navigation" });
+
+    resize(false);
+    await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    resize(true);
+
+    await screen.findByRole("button", { name: "Navigation öffnen" });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("closes the drawer with its close button", async () => {
@@ -711,6 +738,36 @@ describe("command palette", () => {
     expect(await screen.findByRole("dialog", { name: "Befehle" })).toBeInTheDocument();
   });
 
+  it("does not open with Ctrl+Shift+K or after another handler took the key", async () => {
+    renderShell(json(200, info([first], first)));
+    await screen.findByRole("banner");
+
+    fireEvent.keyDown(document.body, { key: "K", ctrlKey: true, shiftKey: true });
+    const taken = new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    taken.preventDefault();
+    document.body.dispatchEvent(taken);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("does not open over another dialog", async () => {
+    renderShell(json(200, info([first], first)));
+    await userEvent.click(await screen.findByRole("button", { name: "Anna Muster" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: /^Versionen/ }));
+    const versions = await screen.findByRole("dialog");
+
+    fireEvent.keyDown(versions, { key: "k", ctrlKey: true });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(screen.queryByRole("dialog", { name: "Befehle" })).toBeNull();
+  });
+
   it("lists the destinations and no record search", async () => {
     renderShell(json(200, info([first], first)));
 
@@ -765,6 +822,17 @@ describe("command palette", () => {
     await userEvent.keyboard("zzzz");
 
     expect(await within(palette).findAllByText("Keine Treffer")).not.toHaveLength(0);
+  });
+
+  it("offers no new action away from the event pages, with an event remembered", async () => {
+    eventItems = [open];
+    localStorage.setItem(EVENT_KEY, open.id);
+    renderShellAt("/inbox", json(200, info([first], first)));
+    await screen.findByRole("button", { name: "Anlass wechseln: Sommerfest 2030" });
+
+    const palette = await openPalette();
+
+    expect(within(palette).queryByRole("menuitem", { name: "Neue Aufgabe" })).toBeNull();
   });
 
   it("offers a new action only inside an event and opens its actions", async () => {

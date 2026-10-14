@@ -63,15 +63,16 @@ const privacy: Destination = {
   icon: IconShieldLock,
 };
 
-/** The items of the sidebar and of the drawer, from top to bottom. */
-export const MAIN: Destination[] = [inbox, myWork, events, persons, institutions, settings];
+/** The items of the sidebar and of the drawer, from top to bottom. Einstellungen sits at the foot. */
+export const MAIN: Destination[] = [inbox, myWork, events, persons, institutions];
+export const SETTINGS = settings;
 /** The bottom bar on narrow layouts has room for these three and „Mehr“. */
 export const BOTTOM: Destination[] = [inbox, myWork, events];
 /** „Mehr“ holds the other destinations. */
 export const MORE: Destination[] = [persons, institutions, settings, privacy];
 export const PRIVACY = privacy;
 /** Each destination, for the command palette. */
-export const ALL: Destination[] = [...MAIN, privacy];
+export const ALL: Destination[] = [...MAIN, settings, privacy];
 
 function isCurrent(destination: Destination, pathname: string): boolean {
   return (

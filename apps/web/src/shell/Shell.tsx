@@ -66,6 +66,13 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [framed]);
 
+  // A wide layout has no drawer; it must not wait to reopen at the next narrow width.
+  useEffect(() => {
+    if (!narrow) {
+      setDrawerOpen(false);
+    }
+  }, [narrow]);
+
   // A destination or an event that opens ends the drawer.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the path change is the trigger
   useEffect(() => setDrawerOpen(false), [pathname]);
@@ -226,7 +233,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           <CommandPalette
             events={events.list}
             loadEvents={events.load}
-            currentEventId={currentEvent?.id}
+            currentEventId={routeEventId === undefined ? undefined : currentEvent?.id}
             canCreateEvent={canCreateEvent}
             onClose={() => setPaletteOpen(false)}
           />

@@ -6,7 +6,7 @@ import { t } from "../i18n";
 import { InboxCount } from "../review/InboxCount";
 import { Avatar } from "../ui/Avatar";
 import { NavLink } from "../ui/NavLink";
-import { MAIN, PRIVACY } from "./navItems";
+import { MAIN, PRIVACY, SETTINGS } from "./navItems";
 import styles from "./Sidebar.module.css";
 import { VersionButton } from "./VersionFooter";
 
@@ -46,6 +46,9 @@ export function Sidebar({
         ))}
       </nav>
       <div className={styles.foot}>
+        <NavLink to={SETTINGS.to} icon={SETTINGS.icon} within={SETTINGS.within}>
+          {SETTINGS.label}
+        </NavLink>
         <NavLink to={PRIVACY.to} icon={PRIVACY.icon}>
           {PRIVACY.label}
         </NavLink>
