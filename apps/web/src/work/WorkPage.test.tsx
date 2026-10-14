@@ -88,12 +88,12 @@ describe("WorkPage", () => {
     expect(screen.getByRole("button", { name: "Abgebrochen, 1 Eintrag" })).toBeInTheDocument();
   });
 
-  it("links a card to the old page of its kind and leaves the risk without a link", async () => {
+  it("links an action to the panel, the other kinds to their old pages, and a risk to none", async () => {
     open();
     await ready();
     expect(screen.getByRole("link", { name: /ACT-001/ })).toHaveAttribute(
       "href",
-      `/events/${EVENT.id}/actions#ACT-001`,
+      `/events/${EVENT.id}/work#ACT-001`,
     );
     expect(screen.getByRole("link", { name: /DEC-001/ })).toHaveAttribute(
       "href",

@@ -30,13 +30,13 @@ function card(
 }
 
 describe("WorkCard", () => {
-  it("is one link to the old page of the kind, named by its id and title", () => {
+  it("is one link to the record, named by its id and title", () => {
     const li = card(
       "action",
       r.action("ACT-012", { title: "Sponsorenliste nachführen", status: "in-progress" }),
     );
     const link = within(li).getByRole("link");
-    expect(link).toHaveAttribute("href", "/events/e1/actions#ACT-012");
+    expect(link).toHaveAttribute("href", "/events/e1/work#ACT-012");
     expect(within(li).getAllByRole("link")).toHaveLength(1);
     expect(link).toHaveAccessibleName("ACT-012 Sponsorenliste nachführen");
   });

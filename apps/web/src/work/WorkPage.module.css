@@ -1,4 +1,15 @@
 @layer components {
+  /* The page and, beside it from 80rem, the docked side panel. */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .main {
+    flex: 1;
+    min-width: 0;
+  }
+
   .page {
     display: grid;
     gap: var(--space-4);
