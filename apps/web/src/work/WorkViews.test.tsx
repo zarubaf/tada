@@ -185,7 +185,7 @@ describe("the table view", () => {
     ).toEqual(["ID", "Typ", "Titel", "Status", "Verantwortlich", "Fällig", "Bereich"]);
   });
 
-  it("lists every record in the order of the board by default", async () => {
+  it("lists every record by date, the soonest first, by default", async () => {
     open("?view=table");
     await table();
     expect(ids()).toEqual(BY_DATE);
