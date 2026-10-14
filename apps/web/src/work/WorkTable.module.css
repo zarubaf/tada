@@ -72,6 +72,13 @@
     max-width: 10rem;
   }
 
+  /* Beside a docked panel the owner gives room to the title, which has the least of it. */
+  @container (width < 56rem) {
+    .owner {
+      max-width: 8rem;
+    }
+  }
+
   .hidden {
     position: absolute;
     width: 1px;
