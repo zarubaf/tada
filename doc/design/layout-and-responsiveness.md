@@ -176,7 +176,7 @@ The page does not use the sub-navigation of the event.
 - A card is one link to its record.
   An action opens in the record panel: the link goes to the same page with the readable ID as the hash, and it keeps the query, so the view and the filters stay.
   Until the panels of the other kinds exist, they lead to the old page of the kind, with the readable ID as the hash.
-  A risk has no such page, so its card has the same look and is no link.
+  A risk opens in the record panel as well and has no old page.
   A row of the table links in the same way.
 - The record panel shows the record that the hash names (`#ACT-012`).
   From 80rem it is a docked column 30rem wide beside the list, under the top bar; the list stays usable and gets the rest of the width.
@@ -223,7 +223,6 @@ A row is `--row-height` high (28 px, and 44 px on coarse pointers).
   The sorted header has `aria-sort`, and a polite live region says „Sortiert nach Titel, aufsteigend“.
   The sort is stable. A record without a value (an empty title, no owner, no date, no area) comes last in both directions, and a tie is broken by the readable ID.
 - The title is a link with the same target as the card: the old page of the kind with the readable ID as the hash.
-  A risk has no page, so its title is text.
   A redacted record shows „entfernt“.
 - The title takes the width that is left and ends in an ellipsis in one line; the `title` attribute holds the whole text. Owner and area end in an ellipsis too.
 - Where its container is less than 40rem wide (a narrow viewport, a docked panel or a column to select), the table keeps its columns and scrolls inside itself, never the page.
