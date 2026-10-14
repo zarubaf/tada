@@ -1,6 +1,9 @@
 @layer components {
+  /* Fills the trigger, so that the chevron sits at the inline end like the one of Select. */
   .value {
+    flex: 1;
     min-width: 0;
+    text-align: start;
     overflow: hidden;
     text-overflow: ellipsis;
   }
