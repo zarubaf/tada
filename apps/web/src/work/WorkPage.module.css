@@ -1,0 +1,7 @@
+@layer components {
+  .page {
+    display: grid;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+}

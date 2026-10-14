@@ -176,10 +176,12 @@ const KEYS = {
   due: "due",
   text: "q",
 } as const;
+/** The query keys of the filters, so that a page can clear them all before it writes new ones. */
+export const FILTER_KEYS: readonly string[] = Object.values(KEYS);
 const ID = /^[\w-]{1,64}$/;
 const MAX_TEXT = 200;
 
-function listOf(params: URLSearchParams, key: string): string[] {
+function listOf(params: Pick<URLSearchParams, "getAll">, key: string): string[] {
   return params
     .getAll(key)
     .flatMap((value) => value.split(","))
@@ -196,7 +198,7 @@ function ids(values: string[]): string[] {
 }
 
 /** Reads the filters from a query string. What it does not know, it ignores. */
-export function parseFilters(params: URLSearchParams): WorkFilters {
+export function parseFilters(params: Pick<URLSearchParams, "get" | "getAll">): WorkFilters {
   const due = params.get(KEYS.due);
   return {
     kinds: inOrder(RECORD_KINDS, listOf(params, KEYS.kinds)),
