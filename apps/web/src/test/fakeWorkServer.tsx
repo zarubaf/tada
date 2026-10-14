@@ -134,6 +134,9 @@ export function renderWork(
     if (path.endsWith("/session")) {
       return json(200, session);
     }
+    if (request.method === "GET" && path === `/api/v1/events/${event.id}`) {
+      return json(200, event);
+    }
     if (request.method === "GET" && path.endsWith("/api/v1/members")) {
       return json(200, { items: members });
     }
