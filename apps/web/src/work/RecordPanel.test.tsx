@@ -98,9 +98,19 @@ describe("the record panel", () => {
       expect(hash()).toBe("#ACT-002");
     });
 
-    it("shows a record of a kind without a panel as not found, until its panel exists", async () => {
+    it("sends a record of a kind without a panel to its page, and does not call it missing", async () => {
       open("#COM-001");
-      await panel("Eintrag nicht gefunden");
+      const region = await panel("Eintrag öffnet noch nicht hier");
+      expect(within(region).queryByText(/gibt es in diesem Anlass nicht/)).toBeNull();
+      expect(
+        within(region).getByRole("link", { name: "Auf der bisherigen Seite öffnen" }),
+      ).toHaveAttribute("href", `/events/${EVENT.id}/commitments#COM-001`);
+    });
+
+    it("says only that a risk does not open here, as it has no page", async () => {
+      open("#RSK-001");
+      const region = await panel("Eintrag öffnet noch nicht hier");
+      expect(within(region).queryByRole("link")).toBeNull();
     });
 
     it("does not open anything without a hash", async () => {
