@@ -164,7 +164,8 @@ function sortValue(
     case "owner":
       return text(item.owner.name);
     case "due":
-      return dueOf(item);
+      // The column shows the day of a decision, so it sorts by it too.
+      return item.date;
     case "area":
       return text(areaOf(item));
   }
