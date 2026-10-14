@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { type MutableRefObject, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { Api, RecordKind } from "../../api/client";
 import { t } from "../../i18n";
 import { LiveRegion } from "../../ui/LiveRegion";
@@ -48,8 +48,10 @@ export interface RecordPanelProps {
   next: string | undefined;
   /** The place of the record among them, counting from one. */
   place: { index: number; total: number } | undefined;
-  /** Shows another record. */
+  /** Shows another record in place of this one: the step buttons. */
   onOpen: (readableId: string) => void;
+  /** Shows the record that a link of the panel names. The member chose it, so Back returns. */
+  onFollow: (readableId: string) => void;
   onClose: () => void;
   /** Where focus goes on close when the element that opened the panel is gone. */
   returnFocusTo: () => HTMLElement | null | undefined;
@@ -119,6 +121,7 @@ function Body({
   lookup,
   timeZone,
   focusTitle,
+  handoff,
 }: {
   item: WorkItem;
   descriptor: RecordDescriptor;
@@ -126,12 +129,40 @@ function Body({
   lookup: RecordLookup;
   timeZone: string;
   focusTitle: boolean;
+  /**
+   * True while focus left with a body that held it, so that the next body puts it on its title.
+   * The member followed a link or stepped back to a record: the element they used is gone.
+   */
+  handoff: MutableRefObject<boolean>;
 }) {
+  const root = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const sourcesId = useId();
   const titleId = useId();
   const { title, description } = descriptor;
+  // The title is the button of an editable title, else the heading itself.
+  const titleElement = () =>
+    heading.current?.querySelector<HTMLElement>("button") ?? heading.current;
+
+  // A layout effect, because its cleanup runs before React removes the body: focus is still in it.
+  useLayoutEffect(() => {
+    const body = root.current;
+    return () => {
+      if (body?.contains(document.activeElement)) {
+        handoff.current = true;
+      }
+    };
+  }, [handoff]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the body appears
+  useEffect(() => {
+    if (handoff.current) {
+      handoff.current = false;
+      titleElement()?.focus();
+    }
+  }, []);
+
   return (
-    <div className={styles.body}>
+    <div ref={root} className={styles.body}>
       {/* The field is the heading: it names itself by the title while the title is on screen. */}
       <FieldEditor
         spec={title}
@@ -140,6 +171,7 @@ function Body({
         heading
         valueId={titleId}
         focusOnMount={focusTitle}
+        headingRef={heading}
       />
       <dl className={styles.props}>
         {descriptor.properties
@@ -149,7 +181,13 @@ function Body({
           ))}
       </dl>
       {descriptor.actions && !item.redacted && (
-        <RecordActions actions={descriptor.actions} item={item} env={env} announce={env.announce} />
+        <RecordActions
+          actions={descriptor.actions}
+          item={item}
+          env={env}
+          announce={env.announce}
+          focusTitle={titleElement}
+        />
       )}
       <RecordHints hints={descriptor.hints?.(item, lookup) ?? []} />
       {!item.redacted &&
@@ -194,9 +232,11 @@ export default function RecordPanel({
   next,
   place,
   onOpen,
+  onFollow,
   onClose,
   returnFocusTo,
 }: RecordPanelProps) {
+  const handoff = useRef(false);
   const [status, setStatus] = useState<string>();
   const [alert, setAlert] = useState<string>();
   const frame = {
@@ -285,7 +325,7 @@ export default function RecordPanel({
     today,
     editable: canEdit(item, writable),
     writable,
-    open: onOpen,
+    open: onFollow,
   };
   const lookup = lookupOf(work);
   // A decision has a long wording: the name of the region has its first line.
@@ -300,6 +340,7 @@ export default function RecordPanel({
         lookup={lookup}
         timeZone={timeZone}
         focusTitle={focusTitle}
+        handoff={handoff}
       />
       {live}
       {/* The failure of a save: at once, and only where a field can fail. */}

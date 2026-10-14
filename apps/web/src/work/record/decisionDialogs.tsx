@@ -178,9 +178,14 @@ export function SupersedeDecisionDialog({ item, env, onDone, onCancel }: ActionD
       ...(area && { workstream_id: area }),
     });
     if (result.ok) {
-      // The replaced decision changed too.
-      void env.refresh("decision");
-      onDone(t("decision-replaced", { id: result.record.local_id, old: item.readableId }));
+      // The replaced decision changed too: the panel shows its new state before the dialog closes.
+      const words = { id: result.record.local_id, old: item.readableId };
+      const loaded = await env.refresh("decision");
+      if (loaded) {
+        onDone(t("decision-replaced", words));
+      } else {
+        onDone(t("decision-replaced-stale", words), "alert");
+      }
       return undefined;
     }
     const { failure } = result;
