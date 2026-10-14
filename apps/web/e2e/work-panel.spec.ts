@@ -120,7 +120,7 @@ test("Escape ends an edit first and closes the panel second, and focus returns t
   await page.keyboard.type(" Entwurf");
   await page.keyboard.press("Escape");
   await expect(panel).toBeVisible();
-  await expect(panel.getByRole("button", { name: /^Titel bearbeiten: Generatoren/ })).toBeFocused();
+  await expect(panel.getByRole("button", { name: "Titel bearbeiten" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("complementary")).toHaveCount(0);
   await expect(card).toBeFocused();

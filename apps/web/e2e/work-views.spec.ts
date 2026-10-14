@@ -177,6 +177,10 @@ test.describe("on a touch screen between the phone and the docked table", () => 
     await tableShown(page, false);
     const small: string[] = [];
     for (const target of await page.getByRole("table").locator("button, a").all()) {
+      // A secondary column leaves a table in a container narrower than 56 rem; it has no target.
+      if (!(await target.isVisible())) {
+        continue;
+      }
       const height = (await target.boundingBox())?.height ?? 0;
       if (height < 44) {
         small.push(`${await target.textContent()} ${height}`);
