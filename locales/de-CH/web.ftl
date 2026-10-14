@@ -1307,7 +1307,6 @@ work-count =
         [one] 1 Eintrag
        *[other] { $count } Einträge
     }
-work-board = Board
 work-board-status = Status
 work-board-column-open = Offen
 work-board-column-in-progress = In Arbeit
@@ -1315,8 +1314,6 @@ work-board-column-blocked = Blockiert
 work-board-column-done = Erledigt
 work-board-column-canceled = Abgebrochen
 work-board-column-empty = Keine Einträge
-work-board-canceled-show = Abgebrochen einblenden
-work-board-canceled-hide = Abgebrochen ausblenden
 # $kind: the plural name of the kind, for example „Aufgaben“.
 work-kind-failed = { $kind } konnten nicht geladen werden.
 work-directory-failed = Personen und Bereiche konnten nicht geladen werden.
