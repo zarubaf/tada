@@ -11,7 +11,7 @@ const names = (id: string) => (id.endsWith("b1") ? "Anna Muster" : "");
 function card(
   kind: RecordKind,
   record: unknown,
-  props: { workstream?: string; today?: string } = {},
+  props: { workstream?: string; today?: string; inColumn?: boolean } = {},
 ) {
   const item = toWorkItem(kind, record as never, names) as WorkItem;
   render(
@@ -22,6 +22,7 @@ function card(
           eventId="e1"
           today={props.today ?? "2030-05-20"}
           workstreamName={props.workstream}
+          inColumn={props.inColumn ?? true}
         />
       </ul>
     </Router>,
@@ -86,6 +87,12 @@ describe("WorkCard", () => {
     // The status is in the description, and it is not a chip.
     expect(within(li).getByRole("link")).toHaveAccessibleDescription(/in Arbeit/);
     expect(status.closest("[class*=chips]")).toBeNull();
+  });
+
+  it("gives every status its label as a chip where no column names it, as in the list of a phone", () => {
+    const li = card("action", r.action("ACT-012", { status: "in-progress" }), { inColumn: false });
+    expect(within(li).getByText("in Arbeit").closest("[class*=chips]")).not.toBeNull();
+    expect(within(li).getByRole("link")).toHaveAccessibleDescription(/in Arbeit/);
   });
 
   it("gives a status that its column does not say a chip, and the icon stays decoration", () => {
