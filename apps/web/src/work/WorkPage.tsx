@@ -241,91 +241,89 @@ export function WorkPage({ api }: { api: Api }) {
     <div ref={layout} className={styles.layout}>
       <div className={styles.main}>
         <Page width="flush">
-          <div className={styles.work}>
-            <WorkViewTabs view={view} onChange={setView} toolbar={toolbar}>
-              <LiveRegion kind="status" visuallyHidden>
-                {announcement}
-              </LiveRegion>
-              {work.directory.kind === "failed" && (
-                <FailureBanner
-                  message={t("work-directory-failed")}
-                  detail={work.directory.message}
-                  busy={retrying.has("directory")}
-                  onRetry={() => retrying.start("directory", work.reloadDirectory)}
-                />
-              )}
-              {failed.map((kind) => (
-                <FailureBanner
-                  key={kind}
-                  message={t("work-kind-failed", { kind: t(`work-type-${kind}`) })}
-                  detail={failureMessage(work.kinds[kind])}
-                  busy={retrying.has(kind)}
-                  onRetry={() => retrying.start(kind, () => work.reloadKind(kind))}
-                />
-              ))}
-              {loading && <BoardSkeleton narrow={narrow} />}
-              {empty && (
-                <EmptyState
-                  title={t("work-empty-title")}
-                  text={t("work-empty-text")}
-                  action={
-                    mayCreate ? (
-                      <Button onPress={() => record.startCreate("action")}>
-                        {t("work-empty-new-action")}
-                      </Button>
-                    ) : undefined
-                  }
-                />
-              )}
-              {filteredOut && (
-                <EmptyState
-                  title={t("work-empty-filtered-title")}
-                  text={t("work-empty-filtered-text")}
-                  action={<Button onPress={reset}>{t("work-filter-reset")}</Button>}
-                />
-              )}
-              {!loading && shown.length > 0 && (
-                <div className={styles.scope}>
-                  <div
-                    className={styles.view}
-                    {...(barShown && !boardFillsColumns && { "data-dock-room": "" })}
-                  >
-                    <WorkViews
-                      view={view}
-                      items={shown}
-                      eventId={eventId}
-                      today={today}
-                      workstreamName={workstreamName}
-                      narrow={narrow}
-                      timeline={{
-                        api,
-                        filters,
-                        workstreams:
-                          work.directory.kind === "loaded"
-                            ? work.directory.directory.workstreams
-                            : [],
-                        timeZone:
-                          event.state.kind === "loaded" ? event.state.event.time_zone : undefined,
-                        onReset: reset,
-                      }}
-                      selection={held}
-                    />
-                  </div>
-                  {barShown && (
-                    <BulkBar
-                      selection={held}
-                      bulk={bulk}
-                      work={work}
-                      narrow={narrow}
-                      announce={setAnnouncement}
-                      bannerRef={banner}
-                      dockRef={dock}
-                    />
-                  )}
+          <WorkViewTabs view={view} onChange={setView} toolbar={toolbar}>
+            <LiveRegion kind="status" visuallyHidden>
+              {announcement}
+            </LiveRegion>
+            {work.directory.kind === "failed" && (
+              <FailureBanner
+                message={t("work-directory-failed")}
+                detail={work.directory.message}
+                busy={retrying.has("directory")}
+                onRetry={() => retrying.start("directory", work.reloadDirectory)}
+              />
+            )}
+            {failed.map((kind) => (
+              <FailureBanner
+                key={kind}
+                message={t("work-kind-failed", { kind: t(`work-type-${kind}`) })}
+                detail={failureMessage(work.kinds[kind])}
+                busy={retrying.has(kind)}
+                onRetry={() => retrying.start(kind, () => work.reloadKind(kind))}
+              />
+            ))}
+            {loading && <BoardSkeleton narrow={narrow} />}
+            {empty && (
+              <EmptyState
+                title={t("work-empty-title")}
+                text={t("work-empty-text")}
+                action={
+                  mayCreate ? (
+                    <Button onPress={() => record.startCreate("action")}>
+                      {t("work-empty-new-action")}
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )}
+            {filteredOut && (
+              <EmptyState
+                title={t("work-empty-filtered-title")}
+                text={t("work-empty-filtered-text")}
+                action={<Button onPress={reset}>{t("work-filter-reset")}</Button>}
+              />
+            )}
+            {!loading && shown.length > 0 && (
+              <div className={styles.scope}>
+                <div
+                  className={styles.view}
+                  {...(barShown && !boardFillsColumns && { "data-dock-room": "" })}
+                >
+                  <WorkViews
+                    view={view}
+                    items={shown}
+                    eventId={eventId}
+                    today={today}
+                    workstreamName={workstreamName}
+                    narrow={narrow}
+                    timeline={{
+                      api,
+                      filters,
+                      workstreams:
+                        work.directory.kind === "loaded"
+                          ? work.directory.directory.workstreams
+                          : [],
+                      timeZone:
+                        event.state.kind === "loaded" ? event.state.event.time_zone : undefined,
+                      onReset: reset,
+                    }}
+                    selection={held}
+                  />
                 </div>
-              )}
-            </WorkViewTabs>
-          </div>
+                {barShown && (
+                  <BulkBar
+                    selection={held}
+                    bulk={bulk}
+                    work={work}
+                    narrow={narrow}
+                    announce={setAnnouncement}
+                    bannerRef={banner}
+                    dockRef={dock}
+                  />
+                )}
+              </div>
+            )}
+          </WorkViewTabs>
         </Page>
       </div>
       {route.mode !== "closed" && !loading && event.state.kind === "loaded" && (
