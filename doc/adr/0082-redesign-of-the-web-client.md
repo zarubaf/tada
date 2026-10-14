@@ -126,6 +126,10 @@ Each card shows its own real status chip, because a column can hold several stat
     It is a plain landmark region in `apps/web/src/ui/` with its own focus rules.
     Focus moves into the panel on open, and `Esc` closes it.
     Focus returns to the element that opened the panel, else to the list.
+  - On narrow layouts (below 640 px) the panel is a full-screen sheet.
+    The page behind it is inert, so it leaves the tab order, the reading order and the scroll.
+    The panel stays non-modal on wide and medium layouts.
+    Focus returns to the opener only if it is still inside the panel when the panel closes.
 - [ADR 0021](0021-typography-and-icons.md) (type and icons):
   - IDs stay in the monospace face.
   - Dense numbers, dates and counts use tabular figures.
