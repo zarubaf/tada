@@ -21,6 +21,7 @@
   .button[data-size="sm"] {
     min-height: var(--control-height-sm);
     padding: 0 var(--space-2);
+    font-size: var(--font-size-xs);
   }
 
   /* 44 px targets on coarse pointers (ADR 0022). */

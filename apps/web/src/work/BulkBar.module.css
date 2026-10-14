@@ -43,6 +43,7 @@
   /* 30 px high with a fine pointer; the hit target grows them to 44 px, as the tokens of the density say. */
   .bar button[data-size="sm"] {
     min-height: max(var(--size-bulk-button), var(--size-hit-target));
+    font-size: var(--font-size-dense);
   }
 
   .count {
