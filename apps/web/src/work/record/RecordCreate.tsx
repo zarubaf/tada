@@ -99,6 +99,7 @@ export function RecordCreate({
   sources,
   owner,
   onCreated,
+  recover,
   announce,
   onCancel,
 }: {
@@ -109,6 +110,11 @@ export function RecordCreate({
   owner: string | undefined;
   /** The readable ID of the record that was created. */
   onCreated: (readableId: string) => void;
+  /**
+   * Looks up the record that this form's ID names, for a retry whose first try did create it but
+   * lost the answer. Resolves to its readable ID, or to nothing if there is no such record.
+   */
+  recover: (recordId: string) => Promise<string | undefined>;
   announce: (text: string) => void;
   onCancel: () => void;
 }) {
@@ -167,6 +173,18 @@ export function RecordCreate({
       return;
     }
     const { problem, message } = result.failure;
+    // The ID is taken by this form's own earlier try, whose answer was lost: show that record.
+    const taken = problem?.errors?.some(
+      ({ pointer, code }) => pointer === "/id" && code === "taken",
+    );
+    if (taken) {
+      const readableId = await recover(recordId);
+      if (readableId) {
+        announce(t("record-created", { id: readableId }));
+        onCreated(readableId);
+        return;
+      }
+    }
     const invalid: Errors = {};
     for (const spec of shown) {
       const text = fieldError(problem, spec);

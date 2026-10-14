@@ -48,6 +48,7 @@ function openWork(
   );
   return {
     ...result,
+    work,
     posts: () => result.calls.filter((c) => c.call.startsWith("POST")).map((c) => c.body as Body),
   };
 }
@@ -183,6 +184,28 @@ describe("the create state", () => {
     const ids = server.posts().map((body) => body.id);
     expect(ids[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(ids[1]).toBe(ids[0]);
+  });
+
+  it("shows the record that a lost response created, when the retry finds its ID taken", async () => {
+    let calls = 0;
+    const server = openWork("?new=action", {}, (body) => {
+      if (++calls === 1) {
+        // The server made the record, but the answer never came back.
+        server.work["/actions"]?.push(created(body));
+        return problem(500, "internal");
+      }
+      return problem(422, "validation-failed", [{ pointer: "/id", code: "taken" }]);
+    });
+    const view = await form();
+    await user.type(view.getByRole("textbox", { name: /^Titel/ }), "Banner");
+    await user.click(view.getByRole("button", { name: "Erstellen" }));
+    await view.findByRole("alert");
+    await user.click(view.getByRole("button", { name: "Erstellen" }));
+
+    await screen.findByRole("complementary", { name: /ACT-020/ });
+    expect(window.location.hash).toBe("#ACT-020");
+    expect(screen.getByText("ACT-020 erfasst.")).toBeInTheDocument();
+    expect(server.posts()).toHaveLength(2);
   });
 
   it("sends one request for a double submit in the same moment", async () => {
