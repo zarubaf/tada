@@ -1,7 +1,8 @@
 # Design principles
 
 Under change by [ADR 0082](../adr/0082-redesign-of-the-web-client.md): the look moves to a dense design with a dark and a light theme.
-The principles stay. The checklist below already allows status icons, chips and dense cards.
+The principles stay.
+The checklist below applies to the new status icons, chips and dense cards.
 
 tada is a work tool for volunteers.
 The interface must disappear into the task: a member opens it, finds the open item, acts and leaves.
@@ -73,15 +74,15 @@ States and motion:
 
 These products show the quality we want. We take principles from them, not their look.
 
-| Reference                                                                        | What we learn from it                                                                  |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [Linear](https://linear.app)                                                     | Keyboard-first work, a command menu, restraint, dense lists that stay readable         |
-| [GitHub Primer](https://primer.style)                                            | Accessible tokens, data tables, review flows, clear status labels                      |
-| [GOV.UK Design System](https://design-system.service.gov.uk)                     | Forms, error summaries, plain-language messages, tested accessibility                  |
-| [Stripe Dashboard](https://dashboard.stripe.com)                                 | Tables with numbers, detail panels next to lists, calm color                           |
-| `itsaplan` (planning app, [ADR 0082](../adr/0082-redesign-of-the-web-client.md)) | Dense lists and boards, a side panel for the record, dark and light themes, one accent |
-| [Things](https://culturedcode.com/things/)                                       | A calm mobile task interface with few, clear actions                                   |
-| [Vercel Geist](https://vercel.com/geist)                                         | Disciplined tokens for type and color                                                  |
+| Reference                                                                                                               | What we learn from it                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [Linear](https://linear.app)                                                                                            | Keyboard-first work, a command menu, restraint, dense lists that stay readable         |
+| [GitHub Primer](https://primer.style)                                                                                   | Accessible tokens, data tables, review flows, clear status labels                      |
+| [GOV.UK Design System](https://design-system.service.gov.uk)                                                            | Forms, error summaries, plain-language messages, tested accessibility                  |
+| [Stripe Dashboard](https://dashboard.stripe.com)                                                                        | Tables with numbers, detail panels next to lists, calm color                           |
+| [itsaplan](https://github.com/croffasia/itsaplan) (planning app, [ADR 0082](../adr/0082-redesign-of-the-web-client.md)) | Dense lists and boards, a side panel for the record, dark and light themes, one accent |
+| [Things](https://culturedcode.com/things/)                                                                              | A calm mobile task interface with few, clear actions                                   |
+| [Vercel Geist](https://vercel.com/geist)                                                                                | Disciplined tokens for type and color                                                  |
 
 ## Sources of the agent guidance
 
