@@ -118,6 +118,9 @@ export function WorkPage({ api }: { api: Api }) {
   const selection = useWorkSelection(eventId, visible, writable, running);
   selectionRef.current = selection;
   const barShown = view !== "timeline" && (selection.selecting || running);
+  // The columns of the wide board already end 72 px under the last card, which is the room that the
+  // bar needs; the table and the lists of a phone get that room from the page.
+  const boardFillsColumns = view === "board" && !narrow;
   // Ending the selection ends the failures that belonged to it, once nothing runs or loads.
   const idle = !running && !reloading;
   const { reset: resetBulk } = bulk;
@@ -282,39 +285,44 @@ export function WorkPage({ api }: { api: Api }) {
                 />
               )}
               {!loading && shown.length > 0 && (
-                <div className={styles.scope} {...(barShown && { "data-bulk": "" })}>
-                  <WorkViews
-                    view={view}
-                    items={shown}
-                    eventId={eventId}
-                    today={today}
-                    workstreamName={workstreamName}
-                    narrow={narrow}
-                    timeline={{
-                      api,
-                      filters,
-                      workstreams:
-                        work.directory.kind === "loaded"
-                          ? work.directory.directory.workstreams
-                          : [],
-                      timeZone:
-                        event.state.kind === "loaded" ? event.state.event.time_zone : undefined,
-                      onReset: reset,
-                    }}
-                    selection={held}
-                  />
+                <div className={styles.scope}>
+                  <div
+                    className={styles.view}
+                    {...(barShown && !boardFillsColumns && { "data-dock-room": "" })}
+                  >
+                    <WorkViews
+                      view={view}
+                      items={shown}
+                      eventId={eventId}
+                      today={today}
+                      workstreamName={workstreamName}
+                      narrow={narrow}
+                      timeline={{
+                        api,
+                        filters,
+                        workstreams:
+                          work.directory.kind === "loaded"
+                            ? work.directory.directory.workstreams
+                            : [],
+                        timeZone:
+                          event.state.kind === "loaded" ? event.state.event.time_zone : undefined,
+                        onReset: reset,
+                      }}
+                      selection={held}
+                    />
+                  </div>
+                  {barShown && (
+                    <BulkBar
+                      selection={held}
+                      bulk={bulk}
+                      work={work}
+                      narrow={narrow}
+                      announce={setAnnouncement}
+                      bannerRef={banner}
+                      dockRef={dock}
+                    />
+                  )}
                 </div>
-              )}
-              {!loading && shown.length > 0 && barShown && (
-                <BulkBar
-                  selection={held}
-                  bulk={bulk}
-                  work={work}
-                  narrow={narrow}
-                  announce={setAnnouncement}
-                  bannerRef={banner}
-                  dockRef={dock}
-                />
               )}
             </WorkViewTabs>
           </div>

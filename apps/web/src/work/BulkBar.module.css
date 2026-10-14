@@ -2,8 +2,9 @@
   /*
    * The bar floats `--dock-offset` above the bottom of the window while the board or the table
    * shows. The dock has no height, so that it takes no room in the page: its content rises from the
-   * bottom edge. It also lets pointers through, so that it never hides a card beside the bar. The
-   * page keeps room for the bar at its end (`.scope` of the page).
+   * bottom edge. It also lets pointers through, so that it never hides a card beside the bar. It sits
+   * in the scope of the page after the view, with no gap before it, and the view keeps room for the
+   * bar at its end where it needs it (`.view` of the page).
    */
   .dock {
     position: sticky;
