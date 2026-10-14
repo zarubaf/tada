@@ -75,6 +75,16 @@ describe("the record panel", () => {
       expect(screen.queryByRole("complementary")).toBeNull();
     });
 
+    it("closes without an error when the hash holds a quote and a bracket", async () => {
+      // The decoded hash is `x"]`; as a selector it would be a syntax error.
+      open("#x%22%5D");
+      const region = await panel("Eintrag nicht gefunden");
+      await user.click(within(region).getByRole("button", { name: "Schliessen" }));
+
+      await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
+      expect(screen.getByRole("heading", { level: 1, name: "Arbeit" })).toHaveFocus();
+    });
+
     it("skips a record of a kind without a panel when it steps", async () => {
       open("#ACT-001");
       await panel(/ACT-001/);
