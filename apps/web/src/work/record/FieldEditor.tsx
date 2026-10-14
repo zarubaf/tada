@@ -170,6 +170,7 @@ export function FieldEditor({
   const value = spec.read(item);
   const picker =
     spec.control === "status" ||
+    spec.control === "enum" ||
     spec.control === "person" ||
     spec.control === "area" ||
     spec.control === "milestone";
@@ -234,7 +235,7 @@ export function FieldEditor({
           isPending={busy}
           placeholder={emptyText}
           variant="quiet"
-          searchable={spec.control !== "status"}
+          searchable={spec.control !== "status" && spec.control !== "enum"}
           {...(spec.emptyKey && { clearLabel: emptyText })}
         />
         {busy && <Saving />}
