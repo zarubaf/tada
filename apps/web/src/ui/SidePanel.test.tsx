@@ -92,6 +92,30 @@ describe("SidePanel", () => {
     expect(screen.getByRole("heading", { name: "Sponsorenliste nachführen" })).toBeInTheDocument();
   });
 
+  it("shows the heading of the caller in the head and keeps the title as the name", async () => {
+    render(
+      <SidePanel title="ACT-012 Sponsorenliste" heading={<span>Kopf</span>} onClose={() => {}}>
+        Inhalt
+      </SidePanel>,
+    );
+
+    expect(screen.getByRole("complementary", { name: "ACT-012 Sponsorenliste" })).toBeVisible();
+    expect(screen.getByText("Kopf")).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "ACT-012 Sponsorenliste" })).toBeNull();
+  });
+
+  it("names the buttons of the head and gives them a tooltip", async () => {
+    render(
+      <SidePanel title="A" onClose={() => {}} onPrevious={() => {}} onNext={() => {}}>
+        x
+      </SidePanel>,
+    );
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Vorheriger Eintrag" })).toHaveFocus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Vorheriger Eintrag");
+  });
+
   it("moves focus into the panel on open", async () => {
     render(<Harness />);
 

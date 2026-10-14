@@ -254,11 +254,12 @@ Elements with a shadow also have a 1 px border in `--color-border-subtle` and th
 
 ## Z-index
 
-| Token        | Use                               |
-| ------------ | --------------------------------- |
-| `--z-sticky` | Sticky table headers and toolbars |
-| `--z-shell`  | Sidebar and bottom bar            |
-| `--z-toast`  | Toasts                            |
+| Token        | Use                                                  |
+| ------------ | ---------------------------------------------------- |
+| `--z-sticky` | Sticky table headers and toolbars                    |
+| `--z-shell`  | Sidebar and bottom bar                               |
+| `--z-panel`  | The side panel, above the top bar and the bottom bar |
+| `--z-toast`  | Toasts                                               |
 
 Dialogs, sheets, popovers, menus and tooltips use the browser top layer (`<dialog>` or the Popover API through React Aria Components). They need no z-index.
 
