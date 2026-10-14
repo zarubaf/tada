@@ -182,7 +182,17 @@ describe("the table view", () => {
       within(grid)
         .getAllByRole("columnheader")
         .map((header) => header.textContent),
-    ).toEqual(["ID", "Typ", "Titel", "Status", "Verantwortlich", "Fällig", "Bereich"]);
+      // The first header holds the box „Alle auswählen“.
+    ).toEqual([
+      "Alle auswählen",
+      "ID",
+      "Typ",
+      "Titel",
+      "Status",
+      "Verantwortlich",
+      "Fällig",
+      "Bereich",
+    ]);
   });
 
   it("lists every record by date, the soonest first, by default", async () => {

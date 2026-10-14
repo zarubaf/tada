@@ -1320,6 +1320,8 @@ work-table-status = Status
 work-table-owner = Verantwortlich
 work-table-due = Fällig
 work-table-area = Bereich
+# The column with the checkboxes: its name for assistive technology.
+work-table-select = Auswahl
 # $column: the name of the column. $direction: asc or desc.
 work-sorted =
     Sortiert nach { $column }, { $direction ->

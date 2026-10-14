@@ -34,6 +34,8 @@ export interface DataTableProps<T> {
   rowKey: (row: T) => string;
   /** The `id` of a row, so that a link can name it. A row with an id can take focus. */
   rowId?: (row: T) => string;
+  /** True for a row that is selected: it has a mark that is more than colour (`data-selected`). */
+  rowSelected?: (row: T) => boolean;
   /** The row that a link named: it has a mark for a moment. */
   linkedId?: string;
   /** The column that the rows are sorted by. The caller sorts the rows; the table only shows it. */
@@ -101,6 +103,7 @@ export function DataTable<T>({
   rows,
   rowKey,
   rowId,
+  rowSelected,
   linkedId,
   sort,
   onSort,
@@ -145,6 +148,7 @@ export function DataTable<T>({
               id={id}
               tabIndex={id === undefined ? undefined : -1}
               data-linked={id !== undefined && id === linkedId ? "" : undefined}
+              data-selected={rowSelected?.(row) ? "" : undefined}
             >
               {columns.map((column) => (
                 <td
@@ -177,6 +181,7 @@ export function DataTable<T>({
           className={styles.scroller}
           aria-label={scrolls ? label : undefined}
           tabIndex={scrolls ? 0 : undefined}
+          data-scrolls={scrolls ? "" : undefined}
         >
           {table}
         </section>

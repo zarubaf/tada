@@ -67,6 +67,19 @@
     }
   }
 
+  /* A selected row has a tint and a bar at its start; the checked box says it too. */
+  .table tbody tr[data-selected] {
+    background: var(--color-accent-subtle);
+  }
+
+  .table tbody tr[data-selected] > :first-child {
+    background: linear-gradient(
+      to right,
+      var(--color-accent) var(--space-1),
+      transparent var(--space-1)
+    );
+  }
+
   .table td[data-mono] {
     font-family: var(--font-family-mono);
     font-size: var(--font-size-sm);
@@ -117,6 +130,14 @@
     }
   }
 
+  /*
+   * Columns that cannot shrink (a mono ID, a date) can need more than 40rem. The container clips,
+   * so the scroller then turns on whenever its content is wider than it, at any width.
+   */
+  .scroller[data-scrolls] {
+    overflow-x: auto;
+  }
+
   /* The container clips, so the ring goes inside the region. */
   .scroller:focus-visible {
     outline-offset: -2px;
@@ -164,6 +185,11 @@
   @media (forced-colors: active) {
     .sortIcon {
       opacity: 1;
+    }
+
+    .table tbody tr[data-selected] {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
     }
   }
 
