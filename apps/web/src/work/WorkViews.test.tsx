@@ -232,12 +232,14 @@ describe("the table view", () => {
     expect(within(row("ACT-004")).queryByText(/überfällig/)).not.toBeInTheDocument();
   });
 
-  it("leaves the risk without a link", async () => {
+  it("links the risk to the panel", async () => {
     open("?view=table");
     await table();
     const risk = within(row("RSK-001"));
-    expect(risk.getByText("Regen ohne Ausweichraum")).toBeInTheDocument();
-    expect(risk.queryByRole("link")).not.toBeInTheDocument();
+    expect(risk.getByRole("link", { name: "Regen ohne Ausweichraum" })).toHaveAttribute(
+      "href",
+      `/events/${EVENT.id}/work?view=table#RSK-001`,
+    );
   });
 
   it("shows the tombstone of a redacted record", async () => {

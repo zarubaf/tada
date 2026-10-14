@@ -108,10 +108,10 @@ describe("the record panel", () => {
       ).toHaveAttribute("href", `/events/${EVENT.id}/commitments#COM-001`);
     });
 
-    it("says only that a risk does not open here, as it has no page", async () => {
+    it("opens the risk that the hash names, with its rating", async () => {
       open("#RSK-001");
-      const region = await panel("Eintrag öffnet noch nicht hier");
-      expect(within(region).queryByRole("link")).toBeNull();
+      const region = await panel(/RSK-001/);
+      expect(within(region).getByRole("button", { name: "Wirkung: hoch" })).toBeVisible();
     });
 
     it("does not open anything without a hash", async () => {
