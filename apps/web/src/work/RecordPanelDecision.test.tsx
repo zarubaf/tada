@@ -377,7 +377,9 @@ describe("replacing a decision", () => {
     expect(within(chosen).getByText("Testwil Generatoren AG (INS-001)")).toBeVisible();
     expect(dialog.getByText(/Der neue Entscheid ersetzt DEC-001/)).toBeVisible();
     // The words say what the new decision takes over; the old one has no reason to give.
-    expect(dialog.getByText(/Verantwortlich und Bereich übernimmt/)).toBeVisible();
+    expect(dialog.getByText(/Verantwortlich und Bereich sind die des bisherigen/)).toBeVisible();
+    expect(dialog.getByRole("button", { name: "Verantwortlich: Bernd Beispiel" })).toBeVisible();
+    expect(dialog.getByRole("button", { name: "Bereich: Bodenbetrieb" })).toBeVisible();
     expect(dialog.queryByRole("textbox", { name: /^Grund/ })).toBeNull();
   });
 
@@ -434,11 +436,55 @@ describe("replacing a decision", () => {
   it("shows the refusal of the server at the fields of the successor", async () => {
     const { dialog } = await openDialog({
       "POST /decisions/rec-dec-001/supersede": () =>
-        problem(422, "validation-failed", [{ pointer: "/successor/decided_on", code: "invalid" }]),
+        problem(422, "validation-failed", [{ pointer: "/decided_on", code: "invalid" }]),
     });
     await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
     await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
     expect(await dialog.findByText("Geben Sie ein gültiges Datum an.")).toBeVisible();
+    expect(dialog.getByRole("textbox", { name: /^Wortlaut/ })).toHaveValue(WORDING);
+  });
+
+  it("lets a manager change the owner and the area of the successor, or clear the area", async () => {
+    const { server, dialog } = await openDialog();
+    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.click(dialog.getByRole("button", { name: "Verantwortlich: Bernd Beispiel" }));
+    await user.click(await screen.findByRole("option", { name: "Anna Muster" }));
+    await user.click(dialog.getByRole("button", { name: "Bereich: Bodenbetrieb" }));
+    await user.click(await screen.findByRole("option", { name: "Festwirtschaft" }));
+    await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(server.sent("POST")[0]).toMatchObject({
+      successor: { owner_user_id: ME, workstream_id: "w2" },
+    });
+  });
+
+  it("sends no area for a successor whose area was cleared", async () => {
+    const { server, dialog } = await openDialog();
+    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.click(dialog.getByRole("button", { name: "Bereich: Bodenbetrieb" }));
+    await user.click(await screen.findByRole("button", { name: "Kein Bereich" }));
+    await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(server.sent("POST")[0]?.successor).not.toHaveProperty("workstream_id");
+  });
+
+  it.each([
+    ["/workstream", "closed", "Bereich: Bodenbetrieb", "Dieser Arbeitsbereich ist geschlossen."],
+    [
+      "/owner",
+      "not-assignable",
+      "Verantwortlich: Bernd Beispiel",
+      "Wählen Sie ein Mitglied des Anlasses mit Mitarbeit oder Anlassleitung.",
+    ],
+  ])("shows the refusal of %s at its field and focuses it", async (pointer, code, button, text) => {
+    const { dialog } = await openDialog({
+      "POST /decisions/rec-dec-001/supersede": () =>
+        problem(422, "validation-failed", [{ pointer, code }]),
+    });
+    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
+    expect(await dialog.findByText(text)).toBeVisible();
+    await waitFor(() => expect(dialog.getByRole("button", { name: button })).toHaveFocus());
     expect(dialog.getByRole("textbox", { name: /^Wortlaut/ })).toHaveValue(WORDING);
   });
 
