@@ -32,6 +32,7 @@ export function IconButton({ icon: Icon, label, ...props }: IconButtonProps) {
         aria-label={label}
         // The tooltip repeats the name. React Aria points `aria-describedby` at it while it is
         // open; an empty value stops a screen reader from reading the name twice.
+        // biome-ignore lint/a11y/useValidAriaValues: the empty value overrides the one of React Aria
         aria-describedby=""
       >
         <Icon size={16} stroke={1.5} aria-hidden="true" />
