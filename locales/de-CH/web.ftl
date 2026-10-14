@@ -1443,6 +1443,7 @@ record-no-mitigation = Keine Gegenmassnahme
 record-unknown-area = Unbekannter Bereich
 record-unknown-milestone = Unbekannter Meilenstein
 record-sources = Quellen
+record-hints = Hinweise
 record-not-found-title = Eintrag nicht gefunden
 # $id: the readable ID from the address.
 record-not-found-text = Den Eintrag { $id } gibt es in diesem Anlass nicht.

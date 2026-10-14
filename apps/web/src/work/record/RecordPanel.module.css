@@ -163,6 +163,28 @@
     color: var(--color-text-muted);
   }
 
+  /* The hints: a warning icon in the warning color, then the sentence, which wraps. */
+  .hints {
+    display: grid;
+    gap: var(--space-1-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .hint {
+    display: flex;
+    align-items: start;
+    gap: var(--space-2);
+    font-weight: var(--font-weight-regular);
+  }
+
+  .hint > svg {
+    flex: none;
+    margin-block-start: var(--space-0-5);
+    color: var(--color-warning);
+  }
+
   /* The sources: each passage is a card, with its version and time inside. */
   .sources > ul {
     gap: var(--space-2);
