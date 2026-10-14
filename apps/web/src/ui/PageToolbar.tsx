@@ -7,5 +7,10 @@ import styles from "./PageToolbar.module.css";
  * wraps into a second row where the controls do not fit, and never overflows.
  */
 export function PageToolbar({ children }: { children: ReactNode }) {
-  return <div className={styles.row}>{children}</div>;
+  // The attribute names the row for the measuring checks of the browser, which must not count parents.
+  return (
+    <div className={styles.row} data-page-toolbar="">
+      {children}
+    </div>
+  );
 }
