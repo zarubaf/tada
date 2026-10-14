@@ -4,4 +4,9 @@
     gap: var(--space-4);
     min-width: 0;
   }
+
+  /* The board and its bulk bar: the bar sticks to the bottom of the screen while the board shows. */
+  .scope {
+    min-width: 0;
+  }
 }
