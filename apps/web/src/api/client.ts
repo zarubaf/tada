@@ -46,6 +46,7 @@ export type MilestoneStatus = components["schemas"]["MilestoneStatus"];
 export type MilestoneWarning = components["schemas"]["Warning"];
 export type Decision = components["schemas"]["Decision"];
 export type DecisionStatus = components["schemas"]["DecisionStatus"];
+export type RiskStatus = components["schemas"]["RiskStatus"];
 export type PartyRef = components["schemas"]["PartyRef"];
 export type RecordEvidence = components["schemas"]["RecordEvidence"];
 export type Document = components["schemas"]["Document"];
