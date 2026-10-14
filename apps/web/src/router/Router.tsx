@@ -324,6 +324,11 @@ export interface LinkProps {
   children: ReactNode;
 }
 
+/** True when the path is `base` or lies below it. */
+export function isAtOrBelow(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
 /**
  * A link that changes the path without a page load. The current page gets `aria-current`. Only the
  * path of `to` counts: a query or a hash does not make a link current or not. A `to` without a
@@ -346,15 +351,14 @@ export function Link({
   const { pathname, navigate } = useLocation();
   // A query or a hash in `to` does not count: the link is current for its path.
   const target = to.split(/[?#]/, 1)[0] ?? to;
-  const yielded =
-    yieldsTo !== undefined && (pathname === yieldsTo || pathname.startsWith(`${yieldsTo}/`));
+  const yielded = yieldsTo !== undefined && isAtOrBelow(pathname, yieldsTo);
   const current =
     target !== "" &&
     !yielded &&
     (pathname === target ||
       (!exact && pathname.startsWith(`${target}/`)) ||
       (within !== undefined && pathname.startsWith(`${within}/`)) ||
-      alsoCurrentOn.some((path) => pathname === path || pathname.startsWith(`${path}/`)));
+      alsoCurrentOn.some((path) => isAtOrBelow(pathname, path)));
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     const plain =
       event.button === 0 &&
