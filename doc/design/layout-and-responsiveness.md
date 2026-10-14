@@ -205,6 +205,7 @@ The page does not use the sub-navigation of the event.
   Over the wide board the bar floats above the empty ends of the columns: they already end 72 px under the last card, which is more than the bar needs (`--dock-room`).
   The table and the list of a phone keep `--dock-room` free at their end (the bar and its distance from the bottom) while the bar shows, so that it never covers the last row or card; they do not fill the height, so that room shifts nothing that is visible.
   Below 40rem it sits above the bottom bar, in two rows: the count and „Auswahl aufheben“, then the three buttons, which wrap and never scroll sideways.
+  Beside the record panel the bar keeps clear of it: from 80rem the docked panel leaves the bar its own column, and from 40rem to 80rem the bar floats in the space left of the overlay panel (`--size-panel-width`), so that the panel never covers it.
   The value lists open as a sheet from the bottom instead of a popover.
   A failure banner sits above the bar in the same dock.
 
