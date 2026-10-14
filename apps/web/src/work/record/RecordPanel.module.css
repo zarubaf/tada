@@ -154,6 +154,13 @@
     min-width: 0;
   }
 
+  /* The value that the server holds after a conflict, beside the draft. */
+  .theirs {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    overflow-wrap: anywhere;
+  }
+
   .error {
     color: var(--color-danger);
     font-size: var(--font-size-sm);
