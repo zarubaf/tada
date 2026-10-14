@@ -98,6 +98,15 @@
     min-width: 40rem;
   }
 
+  /* A growing cell takes the width that is left; the ellipsis needs a width of 0 to start from. */
+  .table[data-fixed] td[data-grow] {
+    width: 100%;
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   @media (width < 58rem) {
     .container[data-fixed] {
       overflow-x: auto;

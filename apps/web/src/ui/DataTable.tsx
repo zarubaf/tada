@@ -10,6 +10,8 @@ export interface Column<T> {
   mono?: boolean;
   /** Tabular figures, for numbers, dates and times. */
   numeric?: boolean;
+  /** The column takes the width that is left, and a long text ends in an ellipsis (`stacked={false}`). */
+  grow?: boolean;
   /** The header is a button that sorts by this column. It needs `onSort` on the table. */
   sortable?: boolean;
 }
@@ -108,6 +110,7 @@ export function DataTable<T>({
                     key={column.id}
                     data-mono={column.mono || undefined}
                     data-numeric={column.numeric || undefined}
+                    data-grow={column.grow || undefined}
                   >
                     {/* Shown only in a two-line row, where the column headers are not visible. */}
                     <span className={styles.label}>{column.header}</span>
