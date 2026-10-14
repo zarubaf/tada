@@ -24,7 +24,7 @@ import { type KindState, useWork } from "./useWork";
 import { useWorkFilters } from "./useWorkFilters";
 import { lockSelection, useWorkSelection, type WorkSelection } from "./useWorkSelection";
 import styles from "./WorkPage.module.css";
-import { WorkToolbar } from "./WorkToolbar";
+import { useWorkToolbar } from "./WorkToolbar";
 import { WorkViews } from "./WorkViews";
 import { WorkViewTabs } from "./WorkViewTabs";
 import { countsFor, filterWork, groupByColumn, NO_FILTERS, serializeFilters } from "./workFilters";
@@ -202,6 +202,22 @@ export function WorkPage({ api }: { api: Api }) {
       ? undefined
       : layout.current?.querySelector<HTMLElement>(`a[href$="#${CSS.escape(openId)}"]`)) ??
     heading.current;
+  const toolbar = useWorkToolbar({
+    filters,
+    onChange: setFilters,
+    counts,
+    directory: work.directory,
+    me,
+    narrow,
+    title: (
+      <PageTitle ref={heading} compact>
+        {t("work-title")}
+      </PageTitle>
+    ),
+    onReset: reset,
+    searchRef: search,
+    onCreate: mayCreate ? () => record.startCreate("action") : undefined,
+  });
 
   const empty = !loading && failed.length === 0 && work.items.length === 0;
   const filteredOut = !loading && work.items.length > 0 && shown.length === 0;
@@ -220,21 +236,9 @@ export function WorkPage({ api }: { api: Api }) {
   return (
     <div ref={layout} className={styles.layout}>
       <div className={styles.main}>
-        <Page>
+        <Page width="flush">
           <div className={styles.page}>
-            <PageTitle ref={heading}>{t("work-title")}</PageTitle>
-            <WorkViewTabs view={view} onChange={setView}>
-              <WorkToolbar
-                filters={filters}
-                onChange={setFilters}
-                counts={counts}
-                directory={work.directory}
-                me={me}
-                narrow={narrow}
-                onReset={reset}
-                searchRef={search}
-                onCreate={mayCreate ? () => record.startCreate("action") : undefined}
-              />
+            <WorkViewTabs view={view} onChange={setView} toolbar={toolbar}>
               <LiveRegion kind="status" visuallyHidden>
                 {announcement}
               </LiveRegion>

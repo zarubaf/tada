@@ -22,6 +22,15 @@ export interface TabsProps {
   /** The ID of the selected tab. The page owns it, for example in the URL. */
   value: string;
   onChange: (id: string) => void;
+  /** `segmented` is a compact switch of views for a toolbar row; the default is the underlined row. */
+  variant?: "underline" | "segmented";
+  /**
+   * Controls of the page toolbar that sit before and after the tab list in one row, for example
+   * the title and the type filter. The row wraps when it does not fit. Without both, the tab list
+   * stands alone.
+   */
+  before?: ReactNode;
+  after?: ReactNode;
   /** The `TabPanel` elements, one for each tab. */
   children: ReactNode;
 }
@@ -30,26 +39,46 @@ export interface TabsProps {
  * Tabs for two to six views of one list or record (doc/design/components.md). Arrow keys move
  * between the tabs; one tab is a tab stop. A type filter without panels is a `TypeFilter`.
  */
-export function Tabs({ label, tabs, value, onChange, children }: TabsProps) {
+export function Tabs({
+  label,
+  tabs,
+  value,
+  onChange,
+  variant = "underline",
+  before,
+  after,
+  children,
+}: TabsProps) {
+  const list = (
+    <TabList className={styles.list} data-variant={variant} aria-label={label}>
+      {tabs.map((tab) => (
+        <Tab key={tab.id} id={tab.id} className={styles.tab}>
+          {tab.label}
+          {tab.count !== undefined && (
+            <>
+              {" "}
+              <span className={styles.count}>{tab.count}</span>
+            </>
+          )}
+        </Tab>
+      ))}
+    </TabList>
+  );
   return (
     <AriaTabs
       className={styles.tabs}
       selectedKey={value}
       onSelectionChange={(key) => onChange(String(key))}
     >
-      <TabList className={styles.list} aria-label={label}>
-        {tabs.map((tab) => (
-          <Tab key={tab.id} id={tab.id} className={styles.tab}>
-            {tab.label}
-            {tab.count !== undefined && (
-              <>
-                {" "}
-                <span className={styles.count}>{tab.count}</span>
-              </>
-            )}
-          </Tab>
-        ))}
-      </TabList>
+      {before === undefined && after === undefined ? (
+        list
+      ) : (
+        <div className={styles.row}>
+          {before}
+          {list}
+          {after}
+        </div>
+      )}
       {children}
     </AriaTabs>
   );

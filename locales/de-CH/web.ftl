@@ -1285,7 +1285,6 @@ org-retention-owner-only-hidden = Nur die Organisationsleitung sieht und ändert
 
 work-title = Arbeit
 work-loading-board = Arbeit wird geladen
-work-toolbar = Filter
 work-type-label = Typ
 work-type-all = Alle
 work-type-action = Aufgaben

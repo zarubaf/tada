@@ -97,6 +97,8 @@ test("a URL opens the same filtered view after a reload", async ({ page }) => {
   await expect(page.getByRole("link", { name: /ACT-001/ })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("link", { name: /ACT-003/ })).toBeVisible();
+  // The search sits in the sheet of the „Filter“ button, which says how many filters are set.
+  await page.getByRole("button", { name: "Filter, 1 gesetzt" }).click();
   await expect(page.getByRole("searchbox", { name: "Arbeit durchsuchen" })).toHaveValue("Flyer");
   await expect(page.getByRole("radio", { name: /^Aufgaben/, checked: true })).toBeVisible();
 });

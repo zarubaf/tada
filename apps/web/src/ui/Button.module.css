@@ -18,6 +18,18 @@
     transition-timing-function: var(--ease-out);
   }
 
+  .button[data-size="sm"] {
+    min-height: var(--control-height-sm);
+    padding: 0 var(--space-2);
+  }
+
+  /* 44 px targets on coarse pointers (ADR 0022). */
+  @media (pointer: coarse) {
+    .button[data-size="sm"] {
+      min-height: var(--control-height-md);
+    }
+  }
+
   /* A refused button (aria-disabled) is not turned off for hover by react-aria, so the rules skip it. */
   .button[data-hovered]:not([aria-disabled="true"]) {
     background: var(--color-bg-hover);
