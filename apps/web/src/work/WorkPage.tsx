@@ -357,6 +357,10 @@ export function WorkPage({ api }: { api: Api }) {
               setMade(undefined);
               record.open(readableId);
             }}
+            onFollow={(readableId) => {
+              setMade(undefined);
+              record.follow(readableId);
+            }}
             onClose={() => {
               setMade(undefined);
               record.close();

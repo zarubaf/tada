@@ -145,8 +145,12 @@ export interface RecordLookup {
 export interface ActionDialogProps {
   item: WorkItem;
   env: FieldEnv;
-  /** The action ran. The dialog says in one sentence what happened; the panel announces it and closes the dialog. */
-  onDone: (message: string) => void;
+  /**
+   * The action ran. The dialog says in one sentence what happened; the panel announces it and
+   * closes the dialog. The urgency is `alert` if the member must act on it, for example when the
+   * record could not be loaded again.
+   */
+  onDone: (message: string, urgency?: "status" | "alert") => void;
   /** The member gave up. */
   onCancel: () => void;
 }

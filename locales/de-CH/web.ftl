@@ -1150,6 +1150,7 @@ decision-wording-more-of = Wortlaut von { $id } ganz zeigen
 decision-wording-less-of = Wortlaut von { $id } kürzen
 # $id: the new decision. $old: the decision that it replaces.
 decision-replaced = { $id } ersetzt { $old }.
+decision-replaced-stale = { $id } ersetzt { $old }, doch { $old } ist nicht aktuell. Laden Sie die Seite neu.
 # $id: the readable ID of the decision.
 decision-revoked = { $id } ist jetzt widerrufen.
 decision-evidence-version = Stützt die Version { $version } des Entscheids

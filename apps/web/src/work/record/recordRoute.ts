@@ -24,6 +24,11 @@ export interface RecordRouteControls {
    * replaces the history entry: prev and next are no places to go back to.
    */
   open: (readableId: string) => void;
+  /**
+   * Shows a record that the member chose by a link of the panel. It makes a history entry, so
+   * that Back returns to the record they came from.
+   */
+  follow: (readableId: string) => void;
   /** Closes the panel and keeps the query. It replaces the history entry. */
   close: () => void;
   /** Opens the create state. It makes a history entry, so that back closes it. */
@@ -66,6 +71,7 @@ export function useRecordRoute(): RecordRouteControls {
   return {
     route,
     open: useCallback((id) => go({ hash: id }, true), [go]),
+    follow: useCallback((id) => go({ hash: id }, false), [go]),
     close: useCallback(() => go({}, true), [go]),
     startCreate: useCallback((kind) => go({ kind }, false), [go]),
   };
