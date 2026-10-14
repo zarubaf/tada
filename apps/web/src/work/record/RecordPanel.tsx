@@ -98,11 +98,20 @@ function Body({
 }) {
   const descriptionId = useId();
   const sourcesId = useId();
+  const titleId = useId();
   const { title, description } = descriptor;
   return (
     <div className={styles.body}>
-      <h2 className={styles.title}>
-        <FieldEditor spec={title} item={item} env={env} heading focusOnMount={focusTitle} />
+      {/* The button inside names itself „Titel bearbeiten“; the heading is named by the title. */}
+      <h2 className={styles.title} aria-labelledby={titleId}>
+        <FieldEditor
+          spec={title}
+          item={item}
+          env={env}
+          heading
+          valueId={titleId}
+          focusOnMount={focusTitle}
+        />
       </h2>
       <dl className={styles.props}>
         {descriptor.properties.map((spec) => (

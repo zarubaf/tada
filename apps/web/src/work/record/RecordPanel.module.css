@@ -59,6 +59,11 @@
     min-width: 0;
   }
 
+  /* The element that names the value of a display button; it adds no box of its own. */
+  .valueText {
+    display: contents;
+  }
+
   .empty {
     color: var(--color-text-muted);
   }
@@ -76,6 +81,7 @@
 
   /* A long text keeps its line breaks. */
   .text {
+    display: block;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

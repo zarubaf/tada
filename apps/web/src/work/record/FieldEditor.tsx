@@ -18,9 +18,9 @@ export interface FieldEnv extends FieldServices {
   editable: boolean;
 }
 
-/** What a screen reader hears of the button that starts an edit: the field and its value. */
-function editName(spec: FieldSpec, value: string) {
-  return t("record-edit-field", { field: t(spec.labelKey), value });
+/** What a screen reader hears as the name of the button that starts an edit: the field only. */
+function editName(spec: FieldSpec) {
+  return t("record-edit-field", { field: t(spec.labelKey) });
 }
 
 /** The text of a value for a name: the words for no value when there is none. */
@@ -148,6 +148,7 @@ export function FieldEditor({
   item,
   env,
   heading = false,
+  valueId,
   focusOnMount = false,
 }: {
   spec: FieldSpec;
@@ -155,6 +156,11 @@ export function FieldEditor({
   env: FieldEnv;
   /** The field is the heading of the panel, so its text is the display button. */
   heading?: boolean;
+  /**
+   * The ID of the element that holds the value. The button points at it as its description, and
+   * the page can name a heading by it.
+   */
+  valueId?: string;
   /** Focus goes to the display button once, for the title of a record that was just created. */
   focusOnMount?: boolean;
 }) {
@@ -171,6 +177,8 @@ export function FieldEditor({
   const display = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
   const errorId = useId();
+  const ownValueId = useId();
+  const valueElement = valueId ?? ownValueId;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the field appears
   useEffect(() => {
@@ -234,16 +242,18 @@ export function FieldEditor({
   }
 
   if (edit.phase === "idle") {
-    const text = valueText(spec, value);
     return (
       <button
         ref={display}
         type="button"
         className={heading ? `${styles.display} ${styles.displayTitle}` : styles.display}
-        aria-label={editName(spec, text)}
+        aria-label={editName(spec)}
+        aria-describedby={valueElement}
         onClick={edit.begin}
       >
-        {view}
+        <span id={valueElement} className={styles.valueText}>
+          {view}
+        </span>
       </button>
     );
   }
