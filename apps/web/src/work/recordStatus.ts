@@ -112,6 +112,15 @@ export function presentationOf<K extends RecordKind>(record: {
   return statusPresentation(record.kind, record.status);
 }
 
+/**
+ * True when the name of the status is the name of its board column, for example an open action in
+ * „Offen“. A card shows such a status as an icon alone; any other status (a conditional
+ * commitment, a reached milestone) gets its label as a chip.
+ */
+export function isColumnStatus<K extends RecordKind>(kind: K, status: StatusOf[K]): boolean {
+  return row(kind, status).column === status;
+}
+
 /** The board column of a record: a card is in the column of its status group (ADR 0082). */
 export function columnOf<K extends RecordKind>(kind: K, status: StatusOf[K]): BoardColumn {
   return row(kind, status).column;

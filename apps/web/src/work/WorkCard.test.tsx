@@ -74,6 +74,27 @@ describe("WorkCard", () => {
     expect(within(li).getByText("bedingt")).toBeVisible();
   });
 
+  it("shows a plain status as an icon before the title, with the status as its name", () => {
+    const li = card(
+      "action",
+      r.action("ACT-012", { title: "Sponsorenliste", status: "in-progress" }),
+    );
+    const status = within(li).getByText("in Arbeit");
+    expect(status.compareDocumentPosition(within(li).getByText("Sponsorenliste"))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    // The status is in the description, and it is not a chip.
+    expect(within(li).getByRole("link")).toHaveAccessibleDescription(/in Arbeit/);
+    expect(status.closest("[class*=chips]")).toBeNull();
+  });
+
+  it("gives a status that its column does not say a chip, and the icon stays decoration", () => {
+    const li = card("commitment", r.commitment("COM-001", { status: "conditional" }));
+    expect(within(li).getByText("bedingt")).toBeVisible();
+    expect(within(li).queryByRole("img")).not.toBeInTheDocument();
+    expect(within(li).getByRole("link")).toHaveAccessibleDescription(/bedingt/);
+  });
+
   it("flags a past due date as overdue on an open record", () => {
     const li = card("action", r.action("ACT-001", { due_date: "2030-05-01" }));
     expect(within(li).getByText(/überfällig/)).toBeInTheDocument();
