@@ -16,6 +16,19 @@
     transition-timing-function: var(--ease-out);
   }
 
+  .button[data-size="sm"] {
+    width: var(--control-height-sm);
+    height: var(--control-height-sm);
+  }
+
+  /* A touch screen needs 44 px, which `--control-height-md` is there. */
+  @media (pointer: coarse) {
+    .button[data-size="sm"] {
+      width: var(--control-height-md);
+      height: var(--control-height-md);
+    }
+  }
+
   .button[data-hovered] {
     background: var(--color-bg-hover);
     color: var(--color-text);

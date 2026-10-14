@@ -122,18 +122,20 @@ export function SidePanel({
               <IconButton
                 icon={IconChevronUp}
                 label={t("side-panel-previous")}
+                size="sm"
                 onPress={() => onPrevious?.()}
                 aria-disabled={onPrevious ? undefined : true}
               />
               <IconButton
                 icon={IconChevronDown}
                 label={t("side-panel-next")}
+                size="sm"
                 onPress={() => onNext?.()}
                 aria-disabled={onNext ? undefined : true}
               />
             </>
           )}
-          <IconButton icon={IconX} label={t("side-panel-close")} onPress={onClose} />
+          <IconButton icon={IconX} label={t("side-panel-close")} size="sm" onPress={onClose} />
         </div>
       </header>
       <div className={styles.body}>{children}</div>
