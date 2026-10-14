@@ -30,8 +30,8 @@ describe("canEdit", () => {
 });
 
 describe("canCreate", () => {
-  const directory = (ids: string[]) =>
-    ({ assignees: ids.map((id) => ({ id, label: id })) }) as unknown as Directory;
+  const directory = (ids: string[], isManager = false) =>
+    ({ isManager, assignees: ids.map((id) => ({ id, label: id })) }) as unknown as Directory;
 
   it("lets a contributor or manager of an open event create", () => {
     expect(canCreate(directory(["me", "other"]), "me", true)).toBe(true);
@@ -41,8 +41,14 @@ describe("canCreate", () => {
     expect(canCreate(directory(["other"]), "me", true)).toBe(false);
   });
 
+  it("lets a manager create who is not a member of the event, as the server does", () => {
+    // An owner or admin of the organization has manager level without a membership.
+    expect(canCreate(directory(["other"], true), "me", true)).toBe(true);
+  });
+
   it("refuses in a closed event", () => {
     expect(canCreate(directory(["me"]), "me", false)).toBe(false);
+    expect(canCreate(directory(["me"], true), "me", false)).toBe(false);
   });
 
   it("refuses while the members are not known", () => {

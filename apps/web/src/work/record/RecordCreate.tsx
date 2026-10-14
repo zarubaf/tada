@@ -47,7 +47,7 @@ function Row({
   const choices = choicesOf(spec, sources, undefined, value);
   const Icon = spec.icon;
   const label = t(spec.labelKey);
-  const empty = spec.emptyKey ? t(spec.emptyKey) : "";
+  const empty = spec.emptyKey ? t(spec.emptyKey) : spec.promptKey ? t(spec.promptKey) : "";
   return (
     <>
       <dt className={styles.label}>
@@ -96,7 +96,7 @@ export function RecordCreate({
   descriptor,
   commands,
   sources,
-  me,
+  owner,
   onCreated,
   announce,
   onCancel,
@@ -104,15 +104,15 @@ export function RecordCreate({
   descriptor: RecordDescriptor;
   commands: WorkCommands;
   sources: ChoiceSources;
-  /** The member who is signed in: the default owner. */
-  me: string;
+  /** The default owner: the member who is signed in, if they can own a record. */
+  owner: string | undefined;
   /** The readable ID of the record that was created. */
   onCreated: (readableId: string) => void;
   announce: (text: string) => void;
   onCancel: () => void;
 }) {
   const create = descriptor.create;
-  const [values, setValues] = useState<Values>(() => create?.defaults(me) ?? {});
+  const [values, setValues] = useState<Values>(() => create?.defaults(owner) ?? {});
   const [errors, setErrors] = useState<Errors>({});
   const [failure, setFailure] = useState<string>();
   const [busy, setBusy] = useState(false);

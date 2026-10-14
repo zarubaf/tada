@@ -1435,6 +1435,8 @@ record-discard = Verwerfen
 record-create-action = Neue Aufgabe
 record-create = Erstellen
 record-create-forbidden = Sie können hier nichts erfassen. Das ist in einem abgeschlossenen Anlass und mit dem Lesezugriff nicht möglich.
+record-create-unavailable = Die Personen sind nicht geladen, darum lässt sich hier nichts erfassen. Laden Sie die Seite neu.
+record-choose-owner = Person wählen
 # $id: the readable ID of the new record.
 record-created = { $id } erfasst.
 work-new = Neu

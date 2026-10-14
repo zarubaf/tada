@@ -24,7 +24,7 @@ export type PanelMode = { mode: "open"; readableId: string } | { mode: "create";
 export interface RecordPanelProps {
   work: Work;
   route: PanelMode;
-  /** The member who is signed in: the owner that a new record starts with. */
+  /** The member who is signed in: the owner that a new record starts with, if they can own one. */
   me: string;
   /** True if the member may create a record. Otherwise the create state says why it is empty. */
   mayCreate: boolean;
@@ -172,6 +172,10 @@ export default function RecordPanel({
   );
 
   if (route.mode === "create") {
+    const assignees = work.directory.kind === "loaded" ? work.directory.directory.assignees : [];
+    // Without the people the form cannot say who may own a record, which is not a closed event.
+    const forbidden =
+      work.directory.kind === "loaded" ? "record-create-forbidden" : "record-create-unavailable";
     const descriptor = descriptorOf(route.kind);
     const create = descriptor?.create;
     return (
@@ -181,13 +185,13 @@ export default function RecordPanel({
             descriptor={descriptor}
             commands={work.commands}
             sources={sourcesOf(work)}
-            me={me}
+            owner={assignees.some((member) => member.id === me) ? me : undefined}
             onCreated={onCreated}
             onCancel={onClose}
             announce={setStatus}
           />
         ) : (
-          <p>{t("record-create-forbidden")}</p>
+          <p>{t(forbidden)}</p>
         )}
         {live}
       </SidePanel>
