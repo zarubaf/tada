@@ -1,0 +1,93 @@
+@layer components {
+  .chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    height: var(--size-chip-height);
+    padding: 0 var(--space-1-5);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--font-size-xs);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-xs);
+    white-space: nowrap;
+  }
+
+  .icon {
+    flex: none;
+  }
+
+  /* A long name ends in an ellipsis inside the chip; the hit area is not clipped. */
+  .text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .chip[data-overdue] {
+    border-color: var(--color-danger);
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+
+  .chip[data-variant="proposal"] {
+    border-style: dashed;
+    border-color: var(--color-proposed);
+    background: var(--color-proposed-subtle);
+    color: var(--color-proposed);
+  }
+
+  .chip[data-variant="unknown"] {
+    border-style: dotted;
+  }
+
+  /* The target of an interactive chip: 44 px with a coarse pointer, none with a fine one. */
+  .chip[data-interactive] {
+    cursor: pointer;
+    transition-property: background-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .chip[data-interactive]::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    min-width: 100%;
+    height: var(--size-hit-target);
+    translate: -50% -50%;
+  }
+
+  .chip[data-interactive][data-hovered] {
+    background: var(--color-bg-hover);
+  }
+
+  .chip[data-interactive][data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (forced-colors: active) {
+    .chip {
+      border-color: CanvasText;
+    }
+  }
+}

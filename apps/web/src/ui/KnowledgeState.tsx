@@ -1,4 +1,5 @@
 import {
+  type Icon,
   IconAlertTriangle,
   IconCircleCheck,
   IconCircleDashed,
@@ -22,13 +23,14 @@ export interface KnowledgeStateProps {
   showLabel?: boolean;
 }
 
-const ICONS = {
+/** The icon of each state. A chip draws on the same icons and labels (Chip). */
+export const KNOWLEDGE_ICONS = {
   accepted: IconCircleCheck,
   proposed: IconCircleDashed,
   assumption: IconCircleDotted,
   unknown: IconHelpCircle,
   conflict: IconAlertTriangle,
-} satisfies Record<KnowledgeStateName, unknown>;
+} satisfies Record<KnowledgeStateName, Icon>;
 
 /**
  * The state of knowledge of a value: its text, an icon and a label (doc/design/components.md).
@@ -36,7 +38,7 @@ const ICONS = {
  */
 export function KnowledgeState({ state, children, showLabel = false }: KnowledgeStateProps) {
   const label = t(`knowledge-${state}`);
-  const Icon = ICONS[state];
+  const Icon = KNOWLEDGE_ICONS[state];
   const labelVisible = showLabel || state !== "accepted";
   return (
     <span className={styles.state} data-state={state} title={label}>
