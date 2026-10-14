@@ -93,9 +93,14 @@ class RecordQueue {
         answer = {};
       }
       if (!answer.data) {
-        this.versions.delete(target.id);
+        const reason = reasonOf(answer.error);
+        // Only a conflict or a missing record proves the remembered version wrong; a refused value,
+        // a refusal or a lost connection leaves the record as the last answer left it.
+        if (reason === "conflict" || reason === "not-found") {
+          this.versions.delete(target.id);
+        }
         const { message } = saveFailure(answer);
-        return { ok: false, failure: { reason: reasonOf(answer.error), message } };
+        return { ok: false, failure: { reason, message } };
       }
       this.versions.set(target.id, answer.data.version);
       return { ok: true, record: answer.data };

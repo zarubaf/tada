@@ -127,6 +127,41 @@ describe("work commands", () => {
     await second;
   });
 
+  it("keeps the newest version after a refusal that is not a version conflict", async () => {
+    const { sent, commands } = server();
+    const t = { id: "a1", version: 1 };
+    const rename = commands.action.rename(t, "A");
+    const due = commands.action.changeDue(t, "2030-01-01");
+    const status = commands.action.changeStatus(t, "done");
+    await tick();
+    sent[0]?.answer(record("a1", 2));
+    await rename;
+    await tick();
+    sent[1]?.answer(problem(422, "validation-failed"));
+    await due;
+    await tick();
+    expect(sent[2]?.body).toMatchObject({ expected_version: 2 });
+    sent[2]?.answer(record("a1", 3));
+    await status;
+  });
+
+  it("forgets the newest version after a conflict or a missing record", async () => {
+    const { sent, commands } = server();
+    const first = commands.action.rename({ id: "a1", version: 1 }, "A");
+    const second = commands.action.rename({ id: "a1", version: 1 }, "B");
+    const third = commands.action.rename({ id: "a1", version: 1 }, "C");
+    await tick();
+    sent[0]?.answer(record("a1", 2));
+    await first;
+    await tick();
+    sent[1]?.answer(problem(409, "record-version-conflict"));
+    await second;
+    await tick();
+    expect(sent[2]?.body).toMatchObject({ expected_version: 1 });
+    sent[2]?.answer(record("a1", 3));
+    await third;
+  });
+
   it("runs the commands of different records at the same time", async () => {
     const { sent, commands } = server();
     const first = commands.action.rename({ id: "a1", version: 1 }, "A");
