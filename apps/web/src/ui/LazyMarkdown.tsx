@@ -1,5 +1,5 @@
 import { type ComponentType, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { problemMessage } from "../api/client";
+import { t } from "../i18n";
 import { ChunkBoundary } from "./ChunkBoundary";
 import { InlineError } from "./InlineError";
 import type { MarkdownProps } from "./Markdown";
@@ -63,7 +63,7 @@ export function LazyMarkdown({
   };
   const fallback = (
     <InlineError
-      message={problemMessage(undefined)}
+      message={t("chunk-failed")}
       onRetry={() => {
         setRetried(true);
         setAttempt((n) => n + 1);
