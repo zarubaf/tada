@@ -1,0 +1,73 @@
+@layer components {
+  .search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .icon {
+    position: absolute;
+    inset-inline-start: var(--space-2);
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+
+  .input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: var(--control-height-md);
+    padding-block: 0;
+    padding-inline: var(--space-6) var(--space-6);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--font-size-ui);
+  }
+
+  .input::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  .input:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* The browser clear button of a search input is replaced by our own. */
+  .input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  .clear {
+    position: absolute;
+    inset-inline-end: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--control-height-md);
+    min-height: var(--control-height-md);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  .clear[data-hovered] {
+    background: var(--color-bg-hover);
+    color: var(--color-text);
+  }
+
+  .clear[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+
+  .search[data-empty] .clear {
+    display: none;
+  }
+}

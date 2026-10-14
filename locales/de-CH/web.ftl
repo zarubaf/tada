@@ -1234,6 +1234,7 @@ workstream-status-closed = geschlossen
 combobox-loading = Suche läuft
 combobox-empty = Keine Treffer
 search-select-search = Optionen durchsuchen
+search-field-clear = Suche leeren
 
 ## My Work
 
@@ -1284,7 +1285,6 @@ work-type-milestone = Meilensteine
 work-type-decision = Entscheide
 work-type-risk = Risiken
 work-search = Arbeit durchsuchen
-work-search-clear = Suche leeren
 work-owner = Verantwortlich
 work-owner-any = Alle Personen
 work-owner-me = Ich
