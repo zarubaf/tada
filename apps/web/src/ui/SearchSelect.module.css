@@ -1,0 +1,62 @@
+@layer components {
+  .value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .popover {
+    width: 18rem;
+    max-width: 100%;
+  }
+
+  .dialog {
+    display: grid;
+    gap: var(--space-1);
+    max-height: inherit;
+    padding: var(--space-1);
+    outline: none;
+  }
+
+  .search {
+    display: grid;
+  }
+
+  .input {
+    min-height: var(--control-height-md);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+    color: var(--color-text);
+    font: inherit;
+  }
+
+  .input[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* 16 px on touch devices, so that iOS does not zoom (doc/design/layout-and-responsiveness.md) */
+  @media (pointer: coarse) {
+    .input {
+      font-size: var(--font-size-base);
+    }
+  }
+
+  .label {
+    flex: 1;
+    min-width: 0;
+    margin-inline-start: var(--space-2);
+    overflow-wrap: anywhere;
+  }
+
+  .label:first-child {
+    margin-inline-start: 0;
+  }
+
+  .empty {
+    padding: var(--space-2) var(--space-3);
+    color: var(--color-text-muted);
+  }
+}
