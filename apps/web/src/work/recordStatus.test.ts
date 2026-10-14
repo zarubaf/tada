@@ -71,6 +71,20 @@ describe("columnOf (ADR 0082)", () => {
 });
 
 describe("statusPresentation", () => {
+  it("keeps a firm commitment in the progress tone", () => {
+    expect(statusPresentation("commitment", "firm").tone).toBe("progress");
+  });
+
+  it("gives each status of a kind its own icon and tone", () => {
+    for (const kind of RECORD_KINDS) {
+      const looks = Object.keys(STATUSES[kind]).map((status) => {
+        const { glyph, tone } = statusPresentation(kind, status as never);
+        return `${glyph}/${tone}`;
+      });
+      expect(new Set(looks).size).toBe(looks.length);
+    }
+  });
+
   it("shows a conditional commitment in the warning tone", () => {
     expect(statusPresentation("commitment", "conditional").tone).toBe("warning");
   });

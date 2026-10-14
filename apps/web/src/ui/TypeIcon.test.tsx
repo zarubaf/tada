@@ -28,6 +28,11 @@ describe("TypeIcon", () => {
     expect(new Set(paths).size).toBe(KINDS.length);
   });
 
+  it("does not use the triangle of a conflict for a risk", () => {
+    const { container } = render(<TypeIcon kind="risk" />);
+    expect(container.querySelector("svg")).not.toHaveClass("tabler-icon-alert-triangle");
+  });
+
   it("is decoration next to its name", () => {
     const { container } = render(<TypeIcon kind="risk" decorative />);
     expect(screen.queryByRole("img")).not.toBeInTheDocument();

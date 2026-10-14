@@ -2,9 +2,9 @@ import {
   type Icon,
   IconAlertTriangle,
   IconCircleCheck,
-  IconCircleDashed,
   IconCircleDotted,
   IconHelpCircle,
+  IconSquareDashed,
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { t } from "../i18n";
@@ -26,7 +26,7 @@ export interface KnowledgeStateProps {
 /** The icon of each state. A chip draws on the same icons and labels (Chip). */
 export const KNOWLEDGE_ICONS = {
   accepted: IconCircleCheck,
-  proposed: IconCircleDashed,
+  proposed: IconSquareDashed,
   assumption: IconCircleDotted,
   unknown: IconHelpCircle,
   conflict: IconAlertTriangle,

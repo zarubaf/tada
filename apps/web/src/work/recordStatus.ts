@@ -48,7 +48,7 @@ export const STATUSES: { [K in RecordKind]: Record<StatusOf[K], Row> } = {
   // A conditional commitment is not yet reliable, so it has the warning tone.
   commitment: {
     conditional: { glyph: "conditional", tone: "warning", column: "open" },
-    firm: { glyph: "firm", tone: "neutral", column: "open" },
+    firm: { glyph: "firm", tone: "progress", column: "open" },
     fulfilled: { glyph: "done", tone: "success", column: "done" },
     broken: { glyph: "canceled", tone: "danger", column: "canceled" },
     withdrawn: { glyph: "canceled", tone: "muted", column: "canceled" },

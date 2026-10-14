@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { KnowledgeState } from "./KnowledgeState";
+import { KNOWLEDGE_ICONS, KnowledgeState } from "./KnowledgeState";
 
 describe("KnowledgeState", () => {
   it.each([
@@ -22,5 +22,14 @@ describe("KnowledgeState", () => {
   it("marks the state for the style", () => {
     const { container } = render(<KnowledgeState state="assumption">20</KnowledgeState>);
     expect(container.firstElementChild).toHaveAttribute("data-state", "assumption");
+  });
+
+  it("draws each state with its own icon", () => {
+    expect(new Set(Object.values(KNOWLEDGE_ICONS)).size).toBe(Object.keys(KNOWLEDGE_ICONS).length);
+  });
+
+  it("draws a proposal as a dashed square, not as the dashed circle of an open status", () => {
+    const { container } = render(<KnowledgeState state="proposed">x</KnowledgeState>);
+    expect(container.querySelector("svg")).toHaveClass("tabler-icon-square-dashed");
   });
 });
