@@ -3,6 +3,7 @@
 import { IconRefresh } from "@tabler/icons-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { type Api, problemMessage } from "../api/client";
+import { useCanCreateEvent } from "../events/useCanCreateEvent";
 import { t } from "../i18n";
 import { useNavigate, usePathname } from "../router/Router";
 import { CHOOSE_ORGANIZATION_PATH, isPublicPath } from "../session/paths";
@@ -11,11 +12,13 @@ import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Select } from "../ui/Select";
-import { sectionTitle } from "./navItems";
+import { ALL_EVENTS, EventSwitcher, eventIdOfItem, NEW_EVENT } from "./EventSwitcher";
+import { eventIdOf, sectionTitle } from "./navItems";
 import { readRemembered, SIDEBAR_KEY, writeRemembered } from "./remembered";
 import styles from "./Shell.module.css";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { useCurrentEvent, useEventList } from "./useEvents";
 import { VersionSheet } from "./VersionFooter";
 import { footerText, outdated as isOutdated, useServerVersion } from "./version";
 
@@ -29,6 +32,11 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(() => readRemembered(SIDEBAR_KEY) !== "collapsed");
   const server = useServerVersion(api, !frameless && session?.organization !== undefined);
   const outdated = server !== undefined && isOutdated(server);
+  const organizationId = session?.organization?.organization_id;
+  const routeEventId = eventIdOf(pathname);
+  const currentEvent = useCurrentEvent(api, routeEventId, organizationId);
+  const events = useEventList(api, organizationId);
+  const canCreateEvent = useCanCreateEvent();
 
   // Without a session or an organization, and on the pages of the sign-in, there is no frame.
   if (frameless || !session?.organization) {
@@ -47,6 +55,17 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       }
     } catch {
       setFailure(problemMessage(undefined));
+    }
+  };
+
+  const openEvent = (item: string) => {
+    const eventId = eventIdOfItem(item);
+    if (eventId !== undefined) {
+      navigate(`/events/${encodeURIComponent(eventId)}`);
+    } else if (item === ALL_EVENTS) {
+      navigate("/events");
+    } else if (item === NEW_EVENT) {
+      navigate("/events/new");
     }
   };
 
@@ -85,7 +104,15 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
         <div className={styles.sidebar}>
           <Sidebar
             organizationSwitcher={organizationSwitcher}
-            eventSwitcher={null}
+            eventSwitcher={
+              <EventSwitcher
+                current={currentEvent}
+                list={events.list}
+                canCreate={canCreateEvent}
+                onOpen={events.load}
+                onAction={openEvent}
+              />
+            }
             server={server}
             onOpenVersions={() => setVersionsOpen(true)}
             member={{
@@ -98,7 +125,11 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       )}
       <div className={styles.workspace}>
         <TopBar
-          title={sectionTitle(pathname) ?? t("app-name")}
+          title={
+            (routeEventId !== undefined ? currentEvent?.name : undefined) ??
+            sectionTitle(pathname) ??
+            t("app-name")
+          }
           toggleLabel={sidebarOpen ? t("shell-sidebar-close") : t("shell-sidebar-open")}
           expanded={sidebarOpen}
           onToggle={toggleSidebar}

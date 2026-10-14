@@ -388,3 +388,108 @@ describe("top bar", () => {
     ).toBeNull();
   });
 });
+
+describe("event switcher", () => {
+  const open = event("0199b8e0-0000-7000-8000-0000000000e1", "Sommerfest 2030", "SF30");
+  const other = event("0199b8e0-0000-7000-8000-0000000000e2", "Herbstflug", "HF30");
+  const closed = event("0199b8e0-0000-7000-8000-0000000000e3", "Jubiläum", "JB29", "closed");
+
+  it("says that no event is chosen when the route names none and nothing is remembered", async () => {
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    expect(await screen.findByRole("button", { name: "Anlass wählen" })).toHaveTextContent(
+      "Kein Anlass gewählt",
+    );
+  });
+
+  it("shows the event of the route with its key, and names it in the top bar", async () => {
+    eventItems = [open, other];
+    renderShellAt(`/events/${open.id}/actions`, json(200, info([first], first)));
+
+    const switcher = await screen.findByRole("button", {
+      name: "Anlass wechseln: Sommerfest 2030",
+    });
+    expect(switcher).toHaveTextContent("SF30");
+    expect(within(screen.getByRole("banner")).getByText("Sommerfest 2030")).toBeInTheDocument();
+  });
+
+  it("marks a closed event in the subtitle", async () => {
+    eventItems = [closed];
+    renderShellAt(`/events/${closed.id}`, json(200, info([first], first)));
+
+    expect(
+      await screen.findByRole("button", { name: "Anlass wechseln: Jubiläum" }),
+    ).toHaveTextContent("JB29 · abgeschlossen");
+  });
+
+  it("remembers the event of the route for other pages", async () => {
+    eventItems = [open];
+    renderShellAt(`/events/${open.id}`, json(200, info([first], first)));
+
+    await screen.findByRole("button", { name: "Anlass wechseln: Sommerfest 2030" });
+    expect(localStorage.getItem("tada-event")).toBe(open.id);
+  });
+
+  it("shows the remembered event away from the event pages", async () => {
+    eventItems = [open];
+    localStorage.setItem("tada-event", open.id);
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    expect(
+      await screen.findByRole("button", { name: "Anlass wechseln: Sommerfest 2030" }),
+    ).toBeInTheDocument();
+    // The title of a page that is no event page stays the section.
+    expect(within(screen.getByRole("banner")).getByText("Eingang")).toBeInTheDocument();
+  });
+
+  it("forgets a remembered event that the server does not find", async () => {
+    localStorage.setItem("tada-event", "0199b8e0-0000-7000-8000-00000000dead");
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    await screen.findByRole("button", { name: "Anlass wählen" });
+    await vi.waitFor(() => expect(localStorage.getItem("tada-event")).toBeNull());
+  });
+
+  it("lists the events of the member, all events and no new event for a member", async () => {
+    eventItems = [open, other];
+    renderShellAt(`/events/${open.id}`, json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: /Anlass wechseln/ }));
+
+    const menu = await screen.findByRole("menu");
+    expect(await within(menu).findByRole("menuitem", { name: "Herbstflug" })).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Sommerfest 2030, aktuell" }),
+    ).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Alle Anlässe" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Neuer Anlass" })).not.toBeInTheDocument();
+  });
+
+  it("opens the chosen event", async () => {
+    eventItems = [open, other];
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Herbstflug" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${other.id}`));
+  });
+
+  it("leads to all events", async () => {
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Alle Anlässe" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/events"));
+  });
+
+  it("offers a new event to an administration", async () => {
+    renderShellAt("/inbox", json(200, info([second], second)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Neuer Anlass" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/events/new"));
+  });
+});
