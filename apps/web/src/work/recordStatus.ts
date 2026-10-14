@@ -92,6 +92,18 @@ export function statusPresentation<K extends RecordKind>(
   return { glyph, tone, labelKey: `${kind}-status-${status}` };
 }
 
+/**
+ * The presentation of a status that is only known as text, for example one of `next_statuses` of a
+ * record whose kind is a union. An unknown status is a bug in the caller and fails here.
+ */
+export function statusPresentationOfText(kind: RecordKind, status: string): StatusPresentation {
+  const found = (STATUSES[kind] as Record<string, Row | undefined>)[status];
+  if (!found) {
+    throw new Error(`${kind} has no status ${status}`);
+  }
+  return { glyph: found.glyph, tone: found.tone, labelKey: `${kind}-status-${status}` };
+}
+
 /** The presentation of a record that holds its kind and its status together, for example an item. */
 export function presentationOf<K extends RecordKind>(record: {
   kind: K;
