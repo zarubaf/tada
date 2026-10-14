@@ -177,6 +177,35 @@ export interface RecordActionSpec {
   dialog: ComponentType<ActionDialogProps>;
 }
 
+/**
+ * A command of the record that is no field: it ends or changes the record as a whole, and asks for
+ * a reason first (ADR 0068: make a commitment firm). The panel offers it in the „Aktionen“ menu of
+ * its head, to a member who may change the record, while `available` holds.
+ */
+export interface MenuAction {
+  id: string;
+  /** The Fluent key of the name in the menu. */
+  labelKey: string;
+  icon?: Icon;
+  /** True if the record can take the command now, for example it is conditional. */
+  available: (item: WorkItem) => boolean;
+  /** What the step before the command says; the dialog is `RecordActionDialog`. */
+  step: {
+    title: (item: WorkItem) => string;
+    /** One sentence for each line. */
+    description?: (item: WorkItem) => string[];
+    /** The Fluent key of the label of the reason. */
+    reasonKey: string;
+    reasonHelpKey?: string;
+    confirmKey: string;
+    /** The command ends something that does not come back. */
+    danger?: boolean;
+  };
+  run: (commands: WorkCommands, item: WorkItem, reason: string) => Promise<CommandResult<unknown>>;
+  /** The Fluent key of the words that tell the result; they take `id`, the readable ID. */
+  doneKey: string;
+}
+
 export interface RecordDescriptor {
   kind: RecordKind;
   /** The title of the record. It is the heading of the panel. */
@@ -196,5 +225,7 @@ export interface RecordDescriptor {
   hints?: (item: WorkItem, lookup: RecordLookup) => string[];
   /** The Fluent key of the line that names the record version that a passage of evidence supports. */
   evidenceVersionKey: string;
+  /** The commands for the whole record, in the order of the menu. */
+  menu?: readonly MenuAction[];
   create?: CreateSpec;
 }

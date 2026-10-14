@@ -1497,6 +1497,7 @@ record-create-forbidden = Sie können hier nichts erfassen. Das ist in einem abg
 record-create-unavailable = Die Personen sind nicht geladen, darum lässt sich hier nichts erfassen. Laden Sie die Seite neu.
 record-choose-owner = Person wählen
 record-choose-level = Stufe wählen
+record-actions = Aktionen
 record-action-conflict = Der Eintrag wurde inzwischen geändert und ist neu geladen. Prüfen Sie ihn und versuchen Sie es erneut.
 # $id: the readable ID of the new record.
 record-created = { $id } erfasst.

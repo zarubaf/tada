@@ -1,6 +1,15 @@
-import { type MutableRefObject, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  type MutableRefObject,
+  type RefObject,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { Api, RecordKind } from "../../api/client";
 import { t } from "../../i18n";
+import { useFocusAfterCommit } from "../../ui/focus";
 import { LiveRegion } from "../../ui/LiveRegion";
 import { SidePanel } from "../../ui/SidePanel";
 import { StandaloneLink } from "../../ui/StandaloneLink";
@@ -11,6 +20,7 @@ import type { Work } from "../useWork";
 import type { WorkItem } from "../workItem";
 import { recordHref } from "../workLinks";
 import { canEdit } from "../workPermissions";
+import { ActionMenu } from "./ActionMenu";
 import type { ChoiceSources } from "./choices";
 import type { FieldSpec, RecordDescriptor, RecordLookup } from "./descriptor";
 import { descriptorOf } from "./descriptors";
@@ -122,7 +132,9 @@ function Body({
   timeZone,
   focusTitle,
   handoff,
+  ref,
 }: {
+  ref: RefObject<HTMLDivElement | null>;
   item: WorkItem;
   descriptor: RecordDescriptor;
   env: FieldEnv;
@@ -135,7 +147,6 @@ function Body({
    */
   handoff: MutableRefObject<boolean>;
 }) {
-  const root = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const sourcesId = useId();
   const titleId = useId();
@@ -146,13 +157,13 @@ function Body({
 
   // A layout effect, because its cleanup runs before React removes the body: focus is still in it.
   useLayoutEffect(() => {
-    const body = root.current;
+    const body = ref.current;
     return () => {
       if (body?.contains(document.activeElement)) {
         handoff.current = true;
       }
     };
-  }, [handoff]);
+  }, [handoff, ref]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the body appears
   useEffect(() => {
     if (handoff.current) {
@@ -162,7 +173,7 @@ function Body({
   }, []);
 
   return (
-    <div ref={root} className={styles.body}>
+    <div ref={ref} className={styles.body}>
       {/* The field is the heading: it names itself by the title while the title is on screen. */}
       <FieldEditor
         spec={title}
@@ -239,6 +250,8 @@ export default function RecordPanel({
   const handoff = useRef(false);
   const [status, setStatus] = useState<string>();
   const [alert, setAlert] = useState<string>();
+  const body = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   const frame = {
     onClose,
     position: place && t("side-panel-position", place),
@@ -332,8 +345,24 @@ export default function RecordPanel({
   // A decision has a long wording: the name of the region has its first line.
   const name = item.redacted ? item.readableId : `${item.readableId} ${oneLineWording(item.title)}`;
   return (
-    <SidePanel title={name} heading={<Head item={item} />} {...frame}>
+    <SidePanel
+      title={name}
+      heading={<Head item={item} />}
+      more={
+        descriptor.menu && (
+          <ActionMenu
+            actions={descriptor.menu}
+            item={item}
+            env={env}
+            // The menu may be gone with the action that ran: focus goes to the panel.
+            onDone={() => focusAfterCommit(() => body.current?.closest("aside"))}
+          />
+        )
+      }
+      {...frame}
+    >
       <Body
+        ref={body}
         key={item.id}
         item={item}
         descriptor={descriptor}
