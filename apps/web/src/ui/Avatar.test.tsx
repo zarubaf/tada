@@ -15,6 +15,30 @@ describe("initialsOf", () => {
   ])("makes %j into %j", (name, initials) => {
     expect(initialsOf(name)).toBe(initials);
   });
+
+  it("does not upper-case a letter into two", () => {
+    expect(initialsOf("ßenja")).toBe("SE");
+    expect(initialsOf("Max Groß")).toBe("MG");
+  });
+
+  it("skips what is not a letter", () => {
+    expect(initialsOf("Anna (Präsidentin)")).toBe("AP");
+    expect(initialsOf("(Anna) Muster")).toBe("AM");
+    expect(initialsOf("123")).toBe("?");
+    expect(initialsOf("--")).toBe("?");
+  });
+
+  it("keeps a letter with its accent in one piece", () => {
+    const decomposed = "E\u0301lodie Zu\u0308rcher";
+    expect(initialsOf(decomposed)).toBe("\u00c9Z");
+    expect(initialsOf("Zoë")).toBe("ZO");
+  });
+
+  it("does not break an emoji or a flag", () => {
+    expect(initialsOf("🇨🇭 Anna Muster")).toBe("AM");
+    expect(initialsOf("👩‍🚀 Anna")).toBe("AN");
+    expect(initialsOf("🇨🇭")).toBe("?");
+  });
 });
 
 describe("avatarColor", () => {
@@ -47,6 +71,12 @@ describe("Avatar", () => {
     render(<Avatar name="Anna Muster" decorative />);
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByText("AM")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("is decoration when the name is empty, not an image without a name", () => {
+    const { container } = render(<Avatar name="  " />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true");
   });
 
   it("takes its color from the id when there is one", () => {
