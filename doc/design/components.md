@@ -147,7 +147,7 @@ The table and the timeline view load lazily.
 
 ### Registers and tables
 
-- `DataTable` has optional sortable headers: a header with `sortable` is a button when the table has `onSort`, and `aria-sort` names the sorted column. The caller sorts the rows. `stacked={false}` turns the two-line rows off, for a table whose headers must stay reachable; it then scrolls inside itself below the width of its columns.
+- `DataTable` has optional sortable headers: a header with `sortable` is a button when the table has `onSort`, and `aria-sort` names the sorted column. The caller sorts the rows. `stacked={false}` turns the two-line rows off, for a table whose headers must stay reachable; it then scrolls sideways inside itself, in a focusable region with the name of the table, where its container is narrower than its columns (40rem), whatever the viewport. A `header` can be a node, for example a checkbox that selects all rows; the column then needs a `label`, its accessible name. A column may be sortable or not.
 - A toolbar with: the search field (`/`), filters as chips, the view options and one primary action („Risiko erfassen“).
 - The table has a sticky header, tabular numbers and a row height of `--row-height`.
 - A click on a row opens the record in a sheet on medium and wide layouts, and as a page on narrow layouts.

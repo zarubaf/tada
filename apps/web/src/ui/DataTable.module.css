@@ -90,9 +90,8 @@
   }
 
   /*
-   * A table that does not stack (`stacked={false}`) keeps its columns. Where the page is too narrow
-   * for them, it scrolls inside itself and never the page, as the board does; the header then
-   * sticks to the table and not to the page.
+   * A table that does not stack (`stacked={false}`) keeps its columns. Where its container is too
+   * narrow for them, it scrolls inside itself and never the page, as the board does.
    */
   .table[data-fixed] {
     min-width: 40rem;
@@ -107,8 +106,13 @@
     white-space: nowrap;
   }
 
-  @media (width < 58rem) {
-    .container[data-fixed] {
+  /*
+   * The scroller sits inside the container and follows the width of the container, not of the page:
+   * a docked panel or a column to select can leave the table less than its columns need at any
+   * viewport. Then it scrolls, and the header sticks to it.
+   */
+  @container (width < 40rem) {
+    .scroller {
       overflow-x: auto;
     }
   }

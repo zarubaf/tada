@@ -76,3 +76,42 @@ describe("DataTable sorting", () => {
     expect(container.querySelector("table")?.hasAttribute("data-stacked")).toBe(false);
   });
 });
+
+describe("DataTable headers", () => {
+  const selectColumn: Column<Row> = {
+    id: "select",
+    header: <input type="checkbox" aria-label="Alle auswählen" />,
+    label: "Auswahl",
+    cell: () => <input type="checkbox" aria-label="Zeile auswählen" />,
+  };
+
+  it("takes a node as a header and names the column by its label", () => {
+    table({ columns: [selectColumn, ...columns] });
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers[0]).toHaveAccessibleName("Auswahl");
+    expect(within(headers[0] as HTMLElement).getByRole("checkbox")).toBeInTheDocument();
+    // A column that is not sortable has no button, also with the sort on.
+    expect(within(headers[0] as HTMLElement).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("shows the label, not the node, as the name of a cell in a two-line row", () => {
+    const { container } = table({ columns: [selectColumn, ...columns] });
+    const label = container.querySelector("td span");
+    expect(label).toHaveTextContent("Auswahl");
+    expect(label?.querySelector("input")).toBeNull();
+  });
+});
+
+describe("DataTable scrolling", () => {
+  it("puts a table that keeps its columns in a focusable, named region", () => {
+    table({ stacked: false });
+    const region = screen.getByRole("region", { name: "Leute" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(within(region).getByRole("table")).toBeInTheDocument();
+  });
+
+  it("has no region around a stacked table", () => {
+    table();
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+  });
+});

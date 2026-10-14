@@ -193,7 +193,8 @@ A row is `--row-height` high (28 px, and 44 px on coarse pointers).
   A risk has no page, so its title is text.
   A redacted record shows „entfernt“.
 - The title takes the width that is left and ends in an ellipsis in one line; the `title` attribute holds the whole text. Owner and area end in an ellipsis too.
-- Where the page leaves the table less than 40rem (a viewport below about 58rem with the docked sidebar), it keeps its columns and scrolls inside itself, never the page.
+- Where its container is less than 40rem wide (a narrow viewport, a docked panel or a column to select), the table keeps its columns and scrolls inside itself, never the page.
+  The scrolling region takes focus, so that the keyboard reaches the columns.
 - The states are those of the board: the skeleton, the banner of a kind that failed, and the two empty states.
 - Below 40rem there is no table.
   The page shows the cards of the board as one list, in the order of the sort.
