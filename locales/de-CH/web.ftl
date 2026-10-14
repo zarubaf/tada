@@ -1366,8 +1366,31 @@ work-bulk-progress = { $done } von { $total } geändert …
 # $count: the number of records that are changed.
 work-bulk-done =
     { $count ->
+        [one] 1 Eintrag geändert
+       *[other] { $count } Einträge geändert
     }
+work-bulk-nothing = Keine Änderung nötig
+work-bulk-busy = Die vorige Änderung läuft noch.
+# $count: the records that failed, $total: all records of the run.
+work-bulk-failed-title =
     { $count ->
+        [one] 1 von { $total } Einträgen nicht geändert
+       *[other] { $count } von { $total } Einträgen nicht geändert
     }
+# $count: the records that failed.
+work-bulk-failed =
     { $count ->
+        [one] 1 Eintrag konnte nicht geändert werden.
+       *[other] { $count } Einträge konnten nicht geändert werden.
     }
+work-bulk-failures = Nicht geändert
+work-bulk-reason-conflict = Konflikt
+work-bulk-reason-forbidden = keine Berechtigung
+work-bulk-reason-not-found = nicht mehr vorhanden
+work-bulk-reason-validation = Wert nicht angenommen
+work-bulk-reason-unknown = unerwarteter Fehler
+work-bulk-reason-directory = Personen und Bereiche sind noch nicht geladen.
+work-bulk-reason-unsupported = Für einen Teil der Auswahl nicht möglich.
+work-bulk-reason-status-mixed = Der Status lässt sich nur für Einträge derselben Art ändern.
+work-bulk-reason-status-no-command = Der Status eines Entscheids ändert sich nur durch Ersetzen oder Widerrufen.
+work-bulk-reason-status-none-common = Die ausgewählten Einträge haben keinen gemeinsamen nächsten Status.
