@@ -1,5 +1,5 @@
 import { IconArrowDown, IconArrowUp } from "@tabler/icons-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import styles from "./DataTable.module.css";
 
 /**
@@ -48,6 +48,28 @@ export interface DataTableProps<T> {
   stacked?: boolean;
 }
 
+/**
+ * Whether the element is wider than it shows. The region of a table takes focus only then, so that
+ * a table that fits is no tab stop. Where there is no `ResizeObserver`, it does not scroll.
+ */
+function useScrolls<E extends HTMLElement>(active: boolean) {
+  const ref = useRef<E>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (!active || !element || typeof ResizeObserver === "undefined") {
+      setScrolls(false);
+      return;
+    }
+    const observer = new ResizeObserver(() =>
+      setScrolls(element.scrollWidth > element.clientWidth),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [active]);
+  return [ref, scrolls] as const;
+}
+
 /** The text that names a column: its label, or its header when that is text. */
 function nameOf<T>(column: Column<T>): string | undefined {
   return column.label ?? (typeof column.header === "string" ? column.header : undefined);
@@ -84,13 +106,15 @@ export function DataTable<T>({
   onSort,
   stacked = true,
 }: DataTableProps<T>) {
+  const [scroller, scrolls] = useScrolls<HTMLElement>(!stacked);
   const table = (
     <table
       className={styles.table}
       data-stacked={stacked ? "" : undefined}
       data-fixed={stacked ? undefined : ""}
     >
-      <caption className={styles.caption}>{label}</caption>
+      {/* The region names the table where it scrolls; both names would be read twice. */}
+      {scrolls ? null : <caption className={styles.caption}>{label}</caption>}
       <thead>
         <tr>
           {columns.map((column) => (
@@ -146,8 +170,14 @@ export function DataTable<T>({
         table
       ) : (
         // A region that scrolls takes focus, so that the keyboard reaches the columns it hides.
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: the region is a scroll container
-        <section className={styles.scroller} aria-label={label} tabIndex={0}>
+        // The same element stays in the tree, so that the observer and the scroll position stay.
+        // A section has the role „region“ only with a name, so it is one only where it scrolls.
+        <section
+          ref={scroller}
+          className={styles.scroller}
+          aria-label={scrolls ? label : undefined}
+          tabIndex={scrolls ? 0 : undefined}
+        >
           {table}
         </section>
       )}
