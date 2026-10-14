@@ -27,6 +27,16 @@ function Harness() {
 const trigger = () => screen.getByRole("button", { name: "Filter" });
 
 describe("PopoverDialog", () => {
+  it("opens and closes with the same button, also by mouse", async () => {
+    render(<Harness />);
+    await userEvent.click(trigger());
+    expect(screen.getByRole("dialog", { name: "Filter" })).toBeInTheDocument();
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(trigger());
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("leaves the page usable: it is no modal dialog, so the palette key still works", async () => {
     render(<Harness />);
     await userEvent.click(trigger());
