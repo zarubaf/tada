@@ -187,6 +187,7 @@ function Body({
       <dl className={styles.props}>
         {descriptor.properties
           .filter((spec) => spec.when?.(item) ?? true)
+          .filter((spec) => !spec.hideEmpty || spec.read(item) !== null)
           .map((spec) => (
             <Property key={spec.id} spec={spec} item={item} env={env} />
           ))}
