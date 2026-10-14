@@ -30,6 +30,25 @@ function Harness({ initial }: { initial?: string }) {
 }
 
 describe("SearchSelect", () => {
+  it("points the trigger at the error", () => {
+    render(
+      <>
+        <SearchSelect
+          label="Zuständig"
+          placeholder="Niemand"
+          options={PEOPLE}
+          value={undefined}
+          onChange={() => {}}
+          errorId="err"
+        />
+        <p id="err">Bitte wählen.</p>
+      </>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Zuständig: Niemand" });
+    expect(trigger).toHaveAccessibleDescription("Bitte wählen.");
+  });
+
   it("names the trigger with the label and the value", () => {
     render(<Harness initial="b" />);
 
