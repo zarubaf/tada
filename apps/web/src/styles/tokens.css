@@ -35,6 +35,14 @@
     --color-proposed-subtle: oklch(95.5% 0.03 300);
     --color-scrim: oklch(16.5% 0.006 265 / 0.4);
 
+    /* The fixed palette of the avatar: a neutral and five hues. Initials use --color-text. */
+    --color-avatar-1: oklch(90% 0.012 265);
+    --color-avatar-2: oklch(88% 0.06 30);
+    --color-avatar-3: oklch(89% 0.07 85);
+    --color-avatar-4: oklch(88% 0.07 150);
+    --color-avatar-5: oklch(88% 0.06 215);
+    --color-avatar-6: oklch(88% 0.06 300);
+
     /* Typography */
     --font-family-sans: "Mona Sans Variable", system-ui, sans-serif;
     --font-family-mono: "JetBrains Mono Variable", ui-monospace, monospace;
@@ -78,6 +86,8 @@
     --control-height-md: 32px;
     --control-height-lg: 36px;
     --row-height: 28px;
+    --size-chip-height: 20px;
+    --size-hit-target: 0px; /* The hit area of a chip: 0 with a fine pointer. */
     --font-size-ui: var(--font-size-md);
     --line-height-ui: var(--line-height-md);
     --font-size-dense: var(--font-size-sm);
@@ -115,6 +125,7 @@
       --control-height-md: 44px;
       --control-height-lg: 44px;
       --row-height: 44px;
+      --size-hit-target: 44px;
       --font-size-ui: var(--font-size-base);
       --line-height-ui: var(--line-height-base);
       --font-size-dense: var(--font-size-base);
@@ -127,6 +138,7 @@
     --control-height-md: 44px;
     --control-height-lg: 44px;
     --row-height: 44px;
+    --size-hit-target: 44px;
     --font-size-ui: var(--font-size-base);
     --line-height-ui: var(--line-height-base);
     --font-size-dense: var(--font-size-base);
@@ -161,6 +173,12 @@
       --color-danger-subtle: oklch(28% 0.06 25);
       --color-proposed: oklch(79% 0.12 300);
       --color-proposed-subtle: oklch(28% 0.05 300);
+      --color-avatar-1: oklch(36% 0.012 265);
+      --color-avatar-2: oklch(36% 0.07 30);
+      --color-avatar-3: oklch(36% 0.07 85);
+      --color-avatar-4: oklch(36% 0.07 150);
+      --color-avatar-5: oklch(36% 0.07 215);
+      --color-avatar-6: oklch(36% 0.07 300);
       --shadow-1: 0 2px 8px oklch(0% 0 0 / 0.35), 0 8px 24px -8px oklch(0% 0 0 / 0.6);
       --shadow-2: 0 2px 8px oklch(0% 0 0 / 0.35), 0 16px 40px -12px oklch(0% 0 0 / 0.6);
     }
@@ -192,6 +210,12 @@
     --color-danger-subtle: oklch(28% 0.06 25);
     --color-proposed: oklch(79% 0.12 300);
     --color-proposed-subtle: oklch(28% 0.05 300);
+    --color-avatar-1: oklch(36% 0.012 265);
+    --color-avatar-2: oklch(36% 0.07 30);
+    --color-avatar-3: oklch(36% 0.07 85);
+    --color-avatar-4: oklch(36% 0.07 150);
+    --color-avatar-5: oklch(36% 0.07 215);
+    --color-avatar-6: oklch(36% 0.07 300);
     --shadow-1: 0 2px 8px oklch(0% 0 0 / 0.35), 0 8px 24px -8px oklch(0% 0 0 / 0.6);
     --shadow-2: 0 2px 8px oklch(0% 0 0 / 0.35), 0 16px 40px -12px oklch(0% 0 0 / 0.6);
   }
