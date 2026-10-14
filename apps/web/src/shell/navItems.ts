@@ -74,7 +74,8 @@ export const PRIVACY = privacy;
 /** Each destination, for the command palette. */
 export const ALL: Destination[] = [...MAIN, settings, privacy];
 
-function isCurrent(destination: Destination, pathname: string): boolean {
+/** True when the path belongs to the destination. */
+export function isCurrent(destination: Destination, pathname: string): boolean {
   return (
     pathname === destination.to ||
     (!destination.exact && pathname.startsWith(`${destination.to}/`)) ||

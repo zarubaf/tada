@@ -220,7 +220,7 @@ describe("Shell", () => {
 
     const footer = await screen.findByRole("link", { name: "Datenschutz" });
     expect(footer).toHaveAttribute("href", "/privacy");
-    await userEvent.click(screen.getByRole("button", { name: "Anna Muster" }));
+    await userEvent.click(screen.getByRole("button", { name: "Konto von Anna Muster" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Datenschutz" }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe("/privacy"));
@@ -229,7 +229,7 @@ describe("Shell", () => {
   it("signs out from the member menu", async () => {
     const calls = renderShell(json(200, info([first], first)), new Response(null, { status: 204 }));
 
-    await userEvent.click(await screen.findByRole("button", { name: "Anna Muster" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Konto von Anna Muster" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Abmelden" }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe("/sign-in"));
@@ -278,7 +278,7 @@ describe("Shell", () => {
   it("opens the list of the components from the member menu", async () => {
     renderShell(json(200, info([first], first)));
 
-    await userEvent.click(await screen.findByRole("button", { name: "Anna Muster" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Konto von Anna Muster" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: /^Versionen \(tada / }));
 
     expect(await screen.findByRole("dialog", { name: "Versionen" })).toBeInTheDocument();
@@ -326,6 +326,17 @@ describe("sidebar", () => {
 
     const link = await screen.findByRole("link", { name: /^Eingang/ });
     await vi.waitFor(() => expect(link).toHaveTextContent("3 offen"));
+  });
+
+  it("puts the brand, the switchers and the links in one labelled region", async () => {
+    renderShell(json(200, info([first, second], first)));
+
+    const region = await screen.findByRole("region", { name: "Seitenleiste" });
+    expect(within(region).getByText("tada")).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: /Organisation/ })).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
+    expect(within(region).getByRole("navigation", { name: "Hauptnavigation" })).toBeInTheDocument();
+    expect(within(region).getByRole("link", { name: "Datenschutz" })).toBeInTheDocument();
   });
 
   it("has Datenschutz, the build and the member at the foot", async () => {
@@ -376,7 +387,7 @@ describe("top bar", () => {
     expect(within(bar).getByText("Eingang")).toBeInTheDocument();
     expect(within(bar).getByRole("button", { name: "Suchen oder Befehl ausführen" })).toBeVisible();
     expect(within(bar).getByRole("button", { name: "Farbschema: System" })).toBeInTheDocument();
-    expect(within(bar).getByRole("button", { name: "Anna Muster" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Konto von Anna Muster" })).toBeInTheDocument();
   });
 
   it("names the context in plain text: the page keeps the only h1", async () => {
@@ -581,6 +592,18 @@ describe("narrow layout", () => {
     expect(screen.queryByRole("button", { name: "Anlass wählen" })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["/persons", "true"],
+    ["/settings/account", "true"],
+    ["/inbox", null],
+  ])("marks Mehr as current on %s when the page is one of its items", async (path, current) => {
+    stubNarrow(true);
+    renderShellAt(path, json(200, info([first], first)));
+
+    const more = await screen.findByRole("button", { name: "Mehr" });
+    expect(more.getAttribute("aria-current")).toBe(current);
+  });
+
   it("shows the open proposals at Eingang in the bottom bar", async () => {
     stubNarrow(true);
     openChangesets = 2;
@@ -621,7 +644,7 @@ describe("narrow layout", () => {
     expect(
       within(bar).getByRole("button", { name: "Suchen oder Befehl ausführen" }),
     ).toBeInTheDocument();
-    expect(within(bar).getByRole("button", { name: "Anna Muster" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Konto von Anna Muster" })).toBeInTheDocument();
   });
 
   it("opens the sidebar as a drawer with the toggle, and closes it with Escape", async () => {
@@ -777,7 +800,7 @@ describe("command palette", () => {
 
   it("does not open over another dialog", async () => {
     renderShell(json(200, info([first], first)));
-    await userEvent.click(await screen.findByRole("button", { name: "Anna Muster" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Konto von Anna Muster" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: /^Versionen/ }));
     const versions = await screen.findByRole("dialog");
 

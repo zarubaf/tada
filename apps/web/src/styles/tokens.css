@@ -83,6 +83,9 @@
 
     /* Layout */
     --size-panel-width: 480px;
+    --topbar-height: 3rem;
+    --sidebar-width: 14.5rem;
+    --size-tile: 28px; /* The tile with the initials of an event. */
 
     /* Density: compact */
     --control-height-sm: 28px;

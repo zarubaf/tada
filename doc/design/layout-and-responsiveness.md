@@ -88,21 +88,22 @@ The destinations are defined once in `apps/web/src/shell/navItems.ts`.
 The sidebar, the bottom bar, „Mehr“ and the command palette read that list.
 An item appears only when its page exists.
 
+The sidebar is a region with the label „Seitenleiste“; its main navigation is the `nav` „Hauptnavigation“.
 Sidebar, from top to bottom:
 
 1. The app name, then the organization switcher (only if the member belongs to more than one organization).
 2. The event switcher: the name and the key of the current event, and a chevron.
-   The current event is the event of the route, else the event that the member opened last (the browser remembers it as `tada-event`), else none.
+   The current event is the event of the route, else the event that the member opened last (the browser remembers it for each organization as `tada-event:<organization ID>`), else none.
    The menu lists the events of the member and has „Alle Anlässe“ and, for the owner and the administration, „Neuer Anlass“.
    A closed event shows „abgeschlossen“ in its subtitle.
-3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Anlässe“, „Personen“, „Institutionen“ and „Einstellungen“.
-4. At the foot: „Datenschutz“, the build of the web client and the member block.
+3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Anlässe“, „Personen“ and „Institutionen“.
+4. At the foot: „Einstellungen“, „Datenschutz“, the build of the web client and the member block.
    The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
    The member block shows the name and the role; the member menu is in the top bar.
 
 The event page has its own sub-navigation: „Übersicht“, „Aufgaben“, „Zeitplan“, „Register“, „Dokumente“, „Mitglieder“ and „Arbeitsbereiche“ (until ADR 0082 replaces it).
-It has a second row below „Register“: „Zusagen“, „Meilensteine“ and „Entscheide“.
-Each tab has its own URL: `/events/:id/commitments`, `/milestones` and `/decisions`.
+It has a second row below „Register“: „Zusagen“, „Meilensteine“, „Entscheide“, „Risiken“ and „Anforderungen“.
+Each tab has its own URL: `/events/:id/commitments`, `/milestones`, `/decisions`, `/risks` and `/requirements`.
 
 Rules:
 

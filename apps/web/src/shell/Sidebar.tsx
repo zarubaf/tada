@@ -30,7 +30,7 @@ export function Sidebar({
   member,
 }: SidebarProps) {
   return (
-    <div className={styles.sidebar}>
+    <section className={styles.sidebar} aria-label={t("shell-sidebar")}>
       <p className={styles.brand}>{t("app-name")}</p>
       {organizationSwitcher}
       {eventSwitcher}
@@ -70,6 +70,6 @@ export function Sidebar({
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -62,7 +62,7 @@ export function TopBar({
       <ThemeToggle iconOnly />
       <MenuButton
         trigger={<Avatar name={member.name} id={member.id} size={24} decorative />}
-        triggerLabel={member.name}
+        triggerLabel={t("member-menu-trigger", { name: member.name })}
         triggerClassName={styles.member}
         label={t("member-menu")}
         items={memberItems}
