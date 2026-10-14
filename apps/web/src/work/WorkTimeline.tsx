@@ -10,6 +10,7 @@ import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { SkeletonLines } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
+import { FailureBanner } from "./FailureBanner";
 import { onlyOffTimeline, timelineRecords } from "./timelineRecords";
 import { isFiltered } from "./WorkFilterControls";
 import type { WorkFilters } from "./workFilters";
@@ -53,8 +54,9 @@ function LoadedTimeline({
   filters,
   workstreams,
   timeZone,
+  onReset,
 }: WorkTimelineProps) {
-  const { profile } = useEventProfile(api, eventId);
+  const { profile, reloadProfile } = useEventProfile(api, eventId);
   const { actions, milestones } = useMemo(() => timelineRecords(items), [items]);
   const names = useMemo(
     () => new Map(items.map((item) => [item.owner.id, item.owner.name])),
@@ -64,6 +66,7 @@ function LoadedTimeline({
   // The window decides whether there is anything to show: wait for it, so that no empty state flashes.
   const waiting = profile.kind === "loading";
   const empty = !waiting && isEmpty({ actions, milestones, window: windowOf(profile) });
+  const filtered = isFiltered(filters);
   return (
     <TimelinePlan
       actions={actions}
@@ -73,10 +76,26 @@ function LoadedTimeline({
       today={timeZone === undefined ? todayLocal() : todayIn(timeZone)}
       base={base}
       nameOf={(userId) => names.get(userId) ?? ""}
-      filtered={isFiltered(filters)}
+      filtered={filtered}
+      lead={
+        profile.kind === "failed" && (
+          <FailureBanner
+            message={t("work-timeline-failed")}
+            detail={profile.message}
+            busy={false}
+            onRetry={() => void reloadProfile()}
+          />
+        )
+      }
       fallback={
         waiting ? (
           <SkeletonLines label={t("work-loading")} />
+        ) : empty && filtered ? (
+          <EmptyState
+            title={t("work-timeline-only-title")}
+            text={t("timeline-no-match")}
+            action={<Button onPress={onReset}>{t("work-filter-reset")}</Button>}
+          />
         ) : empty ? (
           <EmptyState
             title={t("timeline-empty-title")}
