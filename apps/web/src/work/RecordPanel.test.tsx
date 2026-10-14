@@ -160,10 +160,22 @@ describe("the record panel", () => {
       expect(window.history.length).toBe(before);
     });
 
-    it("has no previous entry at the start of the list", async () => {
-      open("#ACT-006");
+    it("keeps the previous button at the start of the list, disabled and focusable", async () => {
+      open("#ACT-001");
+      await panel(/ACT-001/);
+      // ACT-006 is first, so ACT-001 is the second record. Step back to the first.
+      const previous = screen.getByRole("button", { name: "Vorheriger Eintrag" });
+      previous.focus();
+      await user.keyboard("{Enter}");
       await panel(/ACT-006/);
-      expect(screen.queryByRole("button", { name: "Vorheriger Eintrag" })).toBeNull();
+
+      // The button the member used is still there and still has focus; it now refuses the press.
+      expect(previous).toBeInTheDocument();
+      expect(previous).toHaveFocus();
+      expect(previous).toHaveAttribute("aria-disabled", "true");
+      await user.keyboard("{Enter}");
+      expect(hash()).toBe("#ACT-006");
+      expect(previous).toHaveFocus();
     });
 
     it("steps in the sort of the table", async () => {

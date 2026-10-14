@@ -183,6 +183,23 @@ describe("SidePanel", () => {
     expect(screen.getByRole("button", { name: "Vorheriger Eintrag" })).toBeInTheDocument();
   });
 
+  it("keeps both step buttons when one end is reached, the missing one disabled", async () => {
+    const onNext = vi.fn();
+    render(<Harness onNext={onNext} />);
+    await user.click(screen.getByRole("button", { name: "Öffnen" }));
+
+    const previous = screen.getByRole("button", { name: "Vorheriger Eintrag" });
+    expect(previous).toHaveAttribute("aria-disabled", "true");
+    previous.focus();
+    expect(previous).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(onNext).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Nächster Eintrag" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
   it("keeps focus where it is when the page closes the panel", async () => {
     render(<Harness closeFromOutside />);
     await user.click(screen.getByRole("button", { name: "Öffnen" }));
