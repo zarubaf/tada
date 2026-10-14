@@ -10,11 +10,16 @@ type Answer<T> = Promise<{
 /** The largest page that the server gives. */
 export const LARGEST_PAGE = 200;
 
-/** Loads the pages one after the other. `fetchPage` takes the cursor, or none for the first page. */
+/**
+ * Loads the pages one after the other. `fetchPage` takes the cursor, or none for the first page.
+ * A server that serves a cursor again would loop forever, so the list ends there, as in
+ * `useRegister`.
+ */
 export async function loadAll<T>(
   fetchPage: (cursor: string | undefined) => Answer<T>,
 ): Promise<{ items: T[] } | { error: Problem | undefined }> {
   const items: T[] = [];
+  const seen = new Set<string>();
   let cursor: string | undefined;
   do {
     const { data, error } = await fetchPage(cursor);
@@ -22,7 +27,14 @@ export async function loadAll<T>(
       return { error };
     }
     items.push(...data.items);
-    cursor = data.next_cursor ?? undefined;
+    const next = data.next_cursor ?? undefined;
+    if (next !== undefined && seen.has(next)) {
+      break;
+    }
+    if (next !== undefined) {
+      seen.add(next);
+    }
+    cursor = next;
   } while (cursor !== undefined);
   return { items };
 }
