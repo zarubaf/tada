@@ -37,6 +37,18 @@ describe("ThemeToggle", () => {
     expect(localStorage.getItem(THEME_KEY)).toBeNull();
   });
 
+  it("announces the new choice in a live region", async () => {
+    const user = userEvent.setup();
+    render(<ThemeToggle />);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+    await user.click(screen.getByRole("button", { name: "Farbschema: System" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Farbschema geändert: Hell");
+
+    await user.click(screen.getByRole("button", { name: "Farbschema: Hell" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Farbschema geändert: Dunkel");
+  });
+
   it("starts with the stored choice", () => {
     localStorage.setItem(THEME_KEY, "dark");
     render(<ThemeToggle />);

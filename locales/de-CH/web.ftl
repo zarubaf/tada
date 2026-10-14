@@ -118,13 +118,14 @@ member-menu = Mitgliedermenü
 member-menu-versions = Versionen ({ $build })
 sign-out = Abmelden
 nav-privacy = Datenschutz
-# $theme: the current choice, one of system, light and dark.
-theme-toggle =
-    Farbschema: { $theme ->
-        [light] Hell
-        [dark] Dunkel
-       *[system] System
-    }
+# The three choices of the color theme.
+theme-system = System
+theme-light = Hell
+theme-dark = Dunkel
+# $name: the current choice, as the text of one of the three messages above.
+theme-toggle = Farbschema: { $name }
+# The announcement for screen readers after a change of the choice. $name as above.
+theme-announcement = Farbschema geändert: { $name }
 
 # The versions of tada (ADR 0075): the footer, the list of the components and the prompt to reload.
 version-outdated-title = Eine neue Version von tada ist installiert.
