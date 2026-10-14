@@ -1,17 +1,26 @@
 // The component gallery (ADR 0024): each token and each component in each state.
 // Only builds that are not production builds contain this page.
+import { IconX } from "@tabler/icons-react";
+import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
+import { Chip } from "../ui/Chip";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
 import { FileButton } from "../ui/FileButton";
 import { FileLink } from "../ui/FileLink";
+import { IconButton } from "../ui/IconButton";
 import { InlineError } from "../ui/InlineError";
+import { Kbd } from "../ui/Kbd";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Markdown } from "../ui/Markdown";
+import { RecordId } from "../ui/RecordId";
 import { Skeleton } from "../ui/Skeleton";
 import { Switch } from "../ui/Switch";
 import { ThemeToggle } from "../ui/ThemeToggle";
+import { TypeIcon } from "../ui/TypeIcon";
+import { RECORD_KINDS, STATUSES } from "../work/recordStatus";
+import { RecordStatusLabel } from "../work/WorkStatus";
 import styles from "./Gallery.module.css";
 
 const colors = [
@@ -196,6 +205,58 @@ export function Gallery() {
           <KnowledgeState state="assumption">ca. 20’000 Personen pro Tag</KnowledgeState>
           <KnowledgeState state="conflict">CHF 12.00</KnowledgeState>
           <KnowledgeState state="unknown" />
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Status und Typen</h2>
+        {RECORD_KINDS.map((kind) => (
+          <div key={kind} className={styles.row}>
+            <TypeIcon kind={kind} />
+            <RecordId>{`${kind.slice(0, 3).toUpperCase()}-042`}</RecordId>
+            {Object.keys(STATUSES[kind]).map((status) => (
+              <RecordStatusLabel key={status} kind={kind} status={status as never} />
+            ))}
+          </div>
+        ))}
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Chips</h2>
+        <div className={styles.row}>
+          <Chip variant="date" dateTime="2026-10-15">
+            15.10.
+          </Chip>
+          <Chip variant="date" dateTime="2026-10-12" overdue>
+            12.10.
+          </Chip>
+          <Chip variant="workstream">Infrastruktur</Chip>
+          <Chip variant="workstream" onPress={() => {}}>
+            Veranstaltungsbewilligungsverfahren Musterhausen
+          </Chip>
+          <Chip variant="proposal">16.10.</Chip>
+          <Chip variant="assumption">31.10.</Chip>
+          <Chip variant="unknown" />
+          <Chip>Wirkung hoch</Chip>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Personen, Symbolschaltflächen und Tasten</h2>
+        <div className={styles.row}>
+          {["Anna Muster", "Marco Rossi", "Lea Keller", "Jonas Frei", "Élodie Zürcher", "Z"].map(
+            (name) => (
+              <Avatar key={name} name={name} />
+            ),
+          )}
+          <Avatar name="Anna Muster" size={24} />
+          <Avatar name="Marco Rossi" size={24} />
+        </div>
+        <div className={styles.row}>
+          <IconButton icon={IconX} label="Schliessen" onPress={() => {}} />
+          <IconButton icon={IconX} label="Schliessen" isDisabled onPress={() => {}} />
+          <Kbd>Ctrl</Kbd>
+          <Kbd>K</Kbd>
         </div>
       </section>
 
