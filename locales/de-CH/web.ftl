@@ -1014,6 +1014,7 @@ work-error-due = Das ist kein gültiges Datum.
 work-error-due_date = Das ist kein gültiges Datum.
 work-error-date = Geben Sie ein gültiges Datum an.
 work-error-start_date = Das ist kein gültiges Datum.
+work-error-due_date-start-after-due = Fälligkeit liegt vor dem Start.
 work-error-start_date-start-after-due = Das Startdatum liegt nach dem Fälligkeitsdatum. Wählen Sie ein früheres Startdatum.
 work-error-milestone = Wählen Sie einen Meilenstein dieses Anlasses, der nicht abgesagt ist.
 work-error-reason = Geben Sie einen Grund an. Er hat 1 bis 500 Zeichen.

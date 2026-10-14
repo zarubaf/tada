@@ -38,6 +38,17 @@ export interface FieldSpec {
    * the field. It is not always the name in the request.
    */
   pointer: string;
+  /**
+   * Other names in the errors of the server that belong to this field as well. The server names
+   * the start date for a due date that lies before it, so the due field lists `start_date`. The
+   * message for such an error is `work-error-<pointer>-<code>`.
+   */
+  elsewhere?: readonly string[];
+  /**
+   * A rule that the client checks before it sends a change: the message if `value` is not allowed
+   * for `item`, else nothing. The server checks the same rule again.
+   */
+  validate?: (item: WorkItem, value: FieldValue) => string | undefined;
   /** The field must have a value. */
   required?: boolean;
   /**
@@ -66,6 +77,8 @@ export interface CreateSpec {
   fields: readonly string[];
   /** The values that the form starts with. `me` is the member who is signed in. */
   defaults: (me: string) => Record<string, FieldValue>;
+  /** Checks the values before the form is sent: the message by field ID for each invalid field. */
+  validate?: (values: Record<string, FieldValue>) => Record<string, string>;
   /** Creates the record. */
   submit: (
     commands: WorkCommands,
