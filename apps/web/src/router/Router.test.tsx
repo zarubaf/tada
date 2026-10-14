@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { useEffect, useState } from "react";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   Link,
   Redirect,
@@ -12,6 +13,7 @@ import {
   useParams,
   useSearch,
   useSetSearch,
+  useSettleFocus,
 } from "./Router";
 
 function Event() {
@@ -205,6 +207,9 @@ describe("Router", () => {
           <button type="button" onClick={() => setSearch({ type: null, view: undefined })}>
             clear
           </button>
+          <button type="button" onClick={() => setSearch({ view: "board" })}>
+            board
+          </button>
           <button type="button" onClick={() => setSearch({ tag: ["a", "b"] })}>
             tags
           </button>
@@ -313,6 +318,18 @@ describe("Router", () => {
       expect(screen.getByRole("link", { name: "Anlässe" })).toHaveAttribute("aria-current", "page");
     });
 
+    it("never marks a link without a path current", () => {
+      window.history.replaceState(null, "", "/events");
+      render(
+        <Router>
+          <Link to="?view=board">Query</Link>
+          <Link to="#ACT-001">Hash</Link>
+        </Router>,
+      );
+      expect(screen.getByRole("link", { name: "Query" })).not.toHaveAttribute("aria-current");
+      expect(screen.getByRole("link", { name: "Hash" })).not.toHaveAttribute("aria-current");
+    });
+
     it("keeps focus where it is on a query-only change", async () => {
       renderFilters("/events");
       const button = screen.getByRole("button", { name: "filter" });
@@ -323,17 +340,100 @@ describe("Router", () => {
     });
 
     it("does not leave a focus request behind for a later page", async () => {
-      renderFilters("/events");
-      await userEvent.click(screen.getByRole("button", { name: "filter" }));
-      expect(document.querySelector("h1")).not.toHaveFocus();
+      function Settler() {
+        const settle = useSettleFocus();
+        useEffect(settle, [settle]);
+        return null;
+      }
+      function Later() {
+        const navigate = useNavigate();
+        const [mounted, setMounted] = useState(false);
+        return (
+          <>
+            <button type="button" onClick={() => navigate("/events?type=talk")}>
+              query
+            </button>
+            <button type="button" onClick={() => setMounted(true)}>
+              mount
+            </button>
+            {mounted ? <Settler /> : null}
+          </>
+        );
+      }
+      window.history.replaceState(null, "", "/events");
+      render(
+        <Router>
+          <Later />
+          <Routes>
+            <Route path="/events">
+              <h1>Liste</h1>
+            </Route>
+          </Routes>
+        </Router>,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "query" }));
+      await userEvent.click(screen.getByRole("button", { name: "mount" }));
+      expect(screen.getByRole("heading", { name: "Liste" })).not.toHaveFocus();
     });
 
-    it("does not reset the scroll on a query-only change", async () => {
-      const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
-      renderFilters("/events");
-      await userEvent.click(screen.getByRole("button", { name: "tab" }));
-      expect(scrollTo).not.toHaveBeenCalled();
-      scrollTo.mockRestore();
+    it("keeps a waiting focus request when only the query changes", async () => {
+      function Lazy() {
+        const settle = useSettleFocus();
+        const [loaded, setLoaded] = useState(false);
+        useEffect(() => {
+          if (loaded) {
+            settle();
+          }
+        }, [loaded, settle]);
+        return (
+          <>
+            <button type="button" onClick={() => setLoaded(true)}>
+              load
+            </button>
+            {loaded ? <h1>Lazy</h1> : <p data-route-pending>laden</p>}
+          </>
+        );
+      }
+      function Nav() {
+        const navigate = useNavigate();
+        const setSearch = useSetSearch();
+        return (
+          <>
+            <button type="button" onClick={() => navigate("/lazy")}>
+              to-lazy
+            </button>
+            <button type="button" onClick={() => setSearch({ type: "talk" })}>
+              write
+            </button>
+          </>
+        );
+      }
+      window.history.replaceState(null, "", "/events");
+      render(
+        <Router>
+          <Nav />
+          <Routes>
+            <Route path="/events">
+              <h1>Liste</h1>
+            </Route>
+            <Route path="/lazy">
+              <Lazy />
+            </Route>
+          </Routes>
+        </Router>,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "to-lazy" }));
+      await userEvent.click(screen.getByRole("button", { name: "write" }));
+      await userEvent.click(screen.getByRole("button", { name: "load" }));
+      expect(screen.getByRole("heading", { name: "Lazy" })).toHaveFocus();
+    });
+
+    it("does not push an entry when the active tab is clicked on an unnormalized query", async () => {
+      renderFilters("/events?type=a%20b&view=board");
+      const length = window.history.length;
+      await userEvent.click(screen.getByRole("button", { name: "board" }));
+      expect(window.history.length).toBe(length);
+      expect(window.location.search).toBe("?type=a%20b&view=board");
     });
 
     it("still moves focus when the path changes together with the query", async () => {
