@@ -88,7 +88,7 @@ for (const viewport of viewports) {
       await open(page, "#ACT-001");
       await setTheme(page, theme);
       const panel = page.getByRole("complementary", { name: /^ACT-001/ });
-      await panel.getByRole("button", { name: /^Titel bearbeiten/ }).click();
+      await panel.getByRole("button", { name: /^Titel:/ }).click();
       await expect(panel.getByRole("textbox", { name: "Titel" })).toBeFocused();
       expect((await axe(page)).violations).toEqual([]);
       await fontsLoaded(page);
@@ -116,11 +116,11 @@ test("Escape ends an edit first and closes the panel second, and focus returns t
   const card = page.getByRole("link", { name: /ACT-001/ });
   await card.click();
   const panel = page.getByRole("complementary", { name: /^ACT-001/ });
-  await panel.getByRole("button", { name: /^Titel bearbeiten/ }).click();
+  await panel.getByRole("button", { name: /^Titel:/ }).click();
   await page.keyboard.type(" Entwurf");
   await page.keyboard.press("Escape");
   await expect(panel).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Titel bearbeiten" })).toBeFocused();
+  await expect(panel.getByRole("button", { name: /^Titel:/ })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("complementary")).toHaveCount(0);
   await expect(card).toBeFocused();
@@ -143,7 +143,7 @@ test("an edit in the panel changes the card in the list", async ({ page }) => {
     });
   });
   const panel = page.getByRole("complementary", { name: /^ACT-001/ });
-  await panel.getByRole("button", { name: /^Titel bearbeiten/ }).click();
+  await panel.getByRole("button", { name: /^Titel:/ }).click();
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.type("Generator anfragen");
   await page.keyboard.press("Enter");

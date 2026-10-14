@@ -102,17 +102,15 @@ function Body({
   const { title, description } = descriptor;
   return (
     <div className={styles.body}>
-      {/* The button inside names itself „Titel bearbeiten“; the heading is named by the title. */}
-      <h2 className={styles.title} aria-labelledby={titleId}>
-        <FieldEditor
-          spec={title}
-          item={item}
-          env={env}
-          heading
-          valueId={titleId}
-          focusOnMount={focusTitle}
-        />
-      </h2>
+      {/* The field is the heading: it names itself by the title while the title is on screen. */}
+      <FieldEditor
+        spec={title}
+        item={item}
+        env={env}
+        heading
+        valueId={titleId}
+        focusOnMount={focusTitle}
+      />
       <dl className={styles.props}>
         {descriptor.properties.map((spec) => (
           <Property key={spec.id} spec={spec} item={item} env={env} />

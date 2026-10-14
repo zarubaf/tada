@@ -1427,6 +1427,8 @@ record-not-found-text = Den Eintrag { $id } gibt es in diesem Anlass nicht.
 action-evidence-version = Stützt die Version { $version } der Aufgabe
 # $field: the name of the field.
 record-edit-field = { $field } bearbeiten
+# $field: the name of the field. A button names itself by this, then by its visible value.
+record-field-name = { $field }:
 record-saving = Speichert …
 # $field: the name of the field. $id: the readable ID of the record.
 record-saved = { $field } von { $id } gespeichert.

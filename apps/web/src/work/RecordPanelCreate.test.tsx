@@ -150,7 +150,7 @@ describe("the create state", () => {
     // The new action is in the list, and its title has focus.
     expect(screen.getByRole("link", { name: "Banner aufhängen" })).toBeInTheDocument();
     await waitFor(() =>
-      expect(within(open).getByRole("button", { name: /^Titel bearbeiten/ })).toHaveFocus(),
+      expect(within(open).getByRole("button", { name: /^Titel:/ })).toHaveFocus(),
     );
     expect(screen.getByText("ACT-020 erfasst.")).toBeInTheDocument();
   });
