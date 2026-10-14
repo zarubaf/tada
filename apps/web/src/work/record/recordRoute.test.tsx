@@ -25,6 +25,13 @@ describe("useRecordRoute", () => {
     });
   });
 
+  it("reads the ID of the hash in upper case, as the IDs are written", () => {
+    expect(mount("/events/e1/work#act-012").result.current.route).toEqual({
+      mode: "open",
+      id: "ACT-012",
+    });
+  });
+
   it("creates the kind that the query names, before it opens a record", () => {
     expect(mount("/events/e1/work?new=action#ACT-012").result.current.route).toEqual({
       mode: "create",
