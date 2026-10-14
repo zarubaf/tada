@@ -1,0 +1,87 @@
+@layer components {
+  /* The head: what the record is. The close and step buttons are the ones of SidePanel. */
+  .heading {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    color: var(--color-text-muted);
+  }
+
+  .body {
+    display: grid;
+    align-content: start;
+    gap: var(--space-4);
+  }
+
+  .title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-lg);
+    letter-spacing: var(--letter-spacing-tight);
+    overflow-wrap: anywhere;
+  }
+
+  /* Label and value in two columns; a row is as high as a control. */
+  .props {
+    display: grid;
+    grid-template-columns: 8rem minmax(0, 1fr);
+    column-gap: var(--space-2);
+    align-items: start;
+  }
+
+  .label,
+  .field {
+    display: flex;
+    align-items: center;
+    min-height: var(--control-height-md);
+  }
+
+  .label {
+    gap: var(--space-2);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .field {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .value {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .empty {
+    color: var(--color-text-muted);
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .sectionHeading {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+  }
+
+  /* A long text keeps its line breaks. */
+  .text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .notFound {
+    display: grid;
+    gap: var(--space-2);
+  }
+}

@@ -11,8 +11,8 @@ import { TypeIcon } from "../ui/TypeIcon";
 import { presentationOf } from "./recordStatus";
 import type { WorkSelection } from "./useWorkSelection";
 import styles from "./WorkCard.module.css";
-import type { WorkItem } from "./workItem";
-import { recordHref } from "./workLinks";
+import { mayBeOverdue, type WorkItem } from "./workItem";
+import { useRecordHref } from "./workLinks";
 
 export interface WorkCardProps {
   item: WorkItem;
@@ -49,11 +49,6 @@ export function cardSelect(
     : undefined;
 }
 
-/** A closed record is never overdue; neither is the day on which a decision was made. */
-function mayBeOverdue(item: WorkItem): boolean {
-  return item.kind !== "decision" && item.column !== "done" && item.column !== "canceled";
-}
-
 /** The ids of the parts that the card names or describes itself by. */
 function partIds(base: string) {
   return {
@@ -75,7 +70,7 @@ function partIds(base: string) {
  */
 export function WorkCard({ item, eventId, today, workstreamName, select }: WorkCardProps) {
   const ids = partIds(useId());
-  const href = recordHref(eventId, item);
+  const href = useRecordHref(eventId)(item);
   const { glyph, tone, labelKey } = presentationOf(item);
   const hasOwner = item.owner.name !== "";
   const hasArea = workstreamName !== undefined;
