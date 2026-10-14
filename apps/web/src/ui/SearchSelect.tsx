@@ -55,6 +55,7 @@ export function SearchSelect({
   const { contains } = useFilter({ sensitivity: "base" });
   const trigger = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
+  // The popover restores focus in a later frame, and not at all when the chosen element is gone.
   const chosen = options.find((option) => option.id === value);
 
   return (
@@ -82,6 +83,7 @@ export function SearchSelect({
                 if (key !== undefined) {
                   onChange(String(key));
                   setOpen(false);
+                  focusAfterCommit(() => trigger.current);
                 }
               }}
               renderEmptyState={() => <p className={styles.empty}>{t("combobox-empty")}</p>}
@@ -105,7 +107,6 @@ export function SearchSelect({
               onPress={() => {
                 onChange(undefined);
                 setOpen(false);
-                // The clear button leaves with the value, so the popover has no element to restore.
                 focusAfterCommit(() => trigger.current);
               }}
             >
