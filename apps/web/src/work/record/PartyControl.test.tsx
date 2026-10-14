@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWork } from "../../test/fakeWorkServer";
@@ -54,17 +54,31 @@ describe("PartyControl", () => {
     expect(box).toHaveAttribute("placeholder", "Person oder Institution wählen");
     await user.type(box, "Bäck");
 
+    // The search without text lists the person already; click after the typed search was sent.
+    await waitFor(
+      () =>
+        expect(
+          calls.some((c) => c.call === "GET /api/v1/persons" && c.query === "?limit=6&q=B%C3%A4ck"),
+        ).toBe(true),
+      SEARCH,
+    );
     await user.click(await screen.findByRole("option", { name: "Beat Bäcker (PER-001)" }, SEARCH));
     expect(onChange).toHaveBeenLastCalledWith("person:p1");
-    expect(
-      calls.some((c) => c.call === "GET /api/v1/persons" && c.query === "?limit=6&q=B%C3%A4ck"),
-    ).toBe(true);
     expect(calls.some((c) => c.call === "GET /api/v1/institutions")).toBe(true);
   });
 
   it("offers an institution as well, with the kind in the value", async () => {
-    const { onChange } = await show();
+    const { calls, onChange } = await show();
     await user.type(screen.getByRole("combobox", { name: /^Zugesagt von/ }), "Testwil");
+    await waitFor(
+      () =>
+        expect(
+          calls.some(
+            (c) => c.call === "GET /api/v1/institutions" && c.query?.includes("q=Testwil"),
+          ),
+        ).toBe(true),
+      SEARCH,
+    );
     await user.click(
       await screen.findByRole("option", { name: "Testwil Generatoren AG (INS-001)" }, SEARCH),
     );
