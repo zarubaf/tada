@@ -13,13 +13,22 @@ import type { BoardProps } from "./Board";
 import { presentationOf } from "./recordStatus";
 import { WorkCard } from "./WorkCard";
 import styles from "./WorkTable.module.css";
-import { type SortKey, sortBy } from "./workFilters";
+import { SORT_KEYS, type SortKey, sortBy } from "./workFilters";
 import type { WorkItem } from "./workItem";
 import { recordHref } from "./workLinks";
 import { useWorkSort } from "./workView";
 
-/** The columns of the table, in order. A column to select with joins in front when it ships. */
-const COLUMN_KEYS: readonly SortKey[] = ["id", "kind", "title", "status", "owner", "due", "area"];
+/**
+ * The columns of the table, in order. A column is not always a sort key: the column to select joins
+ * in front and has none.
+ */
+const COLUMN_KEYS = ["id", "kind", "title", "status", "owner", "due", "area"] as const;
+type ColumnKey = (typeof COLUMN_KEYS)[number];
+
+/** The sort key that a column id names, or nothing for a column that does not sort. */
+function sortKeyOf(id: string): SortKey | undefined {
+  return SORT_KEYS.find((key) => key === id);
+}
 
 function Title({ item, eventId }: { item: WorkItem; eventId: string }) {
   const href = recordHref(eventId, item);
@@ -56,7 +65,7 @@ function columnsFor({
   today,
   workstreamName,
 }: Pick<BoardProps, "eventId" | "today" | "workstreamName">): Column<WorkItem>[] {
-  const cells: Record<SortKey, (item: WorkItem) => React.ReactNode> = {
+  const cells: Record<ColumnKey, (item: WorkItem) => React.ReactNode> = {
     id: (item) => <RecordId>{item.readableId}</RecordId>,
     kind: (item) => <TypeIcon kind={item.kind} size={14} />,
     title: (item) => <Title item={item} eventId={eventId} />,
@@ -89,7 +98,7 @@ function columnsFor({
     id: key,
     header: t(`work-table-${key}`),
     cell: cells[key],
-    sortable: true,
+    sortable: sortKeyOf(key) !== undefined,
     ...(key === "id" ? { mono: true } : {}),
     ...(key === "title" ? { grow: true } : {}),
   }));
@@ -123,11 +132,11 @@ export default function WorkTable({ items, narrow, ...rest }: BoardProps) {
     t("work-sorted", { column: t(`work-table-${sort.key}`), direction: sort.dir }),
   );
   const onSort = (key: string) => {
-    const same = sort.key === key;
-    setSort({
-      key: COLUMN_KEYS.find((candidate) => candidate === key) ?? sort.key,
-      dir: same && sort.dir === "asc" ? "desc" : "asc",
-    });
+    const next = sortKeyOf(key);
+    if (next === undefined) {
+      return;
+    }
+    setSort({ key: next, dir: sort.key === next && sort.dir === "asc" ? "desc" : "asc" });
   };
   return (
     <>
