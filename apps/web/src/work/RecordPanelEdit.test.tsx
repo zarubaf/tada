@@ -333,8 +333,13 @@ describe("editing an action in the panel", () => {
       await user.click(view.getByRole("button", { name: "Verantwortlich: Bernd Beispiel" }));
       await user.click(await screen.findByRole("option", { name: "Anna Muster" }));
 
-      await waitFor(() => expect(view.getAllByText("Speichert …").length).toBeGreaterThan(0));
       const trigger = view.getByRole("button", { name: "Verantwortlich: Anna Muster" });
+      // The words are visible inside the field; the live region holds a copy that the eye never sees.
+      const field = trigger.closest<HTMLElement>('[aria-busy="true"]');
+      expect(field).not.toBeNull();
+      await waitFor(() =>
+        expect(within(field as HTMLElement).getByText("Speichert …")).toBeVisible(),
+      );
       expect(trigger).toHaveAttribute("aria-disabled", "true");
       // A press neither opens the list nor is it lost without a sign.
       await user.click(trigger);
