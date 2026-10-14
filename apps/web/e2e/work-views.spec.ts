@@ -140,7 +140,7 @@ test("the sidebar item Zeitplan is current in the timeline view and Arbeit is no
   await expect(page.getByRole("tab", { name: "Zeitplan", selected: true })).toBeVisible();
 });
 
-test("a title in the table is one link, and the risk is none", async ({ page }) => {
+test("a title in the table is one link, also for a risk", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page, "?view=table");
   await tableShown(page, false);
@@ -149,9 +149,9 @@ test("a title in the table is one link, and the risk is none", async ({ page }) 
     "href",
     `/events/${event?.id}/work?view=table#ACT-001`,
   );
-  await expect(page.getByRole("row").filter({ hasText: "RSK-001" }).getByRole("link")).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByRole("row").filter({ hasText: "RSK-001" }).getByRole("link"),
+  ).toHaveAttribute("href", `/events/${event?.id}/work?view=table#RSK-001`);
 });
 
 test("the table rows are 28 px high with a fine pointer", async ({ page }) => {

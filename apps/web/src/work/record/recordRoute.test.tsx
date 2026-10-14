@@ -39,8 +39,15 @@ describe("useRecordRoute", () => {
     });
   });
 
+  it("opens the create state of a risk", () => {
+    expect(mount("/events/e1/work?new=risk").result.current.route).toEqual({
+      mode: "create",
+      kind: "risk",
+    });
+  });
+
   it("ignores a kind that it cannot create", () => {
-    expect(mount("/events/e1/work?new=risk").result.current.route).toEqual({ mode: "closed" });
+    expect(mount("/events/e1/work?new=widget").result.current.route).toEqual({ mode: "closed" });
   });
 
   it("moves to another record with replace and keeps the query", () => {
