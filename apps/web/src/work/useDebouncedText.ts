@@ -17,7 +17,10 @@ export interface DebouncedText {
  * keeps a draft; the owner gets the text 300 ms after the last keystroke, at once when the text is
  * empty, and on `flush`. So a fast typist or a held Backspace makes one change, not one for each
  * key. A change of `committed` that this hook did not write (back, forward, a reset) replaces the
- * draft and drops a commit that is still waiting.
+ * draft and drops a commit that is still waiting. So does back or forward, also to an entry with
+ * the same text, because a commit would write onto that entry. The timer lives as long as the
+ * component that calls the hook, so call it above a sheet that can close while the member types.
+ * It does not commit on unmount: a navigation would write the text onto the new address.
  */
 export function useDebouncedText(
   committed: string,
@@ -27,9 +30,9 @@ export function useDebouncedText(
   const [draft, setDraft] = useState(committed);
   const written = useRef(committed);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const latest = useRef({ draft, commit });
+  const latest = useRef({ draft, commit, committed });
   useEffect(() => {
-    latest.current = { draft, commit };
+    latest.current = { draft, commit, committed };
   });
 
   const stop = useCallback(() => {
@@ -73,6 +76,18 @@ export function useDebouncedText(
       setDraft(committed);
     }
   }, [committed, stop]);
+
+  // Back and forward fire `popstate`; the own commit replaces the entry and fires nothing.
+  useEffect(() => {
+    const onPop = () => {
+      if (timer.current !== undefined) {
+        stop();
+        setDraft(latest.current.committed);
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [stop]);
 
   useEffect(() => stop, [stop]);
 
