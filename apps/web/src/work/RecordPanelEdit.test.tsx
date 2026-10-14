@@ -126,6 +126,20 @@ describe("editing an action in the panel", () => {
       await view.findByRole("button", { name: /Plakat gestalten!/ });
     });
 
+    it("shows that it saves, and says so to a screen reader", async () => {
+      let release: (response: Response) => void = () => undefined;
+      openAction({}, {}, () => new Promise<Response>((resolve) => (release = resolve)));
+      const view = await region();
+      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.type(view.getByRole("textbox", { name: "Titel" }), "!{Enter}");
+
+      expect(await view.findByRole("status")).toHaveTextContent("Speichert …");
+      expect(view.getAllByText("Speichert …")).toHaveLength(2);
+      release(json(200, r.action("ACT-001", { title: "Plakat gestalten!", version: 2 })));
+      await view.findByRole("button", { name: /Plakat gestalten!/ });
+      expect(view.queryAllByText("Speichert …")).toHaveLength(0);
+    });
+
     it("cancels with Escape and keeps the panel open; the next Escape closes it", async () => {
       const server = openAction();
       const view = await region();
@@ -285,6 +299,31 @@ describe("editing an action in the panel", () => {
       expect(server.sent()).toEqual([{ status: "in-progress", expected_version: 1 }]);
       // The head and the list follow.
       expect(screen.getByText("Status von ACT-001 gespeichert.")).toBeInTheDocument();
+    });
+
+    it("shows that a pick saves and refuses another pick until it has saved", async () => {
+      let release: (response: Response) => void = () => undefined;
+      const server = openAction(
+        {},
+        {},
+        () => new Promise<Response>((resolve) => (release = resolve)),
+      );
+      const view = await region();
+      await user.click(view.getByRole("button", { name: "Verantwortlich: Bernd Beispiel" }));
+      await user.click(await screen.findByRole("option", { name: "Anna Muster" }));
+
+      await waitFor(() => expect(view.getAllByText("Speichert …").length).toBeGreaterThan(0));
+      const trigger = view.getByRole("button", { name: "Verantwortlich: Anna Muster" });
+      expect(trigger).toHaveAttribute("aria-disabled", "true");
+      // A press neither opens the list nor is it lost without a sign.
+      await user.click(trigger);
+      expect(screen.queryByRole("listbox")).toBeNull();
+      expect(server.sent()).toHaveLength(1);
+
+      release(json(200, r.action("ACT-001", { owner_user_id: ME, version: 2 })));
+      await waitFor(() => expect(trigger).not.toHaveAttribute("aria-disabled", "true"));
+      await user.click(trigger);
+      expect(await screen.findByRole("listbox", { name: "Verantwortlich" })).toBeVisible();
     });
 
     it("offers a status only if the record can move", async () => {
