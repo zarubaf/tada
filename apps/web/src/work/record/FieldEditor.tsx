@@ -220,6 +220,7 @@ export function FieldEditor({
           searchable={spec.control !== "status"}
           {...(spec.emptyKey && { clearLabel: emptyText })}
         />
+        {busy && <Saving />}
         {(edit.phase === "failed" || edit.phase === "conflict") && (
           // biome-ignore lint/a11y/useSemanticElements: a fieldset groups form fields, not a picker with its error
           <div role="group" aria-label={t(spec.labelKey)} aria-describedby={errorId}>
