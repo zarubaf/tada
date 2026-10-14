@@ -248,6 +248,7 @@ export function RecordCreate({
                 onChange={(text) => set(spec.id, text)}
                 error={errors[spec.id]}
                 autoComplete="off"
+                {...(spec.helpKey && { help: t(spec.helpKey) })}
                 {...(spec.control === "multiline" && { rows: 4 })}
               />
             ),

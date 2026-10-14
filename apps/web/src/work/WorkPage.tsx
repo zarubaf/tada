@@ -333,6 +333,7 @@ export function WorkPage({ api }: { api: Api }) {
         <Suspense fallback={null}>
           <RecordPanel
             work={work}
+            api={api}
             eventId={eventId}
             route={
               route.mode === "create"

@@ -13,7 +13,7 @@ export const PANEL: Record<RecordKind, boolean> = {
   action: true,
   commitment: false,
   milestone: true,
-  decision: false,
+  decision: true,
   risk: true,
 };
 
