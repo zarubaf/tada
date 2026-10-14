@@ -97,9 +97,12 @@ Sidebar, from top to bottom:
    The current event is the event of the route, else the event that the member opened last (the browser remembers it for each organization as `tada-event:<organization ID>`), else none.
    The menu lists the events of the member and has „Alle Anlässe“ and, for the owner and the administration, „Neuer Anlass“.
    A closed event shows „abgeschlossen“ in its subtitle.
-3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Arbeit“, „Anlässe“, „Personen“ and „Institutionen“.
-   „Arbeit“ appears only while the path names an event, and it opens the work page of that event.
+3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Arbeit“, „Zeitplan“, „Anlässe“, „Personen“ and „Institutionen“.
+   „Arbeit“ and „Zeitplan“ appear only while the path names an event.
+   „Arbeit“ opens the work page of that event. „Zeitplan“ opens the same page in the timeline view, `/events/:id/work?view=timeline`.
    On that page „Arbeit“ is the current item and „Anlässe“ is not: an item can yield a path to another item.
+   In the timeline view „Zeitplan“ is the current item and „Arbeit“ is not: an item can also be current only for a value of the query (`onlyWith`, `unlessWith`).
+   The bottom bar has no „Zeitplan“; on a phone the view tabs reach it.
 4. At the foot: „Einstellungen“, „Datenschutz“, the build of the web client and the member block.
    The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
    The member block shows the name and the role; the member menu is in the top bar.
@@ -143,10 +146,12 @@ The page does not use the sub-navigation of the event.
 - The toolbar has the type filter „Alle“, „Aufgaben“, „Zusagen“, „Meilensteine“, „Entscheide“ and „Risiken“, each with a count.
   A count shows what the other filters let through, so it says what a click adds.
 - The filter row has the search (title and ID), „Verantwortlich“ („Ich“ first, then the contributors; there is no „Niemand“, because an action needs an owner), „Bereich“, „Fällig“ („Überfällig“, „Diese Woche“, „Ohne Datum“) and „Filter zurücksetzen“, which shows only while a filter is set.
-- The view tabs are not on the page while the board is the only view.
-  They join the toolbar when a second view exists.
-- All state is in the query string: `type`, `owner`, `stream`, `due`, `q`, the view keys `column` (the status of the list on a phone) and `canceled` (the open „Abgebrochen“), and later `view`.
-  A change of a filter replaces the history entry.
+- The view tabs „Board“, „Tabelle“ and „Zeitplan“ sit above the toolbar and choose the view.
+  The filters are the same in every view, and so are the counts and the announcements.
+  A change of the tab makes a new history entry, so that back and forward move between the views; the filters and the sort stay.
+  The table and the timeline are loaded when their tab opens, so the board does not pay for them.
+- All state is in the query string: `type`, `owner`, `stream`, `due`, `q`, `view` (`board` is the default and has no key; the others are `table` and `timeline`), the sort keys `sort` and `dir` of the table, and the view keys `column` (the status of the list on a phone) and `canceled` (the open „Abgebrochen“).
+  A change of a filter or of the sort replaces the history entry.
   The search writes `q` 300 ms after the last keystroke, and at once on Enter, on blur and when it is cleared.
   A reload or a shared link opens the same view.
 - The board has the columns „Offen“, „In Arbeit“, „Blockiert“ and „Erledigt“.
@@ -171,29 +176,69 @@ The page does not use the sub-navigation of the event.
   The button shows the number of filters that are set.
   The page does not scroll sideways, and the targets are 44 px.
 
+### Table
+
+The view `?view=table` shows one dense row for each record, from 40rem.
+The columns are „ID“, „Typ“ (the icon, with the name of the kind as its accessible name), „Titel“, „Status“ (icon and word), „Verantwortlich“ (avatar and name), „Fällig“ (the date chip) and „Bereich“.
+A row is `--row-height` high (28 px, and 44 px on coarse pointers).
+
+- The header of each column is a button that sorts.
+  The query keys are `sort` (`id`, `kind`, `title`, `status`, `owner`, `due`, `area`) and `dir` (`asc`, `desc`); the defaults `due` and `asc` have no key.
+  The default order is the order of the board: by date, the records without a date last, then by ID.
+  Pressing the sorted column flips its direction; pressing another column sorts it ascending.
+  The sorted header has `aria-sort`, and a polite live region says „Sortiert nach Titel, aufsteigend“.
+  The sort is stable. A record without a value (an empty title, no owner, no date, no area) comes last in both directions, and a tie is broken by the readable ID.
+- The title is a link with the same target as the card: the old page of the kind with the readable ID as the hash.
+  A risk has no page, so its title is text.
+  A redacted record shows „entfernt“.
+- The title takes the width that is left and ends in an ellipsis in one line; the `title` attribute holds the whole text. Owner and area end in an ellipsis too.
+- Where the page leaves the table less than 40rem (a viewport below about 58rem with the docked sidebar), it keeps its columns and scrolls inside itself, never the page.
+- The states are those of the board: the skeleton, the banner of a kind that failed, and the two empty states.
+- Below 40rem there is no table.
+  The page shows the cards of the board as one list, in the order of the sort.
+  The list has no sort control; the targets are 44 px.
+- The markup has one cell for each column, so that a column with a checkbox can join in front.
+
 ### Timeline
 
-The „Zeitplan“ page shows the plan of one event.
+The „Zeitplan“ view of the work page shows the plan of one event: `/events/:id/work?view=timeline`.
+The old page `/events/:id/timeline` shows the same plan until the redirect of ADR 0082 replaces it; both use `TimelinePlan`, which takes the records as props.
 It is read-only.
 It has no drag.
 
+- The view shows the actions and milestones that the filters of the page let through.
+  Commitments, decisions and risks are not on the timeline.
+  If the type filter names only such kinds, the view says „Diese Ansicht zeigt Aufgaben und Meilensteine.“ and offers „Filter zurücksetzen“.
+
+- The event window comes from the facts of the event.
+  The view loads them when it opens, and it shows a skeleton until they are there, so that no empty state flashes.
+
 - One lane for each workstream, and one lane „ohne Arbeitsbereich“.
+
 - An action with a start date and a due date is a bar.
   An action with only a due date is a point.
   Actions without a due date appear as a count with a link to the action register.
+
 - A milestone is a marker with a vertical line across all lanes.
+
 - The event window is a band behind the lanes.
   The window comes from the core facts `exact_dates` or `date_window` (ADR 0081).
   If the window is unknown, the page shows no band.
+
 - A line marks today („heute“).
+
 - The axis shows weeks.
   It runs from the earliest to the latest date of the actions (start and due dates), the milestones and the event window.
   A long span scrolls inside the timeline. The page itself never scrolls horizontally.
+
 - Filters: owner and status.
   Each bar and point links to its action.
+
 - Bars, points and markers do not rely on color alone.
   Each has a label, and the status shows as text in the list.
+
 - Narrow layouts and screen readers get a list of the same items, grouped by week.
+
 - An event with no dated actions, no milestones and no event window shows the empty state of the page, not an empty axis.
   An event with milestones but no dated actions shows its milestones, and the band if the window is known.
 
