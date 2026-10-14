@@ -92,4 +92,18 @@ describe("useDebouncedText", () => {
     expect(input).toHaveValue("extern");
     expect(commit).not.toHaveBeenCalled();
   });
+
+  it("drops the pending commit on back or forward, also when the text of the entry is the same", async () => {
+    const user = typer();
+    render(<Harness initial="a" />);
+    const input = screen.getByLabelText("Suche");
+    await user.type(input, "bc");
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    commit.mockClear();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(commit).not.toHaveBeenCalled();
+    expect(input).toHaveValue("a");
+  });
 });
