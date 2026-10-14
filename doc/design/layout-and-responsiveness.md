@@ -134,7 +134,7 @@ Each template uses the `Page` component for the `main` element, the page gutters
 | Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings                         |
 | Event page       | The event header with the key and the name, the sub-navigation of the event, then the sub-page              | „Übersicht“, „Mitglieder“, „Aufgaben“ of an event                |
 | Timeline         | The event header, a filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)           | „Zeitplan“ of an event                                           |
-| Work             | One toolbar row (title, type filter, view switch, „Filter“), 12 px below it the view                        | „Arbeit“ of an event                                             |
+| Work             | One toolbar row (title, type filter, view switch, „Filter“, „Neu“), 12 px below it the view                 | „Arbeit“ of an event                                             |
 | Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                                      |
 
 ### Work
@@ -146,7 +146,7 @@ The page does not use the sub-navigation of the event.
 - The page is `Page width="flush"`: it has no gutter of its own, and its rows set `--page-gutter` (16 px on a phone, 12 px from `--bp-medium`).
   The toolbar runs edge to edge; the view below it keeps the gutter at both sides and at the bottom.
 - The toolbar is one row of `--size-toolbar` (44 px) with a border below and the gutter at both sides.
-  From left to right it holds the `h1` „Arbeit“ as a compact heading (`--font-size-base`), the type filter, then at the right the view switch and the ghost button „Filter“ (the switch first).
+  From left to right it holds the `h1` „Arbeit“ as a compact heading (`--font-size-base`), the type filter, then at the right the view switch, the ghost button „Filter“ and the primary button „Neu“ (in this order, „Neu“ at the very end).
   The `h1` stays the page heading for screen readers and for the focus moves; it only sits in the row.
   The row has a gap of 8 px.
   When it does not fit, for example next to a docked panel, it wraps into a second row with a gap of 6 px; the switch and the button stay together at the right, and the row never overflows.
@@ -197,7 +197,7 @@ The page does not use the sub-navigation of the event.
 - Narrow (below 40rem): the board is one list.
   A status picker (a select with the counts) replaces the columns.
   The first row holds the `h1` and the view switch.
-  The second row holds the type filter as a select and the „Filter“ button, and the status picker follows directly below it.
+  The second row holds the type filter as a select, the „Filter“ button and the „Neu“ button (all 44 px high), and the status picker follows directly below it.
   The button shows the number of filters that are set.
   The page does not scroll sideways, and the targets are 44 px.
 - The bulk bar floats 20 px above the bottom of the window while the board or the table shows, 44 px high with 30 px buttons (`--size-bulk-button`; 44 px with a coarse pointer), grouped by rules of 20 px.

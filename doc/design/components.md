@@ -97,7 +97,7 @@ These pieces belong to the „Arbeit“ page and live in `apps/web/src/work/`.
 
 The tabs „Board“, „Tabelle“ and „Zeitplan“ of the „Arbeit“ page use `Tabs` with `variant="segmented"`: a frame of 30 px with buttons of 24 px, each with a 14 px icon (columns, table, bars on a time axis) and 12 px text; with a coarse pointer the buttons grow to 44 px and the frame stays.
 The selected view and the chosen type have the neutral fill `--color-bg-active` and the normal text color; the accent is for actions.
-`PageToolbar` puts the toolbar controls in one row with the tab list (`renderList` of `Tabs` places it): the title and the type filter, the switch and the „Filter“ button (`Button size="sm"`, 28 px, 12 px text, 44 px on a coarse pointer).
+`PageToolbar` puts the toolbar controls in one row with the tab list (`renderList` of `Tabs` places it): the title and the type filter, the switch, the „Filter“ button and the primary „Neu“ button at the right end (`Button size="sm"`, 28 px, 12 px text, 44 px on a coarse pointer; in the phone row both are `md`).
 The „Filter“ button has the fill `--color-bg-active` while its popover is open, and the same press closes it.
 In the open popover the first Escape in the search clears the text (the standard of a search field) and the second closes the popover; Escape elsewhere in it closes it at once, and focus returns to the button.
 The key `/` is left alone in a text field, in a list of options or a menu, and while a modal dialog is open; `Ctrl+K` is blocked only by a modal dialog, never by a popover that leaves the page usable.
