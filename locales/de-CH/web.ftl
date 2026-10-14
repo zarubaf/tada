@@ -1121,6 +1121,14 @@ parties-remove-short = Entfernen
 parties-added = { $name } hinzugefügt
 # $name: the name of the person or institution that the member removed.
 parties-removed = { $name } entfernt
+# $label: the name of the field, for example „Beschlossen von“.
+people-picker-results = { $label }: Treffer
+# $label: the name of the field.
+people-picker-chosen = { $label }: gewählt
+# $count: the people chosen. $max: the most that can be chosen.
+people-picker-count = { $count } von { $max } gewählt
+# $max: the most that can be chosen.
+people-picker-full = Höchstens { $max } möglich.
 decision-replace = Ersetzen
 # $id: the readable ID of the decision.
 decision-replace-of = { $id } ersetzen

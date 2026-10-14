@@ -1,0 +1,132 @@
+@layer components {
+  .picker {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .label {
+    font-weight: var(--font-weight-medium);
+  }
+
+  /* The chosen people: a row of avatar, name and a button that takes the person back. */
+  .chosen {
+    display: grid;
+    gap: var(--space-0-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .person {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    min-height: var(--control-height-sm);
+    padding-inline-start: var(--space-2);
+  }
+
+  .person > :last-child {
+    margin-inline-start: auto;
+  }
+
+  .name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .search {
+    min-height: var(--control-height-md);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+    color: var(--color-text);
+    font: inherit;
+  }
+
+  .search:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .picker[data-invalid] .search {
+    border-color: var(--color-danger);
+  }
+
+  /* 16 px on touch devices, so that iOS does not zoom (doc/design/layout-and-responsiveness.md) */
+  @media (pointer: coarse) {
+    .search {
+      font-size: var(--font-size-base);
+    }
+  }
+
+  /* The results scroll inside the field, so that a long result does not push the form out of view. */
+  .list {
+    max-height: 12rem;
+    margin: 0;
+    padding: var(--space-1);
+    overflow-y: auto;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    list-style: none;
+  }
+
+  .list:empty {
+    display: none;
+  }
+
+  .option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--control-height-md);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .option:hover,
+  .option[data-active] {
+    background: var(--color-bg-hover);
+  }
+
+  .option[aria-selected="true"] {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
+  }
+
+  .option[data-active] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+
+  .option[aria-disabled="true"] {
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+  }
+
+  .note {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .problem {
+    color: var(--color-danger);
+    font-size: var(--font-size-sm);
+  }
+
+  /* Forced colors replace the backgrounds: the active option and the chosen ones keep a mark. */
+  @media (forced-colors: active) {
+    .option[aria-selected="true"] {
+      forced-color-adjust: none;
+      background: Highlight;
+      color: HighlightText;
+    }
+  }
+}
