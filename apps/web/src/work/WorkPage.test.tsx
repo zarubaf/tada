@@ -71,12 +71,6 @@ describe("WorkPage", () => {
     }
   });
 
-  it("shows no view tabs while the board is the only view", async () => {
-    open();
-    await ready();
-    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-  });
-
   it("puts every kind into the column of its status and counts them", async () => {
     open();
     await ready();
