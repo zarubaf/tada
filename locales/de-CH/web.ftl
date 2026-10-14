@@ -95,6 +95,19 @@ knowledge-assumption = Annahme
 knowledge-unknown = Unbekannt
 knowledge-conflict = Konflikt
 
+## The kinds and display pieces of work records (ADR 0082).
+record-kind-action = Aufgabe
+record-kind-commitment = Zusage
+record-kind-milestone = Meilenstein
+record-kind-decision = Entscheid
+record-kind-risk = Risiko
+risk-status-open = offen
+risk-status-mitigated = entschärft
+risk-status-occurred = eingetreten
+risk-status-closed = abgeschlossen
+chip-overdue = überfällig
+chip-workstream = Bereich
+
 ## Navigation
 
 not-found-title = Seite nicht gefunden
