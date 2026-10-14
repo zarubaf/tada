@@ -85,6 +85,10 @@ for (const theme of themes) {
     expect((await axe(page)).violations).toEqual([]);
     await fontsLoaded(page);
     await expect(page).toHaveScreenshot(`work-board-filter-popover-${theme}-1440.png`);
+    // Escape in the search clears its text first, as in every search field; the popover stays.
+    await page.keyboard.press("Escape");
+    await expect(search).toHaveValue("");
+    await expect(page.getByRole("dialog", { name: "Filter" })).toBeVisible();
     // A picker inside the popover opens above it; Escape closes the picker first, then the popover.
     await page.getByRole("button", { name: /Verantwortlich/ }).click();
     await expect(page.getByRole("listbox")).toBeVisible();
@@ -95,6 +99,32 @@ for (const theme of themes) {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog", { name: "Filter" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^Filter/ })).toBeFocused();
+  });
+
+  test(`the palette key works while the filter popover is open, ${theme}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await fakeWork(page);
+    await page.goto(work);
+    await setTheme(page, theme);
+    await boardShown(page, false);
+    await page.keyboard.press("/");
+    await page.getByRole("searchbox", { name: "Arbeit durchsuchen" }).fill("Flyer");
+    await page.keyboard.press("Control+K");
+    await expect(page.getByRole("dialog", { name: "Befehle" })).toBeVisible();
+  });
+
+  test(`the Filter button closes the popover that it opened, ${theme}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await fakeWork(page);
+    await page.goto(work);
+    await setTheme(page, theme);
+    await boardShown(page, false);
+    const button = page.getByRole("button", { name: "Filter" });
+    await button.click();
+    await expect(page.getByRole("dialog", { name: "Filter" })).toBeVisible();
+    await button.click();
+    await expect(page.getByRole("dialog", { name: "Filter" })).toHaveCount(0);
+    await expect(button).toHaveAttribute("aria-expanded", "false");
   });
 
   test(`a failed kind shows its banner, ${theme}: no axe violation`, async ({ page }) => {
