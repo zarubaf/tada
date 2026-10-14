@@ -203,6 +203,7 @@ Rules:
 | `--size-tile`            | The tile with the initials of an event in the event switcher (28 px)                                                                                             |
 | `--size-chip-height`     | Chips (20 px)                                                                                                                                                    |
 | `--size-hit-target`      | The height of the hit area of an interactive chip (0 with a fine pointer, 44 px with a coarse one)                                                               |
+| `--size-column-head`     | The height of the head of a board column and the width of the rail of a collapsed one (40 px, 44 px with a coarse pointer)                                       |
 | `--size-chip-hit-margin` | The space that an interactive chip keeps above and below, so that the hit areas of wrapped chips do not overlap (0 with a fine pointer, 12 px with a coarse one) |
 | `--font-size-ui`         | UI text: `--font-size-md` in compact density, `--font-size-base` in comfortable density                                                                          |
 | `--font-size-dense`      | Text of dense rows and cards: `--font-size-sm` in compact, `--font-size-base` in comfortable density                                                             |

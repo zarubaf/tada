@@ -151,7 +151,7 @@ The page does not use the sub-navigation of the event.
 - The board has the columns „Offen“, „In Arbeit“, „Blockiert“ and „Erledigt“.
   „Abgebrochen“ is collapsed to a rail with its count and opens with a toggle.
   The counts in the heads follow the filters.
-  The columns have a least width of 14rem; below that the board scrolls inside itself, never the page.
+  A column is 16rem to 22.5rem wide, with a subtle border; below the least width the board scrolls inside itself, never the page.
   There is no drag and drop.
 - A card is one link to its record.
   Until the side panel exists it leads to the old page of the kind, with the readable ID as the hash.
