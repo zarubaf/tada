@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { SearchSelect } from "./SearchSelect";
 import { SidePanel } from "./SidePanel";
 
 const user = userEvent.setup({ delay: null });
@@ -10,10 +11,12 @@ function Harness({
   onPrevious,
   onNext,
   removeOpener,
+  closeFromOutside,
 }: {
   onPrevious?: () => void;
   onNext?: () => void;
   removeOpener?: boolean;
+  closeFromOutside?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -35,12 +38,47 @@ function Harness({
           {...(onNext ? { onNext } : {})}
         >
           <button type="button">Im Panel</button>
+          <SearchSelect
+            label="Zuständig"
+            placeholder="Niemand"
+            options={[{ id: "a", label: "Anna Muster" }]}
+            value={undefined}
+            onChange={() => {}}
+          />
         </SidePanel>
+      )}
+      {closeFromOutside && (
+        <button type="button" onClick={() => setOpen(false)}>
+          Von aussen schliessen
+        </button>
       )}
       <button type="button">Danach</button>
     </>
   );
 }
+
+/** A viewport that starts narrow or wide and can change. */
+function mockViewport(narrow: boolean) {
+  const listeners = new Set<() => void>();
+  const query = {
+    matches: narrow,
+    addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+  };
+  vi.stubGlobal("matchMedia", () => query);
+  return (next: boolean) => {
+    query.matches = next;
+    act(() => {
+      for (const listener of listeners) {
+        listener();
+      }
+    });
+  };
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("SidePanel", () => {
   it("is a complementary region named by its title", async () => {
@@ -100,6 +138,8 @@ describe("SidePanel", () => {
     await user.tab();
     expect(screen.getByRole("button", { name: "Im Panel" })).toHaveFocus();
     await user.tab();
+    expect(screen.getByRole("button", { name: /Zuständig/ })).toHaveFocus();
+    await user.tab();
 
     expect(screen.getByRole("button", { name: "Danach" })).toHaveFocus();
   });
@@ -117,5 +157,63 @@ describe("SidePanel", () => {
 
     expect(onNext).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Vorheriger Eintrag" })).toBeInTheDocument();
+  });
+
+  it("keeps focus where it is when the page closes the panel", async () => {
+    render(<Harness closeFromOutside />);
+    await user.click(screen.getByRole("button", { name: "Öffnen" }));
+
+    await user.click(screen.getByRole("button", { name: "Von aussen schliessen" }));
+
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Von aussen schliessen" })).toHaveFocus();
+  });
+
+  it("closes only the popover on Escape inside a popover", async () => {
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Öffnen" }));
+    await user.click(screen.getByRole("button", { name: /Zuständig/ }));
+    await screen.findByRole("listbox");
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("complementary")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Zuständig/ })).toHaveFocus();
+  });
+
+  it("makes the page behind it inert and stops its scroll below the medium breakpoint", async () => {
+    mockViewport(true);
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Öffnen" }));
+
+    expect((screen.getByRole("button", { name: "Liste" }) as HTMLElement).inert).toBe(true);
+    expect((screen.getByRole("complementary") as HTMLElement).inert).not.toBe(true);
+    expect(document.documentElement.style.overflow).toBe("hidden");
+
+    await user.keyboard("{Escape}");
+
+    expect((screen.getByRole("button", { name: "Liste" }) as HTMLElement).inert).toBe(false);
+    expect(document.documentElement.style.overflow).toBe("");
+  });
+
+  it("follows the viewport: the page is usable again when the panel is an overlay", async () => {
+    const setNarrow = mockViewport(true);
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Öffnen" }));
+    expect((screen.getByRole("button", { name: "Liste" }) as HTMLElement).inert).toBe(true);
+
+    setNarrow(false);
+
+    expect((screen.getByRole("button", { name: "Liste" }) as HTMLElement).inert).toBe(false);
+    expect(document.documentElement.style.overflow).toBe("");
+  });
+
+  it("leaves the page alone on a wide viewport", async () => {
+    mockViewport(false);
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Öffnen" }));
+
+    expect((screen.getByRole("button", { name: "Liste" }) as HTMLElement).inert).toBe(false);
   });
 });

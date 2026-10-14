@@ -8,8 +8,13 @@
     flex-direction: column;
     background: var(--color-bg-raised);
     color: var(--color-text);
-    outline: none;
     animation: slide-in var(--duration-base) var(--ease-out);
+  }
+
+  /* The panel takes focus on open. The ring shows at every size, also after a mouse press. */
+  .panel:focus {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
   }
 
   /* Medium: an overlay from the right, over the list. */
@@ -81,5 +86,6 @@
     min-height: 0;
     padding: var(--space-4);
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 }
