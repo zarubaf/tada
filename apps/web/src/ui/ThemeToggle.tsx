@@ -1,7 +1,7 @@
 import { IconDeviceDesktop, IconMoon, IconSun } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { t } from "../i18n";
-import { applyTheme, nextTheme, readTheme, storeTheme, type Theme } from "../theme/theme";
+import { chooseTheme, nextTheme, readTheme, THEME_EVENT, type Theme } from "../theme/theme";
 import { Button } from "./Button";
 import { IconButton } from "./IconButton";
 import { LiveRegion } from "./LiveRegion";
@@ -19,11 +19,16 @@ export function ThemeToggle({ iconOnly = false }: { iconOnly?: boolean }) {
   const Icon = ICONS[theme];
   const name = (choice: Theme) => t(`theme-${choice}`);
 
+  // Another control, for example the command palette, can choose the theme too.
+  useEffect(() => {
+    const follow = (event: Event) => setTheme((event as CustomEvent<Theme>).detail);
+    window.addEventListener(THEME_EVENT, follow);
+    return () => window.removeEventListener(THEME_EVENT, follow);
+  }, []);
+
   const cycle = () => {
     const next = nextTheme(theme);
-    storeTheme(next);
-    applyTheme(next);
-    setTheme(next);
+    chooseTheme(next);
     // The name of the focused button changes silently in many screen readers.
     setAnnouncement(t("theme-announcement", { name: name(next) }));
   };

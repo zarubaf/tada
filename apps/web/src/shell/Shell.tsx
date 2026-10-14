@@ -18,6 +18,7 @@ import { eventIdOf, sectionTitle } from "./navItems";
 import { readRemembered, SIDEBAR_KEY, writeRemembered } from "./remembered";
 import styles from "./Shell.module.css";
 import { Sidebar } from "./Sidebar";
+import { isPaletteKey } from "./shortcut";
 import { TopBar } from "./TopBar";
 import { useCurrentEvent, useEventList } from "./useEvents";
 import { useNarrow } from "./useNarrow";
@@ -26,6 +27,7 @@ import { footerText, outdated as isOutdated, useServerVersion } from "./version"
 
 // The drawer is only for narrow layouts: its code loads with the first opening (ADR 0024).
 const Drawer = lazy(() => import("../ui/Drawer"));
+const CommandPalette = lazy(() => import("./CommandPalette"));
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const session = useOptionalSession();
@@ -44,6 +46,23 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const canCreateEvent = useCanCreateEvent();
   const narrow = useNarrow();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const framed = session?.organization !== undefined && !frameless;
+
+  // Ctrl+K and ⌘K open the palette from every place of the framed shell.
+  useEffect(() => {
+    if (!framed) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isPaletteKey(event)) {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [framed]);
 
   // A destination or an event that opens ends the drawer.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the path change is the trigger
@@ -155,7 +174,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           }
           expanded={narrow ? false : sidebarOpen}
           onToggle={toggleSidebar}
-          onOpenPalette={() => undefined}
+          onOpenPalette={() => setPaletteOpen(true)}
           member={{ id: user.id, name: user.displayName }}
           memberItems={memberItems}
           onMemberAction={(id) => {
@@ -198,6 +217,17 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           <Drawer title={t("shell-drawer-title")} onClose={() => setDrawerOpen(false)}>
             {sidebar}
           </Drawer>
+        </Suspense>
+      )}
+      {paletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            events={events.list}
+            loadEvents={events.load}
+            currentEventId={currentEvent?.id}
+            canCreateEvent={canCreateEvent}
+            onClose={() => setPaletteOpen(false)}
+          />
         </Suspense>
       )}
       <VersionSheet api={api} isOpen={versionsOpen} onClose={() => setVersionsOpen(false)} />

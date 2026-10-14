@@ -1,0 +1,145 @@
+@layer components {
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-toast);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: var(--space-12) var(--space-3) var(--space-3);
+    background: var(--color-scrim);
+  }
+
+  .modal {
+    display: flex;
+    flex-direction: column;
+    width: 36rem;
+    max-width: 100%;
+    max-height: 100%;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-raised);
+    box-shadow: var(--shadow-2);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .modal[data-entering] {
+      animation: palette-in var(--duration-fast) var(--ease-out);
+    }
+
+    @keyframes palette-in {
+      from {
+        opacity: 0;
+        transform: translateY(calc(-1 * var(--space-2)));
+      }
+    }
+  }
+
+  .dialog {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    outline: none;
+  }
+
+  .search {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .icon {
+    flex: none;
+    color: var(--color-text-muted);
+  }
+
+  .input {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--control-height-md);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    outline: none;
+  }
+
+  .input::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  /* The field has no focus ring of its own; the ring of the whole row shows where focus is. */
+  .search:focus-within {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+    border-start-start-radius: var(--radius-lg);
+    border-start-end-radius: var(--radius-lg);
+  }
+
+  /* 16 px on touch devices, so that iOS does not zoom (doc/design/layout-and-responsiveness.md) */
+  @media (pointer: coarse) {
+    .input {
+      font-size: var(--font-size-base);
+    }
+  }
+
+  .list {
+    flex: 1;
+    min-height: 0;
+    padding: var(--space-1);
+    overflow-y: auto;
+    outline: none;
+  }
+
+  .group {
+    padding: var(--space-2) var(--space-3) var(--space-1);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--control-height-md);
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    cursor: pointer;
+    outline: none;
+    overflow-wrap: anywhere;
+  }
+
+  .item[data-focused] {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
+  }
+
+  .itemIcon {
+    flex: none;
+    color: var(--color-text-muted);
+  }
+
+  .item[data-focused] .itemIcon {
+    color: inherit;
+  }
+
+  /* Forced colors replace the background: the focused command uses the system highlight. */
+  @media (forced-colors: active) {
+    .item[data-focused] {
+      forced-color-adjust: none;
+      background: Highlight;
+      color: HighlightText;
+    }
+  }
+
+  .empty {
+    padding: var(--space-3);
+    color: var(--color-text-muted);
+  }
+}

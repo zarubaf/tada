@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "../api/client";
@@ -613,5 +613,129 @@ describe("narrow layout", () => {
     await screen.findByRole("dialog", { name: "Navigation" });
 
     expect(localStorage.getItem("tada-sidebar")).toBeNull();
+  });
+});
+
+describe("command palette", () => {
+  const open = event("0199b8e0-0000-7000-8000-0000000000e1", "Sommerfest 2030", "SF30");
+  const other = event("0199b8e0-0000-7000-8000-0000000000e2", "Herbstflug", "HF30");
+
+  async function openPalette() {
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Suchen oder Befehl ausführen" }),
+    );
+    return screen.findByRole("dialog", { name: "Befehle" });
+  }
+
+  it("opens from the command box and closes with Escape, and focus returns to the box", async () => {
+    renderShell(json(200, info([first], first)));
+    const box = await screen.findByRole("button", { name: "Suchen oder Befehl ausführen" });
+
+    const palette = await openPalette();
+    expect(within(palette).getByRole("searchbox")).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(box).toHaveFocus());
+  });
+
+  it.each([
+    ["Ctrl", { ctrlKey: true }],
+    ["Cmd", { metaKey: true }],
+  ])("opens with %s+K", async (_name, modifier) => {
+    renderShell(json(200, info([first], first)));
+    await screen.findByRole("banner");
+
+    fireEvent.keyDown(document.body, { key: "k", ...modifier });
+
+    expect(await screen.findByRole("dialog", { name: "Befehle" })).toBeInTheDocument();
+  });
+
+  it("lists the destinations and no record search", async () => {
+    renderShell(json(200, info([first], first)));
+
+    const palette = await openPalette();
+
+    const names = within(palette)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "Eingang",
+        "Meine Arbeit",
+        "Anlässe",
+        "Personen",
+        "Institutionen",
+        "Einstellungen",
+        "Datenschutz",
+      ]),
+    );
+    expect(names).not.toContain("Neue Aufgabe");
+  });
+
+  it("filters while typing, announces the number of results and opens the choice with Enter", async () => {
+    renderShell(json(200, info([first], first)));
+
+    const palette = await openPalette();
+    await userEvent.keyboard("person");
+
+    expect(within(palette).getAllByRole("menuitem")).toHaveLength(1);
+    await vi.waitFor(() =>
+      expect(within(palette).getByRole("status")).toHaveTextContent("1 Treffer"),
+    );
+    await userEvent.keyboard("{Enter}");
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/persons"));
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("moves with the arrow keys", async () => {
+    renderShell(json(200, info([first], first)));
+
+    await openPalette();
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
+
+    await vi.waitFor(() => expect(window.location.pathname).not.toBe("/events"));
+  });
+
+  it("says that nothing matches", async () => {
+    renderShell(json(200, info([first], first)));
+
+    const palette = await openPalette();
+    await userEvent.keyboard("zzzz");
+
+    expect(await within(palette).findAllByText("Keine Treffer")).not.toHaveLength(0);
+  });
+
+  it("offers a new action only inside an event and opens its actions", async () => {
+    eventItems = [open];
+    renderShellAt(`/events/${open.id}`, json(200, info([first], first)));
+    await screen.findByRole("button", { name: "Anlass wechseln: Sommerfest 2030" });
+
+    await openPalette();
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Neue Aufgabe" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}/actions`));
+  });
+
+  it("jumps to an event", async () => {
+    eventItems = [open, other];
+    renderShell(json(200, info([first], first)));
+
+    const palette = await openPalette();
+    await userEvent.keyboard("herbst");
+    await userEvent.click(await within(palette).findByRole("menuitem", { name: "Herbstflug" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${other.id}`));
+  });
+
+  it("switches the theme and the toggle in the top bar follows", async () => {
+    renderShell(json(200, info([first], first)));
+
+    await openPalette();
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Farbschema: Dunkel" }));
+
+    await vi.waitFor(() => expect(document.documentElement).toHaveAttribute("data-theme", "dark"));
+    expect(await screen.findByRole("button", { name: "Farbschema: Dunkel" })).toBeInTheDocument();
   });
 });

@@ -47,3 +47,13 @@ export function applyTheme(theme: Theme): void {
     root.setAttribute("data-theme", theme);
   }
 }
+
+/** Sent on `window` after each choice, so every control that shows the theme can follow. */
+export const THEME_EVENT = "tada-theme-chosen";
+
+/** Stores and applies the choice of the member and tells the controls that show it. */
+export function chooseTheme(theme: Theme): void {
+  storeTheme(theme);
+  applyTheme(theme);
+  window.dispatchEvent(new CustomEvent<Theme>(THEME_EVENT, { detail: theme }));
+}
