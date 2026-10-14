@@ -3,7 +3,7 @@
   .panel {
     position: fixed;
     inset: 0;
-    z-index: var(--z-shell);
+    z-index: var(--z-panel);
     display: flex;
     flex-direction: column;
     background: var(--color-bg-raised);
@@ -30,12 +30,13 @@
   /* Wide: a docked column. The parent is a flex row; the list keeps the space that is left. */
   @media (width >= 80rem) {
     .panel {
+      /* Under the sticky top bar, which stays visible beside the docked panel. */
       position: sticky;
-      inset: 0 auto auto 0;
+      inset: var(--topbar-height) auto auto 0;
       flex: none;
       align-self: flex-start;
       width: var(--size-panel-width);
-      height: 100dvh;
+      height: calc(100dvh - var(--topbar-height));
       box-shadow: none;
       animation: none;
     }
@@ -59,10 +60,10 @@
 
   .head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
     border-bottom: 1px solid var(--color-border-subtle);
   }
 
