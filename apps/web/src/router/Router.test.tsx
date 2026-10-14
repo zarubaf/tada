@@ -332,6 +332,41 @@ describe("Router", () => {
       expect(screen.getByRole("link", { name: "Arbeit" })).toHaveAttribute("aria-current", "page");
     });
 
+    it("marks a link current only for its query value, and its sibling not then", () => {
+      window.history.replaceState(null, "", "/events/e1/work?view=timeline&q=x");
+      render(
+        <Router>
+          <Link to="/events/e1/work" unlessWith={{ name: "view", value: "timeline" }}>
+            Arbeit
+          </Link>
+          <Link to="/events/e1/work?view=timeline" onlyWith={{ name: "view", value: "timeline" }}>
+            Zeitplan
+          </Link>
+        </Router>,
+      );
+      expect(screen.getByRole("link", { name: "Arbeit" })).not.toHaveAttribute("aria-current");
+      expect(screen.getByRole("link", { name: "Zeitplan" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+
+    it("keeps a link with a query rule not current on the page without that query", () => {
+      window.history.replaceState(null, "", "/events/e1/work?view=table");
+      render(
+        <Router>
+          <Link to="/events/e1/work" unlessWith={{ name: "view", value: "timeline" }}>
+            Arbeit
+          </Link>
+          <Link to="/events/e1/work?view=timeline" onlyWith={{ name: "view", value: "timeline" }}>
+            Zeitplan
+          </Link>
+        </Router>,
+      );
+      expect(screen.getByRole("link", { name: "Arbeit" })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("link", { name: "Zeitplan" })).not.toHaveAttribute("aria-current");
+    });
+
     it("never marks a link without a path current", () => {
       window.history.replaceState(null, "", "/events");
       render(
