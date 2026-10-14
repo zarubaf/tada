@@ -150,7 +150,7 @@ function columnsFor({
     cell: cells[key],
     sortable: sortKeyOf(key) !== undefined,
     ...(key === "id" ? { mono: true } : {}),
-    ...(key === "kind" || key === "area" ? { secondary: true } : {}),
+    ...(key === "kind" || key === "area" || key === "due" ? { secondary: true } : {}),
     ...(key === "title" ? { grow: true } : {}),
   }));
 }
