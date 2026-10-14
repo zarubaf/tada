@@ -17,7 +17,8 @@ function takesText(target: EventTarget | null): boolean {
 /**
  * Calls `onKey` when the member presses „/“, the shortcut to the search of a list
  * (doc/design/components.md). A key that is text in a field, or that carries a modifier, is left
- * alone, and so is a key while a modal dialog is open or in a list or menu. The key is taken, so that the browser does not start its quick find.
+ * alone, and so is a key in a list or a menu or while a modal dialog is open. The key is taken,
+ * so that the browser does not start its quick find.
  */
 export function useSlashKey(onKey: () => void): void {
   useEffect(() => {
