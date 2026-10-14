@@ -38,7 +38,6 @@ export function WorkPage({ api }: { api: Api }) {
   const search = useRef<HTMLInputElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const { retry } = useRetry(() => heading.current);
-  const retrying = useRetrying(retry);
   const event = useEventState(api, eventId, () => heading.current);
   const today = todayLocal();
 
@@ -65,17 +64,30 @@ export function WorkPage({ api }: { api: Api }) {
   }, [key, shown.length]);
 
   // The failures go to the same polite region, so that six failures are one announcement and not
-  // six alerts. An event that failed to load shows its own alert instead.
+  // six alerts. Only a failure that is new is announced, and the region is empty when none is. An
+  // event that failed to load shows its own alert instead.
   const failures = [
     ...(work.directory.kind === "failed" ? [t("work-directory-failed")] : []),
     ...failed.map((kind) => t("work-kind-failed", { kind: t(`work-type-${kind}`) })),
-  ].join(" ");
+  ];
+  const failuresKey = failures.join("\n");
+  const announced = useRef<readonly string[]>([]);
   const eventFailed = event.state.kind === "failed";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `failuresKey` stands for `failures`
   useEffect(() => {
-    if (failures !== "" && !eventFailed) {
-      setAnnouncement(failures);
+    if (eventFailed) {
+      return;
     }
-  }, [failures, eventFailed]);
+    const fresh = failures.filter((text) => !announced.current.includes(text));
+    announced.current = failures;
+    setAnnouncement(fresh.length > 0 ? fresh.join(" ") : undefined);
+  }, [failuresKey, eventFailed]);
+  // A retry that fails again changes no failure, so it says so. The region is empty while the
+  // retry runs, so that the same text twice is a change again.
+  const retrying = useRetrying(retry, {
+    onStart: () => setAnnouncement(undefined),
+    onFailedAgain: () => setAnnouncement(t("work-retry-failed")),
+  });
 
   // The reset button leaves with the filters, so focus goes to the search; behind the closed
   // sheet of a phone there is none, so it goes to the heading.
@@ -174,7 +186,10 @@ export function WorkPage({ api }: { api: Api }) {
  * The retries that run. A retry keeps its banner on screen, so a second press is ignored while it
  * runs; the button stays in the page and keeps focus when the retry fails again.
  */
-function useRetrying(retry: (load: () => Promise<boolean>) => void) {
+function useRetrying(
+  retry: (load: () => Promise<boolean>) => void,
+  on: { onStart: () => void; onFailedAgain: () => void },
+) {
   const [running, setRunning] = useState<ReadonlySet<string>>(new Set());
   const change = (key: string, on: boolean) =>
     setRunning((current) => {
@@ -187,7 +202,17 @@ function useRetrying(retry: (load: () => Promise<boolean>) => void) {
     start: (key: string, load: () => Promise<boolean>) => {
       if (!running.has(key)) {
         change(key, true);
-        retry(() => load().finally(() => change(key, false)));
+        on.onStart();
+        retry(() =>
+          load()
+            .then((loaded) => {
+              if (!loaded) {
+                on.onFailedAgain();
+              }
+              return loaded;
+            })
+            .finally(() => change(key, false)),
+        );
       }
     },
   };

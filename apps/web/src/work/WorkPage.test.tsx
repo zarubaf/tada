@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "../router/Router";
@@ -398,6 +398,40 @@ describe("WorkPage", () => {
       expect(screen.getAllByRole("button", { name: "Erneut versuchen" })).toHaveLength(3);
     });
 
+    it("clears the polite region when the failures are gone and says only what is new", async () => {
+      let fail = true;
+      open("", {
+        answers: {
+          "GET /risks": () =>
+            fail ? problem(500, "internal") : json(200, { items: [r.risk("RSK-009")] }),
+          "GET /commitments": () => problem(500, "internal"),
+        },
+      });
+      await screen.findByText("Risiken konnten nicht geladen werden.", bannerText);
+      const polite = screen.getByRole("status");
+      await waitFor(() =>
+        expect(polite).toHaveTextContent("Zusagen konnten nicht geladen werden."),
+      );
+      fail = false;
+      const banner = screen
+        .getByText("Risiken konnten nicht geladen werden.", bannerText)
+        .closest("[aria-busy]") as HTMLElement;
+      await userEvent.click(within(banner).getByRole("button", { name: "Erneut versuchen" }));
+      await screen.findByText("RSK-009");
+      // Nothing new failed, so the region does not read the remaining failure again.
+      await waitFor(() => expect(polite).toBeEmptyDOMElement());
+    });
+
+    it("says so in the polite region when a retry fails again and keeps focus on the button", async () => {
+      open("", { answers: { "GET /risks": () => problem(500, "internal") } });
+      await screen.findByText("Risiken konnten nicht geladen werden.", bannerText);
+      const polite = screen.getByRole("status");
+      const retry = screen.getByRole("button", { name: "Erneut versuchen" });
+      await userEvent.click(retry);
+      await waitFor(() => expect(polite).toHaveTextContent("Erneut fehlgeschlagen"));
+      expect(screen.getByRole("button", { name: "Erneut versuchen" })).toHaveFocus();
+    });
+
     it("says so for an event that is unknown or forbidden, and retries", async () => {
       let known = false;
       open("", {
@@ -508,6 +542,22 @@ describe("WorkPage", () => {
       await userEvent.click(within(dialog).getByRole("button", { name: "Schliessen" }));
       expect(screen.getByRole("button", { name: "Filter, 1 gesetzt" })).toBeInTheDocument();
       expect(shown()).toEqual(["ACT-001"]);
+    });
+
+    it("keeps the typed text when the sheet closes before the pause is over", async () => {
+      open("", { narrow: true });
+      await screen.findByRole("button", { name: /Offen \(5\)/ });
+      await userEvent.click(screen.getByRole("button", { name: "Filter" }));
+      const dialog = await screen.findByRole("dialog");
+      await userEvent.type(within(dialog).getByRole("searchbox"), "Plakat");
+      // A tap on the overlay closes the sheet without leaving the field.
+      // The overlay keeps focus in the field on pointerdown, so no blur flushes the text.
+      const overlay = dialog.parentElement?.parentElement as HTMLElement;
+      fireEvent.pointerDown(overlay, { pointerType: "mouse", button: 0 });
+      fireEvent.pointerUp(overlay, { pointerType: "mouse", button: 0 });
+      fireEvent.click(overlay);
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      await waitFor(() => expect(query().get("q")).toBe("Plakat"));
     });
   });
 });
