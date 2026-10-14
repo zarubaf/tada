@@ -462,3 +462,35 @@ for (const viewport of [
     });
   }
 }
+
+// A selection must not move anything: the bar floats over the empty ends of the columns, as in the
+// mock, so the four columns keep their frames when it shows or goes.
+test("the bar floats over the board and the columns do not move or shrink", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeWork(page);
+  await page.goto(work);
+  const columns = () =>
+    Promise.all(
+      ["Offen", "In Arbeit", "Blockiert", "Erledigt"].map(async (name) => {
+        const frame = await page
+          .getByRole("region", { name: new RegExp(`^${name}`) })
+          .boundingBox();
+        if (!frame) {
+          throw new Error("not shown");
+        }
+        return frame;
+      }),
+    );
+  const before = await columns();
+  await label(page, "ACT-001").click();
+  await expect(bar(page)).toBeVisible();
+  expect(await columns()).toEqual(before);
+  // The columns still end 12 px above the window, and the bar floats 20 px above it, over them.
+  const last = before[0];
+  expect((last?.y ?? 0) + (last?.height ?? 0)).toBeCloseTo(900 - 12, 0);
+  const frame = await bar(page).boundingBox();
+  expect((frame?.y ?? 0) + (frame?.height ?? 0)).toBeCloseTo(900 - 20, 0);
+  await page.keyboard.press("Escape");
+  await expect(bar(page)).toHaveCount(0);
+  expect(await columns()).toEqual(before);
+});
