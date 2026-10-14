@@ -14,7 +14,7 @@
   }
 
   .label[data-tone="progress"] .icon {
-    color: var(--color-accent-text);
+    color: var(--color-warning);
   }
 
   .label[data-tone="success"] .icon {
