@@ -111,6 +111,19 @@
     white-space: nowrap;
   }
 
+  /* A link to another record: the accent color is for links (ADR 0082). */
+  .recordLink {
+    color: var(--color-accent-text);
+    font-variant-numeric: tabular-nums;
+    text-decoration-line: underline;
+    text-underline-offset: var(--space-0-5);
+  }
+
+  .recordLink:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
   /* A list of people as plain values, one on each line. */
   .people {
     display: grid;

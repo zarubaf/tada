@@ -1442,6 +1442,7 @@ record-no-description = Keine Beschreibung
 record-no-mitigation = Keine Gegenmassnahme
 record-unknown-area = Unbekannter Bereich
 record-unknown-milestone = Unbekannter Meilenstein
+record-unknown-record = Unbekannter Eintrag
 record-sources = Quellen
 record-hints = Hinweise
 record-not-found-title = Eintrag nicht gefunden

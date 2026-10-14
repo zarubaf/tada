@@ -40,12 +40,15 @@ export function FieldView({
   choices,
   item,
   today,
+  onOpen,
 }: {
   spec: FieldSpec;
   value: FieldValue;
   choices: Choices;
   item: WorkItem;
   today: string;
+  /** Shows another record in the panel, for a field that refers to one. */
+  onOpen?: ((readableId: string) => void) | undefined;
 }) {
   const isText = spec.control === "text" || spec.control === "multiline";
   if (isText && item.redacted) {
@@ -67,6 +70,32 @@ export function FieldView({
       return <span className={styles.text}>{value}</span>;
     case "text":
       return <>{value}</>;
+    case "record": {
+      const target = choices.options.find((option) => option.id === value)?.label;
+      return target ? (
+        <a
+          className={styles.recordLink}
+          href={`#${target}`}
+          onClick={(event) => {
+            // A click with a modifier opens the record in a new tab, as a link does.
+            if (
+              onOpen &&
+              !event.ctrlKey &&
+              !event.metaKey &&
+              !event.shiftKey &&
+              event.button === 0
+            ) {
+              event.preventDefault();
+              onOpen(target);
+            }
+          }}
+        >
+          {target}
+        </a>
+      ) : (
+        <span className={styles.empty}>{t("record-unknown-record")}</span>
+      );
+    }
     case "people":
       return (
         <ul className={styles.people}>
