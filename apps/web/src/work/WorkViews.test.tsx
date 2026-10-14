@@ -469,6 +469,39 @@ describe("the timeline view", () => {
     expect(screen.queryByText("Noch nichts im Zeitplan")).not.toBeInTheDocument();
   });
 
+  it("says that the filters match nothing on the timeline, with a reset, when only other kinds match", async () => {
+    const work = r.sampleWork();
+    work["/actions"] = [r.action("ACT-001", { due_date: null })];
+    work["/milestones"] = [];
+    open("?view=timeline&q=B%C3%A4ckerei", {
+      lists: work,
+      answers: { "GET /profile": () => json(200, { ...PROFILE, facts: [] }) },
+    });
+    expect(await screen.findByText("Keine Treffer für diese Filter.")).toBeInTheDocument();
+    expect(screen.queryByText("Noch nichts im Zeitplan")).not.toBeInTheDocument();
+    const reset = screen.getAllByRole("button", { name: "Filter zurücksetzen" });
+    await userEvent.click(reset[reset.length - 1] as HTMLElement);
+    expect(query().has("q")).toBe(false);
+  });
+
+  it("shows a banner with a retry when the facts of the event do not load", async () => {
+    let failing = true;
+    open("?view=timeline", {
+      answers: {
+        "GET /profile": () => (failing ? problem(500, "internal") : json(200, PROFILE)),
+      },
+    });
+    expect(
+      await screen.findByText("Daten des Anlasses konnten nicht geladen werden."),
+    ).toBeInTheDocument();
+    failing = false;
+    await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
+    await axis();
+    expect(
+      screen.queryByText("Daten des Anlasses konnten nicht geladen werden."),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows the empty state of the filters when they let nothing through", async () => {
     open("?view=timeline&q=zzz");
     expect(await screen.findByText("Kein Eintrag passt zu den Filtern")).toBeInTheDocument();

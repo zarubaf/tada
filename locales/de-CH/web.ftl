@@ -1328,6 +1328,7 @@ work-sorted =
     }
 work-timeline-only = Diese Ansicht zeigt Aufgaben und Meilensteine.
 work-timeline-only-title = Nichts für den Zeitplan
+work-timeline-failed = Daten des Anlasses konnten nicht geladen werden.
 work-board-status = Status
 work-board-column-open = Offen
 work-board-column-in-progress = In Arbeit
