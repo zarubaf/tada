@@ -1,4 +1,4 @@
-import { IconFilter } from "@tabler/icons-react";
+import { IconFilter, IconPlus } from "@tabler/icons-react";
 import { type Ref, useState } from "react";
 import type { RecordKind } from "../api/client";
 import { t } from "../i18n";
@@ -39,6 +39,17 @@ export interface WorkToolbarProps {
   onReset: () => void;
   /** The search field that shows, for the focus after a reset. */
   searchRef: Ref<HTMLInputElement>;
+  /** Opens the form of a new record. Without it the member may not create one, and there is no button. */
+  onCreate?: (() => void) | undefined;
+}
+
+function NewButton({ onCreate }: { onCreate: () => void }) {
+  return (
+    <Button variant="primary" onPress={onCreate}>
+      <IconPlus size={14} stroke={1.5} aria-hidden="true" />
+      {t("work-new")}
+    </Button>
+  );
 }
 
 function typeOptions(counts: Counts | undefined) {
@@ -93,6 +104,7 @@ function NarrowToolbar({
   me,
   onReset,
   searchRef,
+  onCreate,
   field,
 }: Omit<WorkToolbarProps, "narrow"> & { field: DebouncedText }) {
   const [open, setOpen] = useState(false);
@@ -118,6 +130,7 @@ function NarrowToolbar({
         {t("work-filter-open")}
         {active > 0 && <span className={styles.badge}>{active}</span>}
       </Button>
+      {onCreate && <NewButton onCreate={onCreate} />}
       {open && (
         <Sheet title={t("work-filter-title")} onClose={() => setOpen(false)}>
           <div className={styles.sheet}>
@@ -147,15 +160,18 @@ export function WorkToolbar({ narrow, ...props }: WorkToolbarProps) {
   if (narrow) {
     return <NarrowToolbar {...props} field={field} />;
   }
-  const { filters, onChange, counts, directory, me, onReset, searchRef } = props;
+  const { filters, onChange, counts, directory, me, onReset, searchRef, onCreate } = props;
   return (
     <div className={styles.wide}>
-      <TypeFilter
-        label={t("work-type-label")}
-        options={typeOptions(counts)}
-        value={typeValue(filters)}
-        onChange={(id) => setType(filters, onChange, id)}
-      />
+      <div className={styles.top}>
+        <TypeFilter
+          label={t("work-type-label")}
+          options={typeOptions(counts)}
+          value={typeValue(filters)}
+          onChange={(id) => setType(filters, onChange, id)}
+        />
+        {onCreate && <NewButton onCreate={onCreate} />}
+      </div>
       <div className={styles.filters}>
         <SearchBox field={field} inputRef={searchRef} />
         <Toolbar label={t("work-toolbar")}>

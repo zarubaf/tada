@@ -83,7 +83,7 @@ export default function CommandPalette({
     } else if (id.startsWith(THEME)) {
       chooseTheme(id.slice(THEME.length) as (typeof THEMES)[number]);
     } else if (id === NEW_ACTION && currentEventId !== undefined) {
-      navigate(`/events/${encodeURIComponent(currentEventId)}/actions`);
+      navigate(`/events/${encodeURIComponent(currentEventId)}/work?new=action`);
     } else if (id === NEW_EVENT) {
       navigate("/events/new");
     }

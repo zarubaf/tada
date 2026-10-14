@@ -30,6 +30,7 @@ import { WorkViews } from "./WorkViews";
 import { WorkViewTabs } from "./WorkViewTabs";
 import { countsFor, filterWork, groupByColumn, NO_FILTERS, serializeFilters } from "./workFilters";
 import { opensInPanel } from "./workLinks";
+import { canCreate } from "./workPermissions";
 import { useWorkSort, useWorkView } from "./workView";
 
 // The panel loads on demand: the board does not pay for the editors of a record (ADR 0082).
@@ -189,7 +190,12 @@ export function WorkPage({ api }: { api: Api }) {
     areaOf: (item) =>
       item.workstreamId === undefined ? undefined : workstreamName(item.workstreamId),
   });
-  const openId = record.route.mode === "open" ? record.route.id : undefined;
+  const { route } = record;
+  const openId = route.mode === "open" ? route.id : undefined;
+  const writableDirectory = work.directory.kind === "loaded" ? work.directory.directory : undefined;
+  const mayCreate = canCreate(writableDirectory, me, writable);
+  // The record that the create state made: the panel puts focus on its title once.
+  const [made, setMade] = useState<string>();
   const around = openId === undefined ? undefined : neighbors(order.filter(opensInPanel), openId);
   // Focus goes back to the card or the row of the record, else to the heading of the page.
   const returnFocus = () =>
@@ -227,6 +233,7 @@ export function WorkPage({ api }: { api: Api }) {
                 narrow={narrow}
                 onReset={reset}
                 searchRef={search}
+                onCreate={mayCreate ? () => record.startCreate("action") : undefined}
               />
               <LiveRegion kind="status" visuallyHidden>
                 {announcement}
@@ -306,18 +313,35 @@ export function WorkPage({ api }: { api: Api }) {
           </div>
         </Page>
       </div>
-      {openId !== undefined && !loading && event.state.kind === "loaded" && around && (
+      {route.mode !== "closed" && !loading && event.state.kind === "loaded" && (
         <Suspense fallback={null}>
           <RecordPanel
             work={work}
-            readableId={openId}
+            route={
+              route.mode === "create"
+                ? { mode: "create", kind: route.kind }
+                : { mode: "open", readableId: route.id }
+            }
+            me={me}
+            mayCreate={mayCreate}
+            focusTitle={openId !== undefined && openId === made}
+            onCreated={(readableId) => {
+              setMade(readableId);
+              record.open(readableId);
+            }}
             writable={writable}
             timeZone={event.state.event.time_zone}
             today={today}
-            previous={around.previous}
-            next={around.next}
-            onOpen={record.open}
-            onClose={record.close}
+            previous={around?.previous}
+            next={around?.next}
+            onOpen={(readableId) => {
+              setMade(undefined);
+              record.open(readableId);
+            }}
+            onClose={() => {
+              setMade(undefined);
+              record.close();
+            }}
             returnFocusTo={returnFocus}
           />
         </Suspense>
