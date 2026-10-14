@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
 import { LOCALE, t } from "../i18n";
-import { useOptionalSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
@@ -13,6 +12,7 @@ import { Page, PageTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import styles from "./EventsPage.module.css";
+import { useCanCreateEvent } from "./useCanCreateEvent";
 
 const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" });
 
@@ -47,9 +47,7 @@ type State =
 /** „Anlässe“: the events that the member can see, in the order of their keys. */
 export function EventsPage({ api }: { api: Api }) {
   const [state, setState] = useState<State>({ kind: "loading" });
-  // The server decides; the button only hides an action that would fail.
-  const role = useOptionalSession()?.organization?.role;
-  const canCreate = role === "owner" || role === "admin";
+  const canCreate = useCanCreateEvent();
   const heading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const { retried, retry } = useRetry(() => heading.current);

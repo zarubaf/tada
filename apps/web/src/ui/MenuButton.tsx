@@ -16,8 +16,10 @@ export interface MenuButtonItem {
   id: string;
   label: string;
   icon?: Icon;
-  /** The current choice of a list, for example the current event. */
+  /** The current choice of a list, for example the current event: a check mark shows it. */
   current?: boolean;
+  /** The accessible name when it differs from the label, for example to say „aktuell“. */
+  ariaLabel?: string;
   isDisabled?: boolean;
   /** A line above the item. */
   separated?: boolean;
@@ -79,7 +81,7 @@ export function MenuButton({
               id={item.id}
               textValue={item.label}
               className={popover.item}
-              {...(item.current ? { "aria-current": "true" as const } : {})}
+              {...(item.ariaLabel ? { "aria-label": item.ariaLabel } : {})}
             >
               {item.icon && (
                 <item.icon size={16} stroke={1.5} aria-hidden="true" className={styles.icon} />
