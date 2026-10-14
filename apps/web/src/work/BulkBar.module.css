@@ -16,6 +16,7 @@
     align-items: center;
     justify-content: flex-end;
     block-size: 0;
+    padding-inline-end: var(--dock-clear, 0);
     pointer-events: none;
   }
 
