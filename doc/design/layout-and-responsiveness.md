@@ -96,7 +96,9 @@ Sidebar, from top to bottom:
    The current event is the event of the route, else the event that the member opened last (the browser remembers it for each organization as `tada-event:<organization ID>`), else none.
    The menu lists the events of the member and has „Alle Anlässe“ and, for the owner and the administration, „Neuer Anlass“.
    A closed event shows „abgeschlossen“ in its subtitle.
-3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Anlässe“, „Personen“ and „Institutionen“.
+3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Arbeit“, „Anlässe“, „Personen“ and „Institutionen“.
+   „Arbeit“ appears only while the path names an event, and it opens the work page of that event.
+   On that page „Arbeit“ is the current item and „Anlässe“ is not: an item can yield a path to another item.
 4. At the foot: „Einstellungen“, „Datenschutz“, the build of the web client and the member block.
    The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
    The member block shows the name and the role; the member menu is in the top bar.
@@ -128,7 +130,40 @@ Each template uses the `Page` component for the `main` element, the page gutters
 | Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings                         |
 | Event page       | The event header with the key and the name, the sub-navigation of the event, then the sub-page              | „Übersicht“, „Mitglieder“, „Aufgaben“ of an event                |
 | Timeline         | The event header, a filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)           | „Zeitplan“ of an event                                           |
+| Work             | The `h1` „Arbeit“, the toolbar (type filter, search, filters), then the view (the board for now)            | „Arbeit“ of an event                                             |
 | Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                                      |
+
+### Work
+
+The „Arbeit“ page (`/events/:id/work`) shows all work records of an event: actions, commitments, milestones, decisions and risks (ADR 0082).
+It has its own `h1` „Arbeit“ and not the header of the event page.
+The page does not use the sub-navigation of the event.
+
+- The toolbar has the type filter „Alle“, „Aufgaben“, „Zusagen“, „Meilensteine“, „Entscheide“ and „Risiken“, each with a count.
+  A count shows what the other filters let through, so it says what a click adds.
+- The filter row has the search (title and ID), „Verantwortlich“ („Ich“ first, then the contributors; there is no „Niemand“, because an action needs an owner), „Bereich“, „Fällig“ („Überfällig“, „Diese Woche“, „Ohne Datum“) and „Filter zurücksetzen“, which shows only while a filter is set.
+- The view tabs are not on the page while the board is the only view.
+  They join the toolbar when a second view exists.
+- All state is in the query string: `type`, `owner`, `stream`, `due`, `q` and later `view`.
+  A change of a filter replaces the history entry.
+  A reload or a shared link opens the same view.
+- The board has the columns „Offen“, „In Arbeit“, „Blockiert“ and „Erledigt“.
+  „Abgebrochen“ is collapsed to a rail with its count and opens with a toggle.
+  The counts in the heads follow the filters.
+  The columns have a least width of 14rem; below that the board scrolls inside itself, never the page.
+  There is no drag and drop.
+- A card is one link to its record.
+  Until the side panel exists it leads to the old page of the kind, with the readable ID as the hash.
+  A risk has no such page, so its card has the same look and is no link.
+- A kind that fails to load shows a banner with „Erneut versuchen“ for that kind; the other kinds still show.
+  An event without records shows an empty state with „Neue Aufgabe“.
+  Filters that hide all records show an empty state with „Filter zurücksetzen“.
+- When the filters change, a polite live region announces the number of records, for example „12 Einträge“.
+- Narrow (below 40rem): the board is one list.
+  A status picker (a select with the counts) replaces the columns.
+  The type filter is a select, and the other filters sit behind a „Filter“ button that opens a sheet from the bottom.
+  The button shows the number of filters that are set.
+  The page does not scroll sideways, and the targets are 44 px.
 
 ### Timeline
 
