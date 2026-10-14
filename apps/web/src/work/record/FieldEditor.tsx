@@ -25,6 +25,8 @@ export interface FieldEnv extends FieldServices {
   editable: boolean;
   /** False in a closed event, where no action on a record runs either. */
   writable: boolean;
+  /** Shows another record in the panel. */
+  open: (readableId: string) => void;
 }
 
 /** The text of a value for a name: the words for no value when there is none. */
@@ -205,7 +207,14 @@ export function FieldEditor({
   }, [idle]);
 
   const view = (
-    <FieldView spec={spec} value={shown} choices={choices} item={item} today={env.today} />
+    <FieldView
+      spec={spec}
+      value={shown}
+      choices={choices}
+      item={item}
+      today={env.today}
+      onOpen={env.open}
+    />
   );
   // The heading of the panel is this field, so that the page can name it by the value. The name
   // points at the value only while the value is on screen: not during an edit.

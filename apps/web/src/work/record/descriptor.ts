@@ -19,7 +19,8 @@ export type ControlKind =
   | "person"
   | "area"
   | "milestone"
-  | "people";
+  | "people"
+  | "record";
 
 /** The icon of a value of an enum: a Tabler icon or a drawing of the same shape. */
 export type EnumIcon = ComponentType<{ size?: number; "aria-hidden"?: "true" }>;
@@ -75,6 +76,10 @@ export interface FieldSpec {
   promptKey?: string;
   /** A date that is marked overdue, as the due date of a task. */
   overdue?: boolean;
+  /** The kind of record that a `record` field refers to. Its value is the UUID of that record. */
+  refers?: RecordKind;
+  /** The field shows only for an item that this accepts, for example the successor of a decision that was replaced. */
+  when?: (item: WorkItem) => boolean;
   /** The value of the item. */
   read: (item: WorkItem) => FieldValue;
   /**
