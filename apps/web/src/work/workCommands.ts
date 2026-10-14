@@ -26,7 +26,9 @@ import type {
   Commitment,
   CommitmentStatus,
   CreateActionRequest,
+  CreateRiskRequest,
   Decision,
+  Level,
   Milestone,
   MilestoneStatus,
   Problem,
@@ -166,18 +168,29 @@ export function createWorkCommands(api: Api, eventId: string) {
     );
 
   /** A new record has no version to guard and no commands before it, so it needs no queue. */
-  const createAction = async (body: CreateActionRequest): Promise<CommandResult<Action>> => {
-    let answer: Awaited<Answer<Action>>;
+  const created = async <R>(send: () => Answer<R>): Promise<CommandResult<R>> => {
+    let answer: Awaited<Answer<R>>;
     try {
-      answer = await api.POST("/api/v1/events/{event_id}/actions", {
-        params: { path: { event_id: eventId } },
-        body,
-      });
+      answer = await send();
     } catch {
       answer = {};
     }
     return answer.data ? { ok: true, record: answer.data } : refused(answer);
   };
+  const createAction = (body: CreateActionRequest) =>
+    created<Action>(() =>
+      api.POST("/api/v1/events/{event_id}/actions", {
+        params: { path: { event_id: eventId } },
+        body,
+      }),
+    );
+  const createRisk = (body: CreateRiskRequest) =>
+    created<Risk>(() =>
+      api.POST("/api/v1/events/{event_id}/risks", {
+        params: { path: { event_id: eventId } },
+        body,
+      }),
+    );
 
   return {
     action: {
@@ -216,6 +229,11 @@ export function createWorkCommands(api: Api, eventId: string) {
       changeStatus: (t: Target, status: RiskStatus) => risk(t, { status }),
       changeOwner: (t: Target, userId: string) => risk(t, { owner_user_id: userId }),
       changeWorkstream: (t: Target, id: string | null) => risk(t, { workstream_id: id }),
+      changeImpact: (t: Target, impact: Level) => risk(t, { impact }),
+      changeLikelihood: (t: Target, likelihood: Level) => risk(t, { likelihood }),
+      changeMitigation: (t: Target, text: string | null) => risk(t, { mitigation: text }),
+      changeDescription: (t: Target, text: string | null) => risk(t, { description: text }),
+      create: createRisk,
       rename: (t: Target, title: string) => risk(t, { title }),
     },
   };
