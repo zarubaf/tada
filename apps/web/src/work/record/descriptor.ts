@@ -114,6 +114,8 @@ export interface RecordDescriptor {
   properties: readonly FieldSpec[];
   /** The long text under the fields, if the kind has one. */
   description?: FieldSpec;
+  /** Further long texts under the description, each in its own section, for example a mitigation. */
+  texts?: readonly FieldSpec[];
   /** The Fluent key of the line that names the record version that a passage of evidence supports. */
   evidenceVersionKey: string;
   create?: CreateSpec;
