@@ -1,0 +1,45 @@
+@layer components {
+  .wide {
+    display: grid;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .filters > :first-child {
+    flex: 0 1 16rem;
+  }
+
+  .narrow {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .narrow > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .sheet {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .sheet > * {
+    min-width: 0;
+  }
+
+  .badge {
+    color: var(--color-accent-text);
+    font-variant-numeric: tabular-nums;
+  }
+}

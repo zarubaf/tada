@@ -85,6 +85,11 @@ export function sampleWork() {
       action("ACT-003", { title: "Festzelt bestellen", status: "blocked", owner_user_id: CLARA }),
       action("ACT-004", { title: "Flyer drucken", status: "done", due_date: "2030-01-10" }),
       action("ACT-005", { title: "Hallenplan zeichnen", status: "canceled" }),
+      action("ACT-006", {
+        title: "Rechnung bezahlen",
+        due_date: "2020-02-01",
+        owner_user_id: BERND,
+      }),
     ],
     "/commitments": [
       commitment("COM-001", { text: "Bäckerei liefert 120 Zöpfe", due_date: "2030-06-01" }),

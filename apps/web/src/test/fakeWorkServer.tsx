@@ -88,6 +88,8 @@ export interface Setup {
   profile?: ProfileState;
   /** The fragment of the address, for a link to a row of a register. */
   hash?: string;
+  /** The path and query of the address, if the page does not sit at the path of the event. */
+  url?: string;
 }
 
 /** Renders `page` for the event with the fake server. It records `METHOD path` and the body. */
@@ -102,6 +104,7 @@ export function renderWork(
     lists = {},
     profile = { kind: "loading" },
     hash = "",
+    url: address,
   }: Setup = {},
 ) {
   const calls: { call: string; query: string; body: unknown }[] = [];
@@ -144,14 +147,14 @@ export function renderWork(
     if (request.method === "GET" && list) {
       return json(200, { items: list[1] });
     }
-    // The milestones that the action form offers.
-    if (request.method === "GET" && path.endsWith("/milestones")) {
+    // The milestones that the action form offers, and the kinds that a page did not ask for.
+    if (request.method === "GET" && /\/(milestones|risks)$/.test(path)) {
       return json(200, { items: [] });
     }
     throw new Error(`unexpected ${request.method} ${path}`);
   };
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
-  window.history.replaceState(null, "", `/events/${EVENT.id}${hash}`);
+  window.history.replaceState(null, "", address ?? `/events/${EVENT.id}${hash}`);
   render(
     <Router>
       <SessionProvider api={api}>

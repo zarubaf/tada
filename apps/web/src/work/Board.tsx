@@ -1,6 +1,5 @@
 import { IconEyeOff } from "@tabler/icons-react";
 import { useId, useState } from "react";
-import { Button as AriaButton } from "react-aria-components";
 import { t } from "../i18n";
 import { IconButton } from "../ui/IconButton";
 import { Select } from "../ui/Select";
@@ -102,16 +101,17 @@ function WideBoard({
             {...rest}
           />
         ) : (
-          <AriaButton
+          <button
             key={group.column}
+            type="button"
             className={styles.rail}
             aria-expanded="false"
-            onPress={() => setCanceledShown(true)}
+            onClick={() => setCanceledShown(true)}
           >
             <StatusIcon glyph="canceled" tone="muted" size={14} />
             <span className={styles.railLabel}>{t("work-board-column-canceled")}</span>
             <span className={styles.count}>{group.items.length}</span>
-          </AriaButton>
+          </button>
         );
       })}
     </div>

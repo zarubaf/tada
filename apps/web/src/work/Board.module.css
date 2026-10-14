@@ -81,11 +81,11 @@
     transition-timing-function: var(--ease-out);
   }
 
-  .rail[data-hovered] {
+  .rail:hover {
     background: var(--color-bg-hover);
   }
 
-  .rail[data-focus-visible] {
+  .rail:focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
@@ -93,6 +93,16 @@
   .railLabel {
     font-weight: var(--font-weight-semibold);
     writing-mode: vertical-rl;
+  }
+
+  .skeletonCard {
+    display: grid;
+    gap: var(--space-2);
+    margin: var(--space-1-5);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-surface);
   }
 
   .narrow {
