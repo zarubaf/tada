@@ -318,6 +318,20 @@ describe("Router", () => {
       expect(screen.getByRole("link", { name: "Anlässe" })).toHaveAttribute("aria-current", "page");
     });
 
+    it("does not mark a link current on a path that another link claims", () => {
+      window.history.replaceState(null, "", "/events/e1/work");
+      render(
+        <Router>
+          <Link to="/events" yieldsTo="/events/e1/work">
+            Anlässe
+          </Link>
+          <Link to="/events/e1/work">Arbeit</Link>
+        </Router>,
+      );
+      expect(screen.getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+      expect(screen.getByRole("link", { name: "Arbeit" })).toHaveAttribute("aria-current", "page");
+    });
+
     it("never marks a link without a path current", () => {
       window.history.replaceState(null, "", "/events");
       render(

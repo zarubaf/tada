@@ -41,6 +41,7 @@ export function SearchBox({ filters, onChange }: FilterControlProps) {
   return (
     <SearchField
       label={t("work-search")}
+      placeholder={t("work-search-placeholder")}
       value={draft}
       onChange={(text) => {
         setDraft(text);

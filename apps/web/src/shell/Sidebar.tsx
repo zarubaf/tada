@@ -6,7 +6,7 @@ import { t } from "../i18n";
 import { InboxCount } from "../review/InboxCount";
 import { Avatar } from "../ui/Avatar";
 import { NavLink } from "../ui/NavLink";
-import { MAIN, PRIVACY, SETTINGS } from "./navItems";
+import { mainItems, PRIVACY, SETTINGS } from "./navItems";
 import styles from "./Sidebar.module.css";
 import { VersionButton } from "./VersionFooter";
 
@@ -14,6 +14,8 @@ export interface SidebarProps {
   /** Only a member of more than one organization has it. */
   organizationSwitcher: ReactNode;
   eventSwitcher: ReactNode;
+  /** The event of the route, if the path names one: „Arbeit“ then appears. */
+  eventId: string | undefined;
   server: SystemVersion | undefined;
   onOpenVersions: () => void;
   /** Called when a link starts a navigation: the drawer closes then. */
@@ -24,6 +26,7 @@ export interface SidebarProps {
 export function Sidebar({
   organizationSwitcher,
   eventSwitcher,
+  eventId,
   server,
   onOpenVersions,
   onNavigate,
@@ -35,7 +38,7 @@ export function Sidebar({
       {organizationSwitcher}
       {eventSwitcher}
       <nav className={styles.nav} aria-label={t("shell-nav")}>
-        {MAIN.map((destination) => (
+        {mainItems(eventId).map((destination) => (
           <NavLink
             key={destination.id}
             onNavigate={onNavigate}
@@ -43,6 +46,7 @@ export function Sidebar({
             icon={destination.icon}
             {...(destination.exact ? { exact: true } : {})}
             {...(destination.within ? { within: destination.within } : {})}
+            {...(destination.yieldsTo ? { yieldsTo: destination.yieldsTo } : {})}
           >
             {destination.label}
             {destination.id === "inbox" && <InboxCount />}
