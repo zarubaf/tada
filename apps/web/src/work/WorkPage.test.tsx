@@ -88,8 +88,10 @@ describe("WorkPage", () => {
     expect(within(region(/^Blockiert/)).getByText("ACT-003")).toBeInTheDocument();
     expect(within(region(/^Blockiert/)).getByText("RSK-001")).toBeInTheDocument();
     expect(within(region(/^Erledigt/)).getByText("ACT-004")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "Offen5" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Abgebrochen\s*1/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Offen, 5 Einträge" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abgebrochen, 1 Eintrag" })).toBeInTheDocument();
   });
 
   it("links a card to the old page of its kind and leaves the risk without a link", async () => {
@@ -132,7 +134,9 @@ describe("WorkPage", () => {
       expect(query().get("type")).toBe("decision");
       expect(shown()).toEqual(["DEC-001"]);
       expect(window.history.length).toBe(before);
-      expect(screen.getByRole("heading", { level: 2, name: "Offen1" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Offen, 1 Eintrag" }),
+      ).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("radio", { name: /^Alle/ }));
       expect(window.location.search).toBe("");
@@ -276,7 +280,9 @@ describe("WorkPage", () => {
     it("counts the columns with the filters", async () => {
       open("?owner=mine");
       await ready();
-      expect(screen.getByRole("heading", { level: 2, name: "Offen3" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Offen, 3 Einträge" }),
+      ).toBeInTheDocument();
     });
   });
 
