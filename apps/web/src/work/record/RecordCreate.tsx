@@ -1,4 +1,5 @@
 import { type FormEvent, useRef, useState } from "react";
+import { uuidv7 } from "../../api/uuid";
 import { t } from "../../i18n";
 import { Button } from "../../ui/Button";
 import { firstInvalidField, useFocusAfterCommit } from "../../ui/focus";
@@ -116,6 +117,10 @@ export function RecordCreate({
   const [errors, setErrors] = useState<Errors>({});
   const [failure, setFailure] = useState<string>();
   const [busy, setBusy] = useState(false);
+  // One ID for every try of this form, and a flag that a second press in the same moment sees
+  // before React has rendered `busy`.
+  const [recordId] = useState(uuidv7);
+  const sending = useRef(false);
   const form = useRef<HTMLFormElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   if (!create) {
@@ -133,7 +138,7 @@ export function RecordCreate({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy) {
+    if (sending.current) {
       return;
     }
     const missing: Errors = {};
@@ -151,8 +156,10 @@ export function RecordCreate({
       focusInvalid();
       return;
     }
+    sending.current = true;
     setBusy(true);
-    const result = await create.submit(commands, values);
+    const result = await create.submit(commands, values, recordId);
+    sending.current = false;
     setBusy(false);
     if (result.ok) {
       announce(t("record-created", { id: result.record.local_id }));

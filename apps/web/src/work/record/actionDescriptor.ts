@@ -131,11 +131,12 @@ const description: FieldSpec = {
 const optional = (value: FieldValue): string | undefined =>
   value === null || value.trim() === "" ? undefined : value.trim();
 
-function body(values: Record<string, FieldValue>): CreateActionRequest {
+function body(values: Record<string, FieldValue>, id: string): CreateActionRequest {
   const description = optional(values.description ?? null);
   const start = optional(values.start ?? null);
   const due = optional(values.due ?? null);
   return {
+    id,
     title: optional(values.title ?? null) ?? "",
     owner_user_id: values.owner ?? "",
     ...(description && { description }),
@@ -163,6 +164,6 @@ export const actionDescriptor: RecordDescriptor = {
             due: t("work-error-due_date-start-after-due"),
           }
         : {},
-    submit: (commands, values) => commands.action.create(body(values)),
+    submit: (commands, values, id) => commands.action.create(body(values, id)),
   },
 };
