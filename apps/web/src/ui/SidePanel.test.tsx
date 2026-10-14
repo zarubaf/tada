@@ -223,17 +223,31 @@ describe("SidePanel below the medium breakpoint, in a shell", () => {
     return (
       <div id="root">
         <header id="top">
-          <button type="button">Organisation</button>
+          <button type="button" id="org">
+            Organisation
+          </button>
+          <p id="live" role="status" />
         </header>
         <nav id="nav">
           <a href="/x">Navigation</a>
         </nav>
-        <p id="live" role="status" />
-        <div id="toasts" data-toast-region="" />
+        <div id="wrap">
+          <button type="button" id="beside">
+            Daneben
+          </button>
+          <div id="toasts" data-toast-region="" />
+        </div>
         <main id="main">
           {swap ? <p id="empty">Leer</p> : <ul id="list" />}
           <SidePanel title="Eintrag" onClose={() => {}}>
             <button type="button">Im Panel</button>
+            <SearchSelect
+              label="Zuständig"
+              placeholder="Niemand"
+              options={[{ id: "a", label: "Anna Muster" }]}
+              value={undefined}
+              onChange={() => {}}
+            />
           </SidePanel>
         </main>
       </div>
@@ -245,10 +259,13 @@ describe("SidePanel below the medium breakpoint, in a shell", () => {
     mockViewport(true);
     render(<Shell />);
 
-    expect(inert("top")).toBe(true);
+    expect(inert("top")).toBeFalsy();
+    expect(inert("org")).toBe(true);
     expect(inert("nav")).toBe(true);
     expect(inert("list")).toBe(true);
     expect(inert("live")).toBeFalsy();
+    expect(inert("wrap")).toBeFalsy();
+    expect(inert("beside")).toBe(true);
     expect(inert("toasts")).toBeFalsy();
     expect(inert("main")).toBeFalsy();
     expect(inert("root")).toBeFalsy();
@@ -272,9 +289,50 @@ describe("SidePanel below the medium breakpoint, in a shell", () => {
 
     setNarrow(false);
 
-    expect(inert("top")).toBe(false);
+    expect(inert("org")).toBe(false);
+    expect(inert("beside")).toBe(false);
     expect(inert("nav")).toBe(false);
     expect(inert("list")).toBe(false);
+  });
+
+  it("marks a sibling that appears later inside a header that holds a live region", async () => {
+    mockViewport(true);
+    render(<Shell />);
+    const added = document.createElement("button");
+    added.id = "late-in-header";
+    document.getElementById("top")?.append(added);
+    await waitFor(() => expect(inert("late-in-header")).toBe(true));
+    expect(inert("top")).toBeFalsy();
+  });
+
+  it("leaves a portal root that appears later in the body alone", async () => {
+    mockViewport(true);
+    render(<Shell />);
+    const portal = document.createElement("div");
+    portal.id = "portal";
+    document.body.append(portal);
+    // Let the observer run; add a sentinel sibling that must still be made inert.
+    const late = document.createElement("section");
+    late.id = "late-main";
+    document.getElementById("main")?.prepend(late);
+    await waitFor(() => expect(inert("late-main")).toBe(true));
+
+    expect(inert("portal")).toBeFalsy();
+    portal.remove();
+  });
+
+  it("keeps the popover of a select inside the panel out of reach of inert", async () => {
+    mockViewport(true);
+    render(<Shell />);
+    await user.click(screen.getByRole("button", { name: /Zuständig/ }));
+    const listbox = await screen.findByRole("listbox");
+
+    for (let node: HTMLElement | null = listbox; node; node = node.parentElement) {
+      expect(node.inert, node.outerHTML.slice(0, 60)).toBeFalsy();
+      if (node === document.body) {
+        break;
+      }
+    }
   });
 
   it("marks a sibling that appears later, and releases it on close", async () => {
