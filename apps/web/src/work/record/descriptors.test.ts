@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { RECORD_KINDS } from "../recordStatus";
 import { PANEL } from "../workLinks";
 import { descriptorOf } from "./descriptors";
+import { CREATABLE } from "./recordRoute";
 
 describe("descriptors", () => {
   it("has a descriptor for exactly the kinds whose cards open the panel", () => {
@@ -27,5 +28,10 @@ describe("descriptors", () => {
         expect(ids).toContain(id);
       }
     }
+  });
+
+  it("lists as creatable exactly the kinds whose descriptor can create", () => {
+    const creating = RECORD_KINDS.filter((kind) => descriptorOf(kind)?.create !== undefined);
+    expect([...CREATABLE].sort()).toEqual([...creating].sort());
   });
 });
