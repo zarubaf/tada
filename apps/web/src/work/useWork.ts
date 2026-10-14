@@ -35,6 +35,11 @@ export interface Work {
   /** Loads one kind again without the loading state, after a command. */
   refresh: (kind: RecordKind) => Promise<boolean>;
   /**
+   * Loads one kind again like `refresh` and resolves to the readable ID of the record with this ID,
+   * or to nothing when the load failed or the list lacks the record.
+   */
+  locate: (kind: RecordKind, id: string) => Promise<string | undefined>;
+  /**
    * Puts the record that a command returned into the list, without a request. It replaces the
    * record with the same ID, or adds it at the end when the list lacks it (a new record).
    */
@@ -117,7 +122,8 @@ export function useWork(api: Api, eventId: string): Work {
     risk: 0,
   });
 
-  const load = useCallback(
+  // The records that arrived, or undefined when the load failed or a newer one took its place.
+  const loadRecords = useCallback(
     async (kind: RecordKind, mode: Mode) => {
       const request = ++latest.current[kind];
       const current = () => request === latest.current[kind];
@@ -133,7 +139,7 @@ export function useWork(api: Api, eventId: string): Work {
         result = { error: undefined };
       }
       if (!current()) {
-        return false;
+        return undefined;
       }
       if ("items" in result) {
         setSlots((slots) => ({
@@ -143,7 +149,7 @@ export function useWork(api: Api, eventId: string): Work {
             state: { kind: "loaded", records: newest(slots[kind], result.items) },
           },
         }));
-        return true;
+        return result.items;
       }
       // A refresh that fails keeps the list on screen; the caller sees the false.
       if (mode !== "silent") {
@@ -153,9 +159,24 @@ export function useWork(api: Api, eventId: string): Work {
           requestId: result.error?.request_id,
         });
       }
-      return false;
+      return undefined;
     },
     [api, eventId],
+  );
+
+  const load = useCallback(
+    async (kind: RecordKind, mode: Mode) => (await loadRecords(kind, mode)) !== undefined,
+    [loadRecords],
+  );
+
+  const locate = useCallback(
+    async (kind: RecordKind, id: string) => {
+      const records = await loadRecords(kind, "silent");
+      return (records as { id: string; local_id: string }[] | undefined)?.find(
+        (record) => record.id === id,
+      )?.local_id;
+    },
+    [loadRecords],
   );
 
   useEffect(() => {
@@ -220,6 +241,7 @@ export function useWork(api: Api, eventId: string): Work {
     reloadDirectory,
     reloadKind,
     refresh,
+    locate,
     replace,
   };
 }

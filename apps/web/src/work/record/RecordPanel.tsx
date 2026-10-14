@@ -197,6 +197,7 @@ export default function RecordPanel({
             sources={sourcesOf(work)}
             owner={assignees.some((member) => member.id === me) ? me : undefined}
             onCreated={onCreated}
+            recover={(id) => work.locate(route.kind, id)}
             onCancel={onClose}
             announce={setStatus}
           />
