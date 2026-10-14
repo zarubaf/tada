@@ -1,8 +1,9 @@
-// What the shell remembers in the browser: the state of the sidebar and the last event. The page
+// What the shell remembers in the browser: the state of the sidebar and the last event of each organization. The page
 // works without storage, so each failure means „nothing remembered“ (doc/design/layout-and-responsiveness.md).
 
 export const SIDEBAR_KEY = "tada-sidebar";
-export const EVENT_KEY = "tada-event";
+/** The key of the last event: an event belongs to one organization. */
+export const eventKey = (organizationId: string) => `tada-event:${organizationId}`;
 
 export function readRemembered(key: string): string | undefined {
   try {
