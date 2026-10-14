@@ -7,6 +7,7 @@ import {
   type MyWork,
   problemMessage,
 } from "../api/client";
+import { isOverdue, todayLocal } from "../facts/dueDate";
 import { formatDate } from "../facts/formatValue";
 import { t } from "../i18n";
 import { type Column, DataTable } from "../ui/DataTable";
@@ -18,7 +19,6 @@ import { redactedOr } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import { StatusLabel } from "../ui/StatusLabel";
-import { isOverdue, todayLocal } from "./dueDate";
 import styles from "./MyWorkPage.module.css";
 import { ActionStatusLabel, CommitmentStatusLabel } from "./WorkStatus";
 
