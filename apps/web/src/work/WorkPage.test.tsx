@@ -277,6 +277,22 @@ describe("WorkPage", () => {
       expect(shown()).toHaveLength(9);
     });
 
+    it("moves focus to the search after a reset, as the reset button leaves", async () => {
+      open("?q=Plakat&type=action");
+      await ready();
+      await userEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
+      expect(screen.getByRole("searchbox")).toHaveFocus();
+    });
+
+    it("moves focus to the search after the reset of an empty result", async () => {
+      open("?q=zzz");
+      await screen.findByText("Kein Eintrag passt zu den Filtern");
+      const buttons = screen.getAllByRole("button", { name: "Filter zurücksetzen" });
+      await userEvent.click(buttons[buttons.length - 1] as HTMLElement);
+      await ready();
+      expect(screen.getByRole("searchbox")).toHaveFocus();
+    });
+
     it("counts the columns with the filters", async () => {
       open("?owner=mine");
       await ready();
@@ -445,6 +461,25 @@ describe("WorkPage", () => {
       await waitFor(() => expect(screen.getByText("1 Eintrag")).toBeInTheDocument());
       await userEvent.click(screen.getByRole("radio", { name: /^Aufgaben/ }));
       expect(await screen.findByText("6 Einträge")).toBeInTheDocument();
+    });
+  });
+
+  describe("narrow, focus after a reset", () => {
+    it("keeps focus in the search of the open sheet", async () => {
+      open("?q=Plakat", { narrow: true });
+      await screen.findByRole("button", { name: /Offen \(\d+\)/ });
+      await userEvent.click(screen.getByRole("button", { name: "Filter, 1 gesetzt" }));
+      const dialog = await screen.findByRole("dialog");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Filter zurücksetzen" }));
+      expect(within(dialog).getByRole("searchbox")).toHaveFocus();
+    });
+
+    it("moves focus to the heading when the search is behind the closed sheet", async () => {
+      open("?q=zzz", { narrow: true });
+      await screen.findByText("Kein Eintrag passt zu den Filtern");
+      await userEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
+      await screen.findByRole("button", { name: /Offen \(\d+\)/ });
+      expect(screen.getByRole("heading", { level: 1, name: "Arbeit" })).toHaveFocus();
     });
   });
 

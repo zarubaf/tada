@@ -1,7 +1,7 @@
 // The filter controls of the „Arbeit“ page, one component each, so that the toolbar (wide) and the
 // filter sheet (narrow) place the same controls. They only read and change `WorkFilters`.
 import { IconX } from "@tabler/icons-react";
-import { useMemo } from "react";
+import { type Ref, useMemo } from "react";
 import { t } from "../i18n";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
@@ -10,7 +10,7 @@ import { type SearchOption, SearchSelect } from "../ui/SearchSelect";
 import { Select } from "../ui/Select";
 import type { DirectoryState } from "./directory";
 import { useDebouncedText } from "./useDebouncedText";
-import { DUE_WINDOWS, type DueWindow, NO_FILTERS, type WorkFilters } from "./workFilters";
+import { DUE_WINDOWS, type DueWindow, type WorkFilters } from "./workFilters";
 
 export interface FilterControlProps {
   filters: WorkFilters;
@@ -32,7 +32,11 @@ export function countOtherFilters(filters: WorkFilters): number {
   ].filter(Boolean).length;
 }
 
-export function SearchBox({ filters, onChange }: FilterControlProps) {
+export function SearchBox({
+  filters,
+  onChange,
+  inputRef,
+}: FilterControlProps & { inputRef: Ref<HTMLInputElement> }) {
   // The field keeps what the member types, with its spaces; the filters get the text after a pause.
   const field = useDebouncedText(filters.text, (text) => onChange({ ...filters, text }));
   return (
@@ -42,6 +46,7 @@ export function SearchBox({ filters, onChange }: FilterControlProps) {
       value={field.draft}
       onChange={field.change}
       onCommit={field.flush}
+      inputRef={inputRef}
     />
   );
 }
@@ -126,12 +131,12 @@ export function DueFilter({ filters, onChange }: FilterControlProps) {
   );
 }
 
-export function ResetFilters({ filters, onChange }: FilterControlProps) {
+export function ResetFilters({ filters, onReset }: { filters: WorkFilters; onReset: () => void }) {
   if (!isFiltered(filters)) {
     return null;
   }
   return (
-    <Button variant="quiet" onPress={() => onChange(NO_FILTERS)}>
+    <Button variant="quiet" onPress={onReset}>
       <IconX size={14} stroke={1.5} aria-hidden="true" />
       {t("work-filter-reset")}
     </Button>
