@@ -76,6 +76,11 @@ function work(eventId: string): Destination {
   };
 }
 
+/** „Anlässe“. Inside an event it yields the work page, which has its own item. */
+function eventsItem(eventId: string | undefined): Destination {
+  return eventId === undefined ? events : { ...events, yieldsTo: work(eventId).to };
+}
+
 /**
  * The items of the sidebar and of the drawer, from top to bottom. Einstellungen sits at the foot.
  * „Arbeit“ belongs to an event, so it appears only while the path names one.
@@ -85,8 +90,7 @@ export function mainItems(eventId: string | undefined): Destination[] {
     inbox,
     myWork,
     ...(eventId === undefined ? [] : [work(eventId)]),
-    // The events item stays current on the other pages of an event, but not on „Arbeit“.
-    eventId === undefined ? events : { ...events, yieldsTo: work(eventId).to },
+    eventsItem(eventId),
     persons,
     institutions,
   ];
@@ -94,10 +98,23 @@ export function mainItems(eventId: string | undefined): Destination[] {
 /** The items that do not depend on the event. */
 export const MAIN: Destination[] = mainItems(undefined);
 export const SETTINGS = settings;
-/** The bottom bar on narrow layouts has room for these three and „Mehr“. */
-export const BOTTOM: Destination[] = [inbox, myWork, events];
-/** „Mehr“ holds the other destinations. */
-export const MORE: Destination[] = [persons, institutions, settings, privacy];
+/**
+ * The bottom bar on narrow layouts has room for three items and „Mehr“ (ADR 0082). The third is
+ * „Anlässe“, and inside an event it is „Arbeit“.
+ */
+export function bottomItems(eventId: string | undefined): Destination[] {
+  return [inbox, myWork, eventId === undefined ? events : work(eventId)];
+}
+/** „Mehr“ holds the other destinations; inside an event that includes „Anlässe“. */
+export function moreItems(eventId: string | undefined): Destination[] {
+  return [
+    ...(eventId === undefined ? [] : [eventsItem(eventId)]),
+    persons,
+    institutions,
+    settings,
+    privacy,
+  ];
+}
 export const PRIVACY = privacy;
 /** Each destination, for the command palette. */
 export const ALL: Destination[] = [...MAIN, settings, privacy];

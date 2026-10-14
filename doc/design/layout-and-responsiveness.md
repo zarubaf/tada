@@ -40,7 +40,8 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 ```
 
 - The bottom bar has four items: „Eingang“, „Meine Arbeit“, „Anlässe“ and „Mehr“.
-  „Mehr“ is a menu with „Personen“, „Institutionen“, „Einstellungen“, „Datenschutz“ and „Versionen“.
+  Inside an event the third item is „Arbeit“ (ADR 0082), and „Anlässe“ moves into „Mehr“.
+  „Mehr“ is a menu with „Personen“, „Institutionen“, „Einstellungen“, „Datenschutz“ and „Versionen“, and inside an event „Anlässe“ first.
 - The bottom bar shows a count badge on „Eingang“ when proposals wait for the member.
 - The toggle of the top bar opens the sidebar as a drawer from the left edge.
   The drawer holds the whole sidebar: the switchers, all destinations and the foot.
