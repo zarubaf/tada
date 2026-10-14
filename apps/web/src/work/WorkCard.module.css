@@ -67,7 +67,7 @@
     font-size: var(--font-size-xs);
   }
 
-  /* Only the workstream chip shrinks to an ellipsis; the status and the date keep their size. */
+  /* The chips may shrink to an ellipsis; only the long workstream name needs it in practice. */
   .chips > span {
     min-width: 0;
     max-width: 100%;
