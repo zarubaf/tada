@@ -12,7 +12,7 @@ import type { WorkItem } from "./workItem";
 export const PANEL: Record<RecordKind, boolean> = {
   action: true,
   commitment: false,
-  milestone: false,
+  milestone: true,
   decision: false,
   risk: true,
 };
