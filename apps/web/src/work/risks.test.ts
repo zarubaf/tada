@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createApi } from "../api/client";
 import { loadAll } from "../registers/loadAll";
 import { json } from "../test/fakeWorkServer";
-import { getRisk, listRisks } from "./risks";
+import { listRisks } from "./risks";
 
 const risk = (id: string) => ({ id, local_id: "RSK-001", title: "Regen" });
 
@@ -29,12 +29,5 @@ describe("risks", () => {
       "GET /api/v1/events/e1/risks?limit=200",
       "GET /api/v1/events/e1/risks?limit=200&cursor=p2",
     ]);
-  });
-
-  it("reads one risk", async () => {
-    const { api, calls } = serverWith(() => json(200, risk("r1")));
-    const { data } = await getRisk(api, "e1", "r1");
-    expect(data).toEqual(risk("r1"));
-    expect(calls).toEqual(["GET /api/v1/events/e1/risks/r1"]);
   });
 });

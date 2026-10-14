@@ -4,8 +4,8 @@
 // of the event, so the page loads them once.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Api, type Problem, problemMessage, type RecordKind } from "../api/client";
-import { LARGEST_PAGE, loadAll } from "../registers/loadAll";
-import { type Directory, type DirectoryState, useDirectory } from "./directory";
+import { loadAll } from "../registers/loadAll";
+import { type Directory, type DirectoryState, query, useDirectory } from "./directory";
 import { RECORD_KINDS } from "./recordStatus";
 import { listRisks } from "./risks";
 import { createWorkCommands, type WorkCommands } from "./workCommands";
@@ -39,29 +39,24 @@ type Answer = Promise<{
   error?: Problem | undefined;
 }>;
 
-const page = (cursor: string | undefined) => ({
-  limit: LARGEST_PAGE,
-  ...(cursor && { cursor }),
-});
-
 /** The list call of each kind. A call gives one page. */
 const LISTS: Record<RecordKind, (api: Api, eventId: string, cursor: string | undefined) => Answer> =
   {
     action: (api, event_id, cursor) =>
       api.GET("/api/v1/events/{event_id}/actions", {
-        params: { path: { event_id }, query: page(cursor) },
+        params: { path: { event_id }, query: query(cursor) },
       }),
     commitment: (api, event_id, cursor) =>
       api.GET("/api/v1/events/{event_id}/commitments", {
-        params: { path: { event_id }, query: page(cursor) },
+        params: { path: { event_id }, query: query(cursor) },
       }),
     milestone: (api, event_id, cursor) =>
       api.GET("/api/v1/events/{event_id}/milestones", {
-        params: { path: { event_id }, query: page(cursor) },
+        params: { path: { event_id }, query: query(cursor) },
       }),
     decision: (api, event_id, cursor) =>
       api.GET("/api/v1/events/{event_id}/decisions", {
-        params: { path: { event_id }, query: page(cursor) },
+        params: { path: { event_id }, query: query(cursor) },
       }),
     risk: (api, eventId, cursor) => listRisks(api, eventId, cursor),
   };

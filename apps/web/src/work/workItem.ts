@@ -44,7 +44,6 @@ interface ItemOf<K extends RecordKind> {
 }
 
 export type WorkItem = { [K in RecordKind]: ItemOf<K> }[RecordKind];
-export type WorkItemOf<K extends RecordKind> = ItemOf<K>;
 
 type NameOf = (userId: string) => string;
 
