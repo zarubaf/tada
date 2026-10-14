@@ -6,7 +6,7 @@ import { Chip } from "../../ui/Chip";
 import { Redacted } from "../../ui/Redacted";
 import { mayBeOverdue, type WorkItem } from "../workItem";
 import type { Choices } from "./choices";
-import type { FieldSpec, FieldValue } from "./descriptor";
+import { type FieldSpec, type FieldValue, peopleIds } from "./descriptor";
 import styles from "./RecordPanel.module.css";
 
 /** The words for a field without a value. */
@@ -67,6 +67,22 @@ export function FieldView({
       return <span className={styles.text}>{value}</span>;
     case "text":
       return <>{value}</>;
+    case "people":
+      return (
+        <ul className={styles.people}>
+          {peopleIds(value).map((id) => {
+            const person = choices.options.find((option) => option.id === id);
+            return (
+              <li key={id} className={styles.value}>
+                {person?.leading}
+                <span className={styles.valueName} title={person?.label}>
+                  {person?.label ?? ""}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      );
     case "area":
       return <Chip variant="workstream">{label(choices, value)}</Chip>;
     default: {

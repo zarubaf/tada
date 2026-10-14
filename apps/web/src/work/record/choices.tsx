@@ -1,7 +1,7 @@
 // The choices of the pickers of the panel: members, areas, milestones and the next statuses. They
 // come from the page, so a kind brings none. A picker is offered only while its list is complete;
 // before that, and without the right to change, it shows plain text.
-import type { Milestone } from "../../api/client";
+import type { Api, Milestone } from "../../api/client";
 import { t } from "../../i18n";
 import { Avatar } from "../../ui/Avatar";
 import type { SearchOption } from "../../ui/SearchList";
@@ -18,6 +18,8 @@ export interface ChoiceSources {
   directory: Directory | undefined;
   /** All milestones of the event. */
   milestones: Milestone[] | undefined;
+  /** For a control that searches on the server, such as the people of a decision. */
+  api?: Api | undefined;
 }
 
 export interface Choices {
@@ -107,6 +109,17 @@ export function choicesOf(
           label: t("record-unknown-milestone"),
         }),
         offered: milestones !== undefined,
+      };
+    }
+    case "people": {
+      // The people are those of the record; the search of the form needs no options here.
+      const people = item && spec.people ? spec.people(item) : [];
+      return {
+        options: people.map((person) => ({
+          ...person,
+          leading: <Avatar name={person.label} id={person.id} decorative />,
+        })),
+        offered: true,
       };
     }
     default:

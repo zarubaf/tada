@@ -111,6 +111,16 @@
     white-space: nowrap;
   }
 
+  /* A list of people as plain values, one on each line. */
+  .people {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
   /* A date: the icon and the text, with no box. */
   .date {
     display: inline-flex;
