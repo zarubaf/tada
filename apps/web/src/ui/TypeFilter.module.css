@@ -12,6 +12,8 @@
     gap: var(--space-1-5);
     min-height: var(--control-height-sm);
     padding: 0 var(--space-3);
+    border: 0;
+    background: transparent;
     border-radius: var(--radius-md);
     color: var(--color-text-muted);
     font-weight: var(--font-weight-medium);
