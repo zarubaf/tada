@@ -409,7 +409,7 @@ async fn redact_event_clears_all_event_content_keeps_ids() {
     );
 }
 
-/// A milestone of the event loses its title and description, and its evidence loses its quote (ADR 0080).
+/// A milestone of the event loses its title and description, and its evidence loses its quote (ADR 0081).
 #[tokio::test]
 async fn event_redaction_clears_milestone_text() {
     let test = database().await;
@@ -526,7 +526,7 @@ async fn event_redaction_clears_milestone_text() {
     );
 }
 
-/// A risk of the event loses its title, description and mitigation, and its evidence loses its quote (ADR 0080).
+/// A risk of the event loses its title, description and mitigation, and its evidence loses its quote (ADR 0081).
 #[tokio::test]
 async fn event_redaction_clears_risk_text() {
     let test = database().await;
@@ -644,7 +644,7 @@ async fn event_redaction_clears_risk_text() {
     );
 }
 
-/// A decision of the event loses its wording and its reason, and its evidence loses its quote (ADR 0080).
+/// A decision of the event loses its wording and its reason, and its evidence loses its quote (ADR 0081).
 /// The date, the parties and the status stay.
 #[tokio::test]
 async fn event_redaction_clears_decision_text() {

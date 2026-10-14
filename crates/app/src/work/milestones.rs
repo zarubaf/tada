@@ -1,4 +1,4 @@
-//! Milestones (ADR 0080): the dated points of the plan of an event, with their direct commands.
+//! Milestones (ADR 0081): the dated points of the plan of an event, with their direct commands.
 //! They follow the rules of actions: a contributor or a manager creates one, and its owner, the lead of its
 //! workstream or an event manager changes it.
 
@@ -38,7 +38,7 @@ pub struct MilestoneView {
     pub event_id: EventId,
     pub fields: MilestoneFields,
     pub version: RecordVersion,
-    /// The warnings at the time of the read. tada calculates them and does not store them (ADR 0080).
+    /// The warnings at the time of the read. tada calculates them and does not store them (ADR 0081).
     pub warnings: Vec<MilestoneWarning>,
 }
 
@@ -62,7 +62,7 @@ pub struct MilestoneFields {
     pub status: MilestoneStatus,
 }
 
-/// A warning about a milestone (ADR 0080).
+/// A warning about a milestone (ADR 0081).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MilestoneWarning {
     /// The milestone is open and its date is before today in the time zone of the event.

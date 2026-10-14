@@ -121,7 +121,7 @@ pub fn in_inbox_of(
 /// Only then the reviewers of the dependent decide on the dependency too.
 /// Any other dependency keeps its own reviewers, so a `depends_on` entry cannot move a proposal to another reviewer.
 /// A dependency that only the event managers review, for example a new workstream, gets no reviewers from its
-/// dependents (ADR 0080).
+/// dependents (ADR 0081).
 fn refers_to_new_record(dependent: &Operation, dependency: &Operation) -> bool {
     !dependency.managers_only()
         && dependency
@@ -725,7 +725,7 @@ mod tests {
         );
     }
 
-    /// Rule 5 of ADR 0067 (ADR 0080): a new action that names a new milestone gives its reviewers to the milestone.
+    /// Rule 5 of ADR 0067 (ADR 0081): a new action that names a new milestone gives its reviewers to the milestone.
     #[test]
     fn new_action_with_a_new_milestone_brings_the_milestone_to_the_lead() {
         let milestone_op = new_milestone(None);
@@ -780,7 +780,7 @@ mod tests {
         );
     }
 
-    /// Rule 5 gives no member reviewer to a proposal that only the event managers review (ADR 0080), also through
+    /// Rule 5 gives no member reviewer to a proposal that only the event managers review (ADR 0081), also through
     /// a chain: a new action of an existing workstream names a new milestone, and the milestone names a new workstream.
     #[test]
     fn a_chain_of_new_records_keeps_a_new_workstream_with_the_managers() {

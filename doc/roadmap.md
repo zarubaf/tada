@@ -25,7 +25,7 @@ The export of one person, the correction with dispute notes, the legal redaction
 
 ### Slice 2d: Milestones, decisions, risks and requirements
 
-Scope: milestones, decisions, risks and requirements ([ADR 0080](adr/0080-milestones-decisions-risks-and-requirements.md)), the start date and the milestone of an action, the timeline of an event, and the proposal of a new workstream (`create-workstream`).
+Scope: milestones, decisions, risks and requirements ([ADR 0081](adr/0081-milestones-decisions-risks-and-requirements.md)), the start date and the milestone of an action, the timeline of an event, and the proposal of a new workstream (`create-workstream`).
 
 - An action gets an optional start date and at most one milestone.
 - The timeline is one fixed, read-only page for each event.

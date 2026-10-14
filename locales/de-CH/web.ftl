@@ -999,7 +999,7 @@ milestone-warning-late-unknown = Eine Aufgabe ist erst danach fällig
 # $version: the record version that the evidence supports.
 milestone-evidence-version = Stützt die Version { $version } des Meilensteins
 
-## Decisions (ADR 0080)
+## Decisions (ADR 0081)
 
 decisions-title = Entscheide
 decisions-loading = Entscheide werden geladen

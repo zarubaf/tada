@@ -32,7 +32,7 @@ use crate::paging::{Page, PageLimit};
 use crate::problem::FieldError;
 use crate::store::StoreError;
 
-/// The field code of a start date after the due date of an action (ADR 0080).
+/// The field code of a start date after the due date of an action (ADR 0081).
 pub(crate) const START_AFTER_DUE: &str = "start-after-due";
 
 pub(crate) fn text_error_code(error: TextError) -> &'static str {

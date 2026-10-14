@@ -27,7 +27,7 @@ impl MilestoneStatus {
         }
     }
 
-    /// True if a milestone with this status and `date` is overdue on `today` (ADR 0080):
+    /// True if a milestone with this status and `date` is overdue on `today` (ADR 0081):
     /// it is still open, and its date is before today in the time zone of the event.
     pub fn is_overdue(self, date: Date, today: Date) -> bool {
         self == Self::Open && date < today

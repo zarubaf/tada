@@ -101,7 +101,7 @@ pub enum Operation {
         phone: Option<PhoneNumber>,
     },
     /// Create an action of an event with its owner (ADR 0068). It starts `open`.
-    /// The start date is not after the due date, and the milestone is one of the same event (ADR 0080).
+    /// The start date is not after the due date, and the milestone is one of the same event (ADR 0081).
     CreateAction {
         id: ActionId,
         event_id: EventId,
@@ -138,7 +138,7 @@ pub enum Operation {
         due_date: Option<Date>,
         expected_version: RecordVersion,
     },
-    /// Set or clear the milestone of an action (ADR 0080).
+    /// Set or clear the milestone of an action (ADR 0081).
     ChangeActionMilestone {
         event_id: EventId,
         action_id: ActionId,
@@ -160,7 +160,7 @@ pub enum Operation {
         name: WorkstreamName,
         lead: UserId,
     },
-    /// Create a milestone of an event with its owner (ADR 0080). It starts `open`.
+    /// Create a milestone of an event with its owner (ADR 0081). It starts `open`.
     CreateMilestone {
         id: MilestoneId,
         event_id: EventId,
@@ -177,7 +177,7 @@ pub enum Operation {
         status: MilestoneStatus,
         expected_version: RecordVersion,
     },
-    /// Record a decision of an event with its owner (ADR 0080). It starts `in-force`.
+    /// Record a decision of an event with its owner (ADR 0081). It starts `in-force`.
     /// Its wording, its date and its parties never change. Only the event managers review it.
     CreateDecision {
         id: DecisionId,
@@ -203,7 +203,7 @@ pub enum Operation {
         reason: RecordReason,
         expected_version: RecordVersion,
     },
-    /// Record a risk of an event with its owner (ADR 0080). It starts `open`.
+    /// Record a risk of an event with its owner (ADR 0081). It starts `open`.
     /// The mitigation is optional.
     CreateRisk {
         id: RiskId,
@@ -584,7 +584,7 @@ impl Operation {
     }
 
     /// True if only the event managers review the proposal, whatever record or workstream it names:
-    /// a new workstream and each decision operation (ADR 0080).
+    /// a new workstream and each decision operation (ADR 0081).
     pub fn managers_only(&self) -> bool {
         match self {
             Self::CreateWorkstream { .. }
@@ -616,7 +616,7 @@ impl Operation {
 
     /// The records that the operation names and that a proposal of the same changeset can create
     /// (ADR 0067, rule 5): the promisor of a new commitment, the workstream of a new record, the milestone of an
-    /// action, the parties of a new decision and the successor of a superseded decision (ADR 0080).
+    /// action, the parties of a new decision and the successor of a superseded decision (ADR 0081).
     pub fn references(&self) -> Vec<NewRecord> {
         let promisor = self.promisor().map(party_record);
         let workstream = self.workstream().map(NewRecord::Workstream);

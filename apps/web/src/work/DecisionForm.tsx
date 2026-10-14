@@ -74,7 +74,7 @@ function replaceNote(ended: boolean, stale: boolean) {
 
 /**
  * „Entscheid erfassen“, and the new decision that replaces another („Ersetzen“). The wording
- * has no edit (ADR 0080): a decision that changes is a new one. A successor starts with the words,
+ * has no edit (ADR 0081): a decision that changes is a new one. A successor starts with the words,
  * the parties, the owner and the workstream of the decision that it replaces; the date is new.
  * The page owns the live regions, so the form reports the result: `onSaved` for the new decision,
  * `onFailed` for any other failure.

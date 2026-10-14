@@ -234,7 +234,7 @@ pub(super) async fn write_record(
                 due_date: *due_date,
                 ..current.fields
             };
-            // The start date of the action is not after the new due date (ADR 0080); a refusal is a conflict.
+            // The start date of the action is not after the new due date (ADR 0081); a refusal is a conflict.
             if !dates_in_order(fields.start_date, fields.due_date) {
                 return Err(sqlx::Error::RowNotFound);
             }
@@ -865,7 +865,7 @@ async fn takes_records(
     .await
 }
 
-/// True if a new action of the event, or an action that changes its milestone, can name `milestone` (ADR 0080):
+/// True if a new action of the event, or an action that changes its milestone, can name `milestone` (ADR 0081):
 /// none, a new milestone of the event in the plan, or a milestone of the event that is not canceled.
 /// `lock_targets` locked the milestone, so it cannot be canceled before the commit.
 async fn takes_actions(
@@ -894,7 +894,7 @@ async fn takes_actions(
     .await
 }
 
-/// True if a superseded decision of the event can name `successor` (ADR 0080): a new decision of the event in the
+/// True if a superseded decision of the event can name `successor` (ADR 0081): a new decision of the event in the
 /// plan, or a decision of the event in force. `lock_targets` locked the successor, so it cannot end before the commit.
 async fn takes_successor(
     conn: &mut PgConnection,

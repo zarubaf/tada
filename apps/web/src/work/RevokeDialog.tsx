@@ -10,7 +10,7 @@ import styles from "./Work.module.css";
 
 /**
  * „Widerrufen“: a blocking task with a required reason. The decision keeps the reason and ends
- * without a successor (ADR 0080).
+ * without a successor (ADR 0081).
  */
 export function RevokeDialog({
   api,

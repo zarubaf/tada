@@ -60,7 +60,7 @@ status_enum!(
     }
 );
 
-/// True if an action can have these dates (ADR 0080): the start date is not after the due date.
+/// True if an action can have these dates (ADR 0081): the start date is not after the due date.
 /// An action without one of the dates passes.
 pub fn dates_in_order(start: Option<jiff::civil::Date>, due: Option<jiff::civil::Date>) -> bool {
     match (start, due) {

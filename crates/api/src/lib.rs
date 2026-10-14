@@ -141,11 +141,11 @@ pub struct ApiState {
     pub workstreams: Arc<dyn WorkstreamStore>,
     /// The actions and commitments of events (ADR 0068).
     pub work: Arc<dyn WorkStore>,
-    /// The milestones of events (ADR 0080).
+    /// The milestones of events (ADR 0081).
     pub milestones: Arc<dyn MilestoneStore>,
-    /// The decisions of events (ADR 0080).
+    /// The decisions of events (ADR 0081).
     pub decisions: Arc<dyn DecisionStore>,
-    /// The risks of events (ADR 0080).
+    /// The risks of events (ADR 0081).
     pub risks: Arc<dyn RiskStore>,
     /// The mentions and the export of a person (ADR 0073).
     pub person_data: Arc<dyn PersonDataStore>,

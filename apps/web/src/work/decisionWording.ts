@@ -1,5 +1,5 @@
 // The shortened wording of a decision for a table row: the first lines, cut at a length. The
-// wording itself never changes (ADR 0080); the row only decides how much of it shows.
+// wording itself never changes (ADR 0081); the row only decides how much of it shows.
 
 const MAX_LINES = 3;
 const MAX_CHARACTERS = 160;

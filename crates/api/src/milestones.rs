@@ -1,4 +1,4 @@
-//! `/api/v1/events/{event_id}/milestones` (ADR 0080): the dated points of the plan of an event.
+//! `/api/v1/events/{event_id}/milestones` (ADR 0081): the dated points of the plan of an event.
 
 use axum::extract::State;
 use axum::http::StatusCode;

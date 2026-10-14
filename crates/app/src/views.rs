@@ -126,7 +126,7 @@ pub struct EntityView {
     pub statuses: &'static [&'static str],
 }
 
-/// The kinds of records that an agent can read (ADR 0049, ADR 0068, ADR 0069, ADR 0080).
+/// The kinds of records that an agent can read (ADR 0049, ADR 0068, ADR 0069, ADR 0081).
 const ENTITIES: [EntityView; 12] = [
     EntityView {
         name: "event",

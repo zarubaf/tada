@@ -850,7 +850,7 @@ async fn a_redaction_of_a_source_item_redacts_its_dispute_notes() {
 }
 
 /// A decision that the person took is a reference by ID; a decision whose wording names the person is a mention
-/// (ADR 0080). The export lists both.
+/// (ADR 0081). The export lists both.
 #[tokio::test]
 async fn person_export_lists_the_decisions_of_a_person() {
     let world = World::start().await;
@@ -924,7 +924,7 @@ async fn person_export_lists_the_decisions_of_a_person() {
     assert_eq!(mentions[0]["text"], "Beat Muster leitet den Aufbau.");
 }
 
-/// A risk whose title, description or mitigation names a person is a mention (ADR 0080). The export lists it.
+/// A risk whose title, description or mitigation names a person is a mention (ADR 0081). The export lists it.
 #[tokio::test]
 async fn person_export_lists_the_risks_that_name_a_person() {
     let world = World::start().await;

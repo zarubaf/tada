@@ -1,4 +1,4 @@
-//! Risks (ADR 0080): what can go wrong in an event, rated by likelihood and impact, with their direct commands.
+//! Risks (ADR 0081): what can go wrong in an event, rated by likelihood and impact, with their direct commands.
 //! They follow the rules of actions: a contributor or a manager creates one, and its owner, the lead of its
 //! workstream or an event manager changes it.
 

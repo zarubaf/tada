@@ -1,4 +1,4 @@
-//! The evidence of records (ADR 0068, ADR 0069, ADR 0080): the passages that support each accepted version of an
+//! The evidence of records (ADR 0068, ADR 0069, ADR 0081): the passages that support each accepted version of an
 //! action, a commitment, a person, an institution, a milestone, a decision or a risk. The apply writes them; each record read reads them
 //! here. `record_evidence` has one column for each kind of record, and exactly one of them is set.
 
