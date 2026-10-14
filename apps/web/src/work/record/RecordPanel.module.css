@@ -113,6 +113,11 @@
 
   /* A link to another record: the accent color is for links (ADR 0082). */
   .recordLink {
+    display: inline-flex;
+    align-items: center;
+
+    /* 44 px on a coarse pointer (ADR 0022); 0 with a fine one, where the row is the height. */
+    min-height: var(--size-hit-target);
     color: var(--color-accent-text);
     font-variant-numeric: tabular-nums;
     text-decoration-line: underline;
@@ -124,14 +129,18 @@
     outline-offset: 2px;
   }
 
-  /* A list of people as plain values, one on each line. */
+  /* A list of people as plain values, each as high as a row, so that the label is level with the first. */
   .people {
     display: grid;
-    gap: var(--space-1);
+    gap: 0;
     min-width: 0;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .people li {
+    min-height: var(--control-height-md);
   }
 
   /* A date: the icon and the text, with no box. */
