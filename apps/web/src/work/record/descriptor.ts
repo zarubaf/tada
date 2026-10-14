@@ -56,6 +56,8 @@ export interface FieldSpec {
    * cleared; the words are the choice that clears a picker and the text of an empty field.
    */
   emptyKey?: string;
+  /** The Fluent key of the words on a picker that has no choice and cannot be cleared. */
+  promptKey?: string;
   /** A date that is marked overdue, as the due date of a task. */
   overdue?: boolean;
   /** The value of the item. */
@@ -75,8 +77,11 @@ export interface CreateSpec {
   titleKey: string;
   /** The IDs of the fields of the form, in order. The title comes first. */
   fields: readonly string[];
-  /** The values that the form starts with. `me` is the member who is signed in. */
-  defaults: (me: string) => Record<string, FieldValue>;
+  /**
+   * The values that the form starts with. `owner` is the member who is signed in, if they can own
+   * a record; otherwise there is no default owner.
+   */
+  defaults: (owner: string | undefined) => Record<string, FieldValue>;
   /** Checks the values before the form is sent: the message by field ID for each invalid field. */
   validate?: (values: Record<string, FieldValue>) => Record<string, string>;
   /** Creates the record. */

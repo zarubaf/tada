@@ -72,6 +72,12 @@ describe("the Neu button", () => {
     expect(screen.queryByRole("button", { name: "Neu" })).toBeNull();
   });
 
+  it("is offered to an organization admin who is not a member of the event", async () => {
+    // The admin is only a viewer of the event, yet has manager level there.
+    openWork("", { role: "admin", viewer: true });
+    expect(await screen.findByRole("button", { name: "Neu" })).toBeVisible();
+  });
+
   it("is absent for a viewer, who cannot own a record", async () => {
     openWork("", { viewer: true });
     await screen.findByRole("heading", { level: 2, name: /^Offen/ });
@@ -92,6 +98,17 @@ describe("the create state", () => {
     expect(view.getByRole("textbox", { name: "Beschreibung" })).toBeVisible();
     expect(view.getByRole("button", { name: "Erstellen" })).toBeVisible();
     expect(view.getByRole("button", { name: "Abbrechen" })).toBeVisible();
+  });
+
+  it("starts without an owner when the member cannot own a record, and asks for one", async () => {
+    const server = openWork("?new=action", { role: "admin", viewer: true });
+    const view = await form();
+    expect(view.getByRole("button", { name: "Verantwortlich: Person wählen" })).toBeVisible();
+    await user.type(view.getByRole("textbox", { name: /^Titel/ }), "Banner");
+    await user.click(view.getByRole("button", { name: "Erstellen" }));
+
+    expect(await view.findByText(/Wählen Sie ein Mitglied des Anlasses/)).toBeVisible();
+    expect(server.posts()).toEqual([]);
   });
 
   it("needs a title and focuses the field", async () => {
@@ -220,6 +237,14 @@ describe("the create state", () => {
 
     await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
     expect(screen.getByRole("button", { name: "Neu" })).toHaveFocus();
+  });
+
+  it("says that the people did not load, and does not blame the event", async () => {
+    openWork("?new=action", { answers: { "GET /api/v1/members": () => problem(500, "internal") } });
+    const view = await form();
+    expect(view.getByText(/Personen sind nicht geladen/)).toBeVisible();
+    expect(view.queryByText(/abgeschlossenen Anlass/)).toBeNull();
+    expect(view.queryByRole("button", { name: "Erstellen" })).toBeNull();
   });
 
   it("explains to a member who may not create that the form is not for them", async () => {
