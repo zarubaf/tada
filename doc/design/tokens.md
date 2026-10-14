@@ -131,15 +131,14 @@ Each font size has a line height token with the same suffix, for example `--line
 | `--font-size-2xl`  | Page title (h1)                                                                   |
 | `--font-size-3xl`  | Event title on the event overview, wide layout only                               |
 
-| Token                    | Use                                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `--font-family-sans`     | All UI text: Mona Sans (ADR 0021)                                                                    |
-| `--font-family-mono`     | IDs, hashes and code only: JetBrains Mono (ADR 0021)                                                 |
-| `--font-size-dense`      | Text of dense rows and cards: `--font-size-sm` in compact, `--font-size-base` in comfortable density |
-| `--font-weight-regular`  | Body text                                                                                            |
-| `--font-weight-medium`   | Labels, buttons, table headers and emphasis                                                          |
-| `--font-weight-semibold` | Headings                                                                                             |
-| `--letter-spacing-tight` | Sizes from `--font-size-xl`                                                                          |
+| Token                    | Use                                                  |
+| ------------------------ | ---------------------------------------------------- |
+| `--font-family-sans`     | All UI text: Mona Sans (ADR 0021)                    |
+| `--font-family-mono`     | IDs, hashes and code only: JetBrains Mono (ADR 0021) |
+| `--font-weight-regular`  | Body text                                            |
+| `--font-weight-medium`   | Labels, buttons, table headers and emphasis          |
+| `--font-weight-semibold` | Headings                                             |
+| `--letter-spacing-tight` | Sizes from `--font-size-xl`                          |
 
 Rules:
 
@@ -169,25 +168,12 @@ Rules:
 | `--font-size-ui`      | UI text: `--font-size-md` in compact density, `--font-size-base` in comfortable density              |
 | `--font-size-dense`   | Text of dense rows and cards: `--font-size-sm` in compact, `--font-size-base` in comfortable density |
 
-- The sizes of the dense layout are fixed in both densities:
-
-  | Token                  | Value  | Use                      |
-  | ---------------------- | ------ | ------------------------ |
-  | `--size-chip-height`   | 20 px  | Chips                    |
-  | `--size-bar-height`    | 48 px  | Top bar and panel header |
-  | `--size-sidebar-width` | 232 px | Sidebar                  |
-  | `--size-panel-width`   | 480 px | Side panel               |
-
 - In compact density, body text and panel text are 14 px, and dense rows and cards are 13 px.
   In comfortable density, body text and inputs are 16 px, because iOS zooms into inputs below 16 px.
   Chips and meta text are never below 12 px (ADR 0082 amends ADR 0018).
-
 - The default is `compact` with a fine pointer (`pointer: fine`) and `comfortable` with a coarse pointer.
-
 - A member can choose the density in the settings.
-
 - The comfortable density has larger controls and rows than the compact density.
-
 - Each pointer target is at least 24 × 24 px in compact and 44 × 44 px in comfortable density, including its padding.
 
 ## Radius
