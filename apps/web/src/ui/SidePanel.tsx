@@ -18,9 +18,13 @@ export interface SidePanelProps {
   heading?: ReactNode;
   /** Called by the close button and by Escape. The page unmounts the panel. */
   onClose: () => void;
-  /** The previous record of the list. Without it the button is absent. */
+  /**
+   * The previous record of the list. With neither this nor `onNext` the step buttons are absent.
+   * With only one of them, the other button stays and refuses the press: a button that vanishes at
+   * the end of the list would drop the focus of the member who is stepping.
+   */
   onPrevious?: () => void;
-  /** The next record of the list. Without it the button is absent. */
+  /** The next record of the list. See `onPrevious`. */
   onNext?: () => void;
   /**
    * Where focus goes on close when the element that opened the panel is gone, for example a card
@@ -113,15 +117,21 @@ export function SidePanel({
       <header className={styles.head}>
         {heading ?? <h2 className={styles.title}>{title}</h2>}
         <div className={styles.actions}>
-          {onPrevious && (
-            <IconButton
-              icon={IconChevronUp}
-              label={t("side-panel-previous")}
-              onPress={onPrevious}
-            />
-          )}
-          {onNext && (
-            <IconButton icon={IconChevronDown} label={t("side-panel-next")} onPress={onNext} />
+          {(onPrevious || onNext) && (
+            <>
+              <IconButton
+                icon={IconChevronUp}
+                label={t("side-panel-previous")}
+                onPress={() => onPrevious?.()}
+                aria-disabled={onPrevious ? undefined : true}
+              />
+              <IconButton
+                icon={IconChevronDown}
+                label={t("side-panel-next")}
+                onPress={() => onNext?.()}
+                aria-disabled={onNext ? undefined : true}
+              />
+            </>
           )}
           <IconButton icon={IconX} label={t("side-panel-close")} onPress={onClose} />
         </div>
