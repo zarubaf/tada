@@ -1,4 +1,8 @@
 @layer components {
+  .root {
+    min-width: 0;
+  }
+
   /*
    * Four columns and the rail of the canceled ones. A column is 16rem to 22.5rem wide; below the
    * least width the board scrolls inside itself and not the page. Below 40rem the board is a list
@@ -129,6 +133,38 @@
   .hideIcon {
     margin-inline-start: auto;
     color: var(--color-text-muted);
+  }
+
+  /*
+   * „Alle in Spalte auswählen“ shows like the box of a card: on hover and focus within the column,
+   * on touch, and while any card is selected. It stays in the tab order when it is hidden.
+   */
+  .selectAll {
+    display: inline-flex;
+    margin-inline-start: auto;
+    opacity: 0;
+  }
+
+  .panelSelect {
+    display: flex;
+    justify-content: flex-end;
+    padding-inline: var(--space-3);
+  }
+
+  .narrow .selectAll {
+    margin-inline-start: 0;
+    opacity: 1;
+  }
+
+  .column:is(:hover, :focus-within) .selectAll,
+  .board[data-selecting] .selectAll {
+    opacity: 1;
+  }
+
+  @media (pointer: coarse), (hover: none) {
+    .selectAll {
+      opacity: 1;
+    }
   }
 
   .skeletonCard {

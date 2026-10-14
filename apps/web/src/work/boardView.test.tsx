@@ -2,7 +2,10 @@ import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Router } from "../router/Router";
-import { parseBoardView, useBoardView } from "./boardView";
+import * as r from "../test/workRecords";
+import { parseBoardView, useBoardView, visibleItems } from "./boardView";
+import { groupByColumn } from "./workFilters";
+import { toWorkItem, type WorkItem } from "./workItem";
 
 const wrapper = ({ children }: { children: ReactNode }) => <Router>{children}</Router>;
 
@@ -44,5 +47,46 @@ describe("useBoardView", () => {
     const { result } = renderHook(() => useBoardView(), { wrapper });
     act(() => result.current[1]({ column: undefined, canceled: false }));
     expect(window.location.search).toBe("");
+  });
+});
+
+describe("visibleItems", () => {
+  const make = (id: string, status: string) =>
+    toWorkItem("action", r.action(id, { status }) as never, () => "") as WorkItem;
+  const groups = groupByColumn([
+    make("ACT-001", "open"),
+    make("ACT-002", "in-progress"),
+    make("ACT-003", "done"),
+    make("ACT-004", "canceled"),
+  ]);
+  const ids = (items: WorkItem[]) => items.map((item) => item.readableId);
+
+  it("shows every column but the closed Abgebrochen on a wide layout", () => {
+    expect(ids(visibleItems(groups, { column: undefined, canceled: false }, false))).toEqual([
+      "ACT-001",
+      "ACT-002",
+      "ACT-003",
+    ]);
+    expect(ids(visibleItems(groups, { column: undefined, canceled: true }, false))).toHaveLength(4);
+  });
+
+  it("shows the chosen status on a phone, and the first one with records without a choice", () => {
+    expect(ids(visibleItems(groups, { column: "done", canceled: false }, true))).toEqual([
+      "ACT-003",
+    ]);
+    expect(ids(visibleItems(groups, { column: undefined, canceled: false }, true))).toEqual([
+      "ACT-001",
+    ]);
+  });
+
+  it("shows every record in the table, folded or not, wide or on a phone", () => {
+    const view = { column: "done", canceled: false } as const;
+    expect(ids(visibleItems(groups, view, false, "table"))).toHaveLength(4);
+    expect(ids(visibleItems(groups, view, true, "table"))).toHaveLength(4);
+  });
+
+  it("shows no record in the timeline, so nothing stays selected there", () => {
+    const view = { column: undefined, canceled: true };
+    expect(visibleItems(groups, view, false, "timeline")).toEqual([]);
   });
 });
