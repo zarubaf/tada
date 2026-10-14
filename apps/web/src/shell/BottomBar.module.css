@@ -1,0 +1,72 @@
+@layer components {
+  /*
+   * Each item has room for a label of two lines, so the bar has the same height for each label,
+   * also for a long one and for the pseudo-locale. The shell reads the height for its padding.
+   */
+  .bar {
+    --safe-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+
+    position: fixed;
+    inset: auto 0 0;
+    z-index: var(--z-shell);
+    display: flex;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    padding-block-end: var(--safe-bottom);
+    border-top: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-surface);
+  }
+
+  /* The items of the bar share its width; the labels use the small size and wrap to two lines. */
+  .bar > a,
+  .more {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-0-5);
+    min-width: 0;
+    min-height: var(--bottom-bar-item-height);
+    padding-inline: var(--space-1);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-sm);
+    text-align: center;
+  }
+
+  .bar > a {
+    position: relative;
+  }
+
+  /* The count sits at the top right of the icon: below the label it would make the item taller. */
+  .badge {
+    position: absolute;
+    inset-block-start: var(--space-0-5);
+    inset-inline-end: var(--space-2);
+  }
+
+  .label {
+    overflow-wrap: anywhere;
+  }
+
+  /* The trigger of „Mehr“ looks like the links beside it. */
+  .more {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+  }
+
+  .more[data-hovered],
+  .more[data-pressed] {
+    background: var(--color-bg-hover);
+  }
+
+  .more[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}

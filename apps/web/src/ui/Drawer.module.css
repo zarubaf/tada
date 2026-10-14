@@ -1,0 +1,45 @@
+@layer components {
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-toast);
+    background: var(--color-scrim);
+  }
+
+  .drawer {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(18rem, calc(100% - var(--space-12)));
+    border-inline-end: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-sunken);
+    box-shadow: var(--shadow-2);
+  }
+
+  /* One authored moment: the drawer slides in from its edge. A member who reduces motion gets none. */
+  @media (prefers-reduced-motion: no-preference) {
+    .drawer[data-entering] {
+      animation: slide-in var(--duration-base) var(--ease-out);
+    }
+
+    @keyframes slide-in {
+      from {
+        transform: translateX(-100%);
+      }
+    }
+  }
+
+  .dialog {
+    position: relative;
+    height: 100%;
+    outline: none;
+  }
+
+  /* The close button sits at the top right of the drawer, next to the brand of the sidebar. */
+  .close {
+    position: absolute;
+    inset-block-start: var(--space-2);
+    inset-inline-end: var(--space-2);
+    z-index: var(--z-sticky);
+  }
+}
