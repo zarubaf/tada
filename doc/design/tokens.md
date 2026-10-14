@@ -57,6 +57,7 @@ The test [contrast.test.ts](../../apps/web/src/styles/contrast.test.ts) computes
 A change of a color token must keep each pair at or above its minimum. The values below are from 2026-10-14.
 The text pairs include `--color-text-muted` on every surface, because muted text is used on all of them.
 The `accent` pairs are for the accent as a UI indicator: the fill of a checked box or switch and a selected border.
+The `avatar-1` to `avatar-6` tokens are the fixed palette of the avatar: a neutral and five hues. Initials use `--color-text` on them.
 
 | Foreground       | Background        | Minimum | Light   | Dark    |
 | ---------------- | ----------------- | ------- | ------- | ------- |
@@ -127,6 +128,12 @@ The `accent` pairs are for the accent as a UI indicator: the fill of a checked b
 | `proposed`       | `proposed-subtle` | 4.5:1   | 6.17:1  | 7.38:1  |
 | `text`           | `proposed-subtle` | 4.5:1   | 15.05:1 | 13.19:1 |
 | `text-muted`     | `proposed-subtle` | 4.5:1   | 6.20:1  | 5.97:1  |
+| `text`           | `avatar-1`        | 4.5:1   | 12.85:1 | 9.67:1  |
+| `text`           | `avatar-2`        | 4.5:1   | 11.82:1 | 9.98:1  |
+| `text`           | `avatar-3`        | 4.5:1   | 12.43:1 | 9.72:1  |
+| `text`           | `avatar-4`        | 4.5:1   | 12.37:1 | 9.37:1  |
+| `text`           | `avatar-5`        | 4.5:1   | 12.28:1 | 9.35:1  |
+| `text`           | `avatar-6`        | 4.5:1   | 11.88:1 | 9.93:1  |
 
 ### State of knowledge
 
@@ -190,6 +197,8 @@ Rules:
 | `--control-height-md` | Buttons and inputs (32 px compact, 44 px comfortable)                                                |
 | `--control-height-lg` | Primary actions on mobile pages (36 px compact)                                                      |
 | `--row-height`        | Table and list rows (28 px compact)                                                                  |
+| `--size-chip-height`  | Chips (20 px)                                                                                        |
+| `--size-hit-target`   | The height of the hit area of an interactive chip (0 with a fine pointer, 44 px with a coarse one)   |
 | `--font-size-ui`      | UI text: `--font-size-md` in compact density, `--font-size-base` in comfortable density              |
 | `--font-size-dense`   | Text of dense rows and cards: `--font-size-sm` in compact, `--font-size-base` in comfortable density |
 

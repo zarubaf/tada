@@ -62,6 +62,7 @@ function ratio(foreground: string, background: string): number {
 }
 
 const TEXT = 4.5;
+const AVATARS = [1, 2, 3, 4, 5, 6].map((n) => `avatar-${n}`);
 const UI = 3;
 const surfaces = ["bg-canvas", "bg-surface", "bg-raised", "bg-sunken", "bg-hover", "accent-subtle"];
 
@@ -82,6 +83,8 @@ const pairs: [string, string, number][] = [
     bg,
     UI,
   ]),
+  // Initials on the fixed palette of the avatar (ADR 0082).
+  ...AVATARS.map((bg): [string, string, number] => ["text", bg, TEXT]),
   ...["success", "warning", "danger", "proposed"].flatMap((status): [string, string, number][] => [
     [status, "bg-canvas", TEXT],
     [status, "bg-surface", TEXT],
@@ -126,5 +129,20 @@ describe("the comfortable density", () => {
   ])("makes buttons and inputs 44 px high %s", (_name, tokens) => {
     expect(tokens.get("--control-height-md")).toBe("44px");
     expect(tokens.get("--control-height-lg")).toBe("44px");
+  });
+
+  // The hit area of a chip reaches the target size, while the chip stays 20 px high.
+  it.each([
+    ["on request", block(':root[data-density="comfortable"]')],
+    ["with a coarse pointer", block(':root:not([data-density="compact"])')],
+  ])("gives a chip a 44 px hit area %s", (_name, tokens) => {
+    expect(tokens.get("--size-hit-target")).toBe("44px");
+  });
+});
+
+describe("the chip", () => {
+  it("is 20 px high with a fine pointer", () => {
+    expect(light.get("--size-chip-height")).toBe("20px");
+    expect(light.get("--size-hit-target")).toBe("0px");
   });
 });
