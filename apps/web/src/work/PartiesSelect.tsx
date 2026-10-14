@@ -49,7 +49,15 @@ export function PartyPicker({
       {...(help !== undefined && { help })}
       options={offered}
       inputValue={text}
-      onInputChange={setText}
+      onInputChange={(next) => {
+        setText(next);
+        // React Aria keeps a choice while both the text and the key are controlled; a text that
+        // the member emptied is no choice any more.
+        if (next === "" && chosen !== undefined && !resetOnChoice) {
+          setChosen(undefined);
+          onChange(undefined);
+        }
+      }}
       selectedKey={resetOnChoice ? undefined : chosen?.id}
       clearOnSelect={resetOnChoice}
       onSelectionChange={(id) => {

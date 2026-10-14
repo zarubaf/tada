@@ -332,8 +332,8 @@ export function WorkPage({ api }: { api: Api }) {
       {route.mode !== "closed" && !loading && event.state.kind === "loaded" && (
         <Suspense fallback={null}>
           <RecordPanel
-            work={work}
             api={api}
+            work={work}
             eventId={eventId}
             route={
               route.mode === "create"

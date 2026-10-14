@@ -1,4 +1,5 @@
 import { type FormEvent, useId, useRef, useState } from "react";
+import type { Api } from "../../api/client";
 import { uuidv7 } from "../../api/uuid";
 import { t } from "../../i18n";
 import { Button } from "../../ui/Button";
@@ -8,6 +9,7 @@ import { SearchSelect } from "../../ui/SearchSelect";
 import { TextField } from "../../ui/TextField";
 import type { WorkCommands } from "../workCommands";
 import { type ChoiceSources, choicesOf } from "./choices";
+import { CREATE_CONTROLS } from "./createControls";
 import type { FieldSpec, FieldValue, RecordDescriptor } from "./descriptor";
 import { fieldError } from "./fieldError";
 import { PeopleField } from "./PeopleField";
@@ -18,7 +20,10 @@ type Errors = Record<string, string>;
 
 /** A field of text goes in a stacked field; the others (dates, pickers) are rows of the list. */
 const isStacked = (spec: FieldSpec) =>
-  spec.control === "text" || spec.control === "multiline" || spec.control === "people";
+  spec.control === "text" ||
+  spec.control === "multiline" ||
+  spec.control === "people" ||
+  CREATE_CONTROLS[spec.control]?.stacked === true;
 
 /** The fields of the form in order, in runs of the same layout. */
 function runsOf(specs: FieldSpec[]): { stacked: boolean; specs: FieldSpec[] }[] {
@@ -104,6 +109,7 @@ function Row({
  */
 export function RecordCreate({
   descriptor,
+  api,
   commands,
   sources,
   owner,
@@ -113,6 +119,8 @@ export function RecordCreate({
   onCancel,
 }: {
   descriptor: RecordDescriptor;
+  /** For the controls that search on the server. */
+  api: Api;
   commands: WorkCommands;
   sources: ChoiceSources;
   /** The default owner: the member who is signed in, if they can own a record. */
@@ -224,26 +232,42 @@ export function RecordCreate({
     <form ref={form} className={styles.body} onSubmit={(event) => void submit(event)} noValidate>
       {runsOf(shown).map((run) =>
         run.stacked ? (
-          run.specs.map((spec) =>
-            spec.control === "people" ? (
-              sources.api && (
-                <PeopleField
+          run.specs.map((spec) => {
+            const label = spec.required
+              ? `${t(spec.labelKey)} ${t("record-required")}`
+              : t(spec.labelKey);
+            const custom = CREATE_CONTROLS[spec.control];
+            if (custom) {
+              return (
+                <custom.Control
                   key={spec.id}
-                  label={
-                    spec.required ? `${t(spec.labelKey)} ${t("record-required")}` : t(spec.labelKey)
-                  }
-                  api={sources.api}
+                  spec={spec}
+                  label={label}
                   value={values[spec.id] ?? null}
-                  onChange={(value) => set(spec.id, value)}
                   error={errors[spec.id]}
+                  onChange={(value) => set(spec.id, value)}
+                  api={api}
                 />
-              )
-            ) : (
+              );
+            }
+            if (spec.control === "people") {
+              return (
+                sources.api && (
+                  <PeopleField
+                    key={spec.id}
+                    label={label}
+                    api={sources.api}
+                    value={values[spec.id] ?? null}
+                    onChange={(value) => set(spec.id, value)}
+                    error={errors[spec.id]}
+                  />
+                )
+              );
+            }
+            return (
               <TextField
                 key={spec.id}
-                label={
-                  spec.required ? `${t(spec.labelKey)} ${t("record-required")}` : t(spec.labelKey)
-                }
+                label={label}
                 value={values[spec.id] ?? ""}
                 onChange={(text) => set(spec.id, text)}
                 error={errors[spec.id]}
@@ -251,8 +275,8 @@ export function RecordCreate({
                 {...(spec.helpKey && { help: t(spec.helpKey) })}
                 {...(spec.control === "multiline" && { rows: 4 })}
               />
-            ),
-          )
+            );
+          })
         ) : (
           <dl key={run.specs[0]?.id} className={styles.props}>
             {run.specs.map((spec) => (

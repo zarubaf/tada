@@ -50,7 +50,8 @@ export function FieldView({
   /** Shows another record in the panel, for a field that refers to one. */
   onOpen?: ((readableId: string) => void) | undefined;
 }) {
-  const isText = spec.control === "text" || spec.control === "multiline";
+  const isText =
+    spec.control === "text" || spec.control === "multiline" || spec.control === "party";
   if (isText && item.redacted) {
     return <Redacted />;
   }
@@ -69,6 +70,7 @@ export function FieldView({
     case "multiline":
       return <span className={styles.text}>{value}</span>;
     case "text":
+    case "party":
       return <>{value}</>;
     case "record": {
       const target = choices.options.find((option) => option.id === value)?.label;
