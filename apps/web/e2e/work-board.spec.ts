@@ -61,6 +61,42 @@ for (const theme of themes) {
     await expect(page).toHaveScreenshot(`work-board-filter-sheet-${theme}-375.png`);
   });
 
+  test(`filter popover, ${theme}: no axe violation, the board changes behind it`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await fakeWork(page);
+    await page.goto(work);
+    await setTheme(page, theme);
+    await boardShown(page, false);
+    // „/“ opens it from anywhere, with focus in the search.
+    await page.keyboard.press("/");
+    const search = page.getByRole("searchbox", { name: "Arbeit durchsuchen" });
+    await expect(search).toBeFocused();
+    await expect(page.getByRole("button", { name: "Filter" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await search.fill("Flyer");
+    // The board is not modal: it shows the result while the popover is open.
+    await expect(page.getByRole("link", { name: /ACT-003/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /ACT-001/ })).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Filter" })).toBeVisible();
+    expect((await axe(page)).violations).toEqual([]);
+    await fontsLoaded(page);
+    await expect(page).toHaveScreenshot(`work-board-filter-popover-${theme}-1440.png`);
+    // A picker inside the popover opens above it; Escape closes the picker first, then the popover.
+    await page.getByRole("button", { name: /Verantwortlich/ }).click();
+    await expect(page.getByRole("listbox")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Filter" })).toBeVisible();
+    await page.getByRole("button", { name: /Verantwortlich/ }).focus();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Filter" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Filter/ })).toBeFocused();
+  });
+
   test(`a failed kind shows its banner, ${theme}: no axe violation`, async ({ page }) => {
     await fakeWork(page);
     await fulfill(page, "**/api/v1/events/*/risks*", problemBody("unavailable", 503), 503);
@@ -103,25 +139,36 @@ test("a URL opens the same filtered view after a reload", async ({ page }) => {
   await expect(page.getByRole("radio", { name: /^Aufgaben/, checked: true })).toBeVisible();
 });
 
-// The rhythm of the page (ADR 0082, the approved mock): one toolbar row of 44 px, 12 px to the
-// columns, columns of one height, 8 px between columns and 6 px between cards.
+// The rhythm of the page (ADR 0082, the approved mock): one toolbar row of 44 px (more where it
+// wraps), 12 px to the columns, columns of one height, 8 px between columns and 6 px between cards.
+const rowOf = (page: Page) => page.locator("[data-page-toolbar]");
+
+async function box(target: Locator) {
+  const found = await target.boundingBox();
+  if (!found) {
+    throw new Error("not shown");
+  }
+  return found;
+}
+
+const columnsOf = (page: Page) =>
+  Promise.all(
+    ["Offen", "In Arbeit", "Blockiert", "Erledigt"].map((name) =>
+      box(page.getByRole("region", { name: new RegExp(`^${name}`) })),
+    ),
+  );
+
+/** The page does not scroll: the columns fill the window and not more. */
+const scrolls = (page: Page) =>
+  page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
+
 test("the toolbar is one row of 44 px, 12 px above columns of one height", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await fakeWork(page);
   await page.goto(work);
   await boardShown(page, false);
-  const box = async (target: Locator) => {
-    const found = await target.boundingBox();
-    if (!found) {
-      throw new Error("not shown");
-    }
-    return found;
-  };
-  const row = await box(page.getByRole("heading", { level: 1, name: "Arbeit" }).locator("../.."));
-  const names = ["Offen", "In Arbeit", "Blockiert", "Erledigt"];
-  const columns = await Promise.all(
-    names.map((name) => box(page.getByRole("region", { name: new RegExp(`^${name}`) }))),
-  );
+  const row = await box(rowOf(page));
+  const columns = await columnsOf(page);
   expect(row.height).toBeCloseTo(44, 0);
   for (const column of columns) {
     expect(column.y - (row.y + row.height)).toBeCloseTo(12, 0);
@@ -129,6 +176,7 @@ test("the toolbar is one row of 44 px, 12 px above columns of one height", async
   }
   // The columns fill the screen: the last one ends 12 px above the bottom of the window.
   expect((columns[0]?.y ?? 0) + (columns[0]?.height ?? 0)).toBeCloseTo(900 - 12, 0);
+  expect(await scrolls(page)).toBe(false);
   for (const [index, column] of columns.slice(1).entries()) {
     const before = columns[index];
     expect(column.x - ((before?.x ?? 0) + (before?.width ?? 0))).toBeCloseTo(8, 0);
@@ -137,6 +185,46 @@ test("the toolbar is one row of 44 px, 12 px above columns of one height", async
   const first = await box(page.getByRole("link", { name: /ACT-001/ }));
   const second = await box(page.getByRole("link", { name: /MIL-001/ }));
   expect(second.y - (first.y + first.height)).toBeCloseTo(6, 0);
+});
+
+test("a wrapped toolbar row keeps the gap and the columns still fill the window", async ({
+  page,
+}) => {
+  // The workspace is narrower than the controls need, as next to a docked panel.
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await fakeWork(page);
+  await page.goto(work);
+  await boardShown(page, false);
+  const row = await box(rowOf(page));
+  const columns = await columnsOf(page);
+  expect(row.height).toBeGreaterThan(44);
+  for (const column of columns) {
+    expect(column.y - (row.y + row.height)).toBeCloseTo(12, 0);
+  }
+  expect((columns[0]?.y ?? 0) + (columns[0]?.height ?? 0)).toBeCloseTo(800 - 12, 0);
+  expect(await scrolls(page)).toBe(false);
+});
+
+test("the table view keeps the same 12 px below the toolbar row", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeWork(page);
+  await page.goto(`${work}?view=table`);
+  const table = await box(page.getByRole("table"));
+  const row = await box(rowOf(page));
+  // 12 px to the frame of the table, which has a border of 1 px around its scrolling region.
+  const gap = table.y - (row.y + row.height);
+  expect(gap).toBeGreaterThanOrEqual(12);
+  expect(gap).toBeLessThanOrEqual(13);
+});
+
+test("on a phone the list starts 12 px below the toolbar rows", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await fakeWork(page);
+  await page.goto(work);
+  await boardShown(page, true);
+  const row = await box(rowOf(page));
+  const status = await box(page.getByRole("button", { name: /^Offen \(\d+\)/ }));
+  expect(status.y - (row.y + row.height)).toBeCloseTo(12, 0);
 });
 
 test("a card is one link, and its address opens the panel at the record", async ({ page }) => {
