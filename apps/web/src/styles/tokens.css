@@ -83,12 +83,6 @@
     --font-size-dense: var(--font-size-sm);
     --line-height-dense: var(--line-height-sm);
 
-    /* Fixed sizes of the dense layout (ADR 0082) */
-    --size-chip-height: 20px;
-    --size-bar-height: 48px;
-    --size-sidebar-width: 232px;
-    --size-panel-width: 480px;
-
     /* Radius */
     --radius-sm: 4px;
     --radius-md: 6px;
