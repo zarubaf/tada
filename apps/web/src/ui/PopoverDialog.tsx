@@ -62,6 +62,9 @@ export function PopoverDialog({
       ) : (
         <Popover
           isNonModal
+          // The button toggles the popover itself. Without this, the press moves focus to the
+          // button, which closes the popover as a blur, and the toggle then opens it again.
+          shouldCloseOnInteractOutside={(element) => !triggerRef.current?.contains(element)}
           placement="bottom end"
           className={`${popover.popover} ${styles.popover}`}
         >
