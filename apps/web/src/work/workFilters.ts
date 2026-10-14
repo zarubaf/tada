@@ -130,6 +130,75 @@ export function sortWork(items: WorkItem[]): WorkItem[] {
   });
 }
 
+export const SORT_KEYS = ["id", "kind", "title", "status", "owner", "due", "area"] as const;
+export type SortKey = (typeof SORT_KEYS)[number];
+export type SortDirection = "asc" | "desc";
+
+/** How the table sorts. The default is the order of the board. */
+export interface Sort {
+  key: SortKey;
+  dir: SortDirection;
+}
+
+export const DEFAULT_SORT: Sort = { key: "due", dir: "asc" };
+
+const READABLE = (a: string, b: string) => a.localeCompare(b, "en", { numeric: true });
+const TEXT = (a: string, b: string) => a.localeCompare(b, "de-CH", { numeric: true });
+
+/** What a column compares. Nothing means „no value“, which sorts last in both directions. */
+function sortValue(
+  item: WorkItem,
+  key: SortKey,
+  areaOf: (item: WorkItem) => string | undefined,
+): string | undefined {
+  const text = (value: string | undefined) => (value === "" ? undefined : value);
+  switch (key) {
+    case "id":
+      return item.readableId;
+    case "kind":
+      return String(RECORD_KINDS.indexOf(item.kind));
+    case "title":
+      return text(item.title);
+    case "status":
+      return `${BOARD_COLUMNS.indexOf(item.column)}:${item.status}`;
+    case "owner":
+      return text(item.owner.name);
+    case "due":
+      return dueOf(item);
+    case "area":
+      return text(areaOf(item));
+  }
+}
+
+/**
+ * Sorts for the table: by one column, the records without a value last in both directions, a tie
+ * by the readable ID. The sort is stable and the input stays as it is. `areaOf` names the
+ * workstream of an item, which the item itself does not know.
+ */
+export function sortBy(
+  items: WorkItem[],
+  { key, dir }: Sort,
+  areaOf: (item: WorkItem) => string | undefined,
+): WorkItem[] {
+  const compare =
+    key === "id" || key === "due" || key === "kind" || key === "status" ? READABLE : TEXT;
+  const sign = dir === "asc" ? 1 : -1;
+  return [...items].sort((a, b) => {
+    const [x, y] = [sortValue(a, key, areaOf), sortValue(b, key, areaOf)];
+    if (x === undefined || y === undefined) {
+      if (x !== y) {
+        return x === undefined ? 1 : -1;
+      }
+    } else {
+      const order = compare(x, y);
+      if (order !== 0) {
+        return sign * order;
+      }
+    }
+    return READABLE(a.readableId, b.readableId);
+  });
+}
+
 /** The items per board column, in the order of ADR 0082, each column sorted. */
 export function groupByColumn(items: WorkItem[]): { column: BoardColumn; items: WorkItem[] }[] {
   const sorted = sortWork(items);
@@ -221,6 +290,33 @@ export function serializeFilters(filters: WorkFilters): URLSearchParams {
   }
   if (filters.text.trim() !== "") {
     params.set(KEYS.text, filters.text.trim());
+  }
+  return params;
+}
+
+const SORT = "sort";
+const DIR = "dir";
+/** The query keys of the sort, so that a page can clear them before it writes new ones. */
+export const SORT_PARAMS: readonly string[] = [SORT, DIR];
+
+/** Reads the sort from a query string. What it does not know, it ignores. */
+export function parseSort(params: Pick<URLSearchParams, "get">): Sort {
+  const key = params.get(SORT);
+  const dir = params.get(DIR);
+  return {
+    key: SORT_KEYS.find((candidate) => candidate === key) ?? DEFAULT_SORT.key,
+    dir: dir === "asc" || dir === "desc" ? dir : DEFAULT_SORT.dir,
+  };
+}
+
+/** Writes the sort as a query string. A part at its default has no key. */
+export function serializeSort({ key, dir }: Sort): URLSearchParams {
+  const params = new URLSearchParams();
+  if (key !== DEFAULT_SORT.key) {
+    params.set(SORT, key);
+  }
+  if (dir !== DEFAULT_SORT.dir) {
+    params.set(DIR, dir);
   }
   return params;
 }
