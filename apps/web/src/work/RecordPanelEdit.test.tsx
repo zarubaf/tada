@@ -576,6 +576,34 @@ describe("editing an action in the panel", () => {
     });
   });
 
+  describe("a reload of another kind", () => {
+    it("keeps the panel and an open edit through the retry of a failed list", async () => {
+      let known = false;
+      openAction(
+        {},
+        {
+          answers: {
+            "GET /commitments": () => (known ? json(200, { items: [] }) : problem(500, "internal")),
+          },
+        },
+      );
+      const view = await region();
+      // A long text does not save on a blur, so the click on the retry leaves the draft alone.
+      await user.click(view.getByRole("button", { name: "Beschreibung bearbeiten" }));
+      await user.type(view.getByRole("textbox", { name: "Beschreibung" }), " neu");
+      const retry = await screen.findByRole("button", { name: "Erneut versuchen" });
+      known = true;
+      await user.click(retry);
+
+      await waitFor(() =>
+        expect(screen.queryByRole("button", { name: "Erneut versuchen" })).toBeNull(),
+      );
+      expect(screen.getByRole("textbox", { name: "Beschreibung" })).toHaveValue(
+        "Alte Beschreibung neu",
+      );
+    });
+  });
+
   describe("who may change it", () => {
     it("shows plain text for a record that the member may not change", async () => {
       openAction({ can_change: false });
