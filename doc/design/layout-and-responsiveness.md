@@ -184,7 +184,8 @@ A row is `--row-height` high (28 px, and 44 px on coarse pointers).
 
 - The header of each column is a button that sorts.
   The query keys are `sort` (`id`, `kind`, `title`, `status`, `owner`, `due`, `area`) and `dir` (`asc`, `desc`); the defaults `due` and `asc` have no key.
-  The default order is the order of the board: by date, the records without a date last, then by ID.
+  The default order is by the date of the column: the due date, and for a decision the day it was made; the records without a date last, then by ID.
+  The board orders by due date alone, so a decision stays at the end of its column there.
   Pressing the sorted column flips its direction; pressing another column sorts it ascending.
   The sorted header has `aria-sort`, and a polite live region says „Sortiert nach Titel, aufsteigend“.
   The sort is stable. A record without a value (an empty title, no owner, no date, no area) comes last in both directions, and a tie is broken by the readable ID.
