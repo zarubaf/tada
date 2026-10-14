@@ -1,6 +1,7 @@
-import { IconColumns3, IconTable, IconTimeline } from "@tabler/icons-react";
+import { IconColumns3, IconTable } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { t } from "../i18n";
+import { IconGantt } from "../ui/IconGantt";
 import { PageToolbar } from "../ui/PageToolbar";
 import { TabPanel, Tabs } from "../ui/Tabs";
 import type { WorkToolbarSlots } from "./WorkToolbar";
@@ -16,7 +17,7 @@ export interface WorkViewTabsProps {
   children: ReactNode;
 }
 
-const VIEW_ICONS = { board: IconColumns3, table: IconTable, timeline: IconTimeline } as const;
+const VIEW_ICONS = { board: IconColumns3, table: IconTable, timeline: IconGantt } as const;
 
 function ViewIcon({ view }: { view: WorkView }) {
   const Icon = VIEW_ICONS[view];
