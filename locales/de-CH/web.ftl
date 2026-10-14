@@ -1458,6 +1458,7 @@ record-no-area = Kein Bereich
 record-no-milestone = Kein Meilenstein
 record-no-description = Keine Beschreibung
 record-no-mitigation = Keine Gegenmassnahme
+record-no-condition = Keine Bedingung
 record-unknown-area = Unbekannter Bereich
 record-unknown-milestone = Unbekannter Meilenstein
 record-unknown-record = Unbekannter Eintrag

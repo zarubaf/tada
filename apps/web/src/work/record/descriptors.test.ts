@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { commitment } from "../../test/workRecords";
 import { RECORD_KINDS } from "../recordStatus";
+import { toWorkItem } from "../workItem";
 import { PANEL } from "../workLinks";
 import { descriptorOf } from "./descriptors";
 import { CREATABLE } from "./recordRoute";
@@ -29,6 +31,23 @@ describe("descriptors", () => {
         expect(ids).toContain(id);
       }
     }
+  });
+
+  it("gives the actions of a descriptor unique IDs", () => {
+    for (const kind of RECORD_KINDS) {
+      const ids = (descriptorOf(kind)?.actions ?? []).map((action) => action.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+  });
+
+  it("never offers firm as a choice of a commitment status", () => {
+    const status = descriptorOf("commitment")?.properties.find((spec) => spec.id === "status");
+    const item = toWorkItem(
+      "commitment",
+      commitment("COM-001", { next_statuses: ["firm", "fulfilled"] }) as never,
+      () => "",
+    );
+    expect(status?.options?.(item)).toEqual(["conditional", "fulfilled"]);
   });
 
   it("lists as creatable exactly the kinds whose descriptor can create", () => {

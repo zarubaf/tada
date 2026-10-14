@@ -34,6 +34,13 @@ export const action = (localId: string, over: Over = {}) =>
 export const commitment = (localId: string, over: Over = {}) =>
   base(localId, {
     text: `Zusage ${localId}`,
+    promisor: {
+      kind: "institution",
+      id: "rec-ins-001",
+      local_id: "INS-001",
+      name: "Bäckerei Zopf AG",
+      redacted: false,
+    },
     status: "conditional",
     due_date: null,
     can_make_firm: false,
