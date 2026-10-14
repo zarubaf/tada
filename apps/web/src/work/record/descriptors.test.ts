@@ -22,6 +22,7 @@ describe("descriptors", () => {
         descriptor.title,
         ...descriptor.properties,
         ...(descriptor.description ? [descriptor.description] : []),
+        ...(descriptor.texts ?? []),
       ].map((spec) => spec.id);
       expect(new Set(ids).size).toBe(ids.length);
       for (const id of descriptor.create?.fields ?? []) {
