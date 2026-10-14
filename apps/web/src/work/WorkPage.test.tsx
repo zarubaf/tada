@@ -102,7 +102,7 @@ describe("WorkPage", () => {
     );
     expect(screen.getByRole("link", { name: /DEC-001/ })).toHaveAttribute(
       "href",
-      `/events/${EVENT.id}/decisions#DEC-001`,
+      `/events/${EVENT.id}/work#DEC-001`,
     );
     expect(screen.getByRole("link", { name: /RSK-001/ })).toHaveAttribute(
       "href",

@@ -1,10 +1,11 @@
 import { useId, useState } from "react";
-import type { RecordKind } from "../../api/client";
+import type { Api, RecordKind } from "../../api/client";
 import { t } from "../../i18n";
 import { LiveRegion } from "../../ui/LiveRegion";
 import { SidePanel } from "../../ui/SidePanel";
 import { StandaloneLink } from "../../ui/StandaloneLink";
 import { TypeIcon } from "../../ui/TypeIcon";
+import { oneLineWording } from "../decisionWording";
 import { EvidenceList } from "../EvidenceList";
 import type { Work } from "../useWork";
 import type { WorkItem } from "../workItem";
@@ -24,6 +25,8 @@ export type PanelMode = { mode: "open"; readableId: string } | { mode: "create";
 
 export interface RecordPanelProps {
   work: Work;
+  /** For the pickers that search on the server. */
+  api: Api;
   eventId: string;
   route: PanelMode;
   /** The member who is signed in: the owner that a new record starts with, if they can own one. */
@@ -60,8 +63,9 @@ function lookupOf(work: Work): RecordLookup {
   };
 }
 
-function sourcesOf(work: Work): ChoiceSources {
+function sourcesOf(work: Work, api: Api): ChoiceSources {
   return {
+    api,
     records: lookupOf(work),
     directory: work.directory.kind === "loaded" ? work.directory.directory : undefined,
     milestones: work.kinds.milestone.kind === "loaded" ? work.kinds.milestone.records : undefined,
@@ -176,6 +180,7 @@ function Body({
  */
 export default function RecordPanel({
   work,
+  api,
   eventId,
   route,
   me,
@@ -212,17 +217,24 @@ export default function RecordPanel({
   if (route.mode === "create") {
     const assignees = work.directory.kind === "loaded" ? work.directory.directory.assignees : [];
     // Without the people the form cannot say who may own a record, which is not a closed event.
-    const forbidden =
-      work.directory.kind === "loaded" ? "record-create-forbidden" : "record-create-unavailable";
+    const loaded = work.directory.kind === "loaded";
     const descriptor = descriptorOf(route.kind);
     const create = descriptor?.create;
+    // A kind that only managers create (a decision) says so to a member who may create the others.
+    const isManager = work.directory.kind === "loaded" && work.directory.directory.isManager;
+    const managersOnly = mayCreate && create?.managersOnly === true && !isManager;
+    const forbidden = !loaded
+      ? "record-create-unavailable"
+      : managersOnly
+        ? "record-create-managers-only"
+        : "record-create-forbidden";
     return (
       <SidePanel title={create ? t(create.titleKey) : ""} {...frame}>
-        {descriptor && create && mayCreate ? (
+        {descriptor && create && mayCreate && !managersOnly ? (
           <RecordCreate
             descriptor={descriptor}
             commands={work.commands}
-            sources={sourcesOf(work)}
+            sources={sourcesOf(work, api)}
             owner={assignees.some((member) => member.id === me) ? me : undefined}
             onCreated={onCreated}
             recover={(id) => work.locate(route.kind, id)}
@@ -269,14 +281,15 @@ export default function RecordPanel({
     commands: work.commands,
     refresh: work.refresh,
     announce: (text, urgency) => (urgency === "alert" ? setAlert(text) : setStatus(text)),
-    sources: sourcesOf(work),
+    sources: sourcesOf(work, api),
     today,
     editable: canEdit(item, writable),
     writable,
     open: onOpen,
   };
   const lookup = lookupOf(work);
-  const name = item.redacted ? item.readableId : `${item.readableId} ${item.title}`;
+  // A decision has a long wording: the name of the region has its first line.
+  const name = item.redacted ? item.readableId : `${item.readableId} ${oneLineWording(item.title)}`;
   return (
     <SidePanel title={name} heading={<Head item={item} />} {...frame}>
       <Body

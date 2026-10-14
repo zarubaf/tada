@@ -29,8 +29,10 @@ export function RecordActions({
   const panel = useRef<HTMLElement | null>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const offered = actions.filter((action) => action.available(item, env));
-  const active = offered.find((action) => action.id === open);
-  if (offered.length === 0) {
+  // The dialog that is open stays, also when the record changed meanwhile and the action is no
+  // longer offered: the member keeps what they typed and reads why it failed.
+  const active = actions.find((action) => action.id === open);
+  if (offered.length === 0 && !active) {
     return null;
   }
   const Dialog = active?.dialog;
