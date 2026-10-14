@@ -146,15 +146,18 @@ The page does not use the sub-navigation of the event.
 - The page is `Page width="flush"`: it has no gutter of its own, and its rows set `--page-gutter` (16 px on a phone, 12 px from `--bp-medium`).
   The toolbar runs edge to edge; the view below it keeps the gutter at both sides and at the bottom.
 - The toolbar is one row of `--size-toolbar` (44 px) with a border below and the gutter at both sides.
-  From left to right it holds the `h1` „Arbeit“ as a compact heading (`--font-size-base`), the type filter, the ghost button „Filter“ and the view switch.
+  From left to right it holds the `h1` „Arbeit“ as a compact heading (`--font-size-base`), the type filter, then at the right the view switch and the ghost button „Filter“.
   The `h1` stays the page heading for screen readers and for the focus moves; it only sits in the row.
   The row has a gap of 8 px.
-  When it does not fit, for example next to a docked panel, it wraps into a second row with a gap of 6 px; the button and the switch stay at the right, and the row never overflows.
+  When it does not fit, for example next to a docked panel, it wraps into a second row with a gap of 6 px; the switch and the button stay together at the right, and the row never overflows.
 - Below the row there are 12 px (8 px on a phone) between the banners, the empty states and the view.
-  The columns of the board fill the screen: the board is at least as high as the window below the top bar, the toolbar and the two gaps, and its columns have one height.
+  The columns of the board fill the screen: the page, the tabs and the view are one flex column, and the board takes the height that the toolbar and the banners leave, so the columns have one height and the page does not scroll for them, also where the row wraps.
 - The type filter is „Alle“, „Aufgaben“, „Zusagen“, „Meilensteine“, „Entscheide“ and „Risiken“, each with a count.
   A count shows what the other filters let through, so it says what a click adds.
-- The button „Filter“ opens a sheet from the right (from the bottom on a phone) with the search (title and ID), „Verantwortlich“ („Ich“ first, then the contributors; there is no „Niemand“, because an action needs an owner), „Bereich“, „Fällig“ („Überfällig“, „Diese Woche“, „Ohne Datum“) and „Filter zurücksetzen“, which shows only while a filter is set.
+- The button „Filter“ and the key `/` (outside a text field) open a dialog with the search, and focus goes to the search.
+  From `--bp-medium` the dialog is a popover that is not modal, so the board stays usable and shows the result of each change behind it; Escape closes it and focus returns to the button.
+  On a phone it is a sheet from the bottom.
+  It holds the search (title and ID), „Verantwortlich“ („Ich“ first, then the contributors; there is no „Niemand“, because an action needs an owner), „Bereich“, „Fällig“ („Überfällig“, „Diese Woche“, „Ohne Datum“) and „Filter zurücksetzen“, which shows only while a filter is set.
   The button shows the number of set filters (the type is not counted: it has its own control) and has the accessible name „Filter, 2 gesetzt“.
   The active filters are not repeated as chips: the count is enough, and the sheet shows the values.
 - The view switch „Board“, „Tabelle“ and „Zeitplan“ is a segmented control at the right end of the row (a frame of 30 px with 24 px buttons) and chooses the view.
