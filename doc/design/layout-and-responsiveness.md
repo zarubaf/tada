@@ -134,7 +134,7 @@ Each template uses the `Page` component for the `main` element, the page gutters
 | Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings                         |
 | Event page       | The event header with the key and the name, the sub-navigation of the event, then the sub-page              | „Übersicht“, „Mitglieder“, „Aufgaben“ of an event                |
 | Timeline         | The event header, a filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)           | „Zeitplan“ of an event                                           |
-| Work             | The `h1` „Arbeit“, the toolbar (type filter, search, filters), then the view (the board for now)            | „Arbeit“ of an event                                             |
+| Work             | One toolbar row (title, type filter, „Filter“, view switch), 12 px below it the view                        | „Arbeit“ of an event                                             |
 | Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                                      |
 
 ### Work
@@ -143,10 +143,21 @@ The „Arbeit“ page (`/events/:id/work`) shows all work records of an event: a
 It has its own `h1` „Arbeit“ and not the header of the event page.
 The page does not use the sub-navigation of the event.
 
-- The toolbar has the type filter „Alle“, „Aufgaben“, „Zusagen“, „Meilensteine“, „Entscheide“ and „Risiken“, each with a count.
+- The page is `Page width="flush"`: it has no gutter of its own, and its rows set `--page-gutter` (16 px on a phone, 12 px from `--bp-medium`).
+  The toolbar runs edge to edge; the view below it keeps the gutter at both sides and at the bottom.
+- The toolbar is one row of `--size-toolbar` (44 px) with a border below and the gutter at both sides.
+  From left to right it holds the `h1` „Arbeit“ as a compact heading (`--font-size-base`), the type filter, the ghost button „Filter“ and the view switch.
+  The `h1` stays the page heading for screen readers and for the focus moves; it only sits in the row.
+  The row has a gap of 8 px.
+  When it does not fit, for example next to a docked panel, it wraps into a second row with a gap of 6 px; the button and the switch stay at the right, and the row never overflows.
+- Below the row there are 12 px (8 px on a phone) between the banners, the empty states and the view.
+  The columns of the board fill the screen: the board is at least as high as the window below the top bar, the toolbar and the two gaps, and its columns have one height.
+- The type filter is „Alle“, „Aufgaben“, „Zusagen“, „Meilensteine“, „Entscheide“ and „Risiken“, each with a count.
   A count shows what the other filters let through, so it says what a click adds.
-- The filter row has the search (title and ID), „Verantwortlich“ („Ich“ first, then the contributors; there is no „Niemand“, because an action needs an owner), „Bereich“, „Fällig“ („Überfällig“, „Diese Woche“, „Ohne Datum“) and „Filter zurücksetzen“, which shows only while a filter is set.
-- The view tabs „Board“, „Tabelle“ and „Zeitplan“ sit above the toolbar and choose the view.
+- The button „Filter“ opens a sheet from the right (from the bottom on a phone) with the search (title and ID), „Verantwortlich“ („Ich“ first, then the contributors; there is no „Niemand“, because an action needs an owner), „Bereich“, „Fällig“ („Überfällig“, „Diese Woche“, „Ohne Datum“) and „Filter zurücksetzen“, which shows only while a filter is set.
+  The button shows the number of set filters (the type is not counted: it has its own control) and has the accessible name „Filter, 2 gesetzt“.
+  The active filters are not repeated as chips: the count is enough, and the sheet shows the values.
+- The view switch „Board“, „Tabelle“ and „Zeitplan“ is a segmented control at the right end of the row (a frame of 30 px with 24 px buttons) and chooses the view.
   The filters are the same in every view, and so are the counts and the announcements.
   A change of the tab makes a new history entry, so that back and forward move between the views; the filters and the sort stay.
   The table and the timeline are loaded when their tab opens, so the board does not pay for them.
@@ -178,14 +189,16 @@ The page does not use the sub-navigation of the event.
   An event that is unknown or forbidden shows its error with a retry instead of the page.
   An event without records shows an empty state with „Neue Aufgabe“.
   Filters that hide all records show an empty state with „Filter zurücksetzen“.
-  After a reset, focus moves to the search field.
+  After a reset in the sheet, focus moves to the search field; after a reset from the empty state, to the `h1`.
 - When the filters change, a polite live region announces the number of records, for example „12 Einträge“.
 - Narrow (below 40rem): the board is one list.
   A status picker (a select with the counts) replaces the columns.
-  The type filter is a select, and the other filters sit behind a „Filter“ button that opens a sheet from the bottom.
+  The first row holds the `h1` and the view switch.
+  The second row holds the type filter as a select and the „Filter“ button, and the status picker follows directly below it.
   The button shows the number of filters that are set.
   The page does not scroll sideways, and the targets are 44 px.
-- The bulk bar sticks to the bottom of the work area while the board or the table shows (16 px above the edge).
+- The bulk bar floats 20 px above the bottom of the window while the board or the table shows, 44 px high with 28 px buttons.
+  The dock has no height, so the bar takes no room in the page; the board columns keep 64 px at their end, and the list of a phone keeps room for two rows, so that the bar never covers the last card.
   Below 40rem it sits above the bottom bar, in two rows: the count and „Auswahl aufheben“, then the three buttons, which wrap and never scroll sideways.
   The value lists open as a sheet from the bottom instead of a popover.
   A failure banner sits above the bar in the same dock.
