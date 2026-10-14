@@ -52,8 +52,17 @@ export interface RecordPanelProps {
   returnFocusTo: () => HTMLElement | null | undefined;
 }
 
+/** The readable IDs of the records that the page has loaded. */
+function lookupOf(work: Work): RecordLookup {
+  return {
+    readableId: (kind, id) =>
+      work.items.find((candidate) => candidate.kind === kind && candidate.id === id)?.readableId,
+  };
+}
+
 function sourcesOf(work: Work): ChoiceSources {
   return {
+    records: lookupOf(work),
     directory: work.directory.kind === "loaded" ? work.directory.directory : undefined,
     milestones: work.kinds.milestone.kind === "loaded" ? work.kinds.milestone.records : undefined,
   };
@@ -129,9 +138,11 @@ function Body({
         focusOnMount={focusTitle}
       />
       <dl className={styles.props}>
-        {descriptor.properties.map((spec) => (
-          <Property key={spec.id} spec={spec} item={item} env={env} />
-        ))}
+        {descriptor.properties
+          .filter((spec) => spec.when?.(item) ?? true)
+          .map((spec) => (
+            <Property key={spec.id} spec={spec} item={item} env={env} />
+          ))}
       </dl>
       {descriptor.actions && !item.redacted && (
         <RecordActions actions={descriptor.actions} item={item} env={env} announce={env.announce} />
@@ -262,11 +273,9 @@ export default function RecordPanel({
     today,
     editable: canEdit(item, writable),
     writable,
+    open: onOpen,
   };
-  const lookup: RecordLookup = {
-    readableId: (kind, id) =>
-      work.items.find((candidate) => candidate.kind === kind && candidate.id === id)?.readableId,
-  };
+  const lookup = lookupOf(work);
   const name = item.redacted ? item.readableId : `${item.readableId} ${item.title}`;
   return (
     <SidePanel title={name} heading={<Head item={item} />} {...frame}>

@@ -10,7 +10,7 @@ import type { Directory } from "../directory";
 import { milestoneName } from "../milestoneName";
 import { statusPresentationOfText } from "../recordStatus";
 import type { WorkItem } from "../workItem";
-import type { FieldSpec, FieldValue } from "./descriptor";
+import type { FieldSpec, FieldValue, RecordLookup } from "./descriptor";
 import { enumChoices } from "./enumChoices";
 
 /** What the choices are made of. A part that has not loaded is absent. */
@@ -18,6 +18,8 @@ export interface ChoiceSources {
   directory: Directory | undefined;
   /** All milestones of the event. */
   milestones: Milestone[] | undefined;
+  /** The readable IDs of the records that a field refers to. */
+  records?: RecordLookup | undefined;
   /** For a control that searches on the server, such as the people of a decision. */
   api?: Api | undefined;
 }
@@ -110,6 +112,12 @@ export function choicesOf(
         }),
         offered: milestones !== undefined,
       };
+    }
+    case "record": {
+      // The record that the field refers to, named by its readable ID once its kind has loaded.
+      const label =
+        current && spec.refers ? sources.records?.readableId(spec.refers, current) : undefined;
+      return { options: label ? [{ id: current ?? "", label }] : [], offered: true };
     }
     case "people": {
       // The people are those of the record; the search of the form needs no options here.
