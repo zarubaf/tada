@@ -107,6 +107,11 @@ describe("filterWork", () => {
     expect(ids(filterWork(all, filters({ due: "none" }), ctx))).toEqual(["DEC-001", "RSK-001"]);
   });
 
+  it("finds a readable id typed without the dash", () => {
+    expect(ids(filterWork(all, filters({ text: "act001" }), ctx))).toEqual(["ACT-001"]);
+    expect(ids(filterWork(all, filters({ text: "ACT 002" }), ctx))).toEqual(["ACT-002"]);
+  });
+
   it("searches the title and the readable id, ignoring case and accents", () => {
     expect(ids(filterWork(all, filters({ text: "regen" }), ctx))).toEqual(["RSK-001"]);
     expect(ids(filterWork(all, filters({ text: " act-00 " }), ctx))).toEqual([

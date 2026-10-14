@@ -74,6 +74,11 @@ function plain(text: string): string {
     .toLowerCase();
 }
 
+/** Letters and digits only, so that "act12" and "ACT 012" find ACT-012. */
+function alphanumeric(text: string): string {
+  return text.replace(/[^a-z0-9]/g, "");
+}
+
 type Skip = "kinds" | undefined;
 
 function matches(item: WorkItem, f: WorkFilters, { me, today }: FilterContext, skip: Skip) {
@@ -99,7 +104,14 @@ function matches(item: WorkItem, f: WorkFilters, { me, today }: FilterContext, s
     return false;
   }
   const text = plain(f.text.trim());
-  return text === "" || plain(item.title).includes(text) || plain(item.readableId).includes(text);
+  if (text === "") {
+    return true;
+  }
+  const id = alphanumeric(text);
+  return (
+    plain(item.title).includes(text) ||
+    (id !== "" && alphanumeric(plain(item.readableId)).includes(id))
+  );
 }
 
 export function filterWork(items: WorkItem[], filters: WorkFilters, ctx: FilterContext) {
