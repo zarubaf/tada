@@ -494,3 +494,61 @@ test("the bar floats over the board and the columns do not move or shrink", asyn
   await expect(bar(page)).toHaveCount(0);
   expect(await columns()).toEqual(before);
 });
+
+// From 80rem the record panel docks beside the board. The bar floats over the board column only:
+// it centers in the space between the sidebar and the panel, and the columns do not move.
+test("the bar floats beside the docked panel, not under it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeWork(page);
+  await page.goto(`${work}#ACT-003`);
+  const panel = page.locator("aside[aria-label][tabindex='-1']");
+  await expect(panel).toBeVisible();
+  const columns = () =>
+    Promise.all(
+      ["Offen", "In Arbeit", "Blockiert", "Erledigt"].map((name) =>
+        page.getByRole("region", { name: new RegExp(`^${name}`) }).boundingBox(),
+      ),
+    );
+  const before = await columns();
+  await label(page, "ACT-001").click();
+  await label(page, "ACT-002").click();
+  await expect(bar(page).getByText("2 ausgewählt")).toBeVisible();
+  const frame = await bar(page).boundingBox();
+  const side = await panel.boundingBox();
+  if (!(frame && side)) {
+    throw new Error("not shown");
+  }
+  expect(frame.x + frame.width).toBeLessThanOrEqual(side.x - 12);
+  expect(frame.x).toBeGreaterThanOrEqual(244);
+  expect(Math.abs(frame.x + frame.width / 2 - (232 + side.x) / 2)).toBeLessThanOrEqual(1);
+  expect(frame.y + frame.height).toBeCloseTo(880, -1);
+  expect(await columns()).toEqual(before);
+});
+
+// Below 80rem the panel is an overlay from the right. The bar must stay reachable: the page keeps
+// it clear of the panel, and a pointer at its center hits the bar.
+test("the bar stays reachable beside the overlay panel at 1024 px", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await fakeWork(page);
+  await page.goto(`${work}#ACT-003`);
+  const panel = page.locator("aside[aria-label][tabindex='-1']");
+  await expect(panel).toBeVisible();
+  await label(page, "ACT-001").click();
+  await label(page, "ACT-002").click();
+  await expect(bar(page).getByText("2 ausgewählt")).toBeVisible();
+  const frame = await bar(page).boundingBox();
+  if (!frame) {
+    throw new Error("not shown");
+  }
+  const hit = await page.evaluate(
+    ({ x, y }) => {
+      const element = document.elementFromPoint(x, y);
+      return {
+        inBar: element?.closest("[role=toolbar]") !== null,
+        inPanel: element?.closest("aside[tabindex='-1']") !== null,
+      };
+    },
+    { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 },
+  );
+  expect(hit).toEqual({ inBar: true, inPanel: false });
+});

@@ -40,6 +40,17 @@
     min-width: 0;
   }
 
+  /*
+   * From 40rem to 80rem the record panel is an overlay from the right (z-index above the bar). The
+   * bar keeps clear of it, so that it stays in view and in reach; from 80rem the panel is docked
+   * beside the page and the bar has its own column.
+   */
+  @media (width >= 40rem) and (width < 80rem) {
+    .scope[data-panel-open] {
+      --dock-clear: var(--size-panel-width);
+    }
+  }
+
   .view[data-dock-room] {
     padding-block-end: var(--dock-room);
   }
