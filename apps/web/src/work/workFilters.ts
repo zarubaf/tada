@@ -121,14 +121,15 @@ export function filterWork(items: WorkItem[], filters: WorkFilters, ctx: FilterC
 /** Due date ascending, the items without one last, then the readable ID. The input stays as is. */
 export function sortWork(items: WorkItem[]): WorkItem[] {
   return [...items].sort((a, b) => {
-    if (a.date !== b.date) {
-      if (a.date === undefined) {
+    const [dueA, dueB] = [dueOf(a), dueOf(b)];
+    if (dueA !== dueB) {
+      if (dueA === undefined) {
         return 1;
       }
-      if (b.date === undefined) {
+      if (dueB === undefined) {
         return -1;
       }
-      return a.date < b.date ? -1 : 1;
+      return dueA < dueB ? -1 : 1;
     }
     return a.readableId.localeCompare(b.readableId, "en", { numeric: true });
   });
