@@ -408,7 +408,7 @@ describe("event switcher", () => {
     renderShellAt("/inbox", json(200, info([first], first)));
 
     expect(await screen.findByRole("button", { name: "Anlass wählen" })).toHaveTextContent(
-      "Kein Anlass gewählt",
+      "Anlass wählen",
     );
   });
 

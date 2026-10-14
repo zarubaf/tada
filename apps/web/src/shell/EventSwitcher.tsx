@@ -17,6 +17,11 @@ export const eventItemId = (id: string) => `${EVENT_PREFIX}${id}`;
 export const eventIdOfItem = (item: string) =>
   item.startsWith(EVENT_PREFIX) ? item.slice(EVENT_PREFIX.length) : undefined;
 
+/** The key of the event; a closed event says so. */
+function subtitle(event: Event): string {
+  return event.status === "closed" ? `${event.key} · ${t("event-switcher-closed")}` : event.key;
+}
+
 export function EventSwitcher({
   current,
   list,
@@ -58,12 +63,13 @@ export function EventSwitcher({
             {current ? initialsOf(current.name) : "?"}
           </span>
           <span className={styles.text}>
-            <span className={styles.name}>{current?.name ?? t("event-switcher-none")}</span>
+            {/* A long name is cut: the full name is the title and in the name of the button. */}
+            <span className={styles.name} title={current?.name}>
+              {current?.name ?? t("event-switcher-pick")}
+            </span>
             {current && (
-              <span className={styles.sub}>
-                {current.status === "closed"
-                  ? `${current.key} · ${t("event-switcher-closed")}`
-                  : current.key}
+              <span className={styles.sub} title={subtitle(current)}>
+                {subtitle(current)}
               </span>
             )}
           </span>
