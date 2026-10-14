@@ -147,7 +147,7 @@ test("a title in the table is one link, and the risk is none", async ({ page }) 
   const row = page.getByRole("row").filter({ hasText: "ACT-001" });
   await expect(row.getByRole("link")).toHaveAttribute(
     "href",
-    `/events/${event?.id}/actions#ACT-001`,
+    `/events/${event?.id}/work?view=table#ACT-001`,
   );
   await expect(page.getByRole("row").filter({ hasText: "RSK-001" }).getByRole("link")).toHaveCount(
     0,
