@@ -73,10 +73,18 @@
     min-height: var(--control-height-md);
   }
 
+  /* One label column for every kind, so that the values start at the same x. A long label wraps. */
   .label {
     gap: var(--space-2);
     color: var(--color-text-muted);
     font-size: var(--font-size-sm);
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+
+  /* A wrapped label must not squeeze its icon. */
+  .label svg {
+    flex-shrink: 0;
   }
 
   .field {
