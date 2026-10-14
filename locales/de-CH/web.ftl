@@ -1317,6 +1317,7 @@ work-board-column-empty = Keine Einträge
 # $kind: the plural name of the kind, for example „Aufgaben“.
 work-kind-failed = { $kind } konnten nicht geladen werden.
 work-directory-failed = Personen und Bereiche konnten nicht geladen werden.
+work-retry-failed = Erneut fehlgeschlagen
 work-empty-title = Noch keine Arbeit in diesem Anlass
 work-empty-text = Aufgaben, Zusagen, Meilensteine, Entscheide und Risiken erscheinen hier, sobald jemand sie erfasst.
 work-empty-new-action = Neue Aufgabe
