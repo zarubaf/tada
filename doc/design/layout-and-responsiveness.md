@@ -175,6 +175,10 @@ The page does not use the sub-navigation of the event.
   The type filter is a select, and the other filters sit behind a „Filter“ button that opens a sheet from the bottom.
   The button shows the number of filters that are set.
   The page does not scroll sideways, and the targets are 44 px.
+- The bulk bar sticks to the bottom of the work area while the board or the table shows (16 px above the edge).
+  Below 40rem it sits above the bottom bar, in two rows: the count and „Auswahl aufheben“, then the three buttons, which wrap and never scroll sideways.
+  The value lists open as a sheet from the bottom instead of a popover.
+  A failure banner sits above the bar in the same dock.
 
 ### Table
 
@@ -200,6 +204,12 @@ A row is `--row-height` high (28 px, and 44 px on coarse pointers).
   The page shows the cards of the board as one list, in the order of the sort.
   The list has no sort control; the targets are 44 px.
 - The markup has one cell for each column, so that a column with a checkbox can join in front.
+- Selection: a member who may change a record sees the checkbox column in front, 28 px high (44 px on coarse pointers, as the row).
+  „Alle auswählen“ sits in its header cell and selects all records of the list that can be changed.
+  One selection serves the board and the table; a switch between them keeps the records that the new view shows (the table shows every record, the board hides a collapsed „Abgebrochen“).
+  The timeline has no selection: a switch to it clears the selection, and the bulk bar is not shown.
+  The exception is a bulk change that runs, or whose failures are still open: it keeps its records selected through the timeline, and the failures wait in the bar for the return to the table or the board.
+  Below 40rem the list of cards selects as the board does, with „Alle auswählen“ above it.
 
 ### Timeline
 
