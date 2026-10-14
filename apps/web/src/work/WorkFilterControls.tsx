@@ -1,7 +1,7 @@
 // The filter controls of the „Arbeit“ page, one component each, so that the toolbar (wide) and the
 // filter sheet (narrow) place the same controls. They only read and change `WorkFilters`.
 import { IconX } from "@tabler/icons-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { t } from "../i18n";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
@@ -9,6 +9,7 @@ import { SearchField } from "../ui/SearchField";
 import { type SearchOption, SearchSelect } from "../ui/SearchSelect";
 import { Select } from "../ui/Select";
 import type { DirectoryState } from "./directory";
+import { useDebouncedText } from "./useDebouncedText";
 import { DUE_WINDOWS, type DueWindow, NO_FILTERS, type WorkFilters } from "./workFilters";
 
 export interface FilterControlProps {
@@ -33,20 +34,15 @@ export function countOtherFilters(filters: WorkFilters): number {
 }
 
 export function SearchBox({ filters, onChange }: FilterControlProps) {
-  // The field keeps what the member types, with its spaces; the filters keep the trimmed text.
-  const [draft, setDraft] = useState(filters.text);
-  useEffect(() => {
-    setDraft((current) => (current.trim() === filters.text ? current : filters.text));
-  }, [filters.text]);
+  // The field keeps what the member types, with its spaces; the filters get the text after a pause.
+  const field = useDebouncedText(filters.text, (text) => onChange({ ...filters, text }));
   return (
     <SearchField
       label={t("work-search")}
       placeholder={t("work-search-placeholder")}
-      value={draft}
-      onChange={(text) => {
-        setDraft(text);
-        onChange({ ...filters, text });
-      }}
+      value={field.draft}
+      onChange={field.change}
+      onCommit={field.flush}
     />
   );
 }

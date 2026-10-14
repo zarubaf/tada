@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "../router/Router";
@@ -167,8 +167,48 @@ describe("WorkPage", () => {
       await ready();
       await userEvent.type(screen.getByRole("searchbox"), "Festzelt bes");
       expect(screen.getByRole("searchbox")).toHaveValue("Festzelt bes");
-      expect(query().get("q")).toBe("Festzelt bes");
+      await waitFor(() => expect(query().get("q")).toBe("Festzelt bes"));
       expect(shown()).toEqual(["ACT-003"]);
+    });
+
+    it("writes the search once after the typing, not once for each key, and announces once", async () => {
+      open();
+      await ready();
+      const replace = vi.spyOn(window.history, "replaceState");
+      await userEvent.type(screen.getByRole("searchbox"), "Festzelt");
+      expect(replace).not.toHaveBeenCalled();
+      expect(screen.queryByText(/^\d+ Eintr/)).not.toBeInTheDocument();
+      await waitFor(() => expect(query().get("q")).toBe("Festzelt"));
+      expect(replace).toHaveBeenCalledTimes(1);
+      expect(await screen.findByText("1 Eintrag")).toBeInTheDocument();
+    });
+
+    it("searches at once on Enter and when the field is cleared", async () => {
+      open();
+      await ready();
+      await userEvent.type(screen.getByRole("searchbox"), "Festzelt{Enter}");
+      expect(query().get("q")).toBe("Festzelt");
+      await userEvent.click(screen.getByRole("button", { name: "Suche leeren" }));
+      expect(window.location.search).toBe("");
+    });
+
+    it("follows the search when the member goes back and forward", async () => {
+      open("?q=Plakat");
+      await ready();
+      const box = screen.getByRole("searchbox");
+      expect(box).toHaveValue("Plakat");
+      act(() => {
+        window.history.pushState(null, "", `/events/${EVENT.id}/work?q=Festzelt`);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      await waitFor(() => expect(box).toHaveValue("Festzelt"));
+      expect(shown()).toEqual(["ACT-003"]);
+      act(() => {
+        window.history.pushState(null, "", `/events/${EVENT.id}/work`);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      await waitFor(() => expect(box).toHaveValue(""));
+      expect(shown()).toHaveLength(9);
     });
 
     it("filters by owner, „Ich“ first", async () => {
@@ -333,7 +373,7 @@ describe("WorkPage", () => {
       await userEvent.click(screen.getByRole("button", { name: "Filter" }));
       const dialog = await screen.findByRole("dialog");
       await userEvent.type(within(dialog).getByRole("searchbox"), "Plakat");
-      expect(query().get("q")).toBe("Plakat");
+      await waitFor(() => expect(query().get("q")).toBe("Plakat"));
       await userEvent.click(within(dialog).getByRole("button", { name: "Schliessen" }));
       expect(screen.getByRole("button", { name: "Filter, 1 gesetzt" })).toBeInTheDocument();
       expect(shown()).toEqual(["ACT-001"]);
