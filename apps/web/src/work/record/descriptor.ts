@@ -124,6 +124,12 @@ export interface CreateSpec {
   ) => Promise<CommandResult<Saved>>;
 }
 
+/** Names other records for a descriptor, which holds only the ID of the record it refers to. */
+export interface RecordLookup {
+  /** The readable ID of a record by its UUID, or nothing while the record is not loaded. */
+  readableId: (kind: RecordKind, id: string) => string | undefined;
+}
+
 export interface RecordDescriptor {
   kind: RecordKind;
   /** The title of the record. It is the heading of the panel. */
@@ -134,6 +140,11 @@ export interface RecordDescriptor {
   description?: FieldSpec;
   /** Further long texts under the description, each in its own section, for example a mitigation. */
   texts?: readonly FieldSpec[];
+  /**
+   * Sentences about the record that the member should know, for a read-only section „Hinweise“
+   * between the properties and the description. Nothing means no section.
+   */
+  hints?: (item: WorkItem, lookup: RecordLookup) => string[];
   /** The Fluent key of the line that names the record version that a passage of evidence supports. */
   evidenceVersionKey: string;
   create?: CreateSpec;

@@ -11,10 +11,11 @@ import type { WorkItem } from "../workItem";
 import { recordHref } from "../workLinks";
 import { canEdit } from "../workPermissions";
 import type { ChoiceSources } from "./choices";
-import type { FieldSpec, RecordDescriptor } from "./descriptor";
+import type { FieldSpec, RecordDescriptor, RecordLookup } from "./descriptor";
 import { descriptorOf } from "./descriptors";
 import { FieldEditor, type FieldEnv } from "./FieldEditor";
 import { RecordCreate } from "./RecordCreate";
+import { RecordHints } from "./RecordHints";
 import styles from "./RecordPanel.module.css";
 
 /** What the panel shows: a record that the address names, or the form of a new record. */
@@ -101,12 +102,14 @@ function Body({
   item,
   descriptor,
   env,
+  lookup,
   timeZone,
   focusTitle,
 }: {
   item: WorkItem;
   descriptor: RecordDescriptor;
   env: FieldEnv;
+  lookup: RecordLookup;
   timeZone: string;
   focusTitle: boolean;
 }) {
@@ -129,6 +132,7 @@ function Body({
           <Property key={spec.id} spec={spec} item={item} env={env} />
         ))}
       </dl>
+      <RecordHints hints={descriptor.hints?.(item, lookup) ?? []} />
       {!item.redacted &&
         [description, ...(descriptor.texts ?? [])].map(
           (spec) => spec && <TextSection key={spec.id} spec={spec} item={item} env={env} />,
@@ -254,6 +258,10 @@ export default function RecordPanel({
     today,
     editable: canEdit(item, writable),
   };
+  const lookup: RecordLookup = {
+    readableId: (kind, id) =>
+      work.items.find((candidate) => candidate.kind === kind && candidate.id === id)?.readableId,
+  };
   const name = item.redacted ? item.readableId : `${item.readableId} ${item.title}`;
   return (
     <SidePanel title={name} heading={<Head item={item} />} {...frame}>
@@ -262,6 +270,7 @@ export default function RecordPanel({
         item={item}
         descriptor={descriptor}
         env={env}
+        lookup={lookup}
         timeZone={timeZone}
         focusTitle={focusTitle}
       />
