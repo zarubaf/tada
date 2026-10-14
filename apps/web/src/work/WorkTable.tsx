@@ -219,6 +219,7 @@ export default function WorkTable({ items, narrow, selection, ...rest }: BoardPr
                     item.workstreamId === undefined ? undefined : workstreamName(item.workstreamId)
                   }
                   select={cardSelect(selection, item)}
+                  inColumn={false}
                 />
               ))}
             </ul>

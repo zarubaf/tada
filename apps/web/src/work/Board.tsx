@@ -54,6 +54,7 @@ function Cards({ group, ...rest }: Shared & { group: Group }) {
             item.workstreamId === undefined ? undefined : workstreamName(item.workstreamId)
           }
           select={cardSelect(selection, item)}
+          inColumn
         />
       ))}
     </ul>
