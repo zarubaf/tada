@@ -19,14 +19,6 @@
     min-width: 0;
   }
 
-  /* The page of the work: a column that fills the work area, so that the board can fill what the toolbar leaves. */
-  .work {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    min-width: 0;
-  }
-
   /*
    * The view and its bulk bar, which sticks to the bottom of the screen. The dock of the bar has no
    * height and no gap before it, so the bar never moves the view: a selection changes nothing in
