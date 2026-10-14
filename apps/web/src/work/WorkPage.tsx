@@ -11,7 +11,7 @@ import { useNarrow } from "../shell/useNarrow";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
-import { useRetry } from "../ui/focus";
+import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
 import { StandaloneLink } from "../ui/StandaloneLink";
@@ -35,6 +35,8 @@ export function WorkPage({ api }: { api: Api }) {
   const narrow = useNarrow();
   const [filters, setFilters] = useWorkFilters();
   const heading = useRef<HTMLHeadingElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   const { retry } = useRetry(() => heading.current);
   const retrying = useRetrying(retry);
   const event = useEventState(api, eventId, () => heading.current);
@@ -75,6 +77,13 @@ export function WorkPage({ api }: { api: Api }) {
     }
   }, [failures, eventFailed]);
 
+  // The reset button leaves with the filters, so focus goes to the search; behind the closed
+  // sheet of a phone there is none, so it goes to the heading.
+  const reset = () => {
+    setFilters(NO_FILTERS);
+    focusAfterCommit(() => search.current ?? heading.current);
+  };
+
   const workstreamName = (id: string) =>
     work.directory.kind === "loaded"
       ? work.directory.directory.workstreams.find((stream) => stream.id === id)?.name
@@ -105,6 +114,8 @@ export function WorkPage({ api }: { api: Api }) {
           directory={work.directory}
           me={me}
           narrow={narrow}
+          onReset={reset}
+          searchRef={search}
         />
         <LiveRegion kind="status" visuallyHidden>
           {announcement}
@@ -142,9 +153,7 @@ export function WorkPage({ api }: { api: Api }) {
           <EmptyState
             title={t("work-empty-filtered-title")}
             text={t("work-empty-filtered-text")}
-            action={
-              <Button onPress={() => setFilters(NO_FILTERS)}>{t("work-filter-reset")}</Button>
-            }
+            action={<Button onPress={reset}>{t("work-filter-reset")}</Button>}
           />
         )}
         {!loading && shown.length > 0 && (
