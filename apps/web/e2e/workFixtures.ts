@@ -135,7 +135,7 @@ const decisions = [
   }),
 ];
 
-const risks = [
+export const risks = [
   base("41", CLARA, {
     local_id: "RSK-001",
     title: "Regen: kein Ausweichraum für die Turnshow",
