@@ -1,0 +1,110 @@
+@layer components {
+  /*
+   * Four columns and the rail of the canceled ones. A column has a least width; below it the board
+   * scrolls inside itself and not the page. Below 40rem the board is a list (see `.narrow`).
+   */
+  .board {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .column {
+    flex: 1 1 14rem;
+    min-width: 14rem;
+    border-radius: var(--radius-xl);
+    background: var(--color-bg-sunken);
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--topbar-height);
+    padding-inline: var(--space-3);
+  }
+
+  .name {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: var(--font-size-ui);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .count {
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-regular);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hide {
+    margin-inline-start: auto;
+  }
+
+  .cards {
+    display: grid;
+    gap: var(--space-1-5);
+    margin: 0;
+    padding: 0 var(--space-1-5) var(--space-1-5);
+    list-style: none;
+  }
+
+  .empty {
+    margin: 0;
+    padding: var(--space-2) var(--space-3) var(--space-4);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-dense);
+  }
+
+  /* The collapsed column: a rail that is a button. 44 px wide, so the target is large enough. */
+  .rail {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    box-sizing: border-box;
+    min-width: var(--topbar-height);
+    min-height: 8rem;
+    padding: var(--space-3) var(--space-1);
+    border: 1px solid transparent;
+    border-radius: var(--radius-xl);
+    background: var(--color-bg-sunken);
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+    transition-property: background-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .rail[data-hovered] {
+    background: var(--color-bg-hover);
+  }
+
+  .rail[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .railLabel {
+    font-weight: var(--font-weight-semibold);
+    writing-mode: vertical-rl;
+  }
+
+  .narrow {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  @media (forced-colors: active) {
+    .column,
+    .rail {
+      border: 1px solid CanvasText;
+    }
+  }
+}

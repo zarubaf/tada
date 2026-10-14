@@ -4,7 +4,7 @@ import type { RecordKind } from "../api/client";
 import { Router } from "../router/Router";
 import * as r from "../test/workRecords";
 import { WorkCard } from "./WorkCard";
-import { toWorkItem } from "./workItem";
+import { toWorkItem, type WorkItem } from "./workItem";
 
 const names = (id: string) => (id.endsWith("b1") ? "Anna Muster" : "");
 
@@ -13,7 +13,7 @@ function card(
   record: unknown,
   props: { workstream?: string; today?: string } = {},
 ) {
-  const item = toWorkItem(kind, record as never, names);
+  const item = toWorkItem(kind, record as never, names) as WorkItem;
   render(
     <Router>
       <ul>
