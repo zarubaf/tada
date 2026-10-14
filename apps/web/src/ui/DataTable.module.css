@@ -89,16 +89,74 @@
     }
   }
 
+  /*
+   * A table that does not stack (`stacked={false}`) keeps its columns. Where the page is too narrow
+   * for them, it scrolls inside itself and never the page, as the board does; the header then
+   * sticks to the table and not to the page.
+   */
+  .table[data-fixed] {
+    min-width: 40rem;
+  }
+
+  @media (width < 58rem) {
+    .container[data-fixed] {
+      overflow-x: auto;
+    }
+  }
+
+  /* The sort button fills the header cell, so that the whole header is the target. */
+  .sort {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: var(--row-height);
+    padding: 0;
+    border-radius: var(--radius-sm);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .sort:hover {
+    color: var(--color-text);
+  }
+
+  .sort:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .sortIcon {
+    flex: none;
+    opacity: 0;
+  }
+
+  .sort:hover .sortIcon,
+  .sort:focus-visible .sortIcon,
+  .table th[aria-sort] .sortIcon {
+    opacity: 1;
+  }
+
+  .table th[aria-sort] {
+    color: var(--color-text);
+  }
+
+  @media (forced-colors: active) {
+    .sortIcon {
+      opacity: 1;
+    }
+  }
+
   /* Below 28rem: two-line list rows (doc/design/layout-and-responsiveness.md, „Container queries“). */
   @container (width < 28rem) {
-    .table,
-    .table tbody,
-    .table tr,
-    .table td {
+    .table[data-stacked],
+    .table[data-stacked] tbody,
+    .table[data-stacked] tr,
+    .table[data-stacked] td {
       display: block;
     }
 
-    .table thead {
+    .table[data-stacked] thead {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -106,31 +164,31 @@
       clip-path: inset(50%);
     }
 
-    .table tbody tr {
+    .table[data-stacked] tbody tr {
       display: flex;
       flex-wrap: wrap;
       gap: var(--space-2) var(--space-4);
       padding: var(--space-3);
     }
 
-    .table td {
+    .table[data-stacked] td {
       height: auto;
       padding: 0;
     }
 
     /* The first line: the first column, without its label. */
-    .table td:first-child {
+    .table[data-stacked] td:first-child {
       flex-basis: 100%;
       font-weight: var(--font-weight-medium);
     }
 
-    .table td:not(:first-child) {
+    .table[data-stacked] td:not(:first-child) {
       display: grid;
       align-content: start;
       gap: var(--space-0-5);
     }
 
-    .table td:not(:first-child) > .label {
+    .table[data-stacked] td:not(:first-child) > .label {
       display: block;
       color: var(--color-text-muted);
       font-size: var(--font-size-sm);

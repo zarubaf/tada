@@ -1,3 +1,4 @@
+import { IconArrowDown, IconArrowUp } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import styles from "./DataTable.module.css";
 
@@ -9,6 +10,13 @@ export interface Column<T> {
   mono?: boolean;
   /** Tabular figures, for numbers, dates and times. */
   numeric?: boolean;
+  /** The header is a button that sorts by this column. It needs `onSort` on the table. */
+  sortable?: boolean;
+}
+
+export interface TableSort {
+  columnId: string;
+  direction: "asc" | "desc";
 }
 
 export interface DataTableProps<T> {
@@ -21,6 +29,28 @@ export interface DataTableProps<T> {
   rowId?: (row: T) => string;
   /** The row that a link named: it has a mark for a moment. */
   linkedId?: string;
+  /** The column that the rows are sorted by. The caller sorts the rows; the table only shows it. */
+  sort?: TableSort;
+  /** Called with the column of a pressed header. */
+  onSort?: (columnId: string) => void;
+  /**
+   * Below 28rem each row becomes a two-line list row (the default). A table whose headers must stay
+   * reachable, for example to sort, sets `false`: it keeps its columns and scrolls inside itself.
+   */
+  stacked?: boolean;
+}
+
+function ariaSort<T>(column: Column<T>, sort: TableSort | undefined) {
+  if (sort?.columnId !== column.id) {
+    return undefined;
+  }
+  return sort.direction === "asc" ? "ascending" : "descending";
+}
+
+/** The arrow of a sort button: the direction when the column is sorted, a hint on hover otherwise. */
+function SortIcon({ sort }: { sort: TableSort | undefined }) {
+  const Arrow = sort?.direction === "desc" ? IconArrowDown : IconArrowUp;
+  return <Arrow className={styles.sortIcon} size={14} stroke={1.5} aria-hidden="true" />;
 }
 
 /**
@@ -28,16 +58,37 @@ export interface DataTableProps<T> {
  * In a container below 28rem, each row is a two-line list row: the first column, then the other
  * columns with their names as visible labels. The table never scrolls sideways (ADR 0023).
  */
-export function DataTable<T>({ label, columns, rows, rowKey, rowId, linkedId }: DataTableProps<T>) {
+export function DataTable<T>({
+  label,
+  columns,
+  rows,
+  rowKey,
+  rowId,
+  linkedId,
+  sort,
+  onSort,
+  stacked = true,
+}: DataTableProps<T>) {
   return (
-    <div className={styles.container}>
-      <table className={styles.table}>
+    <div className={styles.container} data-fixed={stacked ? undefined : ""}>
+      <table
+        className={styles.table}
+        data-stacked={stacked ? "" : undefined}
+        data-fixed={stacked ? undefined : ""}
+      >
         <caption className={styles.caption}>{label}</caption>
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column.id} scope="col">
-                {column.header}
+              <th key={column.id} scope="col" aria-sort={ariaSort(column, sort)}>
+                {column.sortable && onSort ? (
+                  <button type="button" className={styles.sort} onClick={() => onSort(column.id)}>
+                    {column.header}
+                    <SortIcon sort={sort?.columnId === column.id ? sort : undefined} />
+                  </button>
+                ) : (
+                  column.header
+                )}
               </th>
             ))}
           </tr>
