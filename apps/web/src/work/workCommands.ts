@@ -3,8 +3,8 @@
 //
 // A kind has a command only if the API offers it, so a missing command is a type error and never a
 // failure at run time. What the API does NOT offer (checked against the contract):
-// - decision: no `changeStatus` (the status changes through supersede and revoke, which take a
-//   reason or a successor), no `changeDue` (the day of a decision never changes) and no `rename`
+// - decision: no `changeStatus` (the status changes through `supersede` and `revoke`, which take a
+//   successor or a reason), no `changeDue` (the day of a decision never changes) and no `rename`
 //   (the wording never changes).
 // - risk: no `changeDue` (a risk has no date).
 // - commitment: `changeStatus` cannot set `firm` (only "make firm" does), and the condition never
@@ -26,6 +26,8 @@ import type {
   Commitment,
   CommitmentStatus,
   CreateActionRequest,
+  CreateDecisionRequest,
+  CreateMilestoneRequest,
   CreateRiskRequest,
   Decision,
   Level,
@@ -177,24 +179,14 @@ export function createWorkCommands(api: Api, eventId: string) {
     }
     return answer.data ? { ok: true, record: answer.data } : refused(answer);
   };
-  const createAction = (body: CreateActionRequest) =>
-    created<Action>(() =>
-      api.POST("/api/v1/events/{event_id}/actions", {
-        params: { path: { event_id: eventId } },
-        body,
-      }),
-    );
-  const createRisk = (body: CreateRiskRequest) =>
-    created<Risk>(() =>
-      api.POST("/api/v1/events/{event_id}/risks", {
-        params: { path: { event_id: eventId } },
-        body,
-      }),
-    );
+  const events = { event_id: eventId };
 
   return {
     action: {
-      create: createAction,
+      create: (body: CreateActionRequest) =>
+        created<Action>(() =>
+          api.POST("/api/v1/events/{event_id}/actions", { params: { path: events }, body }),
+        ),
       changeStatus: (t: Target, status: ActionStatus) => action(t, { status }),
       changeOwner: (t: Target, userId: string) => action(t, { owner_user_id: userId }),
       changeDue: (t: Target, due: string | null) => action(t, { due_date: due }),
@@ -214,14 +206,39 @@ export function createWorkCommands(api: Api, eventId: string) {
       rename: (t: Target, text: string) => commitment(t, { text }),
     },
     milestone: {
+      create: (body: CreateMilestoneRequest) =>
+        created<Milestone>(() =>
+          api.POST("/api/v1/events/{event_id}/milestones", { params: { path: events }, body }),
+        ),
       changeStatus: (t: Target, status: MilestoneStatus) => milestone(t, { status }),
       changeOwner: (t: Target, userId: string) => milestone(t, { owner_user_id: userId }),
       /** The date of a milestone cannot be cleared. */
       changeDue: (t: Target, date: string) => milestone(t, { date }),
       changeWorkstream: (t: Target, id: string | null) => milestone(t, { workstream_id: id }),
+      changeDescription: (t: Target, text: string | null) => milestone(t, { description: text }),
       rename: (t: Target, title: string) => milestone(t, { title }),
     },
     decision: {
+      create: (body: CreateDecisionRequest) =>
+        created<Decision>(() =>
+          api.POST("/api/v1/events/{event_id}/decisions", { params: { path: events }, body }),
+        ),
+      /** Records the successor and ends the decision; the answer is the successor, in force. */
+      supersede: (t: Target, successor: CreateDecisionRequest) =>
+        queue.run<Decision>(t, (expected_version) =>
+          api.POST("/api/v1/events/{event_id}/decisions/{id}/supersede", {
+            params: { path: path(t.id) },
+            body: { successor, expected_version },
+          }),
+        ),
+      /** Ends the decision without a successor; the answer is the revoked decision. */
+      revoke: (t: Target, reason: string) =>
+        queue.run<Decision>(t, (expected_version) =>
+          api.POST("/api/v1/events/{event_id}/decisions/{id}/revoke", {
+            params: { path: path(t.id) },
+            body: { reason, expected_version },
+          }),
+        ),
       changeOwner: (t: Target, userId: string) => decision(t, { owner_user_id: userId }),
       changeWorkstream: (t: Target, id: string | null) => decision(t, { workstream_id: id }),
     },
@@ -233,7 +250,10 @@ export function createWorkCommands(api: Api, eventId: string) {
       changeLikelihood: (t: Target, likelihood: Level) => risk(t, { likelihood }),
       changeMitigation: (t: Target, text: string | null) => risk(t, { mitigation: text }),
       changeDescription: (t: Target, text: string | null) => risk(t, { description: text }),
-      create: createRisk,
+      create: (body: CreateRiskRequest) =>
+        created<Risk>(() =>
+          api.POST("/api/v1/events/{event_id}/risks", { params: { path: events }, body }),
+        ),
       rename: (t: Target, title: string) => risk(t, { title }),
     },
   };

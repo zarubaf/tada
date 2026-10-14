@@ -293,6 +293,92 @@ describe("the commands of a risk beyond the first set", () => {
   });
 });
 
+describe("the commands of a milestone and a decision beyond the first set", () => {
+  it("changes the description of a milestone and can clear it", async () => {
+    const { sent, commands } = server();
+    const t = { id: "m1", version: 1 };
+    const calls = [
+      commands.milestone.changeDescription(t, "Text"),
+      commands.milestone.changeDescription(t, null),
+    ];
+    for (let i = 0; i < calls.length; i++) {
+      await tick();
+      sent[i]?.answer(record("m1", i + 2));
+    }
+    await Promise.all(calls);
+    expect(sent.map((s) => s.body)).toEqual([
+      { description: "Text", expected_version: 1 },
+      { description: null, expected_version: 2 },
+    ]);
+  });
+
+  it("creates a milestone and a decision with the ID that the caller chose", async () => {
+    const { sent, commands } = server();
+    const milestone = commands.milestone.create({
+      id: "m9",
+      title: "Programm steht",
+      date: "2030-07-01",
+      owner_user_id: "u1",
+    });
+    const decision = commands.decision.create({
+      id: "d9",
+      wording: "Das Fest findet statt.",
+      decided_on: "2030-03-12",
+      decided_by: [{ kind: "person", id: "p1" }],
+      owner_user_id: "u1",
+    });
+    await tick();
+    expect(sent.map((s) => [s.method, s.path])).toEqual([
+      ["POST", "/api/v1/events/e1/milestones"],
+      ["POST", "/api/v1/events/e1/decisions"],
+    ]);
+    sent[0]?.answer(json(201, { id: "m9", version: 1 }));
+    sent[1]?.answer(json(201, { id: "d9", version: 1 }));
+    expect(await milestone).toEqual({ ok: true, record: { id: "m9", version: 1 } });
+    expect(await decision).toEqual({ ok: true, record: { id: "d9", version: 1 } });
+  });
+
+  it("supersedes a decision with the successor and the version, and returns the successor", async () => {
+    const { sent, commands } = server();
+    const result = commands.decision.supersede(
+      { id: "d1", version: 3 },
+      { wording: "Neu", decided_on: "2030-04-01", decided_by: [], owner_user_id: "u1" },
+    );
+    await tick();
+    expect(sent[0]).toMatchObject({
+      method: "POST",
+      path: "/api/v1/events/e1/decisions/d1/supersede",
+      body: {
+        successor: {
+          wording: "Neu",
+          decided_on: "2030-04-01",
+          decided_by: [],
+          owner_user_id: "u1",
+        },
+        expected_version: 3,
+      },
+    });
+    sent[0]?.answer(json(201, { id: "d2", version: 1 }));
+    expect(await result).toEqual({ ok: true, record: { id: "d2", version: 1 } });
+  });
+
+  it("revokes a decision with the reason and the version, and keeps a refused reason", async () => {
+    const { sent, commands } = server();
+    const result = commands.decision.revoke({ id: "d1", version: 3 }, "Nicht mehr aktuell");
+    await tick();
+    expect(sent[0]).toMatchObject({
+      method: "POST",
+      path: "/api/v1/events/e1/decisions/d1/revoke",
+      body: { reason: "Nicht mehr aktuell", expected_version: 3 },
+    });
+    sent[0]?.answer(problem(422, "validation-failed", [{ pointer: "/reason", code: "required" }]));
+    expect(await result).toMatchObject({
+      ok: false,
+      failure: { reason: "validation", problem: { errors: [{ pointer: "/reason" }] } },
+    });
+  });
+});
+
 describe("what a kind does not offer", () => {
   it("has no command for a field that the API does not take", () => {
     const { commands } = server();
@@ -306,6 +392,12 @@ describe("what a kind does not offer", () => {
     void commands.risk.changeDue;
     // @ts-expect-error only "make firm" sets the status firm
     void commands.commitment.changeStatus({ id: "c", version: 1 }, "firm");
-    expect(Object.keys(commands.decision).sort()).toEqual(["changeOwner", "changeWorkstream"]);
+    expect(Object.keys(commands.decision).sort()).toEqual([
+      "changeOwner",
+      "changeWorkstream",
+      "create",
+      "revoke",
+      "supersede",
+    ]);
   });
 });
