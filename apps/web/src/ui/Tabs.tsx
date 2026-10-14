@@ -22,40 +22,24 @@ export interface TabsProps {
   /** The ID of the selected tab. The page owns it, for example in the URL. */
   value: string;
   onChange: (id: string) => void;
-  /** `view` is an underline for the views of one record or list. `filter` is a row of pills. */
-  look?: "view" | "filter";
-  /** The `TabPanel` elements. Without them the tabs only report the choice. */
-  children?: ReactNode;
+  /** The `TabPanel` elements, one for each tab. */
+  children: ReactNode;
 }
 
 /**
- * React Aria points the selected tab at a panel and has no prop to stop it. Without panels the
- * reference would dangle, so a tab list without panels removes it after each commit. The inline ref
- * callback is new on each render, so React calls it again after each commit.
+ * Tabs for two to six views of one list or record (doc/design/components.md). Arrow keys move
+ * between the tabs; one tab is a tab stop. A type filter without panels is a `TypeFilter`.
  */
-function dropPanelReference(tab: HTMLDivElement | null) {
-  tab?.removeAttribute("aria-controls");
-}
-
-/**
- * Tabs for two to six views of one list or record, or a type filter with counts
- * (doc/design/components.md). Arrow keys move between the tabs; one tab is a tab stop.
- */
-export function Tabs({ label, tabs, value, onChange, look = "view", children }: TabsProps) {
+export function Tabs({ label, tabs, value, onChange, children }: TabsProps) {
   return (
     <AriaTabs
       className={styles.tabs}
       selectedKey={value}
       onSelectionChange={(key) => onChange(String(key))}
     >
-      <TabList className={styles.list} data-look={look} aria-label={label}>
+      <TabList className={styles.list} aria-label={label}>
         {tabs.map((tab) => (
-          <Tab
-            key={tab.id}
-            id={tab.id}
-            className={styles.tab}
-            ref={children ? null : (tab) => dropPanelReference(tab)}
-          >
+          <Tab key={tab.id} id={tab.id} className={styles.tab}>
             {tab.label}
             {tab.count !== undefined && (
               <>

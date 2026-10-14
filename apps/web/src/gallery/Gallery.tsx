@@ -27,6 +27,7 @@ import { TypeIcon } from "../ui/TypeIcon";
 import { RECORD_KINDS, STATUSES } from "../work/recordStatus";
 import { RecordStatusLabel } from "../work/WorkStatus";
 import { Toolbar } from "../ui/Toolbar";
+import { TypeFilter } from "../ui/TypeFilter";
 import styles from "./Gallery.module.css";
 
 const colors = [
@@ -95,7 +96,7 @@ const viewTabs = [
   { id: "table", label: "Tabelle" },
   { id: "plan", label: "Zeitplan" },
 ];
-const typeTabs = [
+const typeOptions = [
   { id: "all", label: "Alle", count: 24 },
   { id: "tasks", label: "Aufgaben", count: 15 },
   { id: "commitments", label: "Zusagen", count: 9 },
@@ -122,7 +123,7 @@ function NavigationDemo() {
         <TabPanel id="table">Zeilen mit Spalten</TabPanel>
         <TabPanel id="plan">Wochen und Meilensteine</TabPanel>
       </Tabs>
-      <Tabs label="Typ" tabs={typeTabs} value={type} onChange={setType} look="filter" />
+      <TypeFilter label="Typ" options={typeOptions} value={type} onChange={setType} />
       <Toolbar label="Filter und Anzeige">
         <Menu
           trigger="Filter"

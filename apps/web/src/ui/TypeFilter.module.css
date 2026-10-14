@@ -1,0 +1,62 @@
+@layer components {
+  .group {
+    display: flex;
+    gap: var(--space-0-5);
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    min-height: var(--control-height-sm);
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+    cursor: pointer;
+    outline: none;
+    transition-property: background-color, color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
+  }
+
+  /* 44 px targets on coarse pointers (ADR 0022). */
+  @media (pointer: coarse) {
+    .option {
+      min-height: var(--control-height-md);
+    }
+  }
+
+  .option[data-hovered] {
+    background: var(--color-bg-hover);
+    color: var(--color-text);
+  }
+
+  .option[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+
+  .option[data-selected] {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
+  }
+
+  .count {
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-regular);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Forced colors replace the backgrounds: the chosen option keeps an underline of its own. */
+  @media (forced-colors: active) {
+    .option[data-selected] {
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+    }
+  }
+}

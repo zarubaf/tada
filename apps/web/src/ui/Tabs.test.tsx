@@ -12,18 +12,14 @@ const TABS = [
   { id: "plan", label: "Zeitplan" },
 ];
 
-function Harness({ look, panels }: { look?: "view" | "filter"; panels?: boolean }) {
+function Harness() {
   const [value, setValue] = useState("board");
   return (
     <>
-      <Tabs label="Ansicht" tabs={TABS} value={value} onChange={setValue} look={look}>
-        {panels && (
-          <>
-            <TabPanel id="board">Spalten</TabPanel>
-            <TabPanel id="table">Zeilen</TabPanel>
-            <TabPanel id="plan">Wochen</TabPanel>
-          </>
-        )}
+      <Tabs label="Ansicht" tabs={TABS} value={value} onChange={setValue}>
+        <TabPanel id="board">Spalten</TabPanel>
+        <TabPanel id="table">Zeilen</TabPanel>
+        <TabPanel id="plan">Wochen</TabPanel>
       </Tabs>
       <p data-testid="value">{value}</p>
     </>
@@ -59,21 +55,25 @@ describe("Tabs", () => {
     await user.tab();
     await user.tab();
 
-    expect(screen.getByRole("tab", { name: "Board" })).not.toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Tabelle 12" })).not.toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Zeitplan" })).not.toHaveFocus();
   });
 
-  it("works as a type filter without panels", async () => {
-    render(<Harness look="filter" />);
+  it("moves to the first and last tab with Home and End", async () => {
+    render(<Harness />);
 
-    await user.click(screen.getByRole("tab", { name: "Zeitplan" }));
-
+    await user.tab();
+    await user.keyboard("{End}");
+    expect(screen.getByRole("tab", { name: "Zeitplan" })).toHaveFocus();
     expect(screen.getByTestId("value")).toHaveTextContent("plan");
-    expect(screen.queryByRole("tabpanel")).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Zeitplan" })).not.toHaveAttribute("aria-controls");
+    await user.keyboard("{Home}");
+
+    expect(screen.getByRole("tab", { name: "Board" })).toHaveFocus();
+    expect(screen.getByTestId("value")).toHaveTextContent("board");
   });
 
   it("shows the panel of the selected tab", async () => {
-    render(<Harness panels />);
+    render(<Harness />);
 
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Spalten");
     await user.click(screen.getByRole("tab", { name: "Tabelle 12" }));
