@@ -409,20 +409,50 @@ describe("editing an action in the panel", () => {
       expect(input).toHaveValue("2031-01-01");
     });
 
-    it("shows the message of the server at the due date, whose field is due_date", async () => {
-      openAction({}, {}, () =>
-        problem(422, "validation-failed", [{ pointer: "/due_date", code: "invalid" }]),
+    it("shows the order error of the server at the due date, which the member edits", async () => {
+      // The server names the start date for a due date before it (crates/app checks.rs).
+      openAction({ start_date: "2030-05-10" }, {}, () =>
+        problem(422, "validation-failed", [{ pointer: "/start_date", code: "start-after-due" }]),
       );
       const view = await region();
       await user.click(view.getByRole("button", { name: /^Fällig bearbeiten/ }));
       await user.clear(view.getByLabelText("Fällig"));
-      await user.type(view.getByLabelText("Fällig"), "2031-01-01{Enter}");
+      await user.type(view.getByLabelText("Fällig"), "2030-06-01{Enter}");
 
       await waitFor(() =>
         expect(view.getByLabelText("Fällig")).toHaveAccessibleDescription(
-          "Das ist kein gültiges Datum.",
+          "Fälligkeit liegt vor dem Start.",
         ),
       );
+    });
+
+    it("sends no due date before the start date", async () => {
+      const server = openAction({ start_date: "2030-05-10" });
+      const view = await region();
+      await user.click(view.getByRole("button", { name: /^Fällig bearbeiten/ }));
+      await user.clear(view.getByLabelText("Fällig"));
+      await user.type(view.getByLabelText("Fällig"), "2030-05-01{Enter}");
+
+      await waitFor(() =>
+        expect(view.getByLabelText("Fällig")).toHaveAccessibleDescription(
+          "Fälligkeit liegt vor dem Start.",
+        ),
+      );
+      expect(server.sent()).toEqual([]);
+    });
+
+    it("sends no start date after the due date", async () => {
+      const server = openAction();
+      const view = await region();
+      await user.click(view.getByRole("button", { name: "Startdatum bearbeiten: Kein Datum" }));
+      await user.type(view.getByLabelText("Startdatum"), "2031-01-01{Enter}");
+
+      await waitFor(() =>
+        expect(view.getByLabelText("Startdatum")).toHaveAccessibleDescription(
+          /Das Startdatum liegt nach dem Fälligkeitsdatum/,
+        ),
+      );
+      expect(server.sent()).toEqual([]);
     });
   });
 
