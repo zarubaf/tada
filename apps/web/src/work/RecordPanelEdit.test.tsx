@@ -98,46 +98,42 @@ describe("editing an action in the panel", () => {
     it("edits on a click and saves with Enter, with the version of the list", async () => {
       const server = openAction();
       const view = await region();
-      await user.click(
-        view.getByRole("button", { name: "Titel bearbeiten", description: "Plakat gestalten" }),
-      );
+      await user.click(view.getByRole("button", { name: "Titel: Plakat gestalten" }));
       const input = view.getByRole("textbox", { name: "Titel" });
       expect(input).toHaveFocus();
       await user.clear(input);
       await user.type(input, "Plakat entwerfen{Enter}");
 
       await view.findByRole("button", {
-        name: "Titel bearbeiten",
-        description: "Plakat entwerfen",
+        name: "Titel: Plakat entwerfen",
       });
       expect(server.sent()).toEqual([{ title: "Plakat entwerfen", expected_version: 1 }]);
       // The list shows the new title, and the member hears the save.
       expect(screen.getByRole("link", { name: /ACT-001 Plakat entwerfen/ })).toBeInTheDocument();
       expect(screen.getByText("Titel von ACT-001 gespeichert.")).toBeInTheDocument();
       // Focus is back on the title, which now reads as text again.
-      expect(view.getByRole("button", { name: /Titel bearbeiten/ })).toHaveFocus();
+      expect(view.getByRole("button", { name: /^Titel:/ })).toHaveFocus();
     });
 
     it("keeps the title as the name of the heading, and the edit as the hint of the button", async () => {
       openAction();
       const view = await region();
       expect(view.getByRole("heading", { level: 2, name: "Plakat gestalten" })).toBeVisible();
-      expect(view.getByRole("button", { name: "Titel bearbeiten" })).toBeVisible();
+      expect(view.getByRole("button", { name: /^Titel:/ })).toBeVisible();
     });
 
     it("marks the field busy while it saves", async () => {
       let release: (response: Response) => void = () => undefined;
       openAction({}, {}, () => new Promise<Response>((resolve) => (release = resolve)));
       const view = await region();
-      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
       await user.type(view.getByRole("textbox", { name: "Titel" }), "!{Enter}");
 
       const field = view.getByRole("textbox", { name: "Titel" }).closest("[aria-busy]");
       expect(field).toHaveAttribute("aria-busy", "true");
       release(json(200, r.action("ACT-001", { title: "Plakat gestalten!", version: 2 })));
       await view.findByRole("button", {
-        name: "Titel bearbeiten",
-        description: "Plakat gestalten!",
+        name: "Titel: Plakat gestalten!",
       });
     });
 
@@ -145,28 +141,35 @@ describe("editing an action in the panel", () => {
       let release: (response: Response) => void = () => undefined;
       openAction({}, {}, () => new Promise<Response>((resolve) => (release = resolve)));
       const view = await region();
-      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
       await user.type(view.getByRole("textbox", { name: "Titel" }), "!{Enter}");
 
       expect(await view.findByRole("status")).toHaveTextContent("Speichert …");
       expect(view.getAllByText("Speichert …")).toHaveLength(2);
       release(json(200, r.action("ACT-001", { title: "Plakat gestalten!", version: 2 })));
       await view.findByRole("button", {
-        name: "Titel bearbeiten",
-        description: "Plakat gestalten!",
+        name: "Titel: Plakat gestalten!",
       });
       expect(view.queryAllByText("Speichert …")).toHaveLength(0);
+    });
+
+    it("does not point the heading at a title that is being edited", async () => {
+      openAction();
+      const view = await region();
+      const heading = view.getByRole("heading", { level: 2 });
+      const target = heading.getAttribute("aria-labelledby");
+      expect(target && document.getElementById(target)).not.toBeNull();
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
+      expect(heading).not.toHaveAttribute("aria-labelledby");
     });
 
     it("cancels with Escape and keeps the panel open; the next Escape closes it", async () => {
       const server = openAction();
       const view = await region();
-      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
       await user.type(view.getByRole("textbox", { name: "Titel" }), "xyz{Escape}");
 
-      expect(
-        view.getByRole("button", { name: "Titel bearbeiten", description: "Plakat gestalten" }),
-      ).toHaveFocus();
+      expect(view.getByRole("button", { name: "Titel: Plakat gestalten" })).toHaveFocus();
       expect(server.sent()).toEqual([]);
       await user.keyboard("{Escape}");
       await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
@@ -175,13 +178,12 @@ describe("editing an action in the panel", () => {
     it("saves on blur", async () => {
       const server = openAction();
       const view = await region();
-      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
       await user.type(view.getByRole("textbox", { name: "Titel" }), "!");
       await user.tab();
 
       await view.findByRole("button", {
-        name: "Titel bearbeiten",
-        description: "Plakat gestalten!",
+        name: "Titel: Plakat gestalten!",
       });
       expect(server.sent()).toEqual([{ title: "Plakat gestalten!", expected_version: 1 }]);
     });
@@ -189,17 +191,17 @@ describe("editing an action in the panel", () => {
     it("sends nothing when the text did not change", async () => {
       const server = openAction();
       const view = await region();
-      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
       await user.keyboard("{Enter}");
 
-      expect(await view.findByRole("button", { name: /Titel bearbeiten/ })).toBeInTheDocument();
+      expect(await view.findByRole("button", { name: /^Titel:/ })).toBeInTheDocument();
       expect(server.sent()).toEqual([]);
     });
 
     it("refuses an empty title at the field and sends nothing", async () => {
       const server = openAction();
       const view = await region();
-      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
       await user.clear(view.getByRole("textbox", { name: "Titel" }));
       await user.keyboard("{Enter}");
 
@@ -214,7 +216,7 @@ describe("editing an action in the panel", () => {
         ++calls === 1 ? problem(500, "internal") : json(200, { ...current, ...body, version: 2 }),
       );
       const view = await region();
-      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
       await user.clear(view.getByRole("textbox", { name: "Titel" }));
       await user.type(view.getByRole("textbox", { name: "Titel" }), "Neuer Titel{Enter}");
 
@@ -226,14 +228,14 @@ describe("editing an action in the panel", () => {
 
       await user.click(input);
       await user.keyboard("{Enter}");
-      await view.findByRole("button", { name: "Titel bearbeiten", description: "Neuer Titel" });
+      await view.findByRole("button", { name: "Titel: Neuer Titel" });
       expect(server.sent()).toHaveLength(2);
     });
 
     it("tells the member of a conflict, reloads the record and keeps the draft", async () => {
       const server = openAction({}, {}, () => problem(409, "record-version-conflict"));
       const view = await region();
-      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
       await user.clear(view.getByRole("textbox", { name: "Titel" }));
       await user.type(view.getByRole("textbox", { name: "Titel" }), "Mein Titel{Enter}");
 
@@ -264,7 +266,7 @@ describe("editing an action in the panel", () => {
       });
       served.lists = server.work;
       const view = await region();
-      await user.click(view.getByRole("button", { name: /Titel bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Titel:/ }));
       await user.clear(view.getByRole("textbox", { name: "Titel" }));
       await user.type(view.getByRole("textbox", { name: "Titel" }), "Mein Titel{Enter}");
       await view.findByText("Jetzt gespeichert: Titel von Bernd");
@@ -289,7 +291,7 @@ describe("editing an action in the panel", () => {
       await user.click(view.getByRole("textbox", { name: "Titel" }));
       await user.keyboard("{Enter}");
 
-      await view.findByRole("button", { name: "Titel bearbeiten", description: "Mein Titel" });
+      await view.findByRole("button", { name: "Titel: Mein Titel" });
       expect(server.sent()[1]).toEqual({ title: "Mein Titel", expected_version: 2 });
     });
 
@@ -297,7 +299,7 @@ describe("editing an action in the panel", () => {
       const { server, view } = await conflict();
       await user.click(view.getByRole("button", { name: "Speichern" }));
 
-      await view.findByRole("button", { name: "Titel bearbeiten", description: "Mein Titel" });
+      await view.findByRole("button", { name: "Titel: Mein Titel" });
       expect(server.sent()).toHaveLength(2);
     });
   });
@@ -440,20 +442,18 @@ describe("editing an action in the panel", () => {
     it("sets and clears the due date", async () => {
       const server = openAction();
       const view = await region();
-      await user.click(
-        view.getByRole("button", { name: "Fällig bearbeiten", description: /^18\.05\.2030/ }),
-      );
+      await user.click(view.getByRole("button", { name: /^Fällig: 18\.05\.2030/ }));
       const input = view.getByLabelText("Fällig");
       expect(input).toHaveAttribute("type", "date");
       expect(input).toHaveValue("2030-05-18");
       await user.clear(input);
       await user.type(input, "2030-06-01{Enter}");
-      await view.findByRole("button", { name: "Fällig bearbeiten", description: /^01\.06\.2030/ });
+      await view.findByRole("button", { name: /^Fällig: 01\.06\.2030/ });
 
-      await user.click(view.getByRole("button", { name: /^Fällig bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Fällig:/ }));
       await user.clear(view.getByLabelText("Fällig"));
       await user.keyboard("{Enter}");
-      await view.findByRole("button", { name: "Fällig bearbeiten", description: "Kein Datum" });
+      await view.findByRole("button", { name: "Fällig: Kein Datum" });
 
       expect(server.sent()).toEqual([
         { due_date: "2030-06-01", expected_version: 1 },
@@ -464,9 +464,10 @@ describe("editing an action in the panel", () => {
     it("shows a date as text with its icon, not as a chip with a border", async () => {
       openAction({ due_date: "2020-02-01" });
       const view = await region();
-      const button = view.getByRole("button", { name: "Fällig bearbeiten" });
-      // The overdue date is still said in words.
-      expect(button).toHaveAccessibleDescription(/01\.02\.2020.*überfällig/);
+      const button = view.getByRole("button", { name: /^Fällig:/ });
+      // The name has the visible value (WCAG 2.5.3), and the overdue date is still said in words.
+      expect(button).toHaveAccessibleName(/^Fällig: 01\.02\.2020.*überfällig/);
+      expect(button).toHaveTextContent("01.02.2020");
       expect(button.querySelector("time")).not.toBeNull();
       expect(button.querySelector("[data-variant]")).toBeNull();
     });
@@ -476,9 +477,7 @@ describe("editing an action in the panel", () => {
         problem(422, "validation-failed", [{ pointer: "/start_date", code: "start-after-due" }]),
       );
       const view = await region();
-      await user.click(
-        view.getByRole("button", { name: "Startdatum bearbeiten", description: "Kein Datum" }),
-      );
+      await user.click(view.getByRole("button", { name: "Startdatum: Kein Datum" }));
       await user.type(view.getByLabelText("Startdatum"), "2031-01-01{Enter}");
 
       const input = await view.findByLabelText("Startdatum");
@@ -494,7 +493,7 @@ describe("editing an action in the panel", () => {
         problem(422, "validation-failed", [{ pointer: "/start_date", code: "start-after-due" }]),
       );
       const view = await region();
-      await user.click(view.getByRole("button", { name: /^Fällig bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Fällig:/ }));
       await user.clear(view.getByLabelText("Fällig"));
       await user.type(view.getByLabelText("Fällig"), "2030-06-01{Enter}");
 
@@ -508,7 +507,7 @@ describe("editing an action in the panel", () => {
     it("sends no due date before the start date", async () => {
       const server = openAction({ start_date: "2030-05-10" });
       const view = await region();
-      await user.click(view.getByRole("button", { name: /^Fällig bearbeiten/ }));
+      await user.click(view.getByRole("button", { name: /^Fällig:/ }));
       await user.clear(view.getByLabelText("Fällig"));
       await user.type(view.getByLabelText("Fällig"), "2030-05-01{Enter}");
 
@@ -523,9 +522,7 @@ describe("editing an action in the panel", () => {
     it("sends no start date after the due date", async () => {
       const server = openAction();
       const view = await region();
-      await user.click(
-        view.getByRole("button", { name: "Startdatum bearbeiten", description: "Kein Datum" }),
-      );
+      await user.click(view.getByRole("button", { name: "Startdatum: Kein Datum" }));
       await user.type(view.getByLabelText("Startdatum"), "2031-01-01{Enter}");
 
       await waitFor(() =>
@@ -637,6 +634,14 @@ describe("editing an action in the panel", () => {
       const view = await region();
       expect(view.queryByRole("button", { name: /bearbeiten/ })).toBeNull();
       expect(view.getByText("Bernd Beispiel")).toBeVisible();
+    });
+
+    it("names the heading by a title that is on screen, and by nothing that is absent", async () => {
+      openAction({}, { event: { ...EVENT, status: "closed" } });
+      const closed = await region();
+      const plain = closed.getByRole("heading", { level: 2, name: "Plakat gestalten" });
+      const target = plain.getAttribute("aria-labelledby");
+      expect(target && document.getElementById(target)).not.toBeNull();
     });
 
     it("has no control for a redacted record", async () => {
