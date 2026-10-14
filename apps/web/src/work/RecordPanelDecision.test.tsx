@@ -384,11 +384,17 @@ describe("replacing a decision", () => {
     const { dialog } = await openDialog();
     expect(dialog.getByRole("textbox", { name: /^Wortlaut/ })).toHaveValue(WORDING);
     expect(dialog.getByRole("textbox", { name: /^Wortlaut/ })).toHaveFocus();
-    expect(dialog.getByLabelText(/^Entschieden am/)).toHaveValue("");
+    expect(dialog.getByLabelText("Entschieden (Pflichtfeld)")).toHaveValue("");
     const chosen = dialog.getByRole("list", { name: /^Beteiligte.*: gewählt$/ });
     expect(within(chosen).getByText("Cäcilia Probst (PER-001)")).toBeVisible();
     expect(within(chosen).getByText("Testwil Generatoren AG (INS-001)")).toBeVisible();
-    expect(dialog.getByText(/Der neue Entscheid ersetzt DEC-001/)).toBeVisible();
+    expect(
+      dialog.getByText(
+        (_, node) =>
+          node?.tagName === "P" &&
+          /Der neue Entscheid ersetzt DEC-001/.test(node.textContent ?? ""),
+      ),
+    ).toBeVisible();
     // The words say what the new decision takes over; the old one has no reason to give.
     expect(dialog.getByText(/Verantwortlich und Bereich sind die des bisherigen/)).toBeVisible();
     expect(dialog.getByRole("button", { name: "Verantwortlich: Bernd Beispiel" })).toBeVisible();
@@ -415,7 +421,7 @@ describe("replacing a decision", () => {
     const { server, view, dialog } = await openDialog();
     await user.clear(dialog.getByRole("textbox", { name: /^Wortlaut/ }));
     await user.type(dialog.getByRole("textbox", { name: /^Wortlaut/ }), "Nur bei Sonne.");
-    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.type(dialog.getByLabelText(/^Entschieden/), "2030-04-01");
     // A search finds a person that the old decision did not name; both are chosen.
     await dialog.findByRole("option", { name: "Cäcilia Probst (PER-001)" }, SEARCH);
     await user.click(
@@ -450,7 +456,7 @@ describe("replacing a decision", () => {
 
   it("moves focus to the heading at once, while the old decision still has its buttons", async () => {
     const { dialog, view } = await openDialog();
-    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.type(dialog.getByLabelText(/^Entschieden/), "2030-04-01");
     await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(view.getByRole("heading", { level: 2 })).toHaveFocus();
@@ -463,7 +469,7 @@ describe("replacing a decision", () => {
         ref.posted?.() ? problem(500, "internal") : json(200, { items: [dec()] }),
     });
     ref.posted = () => server.sent("POST").length > 0;
-    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.type(dialog.getByLabelText(/^Entschieden/), "2030-04-01");
     await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     const words = /DEC-002 ersetzt DEC-001.*nicht aktuell/;
@@ -480,7 +486,7 @@ describe("replacing a decision", () => {
       "POST /decisions/rec-dec-001/supersede": () =>
         problem(422, "validation-failed", [{ pointer: "/decided_on", code: "invalid" }]),
     });
-    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.type(dialog.getByLabelText(/^Entschieden/), "2030-04-01");
     await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
     expect(await dialog.findByText("Geben Sie ein gültiges Datum an.")).toBeVisible();
     expect(dialog.getByRole("textbox", { name: /^Wortlaut/ })).toHaveValue(WORDING);
@@ -488,7 +494,7 @@ describe("replacing a decision", () => {
 
   it("lets a manager change the owner and the area of the successor, or clear the area", async () => {
     const { server, dialog } = await openDialog();
-    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.type(dialog.getByLabelText(/^Entschieden/), "2030-04-01");
     await user.click(dialog.getByRole("button", { name: "Verantwortlich: Bernd Beispiel" }));
     await user.click(await screen.findByRole("option", { name: "Anna Muster" }));
     await user.click(dialog.getByRole("button", { name: "Bereich: Bodenbetrieb" }));
@@ -502,7 +508,7 @@ describe("replacing a decision", () => {
 
   it("sends no area for a successor whose area was cleared", async () => {
     const { server, dialog } = await openDialog();
-    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.type(dialog.getByLabelText(/^Entschieden/), "2030-04-01");
     await user.click(dialog.getByRole("button", { name: "Bereich: Bodenbetrieb" }));
     await user.click(await screen.findByRole("button", { name: "Kein Bereich" }));
     await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
@@ -523,7 +529,7 @@ describe("replacing a decision", () => {
       "POST /decisions/rec-dec-001/supersede": () =>
         problem(422, "validation-failed", [{ pointer, code }]),
     });
-    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.type(dialog.getByLabelText(/^Entschieden/), "2030-04-01");
     await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
     expect(await dialog.findByText(text)).toBeVisible();
     await waitFor(() => expect(dialog.getByRole("button", { name: button })).toHaveFocus());
@@ -534,7 +540,7 @@ describe("replacing a decision", () => {
     const { server, dialog } = await openDialog({
       "POST /decisions/rec-dec-001/supersede": () => problem(409, "record-version-conflict"),
     });
-    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.type(dialog.getByLabelText(/^Entschieden/), "2030-04-01");
     await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeVisible();
