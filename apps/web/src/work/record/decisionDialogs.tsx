@@ -216,7 +216,7 @@ export function SupersedeDecisionDialog({ item, env, onDone, onCancel }: ActionD
         autoFocus
       />
       <TextField
-        label={`${t("decision-replace-decided-on")} ${t("record-required")}`}
+        label={`${t("record-field-decided-on")} ${t("record-required")}`}
         type="date"
         value={decidedOn}
         onChange={setDecidedOn}
