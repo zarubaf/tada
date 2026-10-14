@@ -30,6 +30,11 @@ describe("Chip", () => {
       expect(screen.queryByText(/überfällig/)).not.toBeInTheDocument();
     });
 
+    it("is never overdue when the caller says so, for a record that is closed", () => {
+      render(<Chip variant="date" date="2026-10-12" today="2026-10-14" overdue={false} />);
+      expect(screen.queryByText(/überfällig/)).not.toBeInTheDocument();
+    });
+
     it("is not overdue on the day itself", () => {
       render(<Chip variant="date" date="2026-10-14" today="2026-10-14" />);
       expect(screen.queryByText(/überfällig/)).not.toBeInTheDocument();

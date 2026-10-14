@@ -24,6 +24,11 @@ export interface DateChipProps extends ChipBase {
   date: string;
   /** The civil date of today. Default: the day of the browser. */
   today?: string;
+  /**
+   * Overrides the rule „before today“, for a record that is closed (done, canceled) or that has
+   * no due date, such as the day of a decision. `false` never shows the overdue state.
+   */
+  overdue?: boolean;
 }
 
 export interface TextChipProps extends ChipBase {
@@ -58,7 +63,10 @@ const KNOWLEDGE = { proposal: "proposed", assumption: "assumption", unknown: "un
  */
 export function Chip(props: ChipProps) {
   const { variant = "neutral", onPress } = props;
-  const overdue = props.variant === "date" && isOverdue(props.date, props.today ?? todayLocal());
+  const overdue =
+    props.variant === "date" &&
+    props.overdue !== false &&
+    isOverdue(props.date, props.today ?? todayLocal());
   const state = variant in KNOWLEDGE ? KNOWLEDGE[variant as keyof typeof KNOWLEDGE] : undefined;
   const Icon =
     (props.variant === "date" ? undefined : props.icon) ?? iconOf(variant, state, overdue);
