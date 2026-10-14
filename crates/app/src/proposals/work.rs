@@ -161,7 +161,7 @@ pub(super) async fn check_work(
                 ..
             } => match stores.work.action(scope, *event_id, *action_id).await? {
                 None => refuse(operation("action_id"), "unknown-record"),
-                // The start date of the action is not after the new due date (ADR 0080).
+                // The start date of the action is not after the new due date (ADR 0081).
                 Some(current) if !dates_in_order(current.fields.start_date, *due_date) => {
                     refuse(operation("due_date"), START_AFTER_DUE);
                 }
@@ -360,7 +360,7 @@ async fn milestone_refusal_in(
     milestone_refusal(scope, event, milestone, stores.milestones, now).await
 }
 
-/// True if the successor of a superseded decision can take its place (ADR 0080): another decision of the event in
+/// True if the successor of a superseded decision can take its place (ADR 0081): another decision of the event in
 /// force, or a new decision of the event in the changeset. A decision of another event, the decision itself, an
 /// unknown one and one that ended are refused alike. `check_structure` checks that the proposal depends on the
 /// proposal that creates a new successor; the apply checks the successor again.

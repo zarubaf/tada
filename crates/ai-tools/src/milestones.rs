@@ -1,4 +1,4 @@
-//! The read tool for the milestones of an event (ADR 0080). It follows the form of `list_actions`.
+//! The read tool for the milestones of an event (ADR 0081). It follows the form of `list_actions`.
 
 use std::sync::LazyLock;
 

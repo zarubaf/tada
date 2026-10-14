@@ -1,4 +1,4 @@
-//! `/api/v1/events/{event_id}/risks` (ADR 0080): what can go wrong in an event, rated by likelihood and impact.
+//! `/api/v1/events/{event_id}/risks` (ADR 0081): what can go wrong in an event, rated by likelihood and impact.
 
 use axum::extract::State;
 use axum::http::StatusCode;

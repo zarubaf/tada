@@ -1,4 +1,4 @@
-//! The `MilestoneStore` adapter (ADR 0080). A read calculates the warnings of each milestone in its query:
+//! The `MilestoneStore` adapter (ADR 0081). A read calculates the warnings of each milestone in its query:
 //! the late actions of the milestone, and "today" in the time zone of its event.
 
 use async_trait::async_trait;

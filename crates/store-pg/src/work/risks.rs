@@ -1,4 +1,4 @@
-//! The `RiskStore` adapter (ADR 0080). A list shows the worst risk first: the score (likelihood times impact,
+//! The `RiskStore` adapter (ADR 0081). A list shows the worst risk first: the score (likelihood times impact,
 //! low 1, medium 2, high 3), then the impact, then the number. `RiskRating::sort_key` states the same order in Rust.
 
 use async_trait::async_trait;

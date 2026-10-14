@@ -1,4 +1,4 @@
-//! Decisions (ADR 0080): what the club decided, when, who decided it, and what replaced it.
+//! Decisions (ADR 0081): what the club decided, when, who decided it, and what replaced it.
 //!
 //! Only an event manager creates, supersedes or revokes a decision, or changes its owner or workstream.
 //! A contributor can own a decision and follow it up. The wording, the date and the parties never change:
@@ -243,7 +243,7 @@ pub struct Revocation {
     pub expected_version: RecordVersion,
 }
 
-/// The caller must be an event manager of an event that takes writes (ADR 0080). Returns the access of the caller.
+/// The caller must be an event manager of an event that takes writes (ADR 0081). Returns the access of the caller.
 async fn require_manager(
     caller: &MemberCaller,
     event: EventId,

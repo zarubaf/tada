@@ -1,4 +1,4 @@
-//! Actions, commitments, milestones, decisions and risks (ADR 0068, ADR 0080): the work records of an event, with their
+//! Actions, commitments, milestones, decisions and risks (ADR 0068, ADR 0081): the work records of an event, with their
 //! direct commands. A member creates and changes them without review; an accepted proposal does the same (ADR 0050).
 
 mod actions;
@@ -90,7 +90,7 @@ pub struct ActionFields {
     /// A member of the event with the contributor or manager role.
     pub owner: UserId,
     pub workstream_id: Option<WorkstreamId>,
-    /// Not after `due_date` (ADR 0080).
+    /// Not after `due_date` (ADR 0081).
     pub start_date: Option<Date>,
     pub due_date: Option<Date>,
     /// A milestone of the same event. A link stays when the milestone is canceled later.

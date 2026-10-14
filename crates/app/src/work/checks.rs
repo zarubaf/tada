@@ -143,7 +143,7 @@ async fn check_workstream(
     }
 }
 
-/// The start date of an action is not after its due date (ADR 0080).
+/// The start date of an action is not after its due date (ADR 0081).
 pub(super) fn check_dates(start: Option<Date>, due: Option<Date>) -> Result<(), FieldError> {
     if dates_in_order(start, due) {
         Ok(())
@@ -152,7 +152,7 @@ pub(super) fn check_dates(start: Option<Date>, due: Option<Date>) -> Result<(), 
     }
 }
 
-/// A new milestone of an action must be a milestone of the event that is not canceled (ADR 0080).
+/// A new milestone of an action must be a milestone of the event that is not canceled (ADR 0081).
 pub(super) async fn check_milestone(
     check: &mut Checker,
     scope: OrgScope,
@@ -305,7 +305,7 @@ impl ChangeRights {
 /// The parts of a work record that its view for a caller needs.
 pub(crate) trait WorkRecord {
     /// True if only an event manager changes a record of the kind, whoever owns it or leads its workstream: a
-    /// decision (ADR 0080).
+    /// decision (ADR 0081).
     fn managers_only(&self) -> bool {
         false
     }

@@ -1464,7 +1464,7 @@ async fn a_milestone_that_is_canceled_after_the_proposal_makes_the_apply_conflic
 }
 
 /// A new milestone of the changeset is one of the event of the action: an organization changeset that creates two
-/// events cannot give an action of the one a new milestone of the other (ADR 0080).
+/// events cannot give an action of the one a new milestone of the other (ADR 0081).
 #[tokio::test]
 async fn an_action_cannot_name_a_new_milestone_of_another_new_event() {
     let test = TestDatabase::start().await;
@@ -1785,7 +1785,7 @@ async fn an_edited_decision_takes_the_owner_and_the_workstream_but_not_the_wordi
     );
 }
 
-/// A supersede and the new successor that it names apply in one apply (ADR 0080): the old decision names the
+/// A supersede and the new successor that it names apply in one apply (ADR 0081): the old decision names the
 /// successor, and its evidence holds the new version.
 #[tokio::test]
 async fn accepted_supersede_with_a_new_successor_applies_together() {

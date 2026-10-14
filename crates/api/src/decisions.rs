@@ -1,4 +1,4 @@
-//! `/api/v1/events/{event_id}/decisions` (ADR 0080): what the club decided, when and by whom.
+//! `/api/v1/events/{event_id}/decisions` (ADR 0081): what the club decided, when and by whom.
 //! Each reader of the event reads them; only an event manager records, changes, supersedes or revokes one.
 
 use axum::extract::State;

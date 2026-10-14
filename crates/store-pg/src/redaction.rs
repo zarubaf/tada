@@ -581,7 +581,7 @@ async fn tombstone(
         &[&rows.milestones],
     )
     .await?;
-    // The date, the parties and the successor stay: they are no text of a member (ADR 0080).
+    // The date, the parties and the successor stay: they are no text of a member (ADR 0081).
     update(
         conn,
         "UPDATE decision

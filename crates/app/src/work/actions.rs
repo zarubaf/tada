@@ -162,7 +162,7 @@ pub async fn change_action(
     if let Err(error) = check_dates(start_date, due_date) {
         check.add(error);
     }
-    // A link to a milestone that is canceled later stays; only a new milestone is checked (ADR 0080).
+    // A link to a milestone that is canceled later stays; only a new milestone is checked (ADR 0081).
     let milestone_id = milestone.unwrap_or(old.milestone_id);
     if let Some(new) = milestone_id
         && milestone_id != old.milestone_id

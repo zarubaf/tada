@@ -1,4 +1,4 @@
-//! The apply of proposals that create or change risks (ADR 0080).
+//! The apply of proposals that create or change risks (ADR 0081).
 
 use tada_app::access::SourceReach;
 use tada_app::caller::TestScope;

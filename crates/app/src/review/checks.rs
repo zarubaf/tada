@@ -225,7 +225,7 @@ pub(super) async fn check_edits(
     finish(errors)
 }
 
-/// The refusal of an edited milestone of a new action (ADR 0080): it must be a milestone of the event that is not
+/// The refusal of an edited milestone of a new action (ADR 0081): it must be a milestone of the event that is not
 /// canceled, or a new milestone of the event in the selection. An unchanged milestone passed the check of the proposal.
 async fn edited_milestone_refusal(
     scope: OrgScope,

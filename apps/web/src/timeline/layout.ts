@@ -250,7 +250,7 @@ export interface EventWindow {
 }
 
 /**
- * The event window from the core facts (ADR 0080): the exact dates if they are accepted, else the
+ * The event window from the core facts (ADR 0081): the exact dates if they are accepted, else the
  * date window if it is accepted or an assumption. An unknown or a redacted fact gives no window.
  */
 export function eventWindow(facts: readonly Fact[]): EventWindow | null {

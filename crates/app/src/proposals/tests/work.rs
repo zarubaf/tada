@@ -1083,7 +1083,7 @@ fn new_decision(id: Uuid, decided_by: Value) -> Value {
     })
 }
 
-/// A supersede names a successor in force of the same event, or a new decision of its changeset (ADR 0080).
+/// A supersede names a successor in force of the same event, or a new decision of its changeset (ADR 0081).
 /// A decision of another event, the decision itself, an unknown one and an ended one give `unknown-record`.
 #[tokio::test]
 async fn supersede_refuses_foreign_self_and_ended_decisions() {

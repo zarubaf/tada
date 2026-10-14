@@ -108,7 +108,7 @@ The MCP tools must also serialize an empty `statuses` list ([#73](https://github
   - Only an event manager creates, supersedes or revokes a decision, or changes its owner or workstream.
 - Routing applies the rules 1 to 3 of ADR 0067 to the new kinds, except decisions.
   Two functions give the reviewers: the owner of a record and the lead of a workstream.
-- Each decision operation, and `CreateWorkstream`, goes to the event managers.
+- Each decision operation, and `CreateWorkstream` (ADR 0080), goes to the event managers.
   A contributor who leads a workstream does not review a decision in it.
 - Rule 5 of ADR 0067 (the reviewers of a dependent also decide on the new record) gets these cases:
   - a new person or institution that a new requirement names as its source;

@@ -16,7 +16,7 @@ status_enum!(
     DecisionStatus { InForce => "in-force", Superseded => "superseded", Revoked => "revoked" }
 );
 
-/// The end of a decision that is in force (ADR 0080). Each change carries what its status needs.
+/// The end of a decision that is in force (ADR 0081). Each change carries what its status needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecisionChange {
     /// A newer decision of the same event replaces the decision. The caller checks the successor.

@@ -63,21 +63,21 @@ pub enum AuditAction {
     CommitmentChange,
     /// A conditional commitment became firm. The commitment keeps the reason; the event holds no text (ADR 0068).
     CommitmentFirm,
-    /// A contributor or manager created a milestone (ADR 0080).
+    /// A contributor or manager created a milestone (ADR 0081).
     MilestoneCreate,
-    /// The owner, the workstream lead or a manager changed a milestone (ADR 0080).
+    /// The owner, the workstream lead or a manager changed a milestone (ADR 0081).
     MilestoneChange,
-    /// An event manager recorded a decision (ADR 0080).
+    /// An event manager recorded a decision (ADR 0081).
     DecisionCreate,
-    /// An event manager changed the owner or the workstream of a decision (ADR 0080).
+    /// An event manager changed the owner or the workstream of a decision (ADR 0081).
     DecisionChange,
-    /// An event manager replaced a decision with a newer one (ADR 0080).
+    /// An event manager replaced a decision with a newer one (ADR 0081).
     DecisionSupersede,
-    /// An event manager revoked a decision. The decision keeps the reason; the event holds no text (ADR 0080).
+    /// An event manager revoked a decision. The decision keeps the reason; the event holds no text (ADR 0081).
     DecisionRevoke,
-    /// A contributor or a manager recorded a risk (ADR 0080).
+    /// A contributor or a manager recorded a risk (ADR 0081).
     RiskCreate,
-    /// The owner, the workstream lead or a manager changed a risk (ADR 0080).
+    /// The owner, the workstream lead or a manager changed a risk (ADR 0081).
     RiskChange,
     /// An event manager, owner or admin closed an event (ADR 0071).
     EventClose,

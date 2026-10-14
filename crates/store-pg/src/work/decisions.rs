@@ -1,4 +1,4 @@
-//! The `DecisionStore` adapter (ADR 0080). A decision keeps its parties in `decision_party`, in their order.
+//! The `DecisionStore` adapter (ADR 0081). A decision keeps its parties in `decision_party`, in their order.
 //! A supersede inserts the successor and ends the old decision in one transaction; the end repeats the expected
 //! version and the status `in-force`, so of two concurrent ends of one decision only one changes it.
 

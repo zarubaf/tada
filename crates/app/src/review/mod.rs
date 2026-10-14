@@ -421,7 +421,7 @@ pub struct ReviewStores<'a> {
     pub workstreams: &'a dyn WorkstreamStore,
     /// The owners of actions and commitments that the routing reads (ADR 0067).
     pub work: &'a dyn WorkStore,
-    /// The milestones that an edit gives a new action (ADR 0080).
+    /// The milestones that an edit gives a new action (ADR 0081).
     pub milestones: &'a dyn MilestoneStore,
     /// The existing persons and institutions that a review shows as duplicates and links to (ADR 0069).
     pub parties: &'a dyn PartyStore,
