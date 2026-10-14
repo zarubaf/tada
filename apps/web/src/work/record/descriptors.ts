@@ -3,9 +3,11 @@
 import type { RecordKind } from "../../api/client";
 import { actionDescriptor } from "./actionDescriptor";
 import type { RecordDescriptor } from "./descriptor";
+import { riskDescriptor } from "./riskDescriptor";
 
 const DESCRIPTORS: { [K in RecordKind]?: RecordDescriptor } = {
   action: actionDescriptor,
+  risk: riskDescriptor,
 };
 
 /** The descriptor of a kind, or nothing while the panel does not know the kind. */

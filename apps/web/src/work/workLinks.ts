@@ -14,13 +14,13 @@ export const PANEL: Record<RecordKind, boolean> = {
   commitment: false,
   milestone: false,
   decision: false,
-  risk: false,
+  risk: true,
 };
 
 /** True if the record opens in the side panel. */
 export const opensInPanel = (item: Pick<WorkItem, "kind">): boolean => PANEL[item.kind];
 
-/** The old page of each kind. A risk has none: the risk register was never built. */
+/** The old page of each kind. A risk has none: it opens in the panel. */
 const PAGES: Record<RecordKind, string | undefined> = {
   action: "actions",
   commitment: "commitments",

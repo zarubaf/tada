@@ -23,8 +23,10 @@ describe("recordHref", () => {
     expect(recordHref("e1", item(kind, id), "view=table")).toBe(href);
   });
 
-  it("has no link for a risk, which has no page yet", () => {
-    expect(recordHref("e1", item("risk", "RSK-001"))).toBeUndefined();
+  it("opens a risk in the panel, as it has no page of its own", () => {
+    expect(recordHref("e1", item("risk", "RSK-001"), "view=table")).toBe(
+      "/events/e1/work?view=table#RSK-001",
+    );
   });
 
   it("escapes the event ID", () => {

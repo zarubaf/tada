@@ -142,7 +142,7 @@ const risks = [
     status: "occurred",
     likelihood: "high",
     impact: "high",
-    next_statuses: [],
+    next_statuses: ["closed"],
   }),
 ];
 

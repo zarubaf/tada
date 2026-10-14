@@ -61,13 +61,14 @@ describe("WorkCard", () => {
     expect(link.getAttribute("aria-labelledby")?.split(" ")).toHaveLength(2);
   });
 
-  it("names a risk, which is no link, as a group and describes it by what it has", () => {
+  it("names a risk by its ID and title, as a link to the panel, and describes it by what it has", () => {
     const li = card(
       "risk",
       r.risk("RSK-001", { status: "occurred", title: "Regen am Fest", owner_user_id: "x" }),
     );
-    const group = within(li).getByRole("group", { name: "RSK-001 Regen am Fest" });
-    expect(group).toHaveAccessibleDescription("Risiko eingetreten");
+    const link = within(li).getByRole("link", { name: "RSK-001 Regen am Fest" });
+    expect(link).toHaveAttribute("href", "/events/e1/work#RSK-001");
+    expect(link).toHaveAccessibleDescription("Risiko eingetreten");
   });
 
   it("shows the real status of the kind as text, not by color alone", () => {
@@ -125,9 +126,8 @@ describe("WorkCard", () => {
     expect(within(li).getByRole("link")).toHaveAttribute("href", "/events/e1/milestones#MIL-001");
   });
 
-  it("shows no date on a risk, and a risk is no link yet", () => {
+  it("shows no date on a risk", () => {
     const li = card("risk", r.risk("RSK-001", { status: "occurred" }));
-    expect(within(li).queryByRole("link")).not.toBeInTheDocument();
     expect(within(li).queryByRole("time")).not.toBeInTheDocument();
     expect(li).toHaveTextContent("RSK-001");
     expect(li).toHaveTextContent("eingetreten");

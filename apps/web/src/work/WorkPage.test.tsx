@@ -93,7 +93,7 @@ describe("WorkPage", () => {
     expect(screen.getByRole("button", { name: "Abgebrochen, 1 Eintrag" })).toBeInTheDocument();
   });
 
-  it("links an action to the panel, the other kinds to their old pages, and a risk to none", async () => {
+  it("links an action and a risk to the panel and the other kinds to their old pages", async () => {
     open();
     await ready();
     expect(screen.getByRole("link", { name: /ACT-001/ })).toHaveAttribute(
@@ -104,8 +104,10 @@ describe("WorkPage", () => {
       "href",
       `/events/${EVENT.id}/decisions#DEC-001`,
     );
-    expect(screen.queryByRole("link", { name: /RSK-001/ })).not.toBeInTheDocument();
-    expect(screen.getByText("RSK-001")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /RSK-001/ })).toHaveAttribute(
+      "href",
+      `/events/${EVENT.id}/work#RSK-001`,
+    );
   });
 
   it("names the owner and the workstream on a card", async () => {

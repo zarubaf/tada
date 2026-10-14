@@ -3,6 +3,7 @@
 // in `descriptors.ts`; it brings no component of its own. The controls are a closed set that every
 // kind shares, and the choices of a control (members, areas, milestones) come from the page.
 import type { Icon } from "@tabler/icons-react";
+import type { ComponentType } from "react";
 import type { RecordKind } from "../../api/client";
 import type { CommandResult, WorkCommands } from "../workCommands";
 import type { WorkItem } from "../workItem";
@@ -17,6 +18,9 @@ export type ControlKind =
   | "person"
   | "area"
   | "milestone";
+
+/** The icon of a value of an enum: a Tabler icon or a drawing of the same shape. */
+export type EnumIcon = ComponentType<{ size?: number; "aria-hidden"?: "true" }>;
 
 /** The text of a field, or the ID of a choice, or a civil date; nothing means the field is empty. */
 export type FieldValue = string | null;
@@ -72,7 +76,7 @@ export interface FieldSpec {
    * For an `enum` control: the words and the icon of a value. The icon repeats the word and never
    * replaces it.
    */
-  present?: (value: string) => { labelKey: string; icon?: Icon };
+  present?: (value: string) => { labelKey: string; icon?: EnumIcon };
   /** For an `enum` control: its values, from low to high, in the order that the list shows. */
   values?: readonly string[];
   /** Changes the field. Without it the field is plain text for this kind, whatever the member may. */
