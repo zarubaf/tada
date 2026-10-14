@@ -210,36 +210,25 @@ It has no drag.
 - The view shows the actions and milestones that the filters of the page let through.
   Commitments, decisions and risks are not on the timeline.
   If the type filter names only such kinds, the view says „Diese Ansicht zeigt Aufgaben und Meilensteine.“ and offers „Filter zurücksetzen“.
-
 - The event window comes from the facts of the event.
   The view loads them when it opens, and it shows a skeleton until they are there, so that no empty state flashes.
-
 - One lane for each workstream, and one lane „ohne Arbeitsbereich“.
-
 - An action with a start date and a due date is a bar.
   An action with only a due date is a point.
   Actions without a due date appear as a count with a link to the action register.
-
 - A milestone is a marker with a vertical line across all lanes.
-
 - The event window is a band behind the lanes.
   The window comes from the core facts `exact_dates` or `date_window` (ADR 0081).
   If the window is unknown, the page shows no band.
-
 - A line marks today („heute“).
-
 - The axis shows weeks.
   It runs from the earliest to the latest date of the actions (start and due dates), the milestones and the event window.
   A long span scrolls inside the timeline. The page itself never scrolls horizontally.
-
 - Filters: owner and status.
   Each bar and point links to its action.
-
 - Bars, points and markers do not rely on color alone.
   Each has a label, and the status shows as text in the list.
-
 - Narrow layouts and screen readers get a list of the same items, grouped by week.
-
 - An event with no dated actions, no milestones and no event window shows the empty state of the page, not an empty axis.
   An event with milestones but no dated actions shows its milestones, and the band if the window is known.
 
