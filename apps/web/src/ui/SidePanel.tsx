@@ -18,6 +18,8 @@ export interface SidePanelProps {
   heading?: ReactNode;
   /** Where the record is in the list, for example „7 von 15“. It shows before the step buttons. */
   position?: string | undefined;
+  /** Extra controls of the head, between the step buttons and the close button, for example a menu. */
+  more?: ReactNode;
   /** Called by the close button and by Escape. The page unmounts the panel. */
   onClose: () => void;
   /**
@@ -48,6 +50,7 @@ export function SidePanel({
   title,
   heading,
   position,
+  more,
   onClose,
   onPrevious,
   onNext,
@@ -139,6 +142,7 @@ export function SidePanel({
               />
             </>
           )}
+          {more}
           <IconButton icon={IconX} label={t("side-panel-close")} size="sm" onPress={onClose} />
         </div>
       </header>
