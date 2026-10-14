@@ -3,19 +3,19 @@ import type { Api, Workstream } from "../api/client";
 import { useEventProfile } from "../events/eventContext";
 import { todayLocal } from "../facts/dueDate";
 import { t } from "../i18n";
+import { isEmpty } from "../timeline/layout";
+import { TimelinePlan, windowOf } from "../timeline/TimelinePlan";
+import { todayIn } from "../timeline/today";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { SkeletonLines } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
-import { isFiltered } from "../work/WorkFilterControls";
-import type { WorkFilters } from "../work/workFilters";
-import type { WorkItem } from "../work/workItem";
-import { isEmpty } from "./layout";
-import { TimelinePlan, windowOf } from "./TimelinePlan";
 import { onlyOffTimeline, timelineRecords } from "./timelineRecords";
-import { todayIn } from "./today";
+import { isFiltered } from "./WorkFilterControls";
+import type { WorkFilters } from "./workFilters";
+import type { WorkItem } from "./workItem";
 
-export interface TimelineViewProps {
+export interface WorkTimelineProps {
   api: Api;
   eventId: string;
   /** The work that the filters let through, of every kind. */
@@ -33,7 +33,7 @@ export interface TimelineViewProps {
  * filtered work on the plan of the event. The facts of the event (its window) load when the view
  * opens, not with the page. Other kinds are not on the timeline.
  */
-export default function TimelineView(props: TimelineViewProps) {
+export default function WorkTimeline(props: WorkTimelineProps) {
   if (onlyOffTimeline(props.filters.kinds)) {
     return (
       <EmptyState
@@ -53,7 +53,7 @@ function LoadedTimeline({
   filters,
   workstreams,
   timeZone,
-}: TimelineViewProps) {
+}: WorkTimelineProps) {
   const { profile } = useEventProfile(api, eventId);
   const { actions, milestones } = useMemo(() => timelineRecords(items), [items]);
   const names = useMemo(

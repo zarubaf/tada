@@ -1,5 +1,5 @@
 import type { Action, Milestone, RecordKind } from "../api/client";
-import type { WorkItem } from "../work/workItem";
+import type { WorkItem } from "./workItem";
 
 /** The kinds that have a place on the timeline. Commitments, decisions and risks do not. */
 export const TIMELINE_KINDS: readonly RecordKind[] = ["action", "milestone"];

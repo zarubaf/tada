@@ -7,7 +7,7 @@ import type { WorkView } from "./workView";
 
 // The table and the timeline load on demand, so that the board does not pay for them (ADR 0082).
 const WorkTable = lazy(() => import("./WorkTable"));
-const TimelineView = lazy(() => import("../timeline/TimelineView"));
+const WorkTimeline = lazy(() => import("./WorkTimeline"));
 
 export interface WorkViewsProps extends BoardProps {
   view: WorkView;
@@ -32,7 +32,7 @@ export function WorkViews({ view, timeline, ...board }: WorkViewsProps) {
       {view === "table" ? (
         <WorkTable {...board} />
       ) : (
-        <TimelineView
+        <WorkTimeline
           items={board.items}
           eventId={board.eventId}
           api={timeline.api}
