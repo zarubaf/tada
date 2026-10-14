@@ -114,7 +114,10 @@ export function Router({ children }: { children: ReactNode }) {
       return;
     }
     shown.current = next;
-    moveFocus.current = focus && previous.pathname !== next.pathname;
+    // A query or hash change leaves a request that still waits for a lazy page as it is.
+    if (previous.pathname !== next.pathname) {
+      moveFocus.current = focus;
+    }
     setAddress(next);
   }, []);
 
@@ -176,7 +179,7 @@ export function useHash(): string {
 
 /**
  * The parameters of the query string. The accessor stays the same while the query does, so it can
- * be a dependency of an effect or a memo. A malformed escape reads as the raw text, never throws.
+ * be a dependency of an effect or a memo. An incomplete escape decodes to U+FFFD, and the parser never throws.
  */
 export function useSearch(): SearchParams {
   const { search } = useLocation();
@@ -199,6 +202,10 @@ export function useSetSearch(): (update: SearchUpdate, options?: NavigateOptions
         }
       }
       const query = params.toString();
+      // Compare the standard forms: `%20` reads as `+` and a bare `?view` as `view=` after a round trip.
+      if (query === new URLSearchParams(window.location.search).toString()) {
+        return;
+      }
       const { pathname, hash } = window.location;
       navigate(`${pathname}${query ? `?${query}` : ""}${hash}`, {
         moveFocus: false,
@@ -299,7 +306,11 @@ export interface LinkProps {
   children: ReactNode;
 }
 
-/** A link that changes the path without a page load. The current page gets `aria-current`. */
+/**
+ * A link that changes the path without a page load. The current page gets `aria-current`. Only the
+ * path of `to` counts: a query or a hash does not make a link current or not. A `to` without a
+ * path (only a query or only a hash) is never current; no such link exists yet.
+ */
 export function Link({
   to,
   className,
@@ -314,10 +325,11 @@ export function Link({
   // A query or a hash in `to` does not count: the link is current for its path.
   const target = to.split(/[?#]/, 1)[0] ?? to;
   const current =
-    pathname === target ||
-    (!exact && pathname.startsWith(`${target}/`)) ||
-    (within !== undefined && pathname.startsWith(`${within}/`)) ||
-    alsoCurrentOn.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+    target !== "" &&
+    (pathname === target ||
+      (!exact && pathname.startsWith(`${target}/`)) ||
+      (within !== undefined && pathname.startsWith(`${within}/`)) ||
+      alsoCurrentOn.some((path) => pathname === path || pathname.startsWith(`${path}/`)));
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     const plain =
       event.button === 0 &&
