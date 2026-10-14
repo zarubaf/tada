@@ -173,12 +173,14 @@ describe("the record panel", () => {
   describe("stepping", () => {
     it("goes through the board column by column and replaces the history entry", async () => {
       open("#ACT-006");
-      await panel(/ACT-006/);
+      const first = await panel(/ACT-006/);
+      expect(within(first).getByText(/^1 von \d+$/)).toBeVisible();
       const before = window.history.length;
       // Offen: ACT-006 (overdue, first), ACT-001, then In Arbeit ACT-002, Blockiert ACT-003.
       await user.click(screen.getByRole("button", { name: "Nächster Eintrag" }));
-      await panel(/ACT-001/);
+      const second = await panel(/ACT-001/);
       expect(hash()).toBe("#ACT-001");
+      expect(within(second).getByText(/^2 von \d+$/)).toBeVisible();
       await user.click(screen.getByRole("button", { name: "Nächster Eintrag" }));
       expect(hash()).toBe("#ACT-002");
       await user.click(screen.getByRole("button", { name: "Vorheriger Eintrag" }));

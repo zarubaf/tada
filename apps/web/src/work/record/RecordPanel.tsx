@@ -2,7 +2,6 @@ import { useId, useState } from "react";
 import type { RecordKind } from "../../api/client";
 import { t } from "../../i18n";
 import { LiveRegion } from "../../ui/LiveRegion";
-import { RecordId } from "../../ui/RecordId";
 import { SidePanel } from "../../ui/SidePanel";
 import { StandaloneLink } from "../../ui/StandaloneLink";
 import { TypeIcon } from "../../ui/TypeIcon";
@@ -42,6 +41,8 @@ export interface RecordPanelProps {
   /** The records before and after, in the order of the view. Without one, the button is absent. */
   previous: string | undefined;
   next: string | undefined;
+  /** The place of the record among them, counting from one. */
+  place: { index: number; total: number } | undefined;
   /** Shows another record. */
   onOpen: (readableId: string) => void;
   onClose: () => void;
@@ -61,7 +62,7 @@ function Head({ item }: { item: WorkItem }) {
   return (
     <div className={styles.heading}>
       <TypeIcon kind={item.kind} size={16} decorative />
-      <RecordId>{item.readableId}</RecordId>
+      <span className={styles.recordId}>{item.readableId}</span>
       <span aria-hidden="true">·</span>
       <span>{t(`record-kind-${item.kind}`)}</span>
     </div>
@@ -159,6 +160,7 @@ export default function RecordPanel({
   today,
   previous,
   next,
+  place,
   onOpen,
   onClose,
   returnFocusTo,
@@ -167,6 +169,7 @@ export default function RecordPanel({
   const [alert, setAlert] = useState<string>();
   const frame = {
     onClose,
+    position: place && t("side-panel-position", place),
     returnFocusTo,
     ...(previous && { onPrevious: () => onOpen(previous) }),
     ...(next && { onNext: () => onOpen(next) }),
