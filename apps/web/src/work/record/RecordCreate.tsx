@@ -139,9 +139,12 @@ export function RecordCreate({
   if (!create) {
     return null;
   }
-  const specs = [descriptor.title, ...descriptor.properties, descriptor.description].filter(
-    (spec): spec is FieldSpec => spec !== undefined,
-  );
+  const specs = [
+    descriptor.title,
+    ...descriptor.properties,
+    descriptor.description,
+    ...(descriptor.texts ?? []),
+  ].filter((spec): spec is FieldSpec => spec !== undefined);
   const shown = create.fields
     .map((id) => specs.find((spec) => spec.id === id))
     .filter((spec): spec is FieldSpec => spec !== undefined);
