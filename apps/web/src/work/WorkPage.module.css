@@ -2,11 +2,14 @@
   /* The page and, beside it from 80rem, the docked side panel. */
   .layout {
     display: flex;
-    align-items: flex-start;
+    flex: 1 1 auto;
   }
 
+  /* The page is a column that fills the work area: the board fills what the toolbar leaves. */
   .main {
+    display: flex;
     flex: 1;
+    flex-direction: column;
     min-width: 0;
   }
 
@@ -16,8 +19,19 @@
     min-width: 0;
   }
 
+  /* The page of the work: a column that fills the work area, so that the board can fill what the toolbar leaves. */
+  .work {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+  }
+
   /* The board and its bulk bar: the bar sticks to the bottom of the screen while the board shows. */
   .scope {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
     min-width: 0;
   }
 }

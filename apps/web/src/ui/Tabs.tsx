@@ -24,6 +24,8 @@ export interface TabsProps {
   onChange: (id: string) => void;
   /** `segmented` is a compact switch of views for a toolbar row; the default is the underlined row. */
   variant?: "underline" | "segmented";
+  /** The tabs and the panel fill the height of their parent, which has to be a column. */
+  fill?: boolean;
   /**
    * Places the tab list, for example in the toolbar row of a page (`PageToolbar`). The list has to
    * stay inside `Tabs`, so the caller wraps it here and not around the tabs. Without it, the list
@@ -44,6 +46,7 @@ export function Tabs({
   value,
   onChange,
   variant = "underline",
+  fill,
   renderList,
   children,
 }: TabsProps) {
@@ -65,6 +68,7 @@ export function Tabs({
   return (
     <AriaTabs
       className={styles.tabs}
+      {...(fill && { "data-fill": "" })}
       selectedKey={value}
       onSelectionChange={(key) => onChange(String(key))}
     >

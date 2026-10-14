@@ -112,4 +112,17 @@
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
+
+  /* The panel fills what the tab list leaves, for a page whose content fills the work area. */
+  .tabs[data-fill] {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .tabs[data-fill] > .panel {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
 }
