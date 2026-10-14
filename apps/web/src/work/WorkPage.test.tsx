@@ -459,11 +459,13 @@ describe("WorkPage", () => {
     it("explains an empty event and offers a new action", async () => {
       open("", { lists: { "/actions": [], "/commitments": [], "/decisions": [] } });
       expect(await screen.findByText("Noch keine Arbeit in diesem Anlass")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Neue Aufgabe" })).toHaveAttribute(
-        "href",
-        `/events/${EVENT.id}/actions`,
-      );
       expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
+      // The new action opens the create state of the panel, not the old page.
+      await userEvent.click(screen.getByRole("button", { name: "Neue Aufgabe" }));
+      expect(
+        await screen.findByRole("complementary", { name: "Neue Aufgabe" }, { timeout: 3000 }),
+      ).toBeVisible();
+      expect(window.location.search).toBe("?new=action");
     });
 
     it("explains an empty result of the filters and resets them", async () => {
