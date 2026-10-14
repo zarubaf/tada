@@ -117,6 +117,7 @@ export function WorkPage({ api }: { api: Api }) {
   );
   const selection = useWorkSelection(eventId, visible, writable, running);
   selectionRef.current = selection;
+  const barShown = view !== "timeline" && (selection.selecting || running);
   // Ending the selection ends the failures that belonged to it, once nothing runs or loads.
   const idle = !running && !reloading;
   const { reset: resetBulk } = bulk;
@@ -281,7 +282,7 @@ export function WorkPage({ api }: { api: Api }) {
                 />
               )}
               {!loading && shown.length > 0 && (
-                <div className={styles.scope}>
+                <div className={styles.scope} {...(barShown && { "data-bulk": "" })}>
                   <WorkViews
                     view={view}
                     items={shown}
@@ -302,18 +303,18 @@ export function WorkPage({ api }: { api: Api }) {
                     }}
                     selection={held}
                   />
-                  {view !== "timeline" && (selection.selecting || running) && (
-                    <BulkBar
-                      selection={held}
-                      bulk={bulk}
-                      work={work}
-                      narrow={narrow}
-                      announce={setAnnouncement}
-                      bannerRef={banner}
-                      dockRef={dock}
-                    />
-                  )}
                 </div>
+              )}
+              {!loading && shown.length > 0 && barShown && (
+                <BulkBar
+                  selection={held}
+                  bulk={bulk}
+                  work={work}
+                  narrow={narrow}
+                  announce={setAnnouncement}
+                  bannerRef={banner}
+                  dockRef={dock}
+                />
               )}
             </WorkViewTabs>
           </div>

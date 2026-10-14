@@ -71,7 +71,12 @@ const actions = [
   action("04", "Hallenplan zeichnen", { can_change: false, next_statuses: [] }),
 ];
 
-async function fakeWork(page: Page): Promise<void> {
+/** Enough open actions that the end of the list lies below the first screen. */
+const manyActions = Array.from({ length: 30 }, (_, index) =>
+  action(String(index + 1).padStart(2, "0"), `Aufgabe Nummer ${index + 1}`),
+);
+
+async function fakeWork(page: Page, rows: typeof actions = actions): Promise<void> {
   await fakeSession(page, sessionWithRole("member"));
   await fakeEvent(page, event);
   const json = (pattern: string, body: unknown) =>
@@ -81,7 +86,7 @@ async function fakeWork(page: Page): Promise<void> {
   await json("**/api/v1/events/*/memberships", { items: memberships });
   await json("**/api/v1/members*", { items: members });
   await json("**/api/v1/events/*/workstreams", { items: workstreams });
-  await json("**/api/v1/events/*/actions*", { items: actions });
+  await json("**/api/v1/events/*/actions*", { items: rows });
   for (const kind of ["commitments", "milestones", "decisions", "risks"]) {
     await json(`**/api/v1/events/*/${kind}*`, { items: [] });
   }
@@ -423,3 +428,34 @@ test.describe("the table on a phone with touch", () => {
     expect((await axe(page)).violations).toEqual([]);
   });
 });
+
+// The bar floats over the page, so every view keeps room for it at its end (ADR 0082): it never
+// covers the last row of the table or the last card.
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 375, height: 812 },
+]) {
+  for (const [view, path] of [
+    ["board", work],
+    ["table", `${work}?view=table`],
+  ] as const) {
+    test(`the bar does not cover the last ${view === "table" ? "row" : "card"}, ${viewport.width} px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await fakeWork(page, manyActions);
+      await page.goto(path);
+      await label(page, "ACT-001").click();
+      await expect(bar(page)).toBeVisible();
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await page.mouse.move(0, 0);
+      const frame = await bar(page).boundingBox();
+      // The last one by position: the cards and the rows end with ACT-030.
+      const last = await label(page, "ACT-030").boundingBox();
+      if (!(frame && last)) {
+        throw new Error("not shown");
+      }
+      expect(last.y + last.height).toBeLessThanOrEqual(frame.y);
+    });
+  }
+}

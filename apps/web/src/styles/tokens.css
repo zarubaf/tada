@@ -88,6 +88,15 @@
     --sidebar-width: 14.5rem;
     --size-toolbar: 44px; /* The toolbar row of a page, the bulk bar. */
     --size-tile: 28px; /* The tile with the initials of an event. */
+    --dock-offset: var(
+      --space-5
+    ); /* The distance of the floating bulk bar from the bottom of the window. */
+
+    --dock-height: var(--size-toolbar); /* The height of the bulk bar: one row. */
+    --dock-room: calc(
+      var(--dock-height) +
+      var(--dock-offset)
+    ); /* What the end of a view keeps free for the bar. */
 
     /* Density: compact */
     --control-height-sm: 28px;
@@ -154,6 +163,14 @@
     --line-height-ui: var(--line-height-base);
     --font-size-dense: var(--font-size-base);
     --line-height-dense: var(--line-height-base);
+  }
+
+  /* --bp-medium and narrower: the bulk bar has two rows and floats above the bottom bar. */
+  @media (width < 40rem) {
+    :root {
+      --dock-offset: calc(var(--bottom-bar-height) + var(--space-2));
+      --dock-height: calc(2 * var(--size-toolbar) + var(--space-4));
+    }
   }
 
   /* Dark theme: the same values for the system preference and for the explicit choice. */
