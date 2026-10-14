@@ -8,6 +8,23 @@
     list-style: none;
   }
 
+  /* „Alle auswählen“ above the cards of the narrow list. */
+  .selectAll {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--space-1-5);
+  }
+
+  /*
+   * The box fits the row: 28 px high, and 44 px on coarse pointers, where the row is 44 px too.
+   * The box itself stays the size of every checkbox.
+   */
+  .check {
+    --control-height-lg: var(--row-height);
+
+    display: flex;
+  }
+
   .title {
     font-weight: var(--font-weight-medium);
   }

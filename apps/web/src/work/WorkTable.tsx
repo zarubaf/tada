@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
 import { Link } from "../router/Router";
 import { Avatar } from "../ui/Avatar";
+import { Checkbox } from "../ui/Checkbox";
 import { Chip } from "../ui/Chip";
 import { type Column, DataTable } from "../ui/DataTable";
 import { LiveRegion } from "../ui/LiveRegion";
@@ -11,17 +12,15 @@ import { StatusLabel } from "../ui/StatusLabel";
 import { TypeIcon } from "../ui/TypeIcon";
 import type { BoardProps } from "./Board";
 import { presentationOf } from "./recordStatus";
-import { WorkCard } from "./WorkCard";
+import { selectionKeys, type WorkSelection } from "./useWorkSelection";
+import { cardSelect, WorkCard } from "./WorkCard";
 import styles from "./WorkTable.module.css";
 import { SORT_KEYS, type SortKey, sortBy } from "./workFilters";
 import type { WorkItem } from "./workItem";
 import { recordHref } from "./workLinks";
 import { useWorkSort } from "./workView";
 
-/**
- * The columns of the table, in order. A column is not always a sort key: the column to select joins
- * in front and has none.
- */
+/** The columns of the table, in order. The column to select joins in front when there is one. */
 const COLUMN_KEYS = ["id", "kind", "title", "status", "owner", "due", "area"] as const;
 type ColumnKey = (typeof COLUMN_KEYS)[number];
 
@@ -58,6 +57,59 @@ function Due({ item, today }: { item: WorkItem; today: string }) {
       <Chip variant="date" date={item.date} today={today} overdue={open} />
     </>
   );
+}
+
+/**
+ * „Alle auswählen“: one box for the rows that the member may select. Without such a row there is
+ * no box.
+ */
+function SelectAll({
+  rows,
+  selection,
+  labelHidden = true,
+}: {
+  rows: WorkItem[];
+  selection: WorkSelection;
+  labelHidden?: boolean;
+}) {
+  const selectable = rows.filter(selection.canSelect);
+  const every = selectable.length > 0 && selectable.every(selection.isSelected);
+  const some = selectable.some(selection.isSelected);
+  return (
+    <Checkbox
+      label={t("work-select-all")}
+      labelHidden={labelHidden}
+      isSelected={every}
+      isIndeterminate={some && !every}
+      isDisabled={selection.locked || selectable.length === 0}
+      onChange={(on) => selection.set(selectable, on)}
+    />
+  );
+}
+
+/** The column to select: the box of a row, and „Alle auswählen“ in its header. */
+function selectColumn(rows: WorkItem[], selection: WorkSelection): Column<WorkItem> {
+  return {
+    id: "select",
+    header: (
+      <span className={styles.check}>
+        <SelectAll rows={rows} selection={selection} />
+      </span>
+    ),
+    label: t("work-table-select"),
+    cell: (item) =>
+      selection.canSelect(item) ? (
+        <span className={styles.check}>
+          <Checkbox
+            label={t("work-select-item", { id: item.readableId, title: item.title })}
+            labelHidden
+            isSelected={selection.isSelected(item)}
+            isDisabled={selection.locked}
+            onChange={(on) => selection.set([item], on)}
+          />
+        </span>
+      ) : null,
+  };
 }
 
 function columnsFor({
@@ -122,7 +174,7 @@ function useSortAnnouncement(text: string): string | undefined {
  * column. Below 40rem there is no table, only the cards of the board in one list; they follow the
  * sort too.
  */
-export default function WorkTable({ items, narrow, ...rest }: BoardProps) {
+export default function WorkTable({ items, narrow, selection, ...rest }: BoardProps) {
   const [sort, setSort] = useWorkSort();
   const { workstreamName } = rest;
   const rows = sortBy(items, sort, (item) =>
@@ -138,36 +190,53 @@ export default function WorkTable({ items, narrow, ...rest }: BoardProps) {
     }
     setSort({ key: next, dir: sort.key === next && sort.dir === "asc" ? "desc" : "asc" });
   };
+  // The table lists every record that the filters let through, so those are in sight.
+  const onKeyDown = selectionKeys(selection, () => items);
+  // The column joins only if the member may change a record: in a closed event there is none.
+  const selecting = selection !== undefined && items.some(selection.canSelect);
+  const columns = columnsFor(rest);
   return (
     <>
       <LiveRegion kind="status" visuallyHidden>
         {announcement}
       </LiveRegion>
-      {narrow ? (
-        <ul className={styles.cards}>
-          {rows.map((item) => (
-            <WorkCard
-              key={item.id}
-              item={item}
-              eventId={rest.eventId}
-              today={rest.today}
-              workstreamName={
-                item.workstreamId === undefined ? undefined : workstreamName(item.workstreamId)
-              }
-            />
-          ))}
-        </ul>
-      ) : (
-        <DataTable
-          label={t("work-table-label")}
-          columns={columnsFor(rest)}
-          rows={rows}
-          rowKey={(item) => item.id}
-          sort={{ columnId: sort.key, direction: sort.dir }}
-          onSort={onSort}
-          stacked={false}
-        />
-      )}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: the keys are shortcuts for the controls inside */}
+      <div onKeyDown={onKeyDown}>
+        {narrow ? (
+          <>
+            {selecting && (
+              <div className={styles.selectAll}>
+                <SelectAll rows={rows} selection={selection} labelHidden={false} />
+              </div>
+            )}
+            <ul className={styles.cards}>
+              {rows.map((item) => (
+                <WorkCard
+                  key={item.id}
+                  item={item}
+                  eventId={rest.eventId}
+                  today={rest.today}
+                  workstreamName={
+                    item.workstreamId === undefined ? undefined : workstreamName(item.workstreamId)
+                  }
+                  select={cardSelect(selection, item)}
+                />
+              ))}
+            </ul>
+          </>
+        ) : (
+          <DataTable
+            label={t("work-table-label")}
+            columns={selecting ? [selectColumn(rows, selection), ...columns] : columns}
+            rows={rows}
+            rowKey={(item) => item.id}
+            rowSelected={selection?.isSelected}
+            sort={{ columnId: sort.key, direction: sort.dir }}
+            onSort={onSort}
+            stacked={false}
+          />
+        )}
+      </div>
     </>
   );
 }
