@@ -1,24 +1,19 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Api, type Event, problemMessage } from "../api/client";
+import { type ReactNode, useMemo, useRef } from "react";
+import type { Api } from "../api/client";
 import { formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { useParams } from "../router/Router";
-import { useRetry } from "../ui/focus";
-import { InlineError } from "../ui/InlineError";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { NavLink, SubNav } from "../ui/NavLink";
 import { Page, PageTitle } from "../ui/Page";
 import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import { CloseEvent } from "./CloseEvent";
+import { EventLoadError } from "./EventLoadError";
 import styles from "./EventPage.module.css";
 import { EventContext, type ProfileState, useEventProfile } from "./eventContext";
 import { registerPaths } from "./RegisterNav";
-
-type State =
-  | { kind: "loading" }
-  | { kind: "failed"; message: string; requestId: string | undefined }
-  | { kind: "loaded"; event: Event };
+import { useEventState } from "./useEventState";
 
 /**
  * The page of one event: the header with the name, the sub-navigation and the sub-page in
@@ -38,36 +33,17 @@ export function EventPage({
 }) {
   const params = useParams();
   const eventId = eventIdProp ?? params.eventId ?? "";
-  const [state, setState] = useState<State>({ kind: "loading" });
   const heading = useRef<HTMLHeadingElement>(null);
-  const { retried, retry } = useRetry(() => heading.current);
+  const { state, setState, load, retried, retry } = useEventState(
+    api,
+    eventId,
+    () => heading.current,
+  );
   const { profile, reloadProfile } = useEventProfile(api, eventId);
   const context = useMemo(
     () => (state.kind === "loaded" ? { event: state.event, profile, reloadProfile } : undefined),
     [state, profile, reloadProfile],
   );
-
-  /** Resolves to true when the event loaded. */
-  const load = useCallback(async () => {
-    try {
-      const { data, error } = await api.GET("/api/v1/events/{event_id}", {
-        params: { path: { event_id: eventId } },
-      });
-      setState(
-        data
-          ? { kind: "loaded", event: data }
-          : { kind: "failed", message: problemMessage(error), requestId: error?.request_id },
-      );
-      return data !== undefined;
-    } catch {
-      setState({ kind: "failed", message: problemMessage(undefined), requestId: undefined });
-      return false;
-    }
-  }, [api, eventId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const base = `/events/${encodeURIComponent(eventId)}`;
   const registers = registerPaths(base);
@@ -80,17 +56,7 @@ export function EventPage({
         </div>
       )}
       {state.kind === "failed" && (
-        <InlineError
-          message={state.message}
-          requestId={state.requestId}
-          onRetry={() =>
-            retry(() => {
-              setState({ kind: "loading" });
-              return load();
-            })
-          }
-          announce={retried ? "focus" : "alert"}
-        />
+        <EventLoadError failure={state} retried={retried} onRetry={retry} />
       )}
       {state.kind === "loaded" && context && (
         <EventContext value={context}>
