@@ -1108,6 +1108,7 @@ decision-replace-ended = { $id } lässt sich nicht mehr ersetzen.
 # $id: the readable ID of the decision that the new one replaces.
 decision-replace-stale = Die Fassung von { $id } ist nicht mehr aktuell. Kopieren Sie den Text, und brechen Sie dann ab. Öffnen Sie { $id } danach neu.
 # $id: the readable ID of the decision that the new one replaces.
+decision-replace-decided-on = Entschieden am
 decision-replace-inherit = Verantwortlich und Bereich übernimmt der neue Entscheid.
 decision-replace-note = Der neue Entscheid ersetzt { $id }. Der Wortlaut von { $id } bleibt unverändert; { $id } gilt danach als ersetzt.
 decision-field-wording = Wortlaut (Pflichtfeld)
@@ -1438,7 +1439,7 @@ record-field-owner = Verantwortlich
 record-field-due = Fällig
 record-field-date = Datum
 record-field-wording = Wortlaut
-record-field-decided-on = Entschieden am
+record-field-decided-on = Entschieden
 record-field-parties = Beteiligte
 record-field-successor = Ersetzt durch
 record-field-revoked-reason = Grund des Widerrufs
