@@ -23,6 +23,11 @@ export interface WorkCardProps {
   workstreamName?: string | undefined;
   /** Present if the member may select the record (it can be changed). */
   select?: CardSelection | undefined;
+  /**
+   * True where a board column names the status of the card. Then a status that the column says is
+   * the icon alone; in a list without columns every status also has its label as a chip.
+   */
+  inColumn: boolean;
 }
 
 export interface CardSelection {
@@ -68,13 +73,21 @@ function partIds(base: string) {
  * same look and is a group, not a link. The name is the ID and the title; kind, status, owner,
  * date and area are the description, each part its own element so that they read apart.
  */
-export function WorkCard({ item, eventId, today, workstreamName, select }: WorkCardProps) {
+export function WorkCard({
+  item,
+  eventId,
+  today,
+  workstreamName,
+  select,
+  inColumn,
+}: WorkCardProps) {
   const ids = partIds(useId());
   const href = useRecordHref(eventId)(item);
   const { glyph, tone, labelKey } = presentationOf(item);
   // A status that its column names is the icon before the title; any other also has its label.
+  // Where no column names a status, every status has it.
   const statusLabel = t(labelKey);
-  const labelled = !isColumnStatus(item.kind, item.status);
+  const labelled = !(inColumn && isColumnStatus(item.kind, item.status));
   const hasOwner = item.owner.name !== "";
   const hasArea = workstreamName !== undefined;
   const describedBy = [

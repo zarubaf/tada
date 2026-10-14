@@ -398,6 +398,12 @@ describe("the table view", () => {
         `/events/${EVENT.id}/work?view=table#ACT-001`,
       );
     });
+
+    it("gives the open card its status as a chip, because no column names it", async () => {
+      open("?view=table", { narrow: true });
+      const link = await screen.findByRole("link", { name: /ACT-001/ });
+      expect(within(link).getByText("offen").closest("[class*=chips]")).not.toBeNull();
+    });
   });
 });
 
