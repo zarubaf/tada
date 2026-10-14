@@ -6,11 +6,10 @@ import type {
   CommitmentStatus,
   DecisionStatus,
   MilestoneStatus,
+  RecordKind,
   RiskStatus,
 } from "../api/client";
 import type { StatusGlyph, StatusTone } from "../ui/StatusIcon";
-
-export type RecordKind = "action" | "commitment" | "milestone" | "decision" | "risk";
 
 export const RECORD_KINDS = [
   "action",

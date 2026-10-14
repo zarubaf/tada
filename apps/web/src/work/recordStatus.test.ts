@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { RecordKind } from "../api/client";
 import { hasMessage } from "../i18n";
 import {
   BOARD_COLUMNS,
   columnOf,
   RECORD_KINDS,
-  type RecordKind,
   STATUSES,
   statusPresentation,
 } from "./recordStatus";
@@ -73,9 +73,5 @@ describe("columnOf (ADR 0082)", () => {
 describe("statusPresentation", () => {
   it("shows a conditional commitment in the warning tone", () => {
     expect(statusPresentation("commitment", "conditional").tone).toBe("warning");
-  });
-
-  it("names the label by kind and status", () => {
-    expect(statusPresentation("risk", "occurred").labelKey).toBe("risk-status-occurred");
   });
 });

@@ -3,12 +3,12 @@ import type {
   CommitmentStatus,
   DecisionStatus,
   MilestoneStatus,
-  RiskStatus,
+  RecordKind,
 } from "../api/client";
 import { t } from "../i18n";
 import { type IconSize, StatusIcon } from "../ui/StatusIcon";
 import { StatusLabel } from "../ui/StatusLabel";
-import { type RecordKind, type StatusOf, statusPresentation } from "./recordStatus";
+import { type StatusOf, statusPresentation } from "./recordStatus";
 
 export interface RecordStatusProps<K extends RecordKind> {
   kind: K;
@@ -46,7 +46,4 @@ export const MilestoneStatusLabel = ({ status }: { status: MilestoneStatus }) =>
 );
 export const DecisionStatusLabel = ({ status }: { status: DecisionStatus }) => (
   <RecordStatusLabel kind="decision" status={status} />
-);
-export const RiskStatusLabel = ({ status }: { status: RiskStatus }) => (
-  <RecordStatusLabel kind="risk" status={status} />
 );

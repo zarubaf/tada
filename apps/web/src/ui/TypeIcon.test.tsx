@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { RECORD_KINDS } from "../work/recordStatus";
+import type { RecordKind } from "../api/client";
 import { RecordId } from "./RecordId";
 import { TypeIcon } from "./TypeIcon";
+
+const KINDS: RecordKind[] = ["action", "commitment", "milestone", "decision", "risk"];
 
 describe("TypeIcon", () => {
   it.each([
@@ -17,13 +19,13 @@ describe("TypeIcon", () => {
   });
 
   it("draws a different icon for each kind", () => {
-    const paths = RECORD_KINDS.map((kind) => {
+    const paths = KINDS.map((kind) => {
       const { container, unmount } = render(<TypeIcon kind={kind} />);
       const html = container.querySelector("svg")?.innerHTML;
       unmount();
       return html;
     });
-    expect(new Set(paths).size).toBe(RECORD_KINDS.length);
+    expect(new Set(paths).size).toBe(KINDS.length);
   });
 
   it("is decoration next to its name", () => {
