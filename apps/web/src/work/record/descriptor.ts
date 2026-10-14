@@ -67,6 +67,8 @@ export interface FieldSpec {
   validate?: (item: WorkItem, value: FieldValue) => string | undefined;
   /** The field must have a value. */
   required?: boolean;
+  /** The Fluent key of a help text under the field in the create form. */
+  helpKey?: string;
   /**
    * The Fluent key of the words for no value, for example „Kein Bereich“. A field with it can be
    * cleared; the words are the choice that clears a picker and the text of an empty field.
@@ -108,6 +110,8 @@ export interface FieldSpec {
 }
 
 export interface CreateSpec {
+  /** Only an event manager creates the record. Otherwise the create state says so. */
+  managersOnly?: boolean;
   /** The Fluent key of the heading, for example „Neue Aufgabe“. */
   titleKey: string;
   /** The IDs of the fields of the form, in order. The title comes first. */

@@ -10,7 +10,7 @@ import { useHash, useNavigate, useSearch } from "../../router/Router";
 export const NEW_PARAM = "new";
 
 /** The kinds that the panel can create. A kind joins with its descriptor. */
-export const CREATABLE: readonly RecordKind[] = ["action", "risk", "milestone"];
+export const CREATABLE: readonly RecordKind[] = ["action", "risk", "milestone", "decision"];
 
 export type RecordRoute =
   | { mode: "closed" }

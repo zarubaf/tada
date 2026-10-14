@@ -221,7 +221,7 @@ describe("the table view", () => {
     expect(act.getByText("Bodenbetrieb")).toBeInTheDocument();
     expect(within(row("DEC-001")).getByRole("link", { name: /Das Fest findet/ })).toHaveAttribute(
       "href",
-      `/events/${EVENT.id}/decisions#DEC-001`,
+      `/events/${EVENT.id}/work?view=table#DEC-001`,
     );
   });
 
