@@ -47,23 +47,17 @@
     border-radius: var(--radius-md);
   }
 
+  /* The buttons reach the hit target of the density, so the frame grows with a coarse pointer. */
   .list[data-variant="segmented"] .tab {
-    min-height: calc(var(--control-height-sm) - var(--space-1));
+    min-height: max(calc(var(--control-height-sm) - var(--space-1)), var(--size-hit-target));
     padding: 0 var(--space-2);
     border-bottom: 0;
     border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
   }
 
   @media (pointer: coarse) {
-    .list[data-variant="segmented"] {
-      gap: 0;
-      padding: 0;
-      border: 0;
-    }
-
     .list[data-variant="segmented"] .tab {
-      min-height: var(--control-height-md);
       font-size: var(--font-size-ui);
     }
   }
@@ -84,9 +78,10 @@
     color: var(--color-text);
   }
 
+  /* A neutral fill marks the selected view, like the selected type; the accent is for action. */
   .list[data-variant="segmented"] .tab[data-selected] {
-    background: var(--color-accent-subtle);
-    color: var(--color-accent-text);
+    background: var(--color-bg-active);
+    color: var(--color-text);
   }
 
   .count {

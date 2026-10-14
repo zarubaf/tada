@@ -42,9 +42,10 @@
     outline-offset: -2px;
   }
 
+  /* A neutral fill marks the chosen type; the accent is for action. */
   .option[data-selected] {
-    background: var(--color-accent-subtle);
-    color: var(--color-accent-text);
+    background: var(--color-bg-active);
+    color: var(--color-text);
   }
 
   .count {
