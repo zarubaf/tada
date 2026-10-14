@@ -224,12 +224,8 @@ export function Gallery() {
       <section className={styles.section}>
         <h2 className={styles.heading}>Chips</h2>
         <div className={styles.row}>
-          <Chip variant="date" dateTime="2026-10-15">
-            15.10.
-          </Chip>
-          <Chip variant="date" dateTime="2026-10-12" overdue>
-            12.10.
-          </Chip>
+          <Chip variant="date" date="2026-10-15" today="2026-10-14" />
+          <Chip variant="date" date="2026-10-12" today="2026-10-14" />
           <Chip variant="workstream">Infrastruktur</Chip>
           <Chip variant="workstream" onPress={() => {}}>
             Veranstaltungsbewilligungsverfahren Musterhausen

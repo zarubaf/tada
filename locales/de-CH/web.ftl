@@ -105,7 +105,7 @@ risk-status-open = offen
 risk-status-mitigated = entschärft
 risk-status-occurred = eingetreten
 risk-status-closed = abgeschlossen
-chip-overdue = überfällig
+overdue = überfällig
 chip-workstream = Bereich
 
 ## Navigation
@@ -1195,7 +1195,6 @@ my-work-title = Meine Arbeit
 my-work-loading = Meine Arbeit wird geladen
 my-work-empty-title = Nichts offen
 my-work-empty-text = Sie haben keine offenen Aufgaben und Zusagen. Neue Einträge, die Ihnen gehören, erscheinen hier.
-my-work-overdue = überfällig
 # $count: the number of proposals that the member reviews.
 my-work-review =
     { $count ->

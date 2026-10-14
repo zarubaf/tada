@@ -23,26 +23,53 @@ describe("Chip", () => {
 
   describe("date", () => {
     it("shows the date in a time element", () => {
-      render(
-        <Chip variant="date" dateTime="2026-10-15">
-          15.10.
-        </Chip>,
-      );
-      const time = screen.getByText("15.10.");
+      render(<Chip variant="date" date="2026-10-15" today="2026-10-14" />);
+      const time = screen.getByText("15.10.2026");
       expect(time.tagName).toBe("TIME");
       expect(time).toHaveAttribute("datetime", "2026-10-15");
       expect(screen.queryByText(/überfällig/)).not.toBeInTheDocument();
     });
 
-    it("says überfällig in words when it is overdue", () => {
-      const { container } = render(
-        <Chip variant="date" dateTime="2026-10-12" overdue>
-          12.10.
-        </Chip>,
-      );
+    it("is not overdue on the day itself", () => {
+      render(<Chip variant="date" date="2026-10-14" today="2026-10-14" />);
+      expect(screen.queryByText(/überfällig/)).not.toBeInTheDocument();
+    });
+
+    it("says überfällig in words when the date is before today", () => {
+      const { container } = render(<Chip variant="date" date="2026-10-12" today="2026-10-14" />);
       expect(screen.getByText(/überfällig/)).toBeInTheDocument();
       expect(container.firstElementChild).toHaveAttribute("data-overdue", "true");
     });
+
+    it("takes today from the browser day when none is given", () => {
+      render(<Chip variant="date" date="2000-01-01" />);
+      expect(screen.getByText(/überfällig/)).toBeInTheDocument();
+    });
+  });
+
+  it("marks an interactive chip for its hit area", () => {
+    const { container, rerender } = render(<Chip>Wirkung hoch</Chip>);
+    expect(container.firstElementChild).not.toHaveAttribute("data-interactive");
+    rerender(<Chip onPress={() => {}}>Wirkung hoch</Chip>);
+    expect(container.firstElementChild).toHaveAttribute("data-interactive", "true");
+  });
+
+  it("takes overdue and dateTime only on the date variant (checked by the compiler)", () => {
+    const rejected = () => (
+      <>
+        {/* @ts-expect-error only the date chip is overdue */}
+        <Chip variant="workstream" overdue>
+          Technik
+        </Chip>
+        {/* @ts-expect-error only the date chip has a date time */}
+        <Chip variant="workstream" dateTime="2026-10-15">
+          Technik
+        </Chip>
+        {/* @ts-expect-error a date chip needs a date */}
+        <Chip variant="date" />
+      </>
+    );
+    expect(rejected).toBeTypeOf("function");
   });
 
   it("names a workstream as a Bereich", () => {
