@@ -361,8 +361,8 @@
 
   /* The tones follow the status labels; the name of each mark says the status in words. */
   [data-status="in-progress"] > .mark .markShape {
-    border-color: var(--color-accent);
-    background: var(--color-accent-subtle);
+    border-color: var(--color-warning);
+    background: var(--color-warning-subtle);
   }
 
   [data-status="blocked"] > .mark .markShape {
