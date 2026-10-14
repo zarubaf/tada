@@ -31,16 +31,17 @@ The confirm button of a destructive confirmation also uses the danger button.
 
 ### Input
 
-| Component                   | Rules                                                                                    |
-| --------------------------- | ---------------------------------------------------------------------------------------- |
-| TextField, TextArea         | Label above, help below, error below the help.                                           |
-| Select                      | For up to 7 options. More options use ComboBox.                                          |
-| ComboBox                    | Search in the options. Used for people, events and records.                              |
-| DatePicker, DateRangePicker | `de-CH` format; keyboard input and calendar. Shows the weekday.                          |
-| Checkbox, CheckboxGroup     | Label to the right of the box.                                                           |
-| RadioGroup                  | For two to five exclusive options that a member must see together.                       |
-| Switch                      | Only for a setting that has an immediate effect. Not inside forms with a submit button.  |
-| FileDrop                    | Drag and drop with a visible „Datei wählen“ button. Shows size limits before the upload. |
+| Component                   | Rules                                                                                                                                                                                                                                                           |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TextField, TextArea         | Label above, help below, error below the help.                                                                                                                                                                                                                  |
+| Select                      | For up to 7 options. More options use ComboBox.                                                                                                                                                                                                                 |
+| SearchSelect                | A select with a search field in its popover, for owner, workstream, milestone and similar lists. All options are present. An option can have an avatar. It has a required label, a „no result“ text, a check on the chosen option and an optional clear button. |
+| ComboBox                    | Search in the options. Used for people, events and records.                                                                                                                                                                                                     |
+| DatePicker, DateRangePicker | `de-CH` format; keyboard input and calendar. Shows the weekday.                                                                                                                                                                                                 |
+| Checkbox, CheckboxGroup     | Label to the right of the box.                                                                                                                                                                                                                                  |
+| RadioGroup                  | For two to five exclusive options that a member must see together.                                                                                                                                                                                              |
+| Switch                      | Only for a setting that has an immediate effect. Not inside forms with a submit button.                                                                                                                                                                         |
+| FileDrop                    | Drag and drop with a visible „Datei wählen“ button. Shows size limits before the upload.                                                                                                                                                                        |
 
 ### Display
 
@@ -70,6 +71,7 @@ See [accessibility.md](accessibility.md#focus).
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | NavLink   | A navigation item. The current page has `aria-current="page"` and the current style. `large` gives the bottom bar a thumb target.                                                                                       |
 | SubNav    | The sub-navigation of a template, for example of the settings or of an event. It contains NavLink items. `secondary` is a second row below one item, smaller and without a line, for example the registers of an event. |
+| Toolbar   | The filter and display row above a list. One tab stop; arrow keys move between its buttons and menus.                                                                                                                   |
 | SkipLink  | „Zum Inhalt springen“, the first focusable element of each page. It moves to `main`.                                                                                                                                    |
 
 ### Page
@@ -88,7 +90,8 @@ See [accessibility.md](accessibility.md#focus).
 | Dialog      | Only for a destructive confirmation or a blocking task. Title, one sentence, two buttons. `ConfirmDialog` is the confirmation; `TaskDialog` holds a blocking task with a field, for example the reason of „Verbindlich machen“.                   |
 | Popover     | For small forms and pickers that belong to one control.                                                                                                                                                                                           |
 | Tooltip     | Text only, no interactive content. Opens on hover after 500 ms and at once on keyboard focus; the Escape key closes it. It repeats a name or adds a hint; no information lives only in a tooltip, because touch has no hover. IconButton uses it. |
-| Tabs        | For two to six views of one record. Not for navigation between pages.                                                                                                                                                                             |
+| SidePanel   | The non-modal details of one record (ADR 0082). Docked beside the list from 80 rem, an overlay from the right from 40 rem, full screen below. Focus moves in on open and returns to the opener, else to the list. `Esc` and the close button close it. It never traps focus. Pages load it lazily. |
+| Tabs        | For two to six views of one record or list, or for a type filter with counts. Arrow keys move between the tabs. Not for navigation between pages.                                                                                                                                                  |
 | Banner      | A message for a whole page or the app, for example „Synchronisation seit 3 Stunden unterbrochen“. Cannot be hidden while the problem exists.                                                                                                      |
 | Toast       | Confirms the last action of the member, with an „Rückgängig“ action if possible. Never for errors that need an action.                                                                                                                            |
 | EmptyState  | A title, one sentence and one action, if the member can act there. No illustration.                                                                                                                                                               |
