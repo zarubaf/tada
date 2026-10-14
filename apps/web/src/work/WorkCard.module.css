@@ -67,6 +67,12 @@
     font-size: var(--font-size-xs);
   }
 
+  /* Only the workstream chip shrinks to an ellipsis; the status and the date keep their size. */
+  .chips > span {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .hidden {
     position: absolute;
     width: 1px;
