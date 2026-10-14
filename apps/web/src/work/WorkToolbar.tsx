@@ -1,5 +1,5 @@
 import { IconFilter } from "@tabler/icons-react";
-import { useState } from "react";
+import { type Ref, useState } from "react";
 import type { RecordKind } from "../api/client";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
@@ -32,6 +32,10 @@ export interface WorkToolbarProps {
   me: string;
   /** Below 40rem the type is a select and the other filters sit in a sheet (ADR 0023). */
   narrow: boolean;
+  /** Clears all filters. The page moves focus afterwards, because the reset button leaves. */
+  onReset: () => void;
+  /** The search field that shows, for the focus after a reset. */
+  searchRef: Ref<HTMLInputElement>;
 }
 
 function typeOptions(counts: Counts | undefined) {
@@ -61,15 +65,17 @@ function Controls({
   onChange,
   directory,
   me,
+  onReset,
+  searchRef,
 }: Omit<WorkToolbarProps, "counts" | "narrow">) {
   const props = { filters, onChange };
   return (
     <>
-      <SearchBox {...props} />
+      <SearchBox {...props} inputRef={searchRef} />
       <OwnerFilter {...props} directory={directory} me={me} />
       <StreamFilter {...props} directory={directory} />
       <DueFilter {...props} />
-      <ResetFilters {...props} />
+      <ResetFilters filters={filters} onReset={onReset} />
     </>
   );
 }
@@ -80,6 +86,8 @@ function NarrowToolbar({
   counts,
   directory,
   me,
+  onReset,
+  searchRef,
 }: Omit<WorkToolbarProps, "narrow">) {
   const [open, setOpen] = useState(false);
   const active = countOtherFilters(filters);
@@ -106,7 +114,14 @@ function NarrowToolbar({
       {open && (
         <Sheet title={t("work-filter-title")} onClose={() => setOpen(false)}>
           <div className={styles.sheet}>
-            <Controls filters={filters} onChange={onChange} directory={directory} me={me} />
+            <Controls
+              filters={filters}
+              onChange={onChange}
+              directory={directory}
+              me={me}
+              onReset={onReset}
+              searchRef={searchRef}
+            />
           </div>
         </Sheet>
       )}
@@ -122,7 +137,7 @@ export function WorkToolbar({ narrow, ...props }: WorkToolbarProps) {
   if (narrow) {
     return <NarrowToolbar {...props} />;
   }
-  const { filters, onChange, counts, directory, me } = props;
+  const { filters, onChange, counts, directory, me, onReset, searchRef } = props;
   return (
     <div className={styles.wide}>
       <TypeFilter
@@ -132,12 +147,12 @@ export function WorkToolbar({ narrow, ...props }: WorkToolbarProps) {
         onChange={(id) => setType(filters, onChange, id)}
       />
       <div className={styles.filters}>
-        <SearchBox filters={filters} onChange={onChange} />
+        <SearchBox filters={filters} onChange={onChange} inputRef={searchRef} />
         <Toolbar label={t("work-toolbar")}>
           <OwnerFilter filters={filters} onChange={onChange} directory={directory} me={me} />
           <StreamFilter filters={filters} onChange={onChange} directory={directory} />
           <DueFilter filters={filters} onChange={onChange} />
-          <ResetFilters filters={filters} onChange={onChange} />
+          <ResetFilters filters={filters} onReset={onReset} />
         </Toolbar>
       </div>
     </div>
