@@ -1419,8 +1419,8 @@ record-not-found-title = Eintrag nicht gefunden
 record-not-found-text = Den Eintrag { $id } gibt es in diesem Anlass nicht.
 # $version: the record version that the evidence supports.
 action-evidence-version = Stützt die Version { $version } der Aufgabe
-# $field: the name of the field. $value: its value, or the words for no value.
-record-edit-field = { $field } bearbeiten: { $value }
+# $field: the name of the field.
+record-edit-field = { $field } bearbeiten
 record-saving = Speichert …
 # $field: the name of the field. $id: the readable ID of the record.
 record-saved = { $field } von { $id } gespeichert.
