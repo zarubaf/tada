@@ -1,6 +1,8 @@
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Api } from "../api/client";
+import { EventLoadError } from "../events/EventLoadError";
+import { useEventState } from "../events/useEventState";
 import { todayLocal } from "../facts/dueDate";
 import { t } from "../i18n";
 import { useParams } from "../router/Router";
@@ -35,6 +37,7 @@ export function WorkPage({ api }: { api: Api }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const { retry } = useRetry(() => heading.current);
   const retrying = useRetrying(retry);
+  const event = useEventState(api, eventId, () => heading.current);
   const today = todayLocal();
 
   const failed = RECORD_KINDS.filter((kind) => work.kinds[kind].kind === "failed");
@@ -59,6 +62,19 @@ export function WorkPage({ api }: { api: Api }) {
     }
   }, [key, shown.length]);
 
+  // The failures go to the same polite region, so that six failures are one announcement and not
+  // six alerts. An event that failed to load shows its own alert instead.
+  const failures = [
+    ...(work.directory.kind === "failed" ? [t("work-directory-failed")] : []),
+    ...failed.map((kind) => t("work-kind-failed", { kind: t(`work-type-${kind}`) })),
+  ].join(" ");
+  const eventFailed = event.state.kind === "failed";
+  useEffect(() => {
+    if (failures !== "" && !eventFailed) {
+      setAnnouncement(failures);
+    }
+  }, [failures, eventFailed]);
+
   const workstreamName = (id: string) =>
     work.directory.kind === "loaded"
       ? work.directory.directory.workstreams.find((stream) => stream.id === id)?.name
@@ -66,6 +82,17 @@ export function WorkPage({ api }: { api: Api }) {
 
   const empty = !loading && failed.length === 0 && work.items.length === 0;
   const filteredOut = !loading && work.items.length > 0 && shown.length === 0;
+
+  if (event.state.kind === "failed") {
+    return (
+      <Page>
+        <div className={styles.page}>
+          <PageTitle ref={heading}>{t("work-title")}</PageTitle>
+          <EventLoadError failure={event.state} retried={event.retried} onRetry={event.retry} />
+        </div>
+      </Page>
+    );
+  }
 
   return (
     <Page>
@@ -174,7 +201,7 @@ function FailureBanner({
   onRetry: () => void;
 }) {
   return (
-    <div role="alert" aria-busy={busy}>
+    <div aria-busy={busy}>
       <Banner icon={IconAlertTriangle} action={<Button onPress={onRetry}>{t("retry")}</Button>}>
         <p>
           <strong>{message}</strong>
