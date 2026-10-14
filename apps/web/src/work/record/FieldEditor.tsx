@@ -291,7 +291,10 @@ export function FieldEditor({
   }
 
   return titled(
-    <div aria-busy={busy || undefined} className={styles.editing}>
+    <div
+      aria-busy={busy || undefined}
+      className={heading ? `${styles.editing} ${styles.editingTitle}` : styles.editing}
+    >
       <TextEditor
         spec={spec}
         draft={edit.draft}
