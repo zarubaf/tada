@@ -135,6 +135,7 @@ nav-more = Mehr
 nav-more-menu = Weitere Bereiche
 nav-my-work = Meine Arbeit
 nav-work = Arbeit
+nav-timeline = Zeitplan
 nav-events = Anlässe
 nav-persons = Personen
 nav-institutions = Institutionen

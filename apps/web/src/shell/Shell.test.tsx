@@ -332,6 +332,7 @@ describe("sidebar", () => {
       "Eingang",
       "Meine Arbeit",
       "Arbeit",
+      "Zeitplan",
       "Anlässe",
       "Personen",
       "Institutionen",
@@ -340,6 +341,23 @@ describe("sidebar", () => {
     expect(work).toHaveAttribute("href", "/events/0199b8e0-0000-7000-8000-0000000000e1/work");
     expect(work).toHaveAttribute("aria-current", "page");
     // Two items are not current at once: Arbeit claims the page.
+    expect(within(nav).getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("marks Zeitplan, not Arbeit, on the timeline view of the work page", async () => {
+    renderShellAt(
+      "/events/0199b8e0-0000-7000-8000-0000000000e1/work?view=timeline",
+      json(200, info([first], first)),
+    );
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    const timeline = within(nav).getByRole("link", { name: "Zeitplan" });
+    expect(timeline).toHaveAttribute(
+      "href",
+      "/events/0199b8e0-0000-7000-8000-0000000000e1/work?view=timeline",
+    );
+    expect(timeline).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Arbeit" })).not.toHaveAttribute("aria-current");
     expect(within(nav).getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
   });
 

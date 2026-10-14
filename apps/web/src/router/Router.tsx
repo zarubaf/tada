@@ -287,6 +287,30 @@ export function Redirect({ to }: { to: string }) {
   return null;
 }
 
+/** A value of a query parameter, for a link that is current only with or without it. */
+export interface QueryRule {
+  name: string;
+  value: string;
+}
+
+/**
+ * True when the query passes the rules: it has the value of `onlyWith`, and it does not have the
+ * value of `unlessWith`. The shared form of the query rules of a link and of a destination.
+ */
+export function passesQueryRules(
+  search: string,
+  {
+    onlyWith,
+    unlessWith,
+  }: { onlyWith?: QueryRule | undefined; unlessWith?: QueryRule | undefined },
+): boolean {
+  const params = new URLSearchParams(search);
+  return (
+    (onlyWith === undefined || params.get(onlyWith.name) === onlyWith.value) &&
+    (unlessWith === undefined || params.get(unlessWith.name) !== unlessWith.value)
+  );
+}
+
 export interface LinkProps {
   /** A path with an optional `?query` and `#hash`. */
   to: string;
@@ -308,6 +332,13 @@ export interface LinkProps {
    * event, below the item of the events. This link is not current there.
    */
   yieldsTo?: string;
+  /**
+   * The link is current only while the query has this value, for example the „Zeitplan“ item, which
+   * opens a view of a page that another item opens too.
+   */
+  onlyWith?: QueryRule;
+  /** The link is not current while the query has this value: the sibling of `onlyWith`. */
+  unlessWith?: QueryRule;
   /** For a link whose words do not name its target alone, for example in a table. */
   "aria-label"?: string;
   /** The IDs of the elements that name the link, for a card whose name is only a part of its text. */
@@ -341,6 +372,8 @@ export function Link({
   within,
   alsoCurrentOn = [],
   yieldsTo,
+  onlyWith,
+  unlessWith,
   "aria-label": ariaLabel,
   "aria-labelledby": labelledBy,
   "aria-describedby": describedBy,
@@ -348,13 +381,15 @@ export function Link({
   onNavigate,
   children,
 }: LinkProps) {
-  const { pathname, navigate } = useLocation();
-  // A query or a hash in `to` does not count: the link is current for its path.
+  const { pathname, search, navigate } = useLocation();
+  // A query or a hash in `to` does not count: the link is current for its path, and for the query
+  // values that its rules name.
   const target = to.split(/[?#]/, 1)[0] ?? to;
   const yielded = yieldsTo !== undefined && isAtOrBelow(pathname, yieldsTo);
   const current =
     target !== "" &&
     !yielded &&
+    passesQueryRules(search, { onlyWith, unlessWith }) &&
     (pathname === target ||
       (!exact && pathname.startsWith(`${target}/`)) ||
       (within !== undefined && pathname.startsWith(`${within}/`)) ||

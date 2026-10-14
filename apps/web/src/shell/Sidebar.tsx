@@ -47,6 +47,8 @@ export function Sidebar({
             {...(destination.exact ? { exact: true } : {})}
             {...(destination.within ? { within: destination.within } : {})}
             {...(destination.yieldsTo ? { yieldsTo: destination.yieldsTo } : {})}
+            {...(destination.onlyWith ? { onlyWith: destination.onlyWith } : {})}
+            {...(destination.unlessWith ? { unlessWith: destination.unlessWith } : {})}
           >
             {destination.label}
             {destination.id === "inbox" && <InboxCount />}
