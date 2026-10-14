@@ -104,7 +104,7 @@ describe("a decision in the panel", () => {
     expect(view.getByText("DEC-001")).toBeVisible();
     expect(view.getByText("Entscheid")).toBeVisible();
     const labels = Array.from(document.querySelectorAll("aside dt")).map((dt) => dt.textContent);
-    expect(labels).toEqual(["Status", "Entschieden am", "Beteiligte", "Verantwortlich", "Bereich"]);
+    expect(labels).toEqual(["Status", "Entschieden", "Beteiligte", "Verantwortlich", "Bereich"]);
     expect(view.getByText("in Kraft")).toBeVisible();
     expect(view.getByText("12.03.2030")).toBeVisible();
     expect(view.getByText("Cäcilia Probst")).toBeVisible();
@@ -128,7 +128,7 @@ describe("a decision in the panel", () => {
     const view = await region();
     expect(view.queryByRole("button", { name: /^Wortlaut/ })).toBeNull();
     expect(view.queryByRole("button", { name: /^Titel/ })).toBeNull();
-    expect(view.queryByRole("button", { name: /^Entschieden am/ })).toBeNull();
+    expect(view.queryByRole("button", { name: /^Entschieden/ })).toBeNull();
     expect(view.queryByRole("button", { name: /^Beteiligte/ })).toBeNull();
     await user.click(view.getByRole("heading", { level: 2 }));
     expect(view.queryByRole("textbox")).toBeNull();
@@ -502,7 +502,7 @@ describe("creating a decision", () => {
     expect(view.getByRole("textbox", { name: /^Wortlaut/ })).toBeVisible();
     expect(view.getByText(/Der Wortlaut lässt sich später nicht ändern/)).toBeVisible();
     expect(view.getByRole("combobox", { name: /^Beteiligte/ })).toBeVisible();
-    expect(view.getByLabelText("Entschieden am")).toHaveAttribute("type", "date");
+    expect(view.getByLabelText("Entschieden")).toHaveAttribute("type", "date");
     expect(
       view.getByRole("button", { name: "Verantwortlich (Pflichtfeld): Anna Muster" }),
     ).toBeVisible();
@@ -531,7 +531,7 @@ describe("creating a decision", () => {
     const server = openCreate();
     const view = await form();
     await user.type(view.getByRole("textbox", { name: /^Wortlaut/ }), "Das Fest findet statt.");
-    await user.type(view.getByLabelText("Entschieden am"), "2030-03-12");
+    await user.type(view.getByLabelText("Entschieden"), "2030-03-12");
     await user.click(await view.findByRole("option", { name: "Cäcilia Probst (PER-001)" }, SEARCH));
     await user.click(view.getByRole("button", { name: "Erstellen" }));
 
