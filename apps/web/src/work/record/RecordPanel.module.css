@@ -293,7 +293,7 @@
     letter-spacing: inherit;
   }
 
-  .editingTitle textarea[data-focus-visible] {
+  .editingTitle textarea:is(:focus-visible, [data-focus-visible]) {
     outline: none;
     border-color: var(--color-focus);
   }
