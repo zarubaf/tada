@@ -101,18 +101,22 @@ test("a URL opens the same filtered view after a reload", async ({ page }) => {
   await expect(page.getByRole("radio", { name: /^Aufgaben/, checked: true })).toBeVisible();
 });
 
-test("a card is one link, and its address opens the old page at the record", async ({ page }) => {
+test("a card is one link, and its address opens the panel at the record", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await fakeWork(page);
   await page.goto(work);
   const link = page.getByRole("link", { name: /ACT-001/ });
-  const href = `/events/${event?.id}/actions#ACT-001`;
+  const href = `/events/${event?.id}/work#ACT-001`;
   await expect(link).toHaveAttribute("href", href);
   await expect(link).toHaveAccessibleName(/^ACT-001 Generatorenvermietung/);
-  // The address works on its own, for a shared link or a reload: it shows the record.
+  // The other kinds keep their old pages until their panels exist.
+  await expect(page.getByRole("link", { name: /COM-001/ })).toHaveAttribute(
+    "href",
+    `/events/${event?.id}/commitments#COM-001`,
+  );
+  // The address works on its own, for a shared link or a reload: it opens the record in the panel.
   await page.goto(href);
-  await expect(page.locator("tr#ACT-001")).toBeVisible();
-  await expect(page.locator("tr#ACT-001")).toBeFocused();
+  await expect(page.getByRole("complementary", { name: /^ACT-001/ })).toBeVisible();
 });
 
 // ADR 0022: the targets are 44 px with a coarse pointer, on the board, the filter sheet and the
