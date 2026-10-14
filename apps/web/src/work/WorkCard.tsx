@@ -63,15 +63,17 @@ function partIds(base: string) {
     status: `${base}-status`,
     owner: `${base}-owner`,
     due: `${base}-due`,
+    impact: `${base}-impact`,
+    likelihood: `${base}-likelihood`,
     area: `${base}-area`,
   };
 }
 
 /**
  * One work record on the board (doc/design/components.md, „Work card“): kind and ID, owner, title
- * and chips. The whole card is one link to the record. A risk has no page yet, so its card has the
- * same look and is a group, not a link. The name is the ID and the title; kind, status, owner,
- * date and area are the description, each part its own element so that they read apart.
+ * and chips. The whole card is one link to the record. The name is the ID and the title; kind,
+ * status, owner, date, the rating of a risk and area are the description, each part its own
+ * element so that they read apart.
  */
 export function WorkCard({
   item,
@@ -95,6 +97,8 @@ export function WorkCard({
     ids.status,
     hasOwner && ids.owner,
     item.date !== undefined && ids.due,
+    item.kind === "risk" && ids.impact,
+    item.kind === "risk" && ids.likelihood,
     hasArea && ids.area,
   ]
     .filter(Boolean)
@@ -146,6 +150,18 @@ export function WorkCard({
             </span>{" "}
             <Chip variant="date" date={item.date} today={today} overdue={mayBeOverdue(item)} />
           </span>
+        )}
+        {item.kind === "risk" && (
+          <>
+            <span id={ids.impact}>
+              <Chip>{t("work-card-impact", { level: t(`risk-level-${item.record.impact}`) })}</Chip>
+            </span>
+            <span id={ids.likelihood}>
+              <Chip>
+                {t("work-card-likelihood", { level: t(`risk-level-${item.record.likelihood}`) })}
+              </Chip>
+            </span>
+          </>
         )}
         {hasArea && (
           <span id={ids.area}>
