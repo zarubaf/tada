@@ -46,7 +46,9 @@ export type MilestoneStatus = components["schemas"]["MilestoneStatus"];
 export type MilestoneWarning = components["schemas"]["Warning"];
 export type Decision = components["schemas"]["Decision"];
 export type DecisionStatus = components["schemas"]["DecisionStatus"];
+export type Risk = components["schemas"]["Risk"];
 export type RiskStatus = components["schemas"]["RiskStatus"];
+export type Level = components["schemas"]["Level"];
 /** The five kinds of work record (ADR 0082). */
 export type RecordKind = "action" | "commitment" | "milestone" | "decision" | "risk";
 export type PartyRef = components["schemas"]["PartyRef"];
