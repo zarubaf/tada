@@ -62,8 +62,11 @@ export interface FieldSpec {
   overdue?: boolean;
   /** The value of the item. */
   read: (item: WorkItem) => FieldValue;
-  /** The status values an item can have now: its own and the next ones. For a `status` control. */
-  statuses?: (item: WorkItem) => string[];
+  /**
+   * The values of an enumeration that the item can have now, for a choice from a closed list: for
+   * a status its own and the next ones. A control of that kind reads them here.
+   */
+  options?: (item: WorkItem) => string[];
   /** Changes the field. Without it the field is plain text for this kind, whatever the member may. */
   save?: (
     commands: WorkCommands,
