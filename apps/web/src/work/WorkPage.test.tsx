@@ -308,6 +308,47 @@ describe("WorkPage", () => {
       expect(calls.filter((c) => c.call.endsWith("/actions")).length).toBe(before);
     });
 
+    it("keeps the board and the focus while a retry runs, also when it fails again", async () => {
+      let answer: () => Response | Promise<Response> = () => problem(500, "internal");
+      open("", { answers: { "GET /risks": () => answer() } });
+      await screen.findByText("Risiken konnten nicht geladen werden.");
+
+      let fail: (response: Response) => void = () => {};
+      answer = () => new Promise<Response>((resolve) => (fail = resolve));
+      const retry = screen.getByRole("button", { name: "Erneut versuchen" });
+      await userEvent.click(retry);
+      // The other kinds still show; the skeleton is for the first load only.
+      expect(screen.getByText("ACT-001")).toBeInTheDocument();
+      expect(screen.queryByRole("status", { name: "Arbeit wird geladen" })).not.toBeInTheDocument();
+      expect(retry.closest("[aria-busy='true']")).not.toBeNull();
+
+      await act(async () => fail(problem(503, "unavailable")));
+      await waitFor(() => expect(retry.closest("[aria-busy='true']")).toBeNull());
+      expect(screen.getByText("Risiken konnten nicht geladen werden.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Erneut versuchen" })).toHaveFocus();
+    });
+
+    it("retries the people and areas without loading the work again", async () => {
+      let fail = true;
+      const { calls } = open("", {
+        answers: {
+          "GET /api/v1/members": () => (fail ? problem(500, "internal") : json(200, { items: [] })),
+        },
+      });
+      await screen.findByText("Personen und Bereiche konnten nicht geladen werden.");
+      const lists = () => calls.filter((c) => /\/(actions|risks)$/.test(c.call)).length;
+      const before = lists();
+      fail = false;
+      await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
+      await waitFor(() =>
+        expect(
+          screen.queryByText("Personen und Bereiche konnten nicht geladen werden."),
+        ).not.toBeInTheDocument(),
+      );
+      expect(lists()).toBe(before);
+      expect(screen.getByText("ACT-001")).toBeInTheDocument();
+    });
+
     it("shows a banner when the people and areas fail, and the work still shows", async () => {
       open("", { answers: { "GET /api/v1/members": () => problem(500, "internal") } });
       expect(

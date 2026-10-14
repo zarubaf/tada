@@ -34,6 +34,7 @@ export function WorkPage({ api }: { api: Api }) {
   const [filters, setFilters] = useWorkFilters();
   const heading = useRef<HTMLHeadingElement>(null);
   const { retry } = useRetry(() => heading.current);
+  const retrying = useRetrying(retry);
   const today = todayLocal();
 
   const failed = RECORD_KINDS.filter((kind) => work.kinds[kind].kind === "failed");
@@ -85,12 +86,8 @@ export function WorkPage({ api }: { api: Api }) {
           <FailureBanner
             message={t("work-directory-failed")}
             detail={work.directory.message}
-            onRetry={() =>
-              retry(async () => {
-                await work.reload();
-                return true;
-              })
-            }
+            busy={retrying.has("directory")}
+            onRetry={() => retrying.start("directory", work.reloadDirectory)}
           />
         )}
         {failed.map((kind) => (
@@ -98,7 +95,8 @@ export function WorkPage({ api }: { api: Api }) {
             key={kind}
             message={t("work-kind-failed", { kind: t(`work-type-${kind}`) })}
             detail={failureMessage(work.kinds[kind])}
-            onRetry={() => retry(() => work.reloadKind(kind))}
+            busy={retrying.has(kind)}
+            onRetry={() => retrying.start(kind, () => work.reloadKind(kind))}
           />
         ))}
         {loading && <BoardSkeleton narrow={narrow} />}
@@ -136,6 +134,29 @@ export function WorkPage({ api }: { api: Api }) {
   );
 }
 
+/**
+ * The retries that run. A retry keeps its banner on screen, so a second press is ignored while it
+ * runs; the button stays in the page and keeps focus when the retry fails again.
+ */
+function useRetrying(retry: (load: () => Promise<boolean>) => void) {
+  const [running, setRunning] = useState<ReadonlySet<string>>(new Set());
+  const change = (key: string, on: boolean) =>
+    setRunning((current) => {
+      const next = new Set(current);
+      next[on ? "add" : "delete"](key);
+      return next;
+    });
+  return {
+    has: (key: string) => running.has(key),
+    start: (key: string, load: () => Promise<boolean>) => {
+      if (!running.has(key)) {
+        change(key, true);
+        retry(() => load().finally(() => change(key, false)));
+      }
+    },
+  };
+}
+
 function failureMessage(state: KindState<unknown>): string | undefined {
   return state.kind === "failed" ? state.message : undefined;
 }
@@ -143,14 +164,17 @@ function failureMessage(state: KindState<unknown>): string | undefined {
 function FailureBanner({
   message,
   detail,
+  busy,
   onRetry,
 }: {
   message: string;
   detail: string | undefined;
+  /** True while the retry runs. */
+  busy: boolean;
   onRetry: () => void;
 }) {
   return (
-    <div role="alert">
+    <div role="alert" aria-busy={busy}>
       <Banner icon={IconAlertTriangle} action={<Button onPress={onRetry}>{t("retry")}</Button>}>
         <p>
           <strong>{message}</strong>

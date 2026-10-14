@@ -327,7 +327,29 @@ describe("useWork", () => {
     expect(result.current.kinds.action.kind).toBe("loaded");
   });
 
-  it("reloads the five kinds and the directory", async () => {
+  it("keeps a failed kind failed while its retry runs, and when the retry fails again", async () => {
+    const waiting: ((response: Response) => void)[] = [];
+    const { api, table } = server({ "ea/milestones": () => problem(500, "internal") });
+    const { result } = mount(api);
+    await waitFor(() => expect(result.current.kinds.milestone.kind).toBe("failed"));
+
+    table["ea/milestones"] = () => new Promise<Response>((resolve) => waiting.push(resolve));
+    let retried: Promise<boolean> | undefined;
+    act(() => {
+      retried = result.current.reloadKind("milestone");
+    });
+    await waitFor(() => expect(waiting).toHaveLength(1));
+    // No loading state in between: the page keeps the banner, and with it the focus.
+    expect(result.current.kinds.milestone.kind).toBe("failed");
+
+    await act(async () => {
+      waiting[0]?.(problem(503, "unavailable"));
+      expect(await retried).toBe(false);
+    });
+    expect(result.current.kinds.milestone.kind).toBe("failed");
+  });
+
+  it("reloads the directory alone", async () => {
     const { api, calls, directory } = server();
     const { result } = mount(api);
     await waitFor(() => expect(result.current.directory.kind).toBe("loaded"));
@@ -336,9 +358,9 @@ describe("useWork", () => {
     expect(directory.sort()).toEqual(["members", "memberships", "workstreams"]);
     const before = calls.length;
     await act(async () => {
-      await result.current.reload();
+      await result.current.reloadDirectory();
     });
-    expect(calls.length - before).toBe(5);
+    expect(calls.length).toBe(before);
     expect(directory.sort()).toEqual([
       "members",
       "members",
