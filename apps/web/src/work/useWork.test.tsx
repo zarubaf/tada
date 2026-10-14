@@ -240,7 +240,7 @@ describe("useWork", () => {
     });
     table["ea/actions"] = async () => {
       await gate;
-      return json(200, { items: [rec("act-1", { title: "Server" })] });
+      return json(200, { items: [rec("act-1", { title: "Server", version: 3 })] });
     };
     const before = calls.length;
     let done: Promise<boolean> = Promise.resolve(false);
@@ -256,6 +256,38 @@ describe("useWork", () => {
       await done;
     });
     expect(result.current.items[0]?.title).toBe("Server");
+  });
+
+  it("keeps a record that a command returned when an older list arrives after it", async () => {
+    const { api, calls, table } = server({
+      "ea/actions": () => json(200, { items: [rec("act-1", { version: 4 })] }),
+      "PATCH ea/actions/act-1": () => json(200, rec("act-1", { title: "Neu", version: 5 })),
+    });
+    const { result } = mount(api);
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    table["ea/actions"] = async () => {
+      await gate;
+      return json(200, { items: [rec("act-1", { version: 4 })] });
+    };
+    const before = calls.length;
+    let done: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      done = result.current.refresh("action");
+    });
+    await waitFor(() => expect(calls.length).toBeGreaterThan(before));
+    await act(async () => {
+      await result.current.commands.action.rename({ id: "act-1", version: 4 }, "Neu");
+    });
+    expect(result.current.items[0]).toMatchObject({ title: "Neu", version: 5 });
+    release();
+    await act(async () => {
+      await done;
+    });
+    expect(result.current.items[0]).toMatchObject({ title: "Neu", version: 5 });
   });
 
   it("puts the record of a successful command into the list, and leaves it after a failure", async () => {

@@ -36,7 +36,7 @@ export interface Work {
 }
 
 type Answer = Promise<{
-  data?: { items: { id: string }[]; next_cursor?: string | null | undefined };
+  data?: { items: { id: string; version: number }[]; next_cursor?: string | null | undefined };
   error?: Problem | undefined;
 }>;
 
@@ -75,6 +75,24 @@ function once<T extends { id: string }>(records: T[]): T[] {
   return [...new Map(records.map((record) => [record.id, record])).values()];
 }
 
+/**
+ * The records of a list that arrived, except where the list on screen has a newer version of one.
+ * A list that was asked for before a command can arrive after the command's answer; versions only
+ * grow, so the higher one is the later state. This also leaves a load that is still running alone,
+ * which dropping its answer would not.
+ */
+function newest<T extends { id: string; version: number }>(
+  slot: Slot | undefined,
+  items: T[],
+): T[] {
+  const shown = slot?.state.kind === "loaded" ? (slot.state.records as T[]) : [];
+  const versions = new Map(shown.map((record) => [record.id, record]));
+  return once(items).map((record) => {
+    const known = versions.get(record.id);
+    return known && known.version > record.version ? known : record;
+  });
+}
+
 export function useWork(api: Api, eventId: string): Work {
   const { state: directory, reload: reloadDirectory } = useDirectory(api, eventId);
   const [slots, setSlots] = useState<Partial<Record<RecordKind, Slot>>>({});
@@ -96,7 +114,7 @@ export function useWork(api: Api, eventId: string): Work {
       if (!silent) {
         put(LOADING);
       }
-      let result: Awaited<ReturnType<typeof loadAll<{ id: string }>>>;
+      let result: Awaited<ReturnType<typeof loadAll<{ id: string; version: number }>>>;
       try {
         result = await loadAll((cursor) => LISTS[kind](api, eventId, cursor));
       } catch {
@@ -106,7 +124,13 @@ export function useWork(api: Api, eventId: string): Work {
         return false;
       }
       if ("items" in result) {
-        put({ kind: "loaded", records: once(result.items) });
+        setSlots((slots) => ({
+          ...slots,
+          [kind]: {
+            eventId,
+            state: { kind: "loaded", records: newest(slots[kind], result.items) },
+          },
+        }));
         return true;
       }
       // A refresh that fails keeps the list on screen; the caller sees the false.
