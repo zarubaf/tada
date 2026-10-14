@@ -1308,6 +1308,26 @@ work-count =
         [one] 1 Eintrag
        *[other] { $count } Einträge
     }
+work-view-label = Ansicht
+work-view-board = Board
+work-view-table = Tabelle
+work-view-timeline = Zeitplan
+work-table-label = Arbeit als Tabelle
+work-table-id = ID
+work-table-kind = Typ
+work-table-title = Titel
+work-table-status = Status
+work-table-owner = Verantwortlich
+work-table-due = Fällig
+work-table-area = Bereich
+# $column: the name of the column. $direction: asc or desc.
+work-sorted =
+    Sortiert nach { $column }, { $direction ->
+        [asc] aufsteigend
+       *[desc] absteigend
+    }
+work-timeline-only = Diese Ansicht zeigt Aufgaben und Meilensteine.
+work-timeline-only-title = Nichts für den Zeitplan
 work-board-status = Status
 work-board-column-open = Offen
 work-board-column-in-progress = In Arbeit

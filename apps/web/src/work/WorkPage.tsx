@@ -15,18 +15,20 @@ import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
 import { StandaloneLink } from "../ui/StandaloneLink";
-import { Board } from "./Board";
 import { BoardSkeleton } from "./BoardSkeleton";
 import { RECORD_KINDS } from "./recordStatus";
 import { type KindState, useWork } from "./useWork";
 import { useWorkFilters } from "./useWorkFilters";
 import styles from "./WorkPage.module.css";
 import { WorkToolbar } from "./WorkToolbar";
+import { WorkViews } from "./WorkViews";
+import { WorkViewTabs } from "./WorkViewTabs";
 import { countsFor, filterWork, NO_FILTERS, serializeFilters } from "./workFilters";
+import { useWorkView } from "./workView";
 
 /**
  * „Arbeit“ (ADR 0082): all work records of an event on one page, with the filters in the query
- * string. The board is the only view for now; the table and the timeline come as further views.
+ * string. The tabs choose the view: board, table or timeline; the filters are the same in all.
  */
 export function WorkPage({ api }: { api: Api }) {
   const eventId = useParams().eventId ?? "";
@@ -34,6 +36,7 @@ export function WorkPage({ api }: { api: Api }) {
   const me = useSession().user.id;
   const narrow = useNarrow();
   const [filters, setFilters] = useWorkFilters();
+  const [view, setView] = useWorkView();
   const heading = useRef<HTMLHeadingElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
@@ -119,64 +122,75 @@ export function WorkPage({ api }: { api: Api }) {
     <Page>
       <div className={styles.page}>
         <PageTitle ref={heading}>{t("work-title")}</PageTitle>
-        <WorkToolbar
-          filters={filters}
-          onChange={setFilters}
-          counts={counts}
-          directory={work.directory}
-          me={me}
-          narrow={narrow}
-          onReset={reset}
-          searchRef={search}
-        />
-        <LiveRegion kind="status" visuallyHidden>
-          {announcement}
-        </LiveRegion>
-        {work.directory.kind === "failed" && (
-          <FailureBanner
-            message={t("work-directory-failed")}
-            detail={work.directory.message}
-            busy={retrying.has("directory")}
-            onRetry={() => retrying.start("directory", work.reloadDirectory)}
-          />
-        )}
-        {failed.map((kind) => (
-          <FailureBanner
-            key={kind}
-            message={t("work-kind-failed", { kind: t(`work-type-${kind}`) })}
-            detail={failureMessage(work.kinds[kind])}
-            busy={retrying.has(kind)}
-            onRetry={() => retrying.start(kind, () => work.reloadKind(kind))}
-          />
-        ))}
-        {loading && <BoardSkeleton narrow={narrow} />}
-        {empty && (
-          <EmptyState
-            title={t("work-empty-title")}
-            text={t("work-empty-text")}
-            action={
-              <StandaloneLink to={`/events/${encodeURIComponent(eventId)}/actions`}>
-                {t("work-empty-new-action")}
-              </StandaloneLink>
-            }
-          />
-        )}
-        {filteredOut && (
-          <EmptyState
-            title={t("work-empty-filtered-title")}
-            text={t("work-empty-filtered-text")}
-            action={<Button onPress={reset}>{t("work-filter-reset")}</Button>}
-          />
-        )}
-        {!loading && shown.length > 0 && (
-          <Board
-            items={shown}
-            eventId={eventId}
-            today={today}
-            workstreamName={workstreamName}
+        <WorkViewTabs view={view} onChange={setView}>
+          <WorkToolbar
+            filters={filters}
+            onChange={setFilters}
+            counts={counts}
+            directory={work.directory}
+            me={me}
             narrow={narrow}
+            onReset={reset}
+            searchRef={search}
           />
-        )}
+          <LiveRegion kind="status" visuallyHidden>
+            {announcement}
+          </LiveRegion>
+          {work.directory.kind === "failed" && (
+            <FailureBanner
+              message={t("work-directory-failed")}
+              detail={work.directory.message}
+              busy={retrying.has("directory")}
+              onRetry={() => retrying.start("directory", work.reloadDirectory)}
+            />
+          )}
+          {failed.map((kind) => (
+            <FailureBanner
+              key={kind}
+              message={t("work-kind-failed", { kind: t(`work-type-${kind}`) })}
+              detail={failureMessage(work.kinds[kind])}
+              busy={retrying.has(kind)}
+              onRetry={() => retrying.start(kind, () => work.reloadKind(kind))}
+            />
+          ))}
+          {loading && <BoardSkeleton narrow={narrow} />}
+          {empty && (
+            <EmptyState
+              title={t("work-empty-title")}
+              text={t("work-empty-text")}
+              action={
+                <StandaloneLink to={`/events/${encodeURIComponent(eventId)}/actions`}>
+                  {t("work-empty-new-action")}
+                </StandaloneLink>
+              }
+            />
+          )}
+          {filteredOut && (
+            <EmptyState
+              title={t("work-empty-filtered-title")}
+              text={t("work-empty-filtered-text")}
+              action={<Button onPress={reset}>{t("work-filter-reset")}</Button>}
+            />
+          )}
+          {!loading && shown.length > 0 && (
+            <WorkViews
+              view={view}
+              items={shown}
+              eventId={eventId}
+              today={today}
+              workstreamName={workstreamName}
+              narrow={narrow}
+              timeline={{
+                api,
+                filters,
+                workstreams:
+                  work.directory.kind === "loaded" ? work.directory.directory.workstreams : [],
+                timeZone: event.state.kind === "loaded" ? event.state.event.time_zone : undefined,
+                onReset: reset,
+              }}
+            />
+          )}
+        </WorkViewTabs>
       </div>
     </Page>
   );
