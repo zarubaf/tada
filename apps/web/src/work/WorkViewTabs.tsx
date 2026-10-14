@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
+import { PageToolbar } from "../ui/PageToolbar";
 import { TabPanel, Tabs } from "../ui/Tabs";
 import type { WorkToolbarSlots } from "./WorkToolbar";
 import styles from "./WorkViewTabs.module.css";
@@ -26,8 +27,13 @@ export function WorkViewTabs({ view, onChange, toolbar, children }: WorkViewTabs
       tabs={WORK_VIEWS.map((id) => ({ id, label: t(`work-view-${id}`) }))}
       value={view}
       variant="segmented"
-      before={toolbar.before}
-      after={toolbar.after}
+      renderList={(list) => (
+        <PageToolbar>
+          {toolbar.before}
+          {list}
+          {toolbar.after}
+        </PageToolbar>
+      )}
       onChange={(id) => onChange(WORK_VIEWS.find((candidate) => candidate === id) ?? "board")}
     >
       <TabPanel id={view}>

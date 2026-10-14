@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
@@ -78,5 +78,28 @@ describe("Tabs", () => {
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Spalten");
     await user.click(screen.getByRole("tab", { name: "Tabelle 12" }));
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Zeilen");
+  });
+
+  it("places the tab list where the caller puts it, inside the tabs", async () => {
+    render(
+      <Tabs
+        label="Ansicht"
+        tabs={TABS}
+        value="board"
+        onChange={() => {}}
+        renderList={(list) => (
+          <div data-testid="row">
+            <span>Vorne</span>
+            {list}
+          </div>
+        )}
+      >
+        <TabPanel id="board">Spalten</TabPanel>
+      </Tabs>,
+    );
+
+    expect(within(screen.getByTestId("row")).getByRole("tablist")).toBeInTheDocument();
+    await user.tab();
+    expect(screen.getByRole("tab", { name: "Board" })).toHaveFocus();
   });
 });

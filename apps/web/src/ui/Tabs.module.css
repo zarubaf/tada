@@ -5,22 +5,6 @@
     min-width: 0;
   }
 
-  /*
-   * The toolbar row of a page (ADR 0082): 44 px high with one line of controls, edge to edge with
-   * the border below, the gutter of the page at both sides. It wraps, and never overflows.
-   */
-  .row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-1-5) var(--space-2);
-    box-sizing: border-box;
-    min-height: var(--size-toolbar);
-    padding: var(--space-1-5) var(--page-gutter, var(--space-3));
-    border-bottom: 1px solid var(--color-border-subtle);
-    min-width: 0;
-  }
-
   .list {
     display: flex;
     gap: var(--space-0-5);
@@ -120,11 +104,7 @@
     }
   }
 
-  /* The content of a tab stands apart from what is above it: one gap for every child. */
   .panel {
-    display: grid;
-    gap: var(--space-3);
-    min-width: 0;
     outline: none;
   }
 
