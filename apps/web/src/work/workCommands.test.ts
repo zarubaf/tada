@@ -176,6 +176,61 @@ describe("work commands", () => {
   });
 });
 
+describe("the commands of an action beyond the first set", () => {
+  it("changes the start date, the description and the milestone, and can clear each", async () => {
+    const { sent, commands } = server();
+    const t = { id: "a1", version: 1 };
+    const calls = [
+      commands.action.changeStart(t, "2030-05-01"),
+      commands.action.changeStart(t, null),
+      commands.action.changeDescription(t, "Text"),
+      commands.action.changeDescription(t, null),
+      commands.action.changeMilestone(t, "m1"),
+      commands.action.changeMilestone(t, null),
+    ];
+    for (let i = 0; i < calls.length; i++) {
+      await tick();
+      sent[i]?.answer(record("a1", i + 2));
+    }
+    await Promise.all(calls);
+    expect(sent.map((s) => s.body)).toEqual([
+      { start_date: "2030-05-01", expected_version: 1 },
+      { start_date: null, expected_version: 2 },
+      { description: "Text", expected_version: 3 },
+      { description: null, expected_version: 4 },
+      { milestone_id: "m1", expected_version: 5 },
+      { milestone_id: null, expected_version: 6 },
+    ]);
+  });
+
+  it("creates an action and returns it", async () => {
+    const { sent, commands } = server();
+    const result = commands.action.create({ title: "Neu", owner_user_id: "u1" });
+    await tick();
+    expect(sent[0]).toMatchObject({
+      method: "POST",
+      path: "/api/v1/events/e1/actions",
+      body: { title: "Neu", owner_user_id: "u1" },
+    });
+    sent[0]?.answer(json(201, { id: "a9", version: 1 }));
+    expect(await result).toEqual({ ok: true, record: { id: "a9", version: 1 } });
+  });
+
+  it("keeps the problem of a refused create, so that a form can show the invalid fields", async () => {
+    const { sent, commands } = server();
+    const result = commands.action.create({ title: "Neu", owner_user_id: "u1" });
+    await tick();
+    sent[0]?.answer(problem(422, "validation-failed", [{ pointer: "/due_date", code: "invalid" }]));
+    expect(await result).toMatchObject({
+      ok: false,
+      failure: {
+        reason: "validation",
+        problem: { errors: [{ pointer: "/due_date", code: "invalid" }] },
+      },
+    });
+  });
+});
+
 describe("what a kind does not offer", () => {
   it("has no command for a field that the API does not take", () => {
     const { commands } = server();
