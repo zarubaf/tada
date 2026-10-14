@@ -1,24 +1,13 @@
 import { lazy, type ReactNode } from "react";
 import { type Api, createApi } from "./api/client";
-import { DocumentPage } from "./documents/DocumentPage";
-import { DocumentsPage } from "./documents/DocumentsPage";
-import { CreateEventForm } from "./events/CreateEventForm";
-import { EventOverview } from "./events/EventOverview";
 import { EventPage } from "./events/EventPage";
-import { EventsPage } from "./events/EventsPage";
 import { RegisterNav } from "./events/RegisterNav";
 import { NotFoundPage } from "./NotFoundPage";
-import { PrivacyPage } from "./privacy/PrivacyPage";
 import { InboxProvider } from "./review/InboxProvider";
-import { ReviewInbox } from "./review/ReviewInbox";
 import { Route, Router, Routes } from "./router/Router";
-import { ChooseOrganizationPage } from "./session/ChooseOrganizationPage";
 import { SessionProvider } from "./session/SessionProvider";
 import { SettingsRoute } from "./settings/SettingsRoute";
 import { Shell } from "./shell/Shell";
-import { InvitationPage } from "./sign-in/InvitationPage";
-import { MagicLinkPage } from "./sign-in/MagicLinkPage";
-import { SignInPage } from "./sign-in/SignInPage";
 import { RouteSuspense } from "./ui/RouteSuspense";
 import { SkipLink } from "./ui/SkipLink";
 import { MyWorkPage } from "./work/MyWorkPage";
@@ -77,6 +66,43 @@ const AccountPage = lazy(() =>
   import("./settings/AccountPage").then((module) => ({ default: module.AccountPage })),
 );
 
+// The other screens load on demand too: the first load stays inside the bundle budget of ADR 0024.
+const DocumentPage = lazy(() =>
+  import("./documents/DocumentPage").then((module) => ({ default: module.DocumentPage })),
+);
+const DocumentsPage = lazy(() =>
+  import("./documents/DocumentsPage").then((module) => ({ default: module.DocumentsPage })),
+);
+const CreateEventForm = lazy(() =>
+  import("./events/CreateEventForm").then((module) => ({ default: module.CreateEventForm })),
+);
+const EventOverview = lazy(() =>
+  import("./events/EventOverview").then((module) => ({ default: module.EventOverview })),
+);
+const EventsPage = lazy(() =>
+  import("./events/EventsPage").then((module) => ({ default: module.EventsPage })),
+);
+const PrivacyPage = lazy(() =>
+  import("./privacy/PrivacyPage").then((module) => ({ default: module.PrivacyPage })),
+);
+const ReviewInbox = lazy(() =>
+  import("./review/ReviewInbox").then((module) => ({ default: module.ReviewInbox })),
+);
+const ChooseOrganizationPage = lazy(() =>
+  import("./session/ChooseOrganizationPage").then((module) => ({
+    default: module.ChooseOrganizationPage,
+  })),
+);
+const InvitationPage = lazy(() =>
+  import("./sign-in/InvitationPage").then((module) => ({ default: module.InvitationPage })),
+);
+const MagicLinkPage = lazy(() =>
+  import("./sign-in/MagicLinkPage").then((module) => ({ default: module.MagicLinkPage })),
+);
+const SignInPage = lazy(() =>
+  import("./sign-in/SignInPage").then((module) => ({ default: module.SignInPage })),
+);
+
 // The component gallery exists only in builds that are not production builds (ADR 0024).
 const Gallery =
   import.meta.env.MODE === "production"
@@ -117,28 +143,42 @@ export function App({ api = defaultApi }: { api?: Api }) {
                     <MyWorkPage api={api} />
                   </Route>
                   <Route path="/events">
-                    <EventsPage api={api} />
+                    <RouteSuspense>
+                      <EventsPage api={api} />
+                    </RouteSuspense>
                   </Route>
                   {/* The pages of the sign-in */}
                   <Route path="/sign-in">
-                    <SignInPage api={api} />
+                    <RouteSuspense>
+                      <SignInPage api={api} />
+                    </RouteSuspense>
                   </Route>
                   <Route path="/sign-in/link">
-                    <MagicLinkPage api={api} />
+                    <RouteSuspense>
+                      <MagicLinkPage api={api} />
+                    </RouteSuspense>
                   </Route>
                   <Route path="/invitation">
-                    <InvitationPage api={api} />
+                    <RouteSuspense>
+                      <InvitationPage api={api} />
+                    </RouteSuspense>
                   </Route>
                   <Route path="/choose-organization">
-                    <ChooseOrganizationPage api={api} />
+                    <RouteSuspense>
+                      <ChooseOrganizationPage api={api} />
+                    </RouteSuspense>
                   </Route>
                   {/* The event screens */}
                   <Route path="/events/new">
-                    <CreateEventForm api={api} />
+                    <RouteSuspense>
+                      <CreateEventForm api={api} />
+                    </RouteSuspense>
                   </Route>
                   <Route path="/events/:eventId">
                     <EventPage api={api}>
-                      <EventOverview api={api} />
+                      <RouteSuspense>
+                        <EventOverview api={api} />
+                      </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/members">
@@ -150,7 +190,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   <Route path="/events/:eventId/documents">
                     <EventPage api={api}>
-                      <DocumentsPage api={api} />
+                      <RouteSuspense>
+                        <DocumentsPage api={api} />
+                      </RouteSuspense>
                     </EventPage>
                   </Route>
                   <Route path="/events/:eventId/actions">
@@ -190,7 +232,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
                     </EventPage>
                   </Route>
                   <Route path="/documents/:documentId">
-                    <DocumentPage api={api} />
+                    <RouteSuspense>
+                      <DocumentPage api={api} />
+                    </RouteSuspense>
                   </Route>
                   <Route path="/documents/:documentId/diff">
                     <RouteSuspense>
@@ -198,7 +242,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
                     </RouteSuspense>
                   </Route>
                   <Route path="/privacy">
-                    <PrivacyPage api={api} />
+                    <RouteSuspense>
+                      <PrivacyPage api={api} />
+                    </RouteSuspense>
                   </Route>
                   {/* The register of persons and institutions */}
                   <Route path="/persons">
@@ -213,10 +259,14 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   </Route>
                   {/* The Review Inbox */}
                   <Route path="/inbox">
-                    <ReviewInbox api={api} />
+                    <RouteSuspense>
+                      <ReviewInbox api={api} />
+                    </RouteSuspense>
                   </Route>
                   <Route path="/inbox/:changesetId">
-                    <ReviewInbox api={api} />
+                    <RouteSuspense>
+                      <ReviewInbox api={api} />
+                    </RouteSuspense>
                   </Route>
                   {/* The settings */}
                   <Route path="/settings/members">
