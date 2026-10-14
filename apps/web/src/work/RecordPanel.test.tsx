@@ -95,8 +95,8 @@ describe("the record panel", () => {
       open("#ACT-001");
       await panel(/ACT-001/);
       await user.click(screen.getByRole("button", { name: "Nächster Eintrag" }));
-      // COM-001, MIL-001 and DEC-001 follow in the column, but they open on their old pages.
-      expect(hash()).toBe("#ACT-002");
+      // COM-001 and DEC-001 open on their old pages; MIL-001 follows ACT-001 in the column.
+      expect(hash()).toBe("#MIL-001");
     });
 
     it("sends a record of a kind without a panel to its page, and does not call it missing", async () => {
@@ -182,7 +182,7 @@ describe("the record panel", () => {
       expect(hash()).toBe("#ACT-001");
       expect(within(second).getByText(/^2 von \d+$/)).toBeVisible();
       await user.click(screen.getByRole("button", { name: "Nächster Eintrag" }));
-      expect(hash()).toBe("#ACT-002");
+      expect(hash()).toBe("#MIL-001");
       await user.click(screen.getByRole("button", { name: "Vorheriger Eintrag" }));
       expect(hash()).toBe("#ACT-001");
       expect(window.history.length).toBe(before);
