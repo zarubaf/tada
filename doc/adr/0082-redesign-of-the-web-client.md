@@ -143,7 +143,8 @@ Each card shows its own real status chip, because a column can hold several stat
   - The side panel is docked on wide layouts (1280 px and above).
   - On medium layouts (640 to 1280 px, including the 1024 px review width), it is an overlay sheet from the right.
   - On narrow layouts it is a full-screen sheet.
-  - The panel replaces the evidence-panel column of the ADR. The evidence of a record shows inside the side panel.
+  - The panel replaces the evidence-panel column of the ADR.
+    The evidence of a record shows inside the side panel.
   - On narrow layouts the board becomes one column list with a status picker.
     It does not scroll sideways.
   - The table view becomes a list of rows on narrow layouts, as the ADR already requires.
