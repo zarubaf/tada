@@ -105,7 +105,7 @@ export function WorkCard({ item, eventId, today, workstreamName, select }: WorkC
               {t("work-card-owner", { name: item.owner.name })}
             </span>
           )}
-          <Avatar name={item.owner.name} id={item.owner.id} size={24} decorative />
+          <Avatar name={item.owner.name} id={item.owner.id} size={20} decorative />
         </span>
       </span>
       <span id={ids.title} className={styles.title}>
