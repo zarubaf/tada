@@ -35,7 +35,8 @@ function routeOf(hash: string, creating: string | null): RecordRoute {
   if (kind) {
     return { mode: "create", kind };
   }
-  return hash === "" ? { mode: "closed" } : { mode: "open", id: hash };
+  // The readable IDs are upper case; an address typed by hand may not be.
+  return hash === "" ? { mode: "closed" } : { mode: "open", id: hash.toUpperCase() };
 }
 
 export function useRecordRoute(): RecordRouteControls {
