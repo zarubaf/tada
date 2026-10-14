@@ -26,13 +26,21 @@
     outline-offset: 2px;
   }
 
-  .button[data-disabled] {
+  /* `aria-disabled` stays focusable: a step button at the end of a list keeps the focus. */
+  .button[data-disabled],
+  .button[aria-disabled="true"] {
     cursor: default;
     opacity: 0.5;
   }
 
+  .button[aria-disabled="true"][data-hovered] {
+    background: none;
+    color: var(--color-text-muted);
+  }
+
   @media (forced-colors: active) {
-    .button[data-disabled] {
+    .button[data-disabled],
+    .button[aria-disabled="true"] {
       color: GrayText;
     }
   }
