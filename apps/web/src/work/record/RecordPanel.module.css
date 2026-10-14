@@ -9,6 +9,14 @@
     color: var(--color-text-muted);
   }
 
+  /* The ID in the head is the name of the record: semibold text in the text color, with figures of one width. */
+  .recordId {
+    color: var(--color-text);
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
   /*
    * Title, labels, values and descriptions start at the same x. A value that the member can
    * change has a hover box, which reaches out of the column by its padding (a negative margin), so
@@ -129,6 +137,7 @@
   }
 
   .sectionHeading {
+    line-height: 1rem;
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
     color: var(--color-text-muted);
@@ -265,6 +274,26 @@
   .editing {
     width: calc(100% + var(--grow-edit));
     margin-inline-start: var(--reach-edit);
+  }
+
+  /*
+   * The title that is being edited keeps the size, the weight and the place of its text: the box of
+   * the input has the height of the display box (the 1 px border and 1 px of padding make its 2 px),
+   * and the focus shows in the border, not in a second frame outside it.
+   */
+  .editingTitle {
+    --pad-block: calc(var(--space-0-5) - 1px);
+  }
+
+  .editingTitle textarea {
+    min-height: 0;
+    padding-block: var(--pad-block);
+    letter-spacing: inherit;
+  }
+
+  .editingTitle textarea[data-focus-visible] {
+    outline: none;
+    border-color: var(--color-focus);
   }
 
   .editing,
