@@ -216,3 +216,23 @@ test("at 320 px the table view and the timeline view do not scroll sideways", as
   await timelineShown(page, true);
   expect(await fits()).toBe(true);
 });
+
+// With the column of the checkboxes, the columns need more room than the container has at some
+// widths. The container clips, so the table must scroll inside it there, never lose a column.
+for (const width of [800, 900, 1024, 1100]) {
+  test(`table, ${width} px with the sidebar open: no column is cut off`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await open(page, "?view=table");
+    await tableShown(page, false);
+    const cut = await page.getByRole("table").evaluate((table) => {
+      const container = table.closest("[class*='container']") as HTMLElement;
+      const scroller = table.closest("[class*='scroller']") as HTMLElement;
+      const scrolls = getComputedStyle(scroller).overflowX === "auto";
+      const overshoot =
+        table.getBoundingClientRect().right - container.getBoundingClientRect().right;
+      return { scrolls, overshoot: Math.round(overshoot) };
+    });
+    // Either the table fits, or its scroller is on and shows the rest.
+    expect(cut.overshoot <= 0 || cut.scrolls).toBe(true);
+  });
+}
