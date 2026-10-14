@@ -43,14 +43,14 @@
 
   .state[data-state="proposed"] .value {
     padding: 0 var(--space-1);
-    border: 1px dashed var(--color-accent);
+    border: 1px dashed var(--color-proposed);
     border-radius: var(--radius-sm);
-    background: var(--color-accent-subtle);
+    background: var(--color-proposed-subtle);
   }
 
   .state[data-state="proposed"] .icon,
   .state[data-state="proposed"] .label {
-    color: var(--color-accent-text);
+    color: var(--color-proposed);
   }
 
   .state[data-state="assumption"] .value {
