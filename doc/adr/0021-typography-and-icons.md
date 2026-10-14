@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-06
+- Amended by: [0082](0082-redesign-of-the-web-client.md)
 
 ## Context
 
