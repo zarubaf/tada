@@ -187,7 +187,7 @@ Rules:
 | Token                 | Use                                                                                                  |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
 | `--control-height-sm` | Small buttons, tabs and inputs in toolbars (28 px compact)                                           |
-| `--control-height-md` | Buttons and inputs (32 px compact)                                                                   |
+| `--control-height-md` | Buttons and inputs (32 px compact, 44 px comfortable)                                                |
 | `--control-height-lg` | Primary actions on mobile pages (36 px compact)                                                      |
 | `--row-height`        | Table and list rows (28 px compact)                                                                  |
 | `--font-size-ui`      | UI text: `--font-size-md` in compact density, `--font-size-base` in comfortable density              |
