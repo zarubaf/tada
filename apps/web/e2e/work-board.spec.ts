@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import {
   events,
   fakeEvent,
@@ -242,7 +242,10 @@ for (const theme of themes) {
     await fulfill(page, "**/api/v1/events/*/risks*", problemBody("unavailable", 503), 503);
     await page.goto(work);
     await setTheme(page, theme);
-    await expect(page.getByText("Risiken konnten nicht geladen werden.")).toBeVisible();
+    // A hidden polite region repeats the text for screen readers: take the banner.
+    await expect(
+      page.locator("strong", { hasText: "Risiken konnten nicht geladen werden." }),
+    ).toBeVisible();
     await expect(page.getByText("ACT-001")).toBeVisible();
     expect((await axe(page)).violations).toEqual([]);
   });
@@ -274,15 +277,53 @@ test("a URL opens the same filtered view after a reload", async ({ page }) => {
   await expect(page.getByRole("radio", { name: /^Aufgaben/, checked: true })).toBeVisible();
 });
 
-test("a card is one link to the old page of its record", async ({ page }) => {
+test("a card is one link, and its address opens the old page at the record", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await fakeWork(page);
   await page.goto(work);
-  await expect(page.getByRole("link", { name: /ACT-001/ })).toHaveAttribute(
-    "href",
-    `/events/${event?.id}/actions#ACT-001`,
-  );
+  const link = page.getByRole("link", { name: /ACT-001/ });
+  const href = `/events/${event?.id}/actions#ACT-001`;
+  await expect(link).toHaveAttribute("href", href);
+  await expect(link).toHaveAccessibleName(/^ACT-001 Generatorenvermietung/);
+  // The address works on its own, for a shared link or a reload: it shows the record.
+  await page.goto(href);
+  await expect(page.locator("tr#ACT-001")).toBeVisible();
+  await expect(page.locator("tr#ACT-001")).toBeFocused();
 });
+
+// ADR 0022: the targets are 44 px with a coarse pointer, on the board, the filter sheet and the
+// controls of the phone.
+for (const width of [320, 375]) {
+  test.describe(`at ${width} px, touch`, () => {
+    test.use({ hasTouch: true, isMobile: true });
+
+    test("every control of the work page is 44 px high", async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await fakeWork(page);
+      await page.goto(`${work}?q=Flyer`);
+      // The search matches an action in progress, so the list opens on that status.
+      await expect(page.getByRole("link", { name: /ACT-003/ })).toBeVisible();
+      const targets = async (scope: Locator) => {
+        const tall: { name: string | null; height: number | undefined }[] = [];
+        for (const target of await scope.locator("button, a, input").all()) {
+          if (await target.isVisible()) {
+            const height = (await target.boundingBox())?.height;
+            if (height === undefined || height < 44) {
+              tall.push({ name: await target.getAttribute("aria-label"), height });
+            }
+          }
+        }
+        return tall;
+      };
+      // The search is in the sheet on a phone; its clear button shows because of `q`.
+      expect(await targets(page.getByRole("main"))).toEqual([]);
+      await page.getByRole("button", { name: /^Filter/ }).click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog.getByRole("button", { name: "Suche leeren" })).toBeVisible();
+      expect(await targets(dialog)).toEqual([]);
+    });
+  });
+}
 
 // ADR 0024: no text overflows with the 40 % longer pseudo-locale, and a phone does not scroll
 // sideways (ADR 0023).
