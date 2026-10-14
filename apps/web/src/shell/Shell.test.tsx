@@ -634,6 +634,59 @@ describe("narrow layout", () => {
     expect(more.getAttribute("aria-current")).toBe(current);
   });
 
+  it("marks Anlässe as current on the list of events, in the bottom bar", async () => {
+    stubNarrow(true);
+    renderShellAt("/events", json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    expect(within(nav).getByRole("link", { name: "Anlässe" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("has Arbeit in the third place inside an event, as the current page", async () => {
+    stubNarrow(true);
+    renderShellAt(
+      "/events/0199b8e0-0000-7000-8000-0000000000e1/work",
+      json(200, info([first], first)),
+    );
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Eingang", "Meine Arbeit", "Arbeit"]);
+    expect(within(nav).getByRole("link", { name: "Arbeit" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    // Anlässe is in Mehr, and the work page is not one of its pages.
+    expect(within(nav).getByRole("button", { name: "Mehr" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("moves Anlässe into Mehr inside an event, and marks Mehr on the other pages of the event", async () => {
+    stubNarrow(true);
+    renderShellAt(
+      "/events/0199b8e0-0000-7000-8000-0000000000e1/actions",
+      json(200, info([first], first)),
+    );
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    expect(within(nav).getByRole("link", { name: "Arbeit" })).not.toHaveAttribute("aria-current");
+    const more = within(nav).getByRole("button", { name: "Mehr" });
+    expect(more).toHaveAttribute("aria-current", "true");
+    await userEvent.click(more);
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent)
+        .slice(0, 2),
+    ).toEqual(["Anlässe", "Personen"]);
+  });
+
   it("shows the open proposals at Eingang in the bottom bar", async () => {
     stubNarrow(true);
     openChangesets = 2;
