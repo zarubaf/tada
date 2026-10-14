@@ -134,15 +134,19 @@ function FilterSheet({
   );
 }
 
-/** What the view tabs place around their own list: the toolbar row is one row (ADR 0082). */
+/**
+ * What the view tabs place around their own list in the toolbar row (ADR 0082): `lead` before it,
+ * `end` right of the switch, and `below` in a row of its own, for a phone.
+ */
 export interface WorkToolbarSlots {
-  before: ReactNode;
-  after?: ReactNode;
+  lead: ReactNode;
+  end?: ReactNode;
+  below?: ReactNode;
 }
 
 /**
  * The toolbar of the „Arbeit“ page as the two slots of its row, which the view tabs complete: the
- * title and the type filter, then the filter button, then the tabs. On a phone the type is a
+ * title and the type filter, then the tabs, then the filter button. On a phone the type is a
  * select, and it sits with the button in a second row below the title and the tabs. It is a hook
  * because the pending text of the search must outlive a sheet that closes.
  */
@@ -163,8 +167,8 @@ export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): W
   );
   if (narrow) {
     return {
-      before: <div className={styles.lead}>{title}</div>,
-      after: (
+      lead: <div className={styles.lead}>{title}</div>,
+      below: (
         <div className={styles.narrow}>
           <Select
             label={t("work-type-label")}
@@ -184,20 +188,22 @@ export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): W
     };
   }
   return {
-    before: (
+    lead: (
+      <div className={styles.lead}>
+        {title}
+        <TypeFilter
+          label={t("work-type-label")}
+          options={typeOptions(counts)}
+          value={typeValue(filters)}
+          onChange={(id) => setType(filters, onChange, id)}
+        />
+      </div>
+    ),
+    end: (
       <>
-        <div className={styles.lead}>
-          {title}
-          <TypeFilter
-            label={t("work-type-label")}
-            options={typeOptions(counts)}
-            value={typeValue(filters)}
-            onChange={(id) => setType(filters, onChange, id)}
-          />
-        </div>
-        <div className={styles.filter}>{sheet(true)}</div>
+        {sheet(true)}
+        {onCreate && <NewButton onCreate={onCreate} />}
       </>
     ),
-    after: onCreate ? <NewButton onCreate={onCreate} /> : undefined,
   };
 }

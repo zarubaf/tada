@@ -8,12 +8,6 @@
     min-width: 0;
   }
 
-  /* The button sits at the right, also when the row wraps and it is alone in a line. */
-  .filter {
-    display: flex;
-    margin-inline-start: auto;
-  }
-
   /* A phone: the type select and the button share the second row. */
   .narrow {
     display: flex;
