@@ -1,28 +1,38 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
 import { TabPanel, Tabs } from "../ui/Tabs";
+import type { WorkToolbarSlots } from "./WorkToolbar";
+import styles from "./WorkViewTabs.module.css";
 import { WORK_VIEWS, type WorkView } from "./workView";
 
 export interface WorkViewTabsProps {
   view: WorkView;
   onChange: (view: WorkView) => void;
-  /** The toolbar and the view; they sit in the panel of the chosen tab. */
+  /** The title, the filters and the like: they share one row with the view switch. */
+  toolbar: WorkToolbarSlots;
+  /** The banners and the view; they sit in the panel of the chosen tab. */
   children: ReactNode;
 }
 
 /**
- * The view tabs of the „Arbeit“ page: Board, Tabelle and Zeitplan (ADR 0082). The filters are the
- * same in every view, so the toolbar sits in the panel and the tab only changes what shows below.
+ * The view switch of the „Arbeit“ page: Board, Tabelle and Zeitplan (ADR 0082). It sits at the
+ * right of the toolbar row. The filters are the same in every view, so the tab only changes what
+ * shows below the row.
  */
-export function WorkViewTabs({ view, onChange, children }: WorkViewTabsProps) {
+export function WorkViewTabs({ view, onChange, toolbar, children }: WorkViewTabsProps) {
   return (
     <Tabs
       label={t("work-view-label")}
       tabs={WORK_VIEWS.map((id) => ({ id, label: t(`work-view-${id}`) }))}
       value={view}
+      variant="segmented"
+      before={toolbar.before}
+      after={toolbar.after}
       onChange={(id) => onChange(WORK_VIEWS.find((candidate) => candidate === id) ?? "board")}
     >
-      <TabPanel id={view}>{children}</TabPanel>
+      <TabPanel id={view}>
+        <div className={styles.content}>{children}</div>
+      </TabPanel>
     </Tabs>
   );
 }

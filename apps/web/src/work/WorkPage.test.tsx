@@ -49,6 +49,11 @@ const bannerText = { selector: "strong" };
 const ready = () => screen.findByRole("heading", { level: 2, name: /^Offen/ });
 const region = (name: RegExp) => screen.getByRole("region", { name });
 const query = () => new URLSearchParams(window.location.search);
+/** The search and the owner, area and due filters sit in the sheet behind the „Filter“ button. */
+async function openFilters() {
+  await userEvent.click(screen.getByRole("button", { name: /^Filter(, \d+ gesetzt)?$/ }));
+  return screen.getByRole("dialog");
+}
 /** The readable IDs on the cards that show. A collapsed column shows none. */
 const shown = () =>
   screen.queryAllByText(/^(ACT|COM|MIL|DEC|RSK)-\d{3}$/).map((element) => element.textContent);
@@ -148,6 +153,7 @@ describe("WorkPage", () => {
       // Owner „Ich“ and the area do not match ACT-001 (owner Bernd), so nothing shows.
       expect(await screen.findByText("Kein Eintrag passt zu den Filtern")).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: /^Aufgaben/, checked: true })).toBeInTheDocument();
+      await openFilters();
       expect(screen.getByRole("searchbox", { name: "Arbeit durchsuchen" })).toHaveValue("plakat");
       expect(screen.getByRole("button", { name: "Verantwortlich: Ich" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Bereich: Bodenbetrieb" })).toBeInTheDocument();
@@ -165,6 +171,7 @@ describe("WorkPage", () => {
     it("searches the title and keeps spaces while typing", async () => {
       open();
       await ready();
+      await openFilters();
       await userEvent.type(screen.getByRole("searchbox"), "Festzelt bes");
       expect(screen.getByRole("searchbox")).toHaveValue("Festzelt bes");
       await waitFor(() => expect(query().get("q")).toBe("Festzelt bes"));
@@ -174,6 +181,7 @@ describe("WorkPage", () => {
     it("writes the search once after the typing, not once for each key, and announces once", async () => {
       open();
       await ready();
+      await openFilters();
       const replace = vi.spyOn(window.history, "replaceState");
       await userEvent.type(screen.getByRole("searchbox"), "Festzelt");
       expect(replace).not.toHaveBeenCalled();
@@ -186,6 +194,7 @@ describe("WorkPage", () => {
     it("searches at once on Enter and when the field is cleared", async () => {
       open();
       await ready();
+      await openFilters();
       await userEvent.type(screen.getByRole("searchbox"), "Festzelt{Enter}");
       expect(query().get("q")).toBe("Festzelt");
       await userEvent.click(screen.getByRole("button", { name: "Suche leeren" }));
@@ -195,6 +204,7 @@ describe("WorkPage", () => {
     it("follows the search when the member goes back and forward", async () => {
       open("?q=Plakat");
       await ready();
+      await openFilters();
       const box = screen.getByRole("searchbox");
       expect(box).toHaveValue("Plakat");
       act(() => {
@@ -214,6 +224,7 @@ describe("WorkPage", () => {
     it("filters by owner, „Ich“ first", async () => {
       open();
       await ready();
+      await openFilters();
       await userEvent.click(screen.getByRole("button", { name: /^Verantwortlich/ }));
       expect(screen.getAllByRole("option")[0]).toHaveAccessibleName("Ich");
       expect(screen.getByRole("option", { name: "Bernd Beispiel" })).toBeInTheDocument();
@@ -233,6 +244,7 @@ describe("WorkPage", () => {
     it("filters by another member", async () => {
       open();
       await ready();
+      await openFilters();
       await userEvent.click(screen.getByRole("button", { name: /^Verantwortlich/ }));
       await userEvent.click(screen.getByRole("option", { name: "Bernd Beispiel" }));
       expect([...shown()].sort()).toEqual(["ACT-001", "ACT-006"]);
@@ -241,6 +253,7 @@ describe("WorkPage", () => {
     it("filters by area", async () => {
       open();
       await ready();
+      await openFilters();
       await userEvent.click(screen.getByRole("button", { name: /^Bereich/ }));
       await userEvent.click(screen.getByRole("option", { name: "Festwirtschaft" }));
       expect(query().get("stream")).toBe("w2");
@@ -253,6 +266,7 @@ describe("WorkPage", () => {
     ])("filters by due: %s", async (label, value, expected) => {
       open();
       await ready();
+      await openFilters();
       await userEvent.click(screen.getByRole("button", { name: /Fällig/ }));
       await userEvent.click(screen.getByRole("option", { name: label }));
       expect(query().get("due")).toBe(value);
@@ -263,8 +277,9 @@ describe("WorkPage", () => {
       open();
       await ready();
       expect(screen.queryByRole("button", { name: "Filter zurücksetzen" })).not.toBeInTheDocument();
-      await userEvent.type(screen.getByRole("searchbox"), "Plakat");
       await userEvent.click(screen.getByRole("radio", { name: /^Aufgaben/ }));
+      await openFilters();
+      await userEvent.type(screen.getByRole("searchbox"), "Plakat");
       await userEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
       expect(window.location.search).toBe("");
       expect(screen.getByRole("searchbox")).toHaveValue("");
@@ -274,6 +289,7 @@ describe("WorkPage", () => {
     it("moves focus to the search after a reset, as the reset button leaves", async () => {
       open("?q=Plakat&type=action");
       await ready();
+      await openFilters();
       await userEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
       expect(screen.getByRole("searchbox")).toHaveFocus();
     });
@@ -284,7 +300,8 @@ describe("WorkPage", () => {
       const buttons = screen.getAllByRole("button", { name: "Filter zurücksetzen" });
       await userEvent.click(buttons[buttons.length - 1] as HTMLElement);
       await ready();
-      expect(screen.getByRole("searchbox")).toHaveFocus();
+      // The sheet is closed, so the search is not in the page: focus goes to the heading.
+      expect(screen.getByRole("heading", { level: 1, name: "Arbeit" })).toHaveFocus();
     });
 
     it("counts the columns with the filters", async () => {
