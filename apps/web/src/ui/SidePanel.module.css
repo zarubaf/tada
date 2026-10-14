@@ -12,12 +12,11 @@
   }
 
   /*
-   * The panel takes focus on open. The ring shows for the keyboard only: after a mouse press the
-   * panel has its border, and a ring around all of it would be a second frame.
+   * The panel takes focus on open so that the keyboard starts inside it, but it cannot be operated,
+   * so it shows no ring (WCAG 2.4.7 covers controls). The controls inside have their own.
    */
-  .panel:focus-visible {
-    outline: 2px solid var(--color-focus);
-    outline-offset: -2px;
+  .panel:focus {
+    outline: none;
   }
 
   /* Medium: an overlay from the right, over the list. */
