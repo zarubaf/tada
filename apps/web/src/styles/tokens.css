@@ -86,6 +86,7 @@
     --size-panel-width: 480px;
     --topbar-height: 3rem;
     --sidebar-width: 14.5rem;
+    --size-toolbar: 44px; /* The toolbar row of a page, the bulk bar. */
     --size-tile: 28px; /* The tile with the initials of an event. */
 
     /* Density: compact */
