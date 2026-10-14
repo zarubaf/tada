@@ -12,7 +12,6 @@ import { EmptyState } from "../ui/EmptyState";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
-import { StandaloneLink } from "../ui/StandaloneLink";
 import { BoardSkeleton } from "./BoardSkeleton";
 import { BulkBar } from "./BulkBar";
 import { useBoardView, visibleItems } from "./boardView";
@@ -262,9 +261,11 @@ export function WorkPage({ api }: { api: Api }) {
                   title={t("work-empty-title")}
                   text={t("work-empty-text")}
                   action={
-                    <StandaloneLink to={`/events/${encodeURIComponent(eventId)}/actions`}>
-                      {t("work-empty-new-action")}
-                    </StandaloneLink>
+                    mayCreate ? (
+                      <Button onPress={() => record.startCreate("action")}>
+                        {t("work-empty-new-action")}
+                      </Button>
+                    ) : undefined
                   }
                 />
               )}
