@@ -1421,6 +1421,7 @@ record-not-found-text = Den Eintrag { $id } gibt es in diesem Anlass nicht.
 action-evidence-version = Stützt die Version { $version } der Aufgabe
 # $field: the name of the field. $value: its value, or the words for no value.
 record-edit-field = { $field } bearbeiten: { $value }
+record-saving = Speichert …
 # $field: the name of the field. $id: the readable ID of the record.
 record-saved = { $field } von { $id } gespeichert.
 # $message: why the field was not saved.

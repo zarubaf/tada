@@ -25,6 +25,11 @@ export interface SearchSelectProps {
   searchable?: boolean;
   /** `quiet` has no border until hover, for a value in a list of properties. */
   variant?: "secondary" | "quiet";
+  /**
+   * A change is being saved. The trigger refuses the press but stays focusable, so that a pick
+   * cannot be lost and focus does not drop.
+   */
+  isPending?: boolean;
 }
 
 /**
@@ -41,6 +46,7 @@ export function SearchSelect({
   clearLabel,
   searchable = true,
   variant = "secondary",
+  isPending = false,
 }: SearchSelectProps) {
   const [isOpen, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -51,6 +57,9 @@ export function SearchSelect({
     <DialogTrigger
       isOpen={isOpen}
       onOpenChange={(open) => {
+        if (open && isPending) {
+          return;
+        }
         setOpen(open);
         if (!open) {
           // Escape and an outside press close the popover too.
@@ -62,6 +71,7 @@ export function SearchSelect({
         ref={trigger}
         variant={variant}
         aria-label={`${label}: ${chosen?.label ?? placeholder}`}
+        aria-disabled={isPending || undefined}
       >
         {chosen?.leading}
         <span className={styles.value}>{chosen?.label ?? placeholder}</span>
