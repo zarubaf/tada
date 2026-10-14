@@ -36,6 +36,19 @@ interface Location {
 
 const LocationContext = createContext<Location | null>(null);
 const ParamsContext = createContext<Params>({});
+// Settles the pending focus request once the page is in. Outside a router it does nothing.
+const SettleFocusContext = createContext<() => void>(() => {});
+
+/**
+ * A lazy page is not in the DOM when the route changes, so the router cannot find its `h1` then.
+ * `useSettleFocus()` returns the function to call when the page has mounted: it moves focus to the
+ * `h1` if a navigation still waits for it.
+ */
+export function useSettleFocus(): () => void {
+  return useContext(SettleFocusContext);
+}
+
+const PENDING = "[data-route-pending]";
 
 function useLocation(): Location {
   const location = useContext(LocationContext);
@@ -70,16 +83,19 @@ export function Router({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("popstate", sync);
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the path change is the trigger
-  useEffect(() => {
-    if (!moveFocus.current) {
+  const settleFocus = useCallback(() => {
+    // A fallback in the page is no target: the request waits until the page mounts.
+    if (!moveFocus.current || document.querySelector(PENDING)) {
       return;
     }
     moveFocus.current = false;
     const target = document.querySelector<HTMLElement>("h1") ?? document.querySelector("main");
     target?.setAttribute("tabindex", "-1");
     target?.focus();
-  }, [pathname]);
+  }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the path change is the trigger
+  useEffect(settleFocus, [pathname]);
 
   const navigate = useCallback((to: string, options?: NavigateOptions) => {
     if (to === window.location.pathname + window.location.hash) {
@@ -95,7 +111,11 @@ export function Router({ children }: { children: ReactNode }) {
     setHash(readHash());
   }, []);
 
-  return <LocationContext value={{ pathname, hash, navigate }}>{children}</LocationContext>;
+  return (
+    <LocationContext value={{ pathname, hash, navigate }}>
+      <SettleFocusContext value={settleFocus}>{children}</SettleFocusContext>
+    </LocationContext>
+  );
 }
 
 export function usePathname(): string {

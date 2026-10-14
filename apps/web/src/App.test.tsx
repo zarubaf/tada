@@ -18,7 +18,9 @@ const session = {
 
 function signedInApi() {
   const fetch = async (request: Request) => {
-    const body = new URL(request.url).pathname.endsWith("/session") ? session : { items: [] };
+    const body = new URL(request.url).pathname.endsWith("/session")
+      ? session
+      : { items: [], actions: [], commitments: [] };
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -39,6 +41,15 @@ describe("App", () => {
     renderAt("/");
     expect(await screen.findByRole("heading", { name: "Meine Arbeit" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/");
+  });
+
+  // First to use /events: a lazy page loads once per test file, so this is its first visit.
+  it("moves focus to the h1 of a lazy page after a navigation", async () => {
+    renderAt("/");
+    await screen.findByRole("heading", { name: "Meine Arbeit" });
+    await userEvent.click(screen.getAllByRole("link", { name: "Anlässe" })[0] as HTMLElement);
+    const heading = await screen.findByRole("heading", { level: 1, name: "Anlässe" });
+    expect(heading).toHaveFocus();
   });
 
   it("keeps the events list at /events", async () => {
