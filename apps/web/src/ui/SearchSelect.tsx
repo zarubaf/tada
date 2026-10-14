@@ -71,10 +71,13 @@ export function SearchSelect({
         ref={trigger}
         variant={variant}
         aria-label={`${label}: ${chosen?.label ?? placeholder}`}
-        aria-disabled={isPending || undefined}
+        isRefused={isPending}
       >
         {chosen?.leading}
-        <span className={styles.value}>{chosen?.label ?? placeholder}</span>
+        {/* A layout that cuts a long value short still shows it whole on hover. */}
+        <span className={styles.value} title={chosen?.label}>
+          {chosen?.label ?? placeholder}
+        </span>
         <IconChevronDown size={14} aria-hidden="true" />
       </Button>
       <Popover className={`${popover.popover} ${styles.popover}`} placement="bottom start">

@@ -5,10 +5,8 @@ import { LiveRegion } from "../../ui/LiveRegion";
 import { RecordId } from "../../ui/RecordId";
 import { SidePanel } from "../../ui/SidePanel";
 import { StandaloneLink } from "../../ui/StandaloneLink";
-import { StatusLabel } from "../../ui/StatusLabel";
 import { TypeIcon } from "../../ui/TypeIcon";
 import { EvidenceList } from "../EvidenceList";
-import { presentationOf } from "../recordStatus";
 import type { Work } from "../useWork";
 import type { WorkItem } from "../workItem";
 import { recordHref } from "../workLinks";
@@ -58,15 +56,14 @@ function sourcesOf(work: Work): ChoiceSources {
   };
 }
 
+/** The head: what the record is. Its status is the first property, so the head does not repeat it. */
 function Head({ item }: { item: WorkItem }) {
-  const { glyph, tone, labelKey } = presentationOf(item);
   return (
     <div className={styles.heading}>
-      <TypeIcon kind={item.kind} size={16} />
+      <TypeIcon kind={item.kind} size={16} decorative />
       <RecordId>{item.readableId}</RecordId>
-      <StatusLabel icon={glyph} tone={tone}>
-        {t(labelKey)}
-      </StatusLabel>
+      <span aria-hidden="true">·</span>
+      <span>{t(`record-kind-${item.kind}`)}</span>
     </div>
   );
 }
@@ -130,7 +127,7 @@ function Body({
         </section>
       )}
       {item.record.evidence.length > 0 && (
-        <section className={styles.section} aria-labelledby={sourcesId}>
+        <section className={`${styles.section} ${styles.sources}`} aria-labelledby={sourcesId}>
           <h3 id={sourcesId} className={styles.sectionHeading}>
             {t("record-sources")}
           </h3>
