@@ -72,6 +72,7 @@ const parties: FieldSpec = {
     record(item).decided_by.map((party) => ({
       id: partyId(party),
       label: party.redacted ? party.local_id : party.name,
+      ...(party.redacted && { redacted: true }),
     })),
 };
 
