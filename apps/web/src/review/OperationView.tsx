@@ -20,6 +20,7 @@ import { DisputeNotes } from "../ui/DisputeNotes";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Redacted } from "../ui/Redacted";
 import { StandaloneLink } from "../ui/StandaloneLink";
+import { STATUSES } from "../work/recordStatus";
 import { ActionStatusLabel, CommitmentStatusLabel, MilestoneStatusLabel } from "../work/WorkStatus";
 import styles from "./OperationView.module.css";
 import { NO_NAMES, type RecordNames } from "./recordNames";
@@ -126,19 +127,9 @@ function Rows({ rows }: { rows: Row[] }) {
   );
 }
 
-const ACTION_STATUSES: readonly string[] = ["open", "in-progress", "blocked", "done", "canceled"];
-const COMMITMENT_STATUSES: readonly string[] = [
-  "conditional",
-  "firm",
-  "fulfilled",
-  "broken",
-  "withdrawn",
-];
-const MILESTONE_STATUSES: readonly string[] = ["open", "reached", "canceled"];
-
 // The proposal carries the status as text, because a newer server can add a status.
 function actionStatus(status: string): ReactNode {
-  return ACTION_STATUSES.includes(status) ? (
+  return Object.hasOwn(STATUSES.action, status) ? (
     <ActionStatusLabel status={status as ActionStatus} />
   ) : (
     status
@@ -146,7 +137,7 @@ function actionStatus(status: string): ReactNode {
 }
 
 function commitmentStatus(status: string): ReactNode {
-  return COMMITMENT_STATUSES.includes(status) ? (
+  return Object.hasOwn(STATUSES.commitment, status) ? (
     <CommitmentStatusLabel status={status as CommitmentStatus} />
   ) : (
     status
@@ -154,7 +145,7 @@ function commitmentStatus(status: string): ReactNode {
 }
 
 function milestoneStatus(status: string): ReactNode {
-  return MILESTONE_STATUSES.includes(status) ? (
+  return Object.hasOwn(STATUSES.milestone, status) ? (
     <MilestoneStatusLabel status={status as MilestoneStatus} />
   ) : (
     status

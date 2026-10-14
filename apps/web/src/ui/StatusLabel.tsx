@@ -2,8 +2,6 @@ import type { Icon } from "@tabler/icons-react";
 import { glyphIcon, type StatusGlyph, type StatusTone, ToneIcon } from "./StatusIcon";
 import styles from "./StatusLabel.module.css";
 
-export type { StatusTone };
-
 export interface StatusLabelProps {
   /** A glyph of a record status (StatusIcon), or any other icon. */
   icon: Icon | StatusGlyph;

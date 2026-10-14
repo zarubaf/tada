@@ -5,8 +5,8 @@ import {
   IconHeartHandshake,
   IconSquareCheck,
 } from "@tabler/icons-react";
+import type { RecordKind } from "../api/client";
 import { t } from "../i18n";
-import type { RecordKind } from "../work/recordStatus";
 import type { IconSize } from "./StatusIcon";
 import styles from "./TypeIcon.module.css";
 

@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { IconButton } from "./IconButton";
-import { Kbd } from "./Kbd";
 
 describe("IconButton", () => {
   it("is a button named by its label", () => {
@@ -35,13 +34,5 @@ describe("IconButton", () => {
     render(<IconButton icon={IconX} label="Schliessen" isDisabled onPress={onPress} />);
     await userEvent.click(screen.getByRole("button"));
     expect(onPress).not.toHaveBeenCalled();
-  });
-});
-
-describe("Kbd", () => {
-  it("is a kbd element with the key", () => {
-    render(<Kbd>Ctrl K</Kbd>);
-    const key = screen.getByText("Ctrl K");
-    expect(key.tagName).toBe("KBD");
   });
 });
