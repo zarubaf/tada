@@ -18,7 +18,8 @@
     transition-timing-function: var(--ease-out);
   }
 
-  .button[data-hovered] {
+  /* A refused button (aria-disabled) is not turned off for hover by react-aria, so the rules skip it. */
+  .button[data-hovered]:not([aria-disabled="true"]) {
     background: var(--color-bg-hover);
   }
 
@@ -28,7 +29,7 @@
     color: var(--color-text-on-accent);
   }
 
-  .button[data-variant="primary"][data-hovered] {
+  .button[data-variant="primary"][data-hovered]:not([aria-disabled="true"]) {
     background: var(--color-accent-hover);
   }
 
@@ -38,7 +39,7 @@
     background: none;
   }
 
-  .button[data-variant="quiet"][data-hovered] {
+  .button[data-variant="quiet"][data-hovered]:not([aria-disabled="true"]) {
     background: var(--color-bg-hover);
   }
 
@@ -52,14 +53,14 @@
     outline-offset: 2px;
   }
 
-  .button[data-disabled] {
+  .button:is([data-disabled], [data-refused]) {
     cursor: default;
     opacity: 0.5;
   }
 
   /* Forced colors ignore the opacity: a disabled button uses the system color for it. */
   @media (forced-colors: active) {
-    .button[data-disabled] {
+    .button:is([data-disabled], [data-refused]) {
       border-color: GrayText;
       color: GrayText;
     }

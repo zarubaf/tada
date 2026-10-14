@@ -8,11 +8,24 @@ export interface ButtonProps extends Omit<AriaButtonProps, "className" | "style"
    * action, for example the version in the footer of the sidebar.
    */
   variant?: "primary" | "secondary" | "quiet" | "danger";
+  /**
+   * The button looks off and refuses the press, but stays in the tab order (`aria-disabled`), so
+   * that focus is not lost and a description can say why. Unlike `isDisabled` it is not removed
+   * from the keyboard.
+   */
+  isRefused?: boolean;
   /** For a page that returns focus to the button. */
   ref?: Ref<HTMLButtonElement>;
 }
 
 /** A button. At most one primary button in a view (doc/design/components.md). */
-export function Button({ variant = "secondary", ...props }: ButtonProps) {
-  return <AriaButton {...props} className={styles.button} data-variant={variant} />;
+export function Button({ variant = "secondary", isRefused, onPress, ...props }: ButtonProps) {
+  return (
+    <AriaButton
+      {...props}
+      {...(isRefused ? { "aria-disabled": true, "data-refused": "" } : { onPress })}
+      className={styles.button}
+      data-variant={variant}
+    />
+  );
 }
