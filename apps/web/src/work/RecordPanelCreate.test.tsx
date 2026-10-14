@@ -145,8 +145,8 @@ describe("the create state", () => {
     );
     const view = await form();
     await user.type(view.getByRole("textbox", { name: /^Titel/ }), "Banner");
-    await user.type(view.getByLabelText("Fällig"), "2030-06-01");
-    await user.type(view.getByLabelText("Startdatum"), "2031-01-01");
+    await user.type(view.getByLabelText("Fällig"), "2031-06-01");
+    await user.type(view.getByLabelText("Startdatum"), "2030-01-01");
     await user.click(view.getByRole("button", { name: "Erstellen" }));
 
     const due = await view.findByLabelText("Fällig");
@@ -156,6 +156,25 @@ describe("the create state", () => {
     expect(due).toHaveFocus();
     expect(view.getByRole("textbox", { name: /^Titel/ })).toHaveValue("Banner");
     expect(server.posts()).toHaveLength(1);
+  });
+
+  it("sends nothing when the start date is after the due date, and says so at both dates", async () => {
+    const server = openWork("?new=action");
+    const view = await form();
+    await user.type(view.getByRole("textbox", { name: /^Titel/ }), "Banner");
+    await user.type(view.getByLabelText("Fällig"), "2030-06-01");
+    await user.type(view.getByLabelText("Startdatum"), "2031-01-01");
+    await user.click(view.getByRole("button", { name: "Erstellen" }));
+
+    await waitFor(() =>
+      expect(view.getByLabelText("Fällig")).toHaveAccessibleDescription(
+        "Fälligkeit liegt vor dem Start.",
+      ),
+    );
+    expect(view.getByLabelText("Startdatum")).toHaveAccessibleDescription(
+      /Das Startdatum liegt nach dem Fälligkeitsdatum/,
+    );
+    expect(server.posts()).toEqual([]);
   });
 
   it("shows another failure in the panel and keeps the draft", async () => {

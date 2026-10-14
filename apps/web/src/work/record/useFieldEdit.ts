@@ -4,10 +4,10 @@
 import { useCallback, useRef, useState } from "react";
 import type { RecordKind } from "../../api/client";
 import { t } from "../../i18n";
-import { fieldErrors } from "../fieldErrors";
 import type { WorkCommands } from "../workCommands";
 import type { WorkItem } from "../workItem";
 import type { FieldSpec, FieldValue } from "./descriptor";
+import { fieldError } from "./fieldError";
 
 /**
  * `conflict` is a failed save after another person changed the record. The draft then does not
@@ -52,13 +52,9 @@ function normalize(spec: FieldSpec, value: FieldValue): FieldValue {
 /** The message of the server for this field if it names one, else the message of the failure. */
 function messageOf(
   spec: FieldSpec,
-  failure: { message: string; problem?: Parameters<typeof fieldErrors>[0] | undefined },
+  failure: { message: string; problem?: Parameters<typeof fieldError>[0] },
 ): string {
-  const invalid =
-    failure.problem?.code === "validation-failed"
-      ? fieldErrors(failure.problem, [spec.pointer])[spec.pointer]
-      : undefined;
-  return invalid ?? failure.message;
+  return fieldError(failure.problem, spec) ?? failure.message;
 }
 
 export function useFieldEdit(spec: FieldSpec, item: WorkItem, services: FieldServices): FieldEdit {
@@ -110,6 +106,13 @@ export function useFieldEdit(spec: FieldSpec, item: WorkItem, services: FieldSer
       if (value === saved) {
         setError(undefined);
         setPhase("idle");
+        return;
+      }
+      const invalid = spec.validate?.(item, value);
+      if (invalid) {
+        setDraft(value);
+        setError(invalid);
+        setPhase("failed");
         return;
       }
       saving.current = true;
