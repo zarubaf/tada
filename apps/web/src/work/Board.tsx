@@ -1,12 +1,14 @@
 import { IconEyeOff } from "@tabler/icons-react";
 import { useId } from "react";
 import { t } from "../i18n";
+import { Checkbox } from "../ui/Checkbox";
 import { Select } from "../ui/Select";
 import { type StatusGlyph, StatusIcon, type StatusTone } from "../ui/StatusIcon";
 import styles from "./Board.module.css";
-import { useBoardView } from "./boardView";
+import { type ColumnGroup, chosenGroup, useBoardView, visibleItems } from "./boardView";
 import type { BoardColumn } from "./recordStatus";
-import { WorkCard } from "./WorkCard";
+import { selectionKeys, type WorkSelection } from "./useWorkSelection";
+import { cardSelect, WorkCard } from "./WorkCard";
 import { groupByColumn } from "./workFilters";
 import type { WorkItem } from "./workItem";
 
@@ -28,15 +30,16 @@ export interface BoardProps {
   workstreamName: (workstreamId: string) => string | undefined;
   /** Below 40rem the board is one list with a status picker (ADR 0023). */
   narrow: boolean;
+  /** The selection of the page; without it the cards have no checkbox. */
+  selection?: WorkSelection;
 }
 
-interface Group {
-  column: BoardColumn;
-  items: WorkItem[];
-}
+type Group = ColumnGroup;
 
-function Cards({ group, ...rest }: Omit<BoardProps, "items" | "narrow"> & { group: Group }) {
-  const { eventId, today, workstreamName } = rest;
+type Shared = Omit<BoardProps, "items" | "narrow">;
+
+function Cards({ group, ...rest }: Shared & { group: Group }) {
+  const { eventId, today, workstreamName, selection } = rest;
   return group.items.length === 0 ? (
     <p className={styles.empty}>{t("work-board-column-empty")}</p>
   ) : (
@@ -50,6 +53,7 @@ function Cards({ group, ...rest }: Omit<BoardProps, "items" | "narrow"> & { grou
           workstreamName={
             item.workstreamId === undefined ? undefined : workstreamName(item.workstreamId)
           }
+          select={cardSelect(selection, item)}
         />
       ))}
     </ul>
@@ -71,7 +75,40 @@ function Count({ items }: { items: number }) {
   );
 }
 
-function Column({ group, ...rest }: Omit<BoardProps, "items" | "narrow"> & { group: Group }) {
+/**
+ * „Alle in Spalte auswählen“: one box for the records of a column that can be changed. Without
+ * such a record there is no box.
+ */
+function ColumnSelect({
+  items,
+  selection,
+  labelHidden = true,
+}: {
+  items: WorkItem[];
+  selection: WorkSelection | undefined;
+  labelHidden?: boolean;
+}) {
+  const selectable = selection ? items.filter(selection.canSelect) : [];
+  if (!selection || selectable.length === 0) {
+    return null;
+  }
+  const every = selectable.every(selection.isSelected);
+  const some = selectable.some(selection.isSelected);
+  return (
+    <span className={styles.selectAll}>
+      <Checkbox
+        label={t("work-select-column")}
+        labelHidden={labelHidden}
+        isSelected={every}
+        isIndeterminate={some && !every}
+        isDisabled={selection.locked}
+        onChange={(on) => selection.set(selectable, on)}
+      />
+    </span>
+  );
+}
+
+function Column({ group, ...rest }: Shared & { group: Group }) {
   const titleId = useId();
   const { glyph, tone } = COLUMN_ICONS[group.column];
   return (
@@ -82,6 +119,7 @@ function Column({ group, ...rest }: Omit<BoardProps, "items" | "narrow"> & { gro
           {t(`work-board-column-${group.column}`)}
           <Count items={group.items.length} />
         </h2>
+        <ColumnSelect items={group.items} selection={rest.selection} />
       </header>
       <Cards group={group} {...rest} />
     </section>
@@ -97,7 +135,7 @@ function CanceledColumn({
   shown,
   onToggle,
   ...rest
-}: Omit<BoardProps, "items" | "narrow"> & { group: Group; shown: boolean; onToggle: () => void }) {
+}: Shared & { group: Group; shown: boolean; onToggle: () => void }) {
   const titleId = useId();
   const panelId = useId();
   return (
@@ -119,19 +157,21 @@ function CanceledColumn({
         </button>
       </h2>
       <div id={panelId} hidden={!shown}>
+        {shown && (
+          <div className={styles.panelSelect}>
+            <ColumnSelect items={group.items} selection={rest.selection} />
+          </div>
+        )}
         {shown && <Cards group={group} {...rest} />}
       </div>
     </section>
   );
 }
 
-function WideBoard({
-  groups,
-  ...rest
-}: Omit<BoardProps, "items" | "narrow"> & { groups: Group[] }) {
+function WideBoard({ groups, ...rest }: Shared & { groups: Group[] }) {
   const [view, setView] = useBoardView();
   return (
-    <div className={styles.board}>
+    <div className={styles.board} {...(rest.selection?.selecting && { "data-selecting": "" })}>
       {groups.map((group) =>
         group.column === "canceled" ? (
           <CanceledColumn
@@ -149,17 +189,12 @@ function WideBoard({
   );
 }
 
-function NarrowBoard({
-  groups,
-  ...rest
-}: Omit<BoardProps, "items" | "narrow"> & { groups: Group[] }) {
+function NarrowBoard({ groups, ...rest }: Shared & { groups: Group[] }) {
   const [view, setView] = useBoardView();
-  // Without a choice the list shows the first status that has records, so that a search that
-  // matches only done records does not open on an empty „Offen“.
-  const chosen = view.column ?? (groups.find((g) => g.items.length > 0) ?? groups[0])?.column;
-  const group = groups.find((candidate) => candidate.column === chosen);
+  const group = chosenGroup(groups, view);
+  const chosen = group?.column;
   return (
-    <div className={styles.narrow}>
+    <div className={styles.narrow} {...(rest.selection?.selecting && { "data-selecting": "" })}>
       <Select
         label={t("work-board-status")}
         labelHidden
@@ -171,6 +206,7 @@ function NarrowBoard({
           label: `${t(`work-board-column-${g.column}`)} (${g.items.length})`,
         }))}
       />
+      {group && <ColumnSelect items={group.items} selection={rest.selection} labelHidden={false} />}
       {group && <Cards group={group} {...rest} />}
     </div>
   );
@@ -183,9 +219,15 @@ function NarrowBoard({
  */
 export function Board({ items, narrow, ...rest }: BoardProps) {
   const groups = groupByColumn(items);
-  return narrow ? (
-    <NarrowBoard groups={groups} {...rest} />
-  ) : (
-    <WideBoard groups={groups} {...rest} />
+  const [view] = useBoardView();
+  const { selection } = rest;
+
+  const onKeyDown = selectionKeys(selection, () => visibleItems(groups, view, narrow));
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: the keys are shortcuts for the controls inside
+    <div className={styles.root} onKeyDown={onKeyDown}>
+      {narrow ? <NarrowBoard groups={groups} {...rest} /> : <WideBoard groups={groups} {...rest} />}
+    </div>
   );
 }

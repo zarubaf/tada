@@ -1,5 +1,6 @@
 @layer components {
   .item {
+    position: relative;
     min-width: 0;
   }
 
@@ -82,9 +83,72 @@
     white-space: nowrap;
   }
 
+  /*
+   * The checkbox sits in the corner of the card. It shows on hover, on focus within and while any
+   * card is selected, and the type icon steps aside then. With a coarse pointer there is no hover:
+   * the box always shows and the row of the card makes room for it, so the type icon stays.
+   */
+  .lead {
+    display: inline-flex;
+    flex: none;
+    justify-content: center;
+  }
+
+  .check {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    display: grid;
+    place-items: center;
+    width: var(--control-height-lg);
+    height: var(--control-height-lg);
+    opacity: 0;
+  }
+
+  .check > * {
+    justify-content: center;
+  }
+
+  .item:is(:hover, :focus-within, [data-selecting], [data-selected]) .check {
+    opacity: 1;
+  }
+
+  /* The fine pointer is the default; a query that is not understood can never overlap icon and box. */
+  .item[data-selectable]:is(:hover, :focus-within, [data-selecting], [data-selected]) .lead > * {
+    visibility: hidden;
+  }
+
+  @media (pointer: coarse), (hover: none) {
+    .item[data-selectable]:is(:hover, :focus-within, [data-selecting], [data-selected]) .lead > * {
+      visibility: visible;
+    }
+
+    .check {
+      opacity: 1;
+    }
+
+    .item[data-selectable] {
+      --check-room: calc(var(--control-height-lg) - var(--space-3));
+    }
+
+    .item[data-selectable] .top {
+      padding-inline-start: var(--check-room);
+    }
+  }
+
+  /* Selected is shown by the checked box and by the tint and border, never by color alone. */
+  .item[data-selected] .card {
+    border-color: var(--color-accent);
+    background: var(--color-accent-subtle);
+  }
+
   @media (forced-colors: active) {
     .card {
       border-color: CanvasText;
+    }
+
+    .item[data-selected] .card {
+      border-color: Highlight;
     }
 
     .link:focus-visible {
