@@ -25,12 +25,11 @@ export interface TabsProps {
   /** `segmented` is a compact switch of views for a toolbar row; the default is the underlined row. */
   variant?: "underline" | "segmented";
   /**
-   * Controls of the page toolbar that sit before and after the tab list in one row, for example
-   * the title and the type filter. The row wraps when it does not fit. Without both, the tab list
-   * stands alone.
+   * Places the tab list, for example in the toolbar row of a page (`PageToolbar`). The list has to
+   * stay inside `Tabs`, so the caller wraps it here and not around the tabs. Without it, the list
+   * stands alone above the panels.
    */
-  before?: ReactNode;
-  after?: ReactNode;
+  renderList?: (list: ReactNode) => ReactNode;
   /** The `TabPanel` elements, one for each tab. */
   children: ReactNode;
 }
@@ -45,8 +44,7 @@ export function Tabs({
   value,
   onChange,
   variant = "underline",
-  before,
-  after,
+  renderList,
   children,
 }: TabsProps) {
   const list = (
@@ -70,15 +68,7 @@ export function Tabs({
       selectedKey={value}
       onSelectionChange={(key) => onChange(String(key))}
     >
-      {before === undefined && after === undefined ? (
-        list
-      ) : (
-        <div className={styles.row}>
-          {before}
-          {list}
-          {after}
-        </div>
-      )}
+      {renderList ? renderList(list) : list}
       {children}
     </AriaTabs>
   );
