@@ -68,7 +68,9 @@ describe("WorkCard", () => {
     );
     const link = within(li).getByRole("link", { name: "RSK-001 Regen am Fest" });
     expect(link).toHaveAttribute("href", "/events/e1/work#RSK-001");
-    expect(link).toHaveAccessibleDescription("Risiko eingetreten");
+    expect(link).toHaveAccessibleDescription(
+      "Risiko eingetreten Wirkung hoch Wahrscheinlich mittel",
+    );
   });
 
   it("shows the real status of the kind as text, not by color alone", () => {
@@ -124,6 +126,20 @@ describe("WorkCard", () => {
     const li = card("milestone", r.milestone("MIL-001", { date: "2030-07-01" }));
     expect(within(li).getByText("01.07.2030")).toBeInTheDocument();
     expect(within(li).getByRole("link")).toHaveAttribute("href", "/events/e1/milestones#MIL-001");
+  });
+
+  it("shows the rating of a risk as two chips in words, which the link also describes", () => {
+    const li = card("risk", r.risk("RSK-001", { impact: "high", likelihood: "medium" }));
+    expect(within(li).getByText("Wirkung hoch")).toBeVisible();
+    expect(within(li).getByText("Wahrscheinlich mittel")).toBeVisible();
+    expect(within(li).getByRole("link")).toHaveAccessibleDescription(
+      /Risiko offen .*Wirkung hoch Wahrscheinlich mittel$/,
+    );
+  });
+
+  it("shows no rating on a kind that has none", () => {
+    const li = card("action", r.action("ACT-001"));
+    expect(within(li).queryByText(/^Wirkung/)).not.toBeInTheDocument();
   });
 
   it("shows no date on a risk", () => {
