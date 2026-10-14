@@ -145,6 +145,13 @@ describe("sortWork", () => {
     ]);
   });
 
+  it("puts a decision from the past after the overdue action, since it has no due date", () => {
+    const decision = item("decision", { readableId: "DEC-001", date: "2030-01-01" });
+    const overdue = item("action", { readableId: "ACT-001", date: "2030-05-01" });
+    const later = item("action", { readableId: "ACT-002", date: "2030-06-01" });
+    expect(ids(sortWork([decision, later, overdue]))).toEqual(["ACT-001", "ACT-002", "DEC-001"]);
+  });
+
   it("does not change its input", () => {
     const input = [item("risk", { readableId: "B" }), item("risk", { readableId: "A" })];
     sortWork(input);
