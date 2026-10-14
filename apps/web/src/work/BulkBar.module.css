@@ -1,23 +1,28 @@
 @layer components {
   /*
-   * The bar sticks to the bottom of the work area while the board shows, and sits above the bottom
-   * bar on a phone. The dock itself lets pointers through, so that it never hides a card beside the
-   * bar.
+   * The bar floats 20 px above the bottom of the work area while the board shows, and above the
+   * bottom bar on a phone. The dock has no height, so that it takes no room in the page: its
+   * content rises from the bottom edge. It also lets pointers through, so that it never hides a
+   * card beside the bar; the end of each view has room of its own for the bar.
    */
   .dock {
-    --dock-offset: var(--space-4);
+    --dock-offset: var(--space-5);
 
     position: sticky;
     inset-block-end: var(--dock-offset);
     z-index: var(--z-sticky);
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-2);
-    justify-items: center;
-    margin-block-start: var(--space-4);
+    align-items: center;
+    justify-content: flex-end;
+    block-size: 0;
     pointer-events: none;
   }
 
+  /* The dock has no height, so no child may shrink to it. */
   .dock > * {
+    flex: none;
     box-sizing: border-box;
     max-width: 100%;
     pointer-events: auto;
@@ -27,16 +32,25 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-1-5) var(--space-2) var(--space-1-5) var(--space-4);
+    gap: var(--space-0-5);
+    min-height: var(--size-toolbar);
+    padding: 0 var(--space-1-5) 0 var(--space-3);
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
     background: var(--color-bg-raised);
     box-shadow: var(--shadow-2);
   }
 
+  /* The buttons are 28 px high in the bar, and 44 px with a coarse pointer or the comfortable density. */
+  @media (pointer: fine) {
+    :root:not([data-density="comfortable"]) .bar {
+      --control-height-md: var(--control-height-sm);
+    }
+  }
+
   .count {
     min-width: 0;
+    padding-inline-start: var(--space-0-5);
     font-weight: var(--font-weight-semibold);
     font-variant-numeric: tabular-nums;
   }
@@ -45,8 +59,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-1);
-    padding-inline: var(--space-2);
+    gap: var(--space-0-5);
+    padding-inline: var(--space-1-5);
     border-inline: 1px solid var(--color-border-subtle);
   }
 
@@ -68,8 +82,7 @@
     .dock {
       --dock-offset: calc(var(--bottom-bar-height) + var(--space-2));
 
-      justify-items: stretch;
-      margin-block-start: var(--space-2);
+      align-items: stretch;
     }
 
     .dock > .bar {
