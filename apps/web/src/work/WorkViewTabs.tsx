@@ -29,9 +29,12 @@ export function WorkViewTabs({ view, onChange, toolbar, children }: WorkViewTabs
       variant="segmented"
       renderList={(list) => (
         <PageToolbar>
-          {toolbar.before}
-          {list}
-          {toolbar.after}
+          {toolbar.lead}
+          <div className={styles.end}>
+            {list}
+            {toolbar.end}
+          </div>
+          {toolbar.below}
         </PageToolbar>
       )}
       onChange={(id) => onChange(WORK_VIEWS.find((candidate) => candidate === id) ?? "board")}
