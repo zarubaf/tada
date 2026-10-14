@@ -42,7 +42,13 @@ async function tableShown(page: Page, narrow: boolean) {
     await expect(page.getByRole("link", { name: /ACT-001/ })).toBeVisible();
     await expect(page.getByRole("table")).toHaveCount(0);
   } else {
-    await expect(page.getByRole("table", { name: "Arbeit als Tabelle" })).toBeVisible();
+    // Where the table scrolls, its region carries the name, and where it fits, the table does.
+    await expect(
+      page
+        .getByRole("table")
+        .or(page.getByRole("region", { name: "Arbeit als Tabelle" }))
+        .first(),
+    ).toBeVisible();
   }
   await expect(page.getByRole("status", { name: "Arbeit wird geladen" })).toHaveCount(0);
 }

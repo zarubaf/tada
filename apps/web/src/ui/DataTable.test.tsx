@@ -1,6 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { type Column, DataTable } from "./DataTable";
 
 interface Row {
@@ -103,14 +103,62 @@ describe("DataTable headers", () => {
 });
 
 describe("DataTable scrolling", () => {
-  it("puts a table that keeps its columns in a focusable, named region", () => {
+  let observe: () => void;
+  let widths = { scroll: 800, client: 400 };
+
+  function mockObserver() {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          observe = callback;
+        }
+        observe() {
+          observe();
+        }
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(() => widths.scroll);
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(() => widths.client);
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    widths = { scroll: 800, client: 400 };
+  });
+
+  it("makes a table that scrolls a focusable region and gives the name to the region only", () => {
+    mockObserver();
     table({ stacked: false });
     const region = screen.getByRole("region", { name: "Leute" });
     expect(region).toHaveAttribute("tabindex", "0");
     expect(within(region).getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Leute" })).not.toBeInTheDocument();
+  });
+
+  it("is no tab stop and has no region where the columns fit", () => {
+    widths = { scroll: 400, client: 400 };
+    mockObserver();
+    table({ stacked: false });
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Leute" })).toBeInTheDocument();
+    expect(document.querySelector("[tabindex='0']")).toBeNull();
+  });
+
+  it("follows the width: the region goes away when the columns fit again", () => {
+    mockObserver();
+    table({ stacked: false });
+    expect(screen.getByRole("region", { name: "Leute" })).toBeInTheDocument();
+    widths = { scroll: 400, client: 400 };
+    act(() => observe());
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Leute" })).toBeInTheDocument();
   });
 
   it("has no region around a stacked table", () => {
+    mockObserver();
     table();
     expect(screen.queryByRole("region")).not.toBeInTheDocument();
   });
