@@ -456,6 +456,16 @@ describe("editing an action in the panel", () => {
       ]);
     });
 
+    it("shows a date as text with its icon, not as a chip with a border", async () => {
+      openAction({ due_date: "2020-02-01" });
+      const view = await region();
+      const button = view.getByRole("button", { name: "Fällig bearbeiten" });
+      // The overdue date is still said in words.
+      expect(button).toHaveAccessibleDescription(/01\.02\.2020.*überfällig/);
+      expect(button.querySelector("time")).not.toBeNull();
+      expect(button.querySelector("[data-variant]")).toBeNull();
+    });
+
     it("shows the message of the server at the start date", async () => {
       openAction({}, {}, () =>
         problem(422, "validation-failed", [{ pointer: "/start_date", code: "start-after-due" }]),
