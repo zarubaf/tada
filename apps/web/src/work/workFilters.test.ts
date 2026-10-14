@@ -3,6 +3,7 @@ import type { RecordKind } from "../api/client";
 import type { BoardColumn } from "./recordStatus";
 import {
   countsFor,
+  FILTER_KEYS,
   filterWork,
   groupByColumn,
   NO_FILTERS,
@@ -65,15 +66,11 @@ describe("filterWork", () => {
     expect(filterWork(all, NO_FILTERS, ctx)).toEqual(all);
   });
 
-  it("filters by kind and by column", () => {
+  it("filters by kind", () => {
     expect(ids(filterWork(all, filters({ kinds: ["action", "risk"] }), ctx))).toEqual([
       "ACT-001",
       "ACT-002",
       "RSK-001",
-    ]);
-    expect(ids(filterWork(all, filters({ columns: ["done", "canceled"] }), ctx))).toEqual([
-      "ACT-002",
-      "MIL-001",
     ]);
   });
 
@@ -123,7 +120,7 @@ describe("filterWork", () => {
   });
 
   it("combines the filters", () => {
-    expect(ids(filterWork(all, filters({ kinds: ["action"], columns: ["open"] }), ctx))).toEqual([
+    expect(ids(filterWork(all, filters({ kinds: ["action"], owners: ["u1"] }), ctx))).toEqual([
       "ACT-001",
     ]);
   });
@@ -209,7 +206,6 @@ describe("countsFor", () => {
 describe("the query string", () => {
   const full: WorkFilters = {
     kinds: ["action", "risk"],
-    columns: ["blocked", "done"],
     owners: ["mine", "0199b8e0-0000-7000-8000-0000000000b2"],
     workstreams: ["w1"],
     due: "overdue",
@@ -239,9 +235,14 @@ describe("the query string", () => {
     expect(parseFilters(params)).toEqual({ ...NO_FILTERS, kinds: ["action"], owners: ["ok"] });
   });
 
-  it("puts the kinds and columns in the order of the tables", () => {
-    const parsed = parseFilters(new URLSearchParams("type=risk,action&column=done,open"));
+  it("puts the kinds in the order of the table", () => {
+    const parsed = parseFilters(new URLSearchParams("type=risk,action"));
     expect(parsed.kinds).toEqual(["action", "risk"]);
-    expect(parsed.columns).toEqual(["open", "done"]);
+  });
+
+  it("leaves the keys of the view alone", () => {
+    const parsed = parseFilters(new URLSearchParams("column=done&canceled=1&view=board"));
+    expect(parsed).toEqual(NO_FILTERS);
+    expect([...FILTER_KEYS]).not.toContain("column");
   });
 });
