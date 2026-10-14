@@ -103,6 +103,42 @@ test("a URL opens the same filtered view after a reload", async ({ page }) => {
   await expect(page.getByRole("radio", { name: /^Aufgaben/, checked: true })).toBeVisible();
 });
 
+// The rhythm of the page (ADR 0082, the approved mock): one toolbar row of 44 px, 12 px to the
+// columns, columns of one height, 8 px between columns and 6 px between cards.
+test("the toolbar is one row of 44 px, 12 px above columns of one height", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeWork(page);
+  await page.goto(work);
+  await boardShown(page, false);
+  const box = async (target: Locator) => {
+    const found = await target.boundingBox();
+    if (!found) {
+      throw new Error("not shown");
+    }
+    return found;
+  };
+  const row = await box(page.getByRole("heading", { level: 1, name: "Arbeit" }).locator("../.."));
+  const names = ["Offen", "In Arbeit", "Blockiert", "Erledigt"];
+  const columns = await Promise.all(
+    names.map((name) => box(page.getByRole("region", { name: new RegExp(`^${name}`) }))),
+  );
+  expect(row.height).toBeCloseTo(44, 0);
+  for (const column of columns) {
+    expect(column.y - (row.y + row.height)).toBeCloseTo(12, 0);
+    expect(column.height).toBeCloseTo(columns[0]?.height ?? 0, 0);
+  }
+  // The columns fill the screen: the last one ends 12 px above the bottom of the window.
+  expect((columns[0]?.y ?? 0) + (columns[0]?.height ?? 0)).toBeCloseTo(900 - 12, 0);
+  for (const [index, column] of columns.slice(1).entries()) {
+    const before = columns[index];
+    expect(column.x - ((before?.x ?? 0) + (before?.width ?? 0))).toBeCloseTo(8, 0);
+  }
+  // Two cards of the first column: 6 px apart.
+  const first = await box(page.getByRole("link", { name: /ACT-001/ }));
+  const second = await box(page.getByRole("link", { name: /MIL-001/ }));
+  expect(second.y - (first.y + first.height)).toBeCloseTo(6, 0);
+});
+
 test("a card is one link, and its address opens the panel at the record", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await fakeWork(page);
