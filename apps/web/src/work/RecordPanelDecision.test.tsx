@@ -216,8 +216,21 @@ describe("a decision in the panel", () => {
       const link = await view.findByRole("link", { name: "DEC-002" });
       expect(link).toHaveAttribute("href", "#DEC-002");
       await user.click(link);
-      await region("DEC-002");
+      const successor = await region("DEC-002");
       expect(window.location.hash).toBe("#DEC-002");
+      // The link left with the old record: focus is on the title of the new one.
+      await waitFor(() => expect(successor.getByRole("heading", { level: 2 })).toHaveFocus());
+    });
+
+    it("lets Back return to the replaced decision, with focus on its title", async () => {
+      replaced();
+      const view = await region();
+      await user.click(await view.findByRole("link", { name: "DEC-002" }));
+      await region("DEC-002");
+      window.history.back();
+      const back = await region("DEC-001");
+      expect(window.location.hash).toBe("#DEC-001");
+      await waitFor(() => expect(back.getByRole("heading", { level: 2 })).toHaveFocus());
     });
   });
 
@@ -431,6 +444,35 @@ describe("replacing a decision", () => {
     expect(await view.findByRole("link", { name: "DEC-002" })).toBeVisible();
     expect(screen.getByText("DEC-002 ersetzt DEC-001.")).toBeInTheDocument();
     expect(view.queryByRole("button", { name: "Ersetzen" })).toBeNull();
+    // The buttons are gone, and focus is on the heading, not on the body.
+    expect(view.getByRole("heading", { level: 2 })).toHaveFocus();
+  });
+
+  it("moves focus to the heading at once, while the old decision still has its buttons", async () => {
+    const { dialog, view } = await openDialog();
+    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(view.getByRole("heading", { level: 2 })).toHaveFocus();
+  });
+
+  it("says that the old decision is not up to date if it cannot be loaded again, and offers no second try", async () => {
+    const ref: { posted?: () => boolean } = {};
+    const { view, dialog, server } = await openDialog({
+      "GET /decisions": () =>
+        ref.posted?.() ? problem(500, "internal") : json(200, { items: [dec()] }),
+    });
+    ref.posted = () => server.sent("POST").length > 0;
+    await user.type(dialog.getByLabelText(/^Entschieden am/), "2030-04-01");
+    await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const words = /DEC-002 ersetzt DEC-001.*nicht aktuell/;
+    const message = (await view.findAllByText(words)).find((node) => node.tagName === "P");
+    expect(message).toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nicht aktuell/);
+    expect(view.queryByRole("button", { name: "Ersetzen" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Widerrufen" })).toBeNull();
+    expect(view.getByRole("heading", { level: 2 })).toHaveFocus();
   });
 
   it("shows the refusal of the server at the fields of the successor", async () => {

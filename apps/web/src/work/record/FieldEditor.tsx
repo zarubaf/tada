@@ -2,6 +2,7 @@ import {
   type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
   useEffect,
   useId,
   useRef,
@@ -156,6 +157,7 @@ export function FieldEditor({
   heading = false,
   valueId,
   focusOnMount = false,
+  headingRef,
 }: {
   spec: FieldSpec;
   item: WorkItem;
@@ -169,6 +171,11 @@ export function FieldEditor({
   valueId?: string;
   /** Focus goes to the display button once, for the title of a record that was just created. */
   focusOnMount?: boolean;
+  /**
+   * The heading element of a heading field. The panel moves focus to it where the record stays but
+   * the control that had focus is gone. It takes focus by script only (`tabindex="-1"`).
+   */
+  headingRef?: RefObject<HTMLHeadingElement | null>;
 }) {
   const edit = useFieldEdit(spec, item, env);
   const value = spec.read(item);
@@ -193,7 +200,7 @@ export function FieldEditor({
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the field appears
   useEffect(() => {
     if (focusOnMount) {
-      display.current?.focus();
+      (display.current ?? headingRef?.current)?.focus();
     }
   }, []);
 
@@ -220,7 +227,12 @@ export function FieldEditor({
   // points at the value only while the value is on screen: not during an edit.
   const titled = (node: ReactNode, named: boolean) =>
     heading ? (
-      <h2 className={styles.title} {...(named && { "aria-labelledby": valueElement })}>
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className={styles.title}
+        {...(named && { "aria-labelledby": valueElement })}
+      >
         {node}
       </h2>
     ) : (

@@ -16,6 +16,7 @@ function Dialog({ onDone, onCancel }: ActionDialogProps) {
   return (
     <div role="dialog" aria-label="Probe">
       <Button onPress={() => onDone("DEC-001 ist jetzt widerrufen.")}>Fertig</Button>
+      <Button onPress={() => onDone("Nicht aktuell.", "alert")}>Veraltet</Button>
       <Button onPress={onCancel}>Zurück</Button>
     </div>
   );
@@ -41,7 +42,14 @@ function show(actions: readonly RecordActionSpec[], writable = true) {
   const announce = vi.fn();
   render(
     <aside aria-label="Panel" tabIndex={-1}>
-      <RecordActions actions={actions} item={item} env={env(writable)} announce={announce} />
+      <h2 tabIndex={-1}>Titel</h2>
+      <RecordActions
+        actions={actions}
+        item={item}
+        env={env(writable)}
+        announce={announce}
+        focusTitle={() => screen.getByRole("heading")}
+      />
     </aside>,
   );
   return { announce };
@@ -58,7 +66,8 @@ describe("RecordActions", () => {
   it("shows nothing when no action is available", () => {
     show([revoke], false);
     expect(screen.queryByRole("button")).toBeNull();
-    expect(document.querySelector("aside")).toBeEmptyDOMElement();
+    // Only the title is in the panel: the component renders nothing.
+    expect(document.querySelector("aside")?.children).toHaveLength(1);
   });
 
   it("opens the dialog of an action, and cancel returns focus to its button", async () => {
@@ -71,13 +80,23 @@ describe("RecordActions", () => {
     expect(screen.getByRole("button", { name: "Widerrufen" })).toHaveFocus();
   });
 
-  it("closes the dialog when the action is done, tells the member and keeps focus in the panel", async () => {
+  it("closes the dialog when the action is done, tells the member and moves focus to the title", async () => {
     const { announce } = show([revoke]);
     await user.click(screen.getByRole("button", { name: "Widerrufen" }));
     await user.click(screen.getByRole("button", { name: "Fertig" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(announce).toHaveBeenCalledWith("DEC-001 ist jetzt widerrufen.", "status");
-    // The button is still there here; focus goes to it, so the member does not lose the place.
-    expect(screen.getByRole("button", { name: "Widerrufen" })).toHaveFocus();
+    // The button leaves when the record shows its new state; the title stays.
+    expect(screen.getByRole("heading")).toHaveFocus();
+  });
+
+  it("says a result that needs action as text, and offers no action for that state", async () => {
+    const { announce } = show([revoke]);
+    await user.click(screen.getByRole("button", { name: "Widerrufen" }));
+    await user.click(screen.getByRole("button", { name: "Veraltet" }));
+    expect(announce).toHaveBeenCalledWith("Nicht aktuell.", "alert");
+    expect(screen.getByText("Nicht aktuell.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Widerrufen" })).toBeNull();
+    expect(screen.getByRole("heading")).toHaveFocus();
   });
 });
