@@ -79,35 +79,49 @@ export function useEventList(
 ): { list: EventList; load: () => void } {
   const [list, setList] = useState<EventList>({ kind: "idle" });
   const asking = useRef(false);
+  // Counts the organizations; an answer of an older one is dropped.
+  const generation = useRef(0);
 
-  // A list of another organization is no list of this one.
+  // A list of another organization is no list of this one, and neither is a request that still runs.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the organization is a trigger only
-  useEffect(() => setList({ kind: "idle" }), [organizationId]);
+  useEffect(() => {
+    generation.current += 1;
+    asking.current = false;
+    setList({ kind: "idle" });
+  }, [organizationId]);
 
   const load = useCallback(() => {
     if (organizationId === undefined || asking.current) {
       return;
     }
     asking.current = true;
+    const mine = generation.current;
+    const current = () => generation.current === mine;
     setList((old) => (old.kind === "loaded" ? old : { kind: "loading" }));
     api
       .GET("/api/v1/events", { params: { query: {} } })
-      .then(({ data, error }) =>
-        setList((old) =>
-          data
-            ? { kind: "loaded", events: data.items }
-            : old.kind === "loaded"
-              ? old
-              : { kind: "failed", message: problemMessage(error) },
-        ),
-      )
-      .catch(() =>
-        setList((old) =>
-          old.kind === "loaded" ? old : { kind: "failed", message: problemMessage(undefined) },
-        ),
-      )
+      .then(({ data, error }) => {
+        if (current()) {
+          setList((old) =>
+            data
+              ? { kind: "loaded", events: data.items }
+              : old.kind === "loaded"
+                ? old
+                : { kind: "failed", message: problemMessage(error) },
+          );
+        }
+      })
+      .catch(() => {
+        if (current()) {
+          setList((old) =>
+            old.kind === "loaded" ? old : { kind: "failed", message: problemMessage(undefined) },
+          );
+        }
+      })
       .finally(() => {
-        asking.current = false;
+        if (current()) {
+          asking.current = false;
+        }
       });
   }, [api, organizationId]);
 
