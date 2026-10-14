@@ -43,9 +43,11 @@ export function useSearchText({ filters, onChange }: FilterControlProps): Deboun
 export function SearchBox({
   field,
   inputRef,
+  autoFocus,
 }: {
   field: DebouncedText;
   inputRef: Ref<HTMLInputElement>;
+  autoFocus?: boolean;
 }) {
   return (
     <SearchField
@@ -55,6 +57,7 @@ export function SearchBox({
       onChange={field.change}
       onCommit={field.flush}
       inputRef={inputRef}
+      {...(autoFocus && { autoFocus })}
     />
   );
 }

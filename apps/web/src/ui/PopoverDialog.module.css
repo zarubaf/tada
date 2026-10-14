@@ -1,0 +1,12 @@
+@layer components {
+  /* Wide enough for a search and two pickers, narrow enough to leave most of the page in view. */
+  .popover {
+    width: 20rem;
+    max-width: calc(100vw - 2 * var(--space-4));
+  }
+
+  .dialog {
+    padding: var(--space-3);
+    outline: none;
+  }
+}
