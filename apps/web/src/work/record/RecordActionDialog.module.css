@@ -21,4 +21,21 @@
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+
+  /* A choice from a list in a dialog: the label above, the picker below. */
+  .pick {
+    display: grid;
+    gap: var(--space-1);
+    justify-items: start;
+  }
+
+  .pickLabel {
+    font-weight: var(--font-weight-medium);
+  }
+
+  .pickError {
+    margin: 0;
+    color: var(--color-danger);
+    font-size: var(--font-size-sm);
+  }
 }

@@ -6,8 +6,8 @@ import type { FieldSpec } from "./descriptor";
 type Read = FieldSpec["read"];
 type Save = NonNullable<FieldSpec["save"]>;
 
-/** The owner: a member of the event who can own a record. A record always has one. */
-export function ownerField(read: Read, save: Save): FieldSpec {
+/** The owner: a member of the event who can own a record. A record always has one. Without `save` it only names choices. */
+export function ownerField(read: Read, save?: Save): FieldSpec {
   return {
     id: "owner",
     labelKey: "record-field-owner",
@@ -17,12 +17,12 @@ export function ownerField(read: Read, save: Save): FieldSpec {
     promptKey: "record-choose-owner",
     required: true,
     read,
-    save,
+    ...(save && { save }),
   };
 }
 
 /** The area (workstream): optional, so the picker can clear it. */
-export function areaField(read: Read, save: Save): FieldSpec {
+export function areaField(read: Read, save?: Save): FieldSpec {
   return {
     id: "area",
     labelKey: "record-field-area",
@@ -31,6 +31,6 @@ export function areaField(read: Read, save: Save): FieldSpec {
     pointer: "workstream",
     emptyKey: "record-no-area",
     read,
-    save,
+    ...(save && { save }),
   };
 }
