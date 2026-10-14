@@ -23,6 +23,8 @@ export interface FieldEnv extends FieldServices {
   today: string;
   /** False in a closed event, for a redacted record, and for a member who may not change it. */
   editable: boolean;
+  /** False in a closed event, where no action on a record runs either. */
+  writable: boolean;
 }
 
 /** The text of a value for a name: the words for no value when there is none. */
