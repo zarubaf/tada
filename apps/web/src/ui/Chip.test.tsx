@@ -87,6 +87,11 @@ describe("Chip", () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
+  it("draws a proposal as a dashed square", () => {
+    const { container } = render(<Chip variant="proposal" />);
+    expect(container.querySelector("svg")).toHaveClass("tabler-icon-square-dashed");
+  });
+
   it("adds the detail of a proposal after the label", () => {
     render(<Chip variant="proposal">16.10.</Chip>);
     expect(screen.getByText("Vorschlag · 16.10.")).toBeInTheDocument();

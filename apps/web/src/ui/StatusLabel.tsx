@@ -21,7 +21,11 @@ export interface StatusLabelProps {
 export function StatusLabel({ icon, tone, children, column = false }: StatusLabelProps) {
   return (
     <span className={styles.label} data-tone={tone} data-column={column || undefined}>
-      <ToneIcon icon={typeof icon === "string" ? glyphIcon(icon) : icon} tone={tone} />
+      {typeof icon === "string" ? (
+        <ToneIcon icon={glyphIcon(icon)} tone={tone} stroke={2} />
+      ) : (
+        <ToneIcon icon={icon} tone={tone} />
+      )}
       {children}
     </span>
   );

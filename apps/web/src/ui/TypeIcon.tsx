@@ -1,6 +1,6 @@
 import {
-  IconAlertTriangle,
   IconDiamond,
+  IconFlag,
   IconGavel,
   IconHeartHandshake,
   IconSquareCheck,
@@ -15,7 +15,7 @@ const ICONS = {
   commitment: IconHeartHandshake,
   milestone: IconDiamond,
   decision: IconGavel,
-  risk: IconAlertTriangle,
+  risk: IconFlag,
 } satisfies Record<RecordKind, unknown>;
 
 export interface TypeIconProps {
