@@ -1,5 +1,5 @@
 import { IconDots } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { t } from "../../i18n";
 import { IconMenu } from "../../ui/IconMenu";
 import type { WorkItem } from "../workItem";
@@ -11,7 +11,8 @@ import { ReasonDialog } from "./ReasonDialog";
  * The „Aktionen“ menu of a record and the step of the action that the member chose. The menu is
  * absent when the member may not change the record or no action is available, so a record without
  * one has no empty menu. The step stays open while the record changes under it (a conflict loads it
- * again), and the member decides to send it again or to cancel.
+ * again), and the member decides to send it again or to cancel. It closes with a sentence when the
+ * record no longer takes the action.
  */
 export function ActionMenu({
   actions,
@@ -29,6 +30,14 @@ export function ActionMenu({
   const offered = env.editable ? actions.filter((action) => action.available(item)) : [];
   const running = actions.find((action) => action.id === chosen);
   const { step } = running ?? {};
+  const gone = running !== undefined && !running.available(item);
+  // A conflict reload can bring a record that no longer takes the action; a retry would only fail.
+  useEffect(() => {
+    if (gone && running) {
+      setChosen(undefined);
+      env.announce(t("record-action-gone", { id: item.readableId }), "alert");
+    }
+  }, [gone, running, item.readableId, env]);
   return (
     <>
       {offered.length > 0 && (
@@ -43,7 +52,7 @@ export function ActionMenu({
           onAction={setChosen}
         />
       )}
-      {running && step && (
+      {running && step && !gone && (
         <ReasonDialog
           title={step.title(item)}
           {...(step.description && { description: step.description(item) })}
