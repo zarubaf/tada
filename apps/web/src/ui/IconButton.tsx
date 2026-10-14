@@ -5,7 +5,10 @@ import styles from "./IconButton.module.css";
 import { Tooltip } from "./Tooltip";
 
 export interface IconButtonProps
-  extends Omit<AriaButtonProps, "className" | "style" | "children" | "aria-label"> {
+  extends Omit<
+    AriaButtonProps,
+    "className" | "style" | "children" | "aria-label" | "aria-describedby"
+  > {
   icon: Icon;
   /**
    * What the button does, for example „Schliessen“. It is the accessible name and the tooltip.
@@ -23,7 +26,14 @@ export interface IconButtonProps
 export function IconButton({ icon: Icon, label, ...props }: IconButtonProps) {
   return (
     <Tooltip text={label}>
-      <AriaButton {...props} className={styles.button} aria-label={label}>
+      <AriaButton
+        {...props}
+        className={styles.button}
+        aria-label={label}
+        // The tooltip repeats the name. React Aria points `aria-describedby` at it while it is
+        // open; an empty value stops a screen reader from reading the name twice.
+        aria-describedby=""
+      >
         <Icon size={16} stroke={1.5} aria-hidden="true" />
       </AriaButton>
     </Tooltip>
