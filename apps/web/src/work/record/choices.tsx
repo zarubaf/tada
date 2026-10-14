@@ -49,11 +49,14 @@ export function choicesOf(
   const { directory, milestones } = sources;
   switch (spec.control) {
     case "status": {
-      const kind = item?.kind;
-      const statuses = item && spec.statuses ? spec.statuses(item) : [];
+      // The statuses are the ones of a record, so a form for a new record has none.
+      if (!item || !spec.options) {
+        return { options: [], offered: false };
+      }
+      const statuses = spec.options(item);
       return {
         options: statuses.map((status) => {
-          const { glyph, tone, labelKey } = statusPresentationOfText(kind ?? "action", status);
+          const { glyph, tone, labelKey } = statusPresentationOfText(item.kind, status);
           return {
             id: status,
             label: t(labelKey),
@@ -86,7 +89,7 @@ export function choicesOf(
       return {
         options: withCurrent(options, current, {
           id: current ?? "",
-          label: t("inbox-name-unknown"),
+          label: t("record-unknown-area"),
         }),
         offered: directory !== undefined,
       };
@@ -98,7 +101,7 @@ export function choicesOf(
       return {
         options: withCurrent(options, current, {
           id: current ?? "",
-          label: t("inbox-name-unknown"),
+          label: t("record-unknown-milestone"),
         }),
         offered: milestones !== undefined,
       };

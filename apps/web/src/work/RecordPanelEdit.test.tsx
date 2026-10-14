@@ -631,6 +631,15 @@ describe("editing an action in the panel", () => {
       expect(view.getByText("entfernt")).toBeVisible();
     });
 
+    it("names an area and a milestone that the lists do not hold as unknown", async () => {
+      openAction({ workstream_id: "w-gone", milestone_id: "m-gone" });
+      const view = await region();
+      expect(view.getByRole("button", { name: "Bereich: Unbekannter Bereich" })).toBeVisible();
+      expect(
+        view.getByRole("button", { name: "Meilenstein: Unbekannter Meilenstein" }),
+      ).toBeVisible();
+    });
+
     it("keeps the owner readable when the directory does not list the member", async () => {
       openAction({ owner_user_id: CLARA });
       const view = await region();
