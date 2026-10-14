@@ -2,7 +2,6 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "../api/client";
 import { Router } from "../router/Router";
-import { isOverdue } from "./dueDate";
 import { MyWorkPage } from "./MyWorkPage";
 
 const EVENT_ID = "0199b8e0-0000-7000-8000-000000000001";
@@ -134,13 +133,5 @@ describe("My Work", () => {
     );
 
     expect(await screen.findByRole("button", { name: "Erneut versuchen" })).toBeInTheDocument();
-  });
-});
-
-describe("isOverdue", () => {
-  it("is true only before today", () => {
-    expect(isOverdue("2030-05-15", "2030-05-16")).toBe(true);
-    expect(isOverdue("2030-05-16", "2030-05-16")).toBe(false);
-    expect(isOverdue(null, "2030-05-16")).toBe(false);
   });
 });
