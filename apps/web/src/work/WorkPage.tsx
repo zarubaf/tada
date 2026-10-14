@@ -237,7 +237,7 @@ export function WorkPage({ api }: { api: Api }) {
     <div ref={layout} className={styles.layout}>
       <div className={styles.main}>
         <Page width="flush">
-          <div className={styles.page}>
+          <div className={styles.work}>
             <WorkViewTabs view={view} onChange={setView} toolbar={toolbar}>
               <LiveRegion kind="status" visuallyHidden>
                 {announcement}

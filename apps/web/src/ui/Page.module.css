@@ -27,10 +27,16 @@
     }
   }
 
-  /* The gutter belongs to the rows of the page: 16 px on a phone, 12 px from --bp-medium. */
+  /*
+   * The gutter belongs to the rows of the page: 16 px on a phone, 12 px from --bp-medium. The page
+   * is a column that fills the work area, so that its last part can fill what the rows leave.
+   */
   .page[data-width="flush"] {
     --page-gutter: var(--space-4);
 
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
     gap: 0;
     padding: 0;
   }
