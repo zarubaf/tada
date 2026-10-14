@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -214,6 +214,88 @@ describe("SidePanel", () => {
     render(<Harness />);
     await user.click(screen.getByRole("button", { name: "Öffnen" }));
 
-    expect((screen.getByRole("button", { name: "Liste" }) as HTMLElement).inert).toBe(false);
+    expect((screen.getByRole("button", { name: "Liste" }) as HTMLElement).inert).toBeFalsy();
+  });
+});
+
+describe("SidePanel below the medium breakpoint, in a shell", () => {
+  function Shell({ swap }: { swap?: boolean }) {
+    return (
+      <div id="root">
+        <header id="top">
+          <button type="button">Organisation</button>
+        </header>
+        <nav id="nav">
+          <a href="/x">Navigation</a>
+        </nav>
+        <p id="live" role="status" />
+        <div id="toasts" data-toast-region="" />
+        <main id="main">
+          {swap ? <p id="empty">Leer</p> : <ul id="list" />}
+          <SidePanel title="Eintrag" onClose={() => {}}>
+            <button type="button">Im Panel</button>
+          </SidePanel>
+        </main>
+      </div>
+    );
+  }
+  const inert = (id: string) => (document.getElementById(id) as HTMLElement).inert;
+
+  it("makes every sibling along the ancestors inert, except live regions", () => {
+    mockViewport(true);
+    render(<Shell />);
+
+    expect(inert("top")).toBe(true);
+    expect(inert("nav")).toBe(true);
+    expect(inert("list")).toBe(true);
+    expect(inert("live")).toBeFalsy();
+    expect(inert("toasts")).toBeFalsy();
+    expect(inert("main")).toBeFalsy();
+    expect(inert("root")).toBeFalsy();
+    expect((screen.getByRole("complementary") as HTMLElement).inert).toBeFalsy();
+  });
+
+  it("restores everything on unmount", () => {
+    mockViewport(true);
+    const { unmount } = render(<Shell />);
+    const nav = document.getElementById("nav") as HTMLElement;
+    expect(nav.inert).toBe(true);
+
+    unmount();
+
+    expect(nav.inert).toBe(false);
+  });
+
+  it("restores the elements when the viewport grows", () => {
+    const setNarrow = mockViewport(true);
+    render(<Shell />);
+
+    setNarrow(false);
+
+    expect(inert("top")).toBe(false);
+    expect(inert("nav")).toBe(false);
+    expect(inert("list")).toBe(false);
+  });
+
+  it("marks a sibling that appears later, and releases it on close", async () => {
+    mockViewport(true);
+    const { unmount } = render(<Shell />);
+    const added = document.createElement("section");
+    added.id = "late";
+    document.getElementById("main")?.prepend(added);
+    await waitFor(() => expect(inert("late")).toBe(true));
+
+    unmount();
+
+    expect(added.inert).toBe(false);
+  });
+
+  it("marks the new root when the list swaps its root element", async () => {
+    mockViewport(true);
+    const { rerender } = render(<Shell />);
+
+    rerender(<Shell swap />);
+
+    await waitFor(() => expect(inert("empty")).toBe(true));
   });
 });
