@@ -55,11 +55,19 @@ export function SearchSelect({
   const { contains } = useFilter({ sensitivity: "base" });
   const trigger = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  // The popover restores focus in a later frame, and not at all when the chosen element is gone.
   const chosen = options.find((option) => option.id === value);
 
   return (
-    <DialogTrigger isOpen={isOpen} onOpenChange={setOpen}>
+    <DialogTrigger
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        setOpen(open);
+        if (!open) {
+          // Escape and an outside press close the popover too.
+          focusAfterCommit(() => trigger.current);
+        }
+      }}
+    >
       <Button ref={trigger} aria-label={`${label}: ${chosen?.label ?? placeholder}`}>
         {chosen?.leading}
         <span className={styles.value}>{chosen?.label ?? placeholder}</span>
@@ -76,15 +84,16 @@ export function SearchSelect({
               aria-label={label}
               items={options}
               selectionMode="single"
-              disallowEmptySelection
               selectedKeys={value === undefined ? [] : [value]}
               onSelectionChange={(keys) => {
+                // Pressing the chosen option again deselects it: the choice stays, the popover closes.
                 const [key] = keys === "all" ? [] : [...keys];
                 if (key !== undefined) {
                   onChange(String(key));
-                  setOpen(false);
-                  focusAfterCommit(() => trigger.current);
                 }
+                setOpen(false);
+                // The popover restores focus in a later frame, and not at all when the chosen element is gone.
+                focusAfterCommit(() => trigger.current);
               }}
               renderEmptyState={() => <p className={styles.empty}>{t("combobox-empty")}</p>}
             >
@@ -107,6 +116,7 @@ export function SearchSelect({
               onPress={() => {
                 onChange(undefined);
                 setOpen(false);
+                // The popover restores focus in a later frame, and not at all when the chosen element is gone.
                 focusAfterCommit(() => trigger.current);
               }}
             >

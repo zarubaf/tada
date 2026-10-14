@@ -70,6 +70,18 @@ describe("SearchSelect", () => {
 
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(screen.getByTestId("value")).toHaveTextContent("a");
+    expect(screen.getByRole("button", { name: /Zuständig/ })).toHaveFocus();
+  });
+
+  it("closes when the chosen option is chosen again and returns focus to the trigger", async () => {
+    render(<Harness initial="a" />);
+
+    await user.click(screen.getByRole("button", { name: /Zuständig/ }));
+    await user.click(await screen.findByRole("option", { name: /Anna Muster/ }));
+
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.getByTestId("value")).toHaveTextContent("a");
+    expect(screen.getByRole("button", { name: "Zuständig: Anna Muster" })).toHaveFocus();
   });
 
   it("marks the selected option and shows the leading node", async () => {
