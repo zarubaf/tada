@@ -70,7 +70,7 @@ for (const theme of themes) {
     await expect(
       page.locator("strong", { hasText: "Risiken konnten nicht geladen werden." }),
     ).toBeVisible();
-    await expect(page.getByText("ACT-001")).toBeVisible();
+    await expect(page.getByText("ACT-001", { exact: true })).toBeVisible();
     expect((await axe(page)).violations).toEqual([]);
   });
 
@@ -127,9 +127,10 @@ for (const width of [320, 375]) {
       await page.goto(`${work}?q=Flyer`);
       // The search matches an action in progress, so the list opens on that status.
       await expect(page.getByRole("link", { name: /ACT-003/ })).toBeVisible();
+      // The input of a checkbox is hidden; its label is the target, and work-bulk.spec.ts measures it.
       const targets = async (scope: Locator) => {
         const tall: { name: string | null; height: number | undefined }[] = [];
-        for (const target of await scope.locator("button, a, input").all()) {
+        for (const target of await scope.locator("button, a, input:not([type=checkbox])").all()) {
           if (await target.isVisible()) {
             const height = (await target.boundingBox())?.height;
             if (height === undefined || height < 44) {
