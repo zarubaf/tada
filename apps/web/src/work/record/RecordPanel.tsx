@@ -4,12 +4,14 @@ import { t } from "../../i18n";
 import { LiveRegion } from "../../ui/LiveRegion";
 import { RecordId } from "../../ui/RecordId";
 import { SidePanel } from "../../ui/SidePanel";
+import { StandaloneLink } from "../../ui/StandaloneLink";
 import { StatusLabel } from "../../ui/StatusLabel";
 import { TypeIcon } from "../../ui/TypeIcon";
 import { EvidenceList } from "../EvidenceList";
 import { presentationOf } from "../recordStatus";
 import type { Work } from "../useWork";
 import type { WorkItem } from "../workItem";
+import { recordHref } from "../workLinks";
 import { canEdit } from "../workPermissions";
 import type { ChoiceSources } from "./choices";
 import type { FieldSpec, RecordDescriptor } from "./descriptor";
@@ -23,6 +25,7 @@ export type PanelMode = { mode: "open"; readableId: string } | { mode: "create";
 
 export interface RecordPanelProps {
   work: Work;
+  eventId: string;
   route: PanelMode;
   /** The member who is signed in: the owner that a new record starts with, if they can own one. */
   me: string;
@@ -150,6 +153,7 @@ function Body({
  */
 export default function RecordPanel({
   work,
+  eventId,
   route,
   me,
   mayCreate,
@@ -209,8 +213,21 @@ export default function RecordPanel({
 
   const { readableId } = route;
   const item = work.items.find((candidate) => candidate.readableId === readableId);
-  // A kind without a descriptor has no panel yet, so its record counts as not found.
   const descriptor = item && descriptorOf(item.kind);
+  if (item && !descriptor) {
+    // The record exists, but its kind has no panel yet: send the member to the old page.
+    const href = recordHref(eventId, item);
+    return (
+      <SidePanel title={t("record-no-panel-title")} {...frame}>
+        <div className={styles.notFound}>
+          <h2 className={styles.title}>{t("record-no-panel-title")}</h2>
+          <p>{t("record-no-panel-text", { id: readableId })}</p>
+          {href && <StandaloneLink to={href}>{t("record-no-panel-open")}</StandaloneLink>}
+        </div>
+        {live}
+      </SidePanel>
+    );
+  }
   if (!item || !descriptor) {
     return (
       <SidePanel title={t("record-not-found-title")} {...frame}>
