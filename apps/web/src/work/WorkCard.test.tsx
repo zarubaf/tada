@@ -125,7 +125,7 @@ describe("WorkCard", () => {
   it("shows the date of a milestone", () => {
     const li = card("milestone", r.milestone("MIL-001", { date: "2030-07-01" }));
     expect(within(li).getByText("01.07.2030")).toBeInTheDocument();
-    expect(within(li).getByRole("link")).toHaveAttribute("href", "/events/e1/milestones#MIL-001");
+    expect(within(li).getByRole("link")).toHaveAttribute("href", "/events/e1/work#MIL-001");
   });
 
   it("shows the rating of a risk as two chips in words, which the link also describes", () => {

@@ -9,6 +9,10 @@ describe("recordHref", () => {
     expect(recordHref("e1", item("action", "ACT-012"))).toBe("/events/e1/work#ACT-012");
   });
 
+  it("opens a milestone in the panel of the Arbeit page", () => {
+    expect(recordHref("e1", item("milestone", "MIL-001"))).toBe("/events/e1/work#MIL-001");
+  });
+
   it("keeps the query of the page, so that the view and the filters stay", () => {
     expect(recordHref("e1", item("action", "ACT-012"), "view=table&type=action")).toBe(
       "/events/e1/work?view=table&type=action#ACT-012",
@@ -17,7 +21,6 @@ describe("recordHref", () => {
 
   it.each([
     ["commitment", "COM-003", "/events/e1/commitments#COM-003"],
-    ["milestone", "MIL-001", "/events/e1/milestones#MIL-001"],
     ["decision", "DEC-004", "/events/e1/decisions#DEC-004"],
   ] as const)("still links a %s to the old page of its kind", (kind, id, href) => {
     expect(recordHref("e1", item(kind, id), "view=table")).toBe(href);
