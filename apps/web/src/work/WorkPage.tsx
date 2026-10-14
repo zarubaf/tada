@@ -337,6 +337,7 @@ export function WorkPage({ api }: { api: Api }) {
             today={today}
             previous={around?.previous}
             next={around?.next}
+            place={around?.place}
             onOpen={(readableId) => {
               setMade(undefined);
               record.open(readableId);

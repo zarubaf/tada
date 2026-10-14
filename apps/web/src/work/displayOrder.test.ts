@@ -84,18 +84,24 @@ describe("displayOrder", () => {
 describe("neighbors", () => {
   const order = items;
   it("gives the records before and after", () => {
-    expect(neighbors(order, "ACT-002")).toEqual({
-      previous: "ACT-001",
-      next: "ACT-003",
-    });
+    expect(neighbors(order, "ACT-002")).toMatchObject({ previous: "ACT-001", next: "ACT-003" });
   });
 
   it("has no previous record at the start and no next one at the end", () => {
-    expect(neighbors(order, "ACT-001")).toEqual({ previous: undefined, next: "ACT-002" });
-    expect(neighbors(order, "ACT-005")).toEqual({ previous: "ACT-004", next: undefined });
+    expect(neighbors(order, "ACT-001")).toMatchObject({ previous: undefined, next: "ACT-002" });
+    expect(neighbors(order, "ACT-005")).toMatchObject({ previous: "ACT-004", next: undefined });
+  });
+
+  it("gives the place of the record in the order, counting from one", () => {
+    expect(neighbors(order, "ACT-001").place).toEqual({ index: 1, total: 5 });
+    expect(neighbors(order, "ACT-004").place).toEqual({ index: 4, total: 5 });
   });
 
   it("has none for a record that is not in the order", () => {
-    expect(neighbors(order, "ACT-099")).toEqual({ previous: undefined, next: undefined });
+    expect(neighbors(order, "ACT-099")).toEqual({
+      previous: undefined,
+      next: undefined,
+      place: undefined,
+    });
   });
 });
