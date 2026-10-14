@@ -50,9 +50,26 @@
     margin-inline-start: auto;
   }
 
+  /* The status icon stands before the title, in a box as high as a line of the title. */
+  .heading {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-1-5);
+    min-width: 0;
+  }
+
+  .status {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-height: var(--line-height-dense);
+  }
+
   /* The clamp is paint only: the whole title stays in the accessible name. */
   .title {
     display: -webkit-box;
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     font-weight: var(--font-weight-medium);
     overflow-wrap: anywhere;

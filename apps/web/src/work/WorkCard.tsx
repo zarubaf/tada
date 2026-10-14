@@ -6,9 +6,9 @@ import { Checkbox } from "../ui/Checkbox";
 import { Chip } from "../ui/Chip";
 import { RecordId } from "../ui/RecordId";
 import { redactedOr } from "../ui/Redacted";
-import { StatusLabel } from "../ui/StatusLabel";
+import { StatusIcon } from "../ui/StatusIcon";
 import { TypeIcon } from "../ui/TypeIcon";
-import { presentationOf } from "./recordStatus";
+import { isColumnStatus, presentationOf } from "./recordStatus";
 import type { WorkSelection } from "./useWorkSelection";
 import styles from "./WorkCard.module.css";
 import { mayBeOverdue, type WorkItem } from "./workItem";
@@ -72,6 +72,9 @@ export function WorkCard({ item, eventId, today, workstreamName, select }: WorkC
   const ids = partIds(useId());
   const href = useRecordHref(eventId)(item);
   const { glyph, tone, labelKey } = presentationOf(item);
+  // A status that its column names is the icon before the title; any other also has its label.
+  const statusLabel = t(labelKey);
+  const labelled = !isColumnStatus(item.kind, item.status);
   const hasOwner = item.owner.name !== "";
   const hasArea = workstreamName !== undefined;
   const describedBy = [
@@ -108,15 +111,21 @@ export function WorkCard({ item, eventId, today, workstreamName, select }: WorkC
           <Avatar name={item.owner.name} id={item.owner.id} size={20} decorative />
         </span>
       </span>
-      <span id={ids.title} className={styles.title}>
-        {redactedOr(item.redacted, item.title)}
+      <span className={styles.heading}>
+        <span className={styles.status} {...(!labelled && { id: ids.status })}>
+          <StatusIcon glyph={glyph} tone={tone} size={14} />
+          {!labelled && <span className={styles.hidden}>{statusLabel}</span>}
+        </span>
+        <span id={ids.title} className={styles.title}>
+          {redactedOr(item.redacted, item.title)}
+        </span>
       </span>
       <span className={styles.chips}>
-        <span id={ids.status}>
-          <StatusLabel icon={glyph} tone={tone}>
-            {t(labelKey)}
-          </StatusLabel>
-        </span>
+        {labelled && (
+          <span id={ids.status}>
+            <Chip>{statusLabel}</Chip>
+          </span>
+        )}
         {item.date !== undefined && (
           <span id={ids.due}>
             <span className={styles.hidden}>
