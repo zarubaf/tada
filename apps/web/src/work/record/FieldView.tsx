@@ -46,7 +46,7 @@ export function FieldView({
         />
       );
     case "multiline":
-      return <p className={styles.text}>{value}</p>;
+      return <span className={styles.text}>{value}</span>;
     case "text":
       return <>{value}</>;
     case "area":
