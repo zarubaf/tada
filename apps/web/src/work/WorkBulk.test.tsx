@@ -611,7 +611,7 @@ describe("the bulk bar", () => {
       // A search hides the second record: it leaves the selection, so it leaves the list.
       await userEvent.click(filterButton());
       await userEvent.type(screen.getByRole("searchbox"), "Plakat");
-      await userEvent.click(screen.getByRole("button", { name: "Schliessen" }));
+      await userEvent.click(filterButton());
       await waitFor(() => expect(within(bar()).getByText("1 ausgewählt")).toBeInTheDocument());
       const list = screen.getByRole("list", { name: "Nicht geändert" });
       expect(

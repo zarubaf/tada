@@ -15,6 +15,8 @@ export interface SearchFieldProps {
   onCommit?: () => void;
   /** The input, for a caller that moves focus to the field. */
   inputRef?: Ref<HTMLInputElement>;
+  /** Takes focus when it appears, for a field that a member opened to type in it. */
+  autoFocus?: boolean;
 }
 
 /**
@@ -28,6 +30,7 @@ export function SearchField({
   onChange,
   onCommit,
   inputRef,
+  autoFocus,
 }: SearchFieldProps) {
   return (
     <AriaSearchField
@@ -37,6 +40,7 @@ export function SearchField({
       onChange={onChange}
       onSubmit={onCommit}
       onBlur={onCommit}
+      {...(autoFocus && { autoFocus })}
     >
       <IconSearch className={styles.icon} size={14} stroke={1.5} aria-hidden="true" />
       <Input ref={inputRef} className={styles.input} placeholder={placeholder} />

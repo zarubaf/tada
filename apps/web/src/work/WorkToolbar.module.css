@@ -21,18 +21,4 @@
     flex: 1 1 auto;
     min-width: 0;
   }
-
-  .sheet {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  .sheet > * {
-    min-width: 0;
-  }
-
-  .badge {
-    color: var(--color-accent-text);
-    font-variant-numeric: tabular-nums;
-  }
 }
