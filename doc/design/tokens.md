@@ -183,6 +183,7 @@ Rules:
 
 The spacing scale has a base of 4 px.
 The number in the name times 4 px gives the size, for example `--space-4` and `--space-0-5`.
+`--space-2-5` (10 px) is the one step between 8 and 12 px: the inset of a card and the side padding of a type filter option.
 
 Rules:
 
@@ -201,6 +202,7 @@ Rules:
 | `--topbar-height`        | Height of the top bar of the shell (48 px)                                                                                                                       |
 | `--sidebar-width`        | Width of the docked sidebar of the shell (232 px)                                                                                                                |
 | `--size-tile`            | The tile with the initials of an event in the event switcher (28 px)                                                                                             |
+| `--size-toolbar`         | The height of the toolbar row of a page and of the bulk bar (44 px)                                                                                              |
 | `--size-chip-height`     | Chips (20 px)                                                                                                                                                    |
 | `--size-hit-target`      | The height of the hit area of an interactive chip (0 with a fine pointer, 44 px with a coarse one)                                                               |
 | `--size-column-head`     | The height of the head of a board column and the width of the rail of a collapsed one (40 px, 44 px with a coarse pointer)                                       |
