@@ -16,8 +16,8 @@ import { selectionKeys, type WorkSelection } from "./useWorkSelection";
 import { cardSelect, WorkCard } from "./WorkCard";
 import styles from "./WorkTable.module.css";
 import { SORT_KEYS, type SortKey, sortBy } from "./workFilters";
-import type { WorkItem } from "./workItem";
-import { recordHref } from "./workLinks";
+import { mayBeOverdue, type WorkItem } from "./workItem";
+import { useRecordHref } from "./workLinks";
 import { useWorkSort } from "./workView";
 
 /** The columns of the table, in order. The column to select joins in front when there is one. */
@@ -30,7 +30,7 @@ function sortKeyOf(id: string): SortKey | undefined {
 }
 
 function Title({ item, eventId }: { item: WorkItem; eventId: string }) {
-  const href = recordHref(eventId, item);
+  const href = useRecordHref(eventId)(item);
   const title = redactedOr(item.redacted, item.title);
   // A long title ends in an ellipsis in its one line; the title attribute holds the whole text.
   const whole = item.redacted ? undefined : item.title;
@@ -49,12 +49,10 @@ function Due({ item, today }: { item: WorkItem; today: string }) {
   if (item.date === undefined) {
     return null;
   }
-  // A closed record is never overdue; neither is the day on which a decision was made.
-  const open = item.kind !== "decision" && item.column !== "done" && item.column !== "canceled";
   return (
     <>
       {item.kind === "decision" && <span className={styles.hidden}>{t("work-card-decided")} </span>}
-      <Chip variant="date" date={item.date} today={today} overdue={open} />
+      <Chip variant="date" date={item.date} today={today} overdue={mayBeOverdue(item)} />
     </>
   );
 }

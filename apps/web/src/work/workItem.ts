@@ -83,3 +83,11 @@ export function toWorkItem<K extends RecordKind>(
     record,
   };
 }
+
+/**
+ * True if a date of the item can be overdue. A closed record is never overdue; neither is the day
+ * on which a decision was made.
+ */
+export function mayBeOverdue(item: Pick<WorkItem, "kind" | "column">): boolean {
+  return item.kind !== "decision" && item.column !== "done" && item.column !== "canceled";
+}

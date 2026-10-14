@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Api } from "../api/client";
 import { EventLoadError } from "../events/EventLoadError";
 import { useEventState } from "../events/useEventState";
@@ -16,7 +16,9 @@ import { StandaloneLink } from "../ui/StandaloneLink";
 import { BoardSkeleton } from "./BoardSkeleton";
 import { BulkBar } from "./BulkBar";
 import { useBoardView, visibleItems } from "./boardView";
+import { displayOrder, neighbors } from "./displayOrder";
 import { FailureBanner } from "./FailureBanner";
+import { useRecordRoute } from "./record/recordRoute";
 import { RECORD_KINDS } from "./recordStatus";
 import { useBulkChange } from "./useBulkChange";
 import { type KindState, useWork } from "./useWork";
@@ -27,7 +29,11 @@ import { WorkToolbar } from "./WorkToolbar";
 import { WorkViews } from "./WorkViews";
 import { WorkViewTabs } from "./WorkViewTabs";
 import { countsFor, filterWork, groupByColumn, NO_FILTERS, serializeFilters } from "./workFilters";
-import { useWorkView } from "./workView";
+import { opensInPanel } from "./workLinks";
+import { useWorkSort, useWorkView } from "./workView";
+
+// The panel loads on demand: the board does not pay for the editors of a record (ADR 0082).
+const RecordPanel = lazy(() => import("./record/RecordPanel"));
 
 /**
  * „Arbeit“ (ADR 0082): all work records of an event on one page, with the filters in the query
@@ -40,6 +46,9 @@ export function WorkPage({ api }: { api: Api }) {
   const narrow = useNarrow();
   const [filters, setFilters] = useWorkFilters();
   const [view, setView] = useWorkView();
+  const [sort] = useWorkSort();
+  const record = useRecordRoute();
+  const layout = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
@@ -170,6 +179,24 @@ export function WorkPage({ api }: { api: Api }) {
       ? work.directory.directory.workstreams.find((stream) => stream.id === id)?.name
       : undefined;
 
+  // The panel steps through what the view shows, in the order it shows it.
+  const order = displayOrder({
+    items: shown,
+    view,
+    boardView,
+    narrow,
+    sort,
+    areaOf: (item) =>
+      item.workstreamId === undefined ? undefined : workstreamName(item.workstreamId),
+  });
+  const openId = record.route.mode === "open" ? record.route.id : undefined;
+  const around = openId === undefined ? undefined : neighbors(order.filter(opensInPanel), openId);
+  // Focus goes back to the card or the row of the record, else to the heading of the page.
+  const returnFocus = () =>
+    (openId === undefined
+      ? undefined
+      : layout.current?.querySelector<HTMLElement>(`a[href$="#${openId}"]`)) ?? heading.current;
+
   const empty = !loading && failed.length === 0 && work.items.length === 0;
   const filteredOut = !loading && work.items.length > 0 && shown.length === 0;
 
@@ -185,94 +212,116 @@ export function WorkPage({ api }: { api: Api }) {
   }
 
   return (
-    <Page>
-      <div className={styles.page}>
-        <PageTitle ref={heading}>{t("work-title")}</PageTitle>
-        <WorkViewTabs view={view} onChange={setView}>
-          <WorkToolbar
-            filters={filters}
-            onChange={setFilters}
-            counts={counts}
-            directory={work.directory}
-            me={me}
-            narrow={narrow}
-            onReset={reset}
-            searchRef={search}
-          />
-          <LiveRegion kind="status" visuallyHidden>
-            {announcement}
-          </LiveRegion>
-          {work.directory.kind === "failed" && (
-            <FailureBanner
-              message={t("work-directory-failed")}
-              detail={work.directory.message}
-              busy={retrying.has("directory")}
-              onRetry={() => retrying.start("directory", work.reloadDirectory)}
-            />
-          )}
-          {failed.map((kind) => (
-            <FailureBanner
-              key={kind}
-              message={t("work-kind-failed", { kind: t(`work-type-${kind}`) })}
-              detail={failureMessage(work.kinds[kind])}
-              busy={retrying.has(kind)}
-              onRetry={() => retrying.start(kind, () => work.reloadKind(kind))}
-            />
-          ))}
-          {loading && <BoardSkeleton narrow={narrow} />}
-          {empty && (
-            <EmptyState
-              title={t("work-empty-title")}
-              text={t("work-empty-text")}
-              action={
-                <StandaloneLink to={`/events/${encodeURIComponent(eventId)}/actions`}>
-                  {t("work-empty-new-action")}
-                </StandaloneLink>
-              }
-            />
-          )}
-          {filteredOut && (
-            <EmptyState
-              title={t("work-empty-filtered-title")}
-              text={t("work-empty-filtered-text")}
-              action={<Button onPress={reset}>{t("work-filter-reset")}</Button>}
-            />
-          )}
-          {!loading && shown.length > 0 && (
-            <div className={styles.scope}>
-              <WorkViews
-                view={view}
-                items={shown}
-                eventId={eventId}
-                today={today}
-                workstreamName={workstreamName}
+    <div ref={layout} className={styles.layout}>
+      <div className={styles.main}>
+        <Page>
+          <div className={styles.page}>
+            <PageTitle ref={heading}>{t("work-title")}</PageTitle>
+            <WorkViewTabs view={view} onChange={setView}>
+              <WorkToolbar
+                filters={filters}
+                onChange={setFilters}
+                counts={counts}
+                directory={work.directory}
+                me={me}
                 narrow={narrow}
-                timeline={{
-                  api,
-                  filters,
-                  workstreams:
-                    work.directory.kind === "loaded" ? work.directory.directory.workstreams : [],
-                  timeZone: event.state.kind === "loaded" ? event.state.event.time_zone : undefined,
-                  onReset: reset,
-                }}
-                selection={held}
+                onReset={reset}
+                searchRef={search}
               />
-              {view !== "timeline" && (selection.selecting || running) && (
-                <BulkBar
-                  selection={held}
-                  bulk={bulk}
-                  work={work}
-                  narrow={narrow}
-                  announce={setAnnouncement}
-                  bannerRef={banner}
-                  dockRef={dock}
+              <LiveRegion kind="status" visuallyHidden>
+                {announcement}
+              </LiveRegion>
+              {work.directory.kind === "failed" && (
+                <FailureBanner
+                  message={t("work-directory-failed")}
+                  detail={work.directory.message}
+                  busy={retrying.has("directory")}
+                  onRetry={() => retrying.start("directory", work.reloadDirectory)}
                 />
               )}
-            </div>
-          )}
-        </WorkViewTabs>
+              {failed.map((kind) => (
+                <FailureBanner
+                  key={kind}
+                  message={t("work-kind-failed", { kind: t(`work-type-${kind}`) })}
+                  detail={failureMessage(work.kinds[kind])}
+                  busy={retrying.has(kind)}
+                  onRetry={() => retrying.start(kind, () => work.reloadKind(kind))}
+                />
+              ))}
+              {loading && <BoardSkeleton narrow={narrow} />}
+              {empty && (
+                <EmptyState
+                  title={t("work-empty-title")}
+                  text={t("work-empty-text")}
+                  action={
+                    <StandaloneLink to={`/events/${encodeURIComponent(eventId)}/actions`}>
+                      {t("work-empty-new-action")}
+                    </StandaloneLink>
+                  }
+                />
+              )}
+              {filteredOut && (
+                <EmptyState
+                  title={t("work-empty-filtered-title")}
+                  text={t("work-empty-filtered-text")}
+                  action={<Button onPress={reset}>{t("work-filter-reset")}</Button>}
+                />
+              )}
+              {!loading && shown.length > 0 && (
+                <div className={styles.scope}>
+                  <WorkViews
+                    view={view}
+                    items={shown}
+                    eventId={eventId}
+                    today={today}
+                    workstreamName={workstreamName}
+                    narrow={narrow}
+                    timeline={{
+                      api,
+                      filters,
+                      workstreams:
+                        work.directory.kind === "loaded"
+                          ? work.directory.directory.workstreams
+                          : [],
+                      timeZone:
+                        event.state.kind === "loaded" ? event.state.event.time_zone : undefined,
+                      onReset: reset,
+                    }}
+                    selection={held}
+                  />
+                  {view !== "timeline" && (selection.selecting || running) && (
+                    <BulkBar
+                      selection={held}
+                      bulk={bulk}
+                      work={work}
+                      narrow={narrow}
+                      announce={setAnnouncement}
+                      bannerRef={banner}
+                      dockRef={dock}
+                    />
+                  )}
+                </div>
+              )}
+            </WorkViewTabs>
+          </div>
+        </Page>
       </div>
-    </Page>
+      {openId !== undefined && !loading && event.state.kind === "loaded" && around && (
+        <Suspense fallback={null}>
+          <RecordPanel
+            work={work}
+            readableId={openId}
+            timeZone={event.state.event.time_zone}
+            today={today}
+            previous={around.previous}
+            next={around.next}
+            onOpen={record.open}
+            onClose={record.close}
+            returnFocusTo={returnFocus}
+          />
+        </Suspense>
+      )}
+    </div>
   );
 }
 
