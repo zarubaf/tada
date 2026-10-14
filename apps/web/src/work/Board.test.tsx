@@ -1,6 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { RecordKind } from "../api/client";
 import { Router } from "../router/Router";
 import * as r from "../test/workRecords";
@@ -58,6 +58,8 @@ function board(items: WorkItem[], narrow = false) {
   );
 }
 
+afterEach(() => window.history.replaceState(null, "", "/"));
+
 const column = (name: RegExp) => screen.getByRole("region", { name });
 
 describe("Board, wide", () => {
@@ -88,24 +90,65 @@ describe("Board, wide", () => {
       make("action", r.action("ACT-002", { status: "blocked" })),
     ]);
     const heads = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(heads).toEqual(["Offen2", "In Arbeit0", "Blockiert1", "Erledigt0"]);
+    expect(heads).toEqual([
+      "Offen2, 2 Einträge",
+      "In Arbeit0, 0 Einträge",
+      "Blockiert1, 1 Eintrag",
+      "Erledigt0, 0 Einträge",
+      "Abgebrochen0, 0 Einträge",
+    ]);
   });
 
-  it("collapses Abgebrochen with its count and opens it with a toggle", async () => {
+  it("names a column with a separator before its count, and shows the count as a number", () => {
+    board([make("action", r.action("ACT-001")), make("action", r.action("ACT-002"))]);
+    expect(screen.getByRole("heading", { level: 2, name: "Offen, 2 Einträge" })).toBeVisible();
+    expect(within(column(/^Offen/)).getByText("2")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Offen, 2 Einträge" })).toBeInTheDocument();
+  });
+
+  it("collapses Abgebrochen with its count and opens it with a toggle that keeps focus", async () => {
     board([
       make("action", r.action("ACT-001", { status: "canceled" })),
       make("decision", r.decision("DEC-001", { status: "revoked" })),
     ]);
-    const toggle = screen.getByRole("button", { name: /Abgebrochen\s*2/ });
+    const toggle = screen.getByRole("button", { name: "Abgebrochen, 2 Einträge" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls");
     expect(screen.queryByText("ACT-001")).not.toBeInTheDocument();
 
     await userEvent.click(toggle);
-    expect(screen.getByText("ACT-001")).toBeInTheDocument();
+    // The same button stays in the page, so focus does not fall to the body.
+    const open = screen.getByRole("button", { name: "Abgebrochen, 2 Einträge" });
+    expect(open).toBe(toggle);
+    expect(open).toHaveFocus();
+    expect(open).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById(open.getAttribute("aria-controls") ?? "")).toContainElement(
+      screen.getByText("ACT-001"),
+    );
     expect(screen.getByRole("heading", { level: 2, name: /Abgebrochen/ })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Abgebrochen ausblenden" }));
+    await userEvent.click(open);
+    expect(open).toHaveFocus();
+    expect(open).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("ACT-001")).not.toBeInTheDocument();
+  });
+
+  it("keeps Abgebrochen open in the query string and opens it from there", async () => {
+    board([make("action", r.action("ACT-001", { status: "canceled" }))]);
+    await userEvent.click(screen.getByRole("button", { name: /Abgebrochen/ }));
+    expect(window.location.search).toBe("?canceled=1");
+    await userEvent.click(screen.getByRole("button", { name: /Abgebrochen/ }));
+    expect(window.location.search).toBe("");
+  });
+
+  it("opens Abgebrochen when the address says so", () => {
+    window.history.replaceState(null, "", "/?canceled=1");
+    board([make("action", r.action("ACT-001", { status: "canceled" }))]);
+    expect(screen.getByRole("button", { name: /Abgebrochen/ })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByText("ACT-001")).toBeInTheDocument();
   });
 
   it("sorts a column by due date, the undated last", () => {
@@ -160,12 +203,51 @@ describe("Board, narrow", () => {
     expect(screen.queryAllByRole("heading", { level: 2 })).toHaveLength(0);
   });
 
-  it("switches the list with the picker, also to Abgebrochen", async () => {
+  it("switches the list with the picker, also to Abgebrochen, and keeps the choice in the address", async () => {
     board(items(), true);
     await userEvent.click(screen.getByRole("button", { name: /Status/ }));
     await userEvent.click(screen.getByRole("option", { name: "Abgebrochen (1)" }));
     expect(screen.getByText("ACT-003")).toBeInTheDocument();
     expect(screen.queryByText("ACT-001")).not.toBeInTheDocument();
+    expect(window.location.search).toBe("?column=canceled");
+  });
+
+  it("opens on the status of the address, so that a reload or a step back shows the same list", () => {
+    window.history.replaceState(null, "", "/?column=in-progress");
+    board(items(), true);
+    expect(screen.getByRole("button", { name: /In Arbeit \(1\)/ })).toBeInTheDocument();
+    expect(screen.getByText("ACT-002")).toBeInTheDocument();
+  });
+
+  it("follows the address when the member goes back", async () => {
+    board(items(), true);
+    await userEvent.click(screen.getByRole("button", { name: /Status/ }));
+    await userEvent.click(screen.getByRole("option", { name: "In Arbeit (1)" }));
+    expect(screen.getByText("ACT-002")).toBeInTheDocument();
+    act(() => {
+      window.history.replaceState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await waitFor(() => expect(screen.getByText("ACT-001")).toBeInTheDocument());
+  });
+
+  it("opens on the first status that has records when the address names none", () => {
+    board(
+      [
+        make("action", r.action("ACT-004", { status: "done" })),
+        make("action", r.action("ACT-005", { status: "canceled" })),
+      ],
+      true,
+    );
+    expect(screen.getByRole("button", { name: /Erledigt \(1\)/ })).toBeInTheDocument();
+    expect(screen.getByText("ACT-004")).toBeInTheDocument();
+    expect(screen.queryByText("Keine Einträge")).not.toBeInTheDocument();
+  });
+
+  it("ignores an unknown status in the address", () => {
+    window.history.replaceState(null, "", "/?column=nope");
+    board(items(), true);
+    expect(screen.getByRole("button", { name: /Offen \(1\)/ })).toBeInTheDocument();
   });
 
   it("says so when the chosen status has no item", async () => {
