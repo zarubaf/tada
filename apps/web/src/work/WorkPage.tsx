@@ -201,7 +201,8 @@ export function WorkPage({ api }: { api: Api }) {
   const returnFocus = () =>
     (openId === undefined
       ? undefined
-      : layout.current?.querySelector<HTMLElement>(`a[href$="#${openId}"]`)) ?? heading.current;
+      : layout.current?.querySelector<HTMLElement>(`a[href$="#${CSS.escape(openId)}"]`)) ??
+    heading.current;
 
   const empty = !loading && failed.length === 0 && work.items.length === 0;
   const filteredOut = !loading && work.items.length > 0 && shown.length === 0;
