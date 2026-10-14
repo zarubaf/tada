@@ -1,7 +1,5 @@
 # Design tokens
 
-Under change by [ADR 0082](../adr/0082-redesign-of-the-web-client.md).
-
 [tokens.css](../../apps/web/src/styles/tokens.css) is the authority for the token names and values (ADR 0018).
 This document gives the uses, the rules and the reasons.
 The values are only in tokens.css. The breakpoints are the exception (see below).
@@ -10,66 +8,100 @@ Components use only these tokens. Stylelint rejects raw values (ADR 0019).
 ## Color
 
 The tokens define all colors in OKLCH.
-Neutral colors have hue 255 (a slightly cool gray). The accent is petrol, hue 220.
-The design system uses no other hue except the three status hues: success 150, warning 65 to 85, danger 25.
+Neutral colors have hue 265 (a slightly cool gray). The accent is one blue, hue 262 ([ADR 0082](../adr/0082-redesign-of-the-web-client.md)).
+The design system uses no other hue except the three status hues (success 150, warning 65 to 85, danger 25) and the hue of a proposal (300).
+The accent marks primary actions, selection, links and focus only.
 
-| Token                    | Use                                      |
-| ------------------------ | ---------------------------------------- |
-| `--color-bg-canvas`      | App background                           |
-| `--color-bg-surface`     | Panels, tables, inputs                   |
-| `--color-bg-raised`      | Menus, popovers, dialogs, sheets         |
-| `--color-bg-sunken`      | Sidebar, table header, code              |
-| `--color-bg-hover`       | Hover and selected row without focus     |
-| `--color-border-subtle`  | Dividers and panel borders               |
-| `--color-border-control` | Input, checkbox and select borders (3:1) |
-| `--color-text`           | Primary text                             |
-| `--color-text-muted`     | Secondary text and placeholders          |
-| `--color-text-on-accent` | Text on accent buttons                   |
-| `--color-accent`         | Primary button background                |
-| `--color-accent-hover`   | Primary button hover                     |
-| `--color-accent-text`    | Links and selected labels                |
-| `--color-accent-subtle`  | Selected row, current navigation item    |
-| `--color-focus`          | Focus ring                               |
-| `--color-success`        | Success text and icons                   |
-| `--color-success-subtle` | Success background                       |
-| `--color-warning`        | Warning text and icons                   |
-| `--color-warning-subtle` | Warning background                       |
-| `--color-danger`         | Error text, icons, destructive buttons   |
-| `--color-danger-subtle`  | Error background                         |
+| Token                     | Use                                      |
+| ------------------------- | ---------------------------------------- |
+| `--color-bg-canvas`       | App background                           |
+| `--color-bg-surface`      | Panels, tables, inputs                   |
+| `--color-bg-raised`       | Menus, popovers, dialogs, sheets         |
+| `--color-bg-sunken`       | Sidebar, table header, code              |
+| `--color-bg-hover`        | Hover and selected row without focus     |
+| `--color-border-subtle`   | Dividers and panel borders               |
+| `--color-border-control`  | Input, checkbox and select borders (3:1) |
+| `--color-text`            | Primary text                             |
+| `--color-text-muted`      | Secondary text and placeholders          |
+| `--color-text-on-accent`  | Text on accent buttons                   |
+| `--color-accent`          | Primary button background                |
+| `--color-accent-hover`    | Primary button hover                     |
+| `--color-accent-text`     | Links and selected labels                |
+| `--color-accent-subtle`   | Selected row, current navigation item    |
+| `--color-focus`           | Focus ring                               |
+| `--color-success`         | Success text and icons                   |
+| `--color-success-subtle`  | Success background                       |
+| `--color-warning`         | Warning text and icons                   |
+| `--color-warning-subtle`  | Warning background                       |
+| `--color-danger`          | Error text, icons, destructive buttons   |
+| `--color-danger-subtle`   | Error background                         |
+| `--color-proposed`        | Border, text and icon of a proposal      |
+| `--color-proposed-subtle` | Background of a proposal                 |
 
 Overlays use a scrim of `--color-scrim`, the same in both themes.
 
+### Themes
+
+The dark and the light theme define the same token names.
+The default follows `prefers-color-scheme`. The attribute `data-theme="light"` or `data-theme="dark"` on `<html>` overrides it.
+Without the attribute, the system decides.
+The member chooses system, light or dark with the theme toggle (see [components.md](components.md)).
+The choice is stored in the browser (`localStorage`, key `tada-theme`).
+The file `theme-init.js` applies it before the first paint, so the page does not flash.
+The page works without the stored choice.
+Status never shows by color alone, so the hues need no separate color-blind variant.
+
 ### Checked contrast pairs
 
-A script computed these ratios with the WCAG 2.2 formula on 2026-10-06.
-A change of a color token must keep each pair at or above its minimum.
+The test [contrast.test.ts](../../apps/web/src/styles/contrast.test.ts) computes these ratios from tokens.css with the WCAG 2.2 formula, in both themes.
+A change of a color token must keep each pair at or above its minimum. The values below are from 2026-10-14.
+The text pairs include `--color-text-muted` on every surface, because muted text is used on all of them.
 
-| Foreground       | Background       | Minimum | Light   | Dark    |
-| ---------------- | ---------------- | ------- | ------- | ------- |
-| `text`           | `bg-canvas`      | 4.5:1   | 16.58:1 | 16.16:1 |
-| `text`           | `bg-sunken`      | 4.5:1   | 15.64:1 | 16.60:1 |
-| `text-muted`     | `bg-canvas`      | 4.5:1   | 6.26:1  | 7.77:1  |
-| `text-muted`     | `bg-sunken`      | 4.5:1   | 5.90:1  | 7.98:1  |
-| `text-muted`     | `bg-hover`       | 4.5:1   | 5.56:1  | 6.54:1  |
-| `text-on-accent` | `accent`         | 4.5:1   | 6.36:1  | 8.60:1  |
-| `text-on-accent` | `accent-hover`   | 4.5:1   | 8.26:1  | 10.58:1 |
-| `accent-text`    | `bg-canvas`      | 4.5:1   | 6.36:1  | 9.23:1  |
-| `accent-text`    | `accent-subtle`  | 4.5:1   | 5.85:1  | 7.15:1  |
-| `border-control` | `bg-surface`     | 3:1     | 3.64:1  | 3.43:1  |
-| `border-control` | `bg-canvas`      | 3:1     | 3.49:1  | 3.65:1  |
-| `focus`          | `bg-canvas`      | 3:1     | 5.12:1  | 8.64:1  |
-| `focus`          | `bg-surface`     | 3:1     | 5.35:1  | 8.12:1  |
-| `success`        | `bg-surface`     | 4.5:1   | 6.48:1  | 8.87:1  |
-| `success`        | `success-subtle` | 4.5:1   | 5.74:1  | 7.28:1  |
-| `warning`        | `bg-surface`     | 4.5:1   | 6.18:1  | 9.59:1  |
-| `warning`        | `warning-subtle` | 4.5:1   | 5.50:1  | 7.77:1  |
-| `danger`         | `bg-surface`     | 4.5:1   | 6.55:1  | 6.84:1  |
-| `danger`         | `danger-subtle`  | 4.5:1   | 5.71:1  | 5.62:1  |
-| `danger`         | `bg-hover`       | 4.5:1   | 5.58:1  | 6.13:1  |
-| `text`           | `accent-subtle`  | 4.5:1   | 15.25:1 | 12.51:1 |
-| `text`           | `bg-raised`      | 4.5:1   | 17.31:1 | 13.98:1 |
-| `text-muted`     | `bg-raised`      | 4.5:1   | 6.53:1  | 6.72:1  |
-| `border-control` | `bg-raised`      | 3:1     | 3.64:1  | 3.16:1  |
+| Foreground       | Background        | Minimum | Light   | Dark    |
+| ---------------- | ----------------- | ------- | ------- | ------- |
+| `text`           | `bg-canvas`       | 4.5:1   | 16.58:1 | 16.59:1 |
+| `text`           | `bg-surface`      | 4.5:1   | 17.07:1 | 15.60:1 |
+| `text`           | `bg-raised`       | 4.5:1   | 17.22:1 | 15.04:1 |
+| `text`           | `bg-sunken`       | 4.5:1   | 15.97:1 | 17.51:1 |
+| `text`           | `bg-hover`        | 4.5:1   | 15.19:1 | 14.04:1 |
+| `text`           | `accent-subtle`   | 4.5:1   | 14.92:1 | 13.05:1 |
+| `text-muted`     | `bg-canvas`       | 4.5:1   | 6.83:1  | 7.51:1  |
+| `text-muted`     | `bg-surface`      | 4.5:1   | 7.03:1  | 7.06:1  |
+| `text-muted`     | `bg-raised`       | 4.5:1   | 7.09:1  | 6.81:1  |
+| `text-muted`     | `bg-sunken`       | 4.5:1   | 6.57:1  | 7.93:1  |
+| `text-muted`     | `bg-hover`        | 4.5:1   | 6.25:1  | 6.36:1  |
+| `text-muted`     | `accent-subtle`   | 4.5:1   | 6.14:1  | 5.91:1  |
+| `text-on-accent` | `accent`          | 4.5:1   | 5.71:1  | 5.22:1  |
+| `text-on-accent` | `accent-hover`    | 4.5:1   | 7.44:1  | 6.49:1  |
+| `accent-text`    | `bg-canvas`       | 4.5:1   | 6.52:1  | 9.20:1  |
+| `accent-text`    | `bg-surface`      | 4.5:1   | 6.71:1  | 8.64:1  |
+| `accent-text`    | `bg-raised`       | 4.5:1   | 6.77:1  | 8.33:1  |
+| `accent-text`    | `bg-sunken`       | 4.5:1   | 6.28:1  | 9.71:1  |
+| `accent-text`    | `accent-subtle`   | 4.5:1   | 5.87:1  | 7.23:1  |
+| `border-control` | `bg-canvas`       | 3:1     | 3.49:1  | 3.84:1  |
+| `border-control` | `bg-surface`      | 3:1     | 3.59:1  | 3.61:1  |
+| `border-control` | `bg-raised`       | 3:1     | 3.62:1  | 3.48:1  |
+| `border-control` | `bg-sunken`       | 3:1     | 3.36:1  | 4.05:1  |
+| `focus`          | `bg-canvas`       | 3:1     | 5.47:1  | 7.88:1  |
+| `focus`          | `bg-surface`      | 3:1     | 5.63:1  | 7.40:1  |
+| `focus`          | `bg-raised`       | 3:1     | 5.68:1  | 7.14:1  |
+| `focus`          | `bg-sunken`       | 3:1     | 5.27:1  | 8.31:1  |
+| `success`        | `bg-canvas`       | 4.5:1   | 5.92:1  | 8.88:1  |
+| `success`        | `bg-surface`      | 4.5:1   | 6.09:1  | 8.35:1  |
+| `success`        | `bg-hover`        | 4.5:1   | 5.42:1  | 7.52:1  |
+| `success`        | `success-subtle`  | 4.5:1   | 5.48:1  | 7.07:1  |
+| `warning`        | `bg-canvas`       | 4.5:1   | 5.93:1  | 9.77:1  |
+| `warning`        | `bg-surface`      | 4.5:1   | 6.10:1  | 9.19:1  |
+| `warning`        | `bg-hover`        | 4.5:1   | 5.43:1  | 8.27:1  |
+| `warning`        | `warning-subtle`  | 4.5:1   | 5.51:1  | 7.70:1  |
+| `danger`         | `bg-canvas`       | 4.5:1   | 6.31:1  | 7.52:1  |
+| `danger`         | `bg-surface`      | 4.5:1   | 6.50:1  | 7.07:1  |
+| `danger`         | `bg-hover`        | 4.5:1   | 5.78:1  | 6.37:1  |
+| `danger`         | `danger-subtle`   | 4.5:1   | 5.71:1  | 6.02:1  |
+| `proposed`       | `bg-canvas`       | 4.5:1   | 6.80:1  | 9.29:1  |
+| `proposed`       | `bg-surface`      | 4.5:1   | 7.00:1  | 8.73:1  |
+| `proposed`       | `bg-hover`        | 4.5:1   | 6.23:1  | 7.86:1  |
+| `proposed`       | `proposed-subtle` | 4.5:1   | 6.17:1  | 7.38:1  |
 
 ### State of knowledge
 
@@ -79,7 +111,7 @@ The state always has a label and an icon. Color and line style only support them
 | State      | Label (de-CH) | Icon (Tabler)    | Visual treatment                                                                                              |
 | ---------- | ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------- |
 | accepted   | „Bestätigt“   | `circle-check`   | Normal text. The label shows only on hover, in detail views and in the evidence panel.                        |
-| proposed   | „Vorschlag“   | `circle-dashed`  | 1 px dashed border in `--color-accent`, background `--color-accent-subtle`, label always visible.             |
+| proposed   | „Vorschlag“   | `circle-dashed`  | 1 px dashed border in `--color-proposed`, background `--color-proposed-subtle`, label always visible.         |
 | assumption | „Annahme“     | `circle-dotted`  | 1 px dotted underline in `--color-text-muted`, label always visible.                                          |
 | unknown    | „Unbekannt“   | `help-circle`    | The word „Unbekannt“ in `--color-text-muted`. tada never shows an empty field or a dash for an unknown value. |
 | conflict   | „Konflikt“    | `alert-triangle` | Background `--color-danger-subtle`, text and icon in `--color-danger`, label always visible.                  |
@@ -88,25 +120,26 @@ The state always has a label and an icon. Color and line style only support them
 
 Each font size has a line height token with the same suffix, for example `--line-height-md`.
 
-| Token              | Use                                                                        |
-| ------------------ | -------------------------------------------------------------------------- |
-| `--font-size-xs`   | Badges, keyboard hints. Never for sentences.                               |
-| `--font-size-sm`   | Secondary text in rows, captions, metadata                                 |
-| `--font-size-md`   | Default UI text in compact density                                         |
-| `--font-size-base` | Default UI text in comfortable density, prose, all inputs on touch devices |
-| `--font-size-lg`   | Section heading (h3)                                                       |
-| `--font-size-xl`   | Panel and dialog title (h2)                                                |
-| `--font-size-2xl`  | Page title (h1)                                                            |
-| `--font-size-3xl`  | Event title on the event overview, wide layout only                        |
+| Token              | Use                                                                               |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `--font-size-xs`   | 12 px. Chips, meta text, keyboard hints. No text is smaller. Never for sentences. |
+| `--font-size-sm`   | 13 px. Dense rows and cards, secondary text, captions, metadata                   |
+| `--font-size-md`   | 14 px. Default UI text and panel text in compact density                          |
+| `--font-size-base` | Default UI text in comfortable density, prose, all inputs on touch devices        |
+| `--font-size-lg`   | Section heading (h3)                                                              |
+| `--font-size-xl`   | Panel and dialog title (h2)                                                       |
+| `--font-size-2xl`  | Page title (h1)                                                                   |
+| `--font-size-3xl`  | Event title on the event overview, wide layout only                               |
 
-| Token                    | Use                                                  |
-| ------------------------ | ---------------------------------------------------- |
-| `--font-family-sans`     | All UI text: Mona Sans (ADR 0021)                    |
-| `--font-family-mono`     | IDs, hashes and code only: JetBrains Mono (ADR 0021) |
-| `--font-weight-regular`  | Body text                                            |
-| `--font-weight-medium`   | Labels, buttons, table headers and emphasis          |
-| `--font-weight-semibold` | Headings                                             |
-| `--letter-spacing-tight` | Sizes from `--font-size-xl`                          |
+| Token                    | Use                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `--font-family-sans`     | All UI text: Mona Sans (ADR 0021)                                                                    |
+| `--font-family-mono`     | IDs, hashes and code only: JetBrains Mono (ADR 0021)                                                 |
+| `--font-size-dense`      | Text of dense rows and cards: `--font-size-sm` in compact, `--font-size-base` in comfortable density |
+| `--font-weight-regular`  | Body text                                                                                            |
+| `--font-weight-medium`   | Labels, buttons, table headers and emphasis                                                          |
+| `--font-weight-semibold` | Headings                                                                                             |
+| `--letter-spacing-tight` | Sizes from `--font-size-xl`                                                                          |
 
 Rules:
 
@@ -127,17 +160,34 @@ Rules:
 
 ## Density and sizes
 
-| Token                 | Use                                                                                     |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| `--control-height-sm` | Small buttons and inputs in toolbars                                                    |
-| `--control-height-md` | Buttons and inputs                                                                      |
-| `--control-height-lg` | Primary actions on mobile pages                                                         |
-| `--row-height`        | Table and list rows                                                                     |
-| `--font-size-ui`      | UI text: `--font-size-md` in compact density, `--font-size-base` in comfortable density |
+| Token                 | Use                                                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------------------------- |
+| `--control-height-sm` | Small buttons, tabs and inputs in toolbars (28 px compact)                                           |
+| `--control-height-md` | Buttons and inputs (32 px compact)                                                                   |
+| `--control-height-lg` | Primary actions on mobile pages (36 px compact)                                                      |
+| `--row-height`        | Table and list rows (28 px compact)                                                                  |
+| `--font-size-ui`      | UI text: `--font-size-md` in compact density, `--font-size-base` in comfortable density              |
+| `--font-size-dense`   | Text of dense rows and cards: `--font-size-sm` in compact, `--font-size-base` in comfortable density |
+
+- The sizes of the dense layout are fixed in both densities:
+
+  | Token                  | Value  | Use                      |
+  | ---------------------- | ------ | ------------------------ |
+  | `--size-chip-height`   | 20 px  | Chips                    |
+  | `--size-bar-height`    | 48 px  | Top bar and panel header |
+  | `--size-sidebar-width` | 232 px | Sidebar                  |
+  | `--size-panel-width`   | 480 px | Side panel               |
+
+- In compact density, body text and panel text are 14 px, and dense rows and cards are 13 px.
+  In comfortable density, body text and inputs are 16 px, because iOS zooms into inputs below 16 px.
+  Chips and meta text are never below 12 px (ADR 0082 amends ADR 0018).
 
 - The default is `compact` with a fine pointer (`pointer: fine`) and `comfortable` with a coarse pointer.
+
 - A member can choose the density in the settings.
+
 - The comfortable density has larger controls and rows than the compact density.
+
 - Each pointer target is at least 24 × 24 px in compact and 44 × 44 px in comfortable density, including its padding.
 
 ## Radius
@@ -160,6 +210,7 @@ Rule: an element inside a container has a radius equal to or smaller than the co
 | `--shadow-1` | Menus, popovers, tooltips                                |
 | `--shadow-2` | Dialogs and sheets                                       |
 
+Shadows are on overlays only. There are no gradients, no glow and no blur.
 Elements with a shadow also have a 1 px border in `--color-border-subtle` and the background `--color-bg-raised`.
 
 ## Motion
