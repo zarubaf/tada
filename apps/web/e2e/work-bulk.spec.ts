@@ -172,6 +172,9 @@ test.describe("a mouse", () => {
     // The bar is in view without a scroll.
     const frame = await bar(page).boundingBox();
     expect(frame && frame.y + frame.height <= 900).toBe(true);
+    // The bar is 44 px high and floats 20 px above the bottom of the window (the approved mock).
+    expect(frame?.height).toBeCloseTo(44, 0);
+    expect(900 - ((frame?.y ?? 0) + (frame?.height ?? 0))).toBeCloseTo(20, 0);
 
     await bar(page).getByRole("button", { name: "Status" }).click();
     await page.getByRole("option", { name: "Erledigt" }).click();
