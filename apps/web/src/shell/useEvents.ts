@@ -1,26 +1,37 @@
 // The events that the shell shows: the current one for the switcher and the title, and the list
 // for the switcher menu and the command palette. Both use the events API as the events page does.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
-import { EVENT_KEY, readRemembered, writeRemembered } from "./remembered";
+import { eventKey, readRemembered, writeRemembered } from "./remembered";
+
+function lastEventOf(organizationId: string | undefined) {
+  return {
+    organizationId,
+    remembered: organizationId === undefined ? undefined : readRemembered(eventKey(organizationId)),
+  };
+}
 
 /**
- * The current event: the one of the route, else the one the member opened last (kept in the
- * browser). An event the server does not find is forgotten. It loads again when the organization
- * changes.
+ * The current event: the one of the route, else the one the member opened last in this
+ * organization (kept in the browser). The route event that the server does not find leaves the
+ * remembered one alone; a remembered event that the server does not find is forgotten. Without an
+ * organization (a page without the frame) it asks for nothing.
  */
 export function useCurrentEvent(
   api: Api,
   routeEventId: string | undefined,
   organizationId: string | undefined,
 ): Event | undefined {
-  const [remembered, setRemembered] = useState(() => readRemembered(EVENT_KEY));
+  const [state, setState] = useState(() => lastEventOf(organizationId));
   const [event, setEvent] = useState<Event>();
-  const id = routeEventId ?? remembered;
+  // Another organization has another last event: adjust while rendering, not in an effect.
+  if (state.organizationId !== organizationId) {
+    setState(lastEventOf(organizationId));
+  }
+  const id = routeEventId ?? state.remembered;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the organization is a trigger only
   useEffect(() => {
-    if (id === undefined) {
+    if (id === undefined || organizationId === undefined) {
       return;
     }
     let current = true;
@@ -32,12 +43,15 @@ export function useCurrentEvent(
         }
         if (data) {
           setEvent(data);
-          setRemembered(id);
-          writeRemembered(EVENT_KEY, id);
+          setState({ organizationId, remembered: id });
+          writeRemembered(eventKey(organizationId), id);
         } else if (response.status === 404 || response.status === 403) {
           setEvent(undefined);
-          setRemembered(undefined);
-          writeRemembered(EVENT_KEY, undefined);
+          // Only the remembered event is forgotten, not the one that a wrong link names.
+          if (readRemembered(eventKey(organizationId)) === id) {
+            setState({ organizationId, remembered: undefined });
+            writeRemembered(eventKey(organizationId), undefined);
+          }
         }
       })
       .catch(() => undefined);
@@ -46,7 +60,7 @@ export function useCurrentEvent(
     };
   }, [api, id, organizationId]);
 
-  return event?.id === id ? event : undefined;
+  return organizationId !== undefined && event?.id === id ? event : undefined;
 }
 
 export type EventList =
@@ -55,33 +69,47 @@ export type EventList =
   | { kind: "failed"; message: string }
   | { kind: "loaded"; events: Event[] };
 
-/** The first page of the events of the member, loaded on the first call of `load`. */
+/**
+ * The first page of the events of the member. `load` asks again each time; a list that is there
+ * stays until the new one comes, so the menu does not flicker.
+ */
 export function useEventList(
   api: Api,
   organizationId: string | undefined,
 ): { list: EventList; load: () => void } {
   const [list, setList] = useState<EventList>({ kind: "idle" });
+  const asking = useRef(false);
 
   // A list of another organization is no list of this one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the organization is a trigger only
   useEffect(() => setList({ kind: "idle" }), [organizationId]);
 
   const load = useCallback(() => {
-    if (list.kind === "loading" || list.kind === "loaded") {
+    if (organizationId === undefined || asking.current) {
       return;
     }
-    setList({ kind: "loading" });
+    asking.current = true;
+    setList((old) => (old.kind === "loaded" ? old : { kind: "loading" }));
     api
       .GET("/api/v1/events", { params: { query: {} } })
       .then(({ data, error }) =>
-        setList(
+        setList((old) =>
           data
             ? { kind: "loaded", events: data.items }
-            : { kind: "failed", message: problemMessage(error) },
+            : old.kind === "loaded"
+              ? old
+              : { kind: "failed", message: problemMessage(error) },
         ),
       )
-      .catch(() => setList({ kind: "failed", message: problemMessage(undefined) }));
-  }, [api, list.kind]);
+      .catch(() =>
+        setList((old) =>
+          old.kind === "loaded" ? old : { kind: "failed", message: problemMessage(undefined) },
+        ),
+      )
+      .finally(() => {
+        asking.current = false;
+      });
+  }, [api, organizationId]);
 
   return { list, load };
 }

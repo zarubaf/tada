@@ -59,6 +59,10 @@ let versionsPending = false;
 let openChangesets = 0;
 /** The events that the fake server lists; the first page only. */
 let eventItems: ReturnType<typeof event>[] = [];
+/** The path of each request that the fake server received. */
+let requested: string[] = [];
+/** The key of the remembered event of the first organization. */
+const EVENT_KEY = `tada-event:${first.organization_id}`;
 
 function event(id: string, name: string, key: string, status = "active") {
   return {
@@ -82,6 +86,7 @@ function renderShellAt(path: string, ...responses: Response[]) {
     }
     // The inbox count, the event switcher and the palette ask on their own too.
     const { pathname } = new URL(request.url);
+    requested.push(pathname);
     if (pathname === "/api/v1/changesets") {
       return json(200, {
         items: Array.from({ length: openChangesets }, (_, index) => ({ id: `c${index}` })),
@@ -143,6 +148,7 @@ afterEach(() => {
   versionsPending = false;
   openChangesets = 0;
   eventItems = [];
+  requested = [];
   localStorage.clear();
   document.documentElement.removeAttribute("data-theme");
 });
@@ -437,12 +443,12 @@ describe("event switcher", () => {
     renderShellAt(`/events/${open.id}`, json(200, info([first], first)));
 
     await screen.findByRole("button", { name: "Anlass wechseln: Sommerfest 2030" });
-    expect(localStorage.getItem("tada-event")).toBe(open.id);
+    expect(localStorage.getItem(EVENT_KEY)).toBe(open.id);
   });
 
   it("shows the remembered event away from the event pages", async () => {
     eventItems = [open];
-    localStorage.setItem("tada-event", open.id);
+    localStorage.setItem(EVENT_KEY, open.id);
     renderShellAt("/inbox", json(200, info([first], first)));
 
     expect(
@@ -453,11 +459,65 @@ describe("event switcher", () => {
   });
 
   it("forgets a remembered event that the server does not find", async () => {
-    localStorage.setItem("tada-event", "0199b8e0-0000-7000-8000-00000000dead");
+    localStorage.setItem(EVENT_KEY, "0199b8e0-0000-7000-8000-00000000dead");
     renderShellAt("/inbox", json(200, info([first], first)));
 
     await screen.findByRole("button", { name: "Anlass wählen" });
-    await vi.waitFor(() => expect(localStorage.getItem("tada-event")).toBeNull());
+    await vi.waitFor(() => expect(localStorage.getItem(EVENT_KEY)).toBeNull());
+  });
+
+  it("keeps the remembered event when the server does not find another event of the route", async () => {
+    eventItems = [open];
+    localStorage.setItem(EVENT_KEY, open.id);
+    renderShellAt("/events/0199b8e0-0000-7000-8000-00000000dead", json(200, info([first], first)));
+
+    await vi.waitFor(() =>
+      expect(requested).toContain("/api/v1/events/0199b8e0-0000-7000-8000-00000000dead"),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(localStorage.getItem(EVENT_KEY)).toBe(open.id);
+  });
+
+  it("remembers an event for each organization", async () => {
+    eventItems = [open];
+    localStorage.setItem(`tada-event:${second.organization_id}`, other.id);
+    renderShellAt("/inbox", json(200, info([first, second], first)));
+
+    // The event of the other organization does not show here, and the shell does not ask for it.
+    await screen.findByRole("button", { name: "Anlass wählen" });
+    expect(requested).not.toContain(`/api/v1/events/${other.id}`);
+  });
+
+  it.each(["/choose-organization", "/sign-in"])(
+    "asks for no event on %s, with an event remembered",
+    async (path) => {
+      eventItems = [open];
+      localStorage.setItem(EVENT_KEY, open.id);
+      localStorage.setItem("tada-event", open.id);
+      renderShellAt(path, json(200, info([first, second], undefined)));
+
+      await screen.findByText("Seiteninhalt");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(requested.filter((path) => path.startsWith("/api/v1/events"))).toEqual([]);
+    },
+  );
+
+  it("loads the list again at each opening and shows a new event", async () => {
+    eventItems = [open];
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    const trigger = await screen.findByRole("button", { name: "Anlass wählen" });
+    await userEvent.click(trigger);
+    await screen.findByRole("menuitem", { name: "Sommerfest 2030" });
+    await userEvent.keyboard("{Escape}");
+
+    eventItems = [open, other];
+    await userEvent.click(trigger);
+
+    // The old list stays while the new one loads: no loading item replaces it.
+    expect(screen.queryByRole("menuitem", { name: "Anlässe werden geladen …" })).toBeNull();
+    expect(await screen.findByRole("menuitem", { name: "Herbstflug" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sommerfest 2030" })).toBeInTheDocument();
   });
 
   it("lists the events of the member, all events and no new event for a member", async () => {

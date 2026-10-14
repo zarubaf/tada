@@ -41,13 +41,15 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const outdated = server !== undefined && isOutdated(server);
   const organizationId = session?.organization?.organization_id;
   const routeEventId = eventIdOf(pathname);
-  const currentEvent = useCurrentEvent(api, routeEventId, organizationId);
-  const events = useEventList(api, organizationId);
+  // A page without the frame has no organization to ask for events.
+  const framed = session?.organization !== undefined && !frameless;
+  const framedOrganizationId = framed ? organizationId : undefined;
+  const currentEvent = useCurrentEvent(api, routeEventId, framedOrganizationId);
+  const events = useEventList(api, framedOrganizationId);
   const canCreateEvent = useCanCreateEvent();
   const narrow = useNarrow();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const framed = session?.organization !== undefined && !frameless;
 
   // Ctrl+K and ⌘K open the palette from every place of the framed shell.
   useEffect(() => {
