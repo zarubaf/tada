@@ -1188,6 +1188,7 @@ workstream-status-closed = geschlossen
 
 combobox-loading = Suche läuft
 combobox-empty = Keine Treffer
+search-select-search = Optionen durchsuchen
 
 ## My Work
 
