@@ -10,15 +10,24 @@ export interface SearchFieldProps {
   placeholder?: string;
   value: string;
   onChange: (value: string) => void;
+  /** Called on Enter and when the field loses focus, for a caller that waits before it filters. */
+  onCommit?: () => void;
 }
 
 /**
  * A search field for the toolbar of a list (doc/design/components.md): an icon, the input and a
  * button that clears it. The caller filters; the field only holds the text.
  */
-export function SearchField({ label, placeholder, value, onChange }: SearchFieldProps) {
+export function SearchField({ label, placeholder, value, onChange, onCommit }: SearchFieldProps) {
   return (
-    <AriaSearchField className={styles.search} aria-label={label} value={value} onChange={onChange}>
+    <AriaSearchField
+      className={styles.search}
+      aria-label={label}
+      value={value}
+      onChange={onChange}
+      onSubmit={onCommit}
+      onBlur={onCommit}
+    >
       <IconSearch className={styles.icon} size={14} stroke={1.5} aria-hidden="true" />
       <Input className={styles.input} placeholder={placeholder} />
       <Button className={styles.clear} aria-label={t("search-field-clear")}>
