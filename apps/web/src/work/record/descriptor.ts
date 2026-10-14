@@ -84,10 +84,14 @@ export interface CreateSpec {
   defaults: (owner: string | undefined) => Record<string, FieldValue>;
   /** Checks the values before the form is sent: the message by field ID for each invalid field. */
   validate?: (values: Record<string, FieldValue>) => Record<string, string>;
-  /** Creates the record. */
+  /**
+   * Creates the record with the ID that the client chose (a UUIDv7). The form sends the same ID
+   * on every try, so a retry cannot create the record twice.
+   */
   submit: (
     commands: WorkCommands,
     values: Record<string, FieldValue>,
+    id: string,
   ) => Promise<CommandResult<Saved>>;
 }
 

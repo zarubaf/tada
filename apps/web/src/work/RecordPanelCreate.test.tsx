@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "../router/Router";
@@ -136,6 +136,7 @@ describe("the create state", () => {
     const open = await screen.findByRole("complementary", { name: /ACT-020/ });
     expect(server.posts()).toEqual([
       {
+        id: expect.any(String),
         title: "Banner aufhängen",
         owner_user_id: ME,
         due_date: "2030-06-01",
@@ -165,6 +166,47 @@ describe("the create state", () => {
     // The same element, which only gained its text: a region that remounts with its text is not read.
     expect(within(open).getByRole("status")).toBe(region);
     expect(region).toHaveTextContent("ACT-020 erfasst.");
+  });
+
+  it("sends one ID for the record, also on a retry, so that a retry cannot create it twice", async () => {
+    let calls = 0;
+    const server = openWork("?new=action", {}, (body) =>
+      ++calls === 1 ? problem(500, "internal") : json(201, created(body)),
+    );
+    const view = await form();
+    await user.type(view.getByRole("textbox", { name: /^Titel/ }), "Banner");
+    await user.click(view.getByRole("button", { name: "Erstellen" }));
+    await view.findByRole("alert");
+    await user.click(view.getByRole("button", { name: "Erstellen" }));
+
+    await screen.findByRole("complementary", { name: /ACT-020/ });
+    const ids = server.posts().map((body) => body.id);
+    expect(ids[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(ids[1]).toBe(ids[0]);
+  });
+
+  it("sends one request for a double submit in the same moment", async () => {
+    let release: (response: Response) => void = () => undefined;
+    const server = openWork(
+      "?new=action",
+      {},
+      (body) =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(json(201, created(body)));
+        }),
+    );
+    const view = await form();
+    await user.type(view.getByRole("textbox", { name: /^Titel/ }), "Banner");
+    const submit = view.getByRole("button", { name: "Erstellen" });
+    // Two presses before React has re-rendered.
+    act(() => {
+      submit.click();
+      submit.click();
+    });
+    await waitFor(() => expect(server.posts()).toHaveLength(1));
+    release(json(201, {}));
+    await screen.findByRole("complementary", { name: /ACT-020/ });
+    expect(server.posts()).toHaveLength(1);
   });
 
   it("shows the invalid fields that the server names, and keeps the draft", async () => {
