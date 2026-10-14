@@ -1500,6 +1500,8 @@ record-create-unavailable = Die Personen sind nicht geladen, darum lässt sich h
 record-choose-owner = Person wählen
 record-choose-level = Stufe wählen
 record-actions = Aktionen
+# $id: the readable ID of the record.
+record-action-gone = { $id } hat sich inzwischen geändert, die Aktion ist nicht mehr möglich.
 record-action-conflict = Der Eintrag wurde inzwischen geändert und ist neu geladen. Prüfen Sie ihn und versuchen Sie es erneut.
 # $id: the readable ID of the new record.
 record-created = { $id } erfasst.

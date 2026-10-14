@@ -113,8 +113,8 @@ describe("ActionMenu", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
-  it("keeps the step open when the action stops being available under it", async () => {
-    // The refresh after a conflict can bring a record that is firm already; the step stays.
+  it("closes the step and says why when the action stops being available under it", async () => {
+    // The refresh after a conflict can bring a record that is firm already.
     const { env, action, onDone, view } = setup();
     await open();
     view.rerender(
@@ -125,7 +125,11 @@ describe("ActionMenu", () => {
         onDone={onDone}
       />,
     );
-    expect(screen.getByRole("dialog")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Aktionen" })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(env.announce).toHaveBeenCalledWith(
+      "COM-001 hat sich inzwischen geändert, die Aktion ist nicht mehr möglich.",
+      "alert",
+    );
+    expect(onDone).not.toHaveBeenCalled();
   });
 });
