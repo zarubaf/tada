@@ -3,12 +3,16 @@ import type { RecordKind } from "../api/client";
 import type { BoardColumn } from "./recordStatus";
 import {
   countsFor,
+  DEFAULT_SORT,
   FILTER_KEYS,
   filterWork,
   groupByColumn,
   NO_FILTERS,
   parseFilters,
+  parseSort,
   serializeFilters,
+  serializeSort,
+  sortBy,
   sortWork,
   type WorkFilters,
 } from "./workFilters";
@@ -244,5 +248,90 @@ describe("the query string", () => {
     const parsed = parseFilters(new URLSearchParams("column=done&canceled=1&view=board"));
     expect(parsed).toEqual(NO_FILTERS);
     expect([...FILTER_KEYS]).not.toContain("column");
+  });
+});
+
+describe("sortBy", () => {
+  const names: Record<string, string> = { w1: "Bodenbetrieb", w2: "Festwirtschaft" };
+  const area = (item: WorkItem) => (item.workstreamId ? names[item.workstreamId] : undefined);
+  const a = item("action", { readableId: "ACT-010", title: "Zelt", date: "2030-05-10" });
+  const b = item("commitment", { readableId: "COM-002", title: "Äpfel", workstreamId: "w2" });
+  const c = item("action", {
+    readableId: "ACT-002",
+    title: "Bühne",
+    date: "2030-05-01",
+    column: "done",
+    workstreamId: "w1",
+  });
+  const d = item("risk", { readableId: "RSK-001", title: "", column: "blocked" });
+  const all = [a, b, c, d];
+  const sorted = (key: Parameters<typeof sortBy>[1]["key"], dir: "asc" | "desc" = "asc") =>
+    ids(sortBy(all, { key, dir }, area));
+
+  it("sorts by the readable id with numbers as numbers", () => {
+    expect(sorted("id")).toEqual(["ACT-002", "ACT-010", "COM-002", "RSK-001"]);
+    expect(sorted("id", "desc")).toEqual(["RSK-001", "COM-002", "ACT-010", "ACT-002"]);
+  });
+
+  it("sorts by the order of the kinds", () => {
+    expect(sorted("kind")).toEqual(["ACT-002", "ACT-010", "COM-002", "RSK-001"]);
+    expect(sorted("kind", "desc")).toEqual(["RSK-001", "COM-002", "ACT-002", "ACT-010"]);
+  });
+
+  it("sorts by title with the German collation and keeps an empty title last", () => {
+    expect(sorted("title")).toEqual(["COM-002", "ACT-002", "ACT-010", "RSK-001"]);
+    expect(sorted("title", "desc")).toEqual(["ACT-010", "ACT-002", "COM-002", "RSK-001"]);
+  });
+
+  it("sorts by the status group of the board", () => {
+    expect(sorted("status")).toEqual(["ACT-010", "COM-002", "RSK-001", "ACT-002"]);
+  });
+
+  it("sorts by the date and keeps the records without one last in both directions", () => {
+    expect(sorted("due")).toEqual(["ACT-002", "ACT-010", "COM-002", "RSK-001"]);
+    expect(sorted("due", "desc")).toEqual(["ACT-010", "ACT-002", "COM-002", "RSK-001"]);
+  });
+
+  it("sorts by the name of the workstream", () => {
+    expect(sorted("area")).toEqual(["ACT-002", "COM-002", "ACT-010", "RSK-001"]);
+  });
+
+  it("keeps the order of the board by default and does not change its input", () => {
+    const before = [...all];
+    expect(ids(sortBy(all, DEFAULT_SORT, area))).toEqual(ids(sortWork(all)));
+    expect(all).toEqual(before);
+  });
+
+  it("breaks a tie by the readable id, also when the direction is descending", () => {
+    const x = item("action", { readableId: "ACT-020", title: "Gleich" });
+    const y = item("action", { readableId: "ACT-003", title: "Gleich" });
+    expect(ids(sortBy([x, y], { key: "title", dir: "desc" }, area))).toEqual([
+      "ACT-003",
+      "ACT-020",
+    ]);
+  });
+});
+
+describe("the sort in the query string", () => {
+  const read = (query: string) => parseSort(new URLSearchParams(query));
+
+  it("has the board order by default and writes no key for it", () => {
+    expect(read("")).toEqual(DEFAULT_SORT);
+    expect(serializeSort(DEFAULT_SORT).toString()).toBe("");
+  });
+
+  it("round-trips a sort", () => {
+    const sort = { key: "title", dir: "desc" } as const;
+    expect(serializeSort(sort).toString()).toBe("sort=title&dir=desc");
+    expect(read("sort=title&dir=desc")).toEqual(sort);
+  });
+
+  it("writes only the key that differs from the default", () => {
+    expect(serializeSort({ key: "due", dir: "desc" }).toString()).toBe("dir=desc");
+    expect(serializeSort({ key: "id", dir: "asc" }).toString()).toBe("sort=id");
+  });
+
+  it("ignores values that it does not know", () => {
+    expect(read("sort=color&dir=sideways")).toEqual(DEFAULT_SORT);
   });
 });
