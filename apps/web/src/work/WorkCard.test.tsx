@@ -30,7 +30,18 @@ function card(
 }
 
 describe("WorkCard", () => {
-  it("is one link to the old page of the kind, named by id, status, title, date, area and owner", () => {
+  it("is one link to the old page of the kind, named by its id and title", () => {
+    const li = card(
+      "action",
+      r.action("ACT-012", { title: "Sponsorenliste nachführen", status: "in-progress" }),
+    );
+    const link = within(li).getByRole("link");
+    expect(link).toHaveAttribute("href", "/events/e1/actions#ACT-012");
+    expect(within(li).getAllByRole("link")).toHaveLength(1);
+    expect(link).toHaveAccessibleName("ACT-012 Sponsorenliste nachführen");
+  });
+
+  it("describes the kind, status, owner, date and area apart from the name, in words", () => {
     const li = card(
       "action",
       r.action("ACT-012", {
@@ -42,19 +53,20 @@ describe("WorkCard", () => {
       { workstream: "Werbung" },
     );
     const link = within(li).getByRole("link");
-    expect(link).toHaveAttribute("href", "/events/e1/actions#ACT-012");
-    expect(within(li).getAllByRole("link")).toHaveLength(1);
-    for (const part of [
-      "Aufgabe",
-      "ACT-012",
-      "in Arbeit",
-      "Sponsorenliste nachführen",
-      "30.05.2030",
-      "Bereich:\\s*Werbung",
-      "Verantwortlich: Anna Muster",
-    ]) {
-      expect(link).toHaveAccessibleName(new RegExp(part));
-    }
+    expect(link).toHaveAccessibleDescription(
+      "Aufgabe in Arbeit Verantwortlich: Anna Muster Fällig 30.05.2030 Bereich: Werbung",
+    );
+    // The name stays short: none of these is part of it.
+    expect(link.getAttribute("aria-labelledby")?.split(" ")).toHaveLength(2);
+  });
+
+  it("names a risk, which is no link, as a group and describes it by what it has", () => {
+    const li = card(
+      "risk",
+      r.risk("RSK-001", { status: "occurred", title: "Regen am Fest", owner_user_id: "x" }),
+    );
+    const group = within(li).getByRole("group", { name: "RSK-001 Regen am Fest" });
+    expect(group).toHaveAccessibleDescription("Risiko eingetreten");
   });
 
   it("shows the real status of the kind as text, not by color alone", () => {
@@ -75,7 +87,7 @@ describe("WorkCard", () => {
   it("shows the decided-on date of a decision, never overdue", () => {
     const li = card("decision", r.decision("DEC-001", { decided_on: "2030-03-12" }));
     expect(within(li).getByText("12.03.2030")).toBeInTheDocument();
-    expect(within(li).getByRole("link")).toHaveAccessibleName(/Entschieden am/);
+    expect(within(li).getByRole("link")).toHaveAccessibleDescription(/Entschieden am 12.03.2030/);
     expect(within(li).queryByText(/überfällig/)).not.toBeInTheDocument();
   });
 
@@ -106,6 +118,6 @@ describe("WorkCard", () => {
   it("keeps the full title in the name; the clamp is only paint", () => {
     const title = "Ein sehr langer Titel ".repeat(10).trim();
     const li = card("action", r.action("ACT-001", { title }));
-    expect(within(li).getByRole("link")).toHaveAccessibleName(new RegExp(title));
+    expect(within(li).getByRole("link")).toHaveAccessibleName(`ACT-001 ${title}`);
   });
 });
