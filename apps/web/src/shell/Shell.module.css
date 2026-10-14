@@ -1,23 +1,31 @@
 @layer components {
   /*
-   * The top bar is 48 px and sticks to the top: a focused element never hides under it (WCAG 2.4.11).
-   * The sidebar is 232 px.
+   * The top bar is 48 px and sticks to the top; the bottom bar on narrow layouts is fixed. The
+   * content clears both, and a focused element never hides under them (WCAG 2.4.11). The sidebar
+   * is 232 px.
    */
   :global(html):has(.shell) {
     --topbar-height: 3rem;
     --sidebar-width: 14.5rem;
 
-    scroll-padding-block-start: calc(var(--topbar-height) + var(--space-1));
+    /* A label of two lines at the small size and the icon above it: 56 px. */
+    --bottom-bar-item-height: 3.5rem;
+    --bottom-bar-height: calc(
+      var(--bottom-bar-item-height) +
+      var(--space-4) +
+      1px +
+      env(safe-area-inset-bottom)
+    );
+
+    scroll-padding-block: calc(var(--topbar-height) + var(--space-1))
+      calc(var(--bottom-bar-height) + var(--space-1));
   }
 
   .shell {
     display: grid;
-    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-    min-height: 100dvh;
-  }
-
-  .shell[data-sidebar="closed"] {
     grid-template-columns: minmax(0, 1fr);
+    min-height: 100dvh;
+    padding-block-end: var(--bottom-bar-height);
   }
 
   .sidebar {
@@ -45,8 +53,20 @@
     padding: var(--space-4) var(--space-4) 0;
   }
 
-  /* --bp-medium and wider: the gutter of the page. */
+  /* --bp-medium and wider: the docked sidebar, no bottom bar. */
   @media (width >= 40rem) {
+    :global(html):has(.shell) {
+      scroll-padding-block-end: 0;
+    }
+
+    .shell {
+      padding-block-end: 0;
+    }
+
+    .shell[data-sidebar="open"] {
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    }
+
     .outdated {
       padding: var(--space-6) var(--space-6) 0;
     }

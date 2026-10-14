@@ -125,6 +125,7 @@ shell-nav = Hauptnavigation
 # The toggle of the sidebar in the top bar. On narrow layouts it opens the drawer.
 shell-sidebar-close = Seitenleiste ausblenden
 shell-sidebar-open = Seitenleiste einblenden
+shell-drawer-open = Navigation öffnen
 shell-drawer-title = Navigation
 shell-drawer-close = Navigation schliessen
 # The bottom bar on narrow layouts: the fourth item opens a menu with the other destinations.

@@ -1,7 +1,7 @@
 // The app shell (doc/design/layout-and-responsiveness.md): a sidebar, a top bar on all widths, and on
 // narrow layouts a bottom bar. It shows only the items that exist.
 import { IconRefresh } from "@tabler/icons-react";
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { type Api, problemMessage } from "../api/client";
 import { useCanCreateEvent } from "../events/useCanCreateEvent";
 import { t } from "../i18n";
@@ -12,6 +12,7 @@ import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Select } from "../ui/Select";
+import { BottomBar } from "./BottomBar";
 import { ALL_EVENTS, EventSwitcher, eventIdOfItem, NEW_EVENT } from "./EventSwitcher";
 import { eventIdOf, sectionTitle } from "./navItems";
 import { readRemembered, SIDEBAR_KEY, writeRemembered } from "./remembered";
@@ -19,8 +20,12 @@ import styles from "./Shell.module.css";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { useCurrentEvent, useEventList } from "./useEvents";
+import { useNarrow } from "./useNarrow";
 import { VersionSheet } from "./VersionFooter";
 import { footerText, outdated as isOutdated, useServerVersion } from "./version";
+
+// The drawer is only for narrow layouts: its code loads with the first opening (ADR 0024).
+const Drawer = lazy(() => import("../ui/Drawer"));
 
 export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const session = useOptionalSession();
@@ -37,6 +42,12 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const currentEvent = useCurrentEvent(api, routeEventId, organizationId);
   const events = useEventList(api, organizationId);
   const canCreateEvent = useCanCreateEvent();
+  const narrow = useNarrow();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // A destination or an event that opens ends the drawer.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the path change is the trigger
+  useEffect(() => setDrawerOpen(false), [pathname]);
 
   // Without a session or an organization, and on the pages of the sign-in, there is no frame.
   if (frameless || !session?.organization) {
@@ -69,20 +80,29 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
     }
   };
 
+  // On narrow layouts the toggle opens the drawer; the remembered state belongs to the wide layouts.
   const toggleSidebar = () => {
+    if (narrow) {
+      setDrawerOpen(true);
+      return;
+    }
     writeRemembered(SIDEBAR_KEY, sidebarOpen ? "collapsed" : undefined);
     setSidebarOpen(!sidebarOpen);
   };
 
+  const openVersions = () => {
+    setDrawerOpen(false);
+    setVersionsOpen(true);
+  };
+
+  const versionsLabel = server
+    ? t("member-menu-versions", { build: footerText(server) })
+    : t("versions-title");
+
   const memberItems = [
     { id: "settings/account", label: t("settings-nav-account") },
     { id: "privacy", label: t("nav-privacy") },
-    {
-      id: "versions",
-      label: server
-        ? t("member-menu-versions", { build: footerText(server) })
-        : t("versions-title"),
-    },
+    { id: "versions", label: versionsLabel },
     { id: "sign-out", label: t("sign-out") },
   ];
 
@@ -98,31 +118,27 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
     />
   );
 
+  const sidebar = (
+    <Sidebar
+      organizationSwitcher={organizationSwitcher}
+      eventSwitcher={
+        <EventSwitcher
+          current={currentEvent}
+          list={events.list}
+          canCreate={canCreateEvent}
+          onOpen={events.load}
+          onAction={openEvent}
+        />
+      }
+      server={server}
+      onOpenVersions={openVersions}
+      member={{ id: user.id, name: user.displayName, role: t(`role-${organization.role}`) }}
+    />
+  );
+
   return (
-    <div className={styles.shell} data-sidebar={sidebarOpen ? "open" : "closed"}>
-      {sidebarOpen && (
-        <div className={styles.sidebar}>
-          <Sidebar
-            organizationSwitcher={organizationSwitcher}
-            eventSwitcher={
-              <EventSwitcher
-                current={currentEvent}
-                list={events.list}
-                canCreate={canCreateEvent}
-                onOpen={events.load}
-                onAction={openEvent}
-              />
-            }
-            server={server}
-            onOpenVersions={() => setVersionsOpen(true)}
-            member={{
-              id: user.id,
-              name: user.displayName,
-              role: t(`role-${organization.role}`),
-            }}
-          />
-        </div>
-      )}
+    <div className={styles.shell} data-sidebar={sidebarOpen && !narrow ? "open" : "closed"}>
+      {sidebarOpen && !narrow && <div className={styles.sidebar}>{sidebar}</div>}
       <div className={styles.workspace}>
         <TopBar
           title={
@@ -130,8 +146,14 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
             sectionTitle(pathname) ??
             t("app-name")
           }
-          toggleLabel={sidebarOpen ? t("shell-sidebar-close") : t("shell-sidebar-open")}
-          expanded={sidebarOpen}
+          toggleLabel={
+            narrow
+              ? t("shell-drawer-open")
+              : sidebarOpen
+                ? t("shell-sidebar-close")
+                : t("shell-sidebar-open")
+          }
+          expanded={narrow ? false : sidebarOpen}
           onToggle={toggleSidebar}
           onOpenPalette={() => undefined}
           member={{ id: user.id, name: user.displayName }}
@@ -140,7 +162,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
             if (id === "sign-out") {
               void signOut().then(setFailure);
             } else if (id === "versions") {
-              setVersionsOpen(true);
+              openVersions();
             } else {
               navigate(`/${id}`);
             }
@@ -170,6 +192,14 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
         )}
         <Fragment key={organization.organization_id}>{children}</Fragment>
       </div>
+      {narrow && <BottomBar versionsLabel={versionsLabel} onOpenVersions={openVersions} />}
+      {narrow && drawerOpen && (
+        <Suspense fallback={null}>
+          <Drawer title={t("shell-drawer-title")} onClose={() => setDrawerOpen(false)}>
+            {sidebar}
+          </Drawer>
+        </Suspense>
+      )}
       <VersionSheet api={api} isOpen={versionsOpen} onClose={() => setVersionsOpen(false)} />
     </div>
   );

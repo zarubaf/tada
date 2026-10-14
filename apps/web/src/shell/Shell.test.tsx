@@ -127,7 +127,17 @@ function renderShell(...responses: Response[]) {
   return renderShellAt("/events", ...responses);
 }
 
+/** Makes the layout narrow (below 40rem) or not, as `matchMedia` answers. */
+function stubNarrow(narrow: boolean) {
+  vi.stubGlobal("matchMedia", () => ({
+    matches: narrow,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
 afterEach(() => {
+  vi.unstubAllGlobals();
   window.history.replaceState(null, "", "/");
   server = systemVersion();
   versionsPending = false;
@@ -491,5 +501,117 @@ describe("event switcher", () => {
     await userEvent.click(await screen.findByRole("menuitem", { name: "Neuer Anlass" }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe("/events/new"));
+  });
+});
+
+describe("narrow layout", () => {
+  it("has a bottom bar with Eingang, Meine Arbeit, Anlässe and Mehr, and no sidebar", async () => {
+    stubNarrow(true);
+    renderShell(json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Eingang", "Meine Arbeit", "Anlässe"]);
+    expect(within(nav).getByRole("button", { name: "Mehr" })).toBeInTheDocument();
+    expect(screen.getAllByRole("navigation")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Anlass wählen" })).not.toBeInTheDocument();
+  });
+
+  it("shows the open proposals at Eingang in the bottom bar", async () => {
+    stubNarrow(true);
+    openChangesets = 2;
+    renderShell(json(200, info([first], first)));
+
+    const link = await screen.findByRole("link", { name: /^Eingang/ });
+    await vi.waitFor(() => expect(link).toHaveTextContent("2 offen"));
+  });
+
+  it("holds the other destinations in the menu Mehr", async () => {
+    stubNarrow(true);
+    renderShell(json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Mehr" }));
+
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual([
+      "Personen",
+      "Institutionen",
+      "Einstellungen",
+      "Datenschutz",
+      expect.stringMatching(/^(tada|Versionen)/),
+    ]);
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Institutionen" }));
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/institutions"));
+  });
+
+  it("keeps the top bar with the theme toggle, the command box and the member menu", async () => {
+    stubNarrow(true);
+    renderShell(json(200, info([first], first)));
+
+    const bar = await screen.findByRole("banner");
+    expect(within(bar).getByRole("button", { name: "Farbschema: System" })).toBeInTheDocument();
+    expect(
+      within(bar).getByRole("button", { name: "Suchen oder Befehl ausführen" }),
+    ).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Anna Muster" })).toBeInTheDocument();
+  });
+
+  it("opens the sidebar as a drawer with the toggle, and closes it with Escape", async () => {
+    stubNarrow(true);
+    renderShell(json(200, info([first, second], first)));
+
+    const toggle = await screen.findByRole("button", { name: "Navigation öffnen" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+
+    const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+    const nav = within(drawer).getByRole("navigation", { name: "Hauptnavigation" });
+    expect(within(nav).getAllByRole("link")).toHaveLength(6);
+    expect(within(drawer).getByRole("button", { name: /Organisation/ })).toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
+    expect(within(drawer).getByRole("link", { name: "Datenschutz" })).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(toggle).toHaveFocus());
+  });
+
+  it("closes the drawer when a destination opens", async () => {
+    stubNarrow(true);
+    renderShell(json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Navigation öffnen" }));
+    const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+    await userEvent.click(within(drawer).getByRole("link", { name: "Personen" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/persons"));
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("closes the drawer with its close button", async () => {
+    stubNarrow(true);
+    renderShell(json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Navigation öffnen" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Navigation schliessen" }));
+
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("does not remember the drawer as the state of the sidebar", async () => {
+    stubNarrow(true);
+    renderShell(json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Navigation öffnen" }));
+    await screen.findByRole("dialog", { name: "Navigation" });
+
+    expect(localStorage.getItem("tada-sidebar")).toBeNull();
   });
 });
