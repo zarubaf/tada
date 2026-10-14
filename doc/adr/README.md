@@ -33,12 +33,12 @@ The ADRs are the authority for the decisions in this project.
 | [0015](0015-deployment.md)                                      | Single-host deployment with Docker Compose               | Moved by 0033                      |
 | [0016](0016-environments-and-releases.md)                       | Environments and release promotion                       | Moved by 0033                      |
 | [0017](0017-api-contract-rust.md)                               | HTTP API contract from Rust types                        | Accepted                           |
-| [0018](0018-design-system-foundation.md)                        | Design system foundation and tokens                      | Accepted                           |
+| [0018](0018-design-system-foundation.md)                        | Design system foundation and tokens                      | Accepted, amended by 0082          |
 | [0019](0019-styling.md)                                         | Styling with CSS custom properties and CSS Modules       | Accepted                           |
-| [0020](0020-component-primitives.md)                            | React Aria Components as the accessible base             | Accepted                           |
-| [0021](0021-typography-and-icons.md)                            | Self-hosted typography and one icon set                  | Accepted                           |
-| [0022](0022-accessibility.md)                                   | Accessibility standard: WCAG 2.2 AA                      | Accepted                           |
-| [0023](0023-responsive-layout.md)                               | Responsive layout: one app, two primary contexts         | Accepted                           |
+| [0020](0020-component-primitives.md)                            | React Aria Components as the accessible base             | Accepted, amended by 0082          |
+| [0021](0021-typography-and-icons.md)                            | Self-hosted typography and one icon set                  | Accepted, amended by 0082          |
+| [0022](0022-accessibility.md)                                   | Accessibility standard: WCAG 2.2 AA                      | Accepted, amended by 0082          |
+| [0023](0023-responsive-layout.md)                               | Responsive layout: one app, two primary contexts         | Accepted, amended by 0082          |
 | [0024](0024-frontend-quality-gates.md)                          | Frontend quality gates                                   | Accepted                           |
 | [0025](0025-platform-contract.md)                               | Platform contract between the app and its runtime        | Accepted                           |
 | [0026](0026-first-runtime.md)                                   | Docker Compose as the first runtime, managed by scripts  | Moved by 0033                      |
@@ -97,6 +97,7 @@ The ADRs are the authority for the decisions in this project.
 | [0079](0079-changesets-without-member-words.md)                 | Changesets without member words                          | Accepted                           |
 | [0080](0080-workstream-proposals.md)                            | Workstream proposals                                     | Proposed                           |
 | [0081](0081-milestones-decisions-risks-and-requirements.md)     | Milestones, decisions, risks and requirements            | Proposed                           |
+| [0082](0082-redesign-of-the-web-client.md)                      | Redesign of the web client                               | Accepted                           |
 
 ## New ADR
 

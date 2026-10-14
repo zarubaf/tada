@@ -70,6 +70,9 @@ Planning views keep the record types fixed and make fields and views configurabl
 
 A new ADR records the views and the custom fields of work records before the work starts.
 
+[ADR 0082](adr/0082-redesign-of-the-web-client.md) already delivers the board, table and timeline views of the work records in the „Arbeit“ page.
+That ADR starts from this page and adds the saved views, the custom fields and the resource view.
+
 ### Follow-ups of Slice 2c
 
 Slice 2c delivered schedules, the AI PM digest, the model adapter and the agent runner, the Telegram webhook mode and the health endpoints.
