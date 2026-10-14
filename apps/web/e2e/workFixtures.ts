@@ -101,10 +101,17 @@ export const actions = [
   }),
 ];
 
-const commitments = [
+export const commitments = [
   base("11", BERND, {
     local_id: "COM-001",
     text: "Lieferung des Generators am Freitag um 15:00 Uhr auf das Flugplatzgelände",
+    promisor: {
+      kind: "institution",
+      id: "0199b8e0-0000-7000-8000-0000000000d1",
+      local_id: "INS-001",
+      name: "Generatorenvermietung Testwil-Oberdorf AG",
+      redacted: false,
+    },
     status: "conditional",
     due_date: "2099-05-17",
     workstream_id: GROUND,

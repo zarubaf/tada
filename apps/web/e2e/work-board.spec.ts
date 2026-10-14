@@ -265,10 +265,13 @@ test("a card is one link, and its address opens the panel at the record", async 
   const href = `/events/${event?.id}/work#ACT-001`;
   await expect(link).toHaveAttribute("href", href);
   await expect(link).toHaveAccessibleName(/^ACT-001 Generatorenvermietung/);
-  // The other kinds keep their old pages until their panels exist.
   await expect(page.getByRole("link", { name: /COM-001/ })).toHaveAttribute(
     "href",
-    `/events/${event?.id}/commitments#COM-001`,
+    `/events/${event?.id}/work#COM-001`,
+  );
+  await expect(page.getByRole("link", { name: /MIL-001/ })).toHaveAttribute(
+    "href",
+    `/events/${event?.id}/work#MIL-001`,
   );
   // The address works on its own, for a shared link or a reload: it opens the record in the panel.
   await page.goto(href);
