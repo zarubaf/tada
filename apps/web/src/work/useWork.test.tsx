@@ -65,6 +65,13 @@ function server(answers: Record<string, Answer> = {}) {
       return answer(url);
     }
     const match = /events\/([^/]+)\/([a-z]+)$/.exec(path);
+    if (request.method === "POST" && match) {
+      const answer = table[`POST ${match[1]}/${match[2]}`];
+      if (!answer) {
+        throw new Error(`unexpected ${request.method} ${path}`);
+      }
+      return answer(url);
+    }
     if (match) {
       calls.push(`${match[1]}/${match[2]}${url.search}`);
       const answer = table[`${match[1]}/${match[2]}`];
@@ -220,6 +227,23 @@ describe("useWork", () => {
     rerender({ eventId: "eb" });
     expect(result.current.kinds.action.kind).toBe("loading");
     expect(result.current.items).toHaveLength(0);
+  });
+
+  it("puts a created record into the list through the wrapped command", async () => {
+    const { api } = server({
+      "ea/actions": () => json(200, { items: [rec("act-1")] }),
+      "POST ea/actions": () => json(201, rec("act-2", { title: "Neu" })),
+    });
+    const { result } = mount(api);
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+
+    let created: Awaited<ReturnType<typeof result.current.commands.action.create>> | undefined;
+    await act(async () => {
+      created = await result.current.commands.action.create({ title: "Neu", owner_user_id: "u" });
+    });
+
+    expect(created?.ok).toBe(true);
+    expect(result.current.items.map((item) => item.id)).toEqual(["act-1", "act-2"]);
   });
 
   it("refreshes a kind without the loading state, and replaces a record", async () => {
