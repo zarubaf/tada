@@ -11,6 +11,7 @@ import { milestoneName } from "../milestoneName";
 import { statusPresentationOfText } from "../recordStatus";
 import type { WorkItem } from "../workItem";
 import type { FieldSpec, FieldValue } from "./descriptor";
+import { enumChoices } from "./enumChoices";
 
 /** What the choices are made of. A part that has not loaded is absent. */
 export interface ChoiceSources {
@@ -66,6 +67,8 @@ export function choicesOf(
         offered: statuses.length > 1,
       };
     }
+    case "enum":
+      return enumChoices(spec);
     case "person": {
       const options = (directory?.assignees ?? []).map((member) => ({
         id: member.id,

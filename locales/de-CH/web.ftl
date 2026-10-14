@@ -110,6 +110,9 @@ risk-status-open = offen
 risk-status-mitigated = entschärft
 risk-status-occurred = eingetreten
 risk-status-closed = abgeschlossen
+risk-level-low = niedrig
+risk-level-medium = mittel
+risk-level-high = hoch
 overdue = überfällig
 chip-workstream = Bereich
 

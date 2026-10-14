@@ -1,4 +1,4 @@
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useId, useRef, useState } from "react";
 import { uuidv7 } from "../../api/uuid";
 import { t } from "../../i18n";
 import { Button } from "../../ui/Button";
@@ -48,6 +48,7 @@ function Row({
   const choices = choicesOf(spec, sources, undefined, value);
   const Icon = spec.icon;
   const label = t(spec.labelKey);
+  const errorId = useId();
   const empty = spec.emptyKey ? t(spec.emptyKey) : spec.promptKey ? t(spec.promptKey) : "";
   return (
     <>
@@ -70,15 +71,21 @@ function Row({
             choices.offered && (
               <>
                 <SearchSelect
-                  label={label}
+                  label={spec.required ? `${label} ${t("record-required")}` : label}
+                  errorId={error ? errorId : undefined}
                   options={choices.options}
                   value={value ?? undefined}
                   onChange={(id) => onChange(id ?? null)}
                   placeholder={empty}
                   variant="quiet"
+                  searchable={spec.control !== "enum"}
                   {...(spec.emptyKey && { clearLabel: empty })}
                 />
-                {error && <p className={styles.error}>{error}</p>}
+                {error && (
+                  <p id={errorId} className={styles.error}>
+                    {error}
+                  </p>
+                )}
               </>
             )
           )}

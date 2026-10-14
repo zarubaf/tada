@@ -91,7 +91,9 @@ describe("the create state", () => {
     openWork("?new=action");
     const view = await form();
     expect(view.getByRole("textbox", { name: /^Titel/ })).toBeVisible();
-    expect(view.getByRole("button", { name: "Verantwortlich: Anna Muster" })).toBeVisible();
+    expect(
+      view.getByRole("button", { name: "Verantwortlich (Pflichtfeld): Anna Muster" }),
+    ).toBeVisible();
     expect(view.getByLabelText("Fällig")).toHaveAttribute("type", "date");
     expect(view.getByLabelText("Startdatum")).toHaveAttribute("type", "date");
     expect(view.getByRole("button", { name: "Bereich: Kein Bereich" })).toBeVisible();
@@ -104,7 +106,9 @@ describe("the create state", () => {
   it("starts without an owner when the member cannot own a record, and asks for one", async () => {
     const server = openWork("?new=action", { role: "admin", viewer: true });
     const view = await form();
-    expect(view.getByRole("button", { name: "Verantwortlich: Person wählen" })).toBeVisible();
+    expect(
+      view.getByRole("button", { name: "Verantwortlich (Pflichtfeld): Person wählen" }),
+    ).toBeVisible();
     await user.type(view.getByRole("textbox", { name: /^Titel/ }), "Banner");
     await user.click(view.getByRole("button", { name: "Erstellen" }));
 
