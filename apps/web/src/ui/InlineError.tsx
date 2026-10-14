@@ -9,6 +9,8 @@ export interface InlineErrorProps {
   requestId?: string | undefined;
   /** Without it, a retry makes no sense, for example after too many requests. */
   onRetry?: () => void;
+  /** The words of the retry button; „Erneut versuchen“ by default. */
+  retryLabel?: string;
   /**
    * How a screen reader learns of the failure (doc/design/accessibility.md, „Focus“):
    * - `alert`: the message is an alert, for a failure that no member action caused.
@@ -25,6 +27,7 @@ export function InlineError({
   message,
   requestId,
   onRetry,
+  retryLabel,
   announce = "alert",
   children,
 }: InlineErrorProps) {
@@ -44,7 +47,7 @@ export function InlineError({
     >
       <p>{message}</p>
       {requestId && <p className={styles.requestId}>{t("problem-request-id", { requestId })}</p>}
-      {onRetry && <Button onPress={onRetry}>{t("retry")}</Button>}
+      {onRetry && <Button onPress={onRetry}>{retryLabel ?? t("retry")}</Button>}
       {children}
     </div>
   );

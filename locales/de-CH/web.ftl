@@ -33,6 +33,8 @@ problem-unavailable = Der Dienst ist im Moment nicht erreichbar. Versuchen Sie e
 problem-general-4xx = Die Anfrage ist ungültig.
 problem-general-5xx = Ein unerwarteter Fehler ist aufgetreten.
 problem-network = Keine Verbindung zum Server. Prüfen Sie Ihre Internetverbindung.
+chunk-failed = Die Seite konnte nicht geladen werden. Vielleicht wurde die App aktualisiert.
+chunk-failed-reload = Seite neu laden
 
 ## Fields of the core catalog (ADR 0049). The ID is field-<key>, and field-<key>-<choice> for a choice.
 

@@ -26,7 +26,7 @@ describe("LazyMarkdown", () => {
       </LazyMarkdown>,
     );
 
-    expect(await screen.findByText(/Keine Verbindung zum Server/)).toBeVisible();
+    expect(await screen.findByText(/Seite konnte nicht geladen/)).toBeVisible();
     expect(onShown).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
 
