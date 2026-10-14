@@ -1,5 +1,5 @@
-// The bottom bar on narrow layouts (ADR 0082): Eingang, Meine Arbeit, Anlässe and „Mehr“, a menu
-// with the other destinations.
+// The bottom bar on narrow layouts (ADR 0082): Eingang, Meine Arbeit, Anlässe (inside an event:
+// Arbeit) and „Mehr“, a menu with the other destinations.
 import { IconDots } from "@tabler/icons-react";
 import { t } from "../i18n";
 import { InboxCount } from "../review/InboxCount";
@@ -7,7 +7,7 @@ import { useNavigate, usePathname } from "../router/Router";
 import { MenuButton } from "../ui/MenuButton";
 import { NavLink } from "../ui/NavLink";
 import styles from "./BottomBar.module.css";
-import { BOTTOM, isCurrent, MORE } from "./navItems";
+import { bottomItems, eventIdOf, isCurrent, moreItems } from "./navItems";
 
 const VERSIONS = "versions";
 
@@ -21,9 +21,11 @@ export function BottomBar({
 }) {
   const navigate = useNavigate();
   const pathname = usePathname();
+  const eventId = eventIdOf(pathname);
+  const more = moreItems(eventId);
   return (
     <nav className={styles.bar} aria-label={t("shell-nav")}>
-      {BOTTOM.map((destination) => (
+      {bottomItems(eventId).map((destination) => (
         <NavLink
           key={destination.id}
           to={destination.to}
@@ -48,10 +50,10 @@ export function BottomBar({
         }
         triggerLabel={t("nav-more")}
         triggerClassName={styles.more}
-        current={MORE.some((destination) => isCurrent(destination, pathname))}
+        current={more.some((destination) => isCurrent(destination, pathname))}
         label={t("nav-more-menu")}
         items={[
-          ...MORE.map((destination) => ({
+          ...more.map((destination) => ({
             id: destination.to,
             label: destination.label,
             icon: destination.icon,
