@@ -146,27 +146,105 @@ for (const viewport of viewports) {
   }
 }
 
-test("the successor of a replaced decision opens in the panel", async ({ page }) => {
+const replaced = [
+  {
+    ...decisions[0],
+    status: "superseded",
+    superseded_by: "0199b8e0-0000-7000-8000-000000000132",
+  },
+  {
+    ...decisions[0],
+    id: "0199b8e0-0000-7000-8000-000000000132",
+    local_id: "DEC-002",
+    wording: "Das Fest findet nur bei Sonne statt.",
+  },
+];
+
+test("the successor of a replaced decision opens in the panel, with focus and Back", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  const replaced = [
-    {
-      ...decisions[0],
-      status: "superseded",
-      superseded_by: "0199b8e0-0000-7000-8000-000000000132",
-    },
-    {
-      ...decisions[0],
-      id: "0199b8e0-0000-7000-8000-000000000132",
-      local_id: "DEC-002",
-      wording: "Das Fest findet nur bei Sonne statt.",
-    },
-  ];
   await fakeWork(page, { decisions: replaced });
   await page.goto(`${work}#DEC-001`);
   const panel = page.getByRole("complementary", { name: /^DEC-001/ });
   await panel.getByRole("link", { name: "DEC-002" }).click();
-  await expect(page.getByRole("complementary", { name: /^DEC-002/ })).toBeVisible();
+  const next = page.getByRole("complementary", { name: /^DEC-002/ });
+  await expect(next).toBeVisible();
   expect(new URL(page.url()).hash).toBe("#DEC-002");
+  // The link left with the old record: focus is on the title of the new one, not on the body.
+  await expect(next.getByRole("heading", { level: 2 })).toBeFocused();
+  await page.goBack();
+  const back = page.getByRole("complementary", { name: /^DEC-001/ });
+  await expect(back).toBeVisible();
+  expect(new URL(page.url()).hash).toBe("#DEC-001");
+  await expect(back.getByRole("heading", { level: 2 })).toBeFocused();
+});
+
+test("Ersetzen leaves focus on the title of the decision", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, "#DEC-001");
+  await page.route("**/api/v1/events/*/decisions/*/supersede", (route) =>
+    route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...decisions[0],
+        id: "0199b8e0-0000-7000-8000-000000000132",
+        local_id: "DEC-002",
+        version: 1,
+      }),
+    }),
+  );
+  const panel = page.getByRole("complementary", { name: /^DEC-001/ });
+  await panel.getByRole("button", { name: "Ersetzen" }).click();
+  const dialog = page.getByRole("dialog", { name: "DEC-001 ersetzen" });
+  await dialog.getByLabel("Entschieden (Pflichtfeld)").fill("2030-06-01");
+  await dialog.getByRole("button", { name: "Ersetzen" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(panel.getByRole("heading", { level: 2 })).toBeFocused();
+});
+
+test("the people of a decision keep the rhythm of a row, and an ID stays on one line", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, "#DEC-001");
+  const panel = page.getByRole("complementary", { name: /^DEC-001/ });
+  await expect(panel.getByText("Testwil Generatoren AG")).toBeVisible();
+  const rows = await panel.locator("ul li").evaluateAll((items) =>
+    items.map((item) => {
+      const box = item.getBoundingClientRect();
+      return { top: box.top, height: box.height };
+    }),
+  );
+  expect(rows).toHaveLength(2);
+  expect(rows[0]?.height).toBe(32);
+  expect((rows[1]?.top ?? 0) - (rows[0]?.top ?? 0)).toBe(32);
+  // The label is level with the first person.
+  const label = await panel.getByText("Beteiligte", { exact: true }).boundingBox();
+  expect(label?.y).toBeGreaterThanOrEqual((rows[0]?.top ?? 0) - 1);
+  expect((label?.y ?? 0) + (label?.height ?? 0)).toBeLessThanOrEqual((rows[0]?.top ?? 0) + 32 + 1);
+
+  await panel.getByRole("button", { name: "Ersetzen" }).click();
+  const heading = page.getByRole("dialog", { name: "DEC-001 ersetzen" }).getByRole("heading");
+  const lines = await heading
+    .locator("span")
+    .evaluate((id) => new Set(Array.from(id.getClientRects(), (rect) => rect.top)).size);
+  expect(lines).toBe(1);
+});
+
+test.describe("with a coarse pointer", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  // ADR 0022: the target is 44 px.
+  test("the link to the successor is 44 px high", async ({ page }) => {
+    await fakeWork(page, { decisions: replaced });
+    await page.goto(`${work}#DEC-001`);
+    const link = page
+      .getByRole("complementary", { name: /^DEC-001/ })
+      .getByRole("link", { name: "DEC-002" });
+    expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  });
 });
 
 test("Escape closes the dialog first and the panel second", async ({ page }) => {
