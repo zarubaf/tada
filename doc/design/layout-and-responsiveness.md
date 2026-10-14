@@ -1,6 +1,6 @@
 # Layout and responsiveness
 
-Under change by ADR 0082: values and screens move to the new design task by task.
+Under change by [ADR 0082](../adr/0082-redesign-of-the-web-client.md): values and screens move to the new design step by step.
 
 ADR 0023 defines the strategy. This document gives the layouts, the navigation and the page templates.
 
