@@ -162,6 +162,8 @@ function NarrowBoard({
     <div className={styles.narrow}>
       <Select
         label={t("work-board-status")}
+        labelHidden
+        variant="toolbar"
         value={chosen}
         onChange={(id) => setView({ column: id as BoardColumn })}
         options={groups.map((g) => ({

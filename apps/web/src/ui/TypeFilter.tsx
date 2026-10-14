@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ToggleButton, ToggleButtonGroup } from "react-aria-components";
 import styles from "./TypeFilter.module.css";
 
@@ -6,6 +7,8 @@ export interface TypeFilterOption {
   label: string;
   /** A number after the label, for example the open tasks of a type. */
   count?: number;
+  /** An icon before the label. It is decoration: the label names the option. */
+  icon?: ReactNode;
 }
 
 export interface TypeFilterProps {
@@ -38,6 +41,7 @@ export function TypeFilter({ label, options, value, onChange }: TypeFilterProps)
     >
       {options.map((option) => (
         <ToggleButton key={option.id} id={option.id} className={styles.option}>
+          {option.icon}
           {option.label}
           {option.count !== undefined && (
             <>

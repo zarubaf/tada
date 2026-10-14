@@ -122,6 +122,7 @@ export function DueFilter({ filters, onChange }: FilterControlProps) {
     <Select
       label={t("work-due")}
       labelHidden
+      variant="toolbar"
       options={options}
       value={filters.due ?? ANY_DUE}
       onChange={(id) =>
