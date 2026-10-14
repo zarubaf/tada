@@ -2,12 +2,14 @@ import { useId } from "react";
 import { t } from "../i18n";
 import { Link } from "../router/Router";
 import { Avatar } from "../ui/Avatar";
+import { Checkbox } from "../ui/Checkbox";
 import { Chip } from "../ui/Chip";
 import { RecordId } from "../ui/RecordId";
 import { redactedOr } from "../ui/Redacted";
 import { StatusLabel } from "../ui/StatusLabel";
 import { TypeIcon } from "../ui/TypeIcon";
 import { presentationOf } from "./recordStatus";
+import type { WorkSelection } from "./useWorkSelection";
 import styles from "./WorkCard.module.css";
 import type { WorkItem } from "./workItem";
 import { recordHref } from "./workLinks";
@@ -19,6 +21,32 @@ export interface WorkCardProps {
   today: string;
   /** The name of the workstream of the item, if it has one. */
   workstreamName?: string | undefined;
+  /** Present if the member may select the record (it can be changed). */
+  select?: CardSelection | undefined;
+}
+
+export interface CardSelection {
+  selected: boolean;
+  /** True while any record is selected: then every checkbox shows. */
+  selecting: boolean;
+  /** True while a bulk change runs on the selection. */
+  locked?: boolean;
+  onChange: (selected: boolean) => void;
+}
+
+/** The selection of one card, or nothing if the member may not select the record. */
+export function cardSelect(
+  selection: WorkSelection | undefined,
+  item: WorkItem,
+): CardSelection | undefined {
+  return selection?.canSelect(item)
+    ? {
+        selected: selection.isSelected(item),
+        selecting: selection.selecting,
+        locked: selection.locked,
+        onChange: (on) => selection.set([item], on),
+      }
+    : undefined;
 }
 
 /** A closed record is never overdue; neither is the day on which a decision was made. */
@@ -45,7 +73,7 @@ function partIds(base: string) {
  * same look and is a group, not a link. The name is the ID and the title; kind, status, owner,
  * date and area are the description, each part its own element so that they read apart.
  */
-export function WorkCard({ item, eventId, today, workstreamName }: WorkCardProps) {
+export function WorkCard({ item, eventId, today, workstreamName, select }: WorkCardProps) {
   const ids = partIds(useId());
   const href = recordHref(eventId, item);
   const { glyph, tone, labelKey } = presentationOf(item);
@@ -67,7 +95,9 @@ export function WorkCard({ item, eventId, today, workstreamName }: WorkCardProps
   const body = (
     <>
       <span className={styles.top}>
-        <TypeIcon kind={item.kind} size={14} decorative />
+        <span className={styles.lead}>
+          <TypeIcon kind={item.kind} size={14} decorative />
+        </span>
         <span id={ids.kind} className={styles.hidden}>
           {t(`record-kind-${item.kind}`)}
         </span>
@@ -109,7 +139,25 @@ export function WorkCard({ item, eventId, today, workstreamName }: WorkCardProps
     </>
   );
   return (
-    <li className={styles.item}>
+    <li
+      className={styles.item}
+      {...(select && { "data-selectable": "" })}
+      {...(select?.selecting && { "data-selecting": "" })}
+      {...(select?.selected && { "data-selected": "" })}
+    >
+      {select && (
+        // A sibling of the link and before it, never inside it: the card stays one link. The
+        // CSS shows the box on hover, on focus within, on touch and while a selection exists.
+        <span className={styles.check}>
+          <Checkbox
+            label={t("work-select-item", { id: item.readableId, title: item.title })}
+            labelHidden
+            isSelected={select.selected}
+            isDisabled={select.locked}
+            onChange={select.onChange}
+          />
+        </span>
+      )}
       {href === undefined ? (
         // biome-ignore lint/a11y/useSemanticElements: a fieldset groups form controls, not a card
         <div role="group" className={styles.card} {...naming}>

@@ -1349,3 +1349,25 @@ work-empty-filtered-text = Ändern Sie die Filter oder setzen Sie sie zurück.
 work-card-owner = Verantwortlich: { $name }
 work-card-due = Fällig
 work-card-decided = Entschieden am
+# $id: the readable ID, $title: the title of the record. The name of the checkbox on a card.
+work-select-item = { $id } { $title } auswählen
+work-select-column = Alle in Spalte auswählen
+work-select-all = Alle auswählen
+work-bulk-label = Aktionen für die Auswahl
+# $count: the number of selected records.
+work-bulk-count = { $count } ausgewählt
+work-bulk-status = Status
+work-bulk-owner = Verantwortlich
+work-bulk-area = Bereich
+work-bulk-no-area = Kein Bereich
+work-bulk-clear = Auswahl aufheben
+# $done and $total: the records that are changed and all that run.
+work-bulk-progress = { $done } von { $total } geändert …
+# $count: the number of records that are changed.
+work-bulk-done =
+    { $count ->
+    }
+    { $count ->
+    }
+    { $count ->
+    }
