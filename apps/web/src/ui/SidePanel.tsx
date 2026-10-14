@@ -1,7 +1,7 @@
 import { IconChevronDown, IconChevronUp, IconX } from "@tabler/icons-react";
-import { type KeyboardEvent, type ReactNode, useId, useLayoutEffect, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, useLayoutEffect, useRef } from "react";
 import { t } from "../i18n";
-import { Button } from "./Button";
+import { IconButton } from "./IconButton";
 import { makeOutsideInert } from "./inertOutside";
 import styles from "./SidePanel.module.css";
 
@@ -9,8 +9,13 @@ import styles from "./SidePanel.module.css";
 const NARROW = "(width < 40rem)";
 
 export interface SidePanelProps {
-  /** The title of the record. It names the region. */
+  /** The title of the record. It names the region and, without `heading`, shows in the head. */
   title: string;
+  /**
+   * What the head shows on the left instead of the title, for example the type, the ID and the
+   * status of a record. The title then stays only the name of the region.
+   */
+  heading?: ReactNode;
   /** Called by the close button and by Escape. The page unmounts the panel. */
   onClose: () => void;
   /** The previous record of the list. Without it the button is absent. */
@@ -35,6 +40,7 @@ export interface SidePanelProps {
  */
 export function SidePanel({
   title,
+  heading,
   onClose,
   onPrevious,
   onNext,
@@ -42,7 +48,6 @@ export function SidePanel({
   children,
 }: SidePanelProps) {
   const region = useRef<HTMLElement>(null);
-  const titleId = useId();
   // The latest fallback, read when the panel closes, not when it opens.
   const fallback = useRef(returnFocusTo);
   fallback.current = returnFocusTo;
@@ -101,28 +106,24 @@ export function SidePanel({
     <aside
       ref={region}
       className={styles.panel}
-      aria-labelledby={titleId}
+      aria-label={title}
       tabIndex={-1}
       onKeyDown={closeOnEscape}
     >
       <header className={styles.head}>
-        <h2 id={titleId} className={styles.title}>
-          {title}
-        </h2>
+        {heading ?? <h2 className={styles.title}>{title}</h2>}
         <div className={styles.actions}>
           {onPrevious && (
-            <Button variant="quiet" aria-label={t("side-panel-previous")} onPress={onPrevious}>
-              <IconChevronUp size={20} aria-hidden="true" />
-            </Button>
+            <IconButton
+              icon={IconChevronUp}
+              label={t("side-panel-previous")}
+              onPress={onPrevious}
+            />
           )}
           {onNext && (
-            <Button variant="quiet" aria-label={t("side-panel-next")} onPress={onNext}>
-              <IconChevronDown size={20} aria-hidden="true" />
-            </Button>
+            <IconButton icon={IconChevronDown} label={t("side-panel-next")} onPress={onNext} />
           )}
-          <Button variant="quiet" aria-label={t("side-panel-close")} onPress={onClose}>
-            <IconX size={20} aria-hidden="true" />
-          </Button>
+          <IconButton icon={IconX} label={t("side-panel-close")} onPress={onClose} />
         </div>
       </header>
       <div className={styles.body}>{children}</div>
