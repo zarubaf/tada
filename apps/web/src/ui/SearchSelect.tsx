@@ -1,28 +1,13 @@
-import { IconCheck, IconChevronDown } from "@tabler/icons-react";
-import { type ReactNode, useRef, useState } from "react";
-import {
-  Autocomplete,
-  Dialog,
-  DialogTrigger,
-  Input,
-  ListBox,
-  ListBoxItem,
-  Popover,
-  SearchField,
-  useFilter,
-} from "react-aria-components";
-import { t } from "../i18n";
+import { IconChevronDown } from "@tabler/icons-react";
+import { useRef, useState } from "react";
+import { Dialog, DialogTrigger, Popover } from "react-aria-components";
 import { Button } from "./Button";
 import { useFocusAfterCommit } from "./focus";
 import popover from "./Popover.module.css";
+import { SearchList, type SearchOption } from "./SearchList";
 import styles from "./SearchSelect.module.css";
 
-export interface SearchOption {
-  id: string;
-  label: string;
-  /** A node before the label, for example an avatar. It is decoration: the label names the option. */
-  leading?: ReactNode;
-}
+export type { SearchOption };
 
 export interface SearchSelectProps {
   /** The accessible name of the select and of its list, for example „Zuständig“. */
@@ -52,7 +37,6 @@ export function SearchSelect({
   clearLabel,
 }: SearchSelectProps) {
   const [isOpen, setOpen] = useState(false);
-  const { contains } = useFilter({ sensitivity: "base" });
   const trigger = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const chosen = options.find((option) => option.id === value);
@@ -75,41 +59,20 @@ export function SearchSelect({
       </Button>
       <Popover className={`${popover.popover} ${styles.popover}`} placement="bottom start">
         <Dialog className={styles.dialog} aria-label={label}>
-          <Autocomplete filter={contains}>
-            <SearchField className={styles.search} aria-label={t("search-select-search")} autoFocus>
-              <Input className={styles.input} />
-            </SearchField>
-            <ListBox
-              className={popover.list}
-              aria-label={label}
-              items={options}
-              selectionMode="single"
-              selectedKeys={value === undefined ? [] : [value]}
-              onSelectionChange={(keys) => {
-                // Pressing the chosen option again deselects it: the choice stays, the popover closes.
-                const [key] = keys === "all" ? [] : [...keys];
-                if (key !== undefined) {
-                  onChange(String(key));
-                }
-                setOpen(false);
-                // The popover restores focus in a later frame, and not at all when the chosen element is gone.
-                focusAfterCommit(() => trigger.current);
-              }}
-              renderEmptyState={() => <p className={styles.empty}>{t("combobox-empty")}</p>}
-            >
-              {(option: SearchOption) => (
-                <ListBoxItem id={option.id} textValue={option.label} className={popover.item}>
-                  {({ isSelected }) => (
-                    <>
-                      {option.leading}
-                      <span className={styles.label}>{option.label}</span>
-                      {isSelected && <IconCheck size={14} aria-hidden="true" />}
-                    </>
-                  )}
-                </ListBoxItem>
-              )}
-            </ListBox>
-          </Autocomplete>
+          <SearchList
+            label={label}
+            options={options}
+            value={value}
+            onChoose={(id) => {
+              // Pressing the chosen option again deselects it: the choice stays, the popover closes.
+              if (id !== undefined) {
+                onChange(id);
+              }
+              setOpen(false);
+              // The popover restores focus in a later frame, and not at all when the chosen element is gone.
+              focusAfterCommit(() => trigger.current);
+            }}
+          />
           {clearLabel && value !== undefined && (
             <Button
               variant="quiet"
