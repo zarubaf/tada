@@ -1,4 +1,11 @@
-import { type FocusEvent, type KeyboardEvent, useEffect, useId, useRef } from "react";
+import {
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+} from "react";
 import { formatDate } from "../../facts/formatValue";
 import { t } from "../../i18n";
 import { Button } from "../../ui/Button";
@@ -16,11 +23,6 @@ export interface FieldEnv extends FieldServices {
   today: string;
   /** False in a closed event, for a redacted record, and for a member who may not change it. */
   editable: boolean;
-}
-
-/** What a screen reader hears as the name of the button that starts an edit: the field only. */
-function editName(spec: FieldSpec) {
-  return t("record-edit-field", { field: t(spec.labelKey) });
 }
 
 /** The text of a value for a name: the words for no value when there is none. */
@@ -178,6 +180,7 @@ export function FieldEditor({
   const restoreFocus = useRef(false);
   const errorId = useId();
   const ownValueId = useId();
+  const nameId = useId();
   const valueElement = valueId ?? ownValueId;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the field appears
@@ -199,8 +202,22 @@ export function FieldEditor({
   const view = (
     <FieldView spec={spec} value={shown} choices={choices} item={item} today={env.today} />
   );
+  // The heading of the panel is this field, so that the page can name it by the value. The name
+  // points at the value only while the value is on screen: not during an edit.
+  const titled = (node: ReactNode, named: boolean) =>
+    heading ? (
+      <h2 className={styles.title} {...(named && { "aria-labelledby": valueElement })}>
+        {node}
+      </h2>
+    ) : (
+      node
+    );
   if (!editable) {
-    return heading ? view : <span className={styles.plain}>{view}</span>;
+    return heading ? (
+      titled(<span id={valueElement}>{view}</span>, true)
+    ) : (
+      <span className={styles.plain}>{view}</span>
+    );
   }
 
   const busy = edit.phase === "saving";
@@ -243,23 +260,37 @@ export function FieldEditor({
   }
 
   if (edit.phase === "idle") {
-    return (
+    // A long text names itself by its field and is described by its value, which is too long for a
+    // name. The others name themselves „<Feld>: <Wert>“, so that the visible value is in the name
+    // (WCAG 2.5.3).
+    const long = spec.control === "multiline";
+    return titled(
       <button
         ref={display}
         type="button"
         className={heading ? `${styles.display} ${styles.displayTitle}` : styles.display}
-        aria-label={editName(spec)}
-        aria-describedby={valueElement}
+        {...(long
+          ? {
+              "aria-label": t("record-edit-field", { field: t(spec.labelKey) }),
+              "aria-describedby": valueElement,
+            }
+          : { "aria-labelledby": `${nameId} ${valueElement}` })}
         onClick={edit.begin}
       >
+        {!long && (
+          <span id={nameId} hidden>
+            {t("record-field-name", { field: t(spec.labelKey) })}
+          </span>
+        )}
         <span id={valueElement} className={styles.valueText}>
           {view}
         </span>
-      </button>
+      </button>,
+      true,
     );
   }
 
-  return (
+  return titled(
     <div aria-busy={busy || undefined} className={styles.editing}>
       <TextEditor
         spec={spec}
@@ -279,6 +310,7 @@ export function FieldEditor({
         }}
       />
       {busy && <Saving />}
-    </div>
+    </div>,
+    false,
   );
 }
