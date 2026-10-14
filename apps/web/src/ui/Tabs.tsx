@@ -13,6 +13,8 @@ export interface TabItem {
   label: string;
   /** A number after the label, for example the open tasks of a type. */
   count?: number;
+  /** An icon before the label. It is decoration: the label names the tab. */
+  icon?: ReactNode;
 }
 
 export interface TabsProps {
@@ -54,6 +56,7 @@ export function Tabs({
     <TabList className={styles.list} data-variant={variant} aria-label={label}>
       {tabs.map((tab) => (
         <Tab key={tab.id} id={tab.id} className={styles.tab}>
+          {tab.icon}
           {tab.label}
           {tab.count !== undefined && (
             <>

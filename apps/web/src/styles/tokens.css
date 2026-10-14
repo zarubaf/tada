@@ -15,6 +15,7 @@
     --color-bg-raised: oklch(99.8% 0 265);
     --color-bg-sunken: oklch(97.2% 0.003 265);
     --color-bg-hover: oklch(95.5% 0.004 265);
+    --color-bg-active: oklch(92.5% 0.005 265);
     --color-border-subtle: oklch(91% 0.004 265);
     --color-border-control: oklch(62% 0.012 265);
     --color-text: oklch(22% 0.01 265);
@@ -181,6 +182,7 @@
       --color-bg-raised: oklch(23% 0.006 265);
       --color-bg-sunken: oklch(15% 0.005 265);
       --color-bg-hover: oklch(25.5% 0.006 265);
+      --color-bg-active: oklch(30% 0.007 265);
       --color-border-subtle: oklch(28.5% 0.006 265);
       --color-border-control: oklch(55% 0.01 265);
       --color-text: oklch(96% 0.003 265);
@@ -218,6 +220,7 @@
     --color-bg-raised: oklch(23% 0.006 265);
     --color-bg-sunken: oklch(15% 0.005 265);
     --color-bg-hover: oklch(25.5% 0.006 265);
+    --color-bg-active: oklch(30% 0.007 265);
     --color-border-subtle: oklch(28.5% 0.006 265);
     --color-border-control: oklch(55% 0.01 265);
     --color-text: oklch(96% 0.003 265);
