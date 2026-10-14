@@ -111,6 +111,7 @@
     --line-height-ui: var(--line-height-md);
     --font-size-dense: var(--font-size-sm);
     --line-height-dense: var(--line-height-sm);
+    --line-height-card-title: 1.125rem; /* The title of a work card: 18 px, as in the mock. */
 
     /* Radius */
     --radius-sm: 4px;
@@ -150,6 +151,7 @@
       --line-height-ui: var(--line-height-base);
       --font-size-dense: var(--font-size-base);
       --line-height-dense: var(--line-height-base);
+      --line-height-card-title: var(--line-height-base);
     }
   }
 
@@ -163,6 +165,7 @@
     --line-height-ui: var(--line-height-base);
     --font-size-dense: var(--font-size-base);
     --line-height-dense: var(--line-height-base);
+    --line-height-card-title: var(--line-height-base);
   }
 
   /* --bp-medium and narrower: the bulk bar has two rows and floats above the bottom bar. */
