@@ -55,4 +55,19 @@
     height: var(--space-12);
     border: 1px solid var(--color-border-control);
   }
+
+  /* A stand-in for an avatar in the search select. */
+  .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--space-6);
+    height: var(--space-6);
+    border-radius: var(--radius-full);
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+  }
 }

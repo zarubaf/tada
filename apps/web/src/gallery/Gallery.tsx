@@ -2,6 +2,7 @@
 // Only builds that are not production builds contain this page.
 import { IconX } from "@tabler/icons-react";
 import { Avatar } from "../ui/Avatar";
+import { useState } from "react";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
 import { Chip } from "../ui/Chip";
@@ -15,12 +16,17 @@ import { Kbd } from "../ui/Kbd";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Markdown } from "../ui/Markdown";
 import { RecordId } from "../ui/RecordId";
+import { Menu } from "../ui/Menu";
+import { SearchSelect } from "../ui/SearchSelect";
+import { SidePanel } from "../ui/SidePanel";
 import { Skeleton } from "../ui/Skeleton";
 import { Switch } from "../ui/Switch";
+import { TabPanel, Tabs } from "../ui/Tabs";
 import { ThemeToggle } from "../ui/ThemeToggle";
 import { TypeIcon } from "../ui/TypeIcon";
 import { RECORD_KINDS, STATUSES } from "../work/recordStatus";
 import { RecordStatusLabel } from "../work/WorkStatus";
+import { Toolbar } from "../ui/Toolbar";
 import styles from "./Gallery.module.css";
 
 const colors = [
@@ -83,6 +89,73 @@ const columns: Column<Row>[] = [
   { id: "name", header: "Name", cell: (row) => row.name },
   { id: "created", header: "Erfasst am", cell: (row) => row.created, numeric: true },
 ];
+
+const viewTabs = [
+  { id: "board", label: "Board" },
+  { id: "table", label: "Tabelle" },
+  { id: "plan", label: "Zeitplan" },
+];
+const typeTabs = [
+  { id: "all", label: "Alle", count: 24 },
+  { id: "tasks", label: "Aufgaben", count: 15 },
+  { id: "commitments", label: "Zusagen", count: 9 },
+];
+const people = [
+  { id: "anna", label: "Anna Muster", leading: <span className={styles.avatar}>AM</span> },
+  {
+    id: "bernd",
+    label: "Bernd Beispiel-Veranstaltungsbewilligungsverfahren",
+    leading: <span className={styles.avatar}>BB</span>,
+  },
+  { id: "clara", label: "Clara Probe", leading: <span className={styles.avatar}>CP</span> },
+];
+
+function NavigationDemo() {
+  const [view, setView] = useState("board");
+  const [type, setType] = useState("all");
+  const [owner, setOwner] = useState<string | undefined>("anna");
+  const [panelOpen, setPanelOpen] = useState(false);
+  return (
+    <>
+      <Tabs label="Ansicht" tabs={viewTabs} value={view} onChange={setView}>
+        <TabPanel id="board">Spalten nach Status</TabPanel>
+        <TabPanel id="table">Zeilen mit Spalten</TabPanel>
+        <TabPanel id="plan">Wochen und Meilensteine</TabPanel>
+      </Tabs>
+      <Tabs label="Typ" tabs={typeTabs} value={type} onChange={setType} look="filter" />
+      <Toolbar label="Filter und Anzeige">
+        <Menu
+          trigger="Filter"
+          label="Filter"
+          items={[
+            { id: "mine", label: "Meine Aufgaben" },
+            { id: "late", label: "Überfällig" },
+          ]}
+          onAction={() => {}}
+        />
+        <SearchSelect
+          label="Zuständig"
+          options={people}
+          value={owner}
+          onChange={setOwner}
+          placeholder="Niemand"
+          clearLabel="Niemand zuweisen"
+        />
+        <Button onPress={() => setPanelOpen(true)}>Panel öffnen</Button>
+      </Toolbar>
+      {panelOpen && (
+        <SidePanel
+          title="Sponsorenliste nachführen"
+          onClose={() => setPanelOpen(false)}
+          onPrevious={() => {}}
+          onNext={() => {}}
+        >
+          Die Details des Eintrags.
+        </SidePanel>
+      )}
+    </>
+  );
+}
 
 export function Gallery() {
   return (
@@ -254,6 +327,11 @@ export function Gallery() {
           <Kbd>Ctrl</Kbd>
           <Kbd>K</Kbd>
         </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Tabs, Auswahl und Panel</h2>
+        <NavigationDemo />
       </section>
 
       <section className={styles.section}>
