@@ -123,6 +123,7 @@
     /* Z-index */
     --z-sticky: 10;
     --z-shell: 20;
+    --z-panel: 30;
     --z-toast: 60;
   }
 
