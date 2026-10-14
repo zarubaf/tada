@@ -27,6 +27,7 @@ export function WorkViewTabs({ view, onChange, toolbar, children }: WorkViewTabs
       tabs={WORK_VIEWS.map((id) => ({ id, label: t(`work-view-${id}`) }))}
       value={view}
       variant="segmented"
+      fill
       renderList={(list) => (
         <PageToolbar>
           {toolbar.lead}
