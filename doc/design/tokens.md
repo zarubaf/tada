@@ -197,7 +197,7 @@ Rules:
 | `--control-height-md`    | Buttons and inputs (32 px compact, 44 px comfortable)                                                                                                            |
 | `--control-height-lg`    | Primary actions on mobile pages (36 px compact)                                                                                                                  |
 | `--row-height`           | Table and list rows (28 px compact)                                                                                                                              |
-| `--size-panel-width`  | Width of the side panel: 480 px, as an overlay and as a docked column                                |
+| `--size-panel-width`     | Width of the side panel: 480 px, as an overlay and as a docked column                                                                                            |
 | `--size-chip-height`     | Chips (20 px)                                                                                                                                                    |
 | `--size-hit-target`      | The height of the hit area of an interactive chip (0 with a fine pointer, 44 px with a coarse one)                                                               |
 | `--size-chip-hit-margin` | The space that an interactive chip keeps above and below, so that the hit areas of wrapped chips do not overlap (0 with a fine pointer, 12 px with a coarse one) |

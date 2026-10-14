@@ -1,8 +1,8 @@
 // The component gallery (ADR 0024): each token and each component in each state.
 // Only builds that are not production builds contain this page.
 import { IconX } from "@tabler/icons-react";
-import { Avatar } from "../ui/Avatar";
 import { useState } from "react";
+import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
 import { Chip } from "../ui/Chip";
@@ -15,19 +15,19 @@ import { InlineError } from "../ui/InlineError";
 import { Kbd } from "../ui/Kbd";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Markdown } from "../ui/Markdown";
-import { RecordId } from "../ui/RecordId";
 import { Menu } from "../ui/Menu";
+import { RecordId } from "../ui/RecordId";
 import { SearchSelect } from "../ui/SearchSelect";
 import { SidePanel } from "../ui/SidePanel";
 import { Skeleton } from "../ui/Skeleton";
 import { Switch } from "../ui/Switch";
 import { TabPanel, Tabs } from "../ui/Tabs";
 import { ThemeToggle } from "../ui/ThemeToggle";
+import { Toolbar } from "../ui/Toolbar";
+import { TypeFilter } from "../ui/TypeFilter";
 import { TypeIcon } from "../ui/TypeIcon";
 import { RECORD_KINDS, STATUSES } from "../work/recordStatus";
 import { RecordStatusLabel } from "../work/WorkStatus";
-import { Toolbar } from "../ui/Toolbar";
-import { TypeFilter } from "../ui/TypeFilter";
 import styles from "./Gallery.module.css";
 
 const colors = [
