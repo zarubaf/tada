@@ -57,6 +57,7 @@ const owner: FieldSpec = {
   icon: IconUser,
   control: "person",
   pointer: "owner",
+  promptKey: "record-choose-owner",
   required: true,
   read: (item) => asAction(item).owner.id,
   save: (commands, item, value) => commands.action.changeOwner(target(item), value ?? ""),
@@ -154,7 +155,7 @@ export const actionDescriptor: RecordDescriptor = {
   create: {
     titleKey: "record-create-action",
     fields: ["title", "owner", "due", "start", "area", "milestone", "description"],
-    defaults: (me) => ({ title: "", owner: me }),
+    defaults: (owner) => ({ title: "", owner: owner ?? null }),
     validate: (values): Record<string, string> =>
       startAfterDue(optional(values.start ?? null) ?? null, optional(values.due ?? null) ?? null)
         ? {
