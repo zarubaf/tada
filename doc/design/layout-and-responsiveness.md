@@ -197,7 +197,7 @@ The page does not use the sub-navigation of the event.
   The second row holds the type filter as a select and the „Filter“ button, and the status picker follows directly below it.
   The button shows the number of filters that are set.
   The page does not scroll sideways, and the targets are 44 px.
-- The bulk bar floats 20 px above the bottom of the window while the board or the table shows, 44 px high with 28 px buttons.
+- The bulk bar floats 20 px above the bottom of the window while the board or the table shows, 44 px high with 30 px buttons (`--size-bulk-button`; 44 px with a coarse pointer), grouped by rules of 20 px.
   The dock has no height, so the bar takes no room of its own; while it shows, the view keeps `--dock-room` free at its end (the bar and its distance from the bottom), so that the bar never covers the last row or card of the board, the table or the list of a phone.
   Below 40rem it sits above the bottom bar, in two rows: the count and „Auswahl aufheben“, then the three buttons, which wrap and never scroll sideways.
   The value lists open as a sheet from the bottom instead of a popover.

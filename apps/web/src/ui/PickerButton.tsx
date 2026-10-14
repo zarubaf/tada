@@ -21,6 +21,8 @@ export interface PickerButtonProps {
   disabledReason: string | undefined;
   /** A short list needs no search field. */
   searchable?: boolean;
+  /** `sm` is the compact button of a bar, as in `Button`. */
+  size?: "md" | "sm";
   /** A popover on a wide layout, a sheet from the bottom on a phone (ADR 0023). */
   narrow: boolean;
   onChoose: (id: string) => void;
@@ -37,6 +39,7 @@ export function PickerButton({
   options,
   disabledReason,
   searchable,
+  size,
   narrow,
   onChoose,
 }: PickerButtonProps) {
@@ -67,11 +70,17 @@ export function PickerButton({
     <Button
       ref={trigger}
       variant="quiet"
+      {...(size && { size })}
       isRefused={refused}
       aria-describedby={disabledReason === undefined ? undefined : reason}
       onPress={narrow ? () => setOpen(true) : undefined}
     >
-      <Icon size={16} stroke={1.5} aria-hidden="true" className={styles.icon} />
+      <Icon
+        size={size === "sm" ? 14 : 16}
+        stroke={1.5}
+        aria-hidden="true"
+        className={styles.icon}
+      />
       {label}
     </Button>
   );
