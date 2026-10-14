@@ -81,17 +81,17 @@ const goBack = () =>
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
-/** Board order of the sample: by date, the undated last, then by ID. */
+/** Table order of the sample: by the date of the column, the undated last, then by ID. */
 const BY_DATE = [
   "ACT-006",
   "ACT-004",
+  "DEC-001",
   "ACT-001",
   "COM-001",
   "MIL-001",
   "ACT-002",
   "ACT-003",
   "ACT-005",
-  "DEC-001",
   "RSK-001",
 ];
 
