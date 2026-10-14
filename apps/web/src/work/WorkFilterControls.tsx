@@ -9,7 +9,7 @@ import { SearchField } from "../ui/SearchField";
 import { type SearchOption, SearchSelect } from "../ui/SearchSelect";
 import { Select } from "../ui/Select";
 import type { DirectoryState } from "./directory";
-import { useDebouncedText } from "./useDebouncedText";
+import { type DebouncedText, useDebouncedText } from "./useDebouncedText";
 import { DUE_WINDOWS, type DueWindow, type WorkFilters } from "./workFilters";
 
 export interface FilterControlProps {
@@ -32,13 +32,21 @@ export function countOtherFilters(filters: WorkFilters): number {
   ].filter(Boolean).length;
 }
 
+/**
+ * The text of the search field. The draft keeps what the member types, with its spaces; the filters
+ * get the text after a pause. The toolbar owns it, because the field can leave with a sheet.
+ */
+export function useSearchText({ filters, onChange }: FilterControlProps): DebouncedText {
+  return useDebouncedText(filters.text, (text) => onChange({ ...filters, text }));
+}
+
 export function SearchBox({
-  filters,
-  onChange,
+  field,
   inputRef,
-}: FilterControlProps & { inputRef: Ref<HTMLInputElement> }) {
-  // The field keeps what the member types, with its spaces; the filters get the text after a pause.
-  const field = useDebouncedText(filters.text, (text) => onChange({ ...filters, text }));
+}: {
+  field: DebouncedText;
+  inputRef: Ref<HTMLInputElement>;
+}) {
   return (
     <SearchField
       label={t("work-search")}

@@ -10,6 +10,7 @@ import { TypeFilter } from "../ui/TypeFilter";
 import { TypeIcon } from "../ui/TypeIcon";
 import type { DirectoryState } from "./directory";
 import { RECORD_KINDS } from "./recordStatus";
+import type { DebouncedText } from "./useDebouncedText";
 import {
   countOtherFilters,
   DueFilter,
@@ -17,6 +18,7 @@ import {
   ResetFilters,
   SearchBox,
   StreamFilter,
+  useSearchText,
 } from "./WorkFilterControls";
 import styles from "./WorkToolbar.module.css";
 import type { Counts, WorkFilters } from "./workFilters";
@@ -69,11 +71,12 @@ function Controls({
   me,
   onReset,
   searchRef,
-}: Omit<WorkToolbarProps, "counts" | "narrow">) {
+  field,
+}: Omit<WorkToolbarProps, "counts" | "narrow"> & { field: DebouncedText }) {
   const props = { filters, onChange };
   return (
     <>
-      <SearchBox {...props} inputRef={searchRef} />
+      <SearchBox field={field} inputRef={searchRef} />
       <OwnerFilter {...props} directory={directory} me={me} />
       <StreamFilter {...props} directory={directory} />
       <DueFilter {...props} />
@@ -90,7 +93,8 @@ function NarrowToolbar({
   me,
   onReset,
   searchRef,
-}: Omit<WorkToolbarProps, "narrow">) {
+  field,
+}: Omit<WorkToolbarProps, "narrow"> & { field: DebouncedText }) {
   const [open, setOpen] = useState(false);
   const active = countOtherFilters(filters);
   return (
@@ -124,6 +128,7 @@ function NarrowToolbar({
               me={me}
               onReset={onReset}
               searchRef={searchRef}
+              field={field}
             />
           </div>
         </Sheet>
@@ -137,8 +142,10 @@ function NarrowToolbar({
  * join it when a second view exists (ADR 0082). On narrow layouts it is a select and a button.
  */
 export function WorkToolbar({ narrow, ...props }: WorkToolbarProps) {
+  // Here and not in the sheet: the pending text must outlive a sheet that closes.
+  const field = useSearchText(props);
   if (narrow) {
-    return <NarrowToolbar {...props} />;
+    return <NarrowToolbar {...props} field={field} />;
   }
   const { filters, onChange, counts, directory, me, onReset, searchRef } = props;
   return (
@@ -150,7 +157,7 @@ export function WorkToolbar({ narrow, ...props }: WorkToolbarProps) {
         onChange={(id) => setType(filters, onChange, id)}
       />
       <div className={styles.filters}>
-        <SearchBox filters={filters} onChange={onChange} inputRef={searchRef} />
+        <SearchBox field={field} inputRef={searchRef} />
         <Toolbar label={t("work-toolbar")}>
           <OwnerFilter filters={filters} onChange={onChange} directory={directory} me={me} />
           <StreamFilter filters={filters} onChange={onChange} directory={directory} />
