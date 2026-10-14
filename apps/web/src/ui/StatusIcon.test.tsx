@@ -1,4 +1,3 @@
-import { IconClockExclamation } from "@tabler/icons-react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { type StatusGlyph, StatusIcon } from "./StatusIcon";
@@ -66,19 +65,10 @@ describe("the glyphs", () => {
 });
 
 describe("StatusLabel", () => {
-  it("draws a status glyph with the stroke of the mock", () => {
+  it("draws every icon with the stroke of ADR 0021", () => {
     const { container } = render(
       <StatusLabel icon="progress" tone="progress">
         in Arbeit
-      </StatusLabel>,
-    );
-    expect(container.querySelector("svg")).toHaveAttribute("stroke-width", "2");
-  });
-
-  it("keeps the stroke of any other icon at 1.5", () => {
-    const { container } = render(
-      <StatusLabel icon={IconClockExclamation} tone="danger">
-        überfällig
       </StatusLabel>,
     );
     expect(container.querySelector("svg")).toHaveAttribute("stroke-width", "1.5");

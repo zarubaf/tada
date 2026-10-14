@@ -22,7 +22,7 @@ export function StatusLabel({ icon, tone, children, column = false }: StatusLabe
   return (
     <span className={styles.label} data-tone={tone} data-column={column || undefined}>
       {typeof icon === "string" ? (
-        <ToneIcon icon={glyphIcon(icon)} tone={tone} stroke={2} />
+        <ToneIcon icon={glyphIcon(icon)} tone={tone} />
       ) : (
         <ToneIcon icon={icon} tone={tone} />
       )}

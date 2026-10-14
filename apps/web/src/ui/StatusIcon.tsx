@@ -52,20 +52,18 @@ export interface ToneIconProps {
   icon: Icon;
   tone: StatusTone;
   size?: IconSize;
-  /** The line width. A status glyph draws with 2, as the mock does; any other icon with 1.5. */
-  stroke?: 1.5 | 2;
   /** The accessible name. Without it, the icon is decoration next to its text. */
   label?: string;
 }
 
 /** An icon in the color of a status tone. The tone only supports the text, never replaces it. */
-export function ToneIcon({ icon: Icon, tone, size = 16, stroke = 1.5, label }: ToneIconProps) {
+export function ToneIcon({ icon: Icon, tone, size = 16, label }: ToneIconProps) {
   return (
     <Icon
       className={styles.icon}
       data-tone={tone}
       size={size}
-      stroke={stroke}
+      stroke={1.5}
       {...(label === undefined ? { "aria-hidden": true } : { role: "img", "aria-label": label })}
     />
   );
@@ -77,7 +75,7 @@ export interface StatusIconProps extends Omit<ToneIconProps, "icon"> {
 
 /** The icon of a status. It has an accessible name, or it stands next to the label of the status. */
 export function StatusIcon({ glyph, ...props }: StatusIconProps) {
-  return <ToneIcon icon={GLYPHS[glyph]} stroke={2} {...props} />;
+  return <ToneIcon icon={GLYPHS[glyph]} {...props} />;
 }
 
 /** The icon of a glyph, for a component that places the icon itself. */
