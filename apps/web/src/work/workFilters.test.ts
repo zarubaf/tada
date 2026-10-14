@@ -292,6 +292,17 @@ describe("sortBy", () => {
     expect(sorted("due", "desc")).toEqual(["ACT-010", "ACT-002", "COM-002", "RSK-001"]);
   });
 
+  it("sorts a decision by the day it was made, as the column shows it", () => {
+    const decision = item("decision", { readableId: "DEC-001", date: "2030-05-05" });
+    const open = item("action", { readableId: "ACT-003" });
+    expect(ids(sortBy([open, a, decision, c], { key: "due", dir: "asc" }, area))).toEqual([
+      "ACT-002",
+      "DEC-001",
+      "ACT-010",
+      "ACT-003",
+    ]);
+  });
+
   it("sorts by the name of the workstream", () => {
     expect(sorted("area")).toEqual(["ACT-002", "COM-002", "ACT-010", "RSK-001"]);
   });
