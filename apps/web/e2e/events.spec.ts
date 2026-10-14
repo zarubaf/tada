@@ -49,6 +49,10 @@ for (const viewport of viewports) {
       await fakeEvents(page, 200, { items: events });
       await page.goto("/events");
       await setTheme(page, theme);
+      // On narrow layouts the switcher is in the drawer.
+      if (viewport.width < 640) {
+        await page.getByRole("button", { name: "Navigation öffnen" }).click();
+      }
       await expect(page.getByRole("button", { name: /Organisation/ })).toBeVisible();
       await expect(page.getByRole("table")).toBeVisible();
 

@@ -104,7 +104,7 @@ for (const viewport of viewports) {
     await page.goto("/events/new?pseudo");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     // The error state shows the longest texts.
-    await page.getByRole("button", { name: /Áñláss/ }).click();
+    await page.getByRole("button", { name: /Áñláss érfásséñ/ }).click();
     await expect(page.locator("[aria-invalid='true']").first()).toBeFocused();
 
     expect(await textOverflows(page)).toEqual([]);
