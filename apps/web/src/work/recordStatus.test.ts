@@ -4,6 +4,7 @@ import { hasMessage } from "../i18n";
 import {
   BOARD_COLUMNS,
   columnOf,
+  isColumnStatus,
   RECORD_KINDS,
   STATUSES,
   statusPresentation,
@@ -87,5 +88,31 @@ describe("statusPresentation", () => {
 
   it("shows a conditional commitment in the warning tone", () => {
     expect(statusPresentation("commitment", "conditional").tone).toBe("warning");
+  });
+});
+
+describe("isColumnStatus", () => {
+  // A status that the name of its column already says needs no label of its own on a card.
+  it.each([
+    ["action", "open"],
+    ["action", "in-progress"],
+    ["action", "blocked"],
+    ["action", "done"],
+    ["action", "canceled"],
+    ["milestone", "open"],
+    ["risk", "open"],
+  ] as const)("is true for %s %s", (kind, status) => {
+    expect(isColumnStatus(kind, status as never)).toBe(true);
+  });
+
+  it.each([
+    ["commitment", "conditional"],
+    ["commitment", "firm"],
+    ["milestone", "reached"],
+    ["decision", "in-force"],
+    ["risk", "occurred"],
+    ["risk", "mitigated"],
+  ] as const)("is false for %s %s", (kind, status) => {
+    expect(isColumnStatus(kind, status as never)).toBe(false);
   });
 });
