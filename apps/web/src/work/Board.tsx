@@ -1,10 +1,10 @@
 import { IconEyeOff } from "@tabler/icons-react";
-import { useId, useState } from "react";
+import { useId } from "react";
 import { t } from "../i18n";
-import { IconButton } from "../ui/IconButton";
 import { Select } from "../ui/Select";
 import { type StatusGlyph, StatusIcon, type StatusTone } from "../ui/StatusIcon";
 import styles from "./Board.module.css";
+import { useBoardView } from "./boardView";
 import type { BoardColumn } from "./recordStatus";
 import { WorkCard } from "./WorkCard";
 import { groupByColumn } from "./workFilters";
@@ -56,11 +56,22 @@ function Cards({ group, ...rest }: Omit<BoardProps, "items" | "narrow"> & { grou
   );
 }
 
-function Column({
-  group,
-  onHide,
-  ...rest
-}: Omit<BoardProps, "items" | "narrow"> & { group: Group; onHide?: () => void }) {
+/**
+ * The count of a column. It shows as a number; the name of the heading says „4 Einträge“ after a
+ * comma, so that it does not read „Offen4“.
+ */
+function Count({ items }: { items: number }) {
+  return (
+    <>
+      <span className={styles.count} aria-hidden="true">
+        {items}
+      </span>
+      <span className={styles.hidden}>, {t("work-count", { count: items })}</span>
+    </>
+  );
+}
+
+function Column({ group, ...rest }: Omit<BoardProps, "items" | "narrow"> & { group: Group }) {
   const titleId = useId();
   const { glyph, tone } = COLUMN_ICONS[group.column];
   return (
@@ -69,15 +80,47 @@ function Column({
         <StatusIcon glyph={glyph} tone={tone} size={14} />
         <h2 id={titleId} className={styles.name}>
           {t(`work-board-column-${group.column}`)}
-          <span className={styles.count}>{group.items.length}</span>
+          <Count items={group.items.length} />
         </h2>
-        {onHide && (
-          <span className={styles.hide}>
-            <IconButton icon={IconEyeOff} label={t("work-board-canceled-hide")} onPress={onHide} />
-          </span>
-        )}
       </header>
       <Cards group={group} {...rest} />
+    </section>
+  );
+}
+
+/**
+ * „Abgebrochen“: a rail that opens as a column. One button does both, so it keeps focus and says
+ * `aria-expanded`; it sits in the heading, as the disclosure pattern asks.
+ */
+function CanceledColumn({
+  group,
+  shown,
+  onToggle,
+  ...rest
+}: Omit<BoardProps, "items" | "narrow"> & { group: Group; shown: boolean; onToggle: () => void }) {
+  const titleId = useId();
+  const panelId = useId();
+  return (
+    <section className={shown ? styles.column : styles.rail} aria-labelledby={titleId}>
+      <h2 id={titleId} className={styles.canceledHead}>
+        <button
+          type="button"
+          className={styles.toggle}
+          aria-expanded={shown}
+          aria-controls={panelId}
+          onClick={onToggle}
+        >
+          <StatusIcon glyph="canceled" tone="muted" size={14} />
+          <span className={styles.toggleLabel}>{t("work-board-column-canceled")}</span>
+          <Count items={group.items.length} />
+          {shown && (
+            <IconEyeOff className={styles.hideIcon} size={14} stroke={1.5} aria-hidden="true" />
+          )}
+        </button>
+      </h2>
+      <div id={panelId} hidden={!shown}>
+        {shown && <Cards group={group} {...rest} />}
+      </div>
     </section>
   );
 }
@@ -86,34 +129,22 @@ function WideBoard({
   groups,
   ...rest
 }: Omit<BoardProps, "items" | "narrow"> & { groups: Group[] }) {
-  const [canceledShown, setCanceledShown] = useState(false);
+  const [view, setView] = useBoardView();
   return (
     <div className={styles.board}>
-      {groups.map((group) => {
-        if (group.column !== "canceled") {
-          return <Column key={group.column} group={group} {...rest} />;
-        }
-        return canceledShown ? (
-          <Column
+      {groups.map((group) =>
+        group.column === "canceled" ? (
+          <CanceledColumn
             key={group.column}
             group={group}
-            onHide={() => setCanceledShown(false)}
+            shown={view.canceled}
+            onToggle={() => setView({ canceled: !view.canceled })}
             {...rest}
           />
         ) : (
-          <button
-            key={group.column}
-            type="button"
-            className={styles.rail}
-            aria-expanded="false"
-            onClick={() => setCanceledShown(true)}
-          >
-            <StatusIcon glyph="canceled" tone="muted" size={14} />
-            <span className={styles.railLabel}>{t("work-board-column-canceled")}</span>
-            <span className={styles.count}>{group.items.length}</span>
-          </button>
-        );
-      })}
+          <Column key={group.column} group={group} {...rest} />
+        ),
+      )}
     </div>
   );
 }
@@ -122,14 +153,17 @@ function NarrowBoard({
   groups,
   ...rest
 }: Omit<BoardProps, "items" | "narrow"> & { groups: Group[] }) {
-  const [chosen, setChosen] = useState<BoardColumn>("open");
-  const group = groups.find((candidate) => candidate.column === chosen) ?? groups[0];
+  const [view, setView] = useBoardView();
+  // Without a choice the list shows the first status that has records, so that a search that
+  // matches only done records does not open on an empty „Offen“.
+  const chosen = view.column ?? (groups.find((g) => g.items.length > 0) ?? groups[0])?.column;
+  const group = groups.find((candidate) => candidate.column === chosen);
   return (
     <div className={styles.narrow}>
       <Select
         label={t("work-board-status")}
         value={chosen}
-        onChange={(id) => setChosen(id as BoardColumn)}
+        onChange={(id) => setView({ column: id as BoardColumn })}
         options={groups.map((g) => ({
           id: g.column,
           label: `${t(`work-board-column-${g.column}`)} (${g.items.length})`,

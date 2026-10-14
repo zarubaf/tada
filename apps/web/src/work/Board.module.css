@@ -1,7 +1,8 @@
 @layer components {
   /*
-   * Four columns and the rail of the canceled ones. A column has a least width; below it the board
-   * scrolls inside itself and not the page. Below 40rem the board is a list (see `.narrow`).
+   * Four columns and the rail of the canceled ones. A column has a least width; below it
+   * the board scrolls inside itself and not the page. Below 40rem the board
+   * is a list (see `.narrow`).
    */
   .board {
     display: flex;
@@ -40,8 +41,13 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .hide {
-    margin-inline-start: auto;
+  .hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .cards {
@@ -59,40 +65,67 @@
     font-size: var(--font-size-dense);
   }
 
-  /* The collapsed column: a rail that is a button. 44 px wide, so the target is large enough. */
+  /*
+   * „Abgebrochen“: one button in a heading, which is the rail while it is collapsed and the head of
+   * the column while it is open. The button stays in the page, so it keeps focus.
+   */
   .rail {
-    display: flex;
     flex: none;
-    flex-direction: column;
+    box-sizing: border-box;
+    width: var(--topbar-height);
+    border-radius: var(--radius-xl);
+    background: var(--color-bg-sunken);
+  }
+
+  .canceledHead {
+    margin: 0;
+    font: inherit;
+  }
+
+  .toggle {
+    display: flex;
     align-items: center;
     gap: var(--space-2);
     box-sizing: border-box;
-    min-width: var(--topbar-height);
-    min-height: 8rem;
-    padding: var(--space-3) var(--space-1);
-    border: 1px solid transparent;
-    border-radius: var(--radius-xl);
-    background: var(--color-bg-sunken);
+    width: 100%;
+    min-height: var(--topbar-height);
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: inherit;
+    background: none;
     color: var(--color-text);
     font: inherit;
+    font-size: var(--font-size-ui);
+    font-weight: var(--font-weight-semibold);
+    text-align: start;
     cursor: pointer;
     transition-property: background-color;
     transition-duration: var(--duration-fast);
     transition-timing-function: var(--ease-out);
   }
 
-  .rail:hover {
+  .toggle:hover {
     background: var(--color-bg-hover);
   }
 
-  .rail:focus-visible {
+  .toggle:focus-visible {
     outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
+    outline-offset: -2px;
   }
 
-  .railLabel {
-    font-weight: var(--font-weight-semibold);
+  .toggle[aria-expanded="false"] {
+    flex-direction: column;
+    min-height: 8rem;
+    padding: var(--space-3) 0;
+  }
+
+  .toggle[aria-expanded="false"] .toggleLabel {
     writing-mode: vertical-rl;
+  }
+
+  .hideIcon {
+    margin-inline-start: auto;
+    color: var(--color-text-muted);
   }
 
   .skeletonCard {
@@ -115,6 +148,10 @@
     .column,
     .rail {
       border: 1px solid CanvasText;
+    }
+
+    .toggle:focus-visible {
+      outline-color: Highlight;
     }
   }
 }
