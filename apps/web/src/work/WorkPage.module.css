@@ -28,8 +28,11 @@
   }
 
   /*
-   * The view and its bulk bar: the bar sticks to the bottom of the screen. While it shows, the end
-   * of every view keeps the room that it needs, so that it never covers the last row or card.
+   * The view and its bulk bar, which sticks to the bottom of the screen. The dock of the bar has no
+   * height and no gap before it, so the bar never moves the view: a selection changes nothing in
+   * the layout. The wide board needs no room for it, because its columns end 72 px under the last
+   * card. The table and the lists of a phone keep the room at their end (`--dock-room`), so that
+   * the bar never covers the last row or card; they do not fill the height, so it shows no shift.
    */
   .scope {
     display: flex;
@@ -38,7 +41,14 @@
     min-width: 0;
   }
 
-  .scope[data-bulk] {
+  .view {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .view[data-dock-room] {
     padding-block-end: var(--dock-room);
   }
 }
