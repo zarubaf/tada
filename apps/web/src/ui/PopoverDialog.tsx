@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from "react";
+import { type ReactNode, type RefObject, useRef } from "react";
 import { Dialog, DialogTrigger, Popover } from "react-aria-components";
 import { useFocusAfterCommit } from "./focus";
 import popover from "./Popover.module.css";
@@ -35,14 +35,17 @@ export function PopoverDialog({
   children,
 }: PopoverDialogProps) {
   const focusAfterCommit = useFocusAfterCommit();
+  const dialog = useRef<HTMLElement>(null);
   const change = (open: boolean) => {
     onOpenChange(open);
     if (!open) {
-      // A popover that is not modal does not restore focus. Focus is on the page body only if it
-      // was inside the popover; a member who moved on to another control keeps focus there.
+      // A popover that is not modal does not restore focus. Focus goes back to the button if it was
+      // inside the popover, which may still be in the page; a member who moved on to another
+      // control keeps focus there.
       focusAfterCommit(() => {
         const active = document.activeElement;
-        return !active || active === document.body ? triggerRef.current : null;
+        const left = !active || active === document.body || dialog.current?.contains(active);
+        return left ? triggerRef.current : null;
       });
     }
   };
@@ -61,7 +64,7 @@ export function PopoverDialog({
           placement="bottom end"
           className={`${popover.popover} ${styles.popover}`}
         >
-          <Dialog className={styles.dialog} aria-label={title}>
+          <Dialog ref={dialog} className={styles.dialog} aria-label={title}>
             {children}
           </Dialog>
         </Popover>
