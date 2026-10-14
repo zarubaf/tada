@@ -24,10 +24,14 @@ const COLUMN_KEYS: readonly SortKey[] = ["id", "kind", "title", "status", "owner
 function Title({ item, eventId }: { item: WorkItem; eventId: string }) {
   const href = recordHref(eventId, item);
   const title = redactedOr(item.redacted, item.title);
+  // A long title ends in an ellipsis in its one line; the title attribute holds the whole text.
+  const whole = item.redacted ? undefined : item.title;
   return href === undefined ? (
-    <span className={styles.title}>{title}</span>
+    <span className={styles.title} title={whole}>
+      {title}
+    </span>
   ) : (
-    <Link to={href} className={styles.link}>
+    <Link to={href} className={styles.link} title={whole}>
       {title}
     </Link>
   );
@@ -68,13 +72,17 @@ function columnsFor({
       item.owner.name === "" ? null : (
         <span className={styles.owner}>
           <Avatar name={item.owner.name} id={item.owner.id} decorative />
-          {item.owner.name}
+          <span className={styles.ownerName} title={item.owner.name}>
+            {item.owner.name}
+          </span>
         </span>
       ),
     due: (item) => <Due item={item} today={today} />,
     area: (item) =>
       item.workstreamId === undefined ? null : (
-        <Chip variant="workstream">{workstreamName(item.workstreamId)}</Chip>
+        <span className={styles.area}>
+          <Chip variant="workstream">{workstreamName(item.workstreamId)}</Chip>
+        </span>
       ),
   };
   return COLUMN_KEYS.map((key) => ({

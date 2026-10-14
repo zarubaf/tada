@@ -12,10 +12,16 @@
     font-weight: var(--font-weight-medium);
   }
 
+  /* The link fills its cell, so the row is the target: 28 px, and 44 px on coarse pointers. */
   .link {
+    display: block;
+    overflow: hidden;
     color: var(--color-text);
     font-weight: var(--font-weight-medium);
+    line-height: var(--row-height);
     text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .link:hover {
@@ -29,11 +35,24 @@
     border-radius: var(--radius-sm);
   }
 
+  /* A long name or area ends in an ellipsis, so that the title keeps the width that is left. */
   .owner {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: var(--space-1-5);
+    max-width: 12rem;
     white-space: nowrap;
+  }
+
+  .ownerName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .area {
+    display: flex;
+    max-width: 10rem;
   }
 
   .hidden {

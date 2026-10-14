@@ -345,6 +345,8 @@ export interface LinkProps {
   "aria-labelledby"?: string;
   /** The IDs of the elements that describe the link. */
   "aria-describedby"?: string;
+  /** The whole text of a link whose text ends in an ellipsis. */
+  title?: string;
   /** `-1` takes the link out of the tab order, where another link of the page does the same. */
   tabIndex?: number;
   /**
@@ -377,6 +379,7 @@ export function Link({
   "aria-label": ariaLabel,
   "aria-labelledby": labelledBy,
   "aria-describedby": describedBy,
+  title,
   tabIndex,
   onNavigate,
   children,
@@ -413,6 +416,7 @@ export function Link({
       aria-label={ariaLabel}
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
+      title={title}
       tabIndex={tabIndex}
       aria-current={current ? "page" : undefined}
       onClick={onClick}

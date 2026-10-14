@@ -88,7 +88,9 @@ export function TimelineChart({
                 <li key={milestone.id} className={styles.row}>
                   <span className={styles.label} aria-hidden="true">
                     <span className={styles.recordId}>{milestone.local_id}</span>
-                    <span className={styles.rowTitle}>{titleOf(milestone)}</span>
+                    <span className={styles.rowTitle} title={titleOf(milestone)}>
+                      {titleOf(milestone)}
+                    </span>
                     <MilestoneStatusLabel status={milestone.status} />
                   </span>
                   <span className={styles.track}>
@@ -149,7 +151,9 @@ function Row({ item, base }: { item: TimelineItem; base: string }) {
       {/* The link names the action; the label repeats it for the eye. */}
       <span className={styles.label} aria-hidden="true">
         <span className={styles.recordId}>{action.local_id}</span>
-        <span className={styles.rowTitle}>{titleOf(action)}</span>
+        <span className={styles.rowTitle} title={titleOf(action)}>
+          {titleOf(action)}
+        </span>
         <ActionStatusLabel status={action.status} />
       </span>
       <span className={styles.track}>
