@@ -115,7 +115,7 @@ describe("editing an action in the panel", () => {
       expect(view.getByRole("button", { name: /^Titel:/ })).toHaveFocus();
     });
 
-    it("keeps the title as the name of the heading, and the edit as the hint of the button", async () => {
+    it("keeps the title as the name of the heading and shows the title button", async () => {
       openAction();
       const view = await region();
       expect(view.getByRole("heading", { level: 2, name: "Plakat gestalten" })).toBeVisible();
