@@ -16,6 +16,8 @@ export interface SidePanelProps {
    * status of a record. The title then stays only the name of the region.
    */
   heading?: ReactNode;
+  /** Where the record is in the list, for example „7 von 15“. It shows before the step buttons. */
+  position?: string | undefined;
   /** Called by the close button and by Escape. The page unmounts the panel. */
   onClose: () => void;
   /**
@@ -45,6 +47,7 @@ export interface SidePanelProps {
 export function SidePanel({
   title,
   heading,
+  position,
   onClose,
   onPrevious,
   onNext,
@@ -117,6 +120,7 @@ export function SidePanel({
       <header className={styles.head}>
         {heading ?? <h2 className={styles.title}>{title}</h2>}
         <div className={styles.actions}>
+          {position && <span className={styles.position}>{position}</span>}
           {(onPrevious || onNext) && (
             <>
               <IconButton
