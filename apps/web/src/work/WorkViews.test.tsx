@@ -205,13 +205,14 @@ describe("the table view", () => {
     );
   });
 
-  it("shows the title as a link to the old page, the owner, the status, the date and the area", async () => {
+  it("shows the title as a link, the owner, the status, the date and the area", async () => {
     open("?view=table");
     await table();
     const act = within(row("ACT-001"));
+    // An action opens in the panel and keeps the view; the other kinds keep their old pages.
     expect(act.getByRole("link", { name: "Plakat gestalten" })).toHaveAttribute(
       "href",
-      `/events/${EVENT.id}/actions#ACT-001`,
+      `/events/${EVENT.id}/work?view=table#ACT-001`,
     );
     expect(act.getByRole("img", { name: "Aufgabe" })).toBeInTheDocument();
     expect(act.getByText("offen")).toBeInTheDocument();
@@ -394,7 +395,7 @@ describe("the table view", () => {
       // The same cards as the board: the whole card is the link, named by ID and title.
       expect(screen.getByRole("link", { name: /ACT-001/ })).toHaveAttribute(
         "href",
-        `/events/${EVENT.id}/actions#ACT-001`,
+        `/events/${EVENT.id}/work?view=table#ACT-001`,
       );
     });
   });

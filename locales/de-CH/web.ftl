@@ -1396,3 +1396,24 @@ work-bulk-reason-unsupported = Für einen Teil der Auswahl nicht möglich.
 work-bulk-reason-status-mixed = Der Status lässt sich nur für Einträge derselben Art ändern.
 work-bulk-reason-status-no-command = Der Status eines Entscheids ändert sich nur durch Ersetzen oder Widerrufen.
 work-bulk-reason-status-none-common = Die ausgewählten Einträge haben keinen gemeinsamen nächsten Status.
+
+## The record panel of the „Arbeit“ page (ADR 0082)
+
+record-field-title = Titel
+record-field-status = Status
+record-field-owner = Verantwortlich
+record-field-due = Fällig
+record-field-start = Startdatum
+record-field-area = Bereich
+record-field-milestone = Meilenstein
+record-field-description = Beschreibung
+record-no-date = Kein Datum
+record-no-area = Kein Bereich
+record-no-milestone = Kein Meilenstein
+record-no-description = Keine Beschreibung
+record-sources = Quellen
+record-not-found-title = Eintrag nicht gefunden
+# $id: the readable ID from the address.
+record-not-found-text = Den Eintrag { $id } gibt es in diesem Anlass nicht.
+# $version: the record version that the evidence supports.
+action-evidence-version = Stützt die Version { $version } der Aufgabe
