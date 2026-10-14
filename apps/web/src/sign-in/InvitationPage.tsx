@@ -9,7 +9,7 @@ import { Button } from "../ui/Button";
 import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
-import { takeFragmentToken } from "./fragment";
+import { useFragmentToken } from "./fragment";
 import { PublicPage, PublicText, ToSignInLink } from "./PublicPage";
 
 type Preview = { kind: "loading" } | { kind: "ready"; preview: InvitationPreview };
@@ -19,8 +19,8 @@ type Preview = { kind: "loading" } | { kind: "ready"; preview: InvitationPreview
  * using the token. Only the click accepts the invitation (ADR 0008, ADR 0056).
  */
 export function InvitationPage({ api }: { api: Api }) {
-  // The first render reads and removes the fragment. A later render must keep the token.
-  const [token] = useState(takeFragmentToken);
+  // The token stays in state; the hook removes the fragment from the address (ADR 0056).
+  const token = useFragmentToken();
   const [preview, setPreview] = useState<Preview>({ kind: "loading" });
   // The failure of the preview or of the click. A final failure replaces the page content.
   const [failure, setFailure] = useState<Failure | undefined>(() =>
