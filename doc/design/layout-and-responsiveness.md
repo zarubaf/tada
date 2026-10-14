@@ -145,11 +145,12 @@ The page does not use the sub-navigation of the event.
 - The filter row has the search (title and ID), „Verantwortlich“ („Ich“ first, then the contributors; there is no „Niemand“, because an action needs an owner), „Bereich“, „Fällig“ („Überfällig“, „Diese Woche“, „Ohne Datum“) and „Filter zurücksetzen“, which shows only while a filter is set.
 - The view tabs are not on the page while the board is the only view.
   They join the toolbar when a second view exists.
-- All state is in the query string: `type`, `owner`, `stream`, `due`, `q` and later `view`.
+- All state is in the query string: `type`, `owner`, `stream`, `due`, `q`, the view keys `column` (the status of the list on a phone) and `canceled` (the open „Abgebrochen“), and later `view`.
   A change of a filter replaces the history entry.
+  The search writes `q` 300 ms after the last keystroke, and at once on Enter, on blur and when it is cleared.
   A reload or a shared link opens the same view.
 - The board has the columns „Offen“, „In Arbeit“, „Blockiert“ and „Erledigt“.
-  „Abgebrochen“ is collapsed to a rail with its count and opens with a toggle.
+  „Abgebrochen“ is collapsed to a rail with its count and opens with a toggle that keeps focus.
   The counts in the heads follow the filters.
   A column is 16rem to 22.5rem wide, with a subtle border; below the least width the board scrolls inside itself, never the page.
   There is no drag and drop.
@@ -157,8 +158,12 @@ The page does not use the sub-navigation of the event.
   Until the side panel exists it leads to the old page of the kind, with the readable ID as the hash.
   A risk has no such page, so its card has the same look and is no link.
 - A kind that fails to load shows a banner with „Erneut versuchen“ for that kind; the other kinds still show.
+  During a retry the board stays, the banner is busy and keeps focus; the skeleton is for the first load.
+  The failures are announced once, in the polite live region of the page, not as alerts.
+  An event that is unknown or forbidden shows its error with a retry instead of the page.
   An event without records shows an empty state with „Neue Aufgabe“.
   Filters that hide all records show an empty state with „Filter zurücksetzen“.
+  After a reset, focus moves to the search field.
 - When the filters change, a polite live region announces the number of records, for example „12 Einträge“.
 - Narrow (below 40rem): the board is one list.
   A status picker (a select with the counts) replaces the columns.
