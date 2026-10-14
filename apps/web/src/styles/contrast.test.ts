@@ -74,11 +74,9 @@ const pairs: [string, string, number][] = [
   ...["bg-canvas", "bg-surface", "bg-raised", "bg-sunken", "accent-subtle"].map(
     (bg): [string, string, number] => ["accent-text", bg, TEXT],
   ),
-  ...["bg-canvas", "bg-surface", "bg-raised", "bg-sunken"].map((bg): [string, string, number] => [
-    "border-control",
-    bg,
-    UI,
-  ]),
+  ...surfaces.map((bg): [string, string, number] => ["border-control", bg, UI]),
+  // The accent as an indicator: the fill of a checked box or switch, a selected border.
+  ...surfaces.map((bg): [string, string, number] => ["accent", bg, UI]),
   ...["bg-canvas", "bg-surface", "bg-raised", "bg-sunken"].map((bg): [string, string, number] => [
     "focus",
     bg,
@@ -87,8 +85,12 @@ const pairs: [string, string, number][] = [
   ...["success", "warning", "danger", "proposed"].flatMap((status): [string, string, number][] => [
     [status, "bg-canvas", TEXT],
     [status, "bg-surface", TEXT],
+    [status, "bg-raised", TEXT],
+    [status, "bg-sunken", TEXT],
     [status, "bg-hover", TEXT],
     [status, `${status}-subtle`, TEXT],
+    ["text", `${status}-subtle`, TEXT],
+    ["text-muted", `${status}-subtle`, TEXT],
   ]),
 ];
 

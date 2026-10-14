@@ -56,6 +56,7 @@ Status never shows by color alone, so the hues need no separate color-blind vari
 The test [contrast.test.ts](../../apps/web/src/styles/contrast.test.ts) computes these ratios from tokens.css with the WCAG 2.2 formula, in both themes.
 A change of a color token must keep each pair at or above its minimum. The values below are from 2026-10-14.
 The text pairs include `--color-text-muted` on every surface, because muted text is used on all of them.
+The `accent` pairs are for the accent as a UI indicator: the fill of a checked box or switch and a selected border.
 
 | Foreground       | Background        | Minimum | Light   | Dark    |
 | ---------------- | ----------------- | ------- | ------- | ------- |
@@ -64,44 +65,68 @@ The text pairs include `--color-text-muted` on every surface, because muted text
 | `text`           | `bg-raised`       | 4.5:1   | 17.22:1 | 15.04:1 |
 | `text`           | `bg-sunken`       | 4.5:1   | 15.97:1 | 17.51:1 |
 | `text`           | `bg-hover`        | 4.5:1   | 15.19:1 | 14.04:1 |
-| `text`           | `accent-subtle`   | 4.5:1   | 14.92:1 | 13.05:1 |
+| `text`           | `accent-subtle`   | 4.5:1   | 14.92:1 | 14.31:1 |
 | `text-muted`     | `bg-canvas`       | 4.5:1   | 6.83:1  | 7.51:1  |
 | `text-muted`     | `bg-surface`      | 4.5:1   | 7.03:1  | 7.06:1  |
 | `text-muted`     | `bg-raised`       | 4.5:1   | 7.09:1  | 6.81:1  |
 | `text-muted`     | `bg-sunken`       | 4.5:1   | 6.57:1  | 7.93:1  |
 | `text-muted`     | `bg-hover`        | 4.5:1   | 6.25:1  | 6.36:1  |
-| `text-muted`     | `accent-subtle`   | 4.5:1   | 6.14:1  | 5.91:1  |
+| `text-muted`     | `accent-subtle`   | 4.5:1   | 6.14:1  | 6.48:1  |
 | `text-on-accent` | `accent`          | 4.5:1   | 5.71:1  | 5.22:1  |
 | `text-on-accent` | `accent-hover`    | 4.5:1   | 7.44:1  | 6.49:1  |
 | `accent-text`    | `bg-canvas`       | 4.5:1   | 6.52:1  | 9.20:1  |
 | `accent-text`    | `bg-surface`      | 4.5:1   | 6.71:1  | 8.64:1  |
 | `accent-text`    | `bg-raised`       | 4.5:1   | 6.77:1  | 8.33:1  |
 | `accent-text`    | `bg-sunken`       | 4.5:1   | 6.28:1  | 9.71:1  |
-| `accent-text`    | `accent-subtle`   | 4.5:1   | 5.87:1  | 7.23:1  |
+| `accent-text`    | `accent-subtle`   | 4.5:1   | 5.87:1  | 7.93:1  |
 | `border-control` | `bg-canvas`       | 3:1     | 3.49:1  | 3.84:1  |
 | `border-control` | `bg-surface`      | 3:1     | 3.59:1  | 3.61:1  |
 | `border-control` | `bg-raised`       | 3:1     | 3.62:1  | 3.48:1  |
 | `border-control` | `bg-sunken`       | 3:1     | 3.36:1  | 4.05:1  |
+| `border-control` | `bg-hover`        | 3:1     | 3.19:1  | 3.25:1  |
+| `border-control` | `accent-subtle`   | 3:1     | 3.14:1  | 3.31:1  |
+| `accent`         | `bg-canvas`       | 3:1     | 5.47:1  | 3.57:1  |
+| `accent`         | `bg-surface`      | 3:1     | 5.63:1  | 3.36:1  |
+| `accent`         | `bg-raised`       | 3:1     | 5.68:1  | 3.24:1  |
+| `accent`         | `bg-sunken`       | 3:1     | 5.27:1  | 3.77:1  |
+| `accent`         | `bg-hover`        | 3:1     | 5.01:1  | 3.02:1  |
+| `accent`         | `accent-subtle`   | 3:1     | 4.92:1  | 3.08:1  |
 | `focus`          | `bg-canvas`       | 3:1     | 5.47:1  | 7.88:1  |
 | `focus`          | `bg-surface`      | 3:1     | 5.63:1  | 7.40:1  |
 | `focus`          | `bg-raised`       | 3:1     | 5.68:1  | 7.14:1  |
 | `focus`          | `bg-sunken`       | 3:1     | 5.27:1  | 8.31:1  |
 | `success`        | `bg-canvas`       | 4.5:1   | 5.92:1  | 8.88:1  |
 | `success`        | `bg-surface`      | 4.5:1   | 6.09:1  | 8.35:1  |
+| `success`        | `bg-raised`       | 4.5:1   | 6.15:1  | 8.05:1  |
+| `success`        | `bg-sunken`       | 4.5:1   | 5.70:1  | 9.37:1  |
 | `success`        | `bg-hover`        | 4.5:1   | 5.42:1  | 7.52:1  |
 | `success`        | `success-subtle`  | 4.5:1   | 5.48:1  | 7.07:1  |
+| `text`           | `success-subtle`  | 4.5:1   | 15.35:1 | 13.20:1 |
+| `text-muted`     | `success-subtle`  | 4.5:1   | 6.32:1  | 5.98:1  |
 | `warning`        | `bg-canvas`       | 4.5:1   | 5.93:1  | 9.77:1  |
 | `warning`        | `bg-surface`      | 4.5:1   | 6.10:1  | 9.19:1  |
+| `warning`        | `bg-raised`       | 4.5:1   | 6.15:1  | 8.86:1  |
+| `warning`        | `bg-sunken`       | 4.5:1   | 5.71:1  | 10.32:1 |
 | `warning`        | `bg-hover`        | 4.5:1   | 5.43:1  | 8.27:1  |
 | `warning`        | `warning-subtle`  | 4.5:1   | 5.51:1  | 7.70:1  |
+| `text`           | `warning-subtle`  | 4.5:1   | 15.41:1 | 13.07:1 |
+| `text-muted`     | `warning-subtle`  | 4.5:1   | 6.34:1  | 5.92:1  |
 | `danger`         | `bg-canvas`       | 4.5:1   | 6.31:1  | 7.52:1  |
 | `danger`         | `bg-surface`      | 4.5:1   | 6.50:1  | 7.07:1  |
+| `danger`         | `bg-raised`       | 4.5:1   | 6.55:1  | 6.82:1  |
+| `danger`         | `bg-sunken`       | 4.5:1   | 6.08:1  | 7.94:1  |
 | `danger`         | `bg-hover`        | 4.5:1   | 5.78:1  | 6.37:1  |
 | `danger`         | `danger-subtle`   | 4.5:1   | 5.71:1  | 6.02:1  |
+| `text`           | `danger-subtle`   | 4.5:1   | 15.01:1 | 13.29:1 |
+| `text-muted`     | `danger-subtle`   | 4.5:1   | 6.18:1  | 6.02:1  |
 | `proposed`       | `bg-canvas`       | 4.5:1   | 6.80:1  | 9.29:1  |
 | `proposed`       | `bg-surface`      | 4.5:1   | 7.00:1  | 8.73:1  |
+| `proposed`       | `bg-raised`       | 4.5:1   | 7.06:1  | 8.42:1  |
+| `proposed`       | `bg-sunken`       | 4.5:1   | 6.55:1  | 9.80:1  |
 | `proposed`       | `bg-hover`        | 4.5:1   | 6.23:1  | 7.86:1  |
 | `proposed`       | `proposed-subtle` | 4.5:1   | 6.17:1  | 7.38:1  |
+| `text`           | `proposed-subtle` | 4.5:1   | 15.05:1 | 13.19:1 |
+| `text-muted`     | `proposed-subtle` | 4.5:1   | 6.20:1  | 5.97:1  |
 
 ### State of knowledge
 

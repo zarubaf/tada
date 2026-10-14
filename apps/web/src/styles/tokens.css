@@ -151,7 +151,7 @@
       --color-accent: oklch(54% 0.18 262);
       --color-accent-hover: oklch(49% 0.18 262);
       --color-accent-text: oklch(78% 0.12 262);
-      --color-accent-subtle: oklch(28% 0.06 262);
+      --color-accent-subtle: oklch(25% 0.06 262);
       --color-focus: oklch(74% 0.15 262);
       --color-success: oklch(75% 0.15 150);
       --color-success-subtle: oklch(27% 0.045 150);
@@ -182,7 +182,7 @@
     --color-accent: oklch(54% 0.18 262);
     --color-accent-hover: oklch(49% 0.18 262);
     --color-accent-text: oklch(78% 0.12 262);
-    --color-accent-subtle: oklch(28% 0.06 262);
+    --color-accent-subtle: oklch(25% 0.06 262);
     --color-focus: oklch(74% 0.15 262);
     --color-success: oklch(75% 0.15 150);
     --color-success-subtle: oklch(27% 0.045 150);
