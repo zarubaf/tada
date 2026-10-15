@@ -81,9 +81,15 @@ describe("the record panel", () => {
       await panel("ACT-001 Plakat gestalten");
     });
 
-    it("closes without an error when the hash holds a quote and a bracket", async () => {
-      // The decoded hash is `x"]`; as a selector it would be a syntax error.
+    it("does not open a panel for a hash that is no record ID", async () => {
+      // The decoded hash is `x"]`; the skip link also leaves `main`. Neither names a record.
       open("#x%22%5D");
+      await screen.findByRole("heading", { level: 2, name: /^Offen/ });
+      expect(screen.queryByRole("complementary")).toBeNull();
+    });
+
+    it("closes a record that is not found and returns focus to the page", async () => {
+      open("#ACT-999");
       const region = await panel("Eintrag nicht gefunden");
       await user.click(within(region).getByRole("button", { name: "Schliessen" }));
 

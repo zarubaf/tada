@@ -41,13 +41,17 @@ export interface RecordRouteControls {
   startCreate: (kind: RecordKind) => void;
 }
 
+/** The shape of a readable ID: three letters for the kind, a number, for example `ACT-012`. */
+const READABLE_ID = /^[A-Z]{3}-\d+$/i;
+
 function routeOf(hash: string, creating: string | null): RecordRoute {
   const kind = CREATABLE.find((candidate) => candidate === creating);
   if (kind) {
     return { mode: "create", kind };
   }
+  // Any other hash, such as the anchor of the skip link, names no record.
   // The readable IDs are upper case; an address typed by hand may not be.
-  return hash === "" ? { mode: "closed" } : { mode: "open", id: hash.toUpperCase() };
+  return READABLE_ID.test(hash) ? { mode: "open", id: hash.toUpperCase() } : { mode: "closed" };
 }
 
 export function useRecordRoute(): RecordRouteControls {
