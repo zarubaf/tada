@@ -149,7 +149,7 @@ export function SupersedeDecisionDialog(props: ActionDialogProps) {
   const directory = env.sources.directory;
   const seed = old.decided_by.map((party) => ({
     id: partyId(party),
-    label: party.redacted ? party.local_id : partyLabel(party.name, party.local_id),
+    label: party.redacted ? t("redacted") : partyLabel(party.name, party.local_id),
     ...(!party.redacted && { name: party.name }),
   }));
 
