@@ -8,7 +8,7 @@ import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { LiveRegion } from "../ui/LiveRegion";
-import { PageTitle } from "../ui/Page";
+import { PanelTitle } from "../ui/Page";
 import styles from "./OrganizationPage.module.css";
 import { ReminderSettings } from "./ReminderSettings";
 
@@ -51,12 +51,12 @@ export function AccountPage({ api }: { api: Api }) {
     <div className={styles.page}>
       <LiveRegion kind="alert">{failure}</LiveRegion>
       <LiveRegion kind="status">{confirmation}</LiveRegion>
-      <PageTitle id="account-title">{t("account-title")}</PageTitle>
+      <PanelTitle id="account-title">{t("account-title")}</PanelTitle>
       <ReminderSettings api={api} onStatus={setConfirmation} onFailure={setFailure} />
       <section className={styles.section} aria-labelledby="account-sessions-title">
-        <h2 id="account-sessions-title" className={styles.heading}>
+        <h3 id="account-sessions-title" className={styles.heading}>
           {t("account-sessions-title")}
-        </h2>
+        </h3>
         <p>{t("account-sessions-text")}</p>
         <div>
           <Button variant="danger" onPress={() => setConfirming(true)}>

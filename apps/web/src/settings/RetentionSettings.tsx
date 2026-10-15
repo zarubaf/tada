@@ -49,9 +49,9 @@ export function RetentionSettings({ api, role, onStatus, onFailure }: RetentionS
   const isOwner = role === "owner";
   return (
     <section className={styles.section} aria-labelledby="org-retention-title">
-      <h2 id="org-retention-title" tabIndex={-1} className={styles.title}>
+      <h3 id="org-retention-title" tabIndex={-1} className={styles.title}>
         {t("org-retention-title")}
-      </h2>
+      </h3>
       {canManage(role) ? (
         <Periods api={api} isOwner={isOwner} onStatus={onStatus} onFailure={onFailure} />
       ) : (

@@ -130,7 +130,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
     : t("versions-title");
 
   const memberItems = [
-    { id: "settings/account", label: t("settings-nav-account") },
+    { id: "settings", label: t("settings-nav-account") },
     { id: "privacy", label: t("nav-privacy") },
     { id: "versions", label: versionsLabel },
     { id: "sign-out", label: t("sign-out") },

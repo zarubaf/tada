@@ -18,7 +18,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
-import { PageTitle } from "../ui/Page";
+import { PanelTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import { InviteMemberForm } from "./InviteMemberForm";
 import styles from "./MembersPage.module.css";
@@ -358,9 +358,9 @@ export function MembersPage({ api }: { api: Api }) {
       <LiveRegion kind="status">{confirmation}</LiveRegion>
 
       <section className={styles.section} aria-labelledby="members-title">
-        <PageTitle id="members-title" ref={membersHeading}>
+        <PanelTitle id="members-title" ref={membersHeading}>
           {t("members-title")}
-        </PageTitle>
+        </PanelTitle>
         {members.kind === "loading" && (
           <div className={styles.skeleton} role="status" aria-label={t("members-loading")}>
             <Skeleton />
@@ -395,14 +395,14 @@ export function MembersPage({ api }: { api: Api }) {
 
       {manages && (
         <section className={styles.section} aria-labelledby="invitations-title">
-          <h2
+          <h3
             id="invitations-title"
             ref={invitationsHeading}
             tabIndex={-1}
             className={styles.heading}
           >
             {t("invitations-title")}
-          </h2>
+          </h3>
           {invitations.kind === "loading" && (
             <div className={styles.skeleton} role="status" aria-label={t("invitations-loading")}>
               <Skeleton />

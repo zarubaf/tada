@@ -1,0 +1,15 @@
+@layer components {
+  /* The page of a tab: the gutter of the toolbar row, then 16 px above, 12 px below. */
+  .panel {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-4) var(--page-gutter, var(--space-3)) var(--space-3);
+  }
+
+  /* A phone: the select takes the room the title leaves. */
+  .select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}

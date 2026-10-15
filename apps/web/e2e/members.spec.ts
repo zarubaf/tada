@@ -72,9 +72,9 @@ for (const viewport of viewports) {
         await page.setViewportSize(viewport);
         await fakeSession(page, sessionWithRole(state.role));
         await fakeMembers(page, state.role !== "member");
-        await page.goto("/settings/members");
+        await page.goto("/settings?tab=members");
         await setTheme(page, theme);
-        await expect(page.getByRole("heading", { level: 1, name: "Mitglieder" })).toBeVisible();
+        await expect(page.getByRole("heading", { level: 2, name: "Mitglieder" })).toBeVisible();
         await expect(page.getByRole("table", { name: "Mitglieder" })).toBeVisible();
         if (state.role === "owner") {
           await expect(page.getByRole("table", { name: "Offene Einladungen" })).toBeVisible();
@@ -103,7 +103,7 @@ test("at 320 px the tables do not scroll sideways and each row action is in reac
   await page.setViewportSize({ width: 320, height: 800 });
   await fakeSession(page, sessionWithRole("owner"));
   await fakeMembers(page, true);
-  await page.goto("/settings/members");
+  await page.goto("/settings?tab=members");
   const remove = page.getByRole("button", {
     name: "Bernhard Beispiel-Schmidlin-Äbischer entfernen",
   });
@@ -118,7 +118,7 @@ test("at 320 px all four items of the bottom bar are inside the viewport", async
   await page.setViewportSize({ width: 320, height: 800 });
   await fakeSession(page, sessionWithRole("owner"));
   await fakeMembers(page, true);
-  await page.goto("/settings/members");
+  await page.goto("/settings?tab=members");
   // Three links and the menu „Mehr“.
   const items = page.getByRole("navigation", { name: "Hauptnavigation" }).locator("a, button");
   await expect(items).toHaveCount(4);
@@ -134,7 +134,7 @@ test("at 375 px a focused element never hides under the bottom bar", async ({ pa
   await page.setViewportSize({ width: 375, height: 640 });
   await fakeSession(page, sessionWithRole("owner"));
   await fakeMembers(page, true);
-  await page.goto("/settings/members");
+  await page.goto("/settings?tab=members");
   await expect(page.getByRole("table", { name: "Offene Einladungen" })).toBeVisible();
 
   for (let step = 0; step < 16; step++) {
@@ -154,14 +154,14 @@ test("at 375 px a focused element never hides under the bottom bar", async ({ pa
   }
 });
 
-test("the navigation item Einstellungen leads to the members", async ({ page }) => {
+test("the navigation item Einstellungen leads to the settings", async ({ page }) => {
   await fakeSession(page, sessionWithRole("owner"));
   await fakeMembers(page, true);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/events");
   await page.getByRole("link", { name: "Einstellungen" }).click();
-  await expect(page).toHaveURL(/\/settings\/members$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Mitglieder" })).toBeVisible();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
 });
 
 // ADR 0024: German text can be 40 % longer than the source. No text may overflow its box.
@@ -173,7 +173,7 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page, sessionWithRole(role));
       await fakeMembers(page, role !== "member");
-      await page.goto("/settings/members?pseudo");
+      await page.goto("/settings?tab=members&pseudo");
       await expect(page.getByRole("table").first()).toBeVisible();
       if (role === "owner") {
         await expect(page.getByRole("table")).toHaveCount(2);
@@ -189,7 +189,7 @@ for (const theme of themes) {
   test(`members, open confirmation, ${theme}: no axe violation`, async ({ page }) => {
     await fakeSession(page, sessionWithRole("owner"));
     await fakeMembers(page, true);
-    await page.goto("/settings/members");
+    await page.goto("/settings?tab=members");
     await setTheme(page, theme);
     await page.getByRole("button", { name: /Bernhard.* entfernen/ }).click();
     await expect(page.getByRole("alertdialog")).toBeVisible();

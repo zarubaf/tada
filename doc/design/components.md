@@ -72,16 +72,16 @@ See [accessibility.md](accessibility.md#focus).
 | Component | Rules                                                                                                                                                                          |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | NavLink   | A navigation item. The current page has `aria-current="page"` and the current style. `icon` draws a Tabler icon before the label. `large` gives the bottom bar a thumb target. |
-| SubNav    | The sub-navigation of a template, for example of the settings. It contains NavLink items. `secondary` is a second row below one item, smaller and without a line.              |
 | Toolbar   | The filter and display row above a list. One tab stop; arrow keys move between its buttons and menus.                                                                          |
 | SkipLink  | „Zum Inhalt springen“, the first focusable element of each page. It moves to `main`.                                                                                           |
 
 ### Page
 
-| Component | Rules                                                                                                                                                                                                            |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Page      | The `main` element of each template, with the page gutters. `width="form"` is the narrow column of the public page. `width="flush"` has no gutter: the rows of the page set `--page-gutter` (the „Arbeit“ page). |
-| PageTitle | The `h1` of a page, in `--font-size-2xl`; `compact` is `--font-size-base`, for a title in a toolbar row. Focus moves to it after a route change.                                                                 |
+| Component  | Rules                                                                                                                                                                                                            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page       | The `main` element of each template, with the page gutters. `width="form"` is the narrow column of the public page. `width="flush"` has no gutter: the rows of the page set `--page-gutter` (the „Arbeit“ page). |
+| PageTitle  | The `h1` of a page, in `--font-size-2xl`; `compact` is `--font-size-base`, for a title in a toolbar row. Focus moves to it after a route change.                                                                 |
+| PanelTitle | The `h2` of a panel in a page with tabs, in `--font-size-xl`. The page owns the `h1`; the panel title names the content of the tab. Focus moves to it by script, as to a page title.                             |
 
 ### Work board
 

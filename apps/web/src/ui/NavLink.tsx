@@ -1,5 +1,4 @@
 import type { Icon } from "@tabler/icons-react";
-import type { ReactNode } from "react";
 import { Link, type LinkProps } from "../router/Router";
 import styles from "./NavLink.module.css";
 
@@ -20,25 +19,5 @@ export function NavLink({ large, icon: Icon, children, ...props }: NavLinkProps)
       {Icon && <Icon size={16} stroke={1.5} aria-hidden="true" className={styles.icon} />}
       {children}
     </Link>
-  );
-}
-
-/**
- * The sub-navigation of a page template, for example of the settings or of an event. The
- * `secondary` level is a second row below an item of the first, for example the registers.
- */
-export function SubNav({
-  label,
-  level = "primary",
-  children,
-}: {
-  label: string;
-  level?: "primary" | "secondary";
-  children: ReactNode;
-}) {
-  return (
-    <nav className={styles.subNav} data-level={level} aria-label={label}>
-      {children}
-    </nav>
   );
 }

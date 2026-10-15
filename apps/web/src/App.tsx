@@ -2,11 +2,12 @@ import { lazy } from "react";
 import { type Api, createApi } from "./api/client";
 import { EventPage } from "./events/EventPage";
 import { LEGACY_EVENT_PAGES, LegacyEventRedirect } from "./events/LegacyEventRedirect";
+import { t } from "./i18n";
 import { NotFoundPage } from "./NotFoundPage";
 import { InboxProvider } from "./review/InboxProvider";
 import { Route, Router, Routes } from "./router/Router";
 import { SessionProvider } from "./session/SessionProvider";
-import { SettingsRoute } from "./settings/SettingsRoute";
+import { SettingsRedirect } from "./settings/SettingsRedirect";
 import { Shell } from "./shell/Shell";
 import { LocaleProvider } from "./ui/LocaleProvider";
 import { RouteSuspense } from "./ui/RouteSuspense";
@@ -15,19 +16,10 @@ import { MyWorkPage } from "./work/MyWorkPage";
 
 const defaultApi = createApi();
 
-// The settings pages load on demand: a member opens them seldom, and the first load stays inside
-// the bundle budget of ADR 0024.
-const MembersPage = lazy(() =>
-  import("./members/MembersPage").then((module) => ({ default: module.MembersPage })),
-);
-const TelegramPage = lazy(() =>
-  import("./telegram/TelegramPage").then((module) => ({ default: module.TelegramPage })),
-);
-const TokensPage = lazy(() =>
-  import("./tokens/TokensPage").then((module) => ({ default: module.TokensPage })),
-);
-const OrganizationPage = lazy(() =>
-  import("./settings/OrganizationPage").then((module) => ({ default: module.OrganizationPage })),
+// „Einstellungen“ loads on demand: a member opens it seldom, and the first load stays inside the
+// bundle budget of ADR 0024. Its tabs load on demand again.
+const SettingsPage = lazy(() =>
+  import("./settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
 );
 // „Arbeit“ is the main screen of an event: the board and its code load on demand.
 const WorkPage = lazy(() =>
@@ -40,12 +32,6 @@ const PartiesPage = lazy(() =>
 );
 const DocumentDiffPage = lazy(() =>
   import("./documents/DocumentDiffPage").then((module) => ({ default: module.DocumentDiffPage })),
-);
-const PmPage = lazy(() =>
-  import("./settings/PmPage").then((module) => ({ default: module.PmPage })),
-);
-const AccountPage = lazy(() =>
-  import("./settings/AccountPage").then((module) => ({ default: module.AccountPage })),
 );
 
 // The other screens load on demand too: the first load stays inside the bundle budget of ADR 0024.
@@ -206,36 +192,14 @@ export function App({ api = defaultApi }: { api?: Api }) {
                         <ReviewInbox api={api} />
                       </RouteSuspense>
                     </Route>
-                    {/* The settings */}
-                    <Route path="/settings/members">
-                      <SettingsRoute>
-                        <MembersPage api={api} />
-                      </SettingsRoute>
+                    {/* The settings: one page with tabs; the old addresses redirect to a tab */}
+                    <Route path="/settings">
+                      <RouteSuspense label={t("settings-loading")}>
+                        <SettingsPage api={api} />
+                      </RouteSuspense>
                     </Route>
-                    <Route path="/settings/telegram">
-                      <SettingsRoute>
-                        <TelegramPage api={api} />
-                      </SettingsRoute>
-                    </Route>
-                    <Route path="/settings/tokens">
-                      <SettingsRoute>
-                        <TokensPage api={api} />
-                      </SettingsRoute>
-                    </Route>
-                    <Route path="/settings/organization">
-                      <SettingsRoute>
-                        <OrganizationPage api={api} />
-                      </SettingsRoute>
-                    </Route>
-                    <Route path="/settings/ai-pm">
-                      <SettingsRoute>
-                        <PmPage api={api} />
-                      </SettingsRoute>
-                    </Route>
-                    <Route path="/settings/account">
-                      <SettingsRoute>
-                        <AccountPage api={api} />
-                      </SettingsRoute>
+                    <Route path="/settings/:tab">
+                      <SettingsRedirect />
                     </Route>
                     <Route path="*">
                       <NotFoundPage />

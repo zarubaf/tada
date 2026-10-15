@@ -203,7 +203,7 @@ describe("Shell", () => {
     );
   });
 
-  it.each(["/settings/members", "/settings/telegram"])(
+  it.each(["/settings", "/settings?tab=telegram"])(
     "marks Einstellungen as current on %s",
     async (path) => {
       renderShellAt(path, json(200, info([first], first)));
@@ -414,7 +414,7 @@ describe("sidebar", () => {
     const foot = await screen.findByRole("link", { name: "Datenschutz" });
     expect(foot).toHaveAttribute("href", "/privacy");
     const settings = screen.getByRole("link", { name: "Einstellungen" });
-    expect(settings).toHaveAttribute("href", "/settings/members");
+    expect(settings).toHaveAttribute("href", "/settings");
     expect(settings.closest("nav")).toBeNull();
     expect(foot.closest("nav")).toBeNull();
     expect(await screen.findByRole("button", { name: /^tada / })).toBeInTheDocument();
@@ -460,7 +460,7 @@ describe("top bar", () => {
   });
 
   it("names the context in plain text: the page keeps the only h1", async () => {
-    renderShellAt("/settings/members", json(200, info([first], first)));
+    renderShellAt("/settings", json(200, info([first], first)));
 
     const bar = await screen.findByRole("banner");
     expect(within(bar).getByText("Einstellungen")).toBeInTheDocument();
@@ -663,7 +663,7 @@ describe("narrow layout", () => {
 
   it.each([
     ["/persons", "true"],
-    ["/settings/account", "true"],
+    ["/settings?tab=members", "true"],
     ["/inbox", null],
   ])("marks Mehr as current on %s when the page is one of its items", async (path, current) => {
     stubNarrow(true);

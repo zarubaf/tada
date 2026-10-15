@@ -63,4 +63,13 @@
     line-height: var(--line-height-base);
     padding-inline-end: var(--space-2);
   }
+
+  /* A panel title is a step below the page title and a step above the headings of its sections. */
+  .panelTitle {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--letter-spacing-tight);
+    line-height: var(--line-height-xl);
+    overflow-wrap: anywhere;
+  }
 }
