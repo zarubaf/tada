@@ -14,7 +14,8 @@ describe("NewMenu", () => {
   it("creates the one kind directly, as a plain button", async () => {
     const onCreate = vi.fn();
     render(<NewMenu kinds={["action"]} narrow={false} onCreate={onCreate} />);
-    const button = screen.getByRole("button", { name: "Neu" });
+    const button = screen.getByRole("button", { name: "Neue Aufgabe" });
+    expect(button).toHaveTextContent("Neu");
     expect(button).not.toHaveAttribute("aria-haspopup");
 
     await user.click(button);
