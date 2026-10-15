@@ -1,5 +1,5 @@
 import { IconLock } from "@tabler/icons-react";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import type { Api, Event } from "../api/client";
 import { type Failure, failureOf } from "../api/failure";
 import { formatDay } from "../facts/formatValue";
@@ -20,6 +20,11 @@ export interface CloseEventProps {
   onChanged: (event: Event) => void;
   /** The event changed elsewhere: the page loads it again. */
   onStale: () => void;
+  /**
+   * Places the two parts: the `control` that closes the event, which has a place in the header, and
+   * the `notice` with the failure, the banner of a closed event and the dialogs, which follows it.
+   */
+  children: (parts: { control: ReactNode; notice: ReactNode }) => ReactNode;
 }
 
 /**
@@ -28,7 +33,7 @@ export interface CloseEventProps {
  * an admin reopens it, unless retention redacted it. Both changes ask for a confirmation. The banner or the button that
  * replaces the control takes focus; a failure shows as an alert.
  */
-export function CloseEvent({ api, event, onChanged, onStale }: CloseEventProps) {
+export function CloseEvent({ api, event, onChanged, onStale, children }: CloseEventProps) {
   const session = useSession();
   const manages = useManagesEvent(api, event.id);
   const isAdmin = canManage(session.organization?.role);
@@ -81,7 +86,12 @@ export function CloseEvent({ api, event, onChanged, onStale }: CloseEventProps) 
   };
   const canClose = !closed && (manages || isAdmin);
   const canReopen = closed && isAdmin && !event.redacted;
-  return (
+  const control = canClose ? (
+    <Button ref={closeButton} variant="quiet" size="sm" onPress={() => setAsking(true)}>
+      {t("event-close")}
+    </Button>
+  ) : null;
+  const notice = (
     <>
       {failure && <InlineError message={failure.message} requestId={failure.requestId} />}
       {closed && (
@@ -104,13 +114,6 @@ export function CloseEvent({ api, event, onChanged, onStale }: CloseEventProps) 
           <span>{t(event.redacted ? "event-closed-redacted" : "event-closed-note")}</span>
         </Banner>
       )}
-      {canClose && (
-        <div>
-          <Button ref={closeButton} onPress={() => setAsking(true)}>
-            {t("event-close")}
-          </Button>
-        </div>
-      )}
       {asking && (
         <TaskDialog
           title={t(closed ? "event-reopen-title" : "event-close-title")}
@@ -127,4 +130,5 @@ export function CloseEvent({ api, event, onChanged, onStale }: CloseEventProps) 
       )}
     </>
   );
+  return children({ control, notice });
 }

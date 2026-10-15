@@ -3,14 +3,16 @@ import type { Api } from "../api/client";
 import { formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { useParams } from "../router/Router";
-import { KnowledgeState } from "../ui/KnowledgeState";
 import { Page, PageTitle } from "../ui/Page";
+import { RecordId } from "../ui/RecordId";
 import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import { CloseEvent } from "./CloseEvent";
 import { EventLoadError } from "./EventLoadError";
 import styles from "./EventPage.module.css";
+import { EventState } from "./EventState";
 import { EventContext, type ProfileState, useEventProfile } from "./eventContext";
+import { KnowledgeValue } from "./KnowledgeValue";
 import { useEventState } from "./useEventState";
 
 /**
@@ -57,18 +59,30 @@ export function EventPage({
       )}
       {state.kind === "loaded" && context && (
         <EventContext value={context}>
-          <header className={styles.header}>
-            <p className={styles.key}>{state.event.key}</p>
-            {/* A redacted event keeps its name (ADR 0072). */}
-            <PageTitle ref={heading}>{state.event.name}</PageTitle>
-            <DateWindow profile={profile} />
-          </header>
           <CloseEvent
             api={api}
             event={state.event}
             onChanged={(event) => setState({ kind: "loaded", event })}
             onStale={() => void load()}
-          />
+          >
+            {({ control, notice }) => (
+              <>
+                <header className={styles.header}>
+                  <div className={styles.titleRow}>
+                    {/* A redacted event keeps its name (ADR 0072). */}
+                    <PageTitle ref={heading}>{state.event.name}</PageTitle>
+                    {control && <div className={styles.control}>{control}</div>}
+                  </div>
+                  <div className={styles.meta}>
+                    <RecordId>{state.event.key}</RecordId>
+                    <EventState status={state.event.status} />
+                    <DateWindow profile={profile} />
+                  </div>
+                </header>
+                {notice}
+              </>
+            )}
+          </CloseEvent>
           {children}
         </EventContext>
       )}
@@ -85,17 +99,17 @@ function DateWindow({ profile }: { profile: ProfileState }) {
   const field = profile.fields.find((candidate) => candidate.key === "date_window");
   const state = fact?.state ?? "unknown";
   return (
-    <p className={styles.dates}>
+    <p>
       <span className={styles.datesLabel}>
         {field ? formatLabel(field.label) : t("field-date_window")}:{" "}
       </span>
-      <KnowledgeState state={state}>
+      <KnowledgeValue state={state}>
         {state === "unknown" ? undefined : fact?.redacted ? (
           <Redacted />
         ) : (
           formatValue(fact ?? {}, field?.value_type)
         )}
-      </KnowledgeState>
+      </KnowledgeValue>
     </p>
   );
 }

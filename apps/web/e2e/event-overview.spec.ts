@@ -157,6 +157,12 @@ for (const viewport of viewports) {
       await setTheme(page, theme);
       await expect(page.getByRole("heading", { level: 2, name: "Fakten" })).toBeVisible();
       await expect(page.getByText("Vorschlag", { exact: true }).first()).toBeVisible();
+      // One h1 with the name of the event; the link leads to the work of the event.
+      await expect(page.getByRole("heading", { level: 1, name: event?.name })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Alle Aufgaben ansehen" })).toHaveAttribute(
+        "href",
+        `/events/${event?.id}/work`,
+      );
 
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])

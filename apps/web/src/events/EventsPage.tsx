@@ -1,4 +1,4 @@
-import { IconLock, IconPlus } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
 import { LOCALE, t } from "../i18n";
@@ -14,24 +14,12 @@ import { Page, PageTitle } from "../ui/Page";
 import { PageToolbar } from "../ui/PageToolbar";
 import { RecordId } from "../ui/RecordId";
 import { Skeleton } from "../ui/Skeleton";
-import { StatusLabel } from "../ui/StatusLabel";
 import tableStyles from "../work/WorkTable.module.css";
+import { EventState } from "./EventState";
 import styles from "./EventsPage.module.css";
 import { useCanCreateEvent } from "./useCanCreateEvent";
 
 const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" });
-
-function EventState({ status }: { status: Event["status"] }) {
-  return status === "closed" ? (
-    <StatusLabel icon={IconLock} tone="muted" column>
-      {t("event-state-closed")}
-    </StatusLabel>
-  ) : (
-    <StatusLabel icon="open" tone="neutral" column>
-      {t("event-state-open")}
-    </StatusLabel>
-  );
-}
 
 const columns: Column<Event>[] = [
   {
@@ -60,7 +48,7 @@ const columns: Column<Event>[] = [
   {
     id: "state",
     header: t("events-column-state"),
-    cell: (event) => <EventState status={event.status} />,
+    cell: (event) => <EventState status={event.status} column />,
   },
   {
     id: "time-zone",

@@ -126,6 +126,13 @@ describe("closing an event", () => {
     expect(screen.queryByRole("button", { name: "Anlass abschliessen" })).not.toBeInTheDocument();
   });
 
+  it("puts the control to close in the header of the event", async () => {
+    setup({ eventManager: true });
+
+    const button = await closeButton();
+    expect(button.closest("header")).not.toBeNull();
+  });
+
   it("does not offer closing to a plain member", async () => {
     setup({ role: "member", eventManager: false });
 
@@ -172,7 +179,12 @@ describe("a closed event", () => {
       answers: { [`POST /api/v1/events/${ACTIVE.id}/reopen`]: () => json(200, ACTIVE) },
     });
 
-    expect(await screen.findByText("Abgeschlossen am 01.07.2030")).toBeVisible();
+    const note = await screen.findByText("Abgeschlossen am 01.07.2030");
+    expect(note).toBeVisible();
+    // The state is in the header in a word; the banner under it says the date and the reopen.
+    const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
+    expect(within(header).getByText("Abgeschlossen")).toBeInTheDocument();
+    expect(header).not.toContainElement(note);
     await user.click(screen.getByRole("button", { name: "Wieder öffnen" }));
     const dialog = await screen.findByRole("dialog", { name: "Anlass wieder öffnen?" });
     await user.click(within(dialog).getByRole("button", { name: "Wieder öffnen" }));

@@ -201,6 +201,23 @@ describe("EventOverview", () => {
     expect(within(section).getByText("Wer bestellt die Festwirtschaft?")).toBeInTheDocument();
   });
 
+  it("links to all work of the event", async () => {
+    setup();
+
+    const link = await screen.findByRole("link", { name: "Alle Aufgaben ansehen" });
+    expect(link).toHaveAttribute("href", `/events/${EVENT_ID}/work`);
+  });
+
+  it("has the headings in order: one h1, then h2 sections", async () => {
+    setup({ managed: true });
+
+    await screen.findByRole("heading", { name: "Mitglieder des Anlasses" });
+    const levels = screen.getAllByRole("heading").map((h) => h.tagName);
+    expect(levels.filter((tag) => tag === "H1")).toHaveLength(1);
+    expect(levels[0]).toBe("H1");
+    expect(levels).not.toContain("H4");
+  });
+
   it("shows the members of the event in a section of its own for an event manager", async () => {
     setup({ managed: true });
 

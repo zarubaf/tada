@@ -1,0 +1,24 @@
+@layer components {
+  .value {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

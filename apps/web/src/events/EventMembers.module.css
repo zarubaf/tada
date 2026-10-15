@@ -1,7 +1,7 @@
 @layer components {
   .members {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .skeleton {
@@ -10,8 +10,9 @@
   }
 
   .heading {
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-base);
   }
 
   .add {
