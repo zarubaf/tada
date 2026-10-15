@@ -403,7 +403,7 @@ describe("the list", () => {
     const list = await screen.findByRole("region", { name: "Offene Vorschläge" });
     const links = await within(list).findAllByRole("link");
     expect(links).toHaveLength(3);
-    expect(links[0]).toHaveTextContent("FLY28 Fly-in Musterhausen");
+    await waitFor(() => expect(links[0]).toHaveTextContent("FLY28 Fly-in Musterhausen"));
     expect(links[0]).toHaveTextContent("Veraltet");
     expect(links[1]).not.toHaveTextContent("Veraltet");
     expect(links[2]).toHaveTextContent("Organisation");
