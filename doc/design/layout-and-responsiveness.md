@@ -131,6 +131,11 @@ A client-side route (`LegacyEventRedirect`) replaces the history entry, so Back 
 | `/events/:id/workstreams` | `/events/:id/work`                 |
 | `/events/:id/members`     | `/events/:id#mitglieder`           |
 
+A document sits below its event: `/events/:eventId/documents/:documentId`, and its comparison of two versions at `/events/:eventId/documents/:documentId/diff`.
+The event in the path keeps the navigation, the title and the „Neu“ action of the event on these pages.
+The old addresses `/documents/:documentId` and `/documents/:documentId/diff` load the document to find its event, and then replace the history entry with the new address.
+The query of the comparison (`from`, `to`) stays.
+
 A hash such as `#ACT-001` stays, so that the panel opens the record.
 The links that tada sends (the digests and the Telegram messages) name the new addresses.
 

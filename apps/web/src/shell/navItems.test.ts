@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bottomItems, isCurrent, mainItems, moreItems } from "./navItems";
+import { bottomItems, eventIdOf, isCurrent, mainItems, moreItems } from "./navItems";
 
 const labels = (items: { label: string }[]) => items.map((item) => item.label);
 const EVENT = "/events/e1";
@@ -74,6 +74,13 @@ describe("isCurrent", () => {
     expect(current(moreItems("e1"), `${EVENT}/documents`)).toEqual(["Dokumente"]);
   });
 
+  it("marks Dokumente on a document and on its differences", () => {
+    expect(current(mainItems("e1"), `${EVENT}/documents/d1`)).toEqual(["Dokumente"]);
+    expect(current(mainItems("e1"), `${EVENT}/documents/d1/diff`, "?from=a&to=b")).toEqual([
+      "Dokumente",
+    ]);
+  });
+
   it("marks Kontakte on both tabs of the page, and nothing else", () => {
     expect(current(mainItems(undefined), "/contacts")).toEqual(["Kontakte"]);
     expect(current(mainItems(undefined), "/contacts", "?tab=institutions")).toEqual(["Kontakte"]);
@@ -83,5 +90,12 @@ describe("isCurrent", () => {
 
   it("marks Anlässe on the list of events", () => {
     expect(current(bottomItems(undefined), "/events")).toEqual(["Anlässe"]);
+  });
+});
+
+describe("eventIdOf", () => {
+  it("names the event of a document and of its differences", () => {
+    expect(eventIdOf("/events/e1/documents/d1")).toBe("e1");
+    expect(eventIdOf("/events/e1/documents/d1/diff")).toBe("e1");
   });
 });

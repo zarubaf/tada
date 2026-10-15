@@ -15,6 +15,7 @@ import type {
 } from "../api/client";
 import { type DraftEnvironment, ProposalDraft } from "../documents/DraftView";
 import { LintWarnings } from "../documents/LintWarnings";
+import { documentPath } from "../documents/versions";
 import { formatDate, formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { Chip, type ChipVariant } from "../ui/Chip";
@@ -511,7 +512,12 @@ export function OperationDetails({
             <>
               <p>{t("inbox-draft-existing")}</p>
               <StandaloneLink
-                to={`/documents/${encodeURIComponent(operation.document.document_id)}`}
+                to={
+                  draftEnvironment
+                    ? documentPath(draftEnvironment.eventId, operation.document.document_id)
+                    : // A changeset of the organization names no event: the old address finds it.
+                      `/documents/${encodeURIComponent(operation.document.document_id)}`
+                }
               >
                 {t("inbox-draft-open")}
               </StandaloneLink>

@@ -136,7 +136,7 @@ function setup(path: string, answer: unknown = diff) {
     <Router>
       <SessionProvider api={api}>
         <Routes>
-          <Route path="/documents/:documentId/diff">
+          <Route path="/events/:eventId/documents/:documentId/diff">
             <DocumentDiffPage api={api} />
           </Route>
         </Routes>
@@ -150,9 +150,20 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-const PATH = `/documents/${DOCUMENT_ID}/diff?from=v2&to=v3`;
+const PATH = `/events/${EVENT_ID}/documents/${DOCUMENT_ID}/diff?from=v2&to=v3`;
 
 describe("DocumentDiffPage", () => {
+  it("moves to the event of the document and keeps the versions", async () => {
+    setup(
+      `/events/0199b8e0-0000-7000-8000-0000000000ff/documents/${DOCUMENT_ID}/diff?from=v2&to=v3`,
+    );
+
+    await screen.findByRole("heading", { level: 1, name: "Unterschiede: Version 2 zu Version 3" });
+    expect(window.location.pathname + window.location.search).toBe(
+      `/events/${EVENT_ID}/documents/${DOCUMENT_ID}/diff?from=v2&to=v3`,
+    );
+  });
+
   it("names the two versions and moves focus to the heading", async () => {
     setup(PATH);
 
@@ -163,7 +174,7 @@ describe("DocumentDiffPage", () => {
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByRole("link", { name: "Zurück zum Dokument" })).toHaveAttribute(
       "href",
-      `/documents/${DOCUMENT_ID}`,
+      `/events/${EVENT_ID}/documents/${DOCUMENT_ID}`,
     );
     // The heading sits in the toolbar row with the way back, the ID of the document and the event.
     const row = heading.closest("[data-page-toolbar]") as HTMLElement;
@@ -212,7 +223,7 @@ describe("DocumentDiffPage", () => {
   });
 
   it("asks for two versions when the address names none", async () => {
-    setup(`/documents/${DOCUMENT_ID}/diff`);
+    setup(`/events/${EVENT_ID}/documents/${DOCUMENT_ID}/diff`);
 
     expect(await screen.findByText(/zwei Entwurfsversionen/)).toBeInTheDocument();
     // No blank version numbers in the heading.

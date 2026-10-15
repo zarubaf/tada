@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DocumentVersion } from "../api/client";
-import { diffPath, isApprovable, newestVersion, previousDraft } from "./versions";
+import { diffPath, documentPath, isApprovable, newestVersion, previousDraft } from "./versions";
 
 function version(
   number: number,
@@ -53,10 +53,16 @@ describe("previousDraft", () => {
   });
 });
 
+describe("documentPath", () => {
+  it("names the event and the document", () => {
+    expect(documentPath("e1", "d1")).toBe("/events/e1/documents/d1");
+  });
+});
+
 describe("diffPath", () => {
-  it("names the document and both versions", () => {
-    expect(diffPath("d1", version(2, "draft"), version(3, "draft"))).toBe(
-      "/documents/d1/diff?from=v2&to=v3",
+  it("names the event, the document and both versions", () => {
+    expect(diffPath("e1", "d1", version(2, "draft"), version(3, "draft"))).toBe(
+      "/events/e1/documents/d1/diff?from=v2&to=v3",
     );
   });
 });
