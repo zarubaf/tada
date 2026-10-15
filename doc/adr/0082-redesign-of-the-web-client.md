@@ -27,12 +27,16 @@ This ADR records the decisions and their reasons.
 
 ### Structure
 
-- The sidebar has these items: „Eingang“ (with a count of open proposals), „Meine Arbeit“, „Arbeit“, „Zeitplan“, „Dokumente“ and „Kontakte“.
+- The sidebar has these items: „Eingang“ (with a count of open proposals), „Meine Arbeit“, „Arbeit“, „Zeitplan“, „Dokumente“, „Anlässe“ and „Kontakte“.
+  „Arbeit“, „Zeitplan“ and „Dokumente“ appear only while the path names an event.
+  „Anlässe“ opens the list of events, and inside an event the event home „Übersicht“.
   „Einstellungen“ and the member menu sit at the foot.
   An item appears only when its page exists.
 - The sidebar head holds the organization and event switchers.
   The sidebar can collapse.
-- The top bar has the page title, a command box (`Ctrl+K`), a „Neu“ button, the theme toggle and the member menu.
+- The top bar has the page title, a command box (`Ctrl+K`), the theme toggle and the member menu.
+  The command box also creates a record.
+  The „Neu“ button is in the toolbar of the page that creates something, for example „Arbeit“.
 - „Arbeit“ is one page for all work records of an event: actions, commitments, milestones, decisions and risks.
   - A type filter selects all kinds or one kind.
   - Three view tabs select the view: „Board“, „Tabelle“ and „Zeitplan“.
@@ -144,6 +148,7 @@ Each card shows its own real status chip, because a column can hold several stat
 - [ADR 0023](0023-responsive-layout.md) (layout):
   - The shell has the sidebar and the top bar described above.
     The bottom bar on phones has four items: „Eingang“, „Meine Arbeit“, „Arbeit“ and „Mehr“.
+    Outside an event the third item is „Anlässe“, because „Arbeit“ belongs to an event.
   - The side panel is docked on wide layouts (1280 px and above).
   - On medium layouts (640 to 1280 px, including the 1024 px review width), it is an overlay sheet from the right.
   - On narrow layouts it is a full-screen sheet.
@@ -185,8 +190,7 @@ A proposal chip on a card means that a proposal in the member's „Eingang“ ta
 - Create and change happen in the panel, so the lists lose their forms.
 - The change is large.
   We deliver it in small steps and keep the app working after each step.
-  Each step updates its part of `doc/design/` with its code.
-  Until then the documents `tokens.md`, `components.md` and `layout-and-responsiveness.md` carry a note.
+  Each step updated its part of `doc/design/` with its code.
 - The hash and the old URLs keep external links alive.
   The public URL of a record points to the „Arbeit“ page.
 - The dense look raises the risk of small targets and low contrast.
