@@ -14,23 +14,18 @@ import { DisputeDialog } from "./DisputeDialog";
 import styles from "./PersonDataProtection.module.css";
 import { exportFileName, isTarget, type Mention, mentionKey, personDataApi } from "./personDataApi";
 
-/** The page of the records that a mention of another kind belongs to, for the normal edit. */
 addMessages(personDataMessages);
 
-const RECORD_PAGES: Record<string, string> = {
-  action: "actions",
-  commitment: "commitments",
-  promisor: "commitments",
-  workstream: "workstreams",
-};
+/** The kinds of mention that are records of the „Arbeit“ page of their event. */
+const WORK_KINDS = new Set(["action", "commitment", "promisor", "workstream"]);
 
+/** The page that shows the record of a mention, for the normal edit. */
 function recordPath(mention: Mention): string | undefined {
   if (!mention.event_id) {
     return undefined;
   }
-  const page = RECORD_PAGES[mention.kind];
   const event = `/events/${encodeURIComponent(mention.event_id)}`;
-  return page ? `${event}/${page}` : event;
+  return WORK_KINDS.has(mention.kind) ? `${event}/work` : event;
 }
 
 function kindName(mention: Mention): string {
