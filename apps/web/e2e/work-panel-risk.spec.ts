@@ -97,6 +97,10 @@ for (const viewport of viewports) {
       await expect(
         panel.getByRole("button", { name: "Wirkung (Pflichtfeld): Stufe wählen" }),
       ).toBeVisible();
+      // The sheet slides in and hides the page behind it as it arrives: measure when it has stopped.
+      await expect
+        .poll(async () => (await panel.boundingBox())?.x)
+        .toBe(narrow ? 0 : viewport.width - 480);
       expect((await axe(page)).violations).toEqual([]);
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`panel-risk-create-${theme}-${viewport.name}.png`);
