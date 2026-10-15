@@ -80,9 +80,9 @@ export function TimelineChart({
 
         {timeline.milestones.length > 0 && (
           <div className={styles.lane}>
-            <h3 className={styles.laneHeading}>
+            <h2 className={styles.laneHeading}>
               <span className={styles.laneName}>{t("timeline-milestones")}</span>
-            </h3>
+            </h2>
             <ul className={styles.rows}>
               {timeline.milestones.map(({ milestone, at }) => (
                 <li key={milestone.id} className={styles.row}>
@@ -117,9 +117,9 @@ export function TimelineChart({
         {timeline.lanes.map((lane) => {
           return (
             <div key={lane.workstream?.id ?? "none"} className={styles.lane}>
-              <h3 className={styles.laneHeading}>
+              <h2 className={styles.laneHeading}>
                 <span className={styles.laneName}>{laneName(lane.workstream)}</span>
-              </h3>
+              </h2>
               <ul className={styles.rows}>
                 {lane.items.map((item) => (
                   <Row key={item.action.id} item={item} base={base} />
