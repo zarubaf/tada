@@ -17,6 +17,7 @@ import { BulkBar } from "./BulkBar";
 import { useBoardView, visibleItems } from "./boardView";
 import { displayOrder, neighbors } from "./displayOrder";
 import { FailureBanner } from "./FailureBanner";
+import { useManageStreams } from "./manageStreams";
 import { useRecordRoute } from "./record/recordRoute";
 import { RECORD_KINDS } from "./recordStatus";
 import { useBulkChange } from "./useBulkChange";
@@ -33,6 +34,10 @@ import { useWorkSort, useWorkView } from "./workView";
 
 // The panel loads on demand: the board does not pay for the editors of a record (ADR 0082).
 const RecordPanel = lazy(() => import("./record/RecordPanel"));
+// So does the dialog that manages the workstreams: it is rare.
+const WorkstreamsDialog = lazy(() =>
+  import("./WorkstreamsDialog").then((module) => ({ default: module.WorkstreamsDialog })),
+);
 
 /**
  * „Arbeit“ (ADR 0082): all work records of an event on one page, with the filters in the query
@@ -47,6 +52,7 @@ export function WorkPage({ api }: { api: Api }) {
   const [view, setView] = useWorkView();
   const [sort] = useWorkSort();
   const record = useRecordRoute();
+  const manage = useManageStreams();
   const layout = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const newButton = useRef<HTMLButtonElement>(null);
@@ -226,6 +232,7 @@ export function WorkPage({ api }: { api: Api }) {
     creatable,
     newRef: newButton,
     onCreate: record.startCreate,
+    onManageStreams: manage.open,
   });
 
   const empty = !loading && failed.length === 0 && work.items.length === 0;
@@ -334,6 +341,21 @@ export function WorkPage({ api }: { api: Api }) {
           </WorkViewTabs>
         </Page>
       </div>
+      {manage.isOpen && work.directory.kind === "loaded" && event.state.kind === "loaded" && (
+        <Suspense fallback={null}>
+          <WorkstreamsDialog
+            api={api}
+            eventId={eventId}
+            directory={work.directory.directory}
+            writable={writable}
+            reloadDirectory={work.reloadDirectory}
+            onClose={() => {
+              manage.close();
+              focusAfterCommit(() => heading.current);
+            }}
+          />
+        </Suspense>
+      )}
       {route.mode !== "closed" && !loading && event.state.kind === "loaded" && (
         <Suspense fallback={null}>
           <RecordPanel

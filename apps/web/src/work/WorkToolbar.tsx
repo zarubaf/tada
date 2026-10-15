@@ -36,6 +36,8 @@ export interface WorkToolbarProps {
   newRef: RefObject<HTMLButtonElement | null>;
   /** Opens the form of a new record of the kind. */
   onCreate: (kind: RecordKind) => void;
+  /** Opens the dialog „Bereiche verwalten“ from the Bereich filter. */
+  onManageStreams: () => void;
 }
 
 function typeOptions(counts: Counts | undefined) {
@@ -91,6 +93,7 @@ export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): W
     creatable,
     newRef,
     onCreate,
+    onManageStreams,
   } = props;
   const filter = (
     <FilterControl
@@ -102,6 +105,7 @@ export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): W
       onReset={onReset}
       searchRef={searchRef}
       field={field}
+      onManageStreams={onManageStreams}
       {...open}
     />
   );

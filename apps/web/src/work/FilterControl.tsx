@@ -32,6 +32,8 @@ export interface FilterControlProps {
   /** How the dialog is open, if it is. The toolbar owns it, see `useFilterOpen`. */
   opened: Opened | undefined;
   onOpened: (opened: Opened | undefined) => void;
+  /** Opens the dialog „Bereiche verwalten“. The filter closes first, so that one dialog is open. */
+  onManageStreams: () => void;
   /** A phone has the plain button and a sheet; a wide layout has the ghost button and a popover. */
   narrow: boolean;
 }
@@ -67,6 +69,7 @@ export function FilterControl({
   field,
   opened,
   onOpened,
+  onManageStreams,
   ...props
 }: FilterControlProps) {
   const active = countOtherFilters(props.filters);
@@ -96,7 +99,13 @@ export function FilterControl({
       <div className={styles.controls}>
         <SearchBox field={field} inputRef={searchRef} autoFocus={opened === "key" || !narrow} />
         <OwnerFilter {...props} />
-        <StreamFilter {...props} />
+        <StreamFilter
+          {...props}
+          onManage={() => {
+            onOpened(undefined);
+            onManageStreams();
+          }}
+        />
         <DueFilter {...props} />
         <ResetFilters filters={props.filters} onReset={props.onReset} />
       </div>
