@@ -70,6 +70,13 @@ const decisions = [
   },
 ];
 
+/** Chooses an action of the record in the „Aktionen“ menu of the panel head. */
+async function chooseAction(page: Page, id: string, action: string) {
+  const panel = page.getByRole("complementary", { name: new RegExp(`^${id}`) });
+  await panel.getByRole("button", { name: "Aktionen" }).click();
+  await page.getByRole("menuitem", { name: action }).click();
+}
+
 async function open(page: Page, search: string) {
   await fakeWork(page, { milestones, decisions });
   await fulfill(page, "**/api/v1/persons*", {
@@ -115,7 +122,7 @@ for (const viewport of viewports) {
       await open(page, "?view=table#DEC-001");
       await setTheme(page, theme);
       const panel = page.getByRole("complementary", { name: /^DEC-001/ });
-      await expect(panel.getByRole("button", { name: "Ersetzen" })).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Aktionen" })).toBeVisible();
       await expect(panel.getByText("Testwil Generatoren AG")).toBeVisible();
       await expect
         .poll(async () => (await panel.boundingBox())?.x)
@@ -129,10 +136,7 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await open(page, "?view=table#DEC-001");
       await setTheme(page, theme);
-      await page
-        .getByRole("complementary", { name: /^DEC-001/ })
-        .getByRole("button", { name: "Ersetzen" })
-        .click();
+      await chooseAction(page, "DEC-001", "Ersetzen");
       const dialog = page.getByRole("dialog", { name: "DEC-001 ersetzen" });
       await expect(dialog.getByRole("textbox", { name: /^Wortlaut/ })).toBeFocused();
       await expect(dialog.getByRole("option", { name: "Cäcilia Probst (PER-001)" })).toBeVisible();
@@ -196,7 +200,7 @@ test("Ersetzen leaves focus on the title of the decision", async ({ page }) => {
     }),
   );
   const panel = page.getByRole("complementary", { name: /^DEC-001/ });
-  await panel.getByRole("button", { name: "Ersetzen" }).click();
+  await chooseAction(page, "DEC-001", "Ersetzen");
   const dialog = page.getByRole("dialog", { name: "DEC-001 ersetzen" });
   await dialog.getByLabel("Entschieden (Pflichtfeld)").fill("2030-06-01");
   await dialog.getByRole("button", { name: "Ersetzen" }).click();
@@ -225,7 +229,7 @@ test("the people of a decision keep the rhythm of a row, and an ID stays on one 
   expect(label?.y).toBeGreaterThanOrEqual((rows[0]?.top ?? 0) - 1);
   expect((label?.y ?? 0) + (label?.height ?? 0)).toBeLessThanOrEqual((rows[0]?.top ?? 0) + 32 + 1);
 
-  await panel.getByRole("button", { name: "Ersetzen" }).click();
+  await chooseAction(page, "DEC-001", "Ersetzen");
   const heading = page.getByRole("dialog", { name: "DEC-001 ersetzen" }).getByRole("heading");
   const lines = await heading
     .locator("span")
@@ -251,10 +255,10 @@ test("Escape closes the dialog first and the panel second", async ({ page }) => 
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page, "#DEC-001");
   const panel = page.getByRole("complementary", { name: /^DEC-001/ });
-  await panel.getByRole("button", { name: "Widerrufen" }).click();
+  await chooseAction(page, "DEC-001", "Widerrufen");
   await expect(page.getByRole("dialog", { name: "DEC-001 widerrufen" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(panel).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Widerrufen" })).toBeFocused();
+  await expect(panel.getByRole("button", { name: "Aktionen" })).toBeFocused();
 });
