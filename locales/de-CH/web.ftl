@@ -1164,7 +1164,6 @@ make-firm-submit = Verbindlich machen
 # $id: the readable ID of the commitment.
 make-firm-done = { $id } ist jetzt verbindlich.
 
-workstreams-title = Arbeitsbereiche
 workstreams-manage-title = Bereiche verwalten
 # The entry at the end of the list of the Bereich filter; it opens the dialog.
 workstreams-manage-entry = Bereiche verwalten …
@@ -1173,12 +1172,6 @@ workstreams-manage-empty-title = Noch keine Bereiche
 workstreams-manage-empty-text = Die Anlassleitung legt den ersten Bereich an.
 workstreams-manage-empty-text-manager = Legen Sie den ersten Bereich an.
 workstreams-manage-create = Bereich anlegen
-workstreams-loading = Arbeitsbereiche werden geladen
-workstreams-empty-title = Noch keine Arbeitsbereiche
-workstreams-empty-text = Die Anlassleitung legt den ersten Arbeitsbereich an.
-workstream-column-name = Name
-workstream-column-lead = Arbeitsbereichsleitung
-workstream-create-title = Arbeitsbereich anlegen
 # $name: the name of the workstream.
 workstream-change-title = „{ $name }“ bearbeiten
 # $name: the name of the workstream.
