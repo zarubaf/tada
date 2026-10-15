@@ -13,14 +13,6 @@
     color: var(--color-text-muted);
   }
 
-  /* The icon of an item that comes as an element, such as a record kind. */
-  .slot {
-    display: inline-flex;
-    flex: none;
-    margin-inline-end: var(--space-2);
-    color: var(--color-text-muted);
-  }
-
   .check {
     flex: none;
     margin-inline-start: auto;

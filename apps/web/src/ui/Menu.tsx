@@ -54,7 +54,7 @@ export function Menu({
         >
           {items.map((item) => (
             <MenuItem key={item.id} id={item.id} textValue={item.label} className={popover.item}>
-              {item.icon && <span className={menu.slot}>{item.icon}</span>}
+              {item.icon && <span className={popover.slot}>{item.icon}</span>}
               <span className={menu.label}>{item.label}</span>
             </MenuItem>
           ))}
