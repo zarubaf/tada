@@ -3,12 +3,11 @@ import {
   IconCalendarEvent,
   IconCircleDashed,
   IconDiamond,
-  IconStack2,
-  IconUser,
 } from "@tabler/icons-react";
 import type { Action, ActionStatus, CreateActionRequest } from "../../api/client";
 import { t } from "../../i18n";
 import type { WorkItem } from "../workItem";
+import { areaField, ownerField } from "./commonFields";
 import type { FieldSpec, FieldValue, RecordDescriptor } from "./descriptor";
 
 type ActionItem = Extract<WorkItem, { kind: "action" }>;
@@ -51,17 +50,10 @@ const status: FieldSpec = {
     commands.action.changeStatus(target(item), value as ActionStatus),
 };
 
-const owner: FieldSpec = {
-  id: "owner",
-  labelKey: "record-field-owner",
-  icon: IconUser,
-  control: "person",
-  pointer: "owner",
-  promptKey: "record-choose-owner",
-  required: true,
-  read: (item) => asAction(item).owner.id,
-  save: (commands, item, value) => commands.action.changeOwner(target(item), value ?? ""),
-};
+const owner = ownerField(
+  (item) => asAction(item).owner.id,
+  (commands, item, value) => commands.action.changeOwner(target(item), value ?? ""),
+);
 
 const due: FieldSpec = {
   id: "due",
@@ -95,16 +87,10 @@ const start: FieldSpec = {
   save: (commands, item, value) => commands.action.changeStart(target(item), value),
 };
 
-const area: FieldSpec = {
-  id: "area",
-  labelKey: "record-field-area",
-  icon: IconStack2,
-  control: "area",
-  pointer: "workstream",
-  emptyKey: "record-no-area",
-  read: (item) => asAction(item).workstreamId ?? null,
-  save: (commands, item, value) => commands.action.changeWorkstream(target(item), value),
-};
+const area = areaField(
+  (item) => asAction(item).workstreamId ?? null,
+  (commands, item, value) => commands.action.changeWorkstream(target(item), value),
+);
 
 const milestone: FieldSpec = {
   id: "milestone",
