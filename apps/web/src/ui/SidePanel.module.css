@@ -103,6 +103,16 @@
     white-space: nowrap;
   }
 
+  /*
+   * Full screen on a touch screen: the 44 px controls leave the type of the record too little room
+   * beside the position text, so the position goes (the step buttons stay).
+   */
+  @media (width < 40rem) and (pointer: coarse) {
+    .position {
+      display: none;
+    }
+  }
+
   .body {
     flex: 1;
     min-height: 0;

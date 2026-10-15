@@ -90,7 +90,7 @@ function Head({ item }: { item: WorkItem }) {
       <TypeIcon kind={item.kind} size={16} decorative />
       <span className={styles.recordId}>{item.readableId}</span>
       <span aria-hidden="true">·</span>
-      <span>{t(`record-kind-${item.kind}`)}</span>
+      <span className={styles.kind}>{t(`record-kind-${item.kind}`)}</span>
     </div>
   );
 }

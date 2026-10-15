@@ -9,6 +9,14 @@
     color: var(--color-text-muted);
   }
 
+  /* The kind gives way first when the head is narrow, with an ellipsis; the ID never shrinks. */
+  .kind {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* The ID in the head is the name of the record: semibold text in the text color, with figures of one width. */
   .recordId {
     color: var(--color-text);
