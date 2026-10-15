@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
   events,
+  expectPageFrame,
   fakeEvent,
   fakeProfile,
   fakeSession,
@@ -200,6 +201,7 @@ for (const viewport of viewports) {
       await setTheme(page, theme);
       await expect(page.getByRole("table", { name: "Dokumente" })).toBeVisible();
 
+      await expectPageFrame(page, viewport);
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
         .analyze();
@@ -231,6 +233,7 @@ for (const viewport of viewports) {
       await expect(page.getByText("Fakten geändert")).toBeVisible();
       await expect(page.getByRole("button", { name: "Version freigeben" })).toBeVisible();
 
+      await expectPageFrame(page, viewport);
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
         .analyze();
@@ -323,6 +326,7 @@ for (const viewport of viewports) {
       await expect(page.getByRole("table", { name: "Zeilen" })).toBeVisible();
       await expect(page.getByText("Veranstaltungsort: Version 1 zu Version 2")).toBeVisible();
 
+      await expectPageFrame(page, viewport);
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
         .analyze();
