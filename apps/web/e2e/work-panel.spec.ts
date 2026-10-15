@@ -99,6 +99,10 @@ for (const viewport of viewports) {
       await setTheme(page, theme);
       const panel = page.getByRole("complementary", { name: "Neue Aufgabe" });
       await expect(panel.getByRole("textbox", { name: /^Titel/ })).toBeVisible();
+      // The sheet slides in and hides the page behind it as it arrives: measure when it has stopped.
+      await expect
+        .poll(async () => (await panel.boundingBox())?.x)
+        .toBe(narrow ? 0 : viewport.width - 480);
       expect((await axe(page)).violations).toEqual([]);
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`panel-create-${theme}-${viewport.name}.png`);
