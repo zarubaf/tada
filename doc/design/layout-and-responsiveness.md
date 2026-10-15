@@ -189,6 +189,8 @@ It has its own `h1` „Arbeit“ and not the header of the event page.
   From `--bp-medium` the dialog is a popover that is not modal, so the board stays usable and shows the result of each change behind it; the first Escape in the search clears its text and the second closes it, and focus returns to the button.
   On a phone it is a sheet from the bottom.
   It holds the search (title and ID), „Verantwortlich“ („Ich“ first, then the contributors; there is no „Niemand“, because an action needs an owner), „Bereich“, „Fällig“ („Überfällig“, „Diese Woche“, „Ohne Datum“) and „Filter zurücksetzen“, which shows only while a filter is set.
+  The list of „Bereich“ ends with „Bereiche verwalten …“, which closes the filter and opens the sheet „Bereiche verwalten“ (the command palette opens it too).
+  The sheet lists the workstreams and offers an event manager the form to create and change them; on a phone it is a sheet from the bottom like the filter, and above 40 rem it is 25 rem wide from the right.
   The button shows the number of set filters (the type is not counted: it has its own control) and has the accessible name „Filter, 2 gesetzt“.
   The active filters are not repeated as chips: the count is enough, and the sheet shows the values.
 - The view switch „Board“, „Tabelle“ and „Zeitplan“ is a segmented control at the right end of the row (a frame of 30 px with 24 px buttons) and chooses the view.
