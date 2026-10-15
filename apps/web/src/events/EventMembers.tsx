@@ -8,7 +8,7 @@ import {
 } from "../api/client";
 import { failureOf } from "../api/failure";
 import { t } from "../i18n";
-import { useParams } from "../router/Router";
+import { useHash, useParams } from "../router/Router";
 import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -18,7 +18,7 @@ import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Select } from "../ui/Select";
 import { Skeleton } from "../ui/Skeleton";
-import styles from "./EventMembersPage.module.css";
+import styles from "./EventMembers.module.css";
 import { useEventWritable } from "./eventContext";
 import {
   addableMembers,
@@ -32,8 +32,13 @@ interface Failure {
   requestId: string | undefined;
 }
 
+/** The anchor of the section in the address: `/events/:id#mitglieder`. */
+const ANCHOR = "mitglieder";
+
 type State =
   | { kind: "loading" }
+  // The server lists the members only to a member who manages them: the others see no section.
+  | { kind: "hidden" }
   | { kind: "failed"; message: string; requestId: string | undefined }
   | { kind: "loaded"; items: EventMembership[] };
 
@@ -52,11 +57,13 @@ function actionMessage(result: { error?: Problem | undefined; response?: Respons
 }
 
 /**
- * „Mitglieder“ of an event: the event memberships. The server lists them only for a member who
- * manages them, so a loaded list always has the actions; the server decides each action anyway.
- * A closed event is read-only (ADR 0071): the page then shows the list without the actions.
+ * „Mitglieder“ of an event, a section of its overview: the event memberships. The server lists them
+ * only for a member who manages them, so a loaded list always has the actions; the server decides
+ * each action anyway, and for any other member the section is not there. A closed event is
+ * read-only (ADR 0071): the section then shows the list without the actions. The address
+ * `#mitglieder` scrolls to it and moves focus to its heading.
  */
-export function EventMembersPage({ api }: { api: Api }) {
+export function EventMembers({ api }: { api: Api }) {
   const { eventId = "" } = useParams();
   const session = useSession();
   const writable = useEventWritable();
@@ -83,7 +90,9 @@ export function EventMembersPage({ api }: { api: Api }) {
       setState(
         data
           ? { kind: "loaded", items: data.items }
-          : { kind: "failed", message: problemMessage(error), requestId: error?.request_id },
+          : error?.code === "forbidden"
+            ? { kind: "hidden" }
+            : { kind: "failed", message: problemMessage(error), requestId: error?.request_id },
       );
       return data !== undefined;
     } catch {
@@ -98,6 +107,15 @@ export function EventMembersPage({ api }: { api: Api }) {
 
   const items = state.kind === "loaded" ? state.items : [];
   const loaded = state.kind === "loaded";
+
+  // Once the section is there, the anchor takes the member to it.
+  const hash = useHash();
+  useEffect(() => {
+    if (loaded && hash === ANCHOR) {
+      heading.current?.scrollIntoView?.({ block: "start" });
+      heading.current?.focus();
+    }
+  }, [loaded, hash]);
 
   /** Resolves to true when the members of the organization loaded. */
   const loadOrganization = useCallback(async () => {
@@ -232,9 +250,17 @@ export function EventMembersPage({ api }: { api: Api }) {
     });
   }
 
+  if (state.kind === "hidden") {
+    return null;
+  }
   if (state.kind === "loading") {
     return (
-      <div className={styles.skeleton} role="status" aria-label={t("event-members-loading")}>
+      <div
+        id={ANCHOR}
+        className={styles.skeleton}
+        role="status"
+        aria-label={t("event-members-loading")}
+      >
         <Skeleton />
         <Skeleton />
         <Skeleton />
@@ -243,23 +269,25 @@ export function EventMembersPage({ api }: { api: Api }) {
   }
   if (state.kind === "failed") {
     return (
-      <InlineError
-        message={state.message}
-        requestId={state.requestId}
-        onRetry={() =>
-          retry(() => {
-            setState({ kind: "loading" });
-            return load();
-          })
-        }
-        announce={retried ? "focus" : "alert"}
-      />
+      <div id={ANCHOR}>
+        <InlineError
+          message={state.message}
+          requestId={state.requestId}
+          onRetry={() =>
+            retry(() => {
+              setState({ kind: "loading" });
+              return load();
+            })
+          }
+          announce={retried ? "focus" : "alert"}
+        />
+      </div>
     );
   }
 
   return (
-    <div className={styles.members}>
-      <h2 ref={heading} tabIndex={-1} className={styles.heading}>
+    <section id={ANCHOR} className={styles.members} aria-labelledby="members-title">
+      <h2 id="members-title" ref={heading} tabIndex={-1} className={styles.heading}>
         {t("event-members-title")}
       </h2>
       <LiveRegion kind="alert">{failure}</LiveRegion>
@@ -310,7 +338,7 @@ export function EventMembersPage({ api }: { api: Api }) {
         onConfirm={() => removing && void remove(removing)}
         onCancel={() => !busy && setRemoving(undefined)}
       />
-    </div>
+    </section>
   );
 }
 

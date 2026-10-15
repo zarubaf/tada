@@ -1,11 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi, type Event, type EventMembership } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
 import { EVENT } from "../test/fakeWorkServer";
-import { EventMembersPage } from "./EventMembersPage";
+import { EventMembers } from "./EventMembers";
 import { EventContext } from "./eventContext";
 
 const EVENT_ID = "0199b8e0-0000-7000-8000-000000000001";
@@ -41,10 +41,18 @@ interface Setup {
   answers?: Record<string, () => Response | Promise<Response>>;
   /** The event of the page, active by default. */
   event?: Event;
+  /** The fragment of the address, for example `#mitglieder`. */
+  hash?: string;
 }
 
 /** A fake server. It records `METHOD path` and the JSON body of each call. */
-function setup({ organizationRole = "member", items = [], answers = {}, event = EVENT }: Setup) {
+function setup({
+  organizationRole = "member",
+  items = [],
+  answers = {},
+  event = EVENT,
+  hash = "",
+}: Setup) {
   const calls: { call: string; body: unknown }[] = [];
   const organization = [
     { user_id: ME, display_name: "Anna Muster", role: "member", version: 1 },
@@ -81,16 +89,16 @@ function setup({ organizationRole = "member", items = [], answers = {}, event = 
     throw new Error(`unexpected ${request.method} ${pathname}`);
   };
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
-  window.history.replaceState(null, "", `/events/${EVENT_ID}/members`);
+  window.history.replaceState(null, "", `/events/${EVENT_ID}${hash}`);
   render(
     <Router>
       <SessionProvider api={api}>
         <Routes>
-          <Route path="/events/:eventId/members">
+          <Route path="/events/:eventId">
             <EventContext
               value={{ event, profile: { kind: "loading" }, reloadProfile: async () => true }}
             >
-              <EventMembersPage api={api} />
+              <EventMembers api={api} />
             </EventContext>
           </Route>
         </Routes>
@@ -107,7 +115,7 @@ afterEach(() => window.history.replaceState(null, "", "/"));
 const anna = membership(ME, "Anna Muster", "event-manager");
 const bernd = membership("u2", "Bernd Beispiel", "event-contributor");
 
-describe("EventMembersPage", () => {
+describe("EventMembers", () => {
   it("lists the members with their event role", async () => {
     setup({ items: [anna, bernd] });
 
@@ -124,12 +132,38 @@ describe("EventMembersPage", () => {
     expect(await screen.findByRole("button", { name: "Mitglied hinzufügen" })).toBeInTheDocument();
   });
 
-  it("shows the message of a forbidden list", async () => {
-    setup({ answers: { "GET /memberships": () => problem(403, "forbidden") } });
+  it("shows nothing to a member who may not list the members", async () => {
+    const { calls } = setup({ answers: { "GET /memberships": () => problem(403, "forbidden") } });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Sie haben keine Berechtigung für diese Aktion.",
+    await waitFor(() =>
+      expect(calls.map((c) => c.call)).toContain(`GET /api/v1/events/${EVENT_ID}/memberships`),
     );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Mitglieder des Anlasses" })).toBeNull();
+  });
+
+  it("names its section for the anchor #mitglieder", async () => {
+    setup({ items: [anna] });
+
+    const heading = await screen.findByRole("heading", { name: "Mitglieder des Anlasses" });
+    expect(heading.closest("section")).toHaveAttribute("id", "mitglieder");
+  });
+
+  it("scrolls to its heading and focuses it when the address names #mitglieder", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    setup({ items: [anna], hash: "#mitglieder" });
+
+    const heading = await screen.findByRole("heading", { name: "Mitglieder des Anlasses" });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(scroll).toHaveBeenCalled();
+  });
+
+  it("leaves focus alone when the address names no section", async () => {
+    setup({ items: [anna] });
+
+    const heading = await screen.findByRole("heading", { name: "Mitglieder des Anlasses" });
+    expect(heading).not.toHaveFocus();
   });
 
   it("shows the message of a rate-limited action, not the general 4xx text", async () => {

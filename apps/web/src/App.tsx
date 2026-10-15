@@ -58,8 +58,8 @@ const WorkstreamsPage = lazy(() =>
 const PartiesPage = lazy(() =>
   import("./parties/PartiesPage").then((module) => ({ default: module.PartiesPage })),
 );
-const EventMembersPage = lazy(() =>
-  import("./events/EventMembersPage").then((module) => ({ default: module.EventMembersPage })),
+const EventMembers = lazy(() =>
+  import("./events/EventMembers").then((module) => ({ default: module.EventMembers })),
 );
 const DocumentDiffPage = lazy(() =>
   import("./documents/DocumentDiffPage").then((module) => ({ default: module.DocumentDiffPage })),
@@ -190,7 +190,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
                     <Route path="/events/:eventId/members">
                       <EventPage api={api}>
                         <RouteSuspense bare>
-                          <EventMembersPage api={api} />
+                          <EventMembers api={api} />
                         </RouteSuspense>
                       </EventPage>
                     </Route>

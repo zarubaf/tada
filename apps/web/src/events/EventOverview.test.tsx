@@ -132,13 +132,26 @@ const session = {
   memberships: [{ organization_id: "o1", name: "Fliegergruppe Testwil", role: "member" }],
 };
 
-function setup(options: { profile?: () => Response } = {}) {
+function setup(options: { profile?: () => Response; managed?: boolean } = {}) {
   const fetch = async (request: Request) => {
     const { pathname } = new URL(request.url);
     if (pathname.endsWith("/session")) {
       return json(200, session);
     }
     if (pathname.endsWith("/memberships")) {
+      if (options.managed) {
+        return json(200, {
+          items: [
+            {
+              user_id: MEMBER_ID,
+              display_name: "Anna Muster",
+              event_role: "event-manager",
+              version: 1,
+              created_at: "2028-03-01T13:12:00Z",
+            },
+          ],
+        });
+      }
       // The member is no event manager: no control to close the event shows.
       return json(403, { type: "", code: "forbidden", title: "", status: 403, instance: "" });
     }
@@ -186,6 +199,24 @@ describe("EventOverview", () => {
     ) as HTMLElement;
     expect(within(section).getByText("QST-001")).toBeInTheDocument();
     expect(within(section).getByText("Wer bestellt die Festwirtschaft?")).toBeInTheDocument();
+  });
+
+  it("shows the members of the event in a section of its own for an event manager", async () => {
+    setup({ managed: true });
+
+    const section = (
+      await screen.findByRole("heading", { name: "Mitglieder des Anlasses" })
+    ).closest("section") as HTMLElement;
+    expect(section).toHaveAttribute("id", "mitglieder");
+    expect(within(section).getByText("Anna Muster")).toBeInTheDocument();
+  });
+
+  it("shows no section of members to a member who cannot manage them", async () => {
+    setup();
+
+    await screen.findByRole("heading", { name: "Fakten" });
+    expect(screen.queryByRole("heading", { name: "Mitglieder des Anlasses" })).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("shows each field with the state of its value and Unbekannt for a missing one", async () => {

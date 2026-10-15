@@ -4,8 +4,10 @@ import {
   events,
   fakeEvent,
   fakeEvents,
+  fakeMemberships,
   fakeSession,
   fontsLoaded,
+  forbidden,
   sessionWithRole,
   setTheme,
   textOverflows,
@@ -50,6 +52,7 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page, sessionWithRole("admin"));
       await fakeEvent(page, event);
+      await fakeMemberships(page, forbidden, 403);
       await page.goto(`/events/${event?.id}`);
       await setTheme(page, theme);
       await expect(page.getByRole("heading", { level: 1, name: event?.name })).toBeVisible();
