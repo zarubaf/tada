@@ -1,6 +1,8 @@
+import { IconLock, IconPlus } from "@tabler/icons-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
 import { LOCALE, t } from "../i18n";
+import { Link } from "../router/Router";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
@@ -9,26 +11,63 @@ import { InlineError } from "../ui/InlineError";
 import { LinkButton } from "../ui/LinkButton";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
+import { PageToolbar } from "../ui/PageToolbar";
+import { RecordId } from "../ui/RecordId";
 import { Skeleton } from "../ui/Skeleton";
-import { StandaloneLink } from "../ui/StandaloneLink";
+import { StatusLabel } from "../ui/StatusLabel";
+import tableStyles from "../work/WorkTable.module.css";
 import styles from "./EventsPage.module.css";
 import { useCanCreateEvent } from "./useCanCreateEvent";
 
 const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" });
 
+function EventState({ status }: { status: Event["status"] }) {
+  return status === "closed" ? (
+    <StatusLabel icon={IconLock} tone="muted" column>
+      {t("event-state-closed")}
+    </StatusLabel>
+  ) : (
+    <StatusLabel icon="open" tone="neutral" column>
+      {t("event-state-open")}
+    </StatusLabel>
+  );
+}
+
 const columns: Column<Event>[] = [
-  { id: "key", header: t("events-column-key"), cell: (event) => event.key, mono: true },
-  // A redacted event keeps its name (ADR 0072).
+  {
+    id: "key",
+    header: t("events-column-key"),
+    cell: (event) => <RecordId>{event.key}</RecordId>,
+    mono: true,
+  },
+  // A redacted event keeps its name (ADR 0072). A closed event is quieter, and as readable.
   {
     id: "name",
     header: t("events-column-name"),
     cell: (event) => (
-      <StandaloneLink inRow to={`/events/${encodeURIComponent(event.id)}`}>
-        {event.name}
-      </StandaloneLink>
+      <span className={styles.name} {...(event.status === "closed" && { "data-closed": "" })}>
+        <Link
+          to={`/events/${encodeURIComponent(event.id)}`}
+          className={tableStyles.link}
+          title={event.name}
+        >
+          {event.name}
+        </Link>
+      </span>
     ),
+    grow: true,
   },
-  { id: "time-zone", header: t("events-column-time-zone"), cell: (event) => event.time_zone },
+  {
+    id: "state",
+    header: t("events-column-state"),
+    cell: (event) => <EventState status={event.status} />,
+  },
+  {
+    id: "time-zone",
+    header: t("events-column-time-zone"),
+    cell: (event) => event.time_zone,
+    secondary: true,
+  },
   {
     id: "created",
     header: t("events-column-created"),
@@ -36,6 +75,7 @@ const columns: Column<Event>[] = [
       <time dateTime={event.created_at}>{createdFormat.format(new Date(event.created_at))}</time>
     ),
     numeric: true,
+    secondary: true,
   },
 ];
 
@@ -111,65 +151,72 @@ export function EventsPage({ api }: { api: Api }) {
   };
 
   return (
-    <Page>
-      <div className={styles.toolbar}>
-        <PageTitle ref={heading}>{t("events-title")}</PageTitle>
+    <Page width="flush">
+      <PageToolbar>
+        <PageTitle ref={heading} compact>
+          {t("events-title")}
+        </PageTitle>
         {canCreate && (
-          <LinkButton to="/events/new" primary>
-            {t("events-create")}
-          </LinkButton>
+          <div className={styles.end}>
+            <LinkButton to="/events/new" primary compact>
+              <IconPlus size={14} stroke={1.5} aria-hidden="true" />
+              {t("events-create")}
+            </LinkButton>
+          </div>
+        )}
+      </PageToolbar>
+      <div className={styles.content}>
+        {state.kind === "loading" && (
+          <div className={styles.skeleton} role="status" aria-label={t("events-loading")}>
+            <Skeleton />
+            <Skeleton />
+            <Skeleton />
+          </div>
+        )}
+        {state.kind === "failed" && (
+          <InlineError
+            message={state.message}
+            requestId={state.requestId}
+            onRetry={() =>
+              retry(() => {
+                setState({ kind: "loading" });
+                return load();
+              })
+            }
+            announce={retried ? "focus" : "alert"}
+          />
+        )}
+        {state.kind === "loaded" && state.events.length === 0 && (
+          <EmptyState title={t("events-empty-title")} text={t("events-empty-text")} />
+        )}
+        {state.kind === "loaded" && state.events.length > 0 && (
+          <>
+            <DataTable
+              label={t("events-title")}
+              columns={columns}
+              rows={state.events}
+              rowKey={(event) => event.id}
+            />
+            <LiveRegion kind="alert">{failure}</LiveRegion>
+            <LiveRegion kind="status">{confirmation}</LiveRegion>
+            {state.nextCursor !== undefined && (
+              <div>
+                <Button
+                  isPending={state.loadingMore}
+                  onPress={() => {
+                    const { events, nextCursor } = state;
+                    if (!state.loadingMore && nextCursor !== undefined) {
+                      void loadMore(events, nextCursor);
+                    }
+                  }}
+                >
+                  {t("events-load-more")}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
-      {state.kind === "loading" && (
-        <div className={styles.skeleton} role="status" aria-label={t("events-loading")}>
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
-        </div>
-      )}
-      {state.kind === "failed" && (
-        <InlineError
-          message={state.message}
-          requestId={state.requestId}
-          onRetry={() =>
-            retry(() => {
-              setState({ kind: "loading" });
-              return load();
-            })
-          }
-          announce={retried ? "focus" : "alert"}
-        />
-      )}
-      {state.kind === "loaded" && state.events.length === 0 && (
-        <EmptyState title={t("events-empty-title")} text={t("events-empty-text")} />
-      )}
-      {state.kind === "loaded" && state.events.length > 0 && (
-        <>
-          <DataTable
-            label={t("events-title")}
-            columns={columns}
-            rows={state.events}
-            rowKey={(event) => event.id}
-          />
-          <LiveRegion kind="alert">{failure}</LiveRegion>
-          <LiveRegion kind="status">{confirmation}</LiveRegion>
-          {state.nextCursor !== undefined && (
-            <div>
-              <Button
-                isPending={state.loadingMore}
-                onPress={() => {
-                  const { events, nextCursor } = state;
-                  if (!state.loadingMore && nextCursor !== undefined) {
-                    void loadMore(events, nextCursor);
-                  }
-                }}
-              >
-                {t("events-load-more")}
-              </Button>
-            </div>
-          )}
-        </>
-      )}
     </Page>
   );
 }

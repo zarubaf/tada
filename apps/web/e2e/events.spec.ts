@@ -29,7 +29,7 @@ for (const viewport of viewports) {
         await fakeEvents(page, state.status, state.body);
         await page.goto("/events");
         await setTheme(page, theme);
-        await expect(page.getByRole("heading", { name: "Anlässe" })).toBeVisible();
+        await expect(page.getByRole("heading", { level: 1, name: "Anlässe" })).toBeVisible();
         // The skeleton is a labelled status; the live regions have no label.
         await expect(page.locator("[role=status][aria-label]")).toHaveCount(0);
 
@@ -87,6 +87,16 @@ test("a member opens an event from its row", async ({ page }) => {
   }
   await page.getByRole("table").getByRole("link", { name: first.name }).click();
   await expect(page).toHaveURL(new RegExp(`/events/${first.id}$`));
+});
+
+test("the list says in words which events are open and which are closed", async ({ page }) => {
+  const closed = { ...events[0], id: "0199b8e0-0000-7000-8000-0000000000c9", status: "closed" };
+  await fakeSession(page);
+  await fakeEvents(page, 200, { items: [...events, closed] });
+  await page.goto("/events");
+  const table = page.getByRole("table");
+  await expect(table.getByText("Offen").first()).toBeVisible();
+  await expect(table.getByText("Abgeschlossen")).toBeVisible();
 });
 
 test("the e2e build has the gallery route", async ({ page }) => {
