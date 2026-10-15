@@ -169,7 +169,7 @@ Each template uses the `Page` component for the `main` element, the page gutters
 
 ### Settings
 
-„Einstellungen“ (`/settings`) is one page with a tab for each area (ADR 0082): „Konto“, „Mitglieder“, „Organisation“, „AI-PM“, „Telegram“ and „API-Token“.
+„Einstellungen“ (`/settings`) is one page with a tab for each area (ADR 0082): „Konto“, „Mitglieder“, „Organisation“, „AI-PM“, „Telegram“ and „Zugangsschlüssel“.
 The old addresses `/settings/members` and the like redirect to `/settings?tab=<tab>`; „Konto“ is the first tab and has no `tab` in the address.
 
 - The page is `Page width="flush"` with the toolbar row of the „Arbeit“ page: the `h1` „Einstellungen“ as a compact heading, then the tabs (`Tabs`, `variant="segmented"`).

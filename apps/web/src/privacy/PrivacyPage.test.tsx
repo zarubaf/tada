@@ -48,7 +48,7 @@ describe("PrivacyPage", () => {
     expect(
       screen.getByText(/ganzen Text einer Eingabe zeigen, die für die ganze Organisation gilt/),
     ).toBeVisible();
-    const clients = screen.getByRole("heading", { name: "KI-Clients der Mitglieder" });
+    const clients = screen.getByRole("heading", { name: "KI-Programme der Mitglieder" });
     expect(clients.nextElementSibling?.textContent).not.toMatch(/Zitat/);
     expect(screen.getByText(/Zähler für Anmeldeversuche/)).toBeVisible();
     expect(screen.getByText(/nicht auf Schadsoftware/)).toBeVisible();

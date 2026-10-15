@@ -93,7 +93,7 @@ const user = userEvent.setup({ delay: null });
 
 afterEach(() => window.history.replaceState(null, "", "/"));
 
-const createButton = () => screen.findByRole("button", { name: "Token erstellen" });
+const createButton = () => screen.findByRole("button", { name: "Zugangsschlüssel erstellen" });
 
 async function fillAndConfirm(name = "Codex") {
   await user.type(await screen.findByRole("textbox", { name: /Name/ }), name);
@@ -101,7 +101,7 @@ async function fillAndConfirm(name = "Codex") {
 }
 
 describe("TokensPage", () => {
-  it("shows the notice and keeps „Token erstellen“ disabled until the member confirms it", async () => {
+  it("shows the notice and keeps „Zugangsschlüssel erstellen“ disabled until the member confirms it", async () => {
     setup();
 
     expect(await screen.findByText(/Zugriff auf die Personendaten/)).toBeTruthy();
@@ -196,7 +196,9 @@ describe("TokensPage", () => {
   it("shows clearly that an owner switched off MCP tokens, and does not offer to create", async () => {
     const { count } = setup({ enabled: false });
 
-    expect(await screen.findByText(/hat die MCP-Token ausgeschaltet/)).toBeTruthy();
+    expect(
+      await screen.findByText(/hat die Zugangsschlüssel für KI-Programme ausgeschaltet/),
+    ).toBeTruthy();
     expect(await createButton()).toHaveProperty("disabled", true);
     expect(count("POST /api/v1/tokens")).toBe(0);
   });
@@ -217,7 +219,9 @@ describe("TokensPage", () => {
 
     await user.click(await createButton());
 
-    const messages = await screen.findAllByText(/hat die MCP-Token ausgeschaltet/);
+    const messages = await screen.findAllByText(
+      /hat die Zugangsschlüssel für KI-Programme ausgeschaltet/,
+    );
     expect(messages.length).toBeGreaterThan(0);
     expect(screen.queryByText(SECRET)).toBeNull();
   });

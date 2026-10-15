@@ -14,7 +14,7 @@ vi.mock("./PmPage", () => ({ PmPage: () => <h2>AI-PM-Seite</h2> }));
 vi.mock("../telegram/TelegramPage", () => ({ TelegramPage: () => <h2>Telegram-Seite</h2> }));
 vi.mock("../tokens/TokensPage", () => ({ TokensPage: () => <h2>Token-Seite</h2> }));
 
-const TABS = ["Konto", "Mitglieder", "Organisation", "AI-PM", "Telegram", "API-Token"];
+const TABS = ["Konto", "Mitglieder", "Organisation", "AI-PM", "Telegram", "Zugangsschlüssel"];
 
 function stubNarrow(narrow: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -98,7 +98,7 @@ describe("SettingsPage", () => {
   it("opens the tab that the address names", async () => {
     renderAt("/settings?tab=tokens", "member");
     expect(await screen.findByRole("heading", { name: "Token-Seite" })).toBeVisible();
-    expect(screen.getByRole("tab", { name: "API-Token", selected: true })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Zugangsschlüssel", selected: true })).toBeVisible();
   });
 
   it("falls back to the first tab for an unknown value", async () => {

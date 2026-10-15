@@ -682,7 +682,7 @@ describe("the detail", () => {
     renderAt(`/inbox/${CS_OLD}`);
 
     const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
-    expect(within(card).queryByText(/KI-Client/)).not.toBeInTheDocument();
+    expect(within(card).queryByText(/KI-Programm/)).not.toBeInTheDocument();
   });
 
   it("disables „Bearbeiten und annehmen“ for a value type that this client does not know", async () => {
@@ -800,7 +800,9 @@ describe("a draft proposal", () => {
 
     const card = await screen.findByRole("article", { name: "Dokumentenentwurf „Ablauf Samstag“" });
     expect(within(card).getByText("2 Hinweise der Prüfung")).toBeInTheDocument();
-    expect(within(card).getByText("Zeile 3: Zahl ausserhalb eines Fakt-Links")).toBeInTheDocument();
+    expect(
+      within(card).getByText("Zeile 3: Zahl ausserhalb eines verknüpften Werts"),
+    ).toBeInTheDocument();
     // The list of kinds is open: a kind that this client lacks gets a general text.
     expect(within(card).getByText("Zeile 3: Anderer Hinweis")).toBeInTheDocument();
   });

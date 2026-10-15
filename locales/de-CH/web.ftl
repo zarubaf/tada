@@ -92,8 +92,8 @@ evidence-page = Seite { $page }
 evidence-source-version = Quellversion { $id }
 evidence-document-version = { $name }, Version { $number }
 evidence-author-unknown = Unbekanntes Mitglied
-evidence-author-ai = KI-Client
-evidence-author-service = Dienst
+evidence-author-ai = KI-Programm
+evidence-author-service = Automatik
 evidence-author-other = Unbekannter Absender
 
 ## The state of knowledge of a value (doc/design/tokens.md).
@@ -206,7 +206,7 @@ versions-web = Web-Client (diese Seite)
 versions-server = Server
 versions-schema = Datenbankschema
 versions-api = API
-versions-mcp = MCP-Server
+versions-mcp = KI-Anbindung
 versions-roles = Laufende Prozesse
 versions-roles-help = Jeder Prozess meldet sich regelmässig. Die Zeit zeigt seine letzte Meldung.
 versions-role = Prozess
@@ -406,9 +406,9 @@ draft-fact-evidence = { $value }, Quelle zu { $label }
 draft-fact-older = (Version { $version } des Fakts, seither geändert)
 # $line: the line of the draft, from 1. $kind: what the lint found.
 draft-lint-line = Zeile { $line }: { $kind }
-draft-lint-number = Zahl ausserhalb eines Fakt-Links
-draft-lint-date = Datum ausserhalb eines Fakt-Links
-draft-lint-money = Betrag ausserhalb eines Fakt-Links
+draft-lint-number = Zahl ausserhalb eines verknüpften Werts
+draft-lint-date = Datum ausserhalb eines verknüpften Werts
+draft-lint-money = Betrag ausserhalb eines verknüpften Werts
 draft-lint-raw-html = HTML im Text. tada zeigt es nicht an.
 draft-lint-other = Anderer Hinweis
 draft-sources = Quellen
@@ -505,7 +505,7 @@ members-loaded-more = Weitere Mitglieder geladen.
 settings-tabs-label = Bereich
 settings-nav-members = Mitglieder
 settings-nav-telegram = Telegram
-settings-nav-tokens = API-Token
+settings-nav-tokens = Zugangsschlüssel
 settings-nav-organization = Organisation
 settings-nav-ai-pm = AI-PM
 settings-nav-account = Konto
@@ -571,19 +571,19 @@ telegram-unlinked = Telegram-Verknüpfung aufgehoben.
 telegram-requests-refreshed = Anfragen aktualisiert.
 
 # The notice of ADR 0045. A changed text gets a new NOTICE_VERSION and a new line in NOTICE_TEXTS in crates/app/src/tokens/mod.rs; a test checks it.
-token-notice-title = Hinweis zum API-Token
-token-notice-access = Mit dem Token erhält Ihr eigener KI-Client Zugriff auf die Personendaten, die Sie in tada sehen können.
+token-notice-title = Hinweis zum Zugangsschlüssel
+token-notice-access = Mit dem Zugangsschlüssel erhält Ihr eigenes KI-Programm Zugriff auf die Personendaten, die Sie in tada sehen können.
 token-notice-policy = Die Richtlinie des Vereins verlangt einen KI-Tarif, der die eingegebenen Daten nicht zum Training verwendet.
 token-notice-confirm = Ich habe den Hinweis gelesen und bestätige ihn.
 
 ## API tokens and the organization switch (settings)
 
-tokens-title = API-Token
-tokens-intro = Mit einem API-Token verbindet sich Ihr eigener KI-Client über MCP mit tada.
-tokens-off = Die Organisationsleitung hat die MCP-Token ausgeschaltet. Sie können im Moment keinen Token erstellen.
-tokens-create-title = Neuer Token
+tokens-title = Zugangsschlüssel
+tokens-intro = Mit einem Zugangsschlüssel verbindet sich Ihr eigenes KI-Programm über MCP mit tada.
+tokens-off = Die Organisationsleitung hat die Zugangsschlüssel für KI-Programme ausgeschaltet. Sie können im Moment keinen Zugangsschlüssel erstellen.
+tokens-create-title = Neuer Zugangsschlüssel
 tokens-name = Name
-tokens-name-help = Zum Beispiel der Name Ihres KI-Clients.
+tokens-name-help = Zum Beispiel der Name Ihres KI-Programms.
 tokens-scope = Berechtigung
 tokens-scope-read = Lesen
 tokens-scope-propose = Lesen und Vorschläge machen
@@ -592,22 +592,22 @@ tokens-expiry-30 = 30 Tage
 tokens-expiry-90 = 90 Tage
 tokens-expiry-180 = 180 Tage
 tokens-expiry-364 = Ein Jahr
-tokens-create = Token erstellen
-tokens-error-name = Geben Sie dem Token einen Namen.
+tokens-create = Zugangsschlüssel erstellen
+tokens-error-name = Geben Sie dem Zugangsschlüssel einen Namen.
 tokens-error-name-too-long = Der Name ist zu lang. Kürzen Sie ihn.
 tokens-error-notice = Der Hinweis hat sich geändert. Laden Sie die Seite neu und lesen Sie ihn erneut.
 tokens-propose-forbidden = Das Recht, Vorschläge zu machen, fehlt Ihnen in allen Veranstaltungen. Wählen Sie „Lesen“.
-tokens-created = Token erstellt.
-tokens-secret-label = Ihr neuer Token
+tokens-created = Zugangsschlüssel erstellt.
+tokens-secret-label = Ihr neuer Zugangsschlüssel
 tokens-secret-once = Wird nur einmal angezeigt
-tokens-secret-hint = Kopieren Sie den Token jetzt. tada kann ihn später nicht mehr zeigen.
-tokens-copy = Token kopieren
-tokens-copied = Token kopiert.
-tokens-copy-failed = Kopieren nicht möglich. Markieren Sie den Token von Hand.
-tokens-list-title = Ihre Token
-tokens-loading = Token werden geladen
-tokens-empty-title = Noch keine Token
-tokens-empty-text = Erstellen Sie oben Ihren ersten Token.
+tokens-secret-hint = Kopieren Sie den Zugangsschlüssel jetzt. tada kann ihn später nicht mehr zeigen.
+tokens-copy = Zugangsschlüssel kopieren
+tokens-copied = Zugangsschlüssel kopiert.
+tokens-copy-failed = Kopieren nicht möglich. Markieren Sie den Zugangsschlüssel von Hand.
+tokens-list-title = Ihre Zugangsschlüssel
+tokens-loading = Zugangsschlüssel werden geladen
+tokens-empty-title = Noch keine Zugangsschlüssel
+tokens-empty-text = Erstellen Sie oben Ihren ersten Zugangsschlüssel.
 tokens-column-name = Name
 tokens-column-scope = Berechtigung
 tokens-column-expires = Gültig bis
@@ -621,23 +621,23 @@ tokens-status-expired = Abgelaufen
 tokens-revoke = Widerrufen
 # $name: the name of the token.
 tokens-revoke-of = { $name } widerrufen
-tokens-revoke-title = Token widerrufen?
+tokens-revoke-title = Zugangsschlüssel widerrufen?
 # $name: the name of the token.
-tokens-revoke-text = Der Token „{ $name }“ funktioniert danach nicht mehr. Ein KI-Client mit diesem Token verliert den Zugriff.
+tokens-revoke-text = Der Zugangsschlüssel „{ $name }“ funktioniert danach nicht mehr. Ein KI-Programm mit diesem Zugangsschlüssel verliert den Zugriff.
 tokens-revoke-cancel = Abbrechen
-tokens-revoked = Token widerrufen.
+tokens-revoked = Zugangsschlüssel widerrufen.
 tokens-example-title = Beispiel für einen MCP-Client
-tokens-example-intro = Tragen Sie den Token als Bearer-Token ein. Ersetzen Sie TOKEN durch Ihren Token.
+tokens-example-intro = Tragen Sie den Zugangsschlüssel als Bearer-Token ein. Ersetzen Sie TOKEN durch Ihren Zugangsschlüssel.
 tokens-example-claude = Claude Code
 tokens-example-codex = Codex
-tokens-example-codex-text = Legen Sie den Token in die Umgebungsvariable TADA_TOKEN und tragen Sie in die Datei config.toml ein:
+tokens-example-codex-text = Legen Sie den Zugangsschlüssel in die Umgebungsvariable TADA_TOKEN und tragen Sie in die Datei config.toml ein:
 
 org-title = Organisation
-org-mcp-label = MCP-Token erlauben
-org-mcp-help = Nur wenn der Schalter an ist, können Mitglieder API-Token für KI-Clients erstellen. Nur die Organisationsleitung ändert ihn.
+org-mcp-label = Zugangsschlüssel für KI-Programme erlauben
+org-mcp-help = Nur wenn der Schalter an ist, können Mitglieder Zugangsschlüssel für KI-Programme erstellen. Nur die Organisationsleitung ändert ihn.
 org-mcp-loading = Einstellungen werden geladen
-org-mcp-on = MCP-Token sind eingeschaltet.
-org-mcp-off = MCP-Token sind ausgeschaltet.
+org-mcp-on = Zugangsschlüssel für KI-Programme sind eingeschaltet.
+org-mcp-off = Zugangsschlüssel für KI-Programme sind ausgeschaltet.
 
 ## The edit form of a value (ADR 0049)
 
@@ -673,7 +673,7 @@ inbox-title = Eingang
 inbox-list-label = Offene Vorschläge
 inbox-loading = Eingang wird geladen
 inbox-empty-title = Nichts zu prüfen
-inbox-empty-text = Es gibt keine offenen Vorschläge. Neue Vorschläge von Mitgliedern und KI-Clients erscheinen hier.
+inbox-empty-text = Es gibt keine offenen Vorschläge. Neue Vorschläge von Mitgliedern und KI-Programmen erscheinen hier.
 inbox-more = Es gibt weitere offene Vorschläge. Die Liste zeigt die ältesten zuerst.
 inbox-scope-organization = Organisation
 inbox-event-unknown = Anlass
@@ -723,7 +723,7 @@ inbox-source-version = Quellversion { $id }
 # $page: the page number in a PDF.
 inbox-source-page = Seite { $page }
 inbox-status-accepted = Angenommen
-inbox-status-accepted-with-edit = Mit Änderung angenommen
+inbox-status-accepted-with-edit = Angepasst angenommen
 inbox-status-rejected = Abgelehnt
 inbox-status-withdrawn = Zurückgezogen
 # Proposals that a legal redaction emptied (ADR 0072).
