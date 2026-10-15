@@ -472,7 +472,7 @@ describe("a commitment in the panel", () => {
       openWork("#COM-001");
       const step = await openStep();
       expect(step.getByText(/Die Bedingung bleibt als Verlauf stehen/)).toBeVisible();
-      expect(step.getByText("Bedingung: wenn der Auftrag unterschrieben ist")).toBeVisible();
+      expect(step.getByText(/Bedingung: wenn der Auftrag unterschrieben ist/)).toBeVisible();
       expect(step.getByRole("textbox", { name: "Grund (Pflichtfeld)" })).toHaveFocus();
     });
 

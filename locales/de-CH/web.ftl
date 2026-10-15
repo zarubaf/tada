@@ -1240,7 +1240,7 @@ make-firm-of = { $id } verbindlich machen
 make-firm-title = { $id } verbindlich machen
 make-firm-text = Die Bedingung bleibt als Verlauf stehen. Der Grund wird mit der Zusage gespeichert.
 make-firm-reason = Grund (Pflichtfeld)
-make-firm-reason-help = Warum ist die Bedingung erfüllt?
+make-firm-reason-help = Warum ist die Bedingung erfüllt? 1 bis 500 Zeichen.
 make-firm-submit = Verbindlich machen
 # $id: the readable ID of the commitment.
 make-firm-done = { $id } ist jetzt verbindlich.
@@ -1502,6 +1502,7 @@ record-choose-level = Stufe wählen
 record-actions = Aktionen
 # $id: the readable ID of the record.
 record-action-gone = { $id } hat sich inzwischen geändert, die Aktion ist nicht mehr möglich.
+record-action-irreversible = Das lässt sich nicht rückgängig machen.
 record-action-conflict = Der Eintrag wurde inzwischen geändert und ist neu geladen. Prüfen Sie ihn und versuchen Sie es erneut.
 # $id: the readable ID of the new record.
 record-created = { $id } erfasst.

@@ -5,14 +5,13 @@ import { IconMenu } from "../../ui/IconMenu";
 import type { WorkItem } from "../workItem";
 import type { MenuAction } from "./descriptor";
 import type { FieldEnv } from "./FieldEditor";
-import { ReasonDialog } from "./ReasonDialog";
 
 /**
- * The „Aktionen“ menu of a record and the step of the action that the member chose. The menu is
+ * The „Aktionen“ menu of a record and the dialog of the action that the member chose. The menu is
  * absent when the member may not change the record or no action is available, so a record without
- * one has no empty menu. The step stays open while the record changes under it (a conflict loads it
- * again), and the member decides to send it again or to cancel. It closes with a sentence when the
- * record no longer takes the action.
+ * one has no empty menu. The dialog stays open while the record changes under it, and the member
+ * decides to send it again or to cancel. After a conflict the record is loaded again; if it no
+ * longer takes the action, the dialog closes with a sentence.
  */
 export function ActionMenu({
   actions,
@@ -23,21 +22,26 @@ export function ActionMenu({
   actions: readonly MenuAction[];
   item: WorkItem;
   env: FieldEnv;
-  /** An action worked and its step is closed. The menu may be gone with the action: focus is for the caller. */
+  /** An action worked and its dialog is closed. The menu may be gone with the action: focus is for the caller. */
   onDone: () => void;
 }) {
   const [chosen, setChosen] = useState<string>();
+  const [conflicted, setConflicted] = useState(false);
   const offered = env.editable ? actions.filter((action) => action.available(item)) : [];
   const running = actions.find((action) => action.id === chosen);
-  const { step } = running ?? {};
-  const gone = running !== undefined && !running.available(item);
-  // A conflict reload can bring a record that no longer takes the action; a retry would only fail.
+  const gone = conflicted && running !== undefined && !running.available(item);
+  const close = () => {
+    setChosen(undefined);
+    setConflicted(false);
+  };
   useEffect(() => {
-    if (gone && running) {
+    if (gone) {
       setChosen(undefined);
+      setConflicted(false);
       env.announce(t("record-action-gone", { id: item.readableId }), "alert");
     }
-  }, [gone, running, item.readableId, env]);
+  }, [gone, item.readableId, env]);
+  const Dialog = running?.dialog;
   return (
     <>
       {offered.length > 0 && (
@@ -52,27 +56,17 @@ export function ActionMenu({
           onAction={setChosen}
         />
       )}
-      {running && step && !gone && (
-        <ReasonDialog
-          title={step.title(item)}
-          {...(step.description && { description: step.description(item) })}
-          reasonLabel={t(step.reasonKey)}
-          {...(step.reasonHelpKey && { reasonHelp: t(step.reasonHelpKey) })}
-          confirmLabel={t(step.confirmKey)}
-          {...(step.danger && { danger: true })}
-          onConfirm={async (reason) => {
-            const result = await running.run(env.commands, item, reason);
-            if (!result.ok && result.failure.reason === "conflict") {
-              void env.refresh(item.kind);
-            }
-            return result;
-          }}
-          onDone={() => {
-            setChosen(undefined);
-            env.announce(t(running.doneKey, { id: item.readableId }), "status");
+      {running && Dialog && !gone && (
+        <Dialog
+          item={item}
+          env={env}
+          onConflict={() => setConflicted(true)}
+          onDone={(message, urgency = "status") => {
+            close();
+            env.announce(message, urgency);
             onDone();
           }}
-          onCancel={() => setChosen(undefined)}
+          onCancel={close}
         />
       )}
     </>
