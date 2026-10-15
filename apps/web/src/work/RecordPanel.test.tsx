@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "../router/Router";
-import { EVENT, renderWork, type Setup } from "../test/fakeWorkServer";
+import { EVENT, json, problem, renderWork, type Setup } from "../test/fakeWorkServer";
 import * as r from "../test/workRecords";
 import { WorkPage } from "./WorkPage";
 
@@ -79,6 +79,23 @@ describe("the record panel", () => {
     it("finds a record when the address writes its ID in lower case", async () => {
       open("#act-001");
       await panel("ACT-001 Plakat gestalten");
+    });
+
+    it("says that the kind could not load, and retries it, when the record is not in the list", async () => {
+      let fail = true;
+      open("#COM-003", {
+        answers: {
+          "GET /commitments": () => (fail ? problem(500, "internal") : json(200, { items: [] })),
+        },
+      });
+      const region = await panel("Eintrag konnte nicht geladen werden");
+      expect(within(region).getByText(/Zusagen konnten nicht geladen werden/)).toBeVisible();
+      expect(within(region).queryByText(/gibt es in diesem Anlass nicht/)).toBeNull();
+
+      fail = false;
+      await user.click(within(region).getByRole("button", { name: "Erneut versuchen" }));
+      // The kind loaded, but it has no COM-003: now the record is really absent.
+      await panel("Eintrag nicht gefunden");
     });
 
     it("does not open a panel for a hash that is no record ID", async () => {
