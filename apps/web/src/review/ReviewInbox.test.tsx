@@ -539,7 +539,8 @@ describe("the look of a proposal card", () => {
     renderAt(`/inbox/${CS_OLD}`);
 
     const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
-    const section = within(card).getByRole("region", { name: "Quelle" });
+    const section = within(card).getByRole("heading", { name: "Quelle" })
+      .parentElement as HTMLElement;
     const [source] = within(section).getAllByRole("listitem");
     expect(source).toHaveTextContent("Wir treffen uns auf dem Flugplatz Testwil.");
     expect(source).toHaveTextContent(/Quellversion 0199b8e0/);

@@ -106,14 +106,13 @@ function Hint({ show, children }: { show: boolean; children: string }) {
 const END_ICONS = { rejected: IconCircleX, withdrawn: IconCircleX } as const;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
-  const id = useId();
   return (
-    <section className={styles.section} aria-labelledby={id}>
-      <h4 id={id} className={styles.sectionTitle}>
-        {title}
-      </h4>
+    // Not a `section`: a changeset repeats these parts for each proposal, and landmarks of the same
+    // name cannot be told apart. The heading gives the structure.
+    <div className={styles.section}>
+      <h4 className={styles.sectionTitle}>{title}</h4>
       {children}
-    </section>
+    </div>
   );
 }
 
