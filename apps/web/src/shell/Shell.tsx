@@ -208,7 +208,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           {failure}
         </LiveRegion>
         {outdated && (
-          <div className={styles.outdated}>
+          // A named section, so that the prompt sits inside a landmark.
+          <section className={styles.outdated} aria-label={t("version-outdated-title")}>
             <Banner
               icon={IconRefresh}
               action={
@@ -220,7 +221,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
               </p>
               <p>{t("version-outdated-text")}</p>
             </Banner>
-          </div>
+          </section>
         )}
         <Fragment key={organization.organization_id}>{children}</Fragment>
       </div>
