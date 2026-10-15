@@ -62,6 +62,25 @@ beforeEach(() => vi.useFakeTimers({ toFake: ["Date"], now: new Date(2030, 4, 16,
 afterEach(() => vi.useRealTimers());
 
 describe("My Work", () => {
+  it("keeps a redacted record reachable by a link that the reference names", async () => {
+    renderPage(
+      work({
+        actions: [action({ redacted: true, title: "" })],
+        commitments: [commitment({ redacted: true, text: "" })],
+      }),
+    );
+
+    for (const [name, local] of [
+      ["FLY28/ACT-042", "ACT-042"],
+      ["FLY28/COM-003", "COM-003"],
+    ] as const) {
+      const link = await screen.findByRole("link", { name });
+      expect(link).toHaveAttribute("href", `/events/${EVENT_ID}/work#${local}`);
+      expect(link).toHaveTextContent("entfernt");
+      expect(link).not.toHaveAttribute("title");
+    }
+  });
+
   it("has one h1 in the toolbar row of the page", async () => {
     renderPage(work({ actions: [action()] }));
 

@@ -43,15 +43,19 @@ function Reference({ row }: { row: Reference }) {
   return <RecordId>{`${row.event_key}/${row.local_id}`}</RecordId>;
 }
 
-/** The title of a row is the link to the record in the panel of „Arbeit“ of its event. */
-function TitleLink({ row, children }: { row: Reference; children: string }) {
+/**
+ * The title of a row is the link to the record in the panel of „Arbeit“ of its event. A redacted
+ * record has no title: the link then shows „entfernt“ and takes the reference as its name.
+ */
+function TitleLink({ row, title }: { row: Reference & { redacted?: boolean }; title: string }) {
   return (
     <Link
       to={recordHref(row.event_id, { readableId: row.local_id })}
       className={tableStyles.link}
-      title={children}
+      title={row.redacted ? undefined : title}
+      aria-label={row.redacted ? `${row.event_key}/${row.local_id}` : undefined}
     >
-      {children}
+      {redactedOr(row.redacted, title)}
     </Link>
   );
 }
@@ -112,7 +116,7 @@ export function MyWorkPage({ api }: { api: Api }) {
     {
       id: "title",
       header: t("action-column-title"),
-      cell: (row) => <TitleLink row={row}>{row.title}</TitleLink>,
+      cell: (row) => <TitleLink row={row} title={row.title} />,
       grow: true,
     },
     {
@@ -137,7 +141,7 @@ export function MyWorkPage({ api }: { api: Api }) {
     {
       id: "text",
       header: t("commitment-column-text"),
-      cell: (row) => <TitleLink row={row}>{row.text}</TitleLink>,
+      cell: (row) => <TitleLink row={row} title={row.text} />,
       grow: true,
     },
     {
