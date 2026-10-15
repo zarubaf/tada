@@ -28,7 +28,7 @@ The export of one person, the correction with dispute notes, the legal redaction
 Scope: milestones, decisions, risks and requirements ([ADR 0081](adr/0081-milestones-decisions-risks-and-requirements.md)), the start date and the milestone of an action, the timeline of an event, and the proposal of a new workstream (`create-workstream`).
 
 - An action gets an optional start date and at most one milestone.
-- The timeline is one fixed, read-only page for each event.
+- The timeline is one fixed, read-only view for each event: the „Zeitplan“ view of the „Arbeit“ page ([ADR 0082](adr/0082-redesign-of-the-web-client.md)).
   It shows actions as bars, grouped by workstream, with the milestones and the event window.
 - MCP clients propose all four kinds and a new workstream.
 - Not in scope: dependencies between actions, a critical path, automatic rescheduling and time tracking.
