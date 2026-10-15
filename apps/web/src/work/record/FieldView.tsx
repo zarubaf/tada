@@ -6,7 +6,7 @@ import { Chip } from "../../ui/Chip";
 import { Redacted } from "../../ui/Redacted";
 import { mayBeOverdue, type WorkItem } from "../workItem";
 import type { Choices } from "./choices";
-import { type FieldSpec, type FieldValue, peopleIds } from "./descriptor";
+import { type FieldSpec, type FieldValue, peopleIds, REDACTED } from "./descriptor";
 import styles from "./RecordPanel.module.css";
 
 /** The words for a field without a value. */
@@ -103,16 +103,22 @@ export function FieldView({
     }
     case "people": {
       const redacted = new Set(
-        spec.people?.(item).flatMap((person) => (person.redacted ? [person.id] : [])),
+        spec.people?.(item).flatMap((person) => (person.label === REDACTED ? [person.id] : [])),
       );
       return (
         <ul className={styles.people}>
           {peopleIds(value).map((id) => {
+            if (redacted.has(id)) {
+              return (
+                <li key={id} className={styles.value}>
+                  <Redacted />
+                </li>
+              );
+            }
             const person = choices.options.find((option) => option.id === id);
             return (
               <li key={id} className={styles.value}>
-                {!redacted.has(id) && person?.leading}
-                {redacted.has(id) && <Redacted />}
+                {person?.leading}
                 <span className={styles.valueName} title={person?.label}>
                   {person?.label ?? ""}
                 </span>

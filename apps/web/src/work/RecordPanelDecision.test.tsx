@@ -191,9 +191,10 @@ describe("a decision in the panel", () => {
     });
     const view = await region("DEC-001");
     expect(view.getAllByText("entfernt").length).toBeGreaterThan(0);
-    // A redacted party is the tombstone and its ID, with no avatar of a made-up initial.
-    const party = within(view.getByRole("list")).getByText("PER-001").closest("li");
-    expect(party).toHaveTextContent(/^entfernt\s*PER-001$/);
+    // A redacted party is the tombstone alone, as on a commitment, with no avatar of a made-up initial.
+    const parties = within(view.getByRole("list")).getAllByRole("listitem");
+    expect(parties).toHaveLength(1);
+    expect(parties[0]).toHaveTextContent(/^entfernt$/);
   });
 
   describe("a decision that was replaced", () => {
