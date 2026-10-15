@@ -176,6 +176,34 @@ test("the step buttons are in the same place for every kind of record", async ({
   }
 });
 
+test.describe("on a touch screen", () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
+
+  // The controls are 44 px wide here, and the head has little room left for the type of the record.
+  for (const id of ["COM-001", "DEC-001"]) {
+    test(`the head of ${id} keeps its words clear of the buttons`, async ({ page }) => {
+      await open(page, `?view=table#${id}`);
+      const panel = page.getByRole("complementary", { name: new RegExp(`^${id}`) });
+      await expect(panel.getByRole("button", { name: "Schliessen" })).toBeVisible();
+      await expect.poll(async () => (await panel.boundingBox())?.x).toBe(0);
+      // The words of the head end before the first thing of the buttons side, the position text too.
+      const actions = await panel
+        .locator("header > :last-child")
+        .evaluate((element) => element.getBoundingClientRect().left);
+      const words = await panel.locator("header > :first-child span").evaluateAll((elements) =>
+        elements.map((element) => ({
+          text: element.textContent,
+          right: element.getBoundingClientRect().right,
+        })),
+      );
+      expect(words.length).toBeGreaterThan(2);
+      for (const word of words) {
+        expect([word.text, word.right <= actions]).toEqual([word.text, true]);
+      }
+    });
+  }
+});
+
 const replaced = [
   {
     ...decisions[0],
