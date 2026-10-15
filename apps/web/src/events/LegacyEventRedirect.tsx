@@ -22,7 +22,8 @@ const TARGETS: Record<LegacyEventPage, { path: string; set?: [string, string]; h
   milestones: { path: "/work", set: ["type", "milestone"] },
   decisions: { path: "/work", set: ["type", "decision"] },
   timeline: { path: "/work", set: ["view", "timeline"] },
-  workstreams: { path: "/work" },
+  // The workstreams are managed in a dialog of the work page.
+  workstreams: { path: "/work", set: ["manage", "streams"] },
   // The members are a section of the overview now.
   members: { path: "", hash: "mitglieder" },
 };
