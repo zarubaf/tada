@@ -4,6 +4,7 @@ import { EventPage } from "./events/EventPage";
 import { LEGACY_EVENT_PAGES, LegacyEventRedirect } from "./events/LegacyEventRedirect";
 import { t } from "./i18n";
 import { NotFoundPage } from "./NotFoundPage";
+import { ContactsRedirect } from "./parties/ContactsRedirect";
 import { InboxProvider } from "./review/InboxProvider";
 import { Route, Router, Routes } from "./router/Router";
 import { SessionProvider } from "./session/SessionProvider";
@@ -27,8 +28,8 @@ const WorkPage = lazy(() =>
 );
 // The register of persons and institutions and the diff of two document versions are seldom the
 // first screen.
-const PartiesPage = lazy(() =>
-  import("./parties/PartiesPage").then((module) => ({ default: module.PartiesPage })),
+const ContactsPage = lazy(() =>
+  import("./parties/ContactsPage").then((module) => ({ default: module.ContactsPage })),
 );
 const DocumentDiffPage = lazy(() =>
   import("./documents/DocumentDiffPage").then((module) => ({ default: module.DocumentDiffPage })),
@@ -170,16 +171,17 @@ export function App({ api = defaultApi }: { api?: Api }) {
                         <PrivacyPage api={api} />
                       </RouteSuspense>
                     </Route>
-                    {/* The register of persons and institutions */}
-                    <Route path="/persons">
+                    {/* „Kontakte“: the persons and institutions; the old addresses lead there */}
+                    <Route path="/contacts">
                       <RouteSuspense>
-                        <PartiesPage api={api} kind="person" />
+                        <ContactsPage api={api} />
                       </RouteSuspense>
                     </Route>
+                    <Route path="/persons">
+                      <ContactsRedirect tab="persons" />
+                    </Route>
                     <Route path="/institutions">
-                      <RouteSuspense>
-                        <PartiesPage api={api} kind="institution" />
-                      </RouteSuspense>
+                      <ContactsRedirect tab="institutions" />
                     </Route>
                     {/* The Review Inbox */}
                     <Route path="/inbox">

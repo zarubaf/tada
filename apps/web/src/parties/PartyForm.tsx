@@ -7,7 +7,7 @@ import { ComboBox } from "../ui/ComboBox";
 import { firstInvalidField, useFocusAfterCommit } from "../ui/focus";
 import { Select } from "../ui/Select";
 import { TextField } from "../ui/TextField";
-import styles from "./PartiesPage.module.css";
+import styles from "./PartyRegister.module.css";
 import type { Party, PartyApi, PartyKind } from "./partyApi";
 import { useAccountSearch } from "./useAccountSearch";
 

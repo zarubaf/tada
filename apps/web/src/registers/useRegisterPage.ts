@@ -1,6 +1,6 @@
 // The state that the register pages share: the form to edit, the two live regions and the focus
 // targets.
-import { useRef, useState } from "react";
+import { type RefObject, useRef, useState } from "react";
 import { t } from "../i18n";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import type { SaveFailure } from "./saveFailure";
@@ -12,11 +12,19 @@ export type RegisterPaging = Pick<
   "retry" | "retried" | "loadMore" | "setConfirmation" | "setFailure"
 >;
 
-export function useRegisterPage<T>(reload: () => Promise<boolean>) {
+/**
+ * `pageHeading` is the `h1` of a page that places it outside the register, for example in a
+ * toolbar row; without it, the hook keeps a ref for the page to attach.
+ */
+export function useRegisterPage<T>(
+  reload: () => Promise<boolean>,
+  pageHeading?: RefObject<HTMLHeadingElement | null>,
+) {
   const [editing, setEditing] = useState<T>();
   const [failure, setFailure] = useState<string>();
   const [confirmation, setConfirmation] = useState<string>();
-  const heading = useRef<HTMLHeadingElement>(null);
+  const ownHeading = useRef<HTMLHeadingElement>(null);
+  const heading = pageHeading ?? ownHeading;
   const formHeading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   // A move to the heading never takes focus from the row that the address names.

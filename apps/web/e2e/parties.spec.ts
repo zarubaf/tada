@@ -66,8 +66,13 @@ async function fakeParties(page: Page, canChange: boolean): Promise<void> {
 }
 
 const pages = [
-  { name: "persons", path: "/persons", title: "Personen" },
-  { name: "institutions", path: "/institutions", title: "Institutionen" },
+  { name: "persons", path: "/contacts", title: "Personen", create: "Neue Person" },
+  {
+    name: "institutions",
+    path: "/contacts?tab=institutions",
+    title: "Institutionen",
+    create: "Neue Institution",
+  },
 ] as const;
 
 const roles = ["admin", "member"] as const;
@@ -84,9 +89,9 @@ for (const viewport of viewports) {
           await fakeParties(page, role === "admin");
           await page.goto(shown.path);
           await setTheme(page, theme);
-          await expect(page.getByRole("heading", { level: 1, name: shown.title })).toBeVisible();
+          await expect(page.getByRole("heading", { level: 1, name: "Kontakte" })).toBeVisible();
           await expect(page.getByRole("table", { name: shown.title })).toBeVisible();
-          await expect(page.getByRole("button", { name: "Erfassen" })).toBeVisible();
+          await expect(page.getByRole("button", { name: shown.create })).toBeVisible();
           await expect(page.getByRole("button", { name: /bearbeiten$/ })).toHaveCount(
             role === "admin" ? 2 : 0,
           );
@@ -111,8 +116,49 @@ test("at 320 px the register does not scroll sideways", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await fakeSession(page, sessionWithRole("admin"));
   await fakeParties(page, true);
-  await page.goto("/institutions");
+  await page.goto("/contacts?tab=institutions");
   await expect(page.getByRole("table", { name: "Institutionen" })).toBeVisible();
 
   expect(await textOverflows(page)).toEqual([]);
+});
+
+for (const viewport of viewports) {
+  for (const theme of themes) {
+    test(`the form of a new person, ${theme}, ${viewport.name} px: no axe violation, screenshot`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await fakeSession(page, sessionWithRole("admin"));
+      await fakeParties(page, true);
+      await page.goto("/contacts");
+      await setTheme(page, theme);
+      await page.getByRole("button", { name: "Neue Person" }).click();
+      await expect(page.getByRole("dialog", { name: "Person erfassen" })).toBeVisible();
+
+      const results = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze();
+      expect(results.violations).toEqual([]);
+
+      await fontsLoaded(page);
+      await expect(page).toHaveScreenshot(`create-person-${theme}-${viewport.name}.png`);
+    });
+  }
+}
+
+test("the tabs switch the register, and the old addresses lead to them", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeSession(page, sessionWithRole("admin"));
+  await fakeParties(page, true);
+  await page.goto("/institutions#INS-002");
+  await expect(page).toHaveURL(/\/contacts\?tab=institutions#INS-002$/);
+  await expect(page.getByRole("table", { name: "Institutionen" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Institutionen" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+
+  await page.getByRole("tab", { name: "Personen" }).click();
+  await expect(page).toHaveURL(/\/contacts$/);
+  await expect(page.getByRole("table", { name: "Personen" })).toBeVisible();
 });
