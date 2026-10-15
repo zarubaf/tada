@@ -1,7 +1,5 @@
 # Components and patterns
 
-Under change by [ADR 0082](../adr/0082-redesign-of-the-web-client.md).
-
 Screens use only the components in `apps/web/src/ui/` (ADR 0020).
 This document lists the core components and the patterns for the main screens.
 A new component needs an entry here in the same pull request.

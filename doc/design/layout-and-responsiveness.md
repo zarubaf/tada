@@ -1,8 +1,7 @@
 # Layout and responsiveness
 
-Under change by [ADR 0082](../adr/0082-redesign-of-the-web-client.md).
-
-ADR 0023 defines the strategy. This document gives the layouts, the navigation and the page templates.
+[ADR 0023](../adr/0023-responsive-layout.md) defines the strategy, and [ADR 0082](../adr/0082-redesign-of-the-web-client.md) amends it.
+This document gives the layouts, the navigation and the page templates.
 
 ## App shell
 
