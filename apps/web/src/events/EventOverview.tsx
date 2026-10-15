@@ -10,6 +10,7 @@ import { InlineError } from "../ui/InlineError";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Redacted, redactedOr } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
+import { EventMembers } from "./EventMembers";
 import styles from "./EventOverview.module.css";
 import { useEventContext } from "./eventContext";
 
@@ -179,6 +180,8 @@ export function EventOverview({ api }: { api: Api }) {
           )}
         </section>
       </section>
+
+      <EventMembers api={api} />
 
       {shown?.fact && (
         <EvidencePanel
