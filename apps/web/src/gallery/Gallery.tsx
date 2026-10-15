@@ -226,10 +226,28 @@ export function Gallery() {
           <Checkbox label="Hinweis gelesen" isSelected isDisabled onChange={() => {}} />
         </div>
         <div className={styles.row}>
-          <Switch label="MCP-Token erlauben" isSelected={false} onChange={() => {}} />
-          <Switch label="MCP-Token erlauben" isSelected onChange={() => {}} />
-          <Switch label="MCP-Token erlauben" isSelected isDisabled onChange={() => {}} />
-          <Switch label="MCP-Token erlauben" isSelected isPending onChange={() => {}} />
+          <Switch
+            label="Zugangsschlüssel für KI-Programme erlauben"
+            isSelected={false}
+            onChange={() => {}}
+          />
+          <Switch
+            label="Zugangsschlüssel für KI-Programme erlauben"
+            isSelected
+            onChange={() => {}}
+          />
+          <Switch
+            label="Zugangsschlüssel für KI-Programme erlauben"
+            isSelected
+            isDisabled
+            onChange={() => {}}
+          />
+          <Switch
+            label="Zugangsschlüssel für KI-Programme erlauben"
+            isSelected
+            isPending
+            onChange={() => {}}
+          />
         </div>
       </section>
 

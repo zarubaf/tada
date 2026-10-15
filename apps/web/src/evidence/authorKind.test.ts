@@ -3,8 +3,8 @@ import { authorKindName } from "./authorKind";
 
 describe("authorKindName", () => {
   it("names the known kinds", () => {
-    expect(authorKindName("ai")).toBe("KI-Client");
-    expect(authorKindName("service")).toBe("Dienst");
+    expect(authorKindName("ai")).toBe("KI-Programm");
+    expect(authorKindName("service")).toBe("Automatik");
   });
 
   it("falls back to a generic label for a kind that a newer server adds", () => {

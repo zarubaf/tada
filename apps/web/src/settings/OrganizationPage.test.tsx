@@ -65,7 +65,7 @@ const user = userEvent.setup({ delay: null });
 
 afterEach(() => window.history.replaceState(null, "", "/"));
 
-const mcpSwitch = () => screen.findByRole("switch", { name: /MCP-Token/ });
+const mcpSwitch = () => screen.findByRole("switch", { name: /Zugangsschlüssel für KI-Programme/ });
 
 describe("OrganizationPage", () => {
   it("lets an owner switch off MCP tokens with the version of the record", async () => {
@@ -80,7 +80,9 @@ describe("OrganizationPage", () => {
     expect(post?.body).toEqual({ enabled: false, expected_version: 2 });
     // The switch stays and keeps focus; the result goes to the live region.
     expect(document.activeElement).toBe(control);
-    expect(await screen.findByText("MCP-Token sind ausgeschaltet.")).toBeTruthy();
+    expect(
+      await screen.findByText("Zugangsschlüssel für KI-Programme sind ausgeschaltet."),
+    ).toBeTruthy();
   });
 
   it("ignores a feature that it does not know, because the list of features is open", async () => {

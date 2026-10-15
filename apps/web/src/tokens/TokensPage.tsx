@@ -58,7 +58,7 @@ function examples(origin: string) {
 }
 
 /**
- * „API-Token“ in the settings (ADR 0045, ADR 0039): the member reads the notice, confirms it,
+ * „Zugangsschlüssel“ in the settings (ADR 0045, ADR 0039): the member reads the notice, confirms it,
  * creates a token and sees its secret once. The secret lives only in the state of this page.
  * It never reaches storage, the address or a cache, and it is gone when the member leaves.
  */

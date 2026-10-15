@@ -65,11 +65,13 @@ for (const viewport of viewports) {
         await fakeTokens(page, [...state.items], state.enabled);
         await page.goto("/settings?tab=tokens");
         await setTheme(page, theme);
-        await expect(page.getByRole("heading", { level: 2, name: "API-Token" })).toBeVisible();
+        await expect(
+          page.getByRole("heading", { level: 2, name: "Zugangsschlüssel" }),
+        ).toBeVisible();
         if (state.items.length > 0) {
-          await expect(page.getByRole("table", { name: "Ihre Token" })).toBeVisible();
+          await expect(page.getByRole("table", { name: "Ihre Zugangsschlüssel" })).toBeVisible();
         } else {
-          await expect(page.getByText("Noch keine Token")).toBeVisible();
+          await expect(page.getByText("Noch keine Zugangsschlüssel")).toBeVisible();
         }
         if (state.withSecret) {
           await page.route("**/api/v1/tokens", (route) =>
@@ -86,7 +88,7 @@ for (const viewport of viewports) {
           );
           await page.getByRole("textbox", { name: /Name/ }).fill("Codex");
           await page.getByText("Ich habe den Hinweis gelesen").click();
-          await page.getByRole("button", { name: "Token erstellen" }).click();
+          await page.getByRole("button", { name: "Zugangsschlüssel erstellen" }).click();
           await expect(page.getByText("Wird nur einmal angezeigt")).toBeVisible();
         }
 
@@ -120,7 +122,9 @@ for (const viewport of viewports) {
       });
       await page.goto("/settings?tab=organization");
       await setTheme(page, theme);
-      await expect(page.getByRole("switch", { name: "MCP-Token erlauben" })).toBeChecked();
+      await expect(
+        page.getByRole("switch", { name: "Zugangsschlüssel für KI-Programme erlauben" }),
+      ).toBeChecked();
       await expect(
         page.getByRole("textbox", { name: "Text der Datenschutzerklärung" }),
       ).toBeVisible();
@@ -148,6 +152,6 @@ test("the tabs of the settings lead to the token page and the organization page"
   await page.goto("/settings?tab=tokens");
   await page.getByRole("tab", { name: "Organisation" }).click();
   await expect(page).toHaveURL(/\/settings\?tab=organization$/);
-  await page.getByRole("tab", { name: "API-Token" }).click();
+  await page.getByRole("tab", { name: "Zugangsschlüssel" }).click();
   await expect(page).toHaveURL(/\/settings\?tab=tokens$/);
 });
