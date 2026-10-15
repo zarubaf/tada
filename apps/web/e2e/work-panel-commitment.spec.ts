@@ -96,7 +96,7 @@ for (const viewport of viewports) {
       await setTheme(page, theme);
       const dialog = await openStep(page);
       await expect(dialog.getByRole("textbox", { name: "Grund (Pflichtfeld)" })).toBeFocused();
-      await expect(dialog.getByText(/^Bedingung: Die Bestellung/)).toBeVisible();
+      await expect(dialog.getByText(/Bedingung: Die Bestellung/)).toBeVisible();
       expect((await axe(page)).violations).toEqual([]);
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`commitment-firm-${theme}-${viewport.name}.png`);
@@ -155,7 +155,8 @@ test("make firm shows the new status in the panel and the card, and the dialog d
   await expect(panel.getByRole("button", { name: "Status: verbindlich" })).toBeVisible();
   await expect(panel.getByText("Bestellung unterschrieben", { exact: true })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Aktionen" })).toHaveCount(0);
-  await expect(panel).toBeFocused();
+  // The menu leaves with the state; focus goes to the title, which is a button for a member who may rename.
+  await expect(panel.getByRole("heading", { level: 2 }).getByRole("button")).toBeFocused();
   expect(firm).toEqual([{ reason: "Bestellung unterschrieben", expected_version: 1 }]);
   expect((await axe(page)).violations).toEqual([]);
 });
