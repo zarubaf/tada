@@ -2,7 +2,7 @@
   .detail {
     display: grid;
     align-content: start;
-    gap: var(--space-4);
+    gap: var(--space-3);
     min-width: 0;
   }
 
@@ -18,45 +18,53 @@
 
   .header {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-1);
   }
 
+  /* The title is the size of the title of a record panel. */
   .title {
-    font-size: var(--font-size-xl);
+    font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
-    line-height: var(--line-height-xl);
+    line-height: var(--line-height-base);
+    letter-spacing: var(--letter-spacing-tight);
     overflow-wrap: anywhere;
   }
 
   .meta {
     color: var(--color-text-muted);
     font-size: var(--font-size-sm);
+    line-height: var(--line-height-sm);
   }
 
-  /* The list is a page of its own on narrow layouts, so the detail needs a way back. */
+  /* The list is a screen of its own on narrow layouts, so the detail needs a way back. */
   .back {
     justify-self: start;
-    color: var(--color-accent-text);
-  }
-
-  .hints {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-3);
-    color: var(--color-text-muted);
+    gap: var(--space-1);
+    min-height: max(var(--size-hit-target), var(--control-height-sm));
     font-size: var(--font-size-sm);
   }
 
-  .hintItem kbd {
-    padding: 0 var(--space-1);
-    border: 1px solid currentcolor;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-family-mono);
+  /* The hints of the keys: one quiet row of key chips, wrapping only where it must. */
+  .hints {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-xs);
+  }
+
+  .hintItem {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
   }
 
   .proposals {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-3);
+    margin: 0;
     padding: 0;
     list-style: none;
   }
@@ -68,9 +76,9 @@
     z-index: var(--z-sticky);
     display: grid;
     gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2-5) var(--space-3);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     background: var(--color-bg-raised);
   }
 
@@ -79,21 +87,18 @@
     gap: var(--space-2);
   }
 
-  .redactedTitle {
-    font-size: var(--font-size-lg);
+  .redactedTitle,
+  .summaryTitle {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
-    line-height: var(--line-height-lg);
+    line-height: var(--line-height-xs);
   }
 
   .redactedList {
     margin: 0;
     padding: 0;
     list-style: none;
-  }
-
-  .summaryTitle {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
   }
 
   .summaryList {
@@ -108,7 +113,7 @@
 
   .summaryActions {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-1-5);
   }
 
   @media (width >= 40rem) {

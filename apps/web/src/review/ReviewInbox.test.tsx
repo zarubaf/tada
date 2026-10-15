@@ -498,6 +498,102 @@ describe("the page frame", () => {
   });
 });
 
+describe("the look of a proposal card", () => {
+  it("shows the current and the proposed value as label and value rows with the state as a chip", async () => {
+    renderAt(`/inbox/${CS_OLD}`);
+
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    const current = within(card).getByText("Aktuell");
+    expect(current.tagName).toBe("DT");
+    expect(current.nextElementSibling).toHaveTextContent("Flugplatz Musterhausen");
+    const proposed = within(card).getByText("Vorgeschlagen");
+    expect(proposed.tagName).toBe("DT");
+    const value = proposed.nextElementSibling as HTMLElement;
+    expect(value).toHaveTextContent("Flugplatz Testwil");
+    const chip = within(value).getByText("Vorschlag").closest("[data-variant]");
+    expect(chip).toHaveAttribute("data-variant", "proposal");
+    expect(chip?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("shows a proposed assumption with a chip for the proposal and one for the assumption", async () => {
+    const CS_ASSUMED = "0199b8e0-0000-7000-8000-000000000ca1";
+    const assumed = structuredClone(oldChangeset);
+    (assumed.proposals[0] as unknown as { operation: { state: string } }).operation.state =
+      "assumption";
+    CHANGESETS.set(CS_ASSUMED, { ...assumed, id: CS_ASSUMED });
+    renderAt(`/inbox/${CS_ASSUMED}`);
+
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    const value = within(card).getByText("Vorgeschlagen").nextElementSibling as HTMLElement;
+    expect(within(value).getByText("Vorschlag").closest("[data-variant]")).toHaveAttribute(
+      "data-variant",
+      "proposal",
+    );
+    expect(within(value).getByText("Annahme").closest("[data-variant]")).toHaveAttribute(
+      "data-variant",
+      "assumption",
+    );
+  });
+
+  it("puts the source in a list item of its own section, with the quote and its version", async () => {
+    renderAt(`/inbox/${CS_OLD}`);
+
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    const section = within(card).getByRole("region", { name: "Quelle" });
+    const [source] = within(section).getAllByRole("listitem");
+    expect(source).toHaveTextContent("Wir treffen uns auf dem Flugplatz Testwil.");
+    expect(source).toHaveTextContent(/Quellversion 0199b8e0/);
+  });
+
+  it("gives the buttons an icon besides the word", async () => {
+    renderAt(`/inbox/${CS_NEW}`);
+
+    const card = await screen.findByRole("article", { name: "Feld „Hangar“ hinzufügen" });
+    for (const name of ["Annehmen", "Ablehnen"]) {
+      const button = within(card).getByRole("button", { name });
+      expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    }
+  });
+
+  it("marks every card while a selection exists, so that the checkboxes stay in view", async () => {
+    renderAt(`/inbox/${CS_NEW}`);
+
+    const field = await screen.findByRole("article", { name: "Feld „Hangar“ hinzufügen" });
+    const question = screen.getByRole("article", { name: "Offene Frage anlegen" });
+    expect(field).not.toHaveAttribute("data-selecting");
+    await userEvent.click(
+      within(question).getByRole("checkbox", { name: "Offene Frage anlegen auswählen" }),
+    );
+    expect(field).toHaveAttribute("data-selecting");
+    expect(question).toHaveAttribute("data-selecting");
+  });
+
+  it("shows the status of a decided proposal as a chip", async () => {
+    const CS_DONE = "0199b8e0-0000-7000-8000-000000000ca2";
+    const done = structuredClone(oldChangeset);
+    (done.proposals[0] as { status: string }).status = "rejected";
+    CHANGESETS.set(CS_DONE, { ...done, id: CS_DONE });
+    renderAt(`/inbox/${CS_DONE}`);
+
+    const card = await screen.findByRole("article", { name: "Wert für „Veranstaltungsort“" });
+    expect(within(card).getByText("Abgelehnt").closest("[data-variant]")).not.toBeNull();
+  });
+
+  it("shows the hints of the keys in one row of key chips", async () => {
+    renderAt(`/inbox/${CS_NEW}`);
+
+    await screen.findByRole("article", { name: "Feld „Hangar“ hinzufügen" });
+    const row = screen.getByText("Tastenkürzel:").parentElement as HTMLElement;
+    expect([...row.querySelectorAll("kbd")].map((key) => key.textContent)).toEqual([
+      "J",
+      "K",
+      "A",
+      "E",
+      "R",
+    ]);
+  });
+});
+
 describe("the detail", () => {
   it("opens at /inbox/:changesetId with the comparison, the source and the reason", async () => {
     renderAt(`/inbox/${CS_OLD}`);

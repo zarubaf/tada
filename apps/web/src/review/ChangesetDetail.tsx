@@ -1,3 +1,4 @@
+import { IconArrowLeft, IconCheck, IconX } from "@tabler/icons-react";
 import { type KeyboardEvent, type Ref, useCallback, useEffect, useRef, useState } from "react";
 import {
   type Api,
@@ -14,6 +15,7 @@ import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { Kbd } from "../ui/Kbd";
 import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
@@ -397,6 +399,7 @@ export function ChangesetDetail({
     >
       <header className={styles.header}>
         <StandaloneLink to="/inbox" className={styles.back}>
+          <IconArrowLeft size={14} stroke={1.5} aria-hidden="true" />
           {t("inbox-back")}
         </StandaloneLink>
         <h2 ref={heading} tabIndex={-1} className={styles.title}>
@@ -415,7 +418,7 @@ export function ChangesetDetail({
             <span>{t("inbox-hints")}:</span>
             {(["j", "k", "a", "e", "r"] as const).map((key) => (
               <span key={key} className={styles.hintItem}>
-                <kbd>{key.toUpperCase()}</kbd> {t(`inbox-hint-${key}`)}
+                <Kbd>{key.toUpperCase()}</Kbd> {t(`inbox-hint-${key}`)}
               </span>
             ))}
           </p>
@@ -443,6 +446,7 @@ export function ChangesetDetail({
                   )
                   .map((other) => titleOf(other.id))}
                 selected={selected.has(proposal.id)}
+                selecting={selected.size > 0}
                 onSelect={(on) => choose(proposal.id, on)}
                 active={active?.id === proposal.id}
                 onActivate={() => setActiveId(proposal.id)}
@@ -521,13 +525,21 @@ export function ChangesetDetail({
           <div className={styles.summaryActions}>
             <Button
               variant="primary"
+              size="sm"
               isPending={busy}
               isDisabled={conflictIn(selected)}
               onPress={() => void apply(selected)}
             >
+              <IconCheck size={14} stroke={1.5} aria-hidden="true" />
               {t("inbox-summary-accept")}
             </Button>
-            <Button variant="danger" isPending={busy} onPress={() => setRejecting([...selected])}>
+            <Button
+              variant="danger"
+              size="sm"
+              isPending={busy}
+              onPress={() => setRejecting([...selected])}
+            >
+              <IconX size={14} stroke={1.5} aria-hidden="true" />
               {t("inbox-summary-reject")}
             </Button>
           </div>
