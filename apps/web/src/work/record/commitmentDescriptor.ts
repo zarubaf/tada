@@ -4,13 +4,12 @@ import {
   IconCircleDashed,
   IconHourglass,
   IconLock,
-  IconStack2,
-  IconUser,
   IconUserCheck,
 } from "@tabler/icons-react";
 import type { Commitment, CommitmentStatus, CreateCommitmentRequest } from "../../api/client";
 import type { WorkItem } from "../workItem";
 import { MakeFirmDialog } from "./commitmentDialogs";
+import { areaField, ownerField } from "./commonFields";
 import {
   type FieldSpec,
   type FieldValue,
@@ -74,17 +73,10 @@ const promisor: FieldSpec = {
   read: (item) => (record(item).promisor.redacted ? REDACTED : record(item).promisor.name),
 };
 
-const owner: FieldSpec = {
-  id: "owner",
-  labelKey: "record-field-owner",
-  icon: IconUser,
-  control: "person",
-  pointer: "owner",
-  promptKey: "record-choose-owner",
-  required: true,
-  read: (item) => asCommitment(item).owner.id,
-  save: (commands, item, value) => commands.commitment.changeOwner(target(item), value ?? ""),
-};
+const owner = ownerField(
+  (item) => asCommitment(item).owner.id,
+  (commands, item, value) => commands.commitment.changeOwner(target(item), value ?? ""),
+);
 
 const due: FieldSpec = {
   id: "due",
@@ -124,16 +116,10 @@ const firmReason: FieldSpec = {
   read: (item) => record(item).firm_reason ?? null,
 };
 
-const area: FieldSpec = {
-  id: "area",
-  labelKey: "record-field-area",
-  icon: IconStack2,
-  control: "area",
-  pointer: "workstream",
-  emptyKey: "record-no-area",
-  read: (item) => asCommitment(item).workstreamId ?? null,
-  save: (commands, item, value) => commands.commitment.changeWorkstream(target(item), value),
-};
+const area = areaField(
+  (item) => asCommitment(item).workstreamId ?? null,
+  (commands, item, value) => commands.commitment.changeWorkstream(target(item), value),
+);
 
 /** „Verbindlich machen“: the one way from conditional to firm, with the reason that the commitment keeps. */
 const makeFirm: RecordActionSpec = {
