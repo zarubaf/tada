@@ -93,3 +93,14 @@ describe("useRecordRoute", () => {
     expect(window.location.search).toBe("?view=table");
   });
 });
+
+describe("useRecordRoute, a hash that is no record", () => {
+  it("stays closed for the anchor of the skip link", () => {
+    expect(mount("/events/e1/work#main").result.current.route).toEqual({ mode: "closed" });
+  });
+
+  it("stays closed for a hash without the shape of a readable ID", () => {
+    expect(mount("/events/e1/work#ACT-").result.current.route).toEqual({ mode: "closed" });
+    expect(mount("/events/e1/work#012").result.current.route).toEqual({ mode: "closed" });
+  });
+});
