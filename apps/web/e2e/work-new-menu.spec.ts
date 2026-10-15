@@ -105,3 +105,26 @@ test("Escape in the create form returns focus to the Neu button", async ({ page 
   await expect(page.getByRole("complementary")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Neu" })).toBeFocused();
 });
+
+test("Escape in the create form returns focus to the Neu button on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await open(page);
+  await page.getByRole("button", { name: "Neu" }).click();
+  await page.getByRole("menuitem", { name: "Aufgabe" }).click();
+  await expect(page.getByRole("complementary", { name: "Neue Aufgabe" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("complementary")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Neu" })).toBeFocused();
+});
+
+test("Abbrechen in the create form returns focus to the Neu button on a phone", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await open(page);
+  await page.getByRole("button", { name: "Neu" }).click();
+  await page.getByRole("menuitem", { name: "Risiko" }).click();
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page.getByRole("complementary")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Neu" })).toBeFocused();
+});
