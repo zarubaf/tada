@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Api, RecordKind } from "../../api/client";
 import { t } from "../../i18n";
+import { Button } from "../../ui/Button";
 import { useFocusAfterCommit } from "../../ui/focus";
 import { LiveRegion } from "../../ui/LiveRegion";
 import { SidePanel } from "../../ui/SidePanel";
@@ -16,7 +17,7 @@ import { TypeIcon } from "../../ui/TypeIcon";
 import { oneLineWording } from "../decisionWording";
 import { EvidenceList } from "../EvidenceList";
 import type { Work } from "../useWork";
-import type { WorkItem } from "../workItem";
+import { kindOfReadableId, type WorkItem } from "../workItem";
 import { canCreate, canEdit, isManagersOnly, mayCreateKind } from "../workPermissions";
 import type { ChoiceSources } from "./choices";
 import type { FieldSpec, RecordDescriptor, RecordLookup } from "./descriptor";
@@ -298,6 +299,22 @@ export default function RecordPanel({
   const { readableId } = route;
   const item = work.items.find((candidate) => candidate.readableId === readableId);
   const descriptor = item && descriptorOf(item.kind);
+  const kind = kindOfReadableId(readableId);
+  if (!item && kind && work.kinds[kind].kind === "failed") {
+    // The list of its kind did not load, so the record may well exist: it is not "not found".
+    return (
+      <SidePanel title={t("record-load-failed-title")} {...frame}>
+        <div className={styles.notFound}>
+          <h2 className={styles.title}>{t("record-load-failed-title")}</h2>
+          <p>{t("work-kind-failed", { kind: t(`work-type-${kind}`) })}</p>
+          <div>
+            <Button onPress={() => void work.reloadKind(kind)}>{t("retry")}</Button>
+          </div>
+        </div>
+        {live}
+      </SidePanel>
+    );
+  }
   if (!item || !descriptor) {
     return (
       <SidePanel title={t("record-not-found-title")} {...frame}>

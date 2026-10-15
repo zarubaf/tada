@@ -13,6 +13,20 @@ export interface RecordOf {
   risk: Risk;
 }
 
+/** The prefix of the readable ID of each kind, for example `ACT` in `ACT-012`. */
+const PREFIX_KIND: Record<string, RecordKind> = {
+  ACT: "action",
+  COM: "commitment",
+  MIL: "milestone",
+  DEC: "decision",
+  RSK: "risk",
+};
+
+/** The kind that a readable ID names by its prefix, or nothing for an ID of no known kind. */
+export function kindOfReadableId(readableId: string): RecordKind | undefined {
+  return PREFIX_KIND[readableId.slice(0, readableId.indexOf("-")).toUpperCase()];
+}
+
 export interface Owner {
   id: string;
   /** The display name, empty if the directory does not know the member. */

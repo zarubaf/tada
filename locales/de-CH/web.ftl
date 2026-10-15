@@ -1362,6 +1362,7 @@ record-unknown-record = Unbekannter Eintrag
 record-sources = Quellen
 record-hints = Hinweise
 record-not-found-title = Eintrag nicht gefunden
+record-load-failed-title = Eintrag konnte nicht geladen werden
 # $id: the readable ID from the address.
 record-not-found-text = Den Eintrag { $id } gibt es in diesem Anlass nicht.
 # $version: the record version that the evidence supports.

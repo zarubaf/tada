@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Action, Commitment, Decision, Milestone, Risk } from "../api/client";
-import { toWorkItem } from "./workItem";
+import { kindOfReadableId, toWorkItem } from "./workItem";
 
 const nameOf = (id: string) => (id === "u1" ? "Anna Muster" : "");
 const base = { event_id: "e1", owner_user_id: "u1", redacted: false, version: 3, evidence: [] };
@@ -119,5 +119,20 @@ describe("toWorkItem", () => {
       title: "",
       owner: { id: "u9", name: "" },
     });
+  });
+});
+
+describe("kindOfReadableId", () => {
+  it("reads the kind from the prefix of the ID", () => {
+    expect(kindOfReadableId("ACT-012")).toBe("action");
+    expect(kindOfReadableId("com-003")).toBe("commitment");
+    expect(kindOfReadableId("MIL-001")).toBe("milestone");
+    expect(kindOfReadableId("DEC-004")).toBe("decision");
+    expect(kindOfReadableId("RSK-001")).toBe("risk");
+  });
+
+  it("knows no kind for another prefix", () => {
+    expect(kindOfReadableId("XYZ-001")).toBeUndefined();
+    expect(kindOfReadableId("main")).toBeUndefined();
   });
 });
