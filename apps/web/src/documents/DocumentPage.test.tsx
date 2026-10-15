@@ -463,7 +463,7 @@ describe("DocumentPage", () => {
     setup([version(1, "Programm.pdf", "application/pdf"), draft], { manager: true });
 
     expect(
-      await screen.findByText("Zeile 3: Zahl ausserhalb eines Fakt-Links"),
+      await screen.findByText("Zeile 3: Zahl ausserhalb eines verknüpften Werts"),
     ).toBeInTheDocument();
   });
 

@@ -38,7 +38,7 @@ privacy-template =
     - Quellentexte, zum Beispiel eingefügte E-Mails oder Notizen.
       Sie können Namen und Kontaktdaten von Dritten enthalten.
     - Ein Protokoll, wer was getan hat. Es enthält Kennungen und Rollen, keine Namen.
-    - Angaben zu API-Token: Name, Zeitpunkt der Erstellung und der letzten Nutzung.
+    - Angaben zu Zugangsschlüsseln: Name, Zeitpunkt der Erstellung und der letzten Nutzung.
     - Einstellungen für Erinnerungen: ob das Mitglied zugestimmt hat, und seine Zeitzone.
     - Erinnerungsstand: welche Aufgabe oder Zusage tada einem Mitglied gemeldet hat und was das Mitglied geantwortet hat.
     - Hinweise zu Daten, die eine Person bestreitet, mit Text, Autorin oder Autor und Zeitpunkt.
@@ -56,7 +56,7 @@ privacy-template =
 
     Ein verknüpftes Mitglied kann mit dem Befehl /vorschlag einen Wert für einen Anlass vorschlagen.
     tada speichert die ganze Nachricht als Quellentext beim Anlass.
-    Alle, die den Anlass lesen dürfen, sehen diesen Text, auch über die KI-Clients der Mitglieder.
+    Alle, die den Anlass lesen dürfen, sehen diesen Text, auch über die KI-Programme der Mitglieder.
     Die Nachricht und die Antwort des Bots, zum Beispiel mit dem Namen des Anlasses, gehen über Telegram.
 
     # Erinnerungen in Telegram
@@ -104,23 +104,23 @@ privacy-template =
     Diese Angaben enthalten keine Inhalte.
     Die Organisation hat eine monatliche Obergrenze für die Kosten.
 
-    # KI-Clients der Mitglieder
+    # KI-Programme der Mitglieder
 
-    Ein Mitglied kann ein API-Token erstellen und damit den eigenen KI-Client verbinden.
-    Der KI-Client liest über Lesewerkzeuge (MCP) alles, was das Mitglied selbst sehen darf:
+    Ein Mitglied kann einen Zugangsschlüssel erstellen und damit das eigene KI-Programm verbinden.
+    Das KI-Programm liest über Lesewerkzeuge (MCP) alles, was das Mitglied selbst sehen darf:
     Anlässe, Fakten, Quellen mit ihren Textstellen und Dokumente.
     Das können Personendaten sein.
-    Der KI-Client kann auch Vorschläge machen.
+    Das KI-Programm kann auch Vorschläge machen.
     Den Text eines solchen Vorschlags speichert tada als Quellentext.
     Der Verein verlangt einen KI-Tarif, der die Eingaben nicht zum Training nutzt.
-    Die Organisationsleitung kann API-Token ausschalten.
+    Die Organisationsleitung kann Zugangsschlüssel ausschalten.
 
     # Zitate als Quellen
 
     Ein Vorschlag oder ein Entwurf nennt zu seinem Inhalt ein Zitat aus einer Quelle.
     Das Zitat kann den ganzen Text einer Eingabe zeigen, die für die ganze Organisation gilt und nicht für einen einzelnen Anlass.
     Alle, die den Anlass lesen dürfen, sehen dann diesen Text.
-    Das gilt in der Web-Oberfläche und für die KI-Clients der Mitglieder.
+    Das gilt in der Web-Oberfläche und für die KI-Programme der Mitglieder.
 
     # Hochgeladene Dateien
 
@@ -155,19 +155,19 @@ privacy-template =
 
     Quellen sind unveränderlich und lassen sich nicht berichtigen.
     Bestreitet eine Person eine Angabe, hält die Organisationsleitung das in einem Hinweis fest.
-    Alle, die die Quelle lesen, sehen den Hinweis, auch über die KI-Clients der Mitglieder.
+    Alle, die die Quelle lesen, sehen den Hinweis, auch über die KI-Programme der Mitglieder.
     Solche Hinweise sind auch in einem abgeschlossenen Anlass möglich.
 
     Nur die Organisationsleitung darf diese Funktionen nutzen.
     Sie braucht dafür eine Anmeldung, die höchstens 15 Minuten zurückliegt.
-    KI-Clients können sie nicht nutzen.
+    KI-Programme können sie nicht nutzen.
 
     # Auskunft über eine Person
 
     Auf Anfrage exportiert die Organisationsleitung alle Daten zu einer Person als JSON-Datei.
     Dazu gehören die Erwähnungen in Texten, die Verweise und die Hinweise auf Bestreitung.
     Hat die Person ein Konto, gehören auch die Kontodaten dazu:
-    Anzeigename, E-Mail-Adresse, Rollen, Telegram-Verknüpfung, Sitzungen, API-Token mit Name und Datum, Einladungen und Einträge im Protokoll.
+    Anzeigename, E-Mail-Adresse, Rollen, Telegram-Verknüpfung, Sitzungen, Zugangsschlüssel mit Name und Datum, Einladungen und Einträge im Protokoll.
     Die Datei enthält keine Geheimnisse.
     tada findet Erwähnungen über Name, E-Mail-Adresse und Telefonnummer.
     Andere Schreibweisen findet tada nicht.
