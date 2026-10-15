@@ -64,6 +64,12 @@
     padding-inline-end: var(--space-2);
   }
 
+  .title[data-compact][data-wrap] {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: normal;
+  }
+
   /* A panel title is a step below the page title and a step above the headings of its sections. */
   .panelTitle {
     font-size: var(--font-size-xl);

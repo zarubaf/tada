@@ -31,12 +31,18 @@ export function PageTitle({
   id,
   children,
   compact,
+  wrap,
   ref,
 }: {
   /** For a section that the heading names with `aria-labelledby`. */
   id?: string;
   children: ReactNode;
   compact?: boolean;
+  /**
+   * A compact title may wrap, for a title that is a name of any length, for example of a document.
+   * It then shrinks in the row and breaks inside a long word.
+   */
+  wrap?: boolean;
   ref?: Ref<HTMLHeadingElement>;
 }) {
   return (
@@ -46,6 +52,7 @@ export function PageTitle({
       tabIndex={-1}
       className={styles.title}
       {...(compact && { "data-compact": "" })}
+      {...(compact && wrap && { "data-wrap": "" })}
     >
       {children}
     </h1>
