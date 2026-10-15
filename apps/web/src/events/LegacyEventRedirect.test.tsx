@@ -35,7 +35,7 @@ describe("LegacyEventRedirect", () => {
     ["milestones", `/events/${EVENT}/work?type=milestone`],
     ["decisions", `/events/${EVENT}/work?type=decision`],
     ["timeline", `/events/${EVENT}/work?view=timeline`],
-    ["workstreams", `/events/${EVENT}/work`],
+    ["workstreams", `/events/${EVENT}/work?manage=streams`],
     ["members", `/events/${EVENT}#mitglieder`],
   ])("sends the old page %s to its place in the new structure", (page, target) => {
     renderAt(`/events/${EVENT}/${page}`);
@@ -48,9 +48,9 @@ describe("LegacyEventRedirect", () => {
     expect(at()).toBe(`/events/${EVENT}/work?type=action#ACT-001`);
   });
 
-  it("keeps a hash on a page without a type", () => {
+  it("keeps a hash on the page of the workstreams", () => {
     renderAt(`/events/${EVENT}/workstreams#WS-002`);
-    expect(at()).toBe(`/events/${EVENT}/work#WS-002`);
+    expect(at()).toBe(`/events/${EVENT}/work?manage=streams#WS-002`);
   });
 
   it("keeps the query keys that it does not know", () => {
