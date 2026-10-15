@@ -8,6 +8,7 @@ import { SessionProvider } from "../session/SessionProvider";
 import { Shell } from "./Shell";
 import { CLIENT_BUILD_ID } from "./version";
 
+const ME = "0199b8e0-0000-7000-8000-0000000000b1";
 const first = {
   organization_id: "0199b8e0-0000-7000-8000-0000000000a1",
   name: "Fliegergruppe Testwil",
@@ -21,7 +22,7 @@ const second = {
 
 function info(memberships: unknown[], organization: unknown) {
   return {
-    user_id: "0199b8e0-0000-7000-8000-0000000000b1",
+    user_id: ME,
     display_name: "Anna Muster",
     organization,
     memberships,
@@ -61,6 +62,8 @@ let openChangesets = 0;
 let eventItems: ReturnType<typeof event>[] = [];
 /** While true, the page of the test has an h1, which the router focuses after a navigation. */
 let pageHeading = false;
+/** The event role of the signed-in member in the events that the fake server lists. */
+let eventRole = "event-contributor";
 /** The path of each request that the fake server received. */
 let requested: string[] = [];
 /** The key of the remembered event of the first organization. */
@@ -97,6 +100,18 @@ function renderShellAt(path: string, ...responses: Response[]) {
     }
     if (pathname === "/api/v1/events") {
       return json(200, { items: eventItems, next_cursor: null });
+    }
+    // What the palette reads to know which kinds the member may create in the event.
+    if (pathname === "/api/v1/members") {
+      return json(200, { items: [{ user_id: ME, display_name: "Anna Muster", role: "member" }] });
+    }
+    if (pathname.endsWith("/memberships")) {
+      return json(200, {
+        items: [{ user_id: ME, display_name: "Anna Muster", event_role: eventRole, version: 1 }],
+      });
+    }
+    if (pathname.endsWith("/workstreams")) {
+      return json(200, { items: [] });
     }
     const one = pathname.match(/^\/api\/v1\/events\/([^/]+)$/);
     if (one) {
@@ -151,6 +166,7 @@ afterEach(() => {
   versionsPending = false;
   openChangesets = 0;
   eventItems = [];
+  eventRole = "event-contributor";
   requested = [];
   pageHeading = false;
   localStorage.clear();
@@ -978,16 +994,74 @@ describe("command palette", () => {
     expect(within(palette).queryByRole("menuitem", { name: "Neue Aufgabe" })).toBeNull();
   });
 
-  it("offers a new action only inside an event and opens the create state of the work page", async () => {
-    eventItems = [open];
+  const NEW = [
+    "Neue Aufgabe",
+    "Neue Zusage",
+    "Neuer Meilenstein",
+    "Neuer Entscheid",
+    "Neues Risiko",
+  ];
+  const newItems = (palette: HTMLElement) =>
+    within(palette)
+      .queryAllByRole("menuitem")
+      .map((item) => item.textContent)
+      .filter((name): name is string => NEW.includes(name ?? ""));
+
+  async function paletteInEvent(role: string, status = "active") {
+    eventRole = role;
+    eventItems = [event(open.id, open.name, open.key, status)];
     renderShellAt(`/events/${open.id}`, json(200, info([first], first)));
     await screen.findByRole("button", { name: "Anlass wechseln: Sommerfest 2030" });
+    return openPalette();
+  }
 
-    await openPalette();
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Neue Aufgabe" }));
+  it("offers a new record of a kind that a contributor may create, and no decision", async () => {
+    const palette = await paletteInEvent("event-contributor");
+
+    await vi.waitFor(() =>
+      expect(newItems(palette)).toEqual([
+        "Neue Aufgabe",
+        "Neue Zusage",
+        "Neuer Meilenstein",
+        "Neues Risiko",
+      ]),
+    );
+  });
+
+  it("offers every kind to an event manager and opens the create state of the work page", async () => {
+    const palette = await paletteInEvent("event-manager");
+    await vi.waitFor(() => expect(newItems(palette)).toEqual(NEW));
+
+    await userEvent.click(within(palette).getByRole("menuitem", { name: "Neuer Entscheid" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}/work`));
+    expect(window.location.search).toBe("?new=decision");
+  });
+
+  it("opens the create state of an action", async () => {
+    const palette = await paletteInEvent("event-contributor");
+    await userEvent.click(await within(palette).findByRole("menuitem", { name: "Neue Aufgabe" }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}/work`));
     expect(window.location.search).toBe("?new=action");
+  });
+
+  it("offers no new record to a viewer or in a closed event", async () => {
+    const viewer = await paletteInEvent("event-viewer");
+    await vi.waitFor(() =>
+      expect(requested.some((path) => path.endsWith("/memberships"))).toBe(true),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(newItems(viewer)).toEqual([]);
+  });
+
+  it("offers no new record in a closed event, also to a manager", async () => {
+    const palette = await paletteInEvent("event-manager", "closed");
+    await vi.waitFor(() =>
+      expect(requested.some((path) => path.endsWith("/memberships"))).toBe(true),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(newItems(palette)).toEqual([]);
   });
 
   it("jumps to an event", async () => {

@@ -235,9 +235,11 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       {paletteOpen && (
         <Suspense fallback={null}>
           <CommandPalette
+            api={api}
             events={events.list}
             loadEvents={events.load}
             currentEventId={routeEventId === undefined ? undefined : currentEvent?.id}
+            eventWritable={currentEvent?.status !== "closed"}
             canCreateEvent={canCreateEvent}
             onClose={() => setPaletteOpen(false)}
           />
