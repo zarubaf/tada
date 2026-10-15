@@ -148,7 +148,7 @@ describe("PersonDataProtection", () => {
     expect(screen.queryByRole("checkbox", { name: /Beat Muster anrufen/ })).toBeNull();
     expect(screen.getByRole("link", { name: /Beat Muster anrufen/ })).toHaveAttribute(
       "href",
-      "/events/e1/actions",
+      "/events/e1/work",
     );
     // A redacted mention shows „entfernt“ and cannot be selected.
     expect(screen.getByText("entfernt")).toBeVisible();
