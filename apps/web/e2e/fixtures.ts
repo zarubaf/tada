@@ -93,6 +93,73 @@ export async function fakeEvents(page: Page, status: number, body: unknown): Pro
   );
 }
 
+// Invented members with long German names and umlauts (doc/design/principles.md).
+export const eventMemberships = [
+  {
+    user_id: sessionInfo.user_id,
+    display_name: "Anna Muster",
+    event_role: "event-manager",
+    version: 1,
+    created_at: "2028-03-01T13:12:00Z",
+  },
+  {
+    user_id: "0199b8e0-0000-7000-8000-0000000000b2",
+    display_name: "Bernhard Beispiel-Schmidlin-Äbischer",
+    event_role: "event-contributor",
+    version: 2,
+    created_at: "2028-03-02T09:00:00Z",
+  },
+];
+
+export const organizationMembers = [
+  ...eventMemberships.map(({ user_id, display_name }) => ({
+    user_id,
+    display_name,
+    role: "member",
+    version: 1,
+  })),
+  {
+    user_id: "0199b8e0-0000-7000-8000-0000000000b3",
+    display_name: "Cäcilia Probst",
+    role: "member",
+    version: 1,
+  },
+];
+
+export const forbidden = {
+  type: "https://github.com/zarubaf/tada/blob/main/doc/problems.md#forbidden",
+  code: "forbidden",
+  title: "The caller may not do this.",
+  status: 403,
+  instance: "urn:uuid:01a1118e-3359-73dd-a500-feed65806a9d",
+  request_id: "01a1118e-3359-73dd-a500-feed65806a9d",
+};
+
+/**
+ * The fake API of the members of an event: the memberships of the event (`items`, or a problem for
+ * a status of 400 and above) and the members of the organization, which the add form offers.
+ */
+export async function fakeMemberships(
+  page: Page,
+  items: unknown = eventMemberships,
+  status = 200,
+): Promise<void> {
+  await page.route("**/api/v1/events/*/memberships", (route) =>
+    route.fulfill({
+      status,
+      contentType: status < 400 ? "application/json" : "application/problem+json",
+      body: JSON.stringify(status < 400 ? { items } : items),
+    }),
+  );
+  await page.route("**/api/v1/members*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: organizationMembers }),
+    }),
+  );
+}
+
 export const unavailable = {
   type: "https://github.com/zarubaf/tada/blob/main/doc/problems.md#unavailable",
   code: "unavailable",

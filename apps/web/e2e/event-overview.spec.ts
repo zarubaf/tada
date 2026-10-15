@@ -3,6 +3,7 @@ import { expect, type Page, test } from "@playwright/test";
 import {
   events,
   fakeEvent,
+  fakeMemberships,
   fakeProfile,
   fakeSession,
   fontsLoaded,
@@ -127,6 +128,7 @@ const profile = {
 async function fakeOverview(page: Page): Promise<void> {
   await fakeSession(page);
   await fakeEvent(page, event);
+  await fakeMemberships(page);
   await fakeProfile(page, profile, fields);
   await page.route("**/api/v1/members*", (route) =>
     route.fulfill({

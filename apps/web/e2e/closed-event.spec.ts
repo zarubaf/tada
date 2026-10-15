@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import {
   events,
   fakeEvent,
+  fakeMemberships,
   fakeSession,
   fontsLoaded,
   sessionWithRole,
@@ -26,6 +27,7 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page, sessionWithRole("owner"));
       await fakeEvent(page, closed);
+      await fakeMemberships(page);
       await page.goto(`/events/${closed.id}`);
       await setTheme(page, theme);
       await expect(page.getByText("Abgeschlossen am 01.07.2030")).toBeVisible();
@@ -49,6 +51,7 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await fakeSession(page, sessionWithRole("owner"));
     await fakeEvent(page, closed);
+    await fakeMemberships(page);
     await page.goto(`/events/${closed.id}?pseudo`);
     await expect(page.getByRole("button", { name: /Wíédér/ })).toBeVisible();
 
