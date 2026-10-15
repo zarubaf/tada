@@ -42,10 +42,27 @@
   }
 
   /*
-   * The box for a selection. On a fine pointer it shows on hover, on focus within and while any
-   * proposal of the changeset is selected; it keeps its room, so nothing moves. On a touch screen
-   * it always shows (ADR 0082).
+   * The mark of a proposal and the box for a selection share one cell, as the type icon and the
+   * box of a work card do. On a fine pointer the box takes the place of the mark on hover, on
+   * focus within and while any proposal of the changeset is selected; on a touch screen the box
+   * always shows (ADR 0082). The box keeps its room, so nothing moves.
    */
+  .lead {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    min-width: var(--control-height-lg);
+  }
+
+  .mark,
+  .check {
+    grid-area: 1 / 1;
+  }
+
+  .mark {
+    color: var(--color-proposed);
+  }
+
   .check {
     display: inline-flex;
     opacity: 0;
@@ -55,9 +72,17 @@
     opacity: 1;
   }
 
+  .card:is(:hover, :focus-within, [data-selecting]) .check ~ .mark {
+    visibility: hidden;
+  }
+
   @media (pointer: coarse), (hover: none) {
     .check {
       opacity: 1;
+    }
+
+    .check ~ .mark {
+      visibility: hidden;
     }
   }
 
