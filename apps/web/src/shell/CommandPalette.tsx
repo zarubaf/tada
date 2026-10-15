@@ -2,13 +2,14 @@
 // shell, jumps to an event, starts a new record of each kind that the member may create in the
 // current event and switches the theme. It searches no records yet. This module loads on the first
 // opening, so that the first load stays small (ADR 0024).
-import { IconCalendarEvent, IconCircleHalf2, IconPlus } from "@tabler/icons-react";
+import { IconCalendarEvent, IconCircleHalf2, IconFilter, IconPlus } from "@tabler/icons-react";
 import { useEffect } from "react";
 import type { Api } from "../api/client";
 import { t } from "../i18n";
 import { useNavigate } from "../router/Router";
 import { chooseTheme, THEMES } from "../theme/theme";
 import Palette, { type CommandGroup } from "../ui/CommandPalette";
+import { manageStreamsAddress } from "../work/manageStreams";
 import { useCreatableKinds } from "../work/useCreatableKinds";
 import { NEW_EVENT } from "./EventSwitcher";
 import { ALL } from "./navItems";
@@ -18,6 +19,7 @@ const GOTO = "goto:";
 const EVENT = "event:";
 const THEME = "theme:";
 const NEW_RECORD = "new-record:";
+const MANAGE_STREAMS = "manage-streams";
 
 interface Props {
   api: Api;
@@ -67,6 +69,10 @@ export default function CommandPalette({
           label: t(`record-create-${kind}`),
           icon: IconPlus,
         })),
+        // Every member of the event reads the workstreams; the dialog offers what each may change.
+        ...(currentEventId === undefined
+          ? []
+          : [{ id: MANAGE_STREAMS, label: t("workstreams-manage-title"), icon: IconFilter }]),
         ...(canCreateEvent
           ? [{ id: NEW_EVENT, label: t("command-new-event"), icon: IconPlus }]
           : []),
@@ -101,6 +107,8 @@ export default function CommandPalette({
     } else if (id.startsWith(NEW_RECORD) && currentEventId !== undefined) {
       const kind = id.slice(NEW_RECORD.length);
       navigate(`/events/${encodeURIComponent(currentEventId)}/work?new=${kind}`);
+    } else if (id === MANAGE_STREAMS && currentEventId !== undefined) {
+      navigate(manageStreamsAddress(currentEventId));
     } else if (id === NEW_EVENT) {
       navigate("/events/new");
     }
