@@ -823,7 +823,7 @@ describe("a draft proposal", () => {
     });
     expect(within(card).getByRole("link", { name: "Dokument öffnen" })).toHaveAttribute(
       "href",
-      "/documents/0199b8e0-0000-7000-8000-0000000000d2",
+      "/events/0199b8e0-0000-7000-8000-000000000001/documents/0199b8e0-0000-7000-8000-0000000000d2",
     );
   });
 });

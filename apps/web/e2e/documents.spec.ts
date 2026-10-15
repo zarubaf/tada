@@ -223,7 +223,7 @@ for (const viewport of viewports) {
         upload(2, "Notizen neu.txt", "text/plain; charset=utf-8"),
         draft,
       ]);
-      await page.goto(`/documents/${DOCUMENT_ID}`);
+      await page.goto(`/events/${event?.id}/documents/${DOCUMENT_ID}`);
       await setTheme(page, theme);
       await expect(page.getByRole("table", { name: "Versionen" })).toBeVisible();
       await expect(page.getByText("Anna Muster").first()).toBeVisible();
@@ -321,7 +321,9 @@ for (const viewport of viewports) {
           body: JSON.stringify(diff),
         }),
       );
-      await page.goto(`/documents/${DOCUMENT_ID}/diff?from=${earlierDraft.id}&to=${draft.id}`);
+      await page.goto(
+        `/events/${event?.id}/documents/${DOCUMENT_ID}/diff?from=${earlierDraft.id}&to=${draft.id}`,
+      );
       await setTheme(page, theme);
       await expect(page.getByRole("table", { name: "Zeilen" })).toBeVisible();
       await expect(page.getByText("Veranstaltungsort: Version 1 zu Version 2")).toBeVisible();
@@ -344,13 +346,31 @@ test("a member opens the evidence of a cited fact and focus returns to it", asyn
   await page.setViewportSize({ width: 1440, height: 900 });
   await fakeSession(page);
   await fakeDocument(page, [upload(1, "Notizen.txt", "text/plain; charset=utf-8"), draft]);
-  await page.goto(`/documents/${DOCUMENT_ID}`);
+  await page.goto(`/events/${event?.id}/documents/${DOCUMENT_ID}`);
 
   const button = page.getByRole("button", { name: /Quelle zu Veranstaltungsort/ });
   await button.click();
   await expect(page.getByRole("dialog", { name: "Veranstaltungsort" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(button).toBeFocused();
+});
+
+test("a document keeps the navigation of its event, and the old address leads there", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fakeSession(page);
+  await fakeDocument(page, [upload(1, "Notizen.txt", "text/plain; charset=utf-8"), draft]);
+  await page.goto(`/documents/${DOCUMENT_ID}`);
+
+  await expect(page).toHaveURL(`/events/${event?.id}/documents/${DOCUMENT_ID}`);
+  const nav = page.getByRole("navigation").first();
+  await expect(nav.getByRole("link", { name: "Arbeit", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Zeitplan" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Dokumente" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 });
 
 // ADR 0024: German text can be 40 % longer than the source. No text may overflow its box.
@@ -368,7 +388,7 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await fakeSession(page);
     await fakeDocument(page, [upload(1, "Notizen.txt", "text/plain; charset=utf-8"), draft]);
-    await page.goto(`/documents/${DOCUMENT_ID}?pseudo`);
+    await page.goto(`/events/${event?.id}/documents/${DOCUMENT_ID}?pseudo`);
     await expect(page.getByRole("table")).toBeVisible();
     expect(await textOverflows(page)).toEqual([]);
   });

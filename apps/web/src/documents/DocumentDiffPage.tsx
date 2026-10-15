@@ -11,7 +11,7 @@ import {
 import { type ProfileState, useEventContext } from "../events/eventContext";
 import { formatLabel } from "../facts/formatValue";
 import { t } from "../i18n";
-import { useParams } from "../router/Router";
+import { Redirect, useParams, useSearch } from "../router/Router";
 import { type Column, DataTable } from "../ui/DataTable";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
@@ -22,6 +22,7 @@ import { StandaloneLink } from "../ui/StandaloneLink";
 import styles from "./DocumentDiffPage.module.css";
 import { EventMark } from "./EventMark";
 import { EventScope } from "./EventScope";
+import { documentPath } from "./versions";
 
 type State =
   | { kind: "loading" }
@@ -131,10 +132,7 @@ function DiffBody({
   return (
     <Page width="flush">
       <PageToolbar>
-        <StandaloneLink
-          to={`/documents/${encodeURIComponent(document.id)}`}
-          className={styles.back}
-        >
+        <StandaloneLink to={documentPath(document.event_id, document.id)} className={styles.back}>
           <IconArrowLeft size={14} stroke={1.5} aria-hidden="true" />
           {t("document-diff-back")}
         </StandaloneLink>
@@ -213,10 +211,11 @@ function DiffBody({
 /**
  * The comparison of two draft versions of a document (ADR 0051): the facts that they cite in
  * another version, and each line with its change. The address names the versions:
- * `/documents/:documentId/diff?from=<older version ID>&to=<newer version ID>`.
+ * `/events/:eventId/documents/:documentId/diff?from=<older version ID>&to=<newer version ID>`.
  */
 export function DocumentDiffPage({ api }: { api: Api }) {
-  const { documentId = "" } = useParams();
+  const { eventId = "", documentId = "" } = useParams();
+  const search = useSearch();
   const [state, setState] = useState<State>({ kind: "loading" });
   const latest = useRef(0);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -264,9 +263,18 @@ export function DocumentDiffPage({ api }: { api: Api }) {
     void load();
   }, [load]);
 
+  if (state.kind === "loaded" && state.document.event_id !== eventId) {
+    // The address names another event than the document belongs to.
+    const query = search.toString();
+    return (
+      <Redirect
+        to={`${documentPath(state.document.event_id, documentId)}/diff${query ? `?${query}` : ""}`}
+      />
+    );
+  }
   if (state.kind === "loaded") {
     return (
-      <EventScope api={api} eventId={state.document.event_id}>
+      <EventScope api={api}>
         <DiffBody
           document={state.document}
           versions={state.versions}

@@ -59,6 +59,8 @@ interface Options {
   manager?: boolean;
   /** The event is closed. */
   closed?: boolean;
+  /** The address to open; by default the document below its event. */
+  path?: string;
   /** The answer of the approval. */
   approve?: () => Response;
   /** The rendering of the draft fails. */
@@ -170,12 +172,16 @@ function setup(versions: DocumentVersion[], options: Options = {}) {
     throw new Error(`unexpected ${request.method} ${pathname}`);
   };
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
-  window.history.replaceState(null, "", `/documents/${DOCUMENT_ID}`);
+  window.history.replaceState(
+    null,
+    "",
+    options.path ?? `/events/${EVENT_ID}/documents/${DOCUMENT_ID}`,
+  );
   render(
     <Router>
       <SessionProvider api={api}>
         <Routes>
-          <Route path="/documents/:documentId">
+          <Route path="/events/:eventId/documents/:documentId">
             <DocumentPage api={api} />
           </Route>
         </Routes>
@@ -191,6 +197,15 @@ afterEach(() => {
 });
 
 describe("DocumentPage", () => {
+  it("moves to the event of the document when the address names another one", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf")], {
+      path: `/events/0199b8e0-0000-7000-8000-0000000000ff/documents/${DOCUMENT_ID}`,
+    });
+
+    await screen.findByRole("heading", { level: 1, name: "Programm Flugtag.pdf" });
+    expect(window.location.pathname).toBe(`/events/${EVENT_ID}/documents/${DOCUMENT_ID}`);
+  });
+
   it("lists the versions with hash prefix, uploader and a download link", async () => {
     setup([
       version(1, "Programm v1.pdf", "application/pdf"),
@@ -430,7 +445,7 @@ describe("DocumentPage", () => {
     const table = await screen.findByRole("table", { name: "Versionen" });
     expect(within(table).getByRole("link", { name: "Unterschiede zu Version 2" })).toHaveAttribute(
       "href",
-      `/documents/${DOCUMENT_ID}/diff?from=v2&to=v3`,
+      `/events/${EVENT_ID}/documents/${DOCUMENT_ID}/diff?from=v2&to=v3`,
     );
   });
 

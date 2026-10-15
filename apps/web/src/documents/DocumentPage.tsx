@@ -11,7 +11,7 @@ import { useEventContext, useEventWritable } from "../events/eventContext";
 import { loadOrganizationMembers } from "../events/eventMembers";
 import { useManagesEvent } from "../events/useManagesEvent";
 import { LOCALE, t } from "../i18n";
-import { useParams } from "../router/Router";
+import { Redirect, useParams } from "../router/Router";
 import { Button } from "../ui/Button";
 import { type Column, DataTable } from "../ui/DataTable";
 import { DisputeNotes } from "../ui/DisputeNotes";
@@ -31,7 +31,7 @@ import { EventMark } from "./EventMark";
 import { EventScope } from "./EventScope";
 import { formatSize, hashPrefix } from "./format";
 import { LintWarnings } from "./LintWarnings";
-import { diffPath, isApprovable, newestVersion, previousDraft } from "./versions";
+import { diffPath, documentPath, isApprovable, newestVersion, previousDraft } from "./versions";
 
 const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" });
 
@@ -70,7 +70,7 @@ function versionLabel(version: DocumentVersion): string {
 
 /** The page of one document: its versions, the download and the preview of the newest version. */
 export function DocumentPage({ api }: { api: Api }) {
-  const { documentId = "" } = useParams();
+  const { eventId = "", documentId = "" } = useParams();
   const [state, setState] = useState<State>({ kind: "loading" });
   // The names of the uploaders. A member list that fails to load leaves the names unknown.
   const [names, setNames] = useState<Map<string, string>>(new Map());
@@ -190,15 +190,24 @@ export function DocumentPage({ api }: { api: Api }) {
           // A draft has no file: its download answers not-found.
           <>
             <span className={styles.muted}>{t("document-draft-no-download")}</span>
-            <DiffLink documentId={documentId} versions={versionsOf(state)} version={v} />
+            <DiffLink
+              eventId={eventId}
+              documentId={documentId}
+              versions={versionsOf(state)}
+              version={v}
+            />
           </>
         ),
     },
   ];
 
+  if (state.kind === "loaded" && state.document.event_id !== eventId) {
+    // The address names another event than the document belongs to.
+    return <Redirect to={documentPath(state.document.event_id, documentId)} />;
+  }
   if (state.kind === "loaded") {
     return (
-      <EventScope api={api} eventId={state.document.event_id}>
+      <EventScope api={api}>
         <DocumentBody
           api={api}
           reload={load}
@@ -244,10 +253,12 @@ function versionsOf(state: State): DocumentVersion[] {
 
 /** The link to the difference between a draft and the draft before it. */
 function DiffLink({
+  eventId,
   documentId,
   versions,
   version,
 }: {
+  eventId: string;
   documentId: string;
   versions: DocumentVersion[];
   version: DocumentVersion;
@@ -255,7 +266,7 @@ function DiffLink({
   const previous = previousDraft(versions, version);
   return previous ? (
     <StandaloneLink
-      to={diffPath(documentId, previous, version)}
+      to={diffPath(eventId, documentId, previous, version)}
       aria-label={t("document-diff-link-to", { number: previous.number })}
     >
       {t("document-diff-link")}
