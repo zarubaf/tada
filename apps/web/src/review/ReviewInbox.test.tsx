@@ -446,6 +446,58 @@ describe("the list", () => {
   });
 });
 
+describe("the page frame", () => {
+  it("puts the heading and the count of open changesets in the toolbar row", async () => {
+    renderAt("/inbox");
+
+    const heading = await screen.findByRole("heading", { level: 1, name: "Eingang" });
+    const row = heading.closest("[data-page-toolbar]");
+    expect(row).not.toBeNull();
+    await waitFor(() => expect(row).toHaveTextContent("3 offen"));
+    expect(screen.getByRole("main")).toHaveAttribute("data-width", "flush");
+  });
+
+  it("shows no count chip when nothing waits", async () => {
+    renderAt("/inbox", fakeServer({ "GET /api/v1/changesets": () => json(200, { items: [] }) }));
+
+    const heading = await screen.findByRole("heading", { level: 1, name: "Eingang" });
+    await screen.findByText("Nichts zu prüfen");
+    expect(heading.closest("[data-page-toolbar]")).not.toHaveTextContent("offen");
+  });
+
+  it("marks a stale changeset with a chip that has an icon and the word", async () => {
+    renderAt("/inbox");
+
+    const list = await screen.findByRole("region", { name: "Offene Vorschläge" });
+    const [stale, fresh] = await within(list).findAllByRole("link");
+    const chip = within(stale as HTMLElement)
+      .getByText("Veraltet")
+      .closest("[data-variant]");
+    expect(chip).not.toBeNull();
+    expect(chip?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(within(fresh as HTMLElement).queryByText("Veraltet")).not.toBeInTheDocument();
+  });
+
+  it("shows the open proposals and the sender in a dense row", async () => {
+    renderAt("/inbox");
+
+    const list = await screen.findByRole("region", { name: "Offene Vorschläge" });
+    const links = await within(list).findAllByRole("link");
+    expect(links[0]).toHaveTextContent("1 offener Vorschlag");
+    expect(links[1]).toHaveTextContent("3 offene Vorschläge");
+    expect(links[1]).toHaveTextContent(/Von KI/);
+  });
+
+  it("marks the open changeset as the current item of the list", async () => {
+    renderAt(`/inbox/${CS_NEW}`);
+
+    const list = await screen.findByRole("region", { name: "Offene Vorschläge" });
+    const links = await within(list).findAllByRole("link");
+    expect(links[1]).toHaveAttribute("aria-current", "page");
+    expect(links[0]).not.toHaveAttribute("aria-current");
+  });
+});
+
 describe("the detail", () => {
   it("opens at /inbox/:changesetId with the comparison, the source and the reason", async () => {
     renderAt(`/inbox/${CS_OLD}`);
