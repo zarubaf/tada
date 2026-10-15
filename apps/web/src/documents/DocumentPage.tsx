@@ -391,7 +391,7 @@ function DocumentBody({
           <IconArrowLeft size={14} stroke={1.5} aria-hidden="true" />
           {t("document-back")}
         </StandaloneLink>
-        <PageTitle ref={heading} compact>
+        <PageTitle ref={heading} compact wrap>
           {document.name}
         </PageTitle>
         <span className={styles.key}>{document.readable_id}</span>

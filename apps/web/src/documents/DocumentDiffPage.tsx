@@ -138,7 +138,7 @@ function DiffBody({
           <IconArrowLeft size={14} stroke={1.5} aria-hidden="true" />
           {t("document-diff-back")}
         </StandaloneLink>
-        <PageTitle ref={heading} compact>
+        <PageTitle ref={heading} compact wrap>
           {numberOf(from) !== "" && numberOf(to) !== ""
             ? t("document-diff-title", { from: numberOf(from), to: numberOf(to) })
             : t("document-diff-title-plain")}
