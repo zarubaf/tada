@@ -1,4 +1,13 @@
-import { IconAlertTriangle, IconClockExclamation } from "@tabler/icons-react";
+import {
+  IconAlertTriangle,
+  IconCheck,
+  IconCircleCheck,
+  IconCircleX,
+  IconClockExclamation,
+  IconPencil,
+  IconUsers,
+  IconX,
+} from "@tabler/icons-react";
 import { lazy, type ReactNode, type Ref, Suspense, useId } from "react";
 import type { Api, ApplyEdit, Proposal } from "../api/client";
 import type { DraftEnvironment } from "../documents/DraftView";
@@ -7,9 +16,12 @@ import { isEditable } from "../facts/valueDraft";
 import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
+import { Chip } from "../ui/Chip";
 import { DisputeNotes } from "../ui/DisputeNotes";
+import { Kbd } from "../ui/Kbd";
 import { KnowledgeState } from "../ui/KnowledgeState";
 import { Skeleton } from "../ui/Skeleton";
+import { StatusLabel } from "../ui/StatusLabel";
 import type { Conflict } from "./conflict";
 import { EditForm } from "./EditForm";
 import { type FieldInfo, OperationDetails, operationTitle } from "./OperationView";
@@ -38,6 +50,8 @@ export interface ProposalCardProps {
   /** The titles of the selected proposals that need this one. */
   neededBy: string[];
   selected: boolean;
+  /** Some proposal of the changeset is selected: every checkbox stays in view. */
+  selecting: boolean;
   onSelect: (selected: boolean) => void;
   /** The shortcuts `A`, `E` and `R` act on the active proposal. */
   active: boolean;
@@ -84,8 +98,11 @@ export function canEdit(proposal: Proposal, fields: Map<string, FieldInfo>): boo
 }
 
 function Hint({ show, children }: { show: boolean; children: string }) {
-  return show ? <kbd className={styles.hint}>{children}</kbd> : null;
+  return show ? <Kbd>{children}</Kbd> : null;
 }
+
+/** The icon of the end state of a proposal that is no longer open. */
+const END_ICONS = { rejected: IconCircleX, withdrawn: IconCircleX } as const;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
@@ -126,161 +143,176 @@ export function ProposalCard(props: ProposalCardProps) {
       className={styles.card}
       aria-labelledby={titleId}
       data-active={(isOpen && active) || undefined}
+      data-selecting={(isOpen && props.selecting) || undefined}
       data-conflict={conflicting || undefined}
       onFocusCapture={props.onActivate}
       onClickCapture={props.onActivate}
     >
       <header className={styles.header}>
         {isOpen && (
-          <Checkbox
-            label={t("inbox-select", { title })}
-            isSelected={selected}
-            onChange={props.onSelect}
-            isDisabled={conflicting}
-            labelHidden
-          />
+          <span className={styles.check}>
+            <Checkbox
+              label={t("inbox-select", { title })}
+              isSelected={selected}
+              onChange={props.onSelect}
+              isDisabled={conflicting}
+              labelHidden
+            />
+          </span>
         )}
         <h3 id={titleId} className={styles.title}>
           {title}
         </h3>
         {proposal.status === "open" && proposal.overdue && (
-          <span className={styles.overdue}>
-            <IconClockExclamation size={16} stroke={1.5} aria-hidden="true" />
+          <StatusLabel icon={IconClockExclamation} tone="warning">
             {t("inbox-overdue")}
-          </span>
+          </StatusLabel>
         )}
-        {elsewhere && <span className={styles.status}>{t("inbox-other-review")}</span>}
+        {elsewhere && <Chip icon={IconUsers}>{t("inbox-other-review")}</Chip>}
         {proposal.status !== "open" && (
           <span className={styles.status}>
             {proposal.status === "conflict" ? (
               <KnowledgeState state="conflict" />
             ) : (
-              t(`inbox-status-${proposal.status}`)
+              <Chip
+                icon={
+                  proposal.status in END_ICONS
+                    ? END_ICONS[proposal.status as keyof typeof END_ICONS]
+                    : IconCircleCheck
+                }
+              >
+                {t(`inbox-status-${proposal.status}`)}
+              </Chip>
             )}
           </span>
         )}
       </header>
 
-      {conflict && (
-        <p id={conflictId} className={styles.conflict}>
-          <IconAlertTriangle size={16} stroke={1.5} aria-hidden="true" />
-          <span>{t(`inbox-conflict-${conflict}`)}</span>
-        </p>
-      )}
+      <div className={styles.body}>
+        {conflict && (
+          <p id={conflictId} className={styles.conflict}>
+            <IconAlertTriangle size={16} stroke={1.5} aria-hidden="true" />
+            <span>{t(`inbox-conflict-${conflict}`)}</span>
+          </p>
+        )}
 
-      <Section title={t("inbox-section-change")}>
-        <OperationDetails
-          proposal={proposal}
-          fields={fields}
-          draftEnvironment={props.draftEnvironment}
-          names={props.names}
-        />
-        <DisputeNotes notes={proposal.dispute_notes} />
-        {isOpen && duplicates.length > 0 && !props.canLink && (
-          <p className={styles.note}>{t("inbox-link-other-reviewer")}</p>
-        )}
-        {isOpen && duplicates.length > 0 && props.canLink && (
-          <fieldset className={styles.duplicates}>
-            <legend>{t("inbox-duplicates")}</legend>
-            {duplicates.map((duplicate) => (
-              <Checkbox
-                key={duplicate.id}
-                label={t("inbox-use-existing", {
-                  name: duplicate.name,
-                  id: duplicate.local_id,
-                })}
-                isSelected={props.linkedRecord === duplicate.id}
-                onChange={(on) => props.onLink(on ? duplicate.id : undefined)}
-              />
-            ))}
-          </fieldset>
-        )}
-        {needs.length > 0 && (
-          <p className={styles.note}>{t("inbox-depends-on", { titles: needs.join(", ") })}</p>
-        )}
-        {selected && neededBy.length > 0 && (
-          <p className={styles.note}>{t("inbox-needed-by", { titles: neededBy.join(", ") })}</p>
-        )}
-      </Section>
-
-      <Section title={t("inbox-section-source")}>
-        {proposal.evidence.length === 0 ? (
-          <p>{t("inbox-source-none")}</p>
-        ) : (
-          <ul className={styles.sources}>
-            {proposal.evidence.map((evidence) => (
-              <li
-                key={`${evidence.source_version_id}:${evidence.passage.start}:${evidence.passage.end}`}
-                className={styles.source}
-              >
-                <Excerpt
-                  before={evidence.excerpt.before}
-                  quote={evidence.excerpt.quote}
-                  after={evidence.excerpt.after}
-                  redacted={evidence.excerpt.redacted}
-                  notes={evidence.dispute_notes}
-                />
-                <p className={styles.note}>
-                  {t("inbox-source-version", { id: evidence.source_version_id.slice(0, 8) })}
-                  {typeof evidence.passage.page === "number" &&
-                    `, ${t("inbox-source-page", { page: evidence.passage.page })}`}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      <Section title={t("inbox-section-reason")}>
-        <p>{proposal.reason}</p>
-        {state === "assumption" && <p className={styles.note}>{t("inbox-assumption-note")}</p>}
-        {state === "unknown" && <p className={styles.note}>{t("inbox-unknown-note")}</p>}
-        {proposal.operation.kind === "set-fact" && proposal.operation.approximate && (
-          <p className={styles.note}>{t("inbox-approximate-note")}</p>
-        )}
-      </Section>
-
-      {isOpen && isEditing && isRecordOperation(proposal.operation) && (
-        <Suspense fallback={<Skeleton />}>
-          <RecordEditForm
-            api={props.api}
-            eventId={props.eventId}
-            names={props.names}
+        <Section title={t("inbox-section-change")}>
+          <OperationDetails
             proposal={proposal}
+            fields={fields}
+            draftEnvironment={props.draftEnvironment}
+            names={props.names}
+          />
+          <DisputeNotes notes={proposal.dispute_notes} />
+          {isOpen && duplicates.length > 0 && !props.canLink && (
+            <p className={styles.note}>{t("inbox-link-other-reviewer")}</p>
+          )}
+          {isOpen && duplicates.length > 0 && props.canLink && (
+            <fieldset className={styles.duplicates}>
+              <legend>{t("inbox-duplicates")}</legend>
+              {duplicates.map((duplicate) => (
+                <Checkbox
+                  key={duplicate.id}
+                  label={t("inbox-use-existing", {
+                    name: duplicate.name,
+                    id: duplicate.local_id,
+                  })}
+                  isSelected={props.linkedRecord === duplicate.id}
+                  onChange={(on) => props.onLink(on ? duplicate.id : undefined)}
+                />
+              ))}
+            </fieldset>
+          )}
+          {needs.length > 0 && (
+            <p className={styles.note}>{t("inbox-depends-on", { titles: needs.join(", ") })}</p>
+          )}
+          {selected && neededBy.length > 0 && (
+            <p className={styles.note}>{t("inbox-needed-by", { titles: neededBy.join(", ") })}</p>
+          )}
+        </Section>
+
+        <Section title={t("inbox-section-source")}>
+          {proposal.evidence.length === 0 ? (
+            <p>{t("inbox-source-none")}</p>
+          ) : (
+            <ul className={styles.sources}>
+              {proposal.evidence.map((evidence) => (
+                <li
+                  key={`${evidence.source_version_id}:${evidence.passage.start}:${evidence.passage.end}`}
+                  className={styles.source}
+                >
+                  <Excerpt
+                    before={evidence.excerpt.before}
+                    quote={evidence.excerpt.quote}
+                    after={evidence.excerpt.after}
+                    redacted={evidence.excerpt.redacted}
+                    notes={evidence.dispute_notes}
+                  />
+                  <p className={styles.note}>
+                    {t("inbox-source-version", { id: evidence.source_version_id.slice(0, 8) })}
+                    {typeof evidence.passage.page === "number" &&
+                      `, ${t("inbox-source-page", { page: evidence.passage.page })}`}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        <Section title={t("inbox-section-reason")}>
+          <p>{proposal.reason}</p>
+          {state === "assumption" && <p className={styles.note}>{t("inbox-assumption-note")}</p>}
+          {state === "unknown" && <p className={styles.note}>{t("inbox-unknown-note")}</p>}
+          {proposal.operation.kind === "set-fact" && proposal.operation.approximate && (
+            <p className={styles.note}>{t("inbox-approximate-note")}</p>
+          )}
+        </Section>
+
+        {isOpen && isEditing && isRecordOperation(proposal.operation) && (
+          <Suspense fallback={<Skeleton />}>
+            <RecordEditForm
+              api={props.api}
+              eventId={props.eventId}
+              names={props.names}
+              proposal={proposal}
+              isPending={isPending}
+              serverErrors={props.recordErrors}
+              onSubmit={props.onRecordEditSubmit}
+              onCancel={props.onEditCancel}
+            />
+          </Suspense>
+        )}
+
+        {isOpen && isEditing && field && (
+          <EditForm
+            proposal={proposal}
+            valueType={field.valueType}
             isPending={isPending}
-            serverErrors={props.recordErrors}
-            onSubmit={props.onRecordEditSubmit}
+            onSubmit={props.onEditSubmit}
             onCancel={props.onEditCancel}
           />
-        </Suspense>
-      )}
-
-      {isOpen && isEditing && field && (
-        <EditForm
-          proposal={proposal}
-          valueType={field.valueType}
-          isPending={isPending}
-          onSubmit={props.onEditSubmit}
-          onCancel={props.onEditCancel}
-        />
-      )}
+        )}
+      </div>
 
       {isOpen && (
         <div className={styles.actions}>
           <Button
             variant={props.primaryAccept ? "primary" : "secondary"}
+            size="sm"
             isPending={isPending}
             isDisabled={conflicting}
             aria-label={t("inbox-accept")}
             aria-describedby={conflicting ? conflictId : undefined}
             onPress={props.onAccept}
           >
+            <IconCheck size={14} stroke={1.5} aria-hidden="true" />
             {t("inbox-accept")}
             <Hint show={active}>A</Hint>
           </Button>
           {(isFact || isRecordOperation(proposal.operation)) && (
             <Button
               ref={props.editButtonRef}
+              size="sm"
               aria-label={t("inbox-edit")}
               isDisabled={conflicting || !canEdit(proposal, fields)}
               aria-describedby={
@@ -288,16 +320,19 @@ export function ProposalCard(props: ProposalCardProps) {
               }
               onPress={props.onEdit}
             >
+              <IconPencil size={14} stroke={1.5} aria-hidden="true" />
               {t("inbox-edit")}
               <Hint show={active}>E</Hint>
             </Button>
           )}
           <Button
             variant="danger"
+            size="sm"
             isPending={isPending}
             aria-label={t("inbox-reject")}
             onPress={props.onReject}
           >
+            <IconX size={14} stroke={1.5} aria-hidden="true" />
             {t("inbox-reject")}
             <Hint show={active}>R</Hint>
           </Button>

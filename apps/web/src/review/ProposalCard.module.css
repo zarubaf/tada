@@ -1,11 +1,14 @@
 @layer components {
+  /*
+   * The card follows the proposals card of the capture feature: a line around it, a head, a body
+   * and a foot, each with its own 10/12 px padding and a line between them. It is the container
+   * of the rows inside, which do not depend on the width of the page.
+   */
   .card {
     container-type: inline-size;
     display: grid;
-    gap: var(--space-4);
-    padding: var(--space-4);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     background: var(--color-bg-surface);
   }
 
@@ -22,30 +25,51 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-2) var(--space-3);
+    gap: var(--space-1-5) var(--space-2);
+    min-height: var(--size-toolbar);
+    box-sizing: border-box;
+    padding: var(--space-1-5) var(--space-3);
+    border-block-end: 1px solid var(--color-border-subtle);
   }
 
   .title {
     flex: 1 1 12rem;
     min-width: 0;
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-md);
     font-weight: var(--font-weight-semibold);
-    line-height: var(--line-height-lg);
+    line-height: var(--line-height-md);
     overflow-wrap: anywhere;
   }
 
-  .status {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
+  /*
+   * The box for a selection. On a fine pointer it shows on hover, on focus within and while any
+   * proposal of the changeset is selected; it keeps its room, so nothing moves. On a touch screen
+   * it always shows (ADR 0082).
+   */
+  .check {
+    display: inline-flex;
+    opacity: 0;
   }
 
-  .overdue {
+  .card:is(:hover, :focus-within, [data-selecting]) .check {
+    opacity: 1;
+  }
+
+  @media (pointer: coarse), (hover: none) {
+    .check {
+      opacity: 1;
+    }
+  }
+
+  .status {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
-    color: var(--color-warning);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
+  }
+
+  .body {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-3);
   }
 
   /* The candidates for an existing record: one choice each, below the data of the proposal. */
@@ -54,18 +78,19 @@
     gap: var(--space-2);
     min-inline-size: 0;
     margin: 0;
-    padding: var(--space-3);
+    padding: var(--space-2-5) var(--space-3);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
   }
 
   .duplicates legend {
     padding-inline: var(--space-1);
     color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
   }
 
+  /* A quiet banner in the card: the icon, then the reason. */
   .conflict {
     display: flex;
     align-items: flex-start;
@@ -86,43 +111,55 @@
     gap: var(--space-2);
   }
 
+  /* A group after the first: 8 px more than the gap, a line, then 16 px to its first line. */
+  .section + .section {
+    margin-block-start: var(--space-2);
+    padding-block-start: var(--space-4);
+    border-block-start: 1px solid var(--color-border-subtle);
+  }
+
   .sectionTitle {
     color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-xs);
   }
 
   .sources {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-2);
+    margin: 0;
     padding: 0;
     list-style: none;
   }
 
+  /* Each passage is a card with its version inside, as in the panel of a record. */
   .source {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-1-5);
+    padding: var(--space-2-5) var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .source blockquote {
+    padding: 0;
+    border-inline-start: 0;
+    background: none;
   }
 
   .note {
     color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
     overflow-wrap: anywhere;
   }
 
   /* Narrow: the actions fill the width, the primary one first and within reach of the thumb. */
   .actions {
     display: grid;
-    gap: var(--space-2);
-  }
-
-  .hint {
-    margin-inline-start: var(--space-2);
-    padding: 0 var(--space-1);
-    border: 1px solid currentcolor;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-sm);
+    gap: var(--space-1-5);
+    padding: var(--space-2-5) var(--space-3);
+    border-block-start: 1px solid var(--color-border-subtle);
   }
 
   @container (width >= 28rem) {
