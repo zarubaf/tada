@@ -162,7 +162,6 @@ command-palette-search = Befehl oder Ziel eingeben
 command-group-goto = Gehe zu
 command-group-events = Anlässe
 command-group-actions = Aktionen
-command-new-action = Neue Aufgabe
 command-new-event = Neuer Anlass
 # $count: the number of results that match the typed text.
 command-results = { $count ->
