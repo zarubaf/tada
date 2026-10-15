@@ -100,7 +100,7 @@ Sidebar, from top to bottom:
    „Arbeit“, „Zeitplan“ and „Dokumente“ appear only while the path names an event.
    „Arbeit“ opens the work page of that event. „Zeitplan“ opens the same page in the timeline view, `/events/:id/work?view=timeline`.
    „Dokumente“ opens the documents of the event, `/events/:id/documents`.
-   „Anlässe“ is the item of the event home, „Übersicht“ (`/events/:id`).
+   „Anlässe“ links to the list of events (`/events`) and is the current item on the event home, „Übersicht“ (`/events/:id`).
    On the work page „Arbeit“ is the current item and „Anlässe“ is not, and on the documents „Dokumente“ is: an item can yield paths to other items.
    In the timeline view „Zeitplan“ is the current item and „Arbeit“ is not: an item can also be current only for a value of the query (`onlyWith`, `unlessWith`).
    The bottom bar has no „Zeitplan“; on a phone the view tabs reach it.
@@ -128,7 +128,7 @@ A client-side route (`LegacyEventRedirect`) replaces the history entry, so Back 
 | `/events/:id/milestones`  | `/events/:id/work?type=milestone`  |
 | `/events/:id/decisions`   | `/events/:id/work?type=decision`   |
 | `/events/:id/timeline`    | `/events/:id/work?view=timeline`   |
-| `/events/:id/workstreams` | `/events/:id/work`                 |
+| `/events/:id/workstreams` | `/events/:id/work?manage=streams`  |
 | `/events/:id/members`     | `/events/:id#mitglieder`           |
 
 A document sits below its event: `/events/:eventId/documents/:documentId`, and its comparison of two versions at `/events/:eventId/documents/:documentId/diff`.
