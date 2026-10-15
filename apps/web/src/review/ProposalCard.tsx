@@ -5,6 +5,7 @@ import {
   IconCircleX,
   IconClockExclamation,
   IconPencil,
+  IconSquareDashed,
   IconUsers,
   IconX,
 } from "@tabler/icons-react";
@@ -149,17 +150,20 @@ export function ProposalCard(props: ProposalCardProps) {
       onClickCapture={props.onActivate}
     >
       <header className={styles.header}>
-        {isOpen && (
-          <span className={styles.check}>
-            <Checkbox
-              label={t("inbox-select", { title })}
-              isSelected={selected}
-              onChange={props.onSelect}
-              isDisabled={conflicting}
-              labelHidden
-            />
-          </span>
-        )}
+        <span className={styles.lead}>
+          {isOpen && (
+            <span className={styles.check}>
+              <Checkbox
+                label={t("inbox-select", { title })}
+                isSelected={selected}
+                onChange={props.onSelect}
+                isDisabled={conflicting}
+                labelHidden
+              />
+            </span>
+          )}
+          <IconSquareDashed className={styles.mark} size={16} stroke={1.5} aria-hidden="true" />
+        </span>
         <h3 id={titleId} className={styles.title}>
           {title}
         </h3>
