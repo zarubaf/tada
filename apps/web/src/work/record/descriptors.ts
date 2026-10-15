@@ -1,5 +1,4 @@
-// The kinds that the side panel knows. A kind joins by one row; set its row in `PANEL` of
-// `workLinks.ts` as well, so that its cards open the panel.
+// The side panel knows every kind of record: a new kind needs one row here.
 import type { RecordKind } from "../../api/client";
 import { actionDescriptor } from "./actionDescriptor";
 import { commitmentDescriptor } from "./commitmentDescriptor";
@@ -8,7 +7,7 @@ import type { RecordDescriptor } from "./descriptor";
 import { milestoneDescriptor } from "./milestoneDescriptor";
 import { riskDescriptor } from "./riskDescriptor";
 
-const DESCRIPTORS: { [K in RecordKind]?: RecordDescriptor } = {
+const DESCRIPTORS: { [K in RecordKind]: RecordDescriptor } = {
   action: actionDescriptor,
   risk: riskDescriptor,
   milestone: milestoneDescriptor,
@@ -16,7 +15,7 @@ const DESCRIPTORS: { [K in RecordKind]?: RecordDescriptor } = {
   commitment: commitmentDescriptor,
 };
 
-/** The descriptor of a kind, or nothing while the panel does not know the kind. */
-export function descriptorOf(kind: RecordKind): RecordDescriptor | undefined {
+/** The descriptor of a kind. */
+export function descriptorOf(kind: RecordKind): RecordDescriptor {
   return DESCRIPTORS[kind];
 }

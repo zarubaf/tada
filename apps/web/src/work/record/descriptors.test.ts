@@ -2,17 +2,10 @@ import { describe, expect, it } from "vitest";
 import { commitment } from "../../test/workRecords";
 import { RECORD_KINDS } from "../recordStatus";
 import { toWorkItem } from "../workItem";
-import { PANEL } from "../workLinks";
 import { descriptorOf } from "./descriptors";
 import { CREATABLE } from "./recordRoute";
 
 describe("descriptors", () => {
-  it("has a descriptor for exactly the kinds whose cards open the panel", () => {
-    for (const kind of RECORD_KINDS) {
-      expect([kind, descriptorOf(kind) !== undefined]).toEqual([kind, PANEL[kind]]);
-    }
-  });
-
   it("gives each descriptor its own kind and unique field IDs", () => {
     for (const kind of RECORD_KINDS) {
       const descriptor = descriptorOf(kind);

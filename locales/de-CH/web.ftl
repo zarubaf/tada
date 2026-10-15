@@ -1074,10 +1074,6 @@ milestone-warning-overdue = Datum überschritten
 # $id: the readable ID of an open action that is due after the milestone.
 milestone-warning-late-action = { $id } ist erst danach fällig
 milestone-warning-late-unknown = Eine Aufgabe ist erst danach fällig
-record-no-panel-title = Eintrag öffnet noch nicht hier
-# $id: the readable ID from the address.
-record-no-panel-text = Den Eintrag { $id } gibt es, aber er lässt sich noch nicht in diesem Fenster ansehen.
-record-no-panel-open = Auf der bisherigen Seite öffnen
 # $version: the record version that the evidence supports.
 milestone-evidence-version = Stützt die Version { $version } des Meilensteins
 

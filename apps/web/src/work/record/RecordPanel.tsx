@@ -12,13 +12,11 @@ import { t } from "../../i18n";
 import { useFocusAfterCommit } from "../../ui/focus";
 import { LiveRegion } from "../../ui/LiveRegion";
 import { SidePanel } from "../../ui/SidePanel";
-import { StandaloneLink } from "../../ui/StandaloneLink";
 import { TypeIcon } from "../../ui/TypeIcon";
 import { oneLineWording } from "../decisionWording";
 import { EvidenceList } from "../EvidenceList";
 import type { Work } from "../useWork";
 import type { WorkItem } from "../workItem";
-import { recordHref } from "../workLinks";
 import { canCreate, canEdit, isManagersOnly, mayCreateKind } from "../workPermissions";
 import type { ChoiceSources } from "./choices";
 import type { FieldSpec, RecordDescriptor, RecordLookup } from "./descriptor";
@@ -36,7 +34,6 @@ export interface RecordPanelProps {
   /** For the pickers that search on the server. */
   api: Api;
   work: Work;
-  eventId: string;
   route: PanelMode;
   /** The member who is signed in: the owner that a new record starts with, if they can own one. */
   me: string;
@@ -224,7 +221,6 @@ function Body({
 export default function RecordPanel({
   api,
   work,
-  eventId,
   route,
   me,
   focusTitle,
@@ -268,7 +264,7 @@ export default function RecordPanel({
     // Without the people the form cannot say who may own a record, which is not a closed event.
     const loaded = work.directory.kind === "loaded";
     const descriptor = descriptorOf(route.kind);
-    const create = descriptor?.create;
+    const create = descriptor.create;
     // A kind that only managers create (a decision) says so to a member who may create the others.
     const directory = work.directory.kind === "loaded" ? work.directory.directory : undefined;
     const mayCreate = mayCreateKind(route.kind, directory, me, writable);
@@ -279,7 +275,7 @@ export default function RecordPanel({
         : "record-create-forbidden";
     return (
       <SidePanel title={create ? t(create.titleKey) : ""} {...frame}>
-        {descriptor && create && mayCreate ? (
+        {create && mayCreate ? (
           <RecordCreate
             key={route.kind}
             descriptor={descriptor}
@@ -302,20 +298,6 @@ export default function RecordPanel({
   const { readableId } = route;
   const item = work.items.find((candidate) => candidate.readableId === readableId);
   const descriptor = item && descriptorOf(item.kind);
-  if (item && !descriptor) {
-    // The record exists, but its kind has no panel yet: send the member to the old page.
-    const href = recordHref(eventId, item);
-    return (
-      <SidePanel title={t("record-no-panel-title")} {...frame}>
-        <div className={styles.notFound}>
-          <h2 className={styles.title}>{t("record-no-panel-title")}</h2>
-          <p>{t("record-no-panel-text", { id: readableId })}</p>
-          {href && <StandaloneLink to={href}>{t("record-no-panel-open")}</StandaloneLink>}
-        </div>
-        {live}
-      </SidePanel>
-    );
-  }
   if (!item || !descriptor) {
     return (
       <SidePanel title={t("record-not-found-title")} {...frame}>

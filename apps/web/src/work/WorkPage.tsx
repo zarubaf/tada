@@ -28,7 +28,6 @@ import { useWorkToolbar } from "./WorkToolbar";
 import { WorkViews } from "./WorkViews";
 import { WorkViewTabs } from "./WorkViewTabs";
 import { countsFor, filterWork, groupByColumn, NO_FILTERS, serializeFilters } from "./workFilters";
-import { opensInPanel } from "./workLinks";
 import { creatableKinds } from "./workPermissions";
 import { useWorkSort, useWorkView } from "./workView";
 
@@ -200,7 +199,7 @@ export function WorkPage({ api }: { api: Api }) {
   const creatable = creatableKinds(writableDirectory, me, writable);
   // The record that the create state made: the panel puts focus on its title once.
   const [made, setMade] = useState<string>();
-  const around = openId === undefined ? undefined : neighbors(order.filter(opensInPanel), openId);
+  const around = openId === undefined ? undefined : neighbors(order, openId);
   // Focus goes back to the card or the row of the record, to the „Neu“ button after the create
   // form, else to the heading of the page.
   const returnFocus = () =>
@@ -340,7 +339,6 @@ export function WorkPage({ api }: { api: Api }) {
           <RecordPanel
             api={api}
             work={work}
-            eventId={eventId}
             route={
               route.mode === "create"
                 ? { mode: "create", kind: route.kind }

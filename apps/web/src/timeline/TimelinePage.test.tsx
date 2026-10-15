@@ -105,18 +105,18 @@ describe("TimelinePage", () => {
     const bar = within(timeline).getByRole("link", {
       name: "ACT-001 Gesuch einreichen, 06.05.2030 bis 10.05.2030, offen",
     });
-    expect(bar).toHaveAttribute("href", `/events/${EVENT.id}/actions#ACT-001`);
+    expect(bar).toHaveAttribute("href", `/events/${EVENT.id}/work#ACT-001`);
     const point = within(timeline).getByRole("link", {
       name: "ACT-002 Festzelt reservieren, fällig 14.05.2030, blockiert",
     });
-    expect(point).toHaveAttribute("href", `/events/${EVENT.id}/actions#ACT-002`);
+    expect(point).toHaveAttribute("href", `/events/${EVENT.id}/work#ACT-002`);
   });
 
   it("each milestone diamond is a link to the milestone", async () => {
     render();
     const timeline = await axis();
     const diamond = within(timeline).getByRole("link", { name: /MIL-001/ });
-    expect(diamond).toHaveAttribute("href", `/events/${EVENT.id}/milestones#MIL-001`);
+    expect(diamond).toHaveAttribute("href", `/events/${EVENT.id}/work#MIL-001`);
     expect(diamond).not.toHaveAttribute("tabindex", "-1");
   });
 
@@ -150,7 +150,7 @@ describe("TimelinePage", () => {
     expect(within(legend).getByText("Annahme")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "1 Aufgabe ohne Fälligkeit" })).toHaveAttribute(
       "href",
-      `/events/${EVENT.id}/actions`,
+      `/events/${EVENT.id}/work?type=action`,
     );
   });
 
@@ -270,11 +270,11 @@ describe("TimelinePage", () => {
     const list = await screen.findByRole("region", { name: "Nach Wochen" });
     expect(within(list).getByRole("link", { name: /ACT-002/ })).toHaveAttribute(
       "href",
-      `/events/${EVENT.id}/actions#ACT-002`,
+      `/events/${EVENT.id}/work#ACT-002`,
     );
     expect(within(list).getByRole("link", { name: /MIL-001/ })).toHaveAttribute(
       "href",
-      `/events/${EVENT.id}/milestones#MIL-001`,
+      `/events/${EVENT.id}/work#MIL-001`,
     );
   });
 

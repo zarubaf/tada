@@ -46,7 +46,7 @@ export function TimelineList({
               entry.kind === "action" ? (
                 <li key={entry.item.action.id} className={styles.entry}>
                   <StandaloneLink
-                    to={`${base}/actions#${entry.item.action.local_id}`}
+                    to={`${base}/work#${entry.item.action.local_id}`}
                     className={styles.entryTitle}
                     tabIndex={tabIndex}
                   >
@@ -63,7 +63,7 @@ export function TimelineList({
               ) : (
                 <li key={entry.milestone.id} className={styles.entry}>
                   <StandaloneLink
-                    to={`${base}/milestones#${entry.milestone.local_id}`}
+                    to={`${base}/work#${entry.milestone.local_id}`}
                     className={styles.entryTitle}
                     tabIndex={tabIndex}
                   >
