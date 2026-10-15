@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useRef, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { uuidv7 } from "../../api/uuid";
 import { t } from "../../i18n";
 import { Button } from "../../ui/Button";
@@ -141,6 +141,11 @@ export function RecordCreate({
   const sending = useRef(false);
   const form = useRef<HTMLFormElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
+  // The form opens on its first field, the title (the panel took focus just before, in its layout
+  // effect), so that the member can type at once.
+  useEffect(() => {
+    form.current?.querySelector<HTMLElement>("input, textarea")?.focus();
+  }, []);
   if (!create) {
     return null;
   }

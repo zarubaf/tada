@@ -1,13 +1,12 @@
-import { IconPlus } from "@tabler/icons-react";
 import type { ReactNode, RefObject } from "react";
 import type { RecordKind } from "../api/client";
 import { t } from "../i18n";
-import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
 import { TypeFilter } from "../ui/TypeFilter";
 import { TypeIcon } from "../ui/TypeIcon";
 import type { DirectoryState } from "./directory";
 import { FilterControl, useFilterOpen } from "./FilterControl";
+import { NewMenu } from "./NewMenu";
 import { RECORD_KINDS } from "./recordStatus";
 import { useSearchText } from "./WorkFilterControls";
 import styles from "./WorkToolbar.module.css";
@@ -31,18 +30,12 @@ export interface WorkToolbarProps {
   onReset: () => void;
   /** The search field that shows, for the focus after a reset. */
   searchRef: RefObject<HTMLInputElement | null>;
-  /** Opens the form of a new record. Without it the member may not create one, and there is no button. */
-  onCreate?: (() => void) | undefined;
-}
-
-/** Sized like the Filter button beside it: 44 px targets in the phone row, compact in the wide row. */
-function NewButton({ onCreate, narrow }: { onCreate: () => void; narrow: boolean }) {
-  return (
-    <Button variant="primary" size={narrow ? "md" : "sm"} onPress={onCreate}>
-      <IconPlus size={14} stroke={1.5} aria-hidden="true" />
-      {t("work-new")}
-    </Button>
-  );
+  /** The kinds that the member may create. With none there is no „Neu“ button. */
+  creatable: readonly RecordKind[];
+  /** The „Neu“ button that shows, for the focus after the create form closes. */
+  newRef: RefObject<HTMLButtonElement | null>;
+  /** Opens the form of a new record of the kind. */
+  onCreate: (kind: RecordKind) => void;
 }
 
 function typeOptions(counts: Counts | undefined) {
@@ -87,7 +80,18 @@ export interface WorkToolbarSlots {
 export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): WorkToolbarSlots {
   const field = useSearchText(props);
   const open = useFilterOpen(props.searchRef);
-  const { filters, onChange, counts, directory, me, onReset, searchRef, onCreate } = props;
+  const {
+    filters,
+    onChange,
+    counts,
+    directory,
+    me,
+    onReset,
+    searchRef,
+    creatable,
+    newRef,
+    onCreate,
+  } = props;
   const filter = (
     <FilterControl
       narrow={narrow}
@@ -118,7 +122,7 @@ export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): W
             onChange={(id) => setType(filters, onChange, id)}
           />
           {filter}
-          {onCreate && <NewButton onCreate={onCreate} narrow />}
+          <NewMenu ref={newRef} kinds={creatable} narrow onCreate={onCreate} />
         </div>
       ),
     };
@@ -138,7 +142,7 @@ export function useWorkToolbar({ narrow, title, ...props }: WorkToolbarProps): W
     end: (
       <>
         {filter}
-        {onCreate && <NewButton onCreate={onCreate} narrow={false} />}
+        <NewMenu ref={newRef} kinds={creatable} narrow={false} onCreate={onCreate} />
       </>
     ),
   };
