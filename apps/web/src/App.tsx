@@ -1,7 +1,7 @@
-import { lazy, type ReactNode } from "react";
+import { lazy } from "react";
 import { type Api, createApi } from "./api/client";
 import { EventPage } from "./events/EventPage";
-import { RegisterNav } from "./events/RegisterNav";
+import { LEGACY_EVENT_PAGES, LegacyEventRedirect } from "./events/LegacyEventRedirect";
 import { NotFoundPage } from "./NotFoundPage";
 import { InboxProvider } from "./review/InboxProvider";
 import { Route, Router, Routes } from "./router/Router";
@@ -29,37 +29,14 @@ const TokensPage = lazy(() =>
 const OrganizationPage = lazy(() =>
   import("./settings/OrganizationPage").then((module) => ({ default: module.OrganizationPage })),
 );
-// The registers of an event load on demand too: they bring the pickers of the work forms.
-const ActionsPage = lazy(() =>
-  import("./work/ActionsPage").then((module) => ({ default: module.ActionsPage })),
-);
-const CommitmentsPage = lazy(() =>
-  import("./work/CommitmentsPage").then((module) => ({ default: module.CommitmentsPage })),
-);
-const DecisionsPage = lazy(() =>
-  import("./work/DecisionsPage").then((module) => ({ default: module.DecisionsPage })),
-);
-const MilestonesPage = lazy(() =>
-  import("./work/MilestonesPage").then((module) => ({ default: module.MilestonesPage })),
-);
-// The timeline is a large screen of its own and seldom the first one.
-const TimelinePage = lazy(() =>
-  import("./timeline/TimelinePage").then((module) => ({ default: module.TimelinePage })),
-);
 // „Arbeit“ is the main screen of an event: the board and its code load on demand.
 const WorkPage = lazy(() =>
   import("./work/WorkPage").then((module) => ({ default: module.WorkPage })),
 );
-const WorkstreamsPage = lazy(() =>
-  import("./work/WorkstreamsPage").then((module) => ({ default: module.WorkstreamsPage })),
-);
-// The register of persons and institutions, the event members and the diff of two document
-// versions are seldom the first screen.
+// The register of persons and institutions and the diff of two document versions are seldom the
+// first screen.
 const PartiesPage = lazy(() =>
   import("./parties/PartiesPage").then((module) => ({ default: module.PartiesPage })),
-);
-const EventMembers = lazy(() =>
-  import("./events/EventMembers").then((module) => ({ default: module.EventMembers })),
 );
 const DocumentDiffPage = lazy(() =>
   import("./documents/DocumentDiffPage").then((module) => ({ default: module.DocumentDiffPage })),
@@ -113,19 +90,6 @@ const Gallery =
   import.meta.env.MODE === "production"
     ? null
     : lazy(() => import("./gallery/Gallery").then((module) => ({ default: module.Gallery })));
-
-/**
- * A register of an event: the second row of the event navigation stays while the register loads,
- * so that it does not jump when the member changes the register.
- */
-function RegisterPage({ api, children }: { api: Api; children: ReactNode }) {
-  return (
-    <EventPage api={api}>
-      <RegisterNav />
-      <RouteSuspense bare>{children}</RouteSuspense>
-    </EventPage>
-  );
-}
 
 export function App({ api = defaultApi }: { api?: Api }) {
   return (
@@ -187,13 +151,6 @@ export function App({ api = defaultApi }: { api?: Api }) {
                         </RouteSuspense>
                       </EventPage>
                     </Route>
-                    <Route path="/events/:eventId/members">
-                      <EventPage api={api}>
-                        <RouteSuspense bare>
-                          <EventMembers api={api} />
-                        </RouteSuspense>
-                      </EventPage>
-                    </Route>
                     <Route path="/events/:eventId/documents">
                       <EventPage api={api}>
                         <RouteSuspense bare>
@@ -206,42 +163,12 @@ export function App({ api = defaultApi }: { api?: Api }) {
                         <WorkPage api={api} />
                       </RouteSuspense>
                     </Route>
-                    <Route path="/events/:eventId/actions">
-                      <EventPage api={api}>
-                        <RouteSuspense bare>
-                          <ActionsPage api={api} />
-                        </RouteSuspense>
-                      </EventPage>
-                    </Route>
-                    <Route path="/events/:eventId/timeline">
-                      <EventPage api={api}>
-                        <RouteSuspense bare>
-                          <TimelinePage api={api} />
-                        </RouteSuspense>
-                      </EventPage>
-                    </Route>
-                    <Route path="/events/:eventId/commitments">
-                      <RegisterPage api={api}>
-                        <CommitmentsPage api={api} />
-                      </RegisterPage>
-                    </Route>
-                    <Route path="/events/:eventId/milestones">
-                      <RegisterPage api={api}>
-                        <MilestonesPage api={api} />
-                      </RegisterPage>
-                    </Route>
-                    <Route path="/events/:eventId/decisions">
-                      <RegisterPage api={api}>
-                        <DecisionsPage api={api} />
-                      </RegisterPage>
-                    </Route>
-                    <Route path="/events/:eventId/workstreams">
-                      <EventPage api={api}>
-                        <RouteSuspense bare>
-                          <WorkstreamsPage api={api} />
-                        </RouteSuspense>
-                      </EventPage>
-                    </Route>
+                    {/* The replaced pages of an event lead to their new place (ADR 0082). */}
+                    {LEGACY_EVENT_PAGES.map((page) => (
+                      <Route key={page} path={`/events/:eventId/${page}`}>
+                        <LegacyEventRedirect page={page} />
+                      </Route>
+                    ))}
                     <Route path="/documents/:documentId">
                       <RouteSuspense>
                         <DocumentPage api={api} />

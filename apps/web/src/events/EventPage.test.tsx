@@ -100,41 +100,6 @@ function renderAt(path: string, api: ReturnType<typeof createApi>) {
               <p>Platzhalter</p>
             </EventPage>
           </Route>
-          <Route path="/events/:eventId/documents">
-            <EventPage api={api}>
-              <p>Dokumentenliste</p>
-            </EventPage>
-          </Route>
-          <Route path="/documents/:documentId">
-            <EventPage api={api} eventId={event.id}>
-              <p>Dokumentseite</p>
-            </EventPage>
-          </Route>
-          <Route path="/events/:eventId/members">
-            <EventPage api={api}>
-              <p>Mitgliederliste</p>
-            </EventPage>
-          </Route>
-          <Route path="/events/:eventId/actions">
-            <EventPage api={api}>
-              <p>Aufgabenliste</p>
-            </EventPage>
-          </Route>
-          <Route path="/events/:eventId/commitments">
-            <EventPage api={api}>
-              <p>Zusagenliste</p>
-            </EventPage>
-          </Route>
-          <Route path="/events/:eventId/milestones">
-            <EventPage api={api}>
-              <p>Meilensteinliste</p>
-            </EventPage>
-          </Route>
-          <Route path="/events/:eventId/workstreams">
-            <EventPage api={api}>
-              <p>Arbeitsbereichsliste</p>
-            </EventPage>
-          </Route>
         </Routes>
       </SessionProvider>
     </Router>,
@@ -144,7 +109,7 @@ function renderAt(path: string, api: ReturnType<typeof createApi>) {
 afterEach(() => window.history.replaceState(null, "", "/"));
 
 describe("EventPage", () => {
-  it("shows the name, the sub-navigation and the content", async () => {
+  it("shows the name and the content, and has no navigation of its own", async () => {
     const { api, urls } = fakeApi(json(200, event));
     renderAt(`/events/${event.id}`, api);
 
@@ -152,44 +117,8 @@ describe("EventPage", () => {
     expect(urls[0]).toBe(`/api/v1/events/${event.id}`);
     expect(screen.getByText("FLY28")).toBeInTheDocument();
     expect(screen.getByText("Platzhalter")).toBeInTheDocument();
-
-    const nav = screen.getByRole("navigation", { name: "Anlass" });
-    expect(within(nav).getByRole("link", { name: "Übersicht" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(within(nav).getByRole("link", { name: "Mitglieder" })).not.toHaveAttribute(
-      "aria-current",
-    );
-    expect(within(nav).queryByRole("link", { name: "Personen" })).not.toBeInTheDocument();
-  });
-
-  it("shows the sub-navigation in the order of the design", async () => {
-    const { api } = fakeApi(json(200, event));
-    renderAt(`/events/${event.id}`, api);
-
-    const nav = await screen.findByRole("navigation", { name: "Anlass" });
-    expect(
-      within(nav)
-        .getAllByRole("link")
-        .map((link) => link.textContent),
-    ).toEqual([
-      "Übersicht",
-      "Aufgaben",
-      "Zeitplan",
-      "Register",
-      "Dokumente",
-      "Mitglieder",
-      "Arbeitsbereiche",
-    ]);
-    expect(within(nav).getByRole("link", { name: "Zeitplan" })).toHaveAttribute(
-      "href",
-      `/events/${event.id}/timeline`,
-    );
-    expect(within(nav).getByRole("link", { name: "Register" })).toHaveAttribute(
-      "href",
-      `/events/${event.id}/commitments`,
-    );
+    // The destinations of an event are the items of the sidebar (ADR 0082), not tabs.
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
 
   it("shows the date window of the profile in the header with its state", async () => {
@@ -222,82 +151,6 @@ describe("EventPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: event.name })).toBeInTheDocument();
     expect(screen.queryByText("Unbekannt")).not.toBeInTheDocument();
     expect(screen.getByText("Platzhalter")).toBeInTheDocument();
-  });
-
-  it("marks only Mitglieder as current on the members path", async () => {
-    const { api } = fakeApi(json(200, event));
-    renderAt(`/events/${event.id}/members`, api);
-
-    await screen.findByText("Mitgliederliste");
-    const nav = screen.getByRole("navigation", { name: "Anlass" });
-    expect(within(nav).getByRole("link", { name: "Mitglieder" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
-      "aria-current",
-    );
-  });
-
-  it.each([
-    ["the documents path", `/events/${event.id}/documents`, "Dokumentenliste"],
-    ["the path of one document", "/documents/d1", "Dokumentseite"],
-  ])("marks only Dokumente as current on %s", async (_name, path, content) => {
-    const { api } = fakeApi(json(200, event));
-    renderAt(path, api);
-
-    await screen.findByText(content);
-    const nav = screen.getByRole("navigation", { name: "Anlass" });
-    expect(within(nav).getByRole("link", { name: "Dokumente" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
-      "aria-current",
-    );
-  });
-
-  it.each([
-    ["Aufgaben", "actions", "Aufgabenliste"],
-    ["Register", "commitments", "Zusagenliste"],
-    ["Register", "milestones", "Meilensteinliste"],
-    ["Arbeitsbereiche", "workstreams", "Arbeitsbereichsliste"],
-  ])("marks only %s as current on the path %s", async (name, segment, content) => {
-    const { api } = fakeApi(json(200, event));
-    renderAt(`/events/${event.id}/${segment}`, api);
-
-    await screen.findByText(content);
-    const nav = screen.getByRole("navigation", { name: "Anlass" });
-    const current = within(nav)
-      .getAllByRole("link")
-      .filter((link) => link.getAttribute("aria-current") === "page");
-    expect(current.map((link) => link.textContent)).toEqual([name]);
-  });
-
-  it.each([
-    ["Aufgaben", "actions", "Aufgabenliste"],
-    ["Register", "commitments", "Zusagenliste"],
-    ["Arbeitsbereiche", "workstreams", "Arbeitsbereichsliste"],
-  ])("opens %s from the sub-navigation", async (name, segment, content) => {
-    const { api, urls } = fakeApi(json(200, event));
-    renderAt(`/events/${event.id}`, api);
-
-    await userEvent.click(await screen.findByRole("link", { name }));
-    expect(window.location.pathname).toBe(`/events/${event.id}/${segment}`);
-    expect(await screen.findByText(content)).toBeInTheDocument();
-    // The page stays mounted: the event is not loaded a second time.
-    expect(urls).toHaveLength(1);
-  });
-
-  it("opens the members page from the sub-navigation", async () => {
-    const { api, urls } = fakeApi(json(200, event));
-    renderAt(`/events/${event.id}`, api);
-
-    await userEvent.click(await screen.findByRole("link", { name: "Mitglieder" }));
-    expect(window.location.pathname).toBe(`/events/${event.id}/members`);
-    expect(await screen.findByText("Mitgliederliste")).toBeInTheDocument();
-    // The page stays mounted: no skeleton, and the event is not loaded a second time.
-    expect(urls).toHaveLength(1);
   });
 
   it("shows the message of a not-found problem and retries", async () => {

@@ -175,7 +175,7 @@ export function sectionTitle(pathname: string): string | undefined {
   return ALL.find((destination) => isCurrent(destination, pathname))?.label;
 }
 
-/** The ID of the event that the path names, for example `/events/<id>/actions`; not `/events/new`. */
+/** The ID of the event that the path names, for example `/events/<id>/work`; not `/events/new`. */
 export function eventIdOf(pathname: string): string | undefined {
   const id = /^\/events\/([^/]+)/.exec(pathname)?.[1];
   if (id === undefined || id === "new") {

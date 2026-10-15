@@ -205,7 +205,9 @@ async function fakeLoop(page: Page): Promise<Requests> {
       }),
     ),
   );
-  await page.route("**/api/v1/events/*/actions*", (route) => route.fulfill(json({ items: [] })));
+  for (const kind of ["actions", "milestones", "decisions", "risks"]) {
+    await page.route(`**/api/v1/events/*/${kind}*`, (route) => route.fulfill(json({ items: [] })));
+  }
   await page.route("**/api/v1/persons*", (route) => route.fulfill(json({ items: [] })));
   await page.route("**/api/v1/institutions*", (route) => route.fulfill(json({ items: [] })));
   await page.route(/\/api\/v1\/events\/[^/]+\/commitments(\?.*)?$/, (route) =>
@@ -259,23 +261,22 @@ for (const theme of themes) {
       { selected: expect.arrayContaining([P_INSTITUTION, P_COMMITMENT]), edits: [], links: [] },
     ]);
 
-    // The register shows the commitment as conditional, with its condition.
-    await page.goto(`/events/${event?.id}/commitments`);
-    const register = page.getByRole("table", { name: "Zusagen" });
-    const row = register.getByRole("row", { name: /COM-001/ });
-    await expect(row.getByText("bedingt", { exact: true })).toBeVisible();
-    await expect(row.getByText(`Bedingung: ${CONDITION}`)).toBeVisible();
+    // The panel of the commitment shows it as conditional, with its condition.
+    await page.goto(`/events/${event?.id}/work#COM-001`);
+    const panel = page.getByRole("complementary", { name: /^COM-001/ });
+    await expect(panel.getByRole("button", { name: "Status: bedingt" })).toBeVisible();
+    await expect(panel.getByText(CONDITION)).toBeVisible();
     await expectNoViolation(page);
 
     // The lead makes it firm with a reason.
-    await page.getByRole("button", { name: "COM-001 verbindlich machen" }).click();
+    await panel.getByRole("button", { name: "Aktionen" }).click();
+    await page.getByRole("menuitem", { name: "Verbindlich machen" }).click();
     const dialog = page.getByRole("dialog", { name: "COM-001 verbindlich machen" });
     await expect(dialog).toBeVisible();
     await dialog.getByRole("textbox").fill(REASON);
     await expectNoViolation(page);
     await dialog.getByRole("button", { name: "Verbindlich machen" }).click();
-    await expect(page.getByText("COM-001 ist jetzt verbindlich.")).toBeVisible();
-    await expect(row.getByText("verbindlich", { exact: true })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Status: verbindlich" })).toBeVisible();
     expect(requests.firms).toEqual([{ reason: REASON, expected_version: 1 }]);
 
     // My Work shows the commitment.

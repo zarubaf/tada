@@ -27,11 +27,6 @@
     max-width: 40rem;
   }
 
-  .dialogForm {
-    display: grid;
-    gap: var(--space-3);
-  }
-
   /* The primary action is full width in a narrow form and on the right in a wide one (ADR 0019). */
   .actions {
     display: grid;
@@ -45,49 +40,6 @@
     }
   }
 
-  .rowActions {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  /*
-   * The condition and the reason of a commitment sit under its text. The link to the successor and
-   * the reason of a revoked decision sit under its status.
-   */
-  .condition,
-  .statusNote {
-    display: block;
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-  }
-
-  /* The warnings of a milestone sit under its title; the icon carries the tone, the text wraps. */
-  .warnings {
-    display: grid;
-    gap: var(--space-0-5);
-    margin-top: var(--space-0-5);
-    list-style: none;
-    padding: 0;
-    font-size: var(--font-size-sm);
-  }
-
-  .warning {
-    display: flex;
-    align-items: start;
-    gap: var(--space-1);
-  }
-
-  .warningIcon {
-    flex: none;
-    margin-top: var(--space-0-5);
-    color: var(--color-warning);
-  }
-
-  .fixedLabel {
-    color: var(--color-text-muted);
-  }
-
   .evidenceList {
     display: grid;
     gap: var(--space-4);
@@ -98,40 +50,5 @@
   .meta {
     color: var(--color-text-muted);
     font-size: var(--font-size-sm);
-  }
-
-  /* The wording of a decision keeps its line breaks and wraps inside the cell. */
-  .wording {
-    display: block;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
-  .parties {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .partyList {
-    display: grid;
-    gap: var(--space-1);
-    list-style: none;
-    padding: 0;
-  }
-
-  .party {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    overflow-wrap: anywhere;
-  }
-
-  /* The link to the successor of a decision: the link color and an underline. */
-  .recordLink {
-    white-space: nowrap;
-    color: var(--color-accent-text);
-    text-decoration: underline;
-    text-underline-offset: var(--space-0-5);
   }
 }

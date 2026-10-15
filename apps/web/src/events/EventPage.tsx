@@ -4,7 +4,6 @@ import { formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
 import { useParams } from "../router/Router";
 import { KnowledgeState } from "../ui/KnowledgeState";
-import { NavLink, SubNav } from "../ui/NavLink";
 import { Page, PageTitle } from "../ui/Page";
 import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
@@ -12,14 +11,14 @@ import { CloseEvent } from "./CloseEvent";
 import { EventLoadError } from "./EventLoadError";
 import styles from "./EventPage.module.css";
 import { EventContext, type ProfileState, useEventProfile } from "./eventContext";
-import { registerPaths } from "./RegisterNav";
 import { useEventState } from "./useEventState";
 
 /**
- * The page of one event: the header with the name, the sub-navigation and the sub-page in
+ * The page of one event: the header with the name, the control to close it and the page in
  * `children`. It owns the route `/events/:eventId`. The header shows the key, the name and the date
- * window of the event with its state of knowledge. The sub-pages read the event and its profile
- * through `useEventContext`.
+ * window of the event with its state of knowledge. The destinations of an event are the items of
+ * the sidebar (ADR 0082), so the page has no navigation of its own. The pages read the event and
+ * its profile through `useEventContext`.
  */
 export function EventPage({
   api,
@@ -45,8 +44,6 @@ export function EventPage({
     [state, profile, reloadProfile],
   );
 
-  const base = `/events/${encodeURIComponent(eventId)}`;
-  const registers = registerPaths(base);
   return (
     <Page>
       {state.kind === "loading" && (
@@ -72,21 +69,6 @@ export function EventPage({
             onChanged={(event) => setState({ kind: "loaded", event })}
             onStale={() => void load()}
           />
-          <SubNav label={t("event-nav")}>
-            <NavLink to={base} exact>
-              {t("event-nav-overview")}
-            </NavLink>
-            <NavLink to={`${base}/actions`}>{t("event-nav-actions")}</NavLink>
-            <NavLink to={`${base}/timeline`}>{t("event-nav-timeline")}</NavLink>
-            <NavLink to={registers[0]} alsoCurrentOn={registers}>
-              {t("event-nav-registers")}
-            </NavLink>
-            <NavLink to={`${base}/documents`} within="/documents">
-              {t("event-nav-documents")}
-            </NavLink>
-            <NavLink to={`${base}/members`}>{t("event-nav-members")}</NavLink>
-            <NavLink to={`${base}/workstreams`}>{t("event-nav-workstreams")}</NavLink>
-          </SubNav>
           {children}
         </EventContext>
       )}
