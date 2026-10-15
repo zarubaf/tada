@@ -104,6 +104,10 @@ for (const viewport of viewports) {
       const panel = page.getByRole("complementary", { name: "Neue Zusage" });
       await expect(panel.getByRole("textbox", { name: /^Zusage/ })).toBeVisible();
       await expect(panel.getByRole("combobox", { name: /^Zugesagt von/ })).toBeVisible();
+      // The sheet slides in and hides the page behind it as it arrives: measure when it has stopped.
+      await expect
+        .poll(async () => (await panel.boundingBox())?.x)
+        .toBe(narrow ? 0 : viewport.width - 480);
       expect((await axe(page)).violations).toEqual([]);
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`commitment-create-${theme}-${viewport.name}.png`);
