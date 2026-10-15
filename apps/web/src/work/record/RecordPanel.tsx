@@ -281,6 +281,7 @@ export default function RecordPanel({
       <SidePanel title={create ? t(create.titleKey) : ""} {...frame}>
         {descriptor && create && mayCreate ? (
           <RecordCreate
+            key={route.kind}
             descriptor={descriptor}
             commands={work.commands}
             sources={sourcesOf(work, api)}
