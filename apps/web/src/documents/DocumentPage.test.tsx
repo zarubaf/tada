@@ -205,11 +205,14 @@ describe("DocumentPage", () => {
     expect(
       within(table).getByRole("link", { name: "Programm v2.pdf herunterladen, Version 2" }),
     ).toHaveAttribute("href", "/api/v1/document-versions/v2/content");
-    const heading = screen.getByRole("heading", { level: 2, name: "Programm Flugtag.pdf" });
+    const heading = screen.getByRole("heading", { level: 1, name: "Programm Flugtag.pdf" });
     await waitFor(() => expect(heading).toHaveFocus());
-    // The event header stays around the document, and a link leads back to its documents.
-    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Zurück zu den Dokumenten" })).toBeInTheDocument();
+    // The heading sits in the toolbar row with the way back, the ID and the event.
+    const row = heading.closest("[data-page-toolbar]") as HTMLElement;
+    expect(within(row).getByRole("link", { name: "Zurück zu den Dokumenten" })).toBeInTheDocument();
+    expect(within(row).getByText("DOC-001")).toBeInTheDocument();
+    expect(within(row).getByText("FLY28")).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("data-width", "flush");
   });
 
   it("shows entfernt without a download for a redacted version and the note of another", async () => {
@@ -235,7 +238,7 @@ describe("DocumentPage", () => {
     expect(retry.closest("[role=alert]")).not.toHaveFocus();
     await userEvent.click(retry);
 
-    const heading = await screen.findByRole("heading", { level: 2, name: "Programm Flugtag.pdf" });
+    const heading = await screen.findByRole("heading", { level: 1, name: "Programm Flugtag.pdf" });
     await waitFor(() => expect(heading).toHaveFocus());
   });
 
@@ -264,7 +267,11 @@ describe("DocumentPage", () => {
     setup([version(1, "Programm.pdf", "application/pdf"), draft]);
 
     const table = await screen.findByRole("table", { name: "Versionen" });
-    expect(within(table).getByText("Entwurf (in Prüfung)")).toBeInTheDocument();
+    // Each state is a chip with an icon and a word.
+    for (const word of ["Entwurf", "in Prüfung"]) {
+      const chip = within(table).getByText(word).closest("[data-variant]");
+      expect(chip?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    }
     expect(within(table).getAllByRole("link")).toHaveLength(1);
   });
 
@@ -392,7 +399,7 @@ describe("DocumentPage", () => {
     });
     // The button left with the approval: focus goes to the heading of the document.
     await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 2, name: "Programm Flugtag.pdf" })).toHaveFocus(),
+      expect(screen.getByRole("heading", { level: 1, name: "Programm Flugtag.pdf" })).toHaveFocus(),
     );
   });
 
@@ -430,8 +437,11 @@ describe("DocumentPage", () => {
   it("puts the headings of a draft below the heading of the preview", async () => {
     setup([version(1, "Programm.pdf", "application/pdf"), draft]);
 
-    // h2 document, h3 preview: the `#` of the draft is h4.
-    expect(await screen.findByRole("heading", { level: 4, name: "Konzept" })).toBeInTheDocument();
+    // h1 document, h2 preview: the `#` of the draft is h3.
+    expect(await screen.findByRole("heading", { level: 3, name: "Konzept" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Vorschau der neuesten Version" }),
+    ).toBeVisible();
   });
 
   it("shows the lint warnings of the draft next to it, before an approval", async () => {
@@ -440,6 +450,15 @@ describe("DocumentPage", () => {
     expect(
       await screen.findByText("Zeile 3: Zahl ausserhalb eines Fakt-Links"),
     ).toBeInTheDocument();
+  });
+
+  it("shows the lint warnings as a quiet banner with an icon", async () => {
+    setup([version(1, "Programm.pdf", "application/pdf"), draft]);
+
+    const title = await screen.findByText("1 Hinweis der Prüfung");
+    const banner = title.closest("[role=note]") as HTMLElement;
+    expect(banner).not.toBeNull();
+    expect(banner.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
   it.each([
@@ -473,7 +492,7 @@ describe("DocumentPage", () => {
     );
     expect(reads.length).toBeGreaterThanOrEqual(2);
     await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 2, name: "Programm Flugtag.pdf" })).toHaveFocus(),
+      expect(screen.getByRole("heading", { level: 1, name: "Programm Flugtag.pdf" })).toHaveFocus(),
     );
   });
 });

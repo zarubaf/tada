@@ -1,7 +1,7 @@
 @layer components {
   .draft {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .note {
@@ -36,13 +36,16 @@
   }
 
   .heading {
-    font-size: var(--font-size-md);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-xs);
   }
 
   .list {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-2);
+    margin: 0;
     padding-inline-start: var(--space-6);
     list-style: decimal;
   }
