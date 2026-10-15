@@ -12,7 +12,7 @@ import styles from "./Work.module.css";
  * „Verbindlich machen“: a blocking task with a required reason. The commitment keeps the reason
  * (ADR 0068). The condition text stays as it is.
  */
-export function MakeFirmDialog({
+export function LegacyMakeFirmDialog({
   api,
   eventId,
   commitment,
