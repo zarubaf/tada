@@ -400,7 +400,7 @@ describe("the list", () => {
   it("shows the open changesets, oldest first, with the stale mark and the event", async () => {
     renderAt("/inbox");
 
-    const list = await screen.findByRole("region", { name: "Offene Änderungen" });
+    const list = await screen.findByRole("region", { name: "Offene Vorschläge" });
     const links = await within(list).findAllByRole("link");
     expect(links).toHaveLength(3);
     expect(links[0]).toHaveTextContent("FLY28 Fly-in Musterhausen");
@@ -417,7 +417,7 @@ describe("the list", () => {
       }),
     );
 
-    const list = await screen.findByRole("region", { name: "Offene Änderungen" });
+    const list = await screen.findByRole("region", { name: "Offene Vorschläge" });
     const links = await within(list).findAllByRole("link");
     await waitFor(() => expect(links[0]).toHaveTextContent("FLY28 Fly-in Musterhausen"));
   });
@@ -807,7 +807,7 @@ describe("the keyboard", () => {
     await userEvent.keyboard("j");
 
     await waitFor(() => expect(window.location.pathname).toBe(`/inbox/${CS_NEW}`));
-    const list = screen.getByRole("region", { name: "Offene Änderungen" });
+    const list = screen.getByRole("region", { name: "Offene Vorschläge" });
     await waitFor(() => expect(within(list).getAllByRole("link")[1]).toHaveFocus());
 
     await userEvent.keyboard("k");
@@ -1188,7 +1188,7 @@ describe("edit of a work record", () => {
     await userEvent.type(title, "Notstrom bestellen");
     await userEvent.click(within(card).getByRole("button", { name: /Verantwortlich/ }));
     await userEvent.click(await screen.findByRole("option", { name: "Bernd Beispiel" }));
-    await userEvent.click(within(card).getByRole("button", { name: /Arbeitsbereich/ }));
+    await userEvent.click(within(card).getByRole("button", { name: /Bereich/ }));
     await userEvent.click(await screen.findByRole("option", { name: "Bodenbetrieb" }));
     await submitEdit(card);
 
@@ -1398,7 +1398,7 @@ describe("a new workstream", () => {
     renderAt(`/inbox/${CS_STREAM}`, editServer());
 
     const card = await screen.findByRole("article", {
-      name: "Arbeitsbereich „Festwirtschaft“ anlegen",
+      name: "Bereich „Festwirtschaft“ anlegen",
     });
     expect(within(card).getByText("Festwirtschaft")).toBeInTheDocument();
     expect(await within(card).findByText("Bernd Beispiel")).toBeInTheDocument();
@@ -1424,7 +1424,7 @@ describe("a new workstream", () => {
     const server = renderAt(`/inbox/${CS_STREAM}`, editServer());
 
     const card = await openEdit("Aufgabe „Getränke bestellen“ anlegen");
-    expect(within(card).getByRole("button", { name: /Arbeitsbereich/ })).toHaveTextContent(
+    expect(within(card).getByRole("button", { name: /Bereich/ })).toHaveTextContent(
       "Festwirtschaft",
     );
     const title = within(card).getByRole("textbox", { name: "Titel" });

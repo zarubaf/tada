@@ -279,7 +279,7 @@ describe("EventOverview", () => {
   it("opens the evidence of a value and returns focus to the button on Escape", async () => {
     setup();
 
-    const button = await screen.findByRole("button", { name: "Beleg zu Ort" });
+    const button = await screen.findByRole("button", { name: "Quelle zu Ort" });
     await userEvent.click(button);
     const dialog = await screen.findByRole("dialog", { name: "Ort" });
     expect(within(dialog).getByText("erfasst am 03.10.2026, 14:12")).toBeVisible();

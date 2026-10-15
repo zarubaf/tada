@@ -298,7 +298,7 @@ It has no drag.
   If the type filter names only such kinds, the view says „Diese Ansicht zeigt Aufgaben und Meilensteine.“ and offers „Filter zurücksetzen“.
 - The event window comes from the facts of the event.
   The view loads them when it opens, and it shows a skeleton until they are there, so that no empty state flashes.
-- One lane for each workstream, and one lane „ohne Arbeitsbereich“.
+- One lane for each workstream, and one lane „ohne Bereich“.
 - An action with a start date and a due date is a bar.
   An action with only a due date is a point.
   Actions without a due date appear as a count with a link to the action register.

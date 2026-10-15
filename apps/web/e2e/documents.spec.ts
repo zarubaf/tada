@@ -226,7 +226,7 @@ for (const viewport of viewports) {
       await expect(page.getByRole("table", { name: "Versionen" })).toBeVisible();
       await expect(page.getByText("Anna Muster").first()).toBeVisible();
       // The newest version is the draft: the preview renders it, and the manager can approve it.
-      await expect(page.getByRole("button", { name: /Beleg zu Veranstaltungsort/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Quelle zu Veranstaltungsort/ })).toBeVisible();
       await expect(page.getByText("entfernt")).toBeVisible();
       await expect(page.getByText("Fakten geändert")).toBeVisible();
       await expect(page.getByRole("button", { name: "Version freigeben" })).toBeVisible();
@@ -342,7 +342,7 @@ test("a member opens the evidence of a cited fact and focus returns to it", asyn
   await fakeDocument(page, [upload(1, "Notizen.txt", "text/plain; charset=utf-8"), draft]);
   await page.goto(`/documents/${DOCUMENT_ID}`);
 
-  const button = page.getByRole("button", { name: /Beleg zu Veranstaltungsort/ });
+  const button = page.getByRole("button", { name: /Quelle zu Veranstaltungsort/ });
   await button.click();
   await expect(page.getByRole("dialog", { name: "Veranstaltungsort" })).toBeVisible();
   await page.keyboard.press("Escape");

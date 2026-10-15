@@ -35,6 +35,6 @@ mention-kind-proposal = Vorschlag
 mention-kind-open-question = Offene Frage
 mention-kind-action = Aufgabe
 mention-kind-commitment = Zusage
-mention-kind-workstream = Arbeitsbereich
+mention-kind-workstream = Bereich
 mention-kind-promisor = Zusagende Partei
 person-data-dispute-redacted = Dieser Eintrag ist schon entfernt.
