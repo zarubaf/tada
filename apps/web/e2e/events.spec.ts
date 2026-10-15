@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import {
+  axeBuilder,
   events,
   fakeEvents,
   fakeSession,
@@ -33,9 +33,7 @@ for (const viewport of viewports) {
         // The skeleton is a labelled status; the live regions have no label.
         await expect(page.locator("[role=status][aria-label]")).toHaveCount(0);
 
-        const results = await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-          .analyze();
+        const results = await axeBuilder(page).analyze();
         expect(results.violations).toEqual([]);
       });
     }
@@ -56,9 +54,7 @@ for (const viewport of viewports) {
       await expect(page.getByRole("button", { name: /Organisation/ })).toBeVisible();
       await expect(page.getByRole("table")).toBeVisible();
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
     });
 

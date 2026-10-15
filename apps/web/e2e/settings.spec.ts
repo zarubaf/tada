@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import {
+  axeBuilder,
   fakeReminders,
   fakeSession,
   sessionWithRole,
@@ -58,9 +58,7 @@ for (const viewport of viewports) {
       );
       expect(overflow).toBeLessThanOrEqual(0);
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
     });
   }

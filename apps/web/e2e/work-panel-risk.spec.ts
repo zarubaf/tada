@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { fontsLoaded, setTheme, themes, viewports } from "./fixtures";
+import { axeBuilder, fontsLoaded, setTheme, themes, viewports } from "./fixtures";
 import { event, fakeWork, risks } from "./workFixtures";
 
 // The risk in the side panel of the „Arbeit“ page (ADR 0082, 0081). The unit tests hold the rules;
@@ -8,8 +7,7 @@ import { event, fakeWork, risks } from "./workFixtures";
 // on the card, the level select, the create state, and the screenshots.
 const work = `/events/${event?.id}/work`;
 
-const axe = (page: Page) =>
-  new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+const axe = (page: Page, openPopover = false) => axeBuilder(page, { openPopover }).analyze();
 
 // RSK-001 with everything the panel can show: the rating, the texts, the next statuses and a source.
 const panelRisks = risks.map((risk: Record<string, unknown>) =>
@@ -85,7 +83,7 @@ for (const viewport of viewports) {
       await panel.getByRole("button", { name: "Wirkung: hoch" }).click();
       const list = page.getByRole("listbox", { name: "Wirkung" });
       await expect(list.getByRole("option")).toHaveText(["niedrig", "mittel", "hoch"]);
-      expect((await axe(page)).violations).toEqual([]);
+      expect((await axe(page, true)).violations).toEqual([]);
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`panel-risk-level-${theme}-${viewport.name}.png`);
     });

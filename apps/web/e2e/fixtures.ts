@@ -1,4 +1,21 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page } from "@playwright/test";
+
+/**
+ * The rule sets of every axe check: the WCAG 2.2 AA rules and the best-practice rules, which hold
+ * the landmarks, the heading order and the single `h1` of a page.
+ */
+const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"];
+
+/**
+ * The axe builder of every check. `openPopover` is for a check while a popover is open: its content
+ * is a portal outside the landmarks by design, and a popup needs no landmark (WAI-ARIA), so the
+ * `region` rule is a known false positive there. It stays on for every other check.
+ */
+export function axeBuilder(page: Page, { openPopover = false } = {}): AxeBuilder {
+  const builder = new AxeBuilder({ page }).withTags(AXE_TAGS);
+  return openPopover ? builder.disableRules(["region"]) : builder;
+}
 
 /** Invented events with long German names and umlauts (doc/design/principles.md). */
 export const events = [

@@ -1,6 +1,13 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { fakeSession, fontsLoaded, setTheme, textOverflows, themes, viewports } from "./fixtures";
+import {
+  axeBuilder,
+  fakeSession,
+  fontsLoaded,
+  setTheme,
+  textOverflows,
+  themes,
+  viewports,
+} from "./fixtures";
 
 // An invented Telegram account with a long name and umlauts (doc/design/principles.md).
 const requests = [
@@ -73,9 +80,7 @@ for (const viewport of viewports) {
           await expect(page.getByText("K7M3-QX92")).toBeVisible();
         }
 
-        const results = await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-          .analyze();
+        const results = await axeBuilder(page).analyze();
         expect(results.violations).toEqual([]);
 
         await fontsLoaded(page);
@@ -139,9 +144,7 @@ for (const theme of themes) {
     await page.getByRole("button", { name: /Bernhard.* bestätigen/ }).click();
     await expect(page.getByRole("alertdialog")).toBeVisible();
 
-    const results = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-      .analyze();
+    const results = await axeBuilder(page).analyze();
     expect(results.violations).toEqual([]);
   });
 }

@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { fontsLoaded, setTheme, themes, viewports } from "./fixtures";
+import { axeBuilder, fontsLoaded, setTheme, themes, viewports } from "./fixtures";
 import { commitments, event, fakeWork, fulfill } from "./workFixtures";
 
 // A commitment in the side panel (ADR 0082): the text, the properties, „Verbindlich machen“ with its
@@ -12,11 +11,7 @@ const work = `/events/${event?.id}/work`;
 // React Aria speaks through a hidden element after a choice (an option, a menu). While it speaks, the
 // element is a role=img that names itself by text that is gone a moment later; it is the library's
 // own and no part of the page, so the check leaves it out.
-const axe = (page: Page) =>
-  new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .exclude("[data-live-announcer]")
-    .analyze();
+const axe = (page: Page) => axeBuilder(page).exclude("[data-live-announcer]").analyze();
 
 // COM-001 with everything the panel can show: a condition, the next statuses and a source.
 const commitment = {
