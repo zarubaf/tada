@@ -15,7 +15,7 @@ import { CommitmentForm } from "./CommitmentForm";
 import { DirectoryGate } from "./DirectoryGate";
 import { type Directory, useDirectory } from "./directory";
 import { EvidenceSheet } from "./EvidenceSheet";
-import { MakeFirmDialog } from "./MakeFirmDialog";
+import { LegacyMakeFirmDialog } from "./LegacyMakeFirmDialog";
 import styles from "./Work.module.css";
 import { CommitmentStatusLabel } from "./WorkStatus";
 
@@ -182,7 +182,7 @@ function Commitments({ api, directory }: { api: Api; directory: Directory }) {
         </section>
       )}
       {firming && (
-        <MakeFirmDialog
+        <LegacyMakeFirmDialog
           api={api}
           eventId={event.id}
           commitment={firming}
