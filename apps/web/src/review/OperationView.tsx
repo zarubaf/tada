@@ -1,6 +1,7 @@
 // How the Review Inbox shows the operation of a proposal: a title and the change itself. A value
 // goes through `formatValue`, so that the inbox and the event overview read the same (ADR 0049).
 
+import { IconArrowRight } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import type {
   ActionStatus,
@@ -16,8 +17,9 @@ import { type DraftEnvironment, ProposalDraft } from "../documents/DraftView";
 import { LintWarnings } from "../documents/LintWarnings";
 import { formatDate, formatLabel, formatValue } from "../facts/formatValue";
 import { t } from "../i18n";
+import { Chip, type ChipVariant } from "../ui/Chip";
 import { DisputeNotes } from "../ui/DisputeNotes";
-import { KnowledgeState } from "../ui/KnowledgeState";
+import { KnowledgeState, type KnowledgeStateName } from "../ui/KnowledgeState";
 import { Redacted } from "../ui/Redacted";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import { STATUSES } from "../work/recordStatus";
@@ -370,7 +372,30 @@ function WorkRows({ operation, names }: { operation: Operation; names: RecordNam
   }
 }
 
-/** The comparison of a fact: the current state and the proposed state side by side. */
+/**
+ * A value with its state of knowledge. A proposal, an assumption and an unknown value show their
+ * chip after the value; an accepted or disputed value keeps the mark of `KnowledgeState`.
+ */
+function StateValue({ state, children }: { state: KnowledgeStateName; children?: ReactNode }) {
+  const variant = CHIP_OF_STATE[state];
+  if (!variant) {
+    return <KnowledgeState state={state}>{children}</KnowledgeState>;
+  }
+  return (
+    <>
+      {children !== undefined && <span className={styles.valueText}>{children}</span>}
+      <Chip variant={variant} />
+    </>
+  );
+}
+
+const CHIP_OF_STATE: Partial<Record<KnowledgeStateName, Exclude<ChipVariant, "date">>> = {
+  proposed: "proposal",
+  assumption: "assumption",
+  unknown: "unknown",
+};
+
+/** The comparison of a fact: the current state and the proposed state as two rows. */
 function FactComparison({
   proposal,
   operation,
@@ -382,33 +407,37 @@ function FactComparison({
 }) {
   const { current } = proposal;
   return (
-    <dl className={styles.comparison}>
-      <div className={styles.side}>
+    <dl className={styles.rows}>
+      <div className={styles.row}>
         <dt>{t("inbox-current")}</dt>
         <dd>
           {current ? (
             <>
-              <KnowledgeState state={current.state}>
+              <StateValue state={current.state}>
                 {current.state === "unknown" ? undefined : current.redacted ? (
                   <Redacted />
                 ) : (
                   formatValue(current, valueType)
                 )}
-              </KnowledgeState>
+              </StateValue>
               <DisputeNotes notes={current.dispute_notes} />
             </>
           ) : (
-            <KnowledgeState state="unknown" />
+            <StateValue state="unknown" />
           )}
         </dd>
       </div>
-      <div className={styles.side}>
+      <div className={styles.row}>
         <dt>{t("inbox-proposed")}</dt>
-        <dd className={styles.proposed}>
-          <KnowledgeState state="proposed">
-            {operation.state === "unknown" ? undefined : formatValue(operation, valueType)}
-          </KnowledgeState>
-          {operation.state !== "accepted" && <KnowledgeState state={operation.state} />}
+        <dd>
+          <IconArrowRight className={styles.arrow} size={14} stroke={1.5} aria-hidden="true" />
+          {operation.state !== "unknown" && (
+            <span className={styles.valueText}>{formatValue(operation, valueType)}</span>
+          )}
+          <Chip variant="proposal" />
+          {operation.state !== "accepted" && (
+            <Chip variant={operation.state === "assumption" ? "assumption" : "unknown"} />
+          )}
         </dd>
       </div>
     </dl>

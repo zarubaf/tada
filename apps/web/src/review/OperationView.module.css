@@ -1,59 +1,55 @@
 @layer components {
+  /*
+   * Label and value in two columns, as in the record panel: the label column is the same for every
+   * operation, so that the values start at one x. A row is as high as a control, and a long
+   * value wraps and grows downward.
+   */
   .rows {
     display: grid;
-    gap: var(--space-2);
+    margin: 0;
   }
 
   .row {
     display: grid;
-    gap: var(--space-1);
+    grid-template-columns: 7.25rem minmax(0, 1fr);
+    column-gap: var(--space-2);
+    align-items: start;
   }
 
   .row dt,
-  .side dt {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-  }
-
-  .row dd,
-  .side dd {
+  .row dd {
+    display: flex;
+    align-items: center;
+    min-height: var(--control-height-md);
     margin: 0;
     overflow-wrap: anywhere;
   }
 
-  .comparison {
-    display: grid;
-    gap: var(--space-3);
+  .row dt {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    hyphens: auto;
   }
 
-  .side {
-    display: grid;
-    gap: var(--space-1);
+  .row dd {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
     min-width: 0;
   }
 
-  .proposed {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-1) var(--space-3);
+  .valueText {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .arrow {
+    flex: none;
+    color: var(--color-text-muted);
   }
 
   .draft {
     display: grid;
     gap: var(--space-2);
-  }
-
-  /* The comparison reads left to right where the container is wide enough. */
-  @container (width >= 28rem) {
-    .comparison {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .row {
-      grid-template-columns: 10rem minmax(0, 1fr);
-      gap: var(--space-3);
-    }
   }
 
   /* The wording of a decision keeps its line breaks. */
