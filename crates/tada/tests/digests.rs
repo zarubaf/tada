@@ -310,8 +310,11 @@ async fn sent_digest_has_the_items_their_buttons_and_records_the_notice() {
     assert_eq!(
         urls(&sent[0]),
         vec![
-            format!("{}/events/{event}/actions", support::PUBLIC_URL),
-            format!("{}/events/{event}/commitments", support::PUBLIC_URL),
+            format!("{}/events/{event}/work?type=action", support::PUBLIC_URL),
+            format!(
+                "{}/events/{event}/work?type=commitment",
+                support::PUBLIC_URL
+            ),
         ]
     );
     let mut expected = vec![(action, 1), (commitment, 1)];
