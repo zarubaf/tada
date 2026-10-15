@@ -29,7 +29,14 @@ export function NewMenu({ kinds, narrow, onCreate, ref }: NewMenuProps) {
   }
   if (kinds.length === 1) {
     return (
-      <Button ref={ref} variant="primary" size={size} onPress={() => onCreate(only)}>
+      // The name says what it creates, and it contains the visible „Neu“.
+      <Button
+        ref={ref}
+        variant="primary"
+        size={size}
+        aria-label={t(`record-create-${only}`)}
+        onPress={() => onCreate(only)}
+      >
         <IconPlus size={14} stroke={1.5} aria-hidden="true" />
         {t("work-new")}
       </Button>
