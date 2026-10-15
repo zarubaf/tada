@@ -82,13 +82,13 @@ impl PublicUrl {
         format!("{}/", self.origin)
     }
 
-    /// The web page of the actions or the commitments of `event`, where a member finds the record.
+    /// The „Arbeit“ page of `event`, filtered to the kind of the record, where a member finds it.
     pub fn work_page(&self, event: EventId, kind: RecordKind) -> String {
-        let register = match kind {
-            RecordKind::Action => "actions",
-            RecordKind::Commitment => "commitments",
+        let kind = match kind {
+            RecordKind::Action => "action",
+            RecordKind::Commitment => "commitment",
         };
-        format!("{}/events/{event}/{register}", self.origin)
+        format!("{}/events/{event}/work?type={kind}", self.origin)
     }
 
     /// The token goes into the fragment, so that the browser never sends it in a GET request
@@ -154,11 +154,11 @@ mod tests {
         assert_eq!(url.my_work(), "https://tada.example.org/");
         assert_eq!(
             url.work_page(event, RecordKind::Commitment),
-            "https://tada.example.org/events/00000000-0000-0000-0000-000000000000/commitments"
+            "https://tada.example.org/events/00000000-0000-0000-0000-000000000000/work?type=commitment"
         );
         assert_eq!(
             url.work_page(event, RecordKind::Action),
-            "https://tada.example.org/events/00000000-0000-0000-0000-000000000000/actions"
+            "https://tada.example.org/events/00000000-0000-0000-0000-000000000000/work?type=action"
         );
     }
 
