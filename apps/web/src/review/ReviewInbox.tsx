@@ -4,11 +4,13 @@ import type { Api, OpenChangeset } from "../api/client";
 import { formatDateTime } from "../facts/formatValue";
 import { t } from "../i18n";
 import { Link, useNavigate, useParams } from "../router/Router";
+import { Chip } from "../ui/Chip";
 import { EmptyState } from "../ui/EmptyState";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { Page, PageTitle } from "../ui/Page";
+import { PageToolbar } from "../ui/PageToolbar";
 import { Skeleton } from "../ui/Skeleton";
 import { authorName } from "./authorName";
 import { ChangesetDetail } from "./ChangesetDetail";
@@ -29,22 +31,23 @@ function ListItem({
   return (
     <li ref={itemRef}>
       <Link to={`/inbox/${encodeURIComponent(item.id)}`} className={styles.item}>
-        <span className={styles.itemTitle}>{scopes.title(item.event_id)}</span>
-        <span className={styles.itemMeta}>
-          {t("inbox-open-proposals", { count: item.open_proposals })}
+        <span className={styles.itemHead}>
+          <span className={styles.itemTitle}>{scopes.title(item.event_id)}</span>
+          {item.stale && (
+            <span className={styles.stale} title={t("inbox-stale-hint")}>
+              <Chip icon={IconClockExclamation}>{t("inbox-stale")}</Chip>
+            </span>
+          )}
         </span>
         <span className={styles.itemMeta}>
-          {t("inbox-proposed-by", { author: authorName(item.author) })},{" "}
-          <time dateTime={item.created_at}>
-            {formatDateTime(item.created_at, scopes.timeZone(item.event_id))}
-          </time>
-        </span>
-        {item.stale && (
-          <span className={styles.stale} title={t("inbox-stale-hint")}>
-            <IconClockExclamation size={16} stroke={1.5} aria-hidden="true" />
-            {t("inbox-stale")}
+          <span>{t("inbox-open-proposals", { count: item.open_proposals })}</span>
+          <span>
+            {t("inbox-proposed-by", { author: authorName(item.author) })},{" "}
+            <time dateTime={item.created_at}>
+              {formatDateTime(item.created_at, scopes.timeZone(item.event_id))}
+            </time>
           </span>
-        )}
+        </span>
       </Link>
     </li>
   );
@@ -101,32 +104,41 @@ export function ReviewInbox({ api }: { api: Api }) {
   };
 
   return (
-    <Page>
+    <Page width="flush">
       {/* The keys work where focus is inside the page; no shortcut is global (WCAG 2.1.4). */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: the handler only reads shortcut keys */}
       <div className={styles.page} onKeyDown={onKeyDown}>
-        <PageTitle ref={heading}>{t("inbox-title")}</PageTitle>
+        <PageToolbar>
+          <PageTitle ref={heading} compact>
+            {t("inbox-title")}
+          </PageTitle>
+          {items.length > 0 && <Chip>{t("nav-inbox-count", { count: items.length })}</Chip>}
+        </PageToolbar>
 
         <div className={styles.frame}>
           <div className={styles.layout} data-detail={changesetId === undefined ? undefined : ""}>
             <section ref={listPane} className={styles.list} aria-label={t("inbox-list-label")}>
               {state.kind === "loading" && (
-                <div className={styles.skeleton} role="status" aria-label={t("inbox-loading")}>
+                <div className={styles.state} role="status" aria-label={t("inbox-loading")}>
                   <Skeleton />
                   <Skeleton />
                   <Skeleton />
                 </div>
               )}
               {state.kind === "failed" && (
-                <InlineError
-                  message={state.message}
-                  requestId={state.requestId}
-                  announce={retried ? "focus" : "alert"}
-                  onRetry={() => retry(reload)}
-                />
+                <div className={styles.state}>
+                  <InlineError
+                    message={state.message}
+                    requestId={state.requestId}
+                    announce={retried ? "focus" : "alert"}
+                    onRetry={() => retry(reload)}
+                  />
+                </div>
               )}
               {state.kind === "loaded" && items.length === 0 && (
-                <EmptyState title={t("inbox-empty-title")} text={t("inbox-empty-text")} />
+                <div className={styles.state}>
+                  <EmptyState title={t("inbox-empty-title")} text={t("inbox-empty-text")} />
+                </div>
               )}
               {items.length > 0 && (
                 <ul className={styles.items}>
