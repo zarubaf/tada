@@ -182,6 +182,7 @@ A descriptor (`RecordDescriptor`) gives each kind its fields and the commands th
 - A click on a row opens the record in a sheet on medium and wide layouts, and as a page on narrow layouts.
 - Bulk actions appear in the toolbar only when rows are selected.
 - A filter that hides rows shows the count of hidden rows and a "Filter zurücksetzen" action.
+- A register of the organization („Personen“ and „Institutionen“ on „Kontakte“) creates in a `TaskDialog` that „Neu“ opens, and changes in a form below its table.
 - The registers of an event share this pattern: „Zusagen“, „Meilensteine“, „Entscheide“, „Risiken“, „Anforderungen“ and the actions.
   Each shows the status actions of its record in the sheet.
 - „Meilensteine“ show the count of open actions and the two warnings (a late action, a past date).
