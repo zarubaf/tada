@@ -10,16 +10,24 @@ import styles from "./LinkButton.module.css";
 export function LinkButton({
   to,
   primary,
+  compact,
   children,
 }: {
   to: string;
   primary?: boolean;
+  /** The compact size of a toolbar row, like `size="sm"` of `Button`. */
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
     <Link
       to={to}
-      className={[buttonStyles.button, styles.link, primary && styles.primary]
+      className={[
+        buttonStyles.button,
+        styles.link,
+        primary && styles.primary,
+        compact && styles.compact,
+      ]
         .filter(Boolean)
         .join(" ")}
     >

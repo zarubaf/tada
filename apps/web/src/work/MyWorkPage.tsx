@@ -1,4 +1,3 @@
-import { IconClockExclamation } from "@tabler/icons-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type Api,
@@ -7,20 +6,25 @@ import {
   type MyWork,
   problemMessage,
 } from "../api/client";
-import { isOverdue, todayLocal } from "../facts/dueDate";
-import { formatDate } from "../facts/formatValue";
+import { todayLocal } from "../facts/dueDate";
 import { t } from "../i18n";
+import { Link } from "../router/Router";
+import { Chip } from "../ui/Chip";
 import { type Column, DataTable } from "../ui/DataTable";
 import { EmptyState } from "../ui/EmptyState";
 import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
+import { LinkButton } from "../ui/LinkButton";
 import { Page, PageTitle } from "../ui/Page";
+import { PageToolbar } from "../ui/PageToolbar";
+import { RecordId } from "../ui/RecordId";
 import { redactedOr } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
-import { StandaloneLink } from "../ui/StandaloneLink";
-import { StatusLabel } from "../ui/StatusLabel";
 import styles from "./MyWorkPage.module.css";
+import { columnOf } from "./recordStatus";
 import { ActionStatusLabel, CommitmentStatusLabel } from "./WorkStatus";
+import tableStyles from "./WorkTable.module.css";
+import { mayBeOverdue } from "./workItem";
 import { recordHref } from "./workLinks";
 
 type State =
@@ -28,28 +32,49 @@ type State =
   | { kind: "failed"; message: string; requestId: string | undefined }
   | { kind: "loaded"; work: MyWork };
 
-/** The full reference of a record, for example `FLY28/ACT-042`, linked to its panel. */
-function Reference({ row }: { row: { event_id: string; event_key: string; local_id: string } }) {
+interface Reference {
+  event_id: string;
+  event_key: string;
+  local_id: string;
+}
+
+/** The reference of a record, for example `FLY28/ACT-042`: the key of the event, then the ID. */
+function Reference({ row }: { row: Reference }) {
+  return <RecordId>{`${row.event_key}/${row.local_id}`}</RecordId>;
+}
+
+/** The title of a row is the link to the record in the panel of „Arbeit“ of its event. */
+function TitleLink({ row, children }: { row: Reference; children: string }) {
   return (
-    <StandaloneLink
+    <Link
       to={recordHref(row.event_id, { readableId: row.local_id })}
-    >{`${row.event_key}/${row.local_id}`}</StandaloneLink>
+      className={tableStyles.link}
+      title={children}
+    >
+      {children}
+    </Link>
   );
 }
 
-function DueDate({ date, today }: { date: string | null | undefined; today: string }) {
-  if (!date) {
-    return null;
-  }
+/** The due date; a finished record is never overdue. */
+function DueDate({
+  date,
+  today,
+  overdue,
+}: {
+  date: string | null | undefined;
+  today: string;
+  overdue: boolean;
+}) {
+  return date ? <Chip variant="date" date={date} today={today} overdue={overdue} /> : null;
+}
+
+/** The heading of a section with the number of its rows. */
+function SectionHeading({ id, title, count }: { id: string; title: string; count: number }) {
   return (
-    <>
-      <time dateTime={date}>{formatDate(date)}</time>
-      {isOverdue(date, today) && (
-        <StatusLabel icon={IconClockExclamation} tone="danger">
-          {t("overdue")}
-        </StatusLabel>
-      )}
-    </>
+    <h2 id={id} className={styles.heading}>
+      {title} <span className={styles.count}>{count}</span>
+    </h2>
   );
 }
 
@@ -83,56 +108,81 @@ export function MyWorkPage({ api }: { api: Api }) {
 
   const today = todayLocal();
   const actionColumns: Column<MyAction>[] = [
+    { id: "id", header: t("work-column-id"), cell: (row) => <Reference row={row} />, mono: true },
     {
-      id: "id",
-      header: t("work-column-id"),
-      cell: (row) => <Reference row={row} />,
-      mono: true,
-    },
-    { id: "title", header: t("action-column-title"), cell: (row) => row.title },
-    {
-      id: "due",
-      header: t("work-column-due"),
-      cell: (row) => <DueDate date={row.due_date} today={today} />,
-      numeric: true,
+      id: "title",
+      header: t("action-column-title"),
+      cell: (row) => <TitleLink row={row}>{row.title}</TitleLink>,
+      grow: true,
     },
     {
       id: "status",
       header: t("work-column-status"),
       cell: (row) => <ActionStatusLabel status={row.status} />,
     },
-  ];
-  const commitmentColumns: Column<MyCommitment>[] = [
-    {
-      id: "id",
-      header: t("work-column-id"),
-      cell: (row) => <Reference row={row} />,
-      mono: true,
-    },
-    { id: "text", header: t("commitment-column-text"), cell: (row) => row.text },
-    {
-      id: "promisor",
-      header: t("commitment-column-promisor"),
-      cell: (row) => redactedOr(row.promisor.redacted, row.promisor.name),
-    },
     {
       id: "due",
       header: t("work-column-due"),
-      cell: (row) => <DueDate date={row.due_date} today={today} />,
-      numeric: true,
+      cell: (row) => (
+        <DueDate
+          date={row.due_date}
+          today={today}
+          overdue={mayBeOverdue({ kind: "action", column: columnOf("action", row.status) })}
+        />
+      ),
+    },
+  ];
+  const commitmentColumns: Column<MyCommitment>[] = [
+    { id: "id", header: t("work-column-id"), cell: (row) => <Reference row={row} />, mono: true },
+    {
+      id: "text",
+      header: t("commitment-column-text"),
+      cell: (row) => <TitleLink row={row}>{row.text}</TitleLink>,
+      grow: true,
     },
     {
       id: "status",
       header: t("work-column-status"),
       cell: (row) => <CommitmentStatusLabel status={row.status} />,
     },
+    {
+      id: "promisor",
+      header: t("commitment-column-promisor"),
+      cell: (row) => redactedOr(row.promisor.redacted, row.promisor.name),
+      secondary: true,
+    },
+    {
+      id: "due",
+      header: t("work-column-due"),
+      cell: (row) => (
+        <DueDate
+          date={row.due_date}
+          today={today}
+          overdue={mayBeOverdue({
+            kind: "commitment",
+            column: columnOf("commitment", row.status),
+          })}
+        />
+      ),
+    },
   ];
 
   const work = state.kind === "loaded" ? state.work : undefined;
   return (
-    <Page>
-      <div className={styles.page}>
-        <PageTitle ref={heading}>{t("my-work-title")}</PageTitle>
+    <Page width="flush">
+      <PageToolbar>
+        <PageTitle ref={heading} compact>
+          {t("my-work-title")}
+        </PageTitle>
+        {work && work.review_count > 0 && (
+          <div className={styles.end}>
+            <LinkButton to="/inbox" compact>
+              {t("my-work-review", { count: work.review_count })}
+            </LinkButton>
+          </div>
+        )}
+      </PageToolbar>
+      <div className={styles.content}>
         {state.kind === "loading" && (
           <div className={styles.skeleton} role="status" aria-label={t("my-work-loading")}>
             <Skeleton />
@@ -153,21 +203,16 @@ export function MyWorkPage({ api }: { api: Api }) {
             announce={retried ? "focus" : "alert"}
           />
         )}
-        {work && work.review_count > 0 && (
-          <p>
-            <StandaloneLink to="/inbox">
-              {t("my-work-review", { count: work.review_count })}
-            </StandaloneLink>
-          </p>
-        )}
         {work && work.actions.length === 0 && work.commitments.length === 0 && (
           <EmptyState title={t("my-work-empty-title")} text={t("my-work-empty-text")} />
         )}
         {work && work.actions.length > 0 && (
           <section className={styles.section} aria-labelledby="my-actions-title">
-            <h2 id="my-actions-title" className={styles.heading}>
-              {t("actions-title")}
-            </h2>
+            <SectionHeading
+              id="my-actions-title"
+              title={t("actions-title")}
+              count={work.actions.length}
+            />
             <DataTable
               label={t("actions-title")}
               columns={actionColumns}
@@ -178,9 +223,11 @@ export function MyWorkPage({ api }: { api: Api }) {
         )}
         {work && work.commitments.length > 0 && (
           <section className={styles.section} aria-labelledby="my-commitments-title">
-            <h2 id="my-commitments-title" className={styles.heading}>
-              {t("commitments-title")}
-            </h2>
+            <SectionHeading
+              id="my-commitments-title"
+              title={t("commitments-title")}
+              count={work.commitments.length}
+            />
             <DataTable
               label={t("commitments-title")}
               columns={commitmentColumns}
