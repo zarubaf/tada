@@ -115,9 +115,9 @@ privacy-template =
     Der Verein verlangt einen KI-Tarif, der die Eingaben nicht zum Training nutzt.
     Die Organisationsleitung kann API-Token ausschalten.
 
-    # Zitate als Belege
+    # Zitate als Quellen
 
-    Ein Vorschlag oder ein Entwurf belegt seinen Inhalt mit einem Zitat aus einer Quelle.
+    Ein Vorschlag oder ein Entwurf nennt zu seinem Inhalt ein Zitat aus einer Quelle.
     Das Zitat kann den ganzen Text einer Eingabe zeigen, die für die ganze Organisation gilt und nicht für einen einzelnen Anlass.
     Alle, die den Anlass lesen dürfen, sehen dann diesen Text.
     Das gilt in der Web-Oberfläche und für die KI-Clients der Mitglieder.
@@ -153,9 +153,9 @@ privacy-template =
     Der Betreiber spielt es nach jeder Wiederherstellung eines Backups ein, bevor tada wieder online geht.
     So kommen entfernte Daten nicht zurück.
 
-    Belege sind unveränderlich und lassen sich nicht berichtigen.
+    Quellen sind unveränderlich und lassen sich nicht berichtigen.
     Bestreitet eine Person eine Angabe, hält die Organisationsleitung das in einem Hinweis fest.
-    Alle, die den Beleg lesen, sehen den Hinweis, auch über die KI-Clients der Mitglieder.
+    Alle, die die Quelle lesen, sehen den Hinweis, auch über die KI-Clients der Mitglieder.
     Solche Hinweise sind auch in einem abgeschlossenen Anlass möglich.
 
     Nur die Organisationsleitung darf diese Funktionen nutzen.

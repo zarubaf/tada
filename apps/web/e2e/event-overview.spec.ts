@@ -175,7 +175,7 @@ for (const viewport of viewports) {
       await fakeOverview(page);
       await page.goto(`/events/${event?.id}`);
       await setTheme(page, theme);
-      await page.getByRole("button", { name: "Beleg zu Zeitfenster" }).click();
+      await page.getByRole("button", { name: "Quelle zu Zeitfenster" }).click();
       const dialog = page.getByRole("dialog", { name: "Zeitfenster" });
       await expect(dialog).toBeVisible();
       await expect(dialog.getByText("Anna Muster")).toBeVisible();

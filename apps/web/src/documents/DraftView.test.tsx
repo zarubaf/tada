@@ -130,7 +130,7 @@ describe("DraftView", () => {
     );
 
     await userEvent.click(
-      await screen.findByRole("button", { name: /18\.05\.2030.*Beleg zu Datum/ }),
+      await screen.findByRole("button", { name: /18\.05\.2030.*Quelle zu Datum/ }),
     );
 
     const sheet = await screen.findByRole("dialog", { name: "Datum" });
