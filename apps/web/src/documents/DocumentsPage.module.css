@@ -1,25 +1,47 @@
 @layer components {
-  .documents {
-    display: grid;
-    gap: var(--space-4);
-  }
-
-  .toolbar {
+  /* The search and the upload stay together at the right of the toolbar row, also where it wraps. */
+  .end {
     display: flex;
+    flex: 1 1 auto;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
+    justify-content: flex-end;
+    gap: var(--space-1-5) var(--space-2);
+    min-width: 0;
   }
 
-  .heading {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
+  .search {
+    display: flex;
+    flex: 1 1 16rem;
+    max-width: 28rem;
+    min-width: 0;
+  }
+
+  .form {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .field {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* 12 px between the row and its first part, and between the parts. */
+  .content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-3) var(--page-gutter, var(--space-3));
   }
 
   .help {
     color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-xs);
   }
 
   .skeleton {
@@ -27,18 +49,10 @@
     gap: var(--space-2);
   }
 
-  /* Narrow: the button under the field. Medium and wide: one row. */
-  .search {
-    display: grid;
-    gap: var(--space-3);
-    max-width: 40rem;
-  }
-
-  @media (width >= 40rem) {
-    /* --bp-medium */
-    .search {
-      grid-template-columns: 1fr auto;
-      align-items: end;
-    }
+  .chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
   }
 }

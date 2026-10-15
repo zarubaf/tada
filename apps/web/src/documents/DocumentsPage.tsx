@@ -11,10 +11,14 @@ import { FileButton } from "../ui/FileButton";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
+import { Page, PageTitle } from "../ui/Page";
+import { PageToolbar } from "../ui/PageToolbar";
+import { SearchField } from "../ui/SearchField";
 import { Skeleton } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
-import { TextField } from "../ui/TextField";
 import styles from "./DocumentsPage.module.css";
+import { DraftChips } from "./DraftChips";
+import { EventMark } from "./EventMark";
 import { formatSize, mediaTypeKind } from "./format";
 import { searchParam } from "./search";
 
@@ -40,9 +44,13 @@ const columns: Column<Document>[] = [
     id: "type",
     header: t("documents-column-type"),
     cell: (d) =>
-      d.newest_version.media_type
-        ? t(`documents-type-${mediaTypeKind(d.newest_version.media_type)}`)
-        : t("document-draft"),
+      d.newest_version.media_type ? (
+        t(`documents-type-${mediaTypeKind(d.newest_version.media_type)}`)
+      ) : (
+        <span className={styles.chips}>
+          <DraftChips version={d.newest_version} />
+        </span>
+      ),
   },
   {
     id: "size",
@@ -172,87 +180,89 @@ export function DocumentsPage({ api }: { api: Api }) {
   };
 
   return (
-    <section className={styles.documents} aria-labelledby="documents-title">
-      <div className={styles.toolbar}>
-        <h2 id="documents-title" ref={heading} tabIndex={-1} className={styles.heading}>
+    <Page width="flush">
+      <PageToolbar>
+        <PageTitle ref={heading} compact>
           {t("documents-title")}
-        </h2>
-        {writable && (
-          <FileButton isPending={uploading} onSelect={(file) => void upload(file)}>
-            {t("documents-upload")}
-          </FileButton>
+        </PageTitle>
+        <EventMark />
+        <div className={styles.end}>
+          <search className={styles.search}>
+            <form className={styles.form} onSubmit={onSearch}>
+              <div ref={search} className={styles.field}>
+                <SearchField label={t("documents-search")} value={text} onChange={setText} />
+              </div>
+              <Button type="submit" size="sm">
+                {t("documents-search-submit")}
+              </Button>
+            </form>
+          </search>
+          {writable && (
+            <FileButton size="sm" isPending={uploading} onSelect={(file) => void upload(file)}>
+              {t("documents-upload")}
+            </FileButton>
+          )}
+        </div>
+      </PageToolbar>
+      <div className={styles.content}>
+        {writable && <p className={styles.help}>{t("documents-upload-limits")}</p>}
+        <LiveRegion kind="status">{uploading ? t("documents-uploading") : uploaded}</LiveRegion>
+        <LiveRegion kind="alert" visuallyHidden>
+          {uploadFailure}
+        </LiveRegion>
+        {uploadFailure && <InlineError message={uploadFailure} announce="none" />}
+        {state.kind === "loading" && (
+          <div className={styles.skeleton} role="status" aria-label={t("documents-loading")}>
+            <Skeleton />
+            <Skeleton />
+            <Skeleton />
+          </div>
+        )}
+        {state.kind === "failed" && (
+          <InlineError
+            message={state.message}
+            requestId={state.requestId}
+            announce={retried ? "focus" : "alert"}
+            onRetry={() =>
+              retry(() => {
+                setState({ kind: "loading" });
+                return load(query, undefined, []);
+              })
+            }
+          />
+        )}
+        {state.kind === "loaded" && state.items.length === 0 && query === undefined && (
+          <EmptyState title={t("documents-none-title")} text={t("documents-none-text")} />
+        )}
+        {state.kind === "loaded" && state.items.length === 0 && query !== undefined && (
+          <EmptyState
+            title={t("documents-no-match")}
+            text={t("documents-no-match-text")}
+            action={<Button onPress={reset}>{t("documents-search-reset")}</Button>}
+          />
+        )}
+        {state.kind === "loaded" && state.items.length > 0 && (
+          <>
+            <DataTable
+              label={t("documents-title")}
+              columns={columns}
+              rows={state.items}
+              rowKey={(d) => d.id}
+            />
+            {state.nextCursor !== undefined && (
+              <Button
+                isPending={state.loadingMore}
+                onPress={() => {
+                  setState({ ...state, loadingMore: true });
+                  void load(query, state.nextCursor, state.items);
+                }}
+              >
+                {t("documents-more")}
+              </Button>
+            )}
+          </>
         )}
       </div>
-      {writable && <p className={styles.help}>{t("documents-upload-limits")}</p>}
-      <LiveRegion kind="status">{uploading ? t("documents-uploading") : uploaded}</LiveRegion>
-      <LiveRegion kind="alert" visuallyHidden>
-        {uploadFailure}
-      </LiveRegion>
-      {uploadFailure && <InlineError message={uploadFailure} announce="none" />}
-      <search>
-        <form className={styles.search} onSubmit={onSearch}>
-          <div ref={search}>
-            <TextField
-              label={t("documents-search")}
-              type="search"
-              value={text}
-              onChange={setText}
-            />
-          </div>
-          <Button type="submit">{t("documents-search-submit")}</Button>
-        </form>
-      </search>
-      {state.kind === "loading" && (
-        <div className={styles.skeleton} role="status" aria-label={t("documents-loading")}>
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
-        </div>
-      )}
-      {state.kind === "failed" && (
-        <InlineError
-          message={state.message}
-          requestId={state.requestId}
-          announce={retried ? "focus" : "alert"}
-          onRetry={() =>
-            retry(() => {
-              setState({ kind: "loading" });
-              return load(query, undefined, []);
-            })
-          }
-        />
-      )}
-      {state.kind === "loaded" && state.items.length === 0 && query === undefined && (
-        <EmptyState title={t("documents-none-title")} text={t("documents-none-text")} />
-      )}
-      {state.kind === "loaded" && state.items.length === 0 && query !== undefined && (
-        <EmptyState
-          title={t("documents-no-match")}
-          text={t("documents-no-match-text")}
-          action={<Button onPress={reset}>{t("documents-search-reset")}</Button>}
-        />
-      )}
-      {state.kind === "loaded" && state.items.length > 0 && (
-        <>
-          <DataTable
-            label={t("documents-title")}
-            columns={columns}
-            rows={state.items}
-            rowKey={(d) => d.id}
-          />
-          {state.nextCursor !== undefined && (
-            <Button
-              isPending={state.loadingMore}
-              onPress={() => {
-                setState({ ...state, loadingMore: true });
-                void load(query, state.nextCursor, state.items);
-              }}
-            >
-              {t("documents-more")}
-            </Button>
-          )}
-        </>
-      )}
-    </section>
+    </Page>
   );
 }
