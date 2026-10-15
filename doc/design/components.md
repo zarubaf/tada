@@ -16,7 +16,7 @@ The gallery (`apps/web/src/gallery/`) is a development tool that shows the compo
 | Button         | primary, secondary, quiet, danger | At most one primary button in a view. Labels are a verb and an object. The label does not wrap.                                                                                                                                                                                                                                                                                                                            |
 | IconButton     | quiet                             | Only in toolbars and rows. `icon` and the required `label`: the label is the accessible name and the tooltip. The tooltip opens on hover and on keyboard focus; the button is not described by it, because it only repeats the name. 32 px; 44 px on a coarse pointer.                                                                                                                                                     |
 | Link           | inline, standalone                | Inline links are underlined. A link never does what a button does.                                                                                                                                                                                                                                                                                                                                                         |
-| LinkButton     | primary                           | A link in the style of a button. Only for an action that opens a page, for example a form.                                                                                                                                                                                                                                                                                                                                 |
+| LinkButton     | primary, compact                  | A link in the style of a button. Only for an action that opens a page, for example a form. `compact` is the size of a toolbar row, like `size="sm"` of Button.                                                                                                                                                                                                                                                             |
 | FileButton     | primary                           | A button that opens the file picker. It shows `isPending` while the upload runs and keeps focus.                                                                                                                                                                                                                                                                                                                           |
 | FileLink       | secondary                         | A plain link to a file on the server, in the style of a button, for a download or a preview. The browser loads it.                                                                                                                                                                                                                                                                                                         |
 | Menu           |                                   | For more than three secondary actions, or the member menu. The trigger is `dots-vertical` or a text, which may take the look of a button (`variant`, `size`, an icon) and give its items an icon. „Neu“ is such a menu: the trigger is the primary button with `plus`, each item has the `TypeIcon` of its kind.                                                                                                           |
@@ -163,17 +163,18 @@ A descriptor (`RecordDescriptor`) gives each kind its fields and the commands th
 
 ### Event overview
 
-- A header with the event name, dates, place, the lead and the readiness. Each value has its KnowledgeState.
+- A header with the event name and the quiet control to close the event, and one row with the key, the state of the event and the date window. A state of knowledge shows as a chip beside its value (`KnowledgeValue`: „Vorschlag“, „Annahme“, „Unbekannt“); a confirmed value has none.
+- Sections are divided by a line and have the headings and the spacing of the record panel. A link leads to all work of the event.
 - Sections in this order: „Offene Fragen“, „Ausnahmen“, „nächste Meilensteine“, „Workstreams“ and „zuletzt geändert“.
 - Unknown values show „Unbekannt“, never an empty space.
 - „Was ist noch unbekannt?“ opens the Ask Event panel with this question.
 
 ### My Work (all members, mobile first)
 
-- A list grouped by due date: „überfällig“, „heute“, „diese Woche“ and „später“.
-- Each row: the RecordId, the title, the event, the due date and the StatusLabel.
+- Two tables, „Aufgaben“ and „Zusagen“, each under a heading with the count of its rows, in the page template „Work list“ (layout-and-responsiveness.md).
+- Each row: the RecordId with the key of the event, the title as the link to the record in the panel, the StatusLabel and the date chip.
 - The row actions on narrow layouts: „Erledigt“, „Blockiert“, „Neues Datum vorschlagen“. These match the Telegram buttons.
-- Items from several events appear in one list. The event name is visible in each row.
+- Items from several events appear in one table. The key of the event is the prefix of the RecordId in each row.
 
 ### Registers and tables
 
