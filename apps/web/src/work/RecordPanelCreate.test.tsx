@@ -392,6 +392,20 @@ describe("the create state", () => {
     expect(screen.getByRole("button", { name: "Neu" })).toHaveFocus();
   });
 
+  it("starts a fresh form when another kind is chosen while a form is open", async () => {
+    openWork("");
+    await choose("Aufgabe");
+    const action = await form();
+    await user.type(action.getByRole("textbox", { name: /^Titel/ }), "Banner");
+
+    await choose("Risiko");
+
+    const panel = await screen.findByRole("complementary", { name: "Neues Risiko" });
+    const title = within(panel).getByRole("textbox", { name: /^Titel/ });
+    expect(title).toHaveValue("");
+    await vi.waitFor(() => expect(title).toHaveFocus());
+  });
+
   it("says that the people did not load, and does not blame the event", async () => {
     openWork("?new=action", { answers: { "GET /api/v1/members": () => problem(500, "internal") } });
     const view = await form();
