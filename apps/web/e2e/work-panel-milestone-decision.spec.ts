@@ -150,6 +150,32 @@ for (const viewport of viewports) {
   }
 }
 
+// The step buttons keep their place from record to record: a manager who presses „Nächster Eintrag“
+// twice in the same spot must not go forward and then back, whether the record offers actions or not.
+test("the step buttons are in the same place for every kind of record", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, "?view=table");
+  const where: Record<string, { previous: number; next: number }> = {};
+  for (const id of ["ACT-001", "COM-001", "DEC-001", "MIL-001"]) {
+    await page.goto(`${work}?view=table#${id}`);
+    const panel = page.getByRole("complementary", { name: new RegExp(`^${id}`) });
+    const previous = panel.getByRole("button", { name: "Vorheriger Eintrag" });
+    const next = panel.getByRole("button", { name: "Nächster Eintrag" });
+    await expect(next).toBeVisible();
+    // The panel slides in; measure it when it has stopped.
+    await expect.poll(async () => (await panel.boundingBox())?.x).toBe(960);
+    where[id] = {
+      previous: (await previous.boundingBox())?.x ?? -1,
+      next: (await next.boundingBox())?.x ?? -1,
+    };
+  }
+  const first = where["ACT-001"];
+  expect(first?.next).toBeGreaterThan(0);
+  for (const place of Object.values(where)) {
+    expect(place).toEqual(first);
+  }
+});
+
 const replaced = [
   {
     ...decisions[0],
