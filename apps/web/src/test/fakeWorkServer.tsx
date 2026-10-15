@@ -55,18 +55,6 @@ export function problem(status: number, code: string, errors?: unknown) {
   return json(status, body, "application/problem+json");
 }
 
-/** An answer that serves `pages` one after the other, each with the cursor of the next. */
-export function pagedList(pages: unknown[][]): () => Response {
-  let served = 0;
-  return () => {
-    const index = Math.min(served++, pages.length - 1);
-    return json(200, {
-      items: pages[index],
-      next_cursor: index < pages.length - 1 ? `page-${index + 1}` : null,
-    });
-  };
-}
-
 export interface Setup {
   /** The organization role of the signed-in member. */
   role?: string;

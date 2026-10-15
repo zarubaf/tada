@@ -3,7 +3,6 @@
 import { BERND, CLARA, EVENT, ME } from "./fakeWorkServer";
 
 export const STREAM_GROUND = "w1";
-export const STREAM_FEST = "w2";
 
 type Over = Record<string, unknown>;
 
