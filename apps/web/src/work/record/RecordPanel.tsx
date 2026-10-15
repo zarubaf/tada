@@ -342,6 +342,7 @@ export default function RecordPanel({
   const notice =
     stale?.id === item.id && stale.version === item.version ? stale.message : undefined;
   const lookup = lookupOf(work);
+  const handFocusToTitle = () => focusAfterCommit(() => titleOf(heading));
   // A decision has a long wording: the name of the region has its first line.
   const name = item.redacted ? item.readableId : `${item.readableId} ${oneLineWording(item.title)}`;
   return (
@@ -362,8 +363,9 @@ export default function RecordPanel({
                 setStale({ id: item.id, version: item.version, message });
               }
               // The menu leaves with the state that the record has now; the title stays.
-              focusAfterCommit(() => titleOf(heading));
+              handFocusToTitle();
             }}
+            onGone={handFocusToTitle}
           />
         )
       }

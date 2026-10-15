@@ -57,6 +57,7 @@ function show(
 ) {
   const env = envOf(over.writable ?? true);
   const onDone = vi.fn();
+  const onGone = vi.fn();
   const tree = (list: readonly RecordActionSpec[]) => (
     <aside aria-label="Panel" tabIndex={-1}>
       <h2 tabIndex={-1}>Titel</h2>
@@ -66,6 +67,10 @@ function show(
         env={env}
         paused={over.paused ?? false}
         onDone={onDone}
+        onGone={() => {
+          onGone();
+          screen.getByRole("heading", { name: "Titel" }).focus();
+        }}
       />
     </aside>
   );
@@ -73,6 +78,7 @@ function show(
   return {
     env,
     onDone,
+    onGone,
     rerender: (list: readonly RecordActionSpec[]) => view.rerender(tree(list)),
   };
 }
@@ -156,11 +162,14 @@ describe("RecordActions", () => {
   });
 
   it("closes the dialog and says why when a conflict took the action away", async () => {
-    const { env, onDone, rerender } = show([revoke]);
+    const { env, onDone, onGone, rerender } = show([revoke]);
     await choose("Widerrufen");
     await user.click(await screen.findByRole("button", { name: "Konflikt" }));
     rerender([{ ...revoke, available: () => false }]);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // The dialog and the menu left: focus goes to the title, not to the body.
+    expect(onGone).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { name: "Titel" })).toHaveFocus();
     expect(env.announce).toHaveBeenCalledWith(
       "DEC-001 hat sich inzwischen geändert, die Aktion ist nicht mehr möglich.",
       "alert",
