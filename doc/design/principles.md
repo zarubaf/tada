@@ -1,8 +1,7 @@
 # Design principles
 
-Under change by [ADR 0082](../adr/0082-redesign-of-the-web-client.md): the look moves to a dense design with a dark and a light theme.
-The principles stay.
-The checklist below applies to the new status icons, chips and dense cards.
+The look is dense and has a dark and a light theme ([ADR 0082](../adr/0082-redesign-of-the-web-client.md)).
+The checklist below applies to the status icons, chips and dense cards.
 
 tada is a work tool for volunteers.
 The interface must disappear into the task: a member opens it, finds the open item, acts and leaves.

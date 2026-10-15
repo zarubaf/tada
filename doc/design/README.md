@@ -1,7 +1,7 @@
 # Design system
 
 These documents describe how the tada web client looks and behaves.
-The ADRs 0018 to 0024 record the decisions and their reasons; these documents give the rules and the values.
+The ADRs 0018 to 0024 and [0082](../adr/0082-redesign-of-the-web-client.md) record the decisions and their reasons; these documents give the rules and the values.
 
 | Document                                                     | Content                                                            |
 | ------------------------------------------------------------ | ------------------------------------------------------------------ |

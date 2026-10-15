@@ -121,7 +121,7 @@ Do not disguise every domain object as a generic asset, and do not build a unive
 
 ### Initial interface
 
-Portfolio, event overview, My Work, registers, Review Inbox and integration health.
+Portfolio, event overview, My Work, the work of an event (board, table and timeline), contacts, documents, Review Inbox and integration health.
 An evidence panel and Ask Event are available across views.
 Mobile participation matters more than a decorative dashboard.
 
