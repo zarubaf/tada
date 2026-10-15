@@ -285,7 +285,6 @@ export default function RecordPanel({
         {descriptor && create && mayCreate && !managersOnly ? (
           <RecordCreate
             descriptor={descriptor}
-            api={api}
             commands={work.commands}
             sources={sourcesOf(work, api)}
             owner={assignees.some((member) => member.id === me) ? me : undefined}
