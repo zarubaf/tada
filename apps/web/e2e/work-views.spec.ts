@@ -251,3 +251,14 @@ test("a bar of the timeline opens its record in the panel", async ({ page }) => 
   await expect(page).toHaveURL(/\/work(\?.*)?#ACT-001$/);
   await expect(page.getByRole("complementary", { name: /ACT-001/ })).toBeVisible();
 });
+
+test("the skip link moves focus to the main region and opens no record", async ({ page }) => {
+  await open(page, "?view=table");
+  await page.keyboard.press("Tab");
+  const skip = page.getByRole("link", { name: "Zum Inhalt springen" });
+  await expect(skip).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("main#main")).toBeFocused();
+  await expect(page.getByRole("complementary")).toHaveCount(0);
+  expect(new URL(page.url()).hash).toBe("");
+});
