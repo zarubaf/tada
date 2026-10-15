@@ -18,7 +18,10 @@ export interface SidePanelProps {
   heading?: ReactNode;
   /** Where the record is in the list, for example „7 von 15“. It shows before the step buttons. */
   position?: string | undefined;
-  /** Extra controls of the head, between the step buttons and the close button, for example a menu. */
+  /**
+   * Extra controls of the head, between the step buttons and the close button, for example a menu.
+   * The place is reserved without them, so that the step buttons do not move between records.
+   */
   more?: ReactNode;
   /** Called by the close button and by Escape. The page unmounts the panel. */
   onClose: () => void;
@@ -142,7 +145,8 @@ export function SidePanel({
               />
             </>
           )}
-          {more}
+          {/* The slot is there without an action, so that the step buttons keep their place. */}
+          <div className={styles.slot}>{more}</div>
           <IconButton icon={IconX} label={t("side-panel-close")} size="sm" onPress={onClose} />
         </div>
       </header>
