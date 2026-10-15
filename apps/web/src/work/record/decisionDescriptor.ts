@@ -12,7 +12,7 @@ import type { WorkItem } from "../workItem";
 import { areaField, ownerField } from "./commonFields";
 import { RevokeDecisionDialog, SupersedeDecisionDialog } from "./decisionDialogs";
 import { partiesOf, partyId, wordingError } from "./decisionInput";
-import type { FieldSpec, FieldValue, RecordDescriptor } from "./descriptor";
+import { type FieldSpec, type FieldValue, REDACTED, type RecordDescriptor } from "./descriptor";
 
 type DecisionItem = Extract<WorkItem, { kind: "decision" }>;
 
@@ -73,8 +73,7 @@ const parties: FieldSpec = {
   people: (item) =>
     record(item).decided_by.map((party) => ({
       id: partyId(party),
-      label: party.redacted ? party.local_id : party.name,
-      ...(party.redacted && { redacted: true }),
+      label: party.redacted ? REDACTED : party.name,
     })),
 };
 

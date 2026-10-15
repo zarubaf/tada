@@ -10,7 +10,7 @@ import type { Directory } from "../directory";
 import { milestoneName } from "../milestoneName";
 import { statusPresentationOfText } from "../recordStatus";
 import type { WorkItem } from "../workItem";
-import type { FieldSpec, FieldValue, RecordLookup } from "./descriptor";
+import { type FieldSpec, type FieldValue, REDACTED, type RecordLookup } from "./descriptor";
 import { enumChoices } from "./enumChoices";
 
 /** What the choices are made of. A part that has not loaded is absent. */
@@ -123,10 +123,15 @@ export function choicesOf(
       // The people are those of the record; the search of the form needs no options here.
       const people = item && spec.people ? spec.people(item) : [];
       return {
-        options: people.map((person) => ({
-          ...person,
-          leading: <Avatar name={person.label} id={person.id} decorative />,
-        })),
+        options: people.map((person) =>
+          person.label === REDACTED
+            ? { id: person.id, label: t("redacted") }
+            : {
+                id: person.id,
+                label: person.label,
+                leading: <Avatar name={person.label} id={person.id} decorative />,
+              },
+        ),
         offered: true,
       };
     }
