@@ -1044,6 +1044,22 @@ describe("command palette", () => {
     expect(window.location.search).toBe("?new=action");
   });
 
+  it("opens the dialog that manages the workstreams of the event on the work page", async () => {
+    const palette = await paletteInEvent("event-viewer");
+    await userEvent.click(
+      await within(palette).findByRole("menuitem", { name: "Bereiche verwalten" }),
+    );
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}/work`));
+    expect(window.location.search).toBe("?manage=streams");
+  });
+
+  it("offers no workstream dialog outside an event", async () => {
+    renderShell(json(200, info([first], first)));
+    const palette = await openPalette();
+    expect(within(palette).queryByRole("menuitem", { name: "Bereiche verwalten" })).toBeNull();
+  });
+
   it("reads only the memberships of the event to know what a member may create", async () => {
     const palette = await paletteInEvent("event-contributor");
     await vi.waitFor(() => expect(newItems(palette)).toHaveLength(4));
