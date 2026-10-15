@@ -68,14 +68,14 @@ test("the command palette opens with Ctrl+K and a choice moves focus to the new 
 
   await page.keyboard.press("Control+k");
   await expect(page.getByRole("searchbox", { name: "Befehl oder Ziel eingeben" })).toBeFocused();
-  await page.keyboard.type("institut");
+  await page.keyboard.type("kontak");
   await expect(page.getByRole("menuitem")).toHaveCount(1);
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
 
-  await expect(page).toHaveURL(/\/contacts\?tab=institutions$/);
+  await expect(page).toHaveURL(/\/contacts$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 1, name: "Kontakte" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Kontakte" })).toBeFocused();
 });
 
 test("Escape closes the command palette and focus returns to the command box", async ({ page }) => {
