@@ -65,6 +65,7 @@ export function RecordActions({
         <Dialog
           item={item}
           env={env}
+          onConflict={() => undefined}
           onCancel={() => {
             setOpen(undefined);
             focusAfterCommit(() => buttons.current.get(active.id));

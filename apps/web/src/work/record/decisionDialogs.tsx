@@ -6,15 +6,15 @@ import { uuidv7 } from "../../api/uuid";
 import { hasMessage, t } from "../../i18n";
 import { SearchSelect } from "../../ui/SearchSelect";
 import { TextField } from "../../ui/TextField";
-import { fieldErrors } from "../fieldErrors";
 import type { WorkItem } from "../workItem";
 import { choicesOf } from "./choices";
 import { areaField, ownerField } from "./commonFields";
 import { partiesOf, partyId, wordingError } from "./decisionInput";
 import { type ActionDialogProps, type FieldSpec, type FieldValue, peopleValue } from "./descriptor";
 import { PeopleField } from "./PeopleField";
-import { RecordActionDialog, type Refusal } from "./RecordActionDialog";
+import { RecordActionDialog } from "./RecordActionDialog";
 import styles from "./RecordActionDialog.module.css";
+import { type Refusal, refusalOf } from "./refusal";
 
 const target = (item: WorkItem) => ({ id: item.id, version: item.version });
 
@@ -25,7 +25,8 @@ function asDecision(item: WorkItem) {
   return item;
 }
 
-export function RevokeDecisionDialog({ item, env, onDone, onCancel }: ActionDialogProps) {
+export function RevokeDecisionDialog(props: ActionDialogProps) {
+  const { item, env, onDone, onCancel } = props;
   return (
     <RecordActionDialog
       title={t("decision-revoke-title", { id: item.readableId })}
@@ -34,21 +35,12 @@ export function RevokeDecisionDialog({ item, env, onDone, onCancel }: ActionDial
       confirmLabel={t("decision-revoke")}
       danger
       onCancel={onCancel}
-      onConfirm={async (reason): Promise<Refusal | undefined> => {
+      onConfirm={async (reason) => {
         const result = await env.commands.decision.revoke(target(item), reason);
         if (result.ok) {
           onDone(t("decision-revoked", { id: item.readableId }));
-          return undefined;
         }
-        const { failure } = result;
-        if (failure.reason === "conflict") {
-          void env.refresh("decision");
-        }
-        const invalid =
-          failure.problem?.code === "validation-failed"
-            ? fieldErrors(failure.problem, ["reason"] as const).reason
-            : undefined;
-        return invalid ? { reason: invalid } : { message: failure.message };
+        return refusalOf(result, props);
       }}
     />
   );
@@ -138,7 +130,8 @@ function refused(errors: { pointer: string; code: string }[] | undefined): Error
  * be allowed (the area closed, the owner lost the role). The old decision keeps its wording and
  * becomes „ersetzt“.
  */
-export function SupersedeDecisionDialog({ item, env, onDone, onCancel }: ActionDialogProps) {
+export function SupersedeDecisionDialog(props: ActionDialogProps) {
+  const { item, env, onDone, onCancel } = props;
   const old = asDecision(item).record;
   const api = env.sources.api;
   // One ID for every try of this dialog.
@@ -188,14 +181,12 @@ export function SupersedeDecisionDialog({ item, env, onDone, onCancel }: ActionD
       }
       return undefined;
     }
-    const { failure } = result;
-    if (failure.reason === "conflict") {
-      void env.refresh("decision");
-    }
-    const invalid =
-      failure.problem?.code === "validation-failed" ? refused(failure.problem.errors) : {};
-    setErrors(invalid);
-    return Object.keys(invalid).length > 0 ? {} : { message: failure.message };
+    setErrors({});
+    return refusalOf(result, props, (problem) => {
+      const invalid = refused(problem.errors);
+      setErrors(invalid);
+      return Object.keys(invalid).length > 0 ? {} : undefined;
+    });
   };
 
   return (

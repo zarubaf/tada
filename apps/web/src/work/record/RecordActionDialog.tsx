@@ -3,6 +3,7 @@
 // 0082). „Ersetzen“ and „Widerrufen“ of a decision use it. It knows no kind: the caller gives the
 // words, the extra fields and the command, and decides when the dialog closes (it is open while it
 // is mounted).
+import { IconAlertTriangle } from "@tabler/icons-react";
 import { type FormEvent, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { Button } from "../../ui/Button";
@@ -12,16 +13,7 @@ import { LiveRegion } from "../../ui/LiveRegion";
 import { TaskDialog, TaskDialogActions } from "../../ui/TaskDialog";
 import { TextField } from "../../ui/TextField";
 import styles from "./RecordActionDialog.module.css";
-
-/**
- * Why the command did not run. `reason` is the message for the reason field, `message` any other
- * failure, which the dialog says as an alert. An empty refusal means that the extra fields show
- * their own errors; focus goes to the first of them.
- */
-export interface Refusal {
-  reason?: string;
-  message?: string;
-}
+import type { Refusal } from "./refusal";
 
 export interface RecordActionDialogProps {
   /** The heading and the name of the dialog, for example „DEC-001 widerrufen“. */
@@ -33,7 +25,10 @@ export interface RecordActionDialogProps {
   /** Extra fields before the reason. They keep their own values; the caller reads them in `onConfirm`. */
   children?: ReactNode;
   confirmLabel: string;
-  /** The action ends something for good: the confirm button is the danger button. */
+  /**
+   * The action ends something for good: the confirm button is the danger button, and a sentence
+   * with a warning icon says that it cannot be undone, so that the color is not the only sign.
+   */
   danger?: boolean;
   /**
    * Runs the command with the trimmed reason (empty without a reason field). It resolves to
@@ -108,6 +103,12 @@ export function RecordActionDialog({
       {description && (
         <p>
           <KeepIds>{description}</KeepIds>
+        </p>
+      )}
+      {danger && (
+        <p className={styles.warning}>
+          <IconAlertTriangle size={16} stroke={1.5} aria-hidden="true" />
+          {t("record-action-irreversible")}
         </p>
       )}
       <form ref={form} className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
