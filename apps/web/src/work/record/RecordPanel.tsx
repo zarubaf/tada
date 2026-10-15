@@ -19,7 +19,7 @@ import { EvidenceList } from "../EvidenceList";
 import type { Work } from "../useWork";
 import type { WorkItem } from "../workItem";
 import { recordHref } from "../workLinks";
-import { canEdit } from "../workPermissions";
+import { canCreate, canEdit, isManagersOnly, mayCreateKind } from "../workPermissions";
 import type { ChoiceSources } from "./choices";
 import type { FieldSpec, RecordDescriptor, RecordLookup } from "./descriptor";
 import { descriptorOf } from "./descriptors";
@@ -40,8 +40,6 @@ export interface RecordPanelProps {
   route: PanelMode;
   /** The member who is signed in: the owner that a new record starts with, if they can own one. */
   me: string;
-  /** True if the member may create a record. Otherwise the create state says why it is empty. */
-  mayCreate: boolean;
   /** Focus goes to the title of the record that the create state made. */
   focusTitle: boolean;
   /** Shows the record that the create state made. */
@@ -229,7 +227,6 @@ export default function RecordPanel({
   eventId,
   route,
   me,
-  mayCreate,
   focusTitle,
   onCreated,
   writable,
@@ -273,16 +270,16 @@ export default function RecordPanel({
     const descriptor = descriptorOf(route.kind);
     const create = descriptor?.create;
     // A kind that only managers create (a decision) says so to a member who may create the others.
-    const isManager = work.directory.kind === "loaded" && work.directory.directory.isManager;
-    const managersOnly = mayCreate && create?.managersOnly === true && !isManager;
+    const directory = work.directory.kind === "loaded" ? work.directory.directory : undefined;
+    const mayCreate = mayCreateKind(route.kind, directory, me, writable);
     const forbidden = !loaded
       ? "record-create-unavailable"
-      : managersOnly
+      : canCreate(directory, me, writable) && isManagersOnly(route.kind)
         ? "record-create-managers-only"
         : "record-create-forbidden";
     return (
       <SidePanel title={create ? t(create.titleKey) : ""} {...frame}>
-        {descriptor && create && mayCreate && !managersOnly ? (
+        {descriptor && create && mayCreate ? (
           <RecordCreate
             descriptor={descriptor}
             commands={work.commands}
