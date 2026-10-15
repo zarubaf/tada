@@ -140,7 +140,7 @@ function Legend({
       </li>
       {undated > 0 && (
         <li className={styles.legendItem}>
-          <StandaloneLink to={`${base}/actions`}>
+          <StandaloneLink to={`${base}/work?type=action`}>
             {t("timeline-undated", { count: undated })}
           </StandaloneLink>
         </li>

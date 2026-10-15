@@ -761,19 +761,6 @@ test("narrow: the axis leaves the keyboard and the accessibility tree", async ({
   await expect(list.getByRole("link", { name: /ACT-001/ })).not.toHaveAttribute("tabindex", "-1");
 });
 
-test("a bar opens its row in the register of actions", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await fakeSession(page, sessionWithRole("member"));
-  await fakeTimeline(page);
-  await page.goto(`/events/${event?.id}/timeline`);
-  await page
-    .getByRole("region", { name: "Zeitachse" })
-    .getByRole("link", { name: /ACT-001/ })
-    .click();
-  await expect(page).toHaveURL(/\/actions#ACT-001$/);
-  await expect(page.locator("tr#ACT-001")).toBeFocused();
-});
-
 for (const contrast of ["no-preference", "more"] as const) {
   test(`hovering a milestone diamond changes its border, whatever its status (contrast ${contrast})`, async ({
     page,

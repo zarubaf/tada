@@ -100,7 +100,7 @@ export function TimelineChart({
                       style={place({ at })}
                     >
                       <Link
-                        to={`${base}/milestones#${milestone.local_id}`}
+                        to={`${base}/work#${milestone.local_id}`}
                         className={styles.mark}
                         aria-label={milestoneLabel(milestone)}
                       >
@@ -163,7 +163,7 @@ function Row({ item, base }: { item: TimelineItem; base: string }) {
           style={place(item.kind === "bar" ? { from: item.from, to: item.to } : { at: item.at })}
         >
           <Link
-            to={`${base}/actions#${action.local_id}`}
+            to={`${base}/work#${action.local_id}`}
             className={styles.mark}
             aria-label={actionLabel(action)}
           >

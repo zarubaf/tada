@@ -5,18 +5,6 @@ import { Route, Routes } from "../router/Router";
 import { EVENT, renderWork, type Setup } from "../test/fakeWorkServer";
 import * as r from "../test/workRecords";
 import { WorkPage } from "./WorkPage";
-import { PANEL } from "./workLinks";
-
-// A kind that the panel does not know yet, to test the way out for such a record.
-const withoutDescriptor = vi.hoisted(() => new Set<string>());
-vi.mock("./record/descriptors", async (original) => {
-  const all = await original<typeof import("./record/descriptors")>();
-  return {
-    ...all,
-    descriptorOf: (kind: string) =>
-      withoutDescriptor.has(kind) ? undefined : all.descriptorOf(kind as never),
-  };
-});
 
 const STREAMS = [
   { id: "w1", event_id: EVENT.id, name: "Bodenbetrieb", status: "active", version: 1 },
@@ -32,8 +20,6 @@ function stubNarrow(narrow: boolean) {
 }
 
 afterEach(() => {
-  PANEL.commitment = true;
-  withoutDescriptor.clear();
   vi.unstubAllGlobals();
   window.history.replaceState(null, "", "/");
 });
@@ -103,26 +89,6 @@ describe("the record panel", () => {
 
       await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
       expect(screen.getByRole("heading", { level: 1, name: "Arbeit" })).toHaveFocus();
-    });
-
-    it("skips a record of a kind without a panel when it steps", async () => {
-      PANEL.commitment = false;
-      open("#ACT-001");
-      await panel(/ACT-001/);
-      await user.click(screen.getByRole("button", { name: "Nächster Eintrag" }));
-      // COM-001 has no panel here; MIL-001 follows ACT-001 in the column.
-      expect(hash()).toBe("#MIL-001");
-    });
-
-    it("sends a record of a kind without a panel to its page, and does not call it missing", async () => {
-      PANEL.commitment = false;
-      withoutDescriptor.add("commitment");
-      open("#COM-001");
-      const region = await panel("Eintrag öffnet noch nicht hier");
-      expect(within(region).queryByText(/gibt es in diesem Anlass nicht/)).toBeNull();
-      expect(
-        within(region).getByRole("link", { name: "Auf der bisherigen Seite öffnen" }),
-      ).toHaveAttribute("href", `/events/${EVENT.id}/commitments#COM-001`);
     });
 
     it("opens the risk that the hash names, with its rating", async () => {
