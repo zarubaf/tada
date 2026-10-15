@@ -36,7 +36,7 @@ export function milestoneLabel(milestone: Milestone): string {
   });
 }
 
-/** The name of a lane: the workstream, or „ohne Arbeitsbereich“. */
+/** The name of a lane: the workstream, or „ohne Bereich“. */
 export function laneName(workstream: Workstream | null): string {
   if (!workstream) {
     return t("timeline-lane-none");

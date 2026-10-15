@@ -1,5 +1,5 @@
 import { t } from "../../i18n";
-import { PartyPicker } from "../PartiesSelect";
+import { PartyPicker } from "../PartyPicker";
 import type { CreateControlProps } from "./createControls";
 
 /**

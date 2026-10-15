@@ -71,8 +71,9 @@ export type EventList =
   | { kind: "loaded"; events: Event[] };
 
 /**
- * Every page of the events of the member, so that the switcher and the palette miss none. `load` asks again each time; a list that is there
- * stays until the new one comes, so the menu does not flicker.
+ * Every page of the events of the member, so that the switcher and the palette miss none. `load`
+ * asks again each time; a list that is there stays until the new one comes, so the menu does not
+ * flicker.
  */
 export function useEventList(
   api: Api,
