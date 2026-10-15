@@ -10,7 +10,7 @@ export type TimelineItem =
   | { kind: "point"; action: Action; at: number };
 
 export interface TimelineLane {
-  /** The workstream of the lane; `null` is the lane „ohne Arbeitsbereich“. */
+  /** The workstream of the lane; `null` is the lane „ohne Bereich“. */
   workstream: Workstream | null;
   items: TimelineItem[];
 }
