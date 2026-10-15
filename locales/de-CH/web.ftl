@@ -972,10 +972,8 @@ register-load-more = Weitere Einträge laden
 register-loaded-more = Weitere Einträge geladen.
 register-row-not-found = { $id } nicht gefunden
 work-column-id = ID
-work-column-owner = Verantwortlich
 work-column-due = Fällig
 work-column-status = Status
-work-column-actions = Aktionen
 work-edit = Bearbeiten
 work-create = Erfassen
 work-save = Speichern
@@ -1018,25 +1016,13 @@ work-error-name-taken = Diesen Namen gibt es in diesem Anlass schon.
 work-error-lead = Wählen Sie ein Mitglied des Anlasses mit Mitarbeit oder Anlassleitung.
 
 actions-title = Aufgaben
-actions-empty-title = Noch keine Aufgaben
 action-column-title = Titel
-action-create-title = Aufgabe erfassen
-# $id: the readable ID of the action.
-action-change-title = { $id } bearbeiten
-action-field-title = Titel (Pflichtfeld)
 action-status-open = offen
 action-status-in-progress = in Arbeit
 action-status-blocked = blockiert
 action-status-done = erledigt
 action-status-canceled = abgebrochen
 
-milestones-title = Meilensteine
-milestones-empty-title = Noch keine Meilensteine
-milestone-column-title = Titel
-milestone-create-title = Meilenstein erfassen
-# $id: the readable ID of the milestone.
-milestone-change-title = { $id } bearbeiten
-milestone-field-title = Titel (Pflichtfeld)
 milestone-status-open = offen
 milestone-status-reached = erreicht
 milestone-status-canceled = abgesagt
@@ -1051,12 +1037,9 @@ milestone-evidence-version = Stützt die Version { $version } des Meilensteins
 
 ## Decisions (ADR 0081)
 
-decisions-title = Entscheide
-decisions-empty-title = Noch keine Entscheide
 decision-status-in-force = in Kraft
 decision-status-superseded = ersetzt
 decision-status-revoked = widerrufen
-decision-create-title = Entscheid erfassen
 # $id: the readable ID of the decision that the new one replaces.
 decision-replace-title = { $id } ersetzen
 # $id: the readable ID of the decision that the new one replaces.
@@ -1105,12 +1088,9 @@ work-error-decided_by = { decision-error-decided_by }
 work-error-decided_by-too-long = { decision-error-decided_by-too-long }
 work-error-decided_by-unknown-record = { decision-error-decided_by-unknown-record }
 
-timeline-title = Zeitplan
 timeline-empty-title = Noch nichts im Zeitplan
 timeline-empty-text = Geben Sie einer Aufgabe ein Fälligkeitsdatum oder erfassen Sie einen Meilenstein.
 timeline-empty-action = Zu den Aufgaben
-timeline-filter-owner = Verantwortlich
-timeline-filter-status = Status
 timeline-no-match = Keine Treffer für diese Filter.
 timeline-list-empty = Keine Einträge in dieser Ansicht.
 }
@@ -1137,14 +1117,11 @@ timeline-action = { $id } { $title }, { $when }, { $status }
 timeline-milestone = { $id } { $title }, { $date }, { $status }
 
 commitments-title = Zusagen
-commitments-empty-title = Noch keine Zusagen
 commitment-column-text = Zusage
 commitment-column-promisor = Zugesagt von
 # $condition: the condition text of the commitment.
 commitment-condition-line = Bedingung: { $condition }
 commitment-create-title = Zusage erfassen
-# $id: the readable ID of the commitment.
-commitment-change-title = { $id } bearbeiten
 commitment-field-promisor-placeholder = Person oder Institution wählen
 commitment-field-condition-help = Mit einer Bedingung ist die Zusage bedingt. Ohne Bedingung ist sie verbindlich.
 commitment-status-conditional = bedingt
