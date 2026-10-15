@@ -518,7 +518,7 @@ describe("DecisionsPage", () => {
     await sendReplacement();
     const send = screen.getByRole("button", { name: "Ersetzen" });
     // The 409 is in, the lookup runs: the form is busy, and the button keeps focus and is not off.
-    await waitFor(() => expect(send).toHaveAttribute("data-pending"));
+    await waitFor(() => expect(send).toHaveAttribute("aria-disabled", "true"));
     expect(send).not.toBeDisabled();
     expect(send).toHaveFocus();
 
