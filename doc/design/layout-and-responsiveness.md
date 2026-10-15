@@ -185,7 +185,8 @@ The page does not use the sub-navigation of the event.
   Its controls are 44 px high on a coarse pointer.
   `Escape` ends an inline edit first; a second `Escape` closes the panel.
   Focus moves into the panel on open and returns to the card or the row that opened it, else to the card or row of the record, else to the heading of the page.
-  The „Neu“ button in the toolbar opens the create state of the same panel (`?new=action`); it is absent in a closed event and for a member who may not create.
+  The „Neu“ button in the toolbar is a menu of the kinds that the member may create („Aufgabe“, „Zusage“, „Meilenstein“, „Entscheid“, „Risiko“, each with its icon). A choice opens the create state of the same panel (`?new=<kind>`) on its title; closing it returns focus to „Neu“.
+  Only managers create a decision. With one kind the button creates it at once, and with none, in a closed event and for a viewer, there is no button.
 - A kind that fails to load shows a banner with „Erneut versuchen“ for that kind; the other kinds still show.
   During a retry the board stays, the banner is busy and keeps focus; the skeleton is for the first load.
   The failures are announced once, in the polite live region of the page, not as alerts.
