@@ -111,7 +111,10 @@ Sidebar, from top to bottom:
    The member block shows the name and the role; the member menu is in the top bar.
 
 The event page has no navigation of its own: the sidebar items above are the destinations of an event (ADR 0082).
-The event home „Übersicht“ (`/events/:id`) shows the header of the event with its key, name and date window, the control to close the event (`CloseEvent`), the open questions, the facts with their proposals and the section „Mitglieder des Anlasses“.
+The event home „Übersicht“ (`/events/:id`) shows the header of the event, the open questions with a link to all work of the event, the facts with their proposals and the section „Mitglieder des Anlasses“.
+The header has the name with the quiet control to close the event (`CloseEvent`) at its right, and under it one row with the key, the state of the event (an icon and a word) and the date window.
+The sections are divided by a line and have the spacing of the record panel: 16 px around the line, 12 px between the heading and its content.
+A fact shows its state of knowledge as a chip beside the value (`proposal`, `assumption`, `unknown`); a confirmed value has no chip.
 That section has the anchor `#mitglieder`: an address with it scrolls to the section and moves focus to its heading.
 A member who may not list the event members sees no such section.
 The documents of an event keep the header of the event above them, and a document page links back to the documents.
@@ -144,20 +147,21 @@ Rules:
 Each screen uses one of these templates. A new template needs a change to this document.
 Each template uses the `Page` component for the `main` element, the page gutters and the `h1` style.
 
-| Template         | Structure                                                                                                   | Used by                                               |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| List with detail | A list on the left, the selected item on the right (wide); the list, then the item as its own page (narrow) | „Eingang“, „Meine Arbeit“                             |
-| Register         | A toolbar with filters and actions, then a table                                                            | Persons, institutions                                 |
-| Overview         | A header with the key facts, then sections in one column                                                    | Event overview                                        |
-| Portfolio        | A filter bar, then a table of events with readiness columns                                                 | Portfolio                                             |
-| Form             | One column, at most 40rem wide, the actions at the bottom                                                   | Create and edit pages                                 |
-| Public page      | No shell. The app name, one heading and a form column of at most 40rem                                      | Sign-in, magic link, invitation, organization choice  |
-| Settings         | One toolbar row (title, tabs or, on a phone, a select), 16 px below it the page of the tab                  | „Einstellungen“                                       |
-| Event page       | The event header with the key and the name, the control to close the event, then the page                   | „Übersicht“ and „Dokumente“ of an event               |
-| Timeline         | A filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)                             | The timeline view of „Arbeit“, „Zeitplan“ of an event |
-| Work             | One toolbar row (title, type filter, view switch, „Filter“, „Neu“), 12 px below it the view                 | „Arbeit“ of an event                                  |
-| Contacts         | One toolbar row (title, tabs, search, „Neu“), 12 px below it the register of the tab                        | „Kontakte“                                            |
-| Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                           |
+| Template         | Structure                                                                                                                                                            | Used by                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| List with detail | A list on the left, the selected item on the right (wide); the list, then the item as its own page (narrow)                                                          | „Eingang“                                             |
+| Work list        | One toolbar row (title, then the action or link of the page at the right), 12 px below it dense tables, each with a heading and its count (two-line rows on a phone) | „Meine Arbeit“, „Anlässe“                             |
+| Register         | A toolbar with filters and actions, then a table                                                                                                                     | Persons, institutions                                 |
+| Overview         | A header (name, control to close, then key, state and date window), then sections in one column, each divided by a line                                              | Event overview                                        |
+| Portfolio        | A filter bar, then a table of events with readiness columns                                                                                                          | Portfolio                                             |
+| Form             | One column, at most 40rem wide, the actions at the bottom                                                                                                            | Create and edit pages                                 |
+| Public page      | No shell. The app name, one heading and a form column of at most 40rem                                                                                               | Sign-in, magic link, invitation, organization choice  |
+| Settings         | One toolbar row (title, tabs or, on a phone, a select), 16 px below it the page of the tab                                                                           | „Einstellungen“                                       |
+| Event page       | The event header with the key and the name, the control to close the event, then the page                                                                            | „Übersicht“ and „Dokumente“ of an event               |
+| Timeline         | A filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)                                                                                      | The timeline view of „Arbeit“, „Zeitplan“ of an event |
+| Work             | One toolbar row (title, type filter, view switch, „Filter“, „Neu“), 12 px below it the view                                                                          | „Arbeit“ of an event                                  |
+| Contacts         | One toolbar row (title, tabs, search, „Neu“), 12 px below it the register of the tab                                                                                 | „Kontakte“                                            |
+| Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                                                                                      | „Dokumente“                                           |
 
 ### Settings
 
@@ -241,6 +245,18 @@ It has its own `h1` „Arbeit“ and not the header of the event page.
   Beside the record panel the bar keeps clear of it: from 80rem the docked panel leaves the bar its own column, and from 40rem to 80rem the bar floats in the space left of the overlay panel (`--size-panel-width`), so that the panel never covers it.
   The value lists open as a sheet from the bottom instead of a popover.
   A failure banner sits above the bar in the same dock.
+
+### Work lists
+
+„Meine Arbeit“ (`/`) and „Anlässe“ (`/events`) are `Page width="flush"` with the toolbar row of the „Arbeit“ page: the `h1` as a compact heading at the left and, at the right, the one action or link of the page as a compact `LinkButton`.
+On „Meine Arbeit“ this is the count of proposals that wait for the member (a link to „Eingang“), and on „Anlässe“ it is „Anlass erfassen“ as the primary button, for the roles that may create an event.
+Below the row, 12 px from it, the page is dense tables of 28 px rows (`DataTable`).
+Below 28rem of the container, a table is a list of two-line rows; there is no sideways scroll.
+
+- „Meine Arbeit“ has one table each for „Aufgaben“ and „Zusagen“, under an `h2` with the count of its rows.
+  A row has the reference with the key of the event (`FLY28/ACT-042`) as muted mono text, the title as the link to the record in the panel of „Arbeit“ (`/events/:id/work#ACT-042`), the status with its icon and word, and a date chip that says „überfällig“ in words for a record that is not finished.
+- „Anlässe“ has a row for each event: the key, the name as the link, the state (an icon and a word: „Offen“, „Abgeschlossen“), the time zone and the date of the entry. The time zone and the date go first where the container is narrow.
+  The name of a closed event is quieter, but keeps the contrast of text.
 
 ### Contacts
 
