@@ -25,23 +25,23 @@ const reasonOf = (problem: Problem): Refusal | undefined => {
 
 /**
  * The refusal for the result of a command, or nothing if it worked. After a conflict the record is
- * loaded again and the dialog says so; the panel then closes the dialog if the action is gone
+ * loaded again and the dialog says so, or says that the reload failed; the panel then closes the dialog if the action is gone
  * (`onConflict`). A `validation-failed` problem goes to `fields`, which maps it to the fields of
  * the dialog; by default it is the reason.
  */
-export function refusalOf(
+export async function refusalOf(
   result: CommandResult<unknown>,
   { item, env, onConflict }: Pick<ActionDialogProps, "item" | "env" | "onConflict">,
   fields: (problem: Problem) => Refusal | undefined = reasonOf,
-): Refusal | undefined {
+): Promise<Refusal | undefined> {
   if (result.ok) {
     return undefined;
   }
   const { failure } = result;
   if (failure.reason === "conflict") {
     onConflict();
-    void env.refresh(item.kind);
-    return { message: t("record-action-conflict") };
+    const loaded = await env.refresh(item.kind);
+    return { message: t(loaded ? "record-action-conflict" : "record-action-conflict-stale") };
   }
   const invalid =
     failure.problem?.code === "validation-failed" ? fields(failure.problem) : undefined;

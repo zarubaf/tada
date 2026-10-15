@@ -1504,6 +1504,7 @@ record-actions = Aktionen
 record-action-gone = { $id } hat sich inzwischen geändert, die Aktion ist nicht mehr möglich.
 record-action-irreversible = Das lässt sich nicht rückgängig machen.
 record-action-conflict = Der Eintrag wurde inzwischen geändert und ist neu geladen. Prüfen Sie ihn und versuchen Sie es erneut.
+record-action-conflict-stale = Der Eintrag wurde inzwischen geändert, liess sich aber nicht neu laden. Laden Sie die Seite neu und versuchen Sie es erneut.
 # $id: the readable ID of the new record.
 record-created = { $id } erfasst.
 work-new = Neu
