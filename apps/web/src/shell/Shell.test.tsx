@@ -353,6 +353,7 @@ describe("sidebar", () => {
       "Meine Arbeit",
       "Arbeit",
       "Zeitplan",
+      "Dokumente",
       "Anlässe",
       "Personen",
       "Institutionen",
@@ -721,8 +722,8 @@ describe("narrow layout", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent)
-        .slice(0, 2),
-    ).toEqual(["Anlässe", "Personen"]);
+        .slice(0, 3),
+    ).toEqual(["Anlässe", "Dokumente", "Personen"]);
   });
 
   it("shows the open proposals at Eingang in the bottom bar", async () => {

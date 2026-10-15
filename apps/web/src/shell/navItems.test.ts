@@ -23,10 +23,19 @@ describe("the bottom bar", () => {
     );
   });
 
-  it("has Arbeit instead of Anlässe inside an event, and Anlässe moves into Mehr", () => {
+  it("has Dokumente after Zeitplan inside an event and not outside", () => {
+    expect(labels(mainItems("e1")).slice(2, 5)).toEqual(["Arbeit", "Zeitplan", "Dokumente"]);
+    expect(labels(mainItems(undefined))).not.toContain("Dokumente");
+    expect(mainItems("e1").find((item) => item.label === "Dokumente")?.to).toBe(
+      "/events/e1/documents",
+    );
+  });
+
+  it("has Arbeit instead of Anlässe inside an event, and Anlässe and Dokumente move into Mehr", () => {
     expect(labels(bottomItems("e1"))).toEqual(["Eingang", "Meine Arbeit", "Arbeit"]);
     expect(labels(moreItems("e1"))).toEqual([
       "Anlässe",
+      "Dokumente",
       "Personen",
       "Institutionen",
       "Einstellungen",
@@ -64,6 +73,15 @@ describe("isCurrent", () => {
     expect(current(mainItems("e1"), `${EVENT}/actions`)).toEqual(["Anlässe"]);
     expect(current(moreItems("e1"), `${EVENT}/actions`)).toEqual(["Anlässe"]);
     expect(current(bottomItems("e1"), `${EVENT}/actions`)).toEqual([]);
+  });
+
+  it("marks Dokumente and not Anlässe on the documents of an event", () => {
+    expect(current(mainItems("e1"), `${EVENT}/documents`)).toEqual(["Dokumente"]);
+    expect(current(moreItems("e1"), `${EVENT}/documents`)).toEqual(["Dokumente"]);
+  });
+
+  it("marks Anlässe on the overview of an event", () => {
+    expect(current(mainItems("e1"), EVENT)).toEqual(["Anlässe"]);
   });
 
   it("marks Anlässe on the list of events", () => {
