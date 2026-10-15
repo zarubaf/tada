@@ -1,3 +1,4 @@
+import { IconArrowRight } from "@tabler/icons-react";
 import { useRef, useState } from "react";
 import type { Api, Fact, Field } from "../api/client";
 import { EvidencePanel } from "../evidence/EvidencePanel";
@@ -7,12 +8,14 @@ import { Button } from "../ui/Button";
 import { DisputeNotes } from "../ui/DisputeNotes";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
-import { KnowledgeState } from "../ui/KnowledgeState";
+import { RecordId } from "../ui/RecordId";
 import { Redacted, redactedOr } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
+import { StandaloneLink } from "../ui/StandaloneLink";
 import { EventMembers } from "./EventMembers";
 import styles from "./EventOverview.module.css";
 import { useEventContext } from "./eventContext";
+import { KnowledgeValue } from "./KnowledgeValue";
 
 /** One line of „Fakten“: a field of the event and its current fact, if it has one. */
 interface Row {
@@ -96,12 +99,19 @@ export function EventOverview({ api }: { api: Api }) {
           <ul className={styles.questions}>
             {open_questions.map((question) => (
               <li key={question.id}>
-                <span className={styles.id}>{question.local_id}</span>{" "}
+                <RecordId>{question.local_id}</RecordId>{" "}
                 {redactedOr(question.redacted, question.text)}
               </li>
             ))}
           </ul>
         )}
+        <StandaloneLink
+          to={`/events/${encodeURIComponent(event.id)}/work`}
+          className={styles.allWork}
+        >
+          {t("event-overview-all-work")}
+          <IconArrowRight size={14} stroke={1.5} aria-hidden="true" />
+        </StandaloneLink>
       </section>
 
       <section className={styles.section} aria-labelledby="overview-facts">
@@ -115,16 +125,18 @@ export function EventOverview({ api }: { api: Api }) {
               <div key={row.key} className={styles.row}>
                 <dt>{row.label}</dt>
                 <dd>
-                  <KnowledgeState state={state}>
+                  <KnowledgeValue state={state}>
                     {state === "unknown" ? undefined : row.fact?.redacted ? (
                       <Redacted />
                     ) : (
                       formatValue(row.fact ?? {}, row.field?.value_type)
                     )}
-                  </KnowledgeState>
+                  </KnowledgeValue>
                   <DisputeNotes notes={row.fact?.dispute_notes} className={styles.notes} />
                   {row.fact && (
                     <Button
+                      variant="quiet"
+                      size="sm"
                       ref={(button) => {
                         if (button) {
                           buttons.current.set(row.key, button);
@@ -160,12 +172,12 @@ export function EventOverview({ api }: { api: Api }) {
                     <li key={proposal.id} className={styles.proposal}>
                       <span>{field ? formatLabel(field.label) : proposal.field_id}</span>
                       <span className={styles.proposed}>
-                        <KnowledgeState state="proposed">
+                        <KnowledgeValue state="proposed">
                           {proposal.state === "unknown"
                             ? undefined
                             : formatValue(proposal, field?.value_type)}
-                        </KnowledgeState>
-                        {proposal.state !== "accepted" && <KnowledgeState state={proposal.state} />}
+                        </KnowledgeValue>
+                        {proposal.state !== "accepted" && <KnowledgeValue state={proposal.state} />}
                       </span>
                       <time className={styles.note} dateTime={proposal.created_at}>
                         {t("event-overview-proposed-at", {

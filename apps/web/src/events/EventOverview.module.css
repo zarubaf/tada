@@ -4,38 +4,50 @@
     gap: var(--space-2);
   }
 
+  /*
+   * The sections follow the rhythm of the record panel: a line between them, 16 px from the line
+   * to the heading and 12 px from the heading to its content. The sections are the direct children,
+   * also the one of the members, whatever it shows.
+   */
   .overview {
     display: grid;
-    gap: var(--space-6);
+    gap: var(--space-4);
+  }
+
+  .overview > * + * {
+    padding-block-start: var(--space-4);
+    border-block-start: 1px solid var(--color-border-subtle);
   }
 
   .section {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .heading {
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
-    line-height: var(--line-height-lg);
+    line-height: var(--line-height-base);
   }
 
   .subheading {
-    font-size: var(--font-size-base);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-xs);
+  }
+
+  .allWork {
+    gap: var(--space-1);
+    justify-self: start;
   }
 
   .questions {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-1-5);
+    margin: 0;
     padding: 0;
     list-style: none;
-  }
-
-  .id {
-    color: var(--color-text-muted);
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-sm);
   }
 
   .facts {
@@ -48,7 +60,7 @@
   .row {
     display: grid;
     gap: var(--space-1);
-    padding: var(--space-2) 0;
+    padding: var(--space-1) 0;
     border-block-end: 1px solid var(--color-border-subtle);
   }
 
@@ -90,7 +102,7 @@
   .proposals {
     display: grid;
     gap: var(--space-2);
-    margin-block-start: var(--space-4);
+    margin-block-start: var(--space-3);
   }
 
   .proposalList {

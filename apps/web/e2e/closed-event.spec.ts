@@ -32,6 +32,10 @@ for (const viewport of viewports) {
       await setTheme(page, theme);
       await expect(page.getByText("Abgeschlossen am 01.07.2030")).toBeVisible();
       await expect(page.getByRole("button", { name: "Wieder öffnen" })).toBeVisible();
+      // The header says the state in a word, besides the banner with the date.
+      await expect(
+        page.locator("main header").getByText("Abgeschlossen", { exact: true }),
+      ).toBeVisible();
 
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
