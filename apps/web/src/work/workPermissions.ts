@@ -3,7 +3,6 @@
 // the event manager. The client adds only what the server cannot know before it asks: a closed
 // event is read-only for everybody (ADR 0071), and a redacted record has no text left to change.
 import type { RecordKind } from "../api/client";
-import type { Directory } from "./directory";
 import { CREATABLE } from "./record/recordRoute";
 import type { WorkItem } from "./workItem";
 
@@ -15,17 +14,16 @@ export function canEdit(item: WorkItem, eventWritable: boolean): boolean {
   return eventWritable && item.record.can_change && !item.redacted;
 }
 
+/** What the rules need to know of the event: who may own a record and whether the member manages. */
+type Who = { assignees: readonly { id: string }[]; isManager: boolean };
+
 /**
  * True if the member may create a record: an event manager or an owner or admin of the organization
  * (manager level, also without a membership), or a member who could own a record, which is a
  * contributor (ADR 0052). The same rule as `require_create` of the server, which checks it again.
  * A closed event is read-only.
  */
-export function canCreate(
-  directory: Pick<Directory, "assignees" | "isManager"> | undefined,
-  me: string,
-  eventWritable: boolean,
-): boolean {
+export function canCreate(directory: Who | undefined, me: string, eventWritable: boolean): boolean {
   return (
     eventWritable &&
     directory !== undefined &&
@@ -38,8 +36,6 @@ export function canCreate(
  * the descriptors, because the page needs it for the menu and the descriptors load with the panel.
  */
 const MANAGERS_ONLY: ReadonlySet<RecordKind> = new Set(["decision"]);
-
-type Who = Pick<Directory, "assignees" | "isManager">;
 
 /** True if the member may create a record of the kind: `canCreate`, and a manager for a decision. */
 export function mayCreateKind(

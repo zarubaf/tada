@@ -1,18 +1,15 @@
 // The command palette behind the command box (ADR 0082). It navigates to the destinations of the
 // shell, jumps to an event, starts a new record of each kind that the member may create in the
-// current event and switches the theme. It
-// searches no records yet. This module loads on the first opening, so that the first load stays
-// small (ADR 0024).
+// current event and switches the theme. It searches no records yet. This module loads on the first
+// opening, so that the first load stays small (ADR 0024).
 import { IconCalendarEvent, IconCircleHalf2, IconPlus } from "@tabler/icons-react";
 import { useEffect } from "react";
-import type { Api, RecordKind } from "../api/client";
+import type { Api } from "../api/client";
 import { t } from "../i18n";
 import { useNavigate } from "../router/Router";
-import { useSession } from "../session/SessionProvider";
 import { chooseTheme, THEMES } from "../theme/theme";
 import Palette, { type CommandGroup } from "../ui/CommandPalette";
-import { useDirectory } from "../work/directory";
-import { creatableKinds } from "../work/workPermissions";
+import { useCreatableKinds } from "../work/useCreatableKinds";
 import { NEW_EVENT } from "./EventSwitcher";
 import { ALL } from "./navItems";
 import type { EventList } from "./useEvents";
@@ -33,38 +30,21 @@ interface Props {
   onClose: () => void;
 }
 
-/** The palette of the shell. Inside an event it asks which kinds of record the member may create. */
-export default function CommandPalette(props: Props) {
-  return props.currentEventId === undefined ? (
-    <Commands {...props} creatable={[]} />
-  ) : (
-    <InEvent {...props} eventId={props.currentEventId} />
-  );
-}
-
-function InEvent({ api, eventId, eventWritable, ...props }: Props & { eventId: string }) {
-  const me = useSession().user.id;
-  const { state } = useDirectory(api, eventId);
-  const directory = state.kind === "loaded" ? state.directory : undefined;
-  return (
-    <Commands
-      api={api}
-      eventWritable={eventWritable}
-      {...props}
-      creatable={creatableKinds(directory, me, eventWritable)}
-    />
-  );
-}
-
-function Commands({
+/**
+ * The palette of the shell. One component stays mounted from the opening, so that the typed text
+ * survives the moment when the current event becomes known.
+ */
+export default function CommandPalette({
+  api,
   events,
   loadEvents,
   currentEventId,
-  creatable,
+  eventWritable,
   canCreateEvent,
   onClose,
-}: Props & { creatable: readonly RecordKind[] }) {
+}: Props) {
   const navigate = useNavigate();
+  const creatable = useCreatableKinds(api, currentEventId, eventWritable);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the list loads once, when the palette opens
   useEffect(loadEvents, []);
 

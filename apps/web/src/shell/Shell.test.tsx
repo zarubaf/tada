@@ -66,6 +66,8 @@ let pageHeading = false;
 let eventRole = "event-contributor";
 /** The path of each request that the fake server received. */
 let requested: string[] = [];
+/** While set, the fake server holds back the answer for a single event until it resolves. */
+let eventGate: Promise<void> | undefined;
 /** The key of the remembered event of the first organization. */
 const EVENT_KEY = `tada-event:${first.organization_id}`;
 
@@ -115,6 +117,7 @@ function renderShellAt(path: string, ...responses: Response[]) {
     }
     const one = pathname.match(/^\/api\/v1\/events\/([^/]+)$/);
     if (one) {
+      await eventGate;
       const found = eventItems.find((item) => item.id === one[1]);
       return found ? json(200, found) : json(404, { title: "Not found", status: 404 });
     }
@@ -168,6 +171,7 @@ afterEach(() => {
   eventItems = [];
   eventRole = "event-contributor";
   requested = [];
+  eventGate = undefined;
   pageHeading = false;
   localStorage.clear();
   document.documentElement.removeAttribute("data-theme");
@@ -1044,6 +1048,46 @@ describe("command palette", () => {
 
     await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}/work`));
     expect(window.location.search).toBe("?new=action");
+  });
+
+  it("reads only the memberships of the event to know what a member may create", async () => {
+    const palette = await paletteInEvent("event-contributor");
+    await vi.waitFor(() => expect(newItems(palette)).toHaveLength(4));
+
+    expect(requested.filter((path) => path.endsWith("/memberships"))).toHaveLength(1);
+    expect(requested).not.toContain("/api/v1/members");
+    expect(requested.some((path) => path.endsWith("/workstreams"))).toBe(false);
+  });
+
+  it("reads nothing for an owner or admin of the organization, who may create every kind", async () => {
+    eventItems = [event(open.id, open.name, open.key)];
+    renderShellAt(`/events/${open.id}`, json(200, info([second], second)));
+    await screen.findByRole("button", { name: "Anlass wechseln: Sommerfest 2030" });
+
+    const palette = await openPalette();
+
+    await vi.waitFor(() => expect(newItems(palette)).toEqual(NEW));
+    expect(requested.some((path) => path.endsWith("/memberships"))).toBe(false);
+    expect(requested).not.toContain("/api/v1/members");
+  });
+
+  it("keeps the typed text when the event resolves after the palette opened", async () => {
+    eventRole = "event-manager";
+    eventItems = [event(open.id, open.name, open.key)];
+    let release: () => void = () => {};
+    eventGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    renderShellAt(`/events/${open.id}`, json(200, info([first], first)));
+    const palette = await openPalette();
+    await userEvent.keyboard("pers");
+    expect(newItems(palette)).toEqual([]);
+
+    release();
+
+    await vi.waitFor(() => expect(requested.some((p) => p.endsWith("/memberships"))).toBe(true));
+    expect(within(palette).getByRole("searchbox")).toHaveValue("pers");
+    expect(palette.isConnected).toBe(true);
   });
 
   it("offers no new record to a viewer or in a closed event", async () => {
