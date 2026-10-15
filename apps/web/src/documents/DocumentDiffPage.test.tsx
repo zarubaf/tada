@@ -157,7 +157,7 @@ describe("DocumentDiffPage", () => {
     setup(PATH);
 
     const heading = await screen.findByRole("heading", {
-      level: 2,
+      level: 1,
       name: "Unterschiede: Version 2 zu Version 3",
     });
     await waitFor(() => expect(heading).toHaveFocus());
@@ -165,6 +165,18 @@ describe("DocumentDiffPage", () => {
       "href",
       `/documents/${DOCUMENT_ID}`,
     );
+    // The heading sits in the toolbar row with the way back, the ID of the document and the event.
+    const row = heading.closest("[data-page-toolbar]") as HTMLElement;
+    expect(within(row).getByRole("link", { name: "Zurück zum Dokument" })).toBeInTheDocument();
+    expect(within(row).getByText("DOC-001")).toBeInTheDocument();
+    expect(within(row).getByText("FLY28")).toBeInTheDocument();
+  });
+
+  it("puts the sections below the heading of the page", async () => {
+    setup(PATH);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Fakten" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Zeilen" })).toBeInTheDocument();
   });
 
   it("shows each line with its change in words, not in color alone", async () => {
@@ -204,7 +216,7 @@ describe("DocumentDiffPage", () => {
 
     expect(await screen.findByText(/zwei Entwurfsversionen/)).toBeInTheDocument();
     // No blank version numbers in the heading.
-    expect(screen.getByRole("heading", { level: 2, name: "Unterschiede" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Unterschiede" })).toBeInTheDocument();
   });
 
   it("shows the failure with a retry that moves focus to the heading", async () => {
@@ -213,7 +225,7 @@ describe("DocumentDiffPage", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Erneut versuchen" }));
 
-    const heading = await screen.findByRole("heading", { level: 2, name: /Unterschiede/ });
+    const heading = await screen.findByRole("heading", { level: 1, name: /Unterschiede/ });
     await waitFor(() => expect(heading).toHaveFocus());
   });
 });

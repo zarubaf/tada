@@ -1,3 +1,4 @@
+import { IconArrowLeft } from "@tabler/icons-react";
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import {
   type Api,
@@ -7,7 +8,6 @@ import {
   problemMessage,
   type VersionDiff,
 } from "../api/client";
-import { EventPage } from "../events/EventPage";
 import { type ProfileState, useEventContext } from "../events/eventContext";
 import { formatLabel } from "../facts/formatValue";
 import { t } from "../i18n";
@@ -15,10 +15,13 @@ import { useParams } from "../router/Router";
 import { type Column, DataTable } from "../ui/DataTable";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
-import { Page } from "../ui/Page";
+import { Page, PageTitle } from "../ui/Page";
+import { PageToolbar } from "../ui/PageToolbar";
 import { Skeleton } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import styles from "./DocumentDiffPage.module.css";
+import { EventMark } from "./EventMark";
+import { EventScope } from "./EventScope";
 
 type State =
   | { kind: "loading" }
@@ -126,77 +129,84 @@ function DiffBody({
     facts.added.length === 0 &&
     facts.removed.length === 0;
   return (
-    <>
-      <StandaloneLink to={`/documents/${encodeURIComponent(document.id)}`}>
-        {t("document-diff-back")}
-      </StandaloneLink>
-      <header className={styles.header}>
-        <p className={styles.key}>{document.readable_id}</p>
-        <h2 ref={heading} tabIndex={-1} className={styles.title}>
+    <Page width="flush">
+      <PageToolbar>
+        <StandaloneLink
+          to={`/documents/${encodeURIComponent(document.id)}`}
+          className={styles.back}
+        >
+          <IconArrowLeft size={14} stroke={1.5} aria-hidden="true" />
+          {t("document-diff-back")}
+        </StandaloneLink>
+        <PageTitle ref={heading} compact>
           {numberOf(from) !== "" && numberOf(to) !== ""
             ? t("document-diff-title", { from: numberOf(from), to: numberOf(to) })
             : t("document-diff-title-plain")}
-        </h2>
-      </header>
-      {!diff ? (
-        <p>{t("document-diff-missing")}</p>
-      ) : (
-        <>
-          <section className={styles.section} aria-labelledby="document-diff-facts">
-            <h3 id="document-diff-facts" className={styles.heading}>
-              {t("document-diff-facts")}
-            </h3>
-            {noFacts ? (
-              <p>{t("document-diff-facts-none")}</p>
-            ) : (
-              <ul className={styles.list}>
-                {diff.facts.changed.map((change) => (
-                  <li key={`changed:${change.fact_id}`}>
-                    {t("document-diff-fact-changed", {
-                      label: factLabel(profile, change.fact_id),
-                      from: change.from,
-                      to: change.to,
-                    })}
-                  </li>
-                ))}
-                {diff.facts.added.map((fact) => (
-                  <li key={`added:${fact.fact_id}`}>
-                    {t("document-diff-fact-added", {
-                      label: factLabel(profile, fact.fact_id),
-                      version: fact.version,
-                    })}
-                  </li>
-                ))}
-                {diff.facts.removed.map((fact) => (
-                  <li key={`removed:${fact.fact_id}`}>
-                    {t("document-diff-fact-removed", {
-                      label: factLabel(profile, fact.fact_id),
-                      version: fact.version,
-                    })}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          <section className={styles.section} aria-labelledby="document-diff-lines">
-            <h3 id="document-diff-lines" className={styles.heading}>
-              {t("document-diff-lines")}
-            </h3>
-            {diff.lines.every((line) => line.kind === "unchanged") && (
-              <p>{t("document-diff-lines-same")}</p>
-            )}
-            {diff.lines.length > 0 && (
-              <DataTable
-                label={t("document-diff-lines")}
-                columns={columns}
-                rows={diff.lines}
-                rowKey={(line) => `${line.kind}:${line.old_line ?? ""}:${line.new_line ?? ""}`}
-              />
-            )}
-          </section>
-        </>
-      )}
-    </>
+        </PageTitle>
+        <span className={styles.key}>{document.readable_id}</span>
+        <EventMark />
+      </PageToolbar>
+      <div className={styles.content}>
+        {!diff ? (
+          <p>{t("document-diff-missing")}</p>
+        ) : (
+          <>
+            <section className={styles.section} aria-labelledby="document-diff-facts">
+              <h2 id="document-diff-facts" className={styles.heading}>
+                {t("document-diff-facts")}
+              </h2>
+              {noFacts ? (
+                <p>{t("document-diff-facts-none")}</p>
+              ) : (
+                <ul className={styles.list}>
+                  {diff.facts.changed.map((change) => (
+                    <li key={`changed:${change.fact_id}`}>
+                      {t("document-diff-fact-changed", {
+                        label: factLabel(profile, change.fact_id),
+                        from: change.from,
+                        to: change.to,
+                      })}
+                    </li>
+                  ))}
+                  {diff.facts.added.map((fact) => (
+                    <li key={`added:${fact.fact_id}`}>
+                      {t("document-diff-fact-added", {
+                        label: factLabel(profile, fact.fact_id),
+                        version: fact.version,
+                      })}
+                    </li>
+                  ))}
+                  {diff.facts.removed.map((fact) => (
+                    <li key={`removed:${fact.fact_id}`}>
+                      {t("document-diff-fact-removed", {
+                        label: factLabel(profile, fact.fact_id),
+                        version: fact.version,
+                      })}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section className={styles.section} aria-labelledby="document-diff-lines">
+              <h2 id="document-diff-lines" className={styles.heading}>
+                {t("document-diff-lines")}
+              </h2>
+              {diff.lines.every((line) => line.kind === "unchanged") && (
+                <p>{t("document-diff-lines-same")}</p>
+              )}
+              {diff.lines.length > 0 && (
+                <DataTable
+                  label={t("document-diff-lines")}
+                  columns={columns}
+                  rows={diff.lines}
+                  rowKey={(line) => `${line.kind}:${line.old_line ?? ""}:${line.new_line ?? ""}`}
+                />
+              )}
+            </section>
+          </>
+        )}
+      </div>
+    </Page>
   );
 }
 
@@ -256,7 +266,7 @@ export function DocumentDiffPage({ api }: { api: Api }) {
 
   if (state.kind === "loaded") {
     return (
-      <EventPage api={api} eventId={state.document.event_id}>
+      <EventScope api={api} eventId={state.document.event_id}>
         <DiffBody
           document={state.document}
           versions={state.versions}
@@ -265,30 +275,32 @@ export function DocumentDiffPage({ api }: { api: Api }) {
           to={state.to}
           heading={heading}
         />
-      </EventPage>
+      </EventScope>
     );
   }
   return (
-    <Page>
-      {state.kind === "loading" && (
-        <div className={styles.skeleton} role="status" aria-label={t("document-loading")}>
-          <Skeleton />
-          <Skeleton />
-        </div>
-      )}
-      {state.kind === "failed" && (
-        <InlineError
-          message={state.message}
-          requestId={state.requestId}
-          announce={retried ? "focus" : "alert"}
-          onRetry={() =>
-            retry(() => {
-              setState({ kind: "loading" });
-              return load();
-            })
-          }
-        />
-      )}
+    <Page width="flush">
+      <div className={styles.state}>
+        {state.kind === "loading" && (
+          <div className={styles.skeleton} role="status" aria-label={t("document-loading")}>
+            <Skeleton />
+            <Skeleton />
+          </div>
+        )}
+        {state.kind === "failed" && (
+          <InlineError
+            message={state.message}
+            requestId={state.requestId}
+            announce={retried ? "focus" : "alert"}
+            onRetry={() =>
+              retry(() => {
+                setState({ kind: "loading" });
+                return load();
+              })
+            }
+          />
+        )}
+      </div>
     </Page>
   );
 }

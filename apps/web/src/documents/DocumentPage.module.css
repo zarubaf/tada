@@ -1,57 +1,94 @@
 @layer components {
+  /* Until the document has loaded the page has no toolbar row: the state sits in the gutter. */
+  .state {
+    padding: var(--space-3) var(--page-gutter, var(--space-3));
+  }
+
   .skeleton {
     display: grid;
     gap: var(--space-2);
   }
 
-  .header {
-    display: grid;
+  .back {
     gap: var(--space-1);
+    min-height: max(var(--size-hit-target), var(--control-height-sm));
+    font-size: var(--font-size-sm);
   }
 
   .key {
     color: var(--color-text-muted);
     font-family: var(--font-family-mono);
     font-size: var(--font-size-sm);
+    white-space: nowrap;
   }
 
-  .title {
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--letter-spacing-tight);
-    line-height: var(--line-height-2xl);
-    overflow-wrap: anywhere;
+  /* 12 px between the row and its first part, and between the parts. */
+  .content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-3) var(--page-gutter, var(--space-3));
   }
 
   .section {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  /* A part after another: 8 px more than the gap, a line, then 16 px to its first line. */
+  .section + .section {
+    margin-block-start: var(--space-2);
+    padding-block-start: var(--space-4);
+    border-block-start: 1px solid var(--color-border-subtle);
   }
 
   .heading {
-    font-size: var(--font-size-lg);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-xs);
   }
 
+  /* A quiet banner: the icon in the warning color, then the title and the sentence. */
   .changed {
-    display: grid;
-    gap: var(--space-1);
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-2-5) var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
     background: var(--color-warning-subtle);
   }
 
+  .icon {
+    flex: none;
+    margin-block-start: var(--space-0-5);
+    color: var(--color-warning);
+  }
+
+  .changedText {
+    display: grid;
+    gap: var(--space-0-5);
+  }
+
   .changedTitle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1-5);
+    font-size: var(--font-size-md);
     font-weight: var(--font-weight-semibold);
+  }
+
+  .chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
   }
 
   .help,
   .muted {
     color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-xs);
   }
 
   .frame {

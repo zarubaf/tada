@@ -1,3 +1,4 @@
+import { IconAlertTriangle } from "@tabler/icons-react";
 import type { LintWarning } from "../api/client";
 import { hasMessage, t } from "../i18n";
 import styles from "./LintWarnings.module.css";
@@ -9,23 +10,27 @@ function kindText(kind: string): string {
 }
 
 /**
- * The warnings of the draft lint for the review: a number, a date or an amount outside a `tada:`
- * link, or raw HTML (ADR 0051). They never block; the reviewer decides.
+ * The warnings of the draft lint for the review as a quiet banner with an icon: a number, a date
+ * or an amount outside a `tada:` link, or raw HTML (ADR 0051). They never block; the reviewer
+ * decides.
  */
 export function LintWarnings({ warnings }: { warnings: LintWarning[] }) {
   if (warnings.length === 0) {
     return null;
   }
   return (
-    <div className={styles.warnings}>
-      <p className={styles.title}>{t("inbox-draft-warnings", { count: warnings.length })}</p>
-      <ul className={styles.list}>
-        {warnings.map((warning) => (
-          <li key={`${warning.line}:${warning.kind}`}>
-            {t("draft-lint-line", { line: warning.line, kind: kindText(warning.kind) })}
-          </li>
-        ))}
-      </ul>
+    <div className={styles.warnings} role="note">
+      <IconAlertTriangle className={styles.icon} size={16} stroke={1.5} aria-hidden="true" />
+      <div className={styles.text}>
+        <p className={styles.title}>{t("inbox-draft-warnings", { count: warnings.length })}</p>
+        <ul className={styles.list}>
+          {warnings.map((warning) => (
+            <li key={`${warning.line}:${warning.kind}`}>
+              {t("draft-lint-line", { line: warning.line, kind: kindText(warning.kind) })}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
