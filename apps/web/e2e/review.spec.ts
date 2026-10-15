@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
   events,
+  expectPageFrame,
   fakeSession,
   fontsLoaded,
   sessionWithRole,
@@ -333,6 +334,7 @@ for (const viewport of viewports) {
           await expect(page.getByRole("article").first()).toBeVisible();
         }
 
+        await expectPageFrame(page, viewport);
         const results = await new AxeBuilder({ page })
           .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
           .analyze();

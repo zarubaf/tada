@@ -117,7 +117,7 @@ The sections are divided by a line and have the spacing of the record panel: 16 
 A fact shows its state of knowledge as a chip beside the value (`proposal`, `assumption`, `unknown`); a confirmed value has no chip.
 That section has the anchor `#mitglieder`: an address with it scrolls to the section and moves focus to its heading.
 A member who may not list the event members sees no such section.
-The documents of an event keep the header of the event above them, and a document page links back to the documents.
+The documents of an event have their own toolbar row with the `h1` and no event header, and a document page links back to the documents.
 
 The old addresses of the event pages stay valid.
 A client-side route (`LegacyEventRedirect`) replaces the history entry, so Back does not return to the old address, and it keeps the hash and the query keys that it does not set:
@@ -149,7 +149,7 @@ Each template uses the `Page` component for the `main` element, the page gutters
 
 | Template         | Structure                                                                                                                                                            | Used by                                               |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| List with detail | A list on the left, the selected item on the right (wide); the list, then the item as its own page (narrow)                                                          | „Eingang“                                             |
+| List with detail | One toolbar row, then a list on the left and the selected item on the right (wide); the list, then the item as its own screen (narrow)                               | „Eingang“                                             |
 | Work list        | One toolbar row (title, then the action or link of the page at the right), 12 px below it dense tables, each with a heading and its count (two-line rows on a phone) | „Meine Arbeit“, „Anlässe“                             |
 | Register         | A toolbar with filters and actions, then a table                                                                                                                     | Persons, institutions                                 |
 | Overview         | A header (name, control to close, then key, state and date window), then sections in one column, each divided by a line                                              | Event overview                                        |
@@ -157,11 +157,11 @@ Each template uses the `Page` component for the `main` element, the page gutters
 | Form             | One column, at most 40rem wide, the actions at the bottom                                                                                                            | Create and edit pages                                 |
 | Public page      | No shell. The app name, one heading and a form column of at most 40rem                                                                                               | Sign-in, magic link, invitation, organization choice  |
 | Settings         | One toolbar row (title, tabs or, on a phone, a select), 16 px below it the page of the tab                                                                           | „Einstellungen“                                       |
-| Event page       | The event header with the key and the name, the control to close the event, then the page                                                                            | „Übersicht“ and „Dokumente“ of an event               |
+| Event page       | The event header with the key and the name, the control to close the event, then the page                                                                            | „Übersicht“ of an event                               |
 | Timeline         | A filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)                                                                                      | The timeline view of „Arbeit“, „Zeitplan“ of an event |
 | Work             | One toolbar row (title, type filter, view switch, „Filter“, „Neu“), 12 px below it the view                                                                          | „Arbeit“ of an event                                  |
 | Contacts         | One toolbar row (title, tabs, search, „Neu“), 12 px below it the register of the tab                                                                                 | „Kontakte“                                            |
-| Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                                                                                      | „Dokumente“                                           |
+| Documents        | One toolbar row (title, event, search, upload), 12 px below it a dense table; a document and its comparison have the way back in the row                             | „Dokumente“, a document, a comparison                 |
 
 ### Settings
 
