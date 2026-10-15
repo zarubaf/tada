@@ -35,7 +35,10 @@ export interface RecordRouteControls {
    * that Back returns to the record they came from.
    */
   follow: (readableId: string) => void;
-  /** Closes the panel and keeps the query. It replaces the history entry. */
+  /**
+   * Closes the panel and keeps the query. It goes back when the step that opened the panel made
+   * its history entry, so that no two equal entries stay; otherwise it replaces the entry.
+   */
   close: () => void;
   /** Opens the create state. It makes a history entry, so that back closes it. */
   startCreate: (kind: RecordKind) => void;
@@ -62,7 +65,7 @@ export function useRecordRoute(): RecordRouteControls {
   const route = useMemo(() => routeOf(hash, creating), [hash, creating]);
 
   const go = useCallback(
-    (to: { hash?: string; kind?: RecordKind }, replace: boolean) => {
+    (to: { hash?: string; kind?: RecordKind }, how: "replace" | "push" | "undo") => {
       const params = new URLSearchParams(window.location.search);
       params.delete(NEW_PARAM);
       if (to.kind) {
@@ -71,7 +74,8 @@ export function useRecordRoute(): RecordRouteControls {
       const query = params.toString();
       const fragment = to.hash === undefined ? "" : `#${encodeURIComponent(to.hash)}`;
       navigate(`${window.location.pathname}${query ? `?${query}` : ""}${fragment}`, {
-        replace,
+        replace: how !== "push",
+        undoPush: how === "undo",
         moveFocus: false,
       });
     },
@@ -80,9 +84,9 @@ export function useRecordRoute(): RecordRouteControls {
 
   return {
     route,
-    open: useCallback((id) => go({ hash: id }, true), [go]),
-    follow: useCallback((id) => go({ hash: id }, false), [go]),
-    close: useCallback(() => go({}, true), [go]),
-    startCreate: useCallback((kind) => go({ kind }, false), [go]),
+    open: useCallback((id) => go({ hash: id }, "replace"), [go]),
+    follow: useCallback((id) => go({ hash: id }, "push"), [go]),
+    close: useCallback(() => go({}, "undo"), [go]),
+    startCreate: useCallback((kind) => go({ kind }, "push"), [go]),
   };
 }

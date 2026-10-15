@@ -28,6 +28,39 @@ export interface NavigateOptions {
    * member caused turns it off; after a member action the pressed control has left the page.
    */
   moveFocus?: boolean;
+  /**
+   * Goes back one entry instead of replacing the current one, when the previous entry of this
+   * session is the address `to`: the step that opened the view pushed the current entry, and
+   * replacing it would leave two equal entries, so that Back seems to do nothing. A view that a
+   * deep link opened has no known previous entry: then it replaces.
+   */
+  undoPush?: boolean;
+}
+
+/**
+ * The addresses of the history entries that this session made, by the index that the entry keeps
+ * in its state. A reload or an entry from outside has no index; its previous address is unknown.
+ */
+const entries = new Map<number, string>();
+
+function entryIndex(): number {
+  const index: unknown = window.history.state?.tadaIndex;
+  return typeof index === "number" ? index : 0;
+}
+
+/** True when two addresses differ at most in the order of the query keys. */
+function sameTarget(a: string, b: string): boolean {
+  const [first, second] = [a, b].map((address) => new URL(address, window.location.origin));
+  if (!first || !second) {
+    return false;
+  }
+  first.searchParams.sort();
+  second.searchParams.sort();
+  return (
+    first.pathname === second.pathname &&
+    first.search === second.search &&
+    first.hash === second.hash
+  );
 }
 
 /** The parts of the address that the router follows. */
@@ -151,10 +184,20 @@ export function Router({ children }: { children: ReactNode }) {
       if (to === path + query + fragment) {
         return;
       }
+      const index = entryIndex();
+      const previous = entries.get(index - 1);
+      if (options?.undoPush && previous !== undefined && sameTarget(previous, to)) {
+        // The popstate event brings the address in.
+        window.history.back();
+        return;
+      }
+      entries.set(index, path + query + fragment);
       if (options?.replace) {
-        window.history.replaceState(null, "", to);
+        window.history.replaceState({ tadaIndex: index }, "", to);
+        entries.set(index, to);
       } else {
-        window.history.pushState(null, "", to);
+        window.history.pushState({ tadaIndex: index + 1 }, "", to);
+        entries.set(index + 1, to);
       }
       sync(options?.moveFocus ?? true);
     },
