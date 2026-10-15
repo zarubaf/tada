@@ -1,5 +1,6 @@
 // The rules of the event memberships screen that need no React.
 import type { Api, EventMembership, EventRole, Problem } from "../api/client";
+import { LARGEST_PAGE, loadAll } from "../registers/loadAll";
 
 /** The event roles in the order of their rights, most rights first. */
 export const EVENT_ROLES: EventRole[] = ["event-manager", "event-contributor", "event-viewer"];
@@ -23,17 +24,15 @@ export function addableMembers(
 export async function loadOrganizationMembers(
   api: Api,
 ): Promise<{ members: OrganizationMember[] } | { error: Problem | undefined }> {
-  const members: OrganizationMember[] = [];
-  let cursor: string | undefined;
-  do {
-    const { data, error } = await api.GET("/api/v1/members", {
-      params: { query: cursor === undefined ? {} : { cursor } },
-    });
-    if (!data) {
-      return { error };
-    }
-    members.push(...data.items.map(({ user_id, display_name }) => ({ user_id, display_name })));
-    cursor = data.next_cursor ?? undefined;
-  } while (cursor !== undefined);
-  return { members };
+  const result = await loadAll((cursor) =>
+    api.GET("/api/v1/members", {
+      params: { query: { limit: LARGEST_PAGE, ...(cursor && { cursor }) } },
+    }),
+  );
+  if ("error" in result) {
+    return result;
+  }
+  return {
+    members: result.items.map(({ user_id, display_name }) => ({ user_id, display_name })),
+  };
 }

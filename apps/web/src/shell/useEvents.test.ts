@@ -53,3 +53,25 @@ describe("useEventList", () => {
     expect(result.current.list).toEqual({ kind: "loaded", events: [event("new")] });
   });
 });
+
+describe("useEventList, more than one page", () => {
+  it("loads every page with the largest page size", async () => {
+    const queries: unknown[] = [];
+    const pages = [
+      { items: [event("a")], next_cursor: "c1" },
+      { items: [event("b")], next_cursor: null },
+    ];
+    const GET = vi.fn(async (_path: string, init: { params: { query: unknown } }) => {
+      queries.push(init.params.query);
+      return { data: pages[queries.length - 1], error: undefined };
+    });
+    const { result } = renderHook(() => useEventList({ GET } as unknown as Api, "org-a"));
+
+    await act(async () => result.current.load());
+
+    await vi.waitFor(() =>
+      expect(result.current.list).toEqual({ kind: "loaded", events: [event("a"), event("b")] }),
+    );
+    expect(queries).toEqual([{ limit: 200 }, { limit: 200, cursor: "c1" }]);
+  });
+});
