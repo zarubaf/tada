@@ -319,14 +319,9 @@ export interface LinkProps {
   exact?: boolean;
   /**
    * The link is also current for every path below this prefix, for example a whole settings area,
-   * or the pages of the documents of one event, whose paths do not start with the path of the link.
+   * whose paths do not start with the path of the link.
    */
   within?: string;
-  /**
-   * The link is also current on each of these paths and the paths below them, for example a link to
-   * the first page of a group of pages with a navigation of its own.
-   */
-  alsoCurrentOn?: readonly string[];
   /**
    * Another link claims this path and the paths below it, for example the item of one page of an
    * event, below the item of the events. This link is not current there.
@@ -377,7 +372,6 @@ export function Link({
   className,
   exact,
   within,
-  alsoCurrentOn = [],
   yieldsTo,
   onlyWith,
   unlessWith,
@@ -400,8 +394,7 @@ export function Link({
     passesQueryRules(search, { onlyWith, unlessWith }) &&
     (pathname === target ||
       (!exact && pathname.startsWith(`${target}/`)) ||
-      (within !== undefined && pathname.startsWith(`${within}/`)) ||
-      alsoCurrentOn.some((path) => isAtOrBelow(pathname, path)));
+      (within !== undefined && pathname.startsWith(`${within}/`)));
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     const plain =
       event.button === 0 &&
