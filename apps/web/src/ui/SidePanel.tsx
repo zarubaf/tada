@@ -64,6 +64,8 @@ export function SidePanel({
   // The latest fallback, read when the panel closes, not when it opens.
   const fallback = useRef(returnFocusTo);
   fallback.current = returnFocusTo;
+  // Lets go of the inert page. The focus must return to an element that is no longer inert.
+  const releaseInert = useRef<() => void>(undefined);
 
   // A layout effect, because its cleanup runs before React removes the panel. Then the focus is
   // still inside the panel, and we can tell whether the panel owned it.
@@ -75,6 +77,8 @@ export function SidePanel({
       if (!panel?.contains(document.activeElement)) {
         return;
       }
+      // The cleanups run in the order of the effects: the page is still inert here on a phone.
+      releaseInert.current?.();
       const target =
         opener instanceof HTMLElement && opener !== document.body && opener.isConnected
           ? opener
@@ -91,19 +95,19 @@ export function SidePanel({
     if (!panel || !narrow) {
       return;
     }
-    let release: (() => void) | undefined;
     function apply() {
-      release?.();
-      release = undefined;
+      releaseInert.current?.();
+      releaseInert.current = undefined;
       if (panel && narrow?.matches) {
-        release = makeOutsideInert(panel);
+        releaseInert.current = makeOutsideInert(panel);
       }
     }
     apply();
     narrow.addEventListener("change", apply);
     return () => {
       narrow.removeEventListener("change", apply);
-      release?.();
+      releaseInert.current?.();
+      releaseInert.current = undefined;
     };
   }, []);
 
