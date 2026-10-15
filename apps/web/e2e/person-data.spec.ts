@@ -67,7 +67,7 @@ test("an owner finds the export, redacts a mention and sees it removed", async (
     return route.fulfill(json({ applied: ["0199b8e0-0000-7000-8000-0000000000f1"] }, 201));
   });
 
-  await page.goto("/persons");
+  await page.goto("/contacts");
   await page.getByRole("button", { name: /bearbeiten$/ }).click();
   await expect(page.getByRole("heading", { name: "Datenschutz" })).toBeVisible();
 

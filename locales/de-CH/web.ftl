@@ -921,12 +921,17 @@ org-privacy-read = Datenschutzerklärung lesen
 
 ## Persons and institutions (ADR 0069)
 
-persons-title = Personen
-institutions-title = Institutionen
+contacts-title = Kontakte
+contacts-tabs = Art des Kontakts
+contacts-tab-persons = Personen
+contacts-tab-institutions = Institutionen
+parties-new = Neu
+person-new = Neue Person
+institution-new = Neue Institution
 parties-search = Nach Name suchen
 parties-loading = Einträge werden geladen
 parties-empty-title = Noch keine Einträge erfasst
-parties-empty-text = Erfassen Sie den ersten Eintrag mit dem Formular unter der Liste.
+parties-empty-text = Erfassen Sie den ersten Eintrag mit „Neu“.
 parties-no-match-title = Keine Treffer
 parties-no-match-text = Ändern Sie den Suchbegriff.
 parties-column-id = ID

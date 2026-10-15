@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { lazy, type RefObject, Suspense, useCallback, useMemo } from "react";
 import type { Api } from "../api/client";
 import { t } from "../i18n";
 import { canManage } from "../members/roles";
@@ -9,27 +9,48 @@ import { useSession } from "../session/SessionProvider";
 import { Button } from "../ui/Button";
 import type { Column } from "../ui/DataTable";
 import { LiveRegion } from "../ui/LiveRegion";
-import { Page, PageTitle } from "../ui/Page";
 import { redactedOr } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
-import { TextField } from "../ui/TextField";
-import styles from "./PartiesPage.module.css";
+import { TaskDialog } from "../ui/TaskDialog";
 import { PartyForm } from "./PartyForm";
+import styles from "./PartyRegister.module.css";
 import { type Party, type PartyKind, partyApi } from "./partyApi";
 
 // Only an owner opens it, so the initial bundle does not carry it (ADR 0024).
 const PersonDataProtection = lazy(() => import("./PersonDataProtection"));
 
+export interface PartyRegisterProps {
+  api: Api;
+  kind: PartyKind;
+  /** The text of the search by name; the page owns the field in its toolbar row. */
+  query: string;
+  /** The name of the table. */
+  label: string;
+  /** The `h1` of the page: focus returns to it when a form closes. */
+  heading: RefObject<HTMLHeadingElement | null>;
+  /** True while the form of a new record is open in its dialog. */
+  creating: boolean;
+  onCloseCreate: () => void;
+}
+
 /**
- * „Personen“ and „Institutionen“: the register of the organization, a search by name and the form
- * that creates a record. The page shows „Bearbeiten“ only where the record says `can_change`.
+ * One register of „Kontakte“, persons or institutions: the table, the form that changes a record
+ * and the dialog that creates one. The page shows „Bearbeiten“ only where the record says
+ * `can_change`.
  */
-export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
+export function PartyRegister({
+  api,
+  kind,
+  query,
+  label,
+  heading,
+  creating,
+  onCloseCreate,
+}: PartyRegisterProps) {
   const party = useMemo(() => partyApi(api, kind), [api, kind]);
   const person = kind === "person";
   const role = useSession().organization?.role;
   const manages = canManage(role);
-  const [query, setQuery] = useState("");
   const search = query.trim();
   // A new search is a new `fetchPage`, so the register loads the first page again.
   const fetchPage = useCallback(
@@ -38,7 +59,7 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
     [party, search],
   );
   const register = useRegister<Party>(fetchPage);
-  const page = useRegisterPage<Party>(register.reload);
+  const page = useRegisterPage<Party>(register.reload, heading);
   const { editing } = page;
 
   const saved = (record: Party) => {
@@ -46,12 +67,15 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
     if (editing) {
       register.replace(record);
       page.closeForm();
-    } else if (search === "") {
-      // A new record has the highest number, so it belongs at the end of the loaded rows. With a
-      // search, it may not match, so the list loads again.
-      register.append(record);
     } else {
-      void register.reload();
+      onCloseCreate();
+      if (search === "") {
+        // A new record has the highest number, so it belongs at the end of the loaded rows. With
+        // a search, it may not match, so the list loads again.
+        register.append(record);
+      } else {
+        void register.reload();
+      }
     }
   };
 
@@ -83,6 +107,7 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
               row.can_change &&
               !row.redacted && (
                 <Button
+                  size="sm"
                   aria-label={t("parties-edit-of", { name: row.name })}
                   onPress={() => page.edit(row)}
                 >
@@ -94,29 +119,15 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
       : []),
   ];
 
-  const title = person ? t("persons-title") : t("institutions-title");
-
   return (
-    <Page>
+    <>
       <LiveRegion kind="alert">{page.failure}</LiveRegion>
       <LiveRegion kind="status">{page.confirmation}</LiveRegion>
-      <div className={styles.toolbar}>
-        <PageTitle ref={page.heading}>{title}</PageTitle>
-        <div className={styles.search}>
-          <TextField
-            label={t("parties-search")}
-            type="search"
-            value={query}
-            onChange={setQuery}
-            autoComplete="off"
-          />
-        </div>
-      </div>
 
       <RegisterView
         register={register}
         page={page}
-        label={title}
+        label={label}
         columns={columns}
         rowId={(row) => row.local_id}
         loadingLabel={t("parties-loading")}
@@ -127,32 +138,47 @@ export function PartiesPage({ api, kind }: { api: Api; kind: PartyKind }) {
         }
       />
 
-      <section className={styles.section} aria-labelledby="party-form-title">
-        <h2 id="party-form-title" ref={page.formHeading} tabIndex={-1} className={styles.heading}>
-          {editing
-            ? t("party-change-title", { name: editing.name })
-            : person
-              ? t("person-create-title")
-              : t("institution-create-title")}
-        </h2>
-        <PartyForm
-          key={editing ? `${editing.id}:${editing.version}` : "new"}
-          api={party}
-          kind={kind}
-          {...(person && manages && { memberApi: api })}
-          {...(editing && { record: editing })}
-          onStart={page.start}
-          onSaved={saved}
-          onFailed={page.fail}
-          {...(editing && { onCancel: () => page.closeForm() })}
-        />
-      </section>
+      {creating && (
+        <TaskDialog
+          title={person ? t("person-create-title") : t("institution-create-title")}
+          onCancel={onCloseCreate}
+        >
+          <PartyForm
+            api={party}
+            kind={kind}
+            {...(person && manages && { memberApi: api })}
+            onStart={page.start}
+            onSaved={saved}
+            onFailed={page.fail}
+            onCancel={onCloseCreate}
+          />
+        </TaskDialog>
+      )}
+
+      {editing && (
+        <section className={styles.section} aria-labelledby="party-form-title">
+          <h2 id="party-form-title" ref={page.formHeading} tabIndex={-1} className={styles.heading}>
+            {t("party-change-title", { name: editing.name })}
+          </h2>
+          <PartyForm
+            key={`${editing.id}:${editing.version}`}
+            api={party}
+            kind={kind}
+            {...(person && manages && { memberApi: api })}
+            record={editing}
+            onStart={page.start}
+            onSaved={saved}
+            onFailed={page.fail}
+            onCancel={() => page.closeForm()}
+          />
+        </section>
+      )}
 
       {person && role === "owner" && editing && (
         <Suspense fallback={<Skeleton />}>
           <PersonDataProtection key={editing.id} api={api} personId={editing.id} />
         </Suspense>
       )}
-    </Page>
+    </>
   );
 }

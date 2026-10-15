@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createApi } from "../api/client";
 import { Route, Router, Routes } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
-import { PartiesPage } from "./PartiesPage";
+import { ContactsPage } from "./ContactsPage";
+import { ContactsRedirect } from "./ContactsRedirect";
 
 const ME = "0199b8e0-0000-7000-8000-0000000000b1";
 
@@ -111,14 +112,20 @@ function setup({
     throw new Error(`unexpected ${request.method} ${url.pathname}`);
   };
   const api = createApi(fetch as unknown as typeof globalThis.fetch);
-  const path = kind === "person" ? "/persons" : "/institutions";
-  window.history.replaceState(null, "", `${path}${hash}`);
+  const query = kind === "person" ? "" : "?tab=institutions";
+  window.history.replaceState(null, "", `/contacts${query}${hash}`);
   render(
     <Router>
       <SessionProvider api={api}>
         <Routes>
-          <Route path={path}>
-            <PartiesPage api={api} kind={kind} />
+          <Route path="/contacts">
+            <ContactsPage api={api} />
+          </Route>
+          <Route path="/persons">
+            <ContactsRedirect tab="persons" />
+          </Route>
+          <Route path="/institutions">
+            <ContactsRedirect tab="institutions" />
           </Route>
         </Routes>
       </SessionProvider>
@@ -128,6 +135,12 @@ function setup({
 }
 
 const user = userEvent.setup({ delay: null });
+
+/** The „Neu“ button opens the form of a new record in a dialog. */
+async function openCreate() {
+  await user.click(screen.getByRole("button", { name: /^Neue? / }));
+  return screen.findByRole("dialog");
+}
 
 const spaet = { ...clara, id: "p9", local_id: "PER-009", name: "Spät" };
 
@@ -142,7 +155,7 @@ function held() {
 
 afterEach(() => window.history.replaceState(null, "", "/"));
 
-describe("PartiesPage", () => {
+describe("ContactsPage", () => {
   it("lists persons and filters by name", async () => {
     const { calls } = setup();
 
@@ -176,7 +189,7 @@ describe("PartiesPage", () => {
     expect(
       screen.queryByRole("button", { name: "Weitere Einträge laden" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: "Personen" })).toHaveFocus();
+    expect(screen.getByRole("heading", { level: 1, name: "Kontakte" })).toHaveFocus();
   });
 
   it("ignores a next page that arrives after the search changed the list", async () => {
@@ -335,6 +348,7 @@ describe("PartiesPage", () => {
     });
     await screen.findByRole("table", { name: "Personen" });
 
+    await openCreate();
     await user.type(screen.getByRole("textbox", { name: "Name (Pflichtfeld)" }), "Dora");
     await user.type(screen.getByRole("textbox", { name: "E-Mail-Adresse" }), "dora");
     await user.click(screen.getByRole("button", { name: "Erfassen" }));
@@ -355,6 +369,7 @@ describe("PartiesPage", () => {
     });
     await screen.findByRole("table", { name: "Personen" });
 
+    await openCreate();
     await user.type(screen.getByRole("textbox", { name: "Name (Pflichtfeld)" }), "Dora");
     await user.click(screen.getByRole("button", { name: "Erfassen" }));
 
@@ -395,7 +410,8 @@ describe("PartiesPage", () => {
     const { calls } = setup({ role: "member" });
     await screen.findByRole("table", { name: "Personen" });
 
-    expect(screen.queryByRole("button", { name: /Konto/ })).not.toBeInTheDocument();
+    await openCreate();
+    expect(screen.queryByRole("combobox", { name: "Konto" })).not.toBeInTheDocument();
     expect(calls.some((c) => c.call.includes("/members"))).toBe(false);
   });
 
@@ -406,6 +422,7 @@ describe("PartiesPage", () => {
     });
     await screen.findByRole("table", { name: "Personen" });
 
+    await openCreate();
     await user.type(screen.getByRole("textbox", { name: "Name (Pflichtfeld)" }), "Dora");
     await user.type(await screen.findByRole("combobox", { name: "Konto" }), "bru");
     await user.click(await screen.findByRole("option", { name: "Bruno Beispiel" }));
@@ -425,6 +442,7 @@ describe("PartiesPage", () => {
     });
     await screen.findByRole("table", { name: "Personen" });
 
+    await openCreate();
     await user.type(screen.getByRole("textbox", { name: "Name (Pflichtfeld)" }), "Dora");
     const account = await screen.findByRole("combobox", { name: "Konto" });
     await user.type(account, "bru");
@@ -442,6 +460,7 @@ describe("PartiesPage", () => {
     const { calls } = setup({ role: "admin" });
     await screen.findByRole("table", { name: "Personen" });
 
+    await openCreate();
     await user.type(await screen.findByRole("combobox", { name: "Konto" }), "bru");
 
     await screen.findByRole("option", { name: "Bruno Beispiel" });
@@ -519,5 +538,179 @@ describe("PartiesPage", () => {
     const table = await screen.findByRole("table", { name: "Personen" });
     expect(within(table).getByText("entfernt")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /bearbeiten/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("the tabs of Kontakte", () => {
+  it("shows the persons by default and keeps no tab key in the address", async () => {
+    setup();
+
+    const tabs = await screen.findByRole("tablist", { name: "Art des Kontakts" });
+    expect(within(tabs).getByRole("tab", { name: "Personen" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(await screen.findByRole("table", { name: "Personen" })).toBeInTheDocument();
+    expect(window.location.search).toBe("");
+  });
+
+  it("opens the institutions from the query", async () => {
+    setup({ kind: "institution" });
+
+    expect(await screen.findByRole("table", { name: "Institutionen" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Institutionen" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("switches the tab, writes it to the address and removes it for the default", async () => {
+    const { calls } = setup();
+    await screen.findByRole("table", { name: "Personen" });
+
+    await user.click(screen.getByRole("tab", { name: "Institutionen" }));
+    expect(await screen.findByRole("table", { name: "Institutionen" })).toBeInTheDocument();
+    expect(window.location.search).toBe("?tab=institutions");
+    expect(calls.some((c) => c.call === "GET /api/v1/institutions")).toBe(true);
+
+    await user.click(screen.getByRole("tab", { name: "Personen" }));
+    expect(await screen.findByRole("table", { name: "Personen" })).toBeInTheDocument();
+    expect(window.location.search).toBe("");
+  });
+
+  it("follows the back button between the tabs", async () => {
+    setup();
+    await screen.findByRole("table", { name: "Personen" });
+    await user.click(screen.getByRole("tab", { name: "Institutionen" }));
+    await screen.findByRole("table", { name: "Institutionen" });
+
+    act(() => window.history.back());
+
+    expect(await screen.findByRole("table", { name: "Personen" })).toBeInTheDocument();
+  });
+
+  it("drops the fragment of a row when the tab changes", async () => {
+    setup({ kind: "institution", hash: "#INS-001" });
+    await screen.findByRole("table", { name: "Institutionen" });
+
+    await user.click(screen.getByRole("tab", { name: "Personen" }));
+
+    await screen.findByRole("table", { name: "Personen" });
+    expect(window.location.hash).toBe("");
+  });
+
+  it("clears the search when the tab changes", async () => {
+    setup();
+    await screen.findByRole("table", { name: "Personen" });
+    await user.type(screen.getByRole("searchbox", { name: "Nach Name suchen" }), "probst");
+
+    await user.click(screen.getByRole("tab", { name: "Institutionen" }));
+
+    await screen.findByRole("table", { name: "Institutionen" });
+    expect(screen.getByRole("searchbox", { name: "Nach Name suchen" })).toHaveValue("");
+  });
+
+  it("names the new button after the kind of the tab", async () => {
+    setup();
+    await screen.findByRole("table", { name: "Personen" });
+    expect(screen.getByRole("button", { name: "Neue Person" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Institutionen" }));
+
+    expect(await screen.findByRole("button", { name: "Neue Institution" })).toBeInTheDocument();
+  });
+});
+
+describe("the form of a new record", () => {
+  it("opens in a dialog and closes on cancel, with focus back on the button", async () => {
+    setup();
+    await screen.findByRole("table", { name: "Personen" });
+
+    const dialog = await openCreate();
+    expect(within(dialog).getByRole("heading", { name: "Person erfassen" })).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Abbrechen" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Neue Person" })).toHaveFocus());
+  });
+
+  it("closes after the save and says so", async () => {
+    setup({
+      answers: {
+        "POST /persons": () => json(201, { ...clara, id: "p3", local_id: "PER-003", name: "Dora" }),
+      },
+    });
+    await screen.findByRole("table", { name: "Personen" });
+    await openCreate();
+    await user.type(screen.getByRole("textbox", { name: "Name (Pflichtfeld)" }), "Dora");
+    await user.click(screen.getByRole("button", { name: "Erfassen" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByText("PER-003")).toBeInTheDocument();
+    expect(screen.getByText(/Dora/, { selector: "[role=status]" })).toBeInTheDocument();
+  });
+
+  it("creates an institution on the institutions tab", async () => {
+    const { calls } = setup({
+      kind: "institution",
+      answers: {
+        "POST /institutions": () => json(201, { ...generators, id: "i2", name: "Neu AG" }),
+      },
+    });
+    await screen.findByRole("table", { name: "Institutionen" });
+    const dialog = await openCreate();
+    expect(within(dialog).getByRole("heading", { name: "Institution erfassen" })).toBeVisible();
+    await user.type(screen.getByRole("textbox", { name: "Name (Pflichtfeld)" }), "Neu AG");
+    await user.click(screen.getByRole("button", { name: "Erfassen" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(calls.find((c) => c.call === "POST /api/v1/institutions")?.body).toMatchObject({
+      name: "Neu AG",
+      kind: "other",
+    });
+  });
+});
+
+describe("the old addresses", () => {
+  const redirect = async (from: string) => {
+    window.history.replaceState(null, "", from);
+    render(
+      <Router>
+        <Routes>
+          <Route path="/persons">
+            <ContactsRedirect tab="persons" />
+          </Route>
+          <Route path="/institutions">
+            <ContactsRedirect tab="institutions" />
+          </Route>
+        </Routes>
+      </Router>,
+    );
+    await waitFor(() => expect(window.location.pathname).toBe("/contacts"));
+  };
+
+  it("sends /persons to the first tab", async () => {
+    await redirect("/persons");
+    expect(window.location.search).toBe("");
+  });
+
+  it("sends /institutions to its tab and keeps the fragment of a row", async () => {
+    await redirect("/institutions#INS-001");
+    expect(window.location.search).toBe("?tab=institutions");
+    expect(window.location.hash).toBe("#INS-001");
+  });
+
+  it("keeps the other parts of the query", async () => {
+    await redirect("/institutions?x=1");
+    expect(new URLSearchParams(window.location.search).get("x")).toBe("1");
+    expect(new URLSearchParams(window.location.search).get("tab")).toBe("institutions");
+  });
+
+  it("replaces the history entry, so that back does not return to the old address", async () => {
+    window.history.replaceState(null, "", "/");
+    const before = window.history.length;
+    window.history.pushState(null, "", "/persons");
+    await redirect("/persons");
+    expect(window.history.length).toBe(before + 1);
   });
 });
