@@ -21,6 +21,11 @@ export interface SearchSelectProps {
   placeholder: string;
   /** The text of the button that clears the choice. Without it the choice cannot be cleared. */
   clearLabel?: string;
+  /**
+   * An entry after the list that leaves the select, for example „Bereiche verwalten …“. The popover
+   * closes and the caller moves focus on, because what `onPress` opens takes it.
+   */
+  action?: { label: string; onPress: () => void };
   /** False for a short list, where a search field is noise. */
   searchable?: boolean;
   /** `quiet` has no border until hover, for a value in a list of properties. */
@@ -51,6 +56,7 @@ export function SearchSelect({
   onChange,
   placeholder,
   clearLabel,
+  action,
   searchable = true,
   variant = "secondary",
   isPending = false,
@@ -117,6 +123,17 @@ export function SearchSelect({
               }}
             >
               {clearLabel}
+            </Button>
+          )}
+          {action && (
+            <Button
+              variant="quiet"
+              onPress={() => {
+                setOpen(false);
+                action.onPress();
+              }}
+            >
+              {action.label}
             </Button>
           )}
         </Dialog>
