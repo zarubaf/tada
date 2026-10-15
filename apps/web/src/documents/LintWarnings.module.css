@@ -1,10 +1,24 @@
 @layer components {
   .warnings {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-2-5) var(--space-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-warning-subtle);
+  }
+
+  .icon {
+    flex: none;
+    margin-block-start: var(--space-0-5);
+    color: var(--color-warning);
+  }
+
+  .text {
     display: grid;
     gap: var(--space-1);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--color-warning-subtle);
+    min-width: 0;
   }
 
   .title {
@@ -14,6 +28,7 @@
   .list {
     display: grid;
     gap: var(--space-0-5);
+    margin: 0;
     padding-inline-start: var(--space-4);
     list-style: disc;
     font-size: var(--font-size-sm);

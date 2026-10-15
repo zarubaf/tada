@@ -1,4 +1,4 @@
-import { IconAlertTriangle } from "@tabler/icons-react";
+import { IconAlertTriangle, IconArrowLeft, IconCheck } from "@tabler/icons-react";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Api,
@@ -7,7 +7,6 @@ import {
   type DraftRendering,
   problemMessage,
 } from "../api/client";
-import { EventPage } from "../events/EventPage";
 import { useEventContext, useEventWritable } from "../events/eventContext";
 import { loadOrganizationMembers } from "../events/eventMembers";
 import { useManagesEvent } from "../events/useManagesEvent";
@@ -20,12 +19,16 @@ import { FileLink } from "../ui/FileLink";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
-import { Page } from "../ui/Page";
+import { Page, PageTitle } from "../ui/Page";
+import { PageToolbar } from "../ui/PageToolbar";
 import { Redacted } from "../ui/Redacted";
 import { Skeleton } from "../ui/Skeleton";
 import { StandaloneLink } from "../ui/StandaloneLink";
 import styles from "./DocumentPage.module.css";
+import { DraftChips } from "./DraftChips";
 import { DraftView } from "./DraftView";
+import { EventMark } from "./EventMark";
+import { EventScope } from "./EventScope";
 import { formatSize, hashPrefix } from "./format";
 import { LintWarnings } from "./LintWarnings";
 import { diffPath, isApprovable, newestVersion, previousDraft } from "./versions";
@@ -59,13 +62,8 @@ function previewKind(version: DocumentVersion | undefined): "pdf" | "text" | und
   return mediaType === "text/plain" ? "text" : undefined;
 }
 
-/** A version of a document: the file, or the draft status. */
+/** The file of an upload version, with its size. */
 function versionLabel(version: DocumentVersion): string {
-  if (version.kind === "draft") {
-    return t("document-draft-status", {
-      status: t(`document-status-${version.status ?? "draft"}`),
-    });
-  }
   const size = typeof version.size_bytes === "number" ? ` · ${formatSize(version.size_bytes)}` : "";
   return `${version.file_name ?? ""}${size}`;
 }
@@ -144,7 +142,13 @@ export function DocumentPage({ api }: { api: Api }) {
           <Redacted />
         ) : (
           <>
-            {versionLabel(v)}
+            {v.kind === "draft" ? (
+              <span className={styles.chips}>
+                <DraftChips version={v} />
+              </span>
+            ) : (
+              versionLabel(v)
+            )}
             <DisputeNotes notes={v.dispute_notes} />
           </>
         ),
@@ -194,7 +198,7 @@ export function DocumentPage({ api }: { api: Api }) {
 
   if (state.kind === "loaded") {
     return (
-      <EventPage api={api} eventId={state.document.event_id}>
+      <EventScope api={api} eventId={state.document.event_id}>
         <DocumentBody
           api={api}
           reload={load}
@@ -203,30 +207,32 @@ export function DocumentPage({ api }: { api: Api }) {
           columns={columns}
           heading={heading}
         />
-      </EventPage>
+      </EventScope>
     );
   }
   return (
-    <Page>
-      {state.kind === "loading" && (
-        <div className={styles.skeleton} role="status" aria-label={t("document-loading")}>
-          <Skeleton />
-          <Skeleton />
-        </div>
-      )}
-      {state.kind === "failed" && (
-        <InlineError
-          message={state.message}
-          requestId={state.requestId}
-          announce={retried ? "focus" : "alert"}
-          onRetry={() =>
-            retry(() => {
-              setState({ kind: "loading" });
-              return load();
-            })
-          }
-        />
-      )}
+    <Page width="flush">
+      <div className={styles.state}>
+        {state.kind === "loading" && (
+          <div className={styles.skeleton} role="status" aria-label={t("document-loading")}>
+            <Skeleton />
+            <Skeleton />
+          </div>
+        )}
+        {state.kind === "failed" && (
+          <InlineError
+            message={state.message}
+            requestId={state.requestId}
+            announce={retried ? "focus" : "alert"}
+            onRetry={() =>
+              retry(() => {
+                setState({ kind: "loading" });
+                return load();
+              })
+            }
+          />
+        )}
+      </div>
     </Page>
   );
 }
@@ -376,102 +382,117 @@ function DocumentBody({
   };
 
   return (
-    <>
-      <StandaloneLink to={`/events/${encodeURIComponent(document.event_id)}/documents`}>
-        {t("document-back")}
-      </StandaloneLink>
-      <header className={styles.header}>
-        <p className={styles.key}>{document.readable_id}</p>
-        <h2 ref={heading} tabIndex={-1} className={styles.title}>
-          {document.name}
-        </h2>
-      </header>
-      <LiveRegion kind="status">{approved}</LiveRegion>
-      <LiveRegion kind="alert">{failed}</LiveRegion>
-      {/* An absent value means that the server does not know: the page then says nothing. */}
-      {document.facts_changed === true && (
-        <section className={styles.changed} aria-labelledby="document-facts-changed-title">
-          <h3 id="document-facts-changed-title" className={styles.changedTitle}>
-            <IconAlertTriangle size={16} stroke={1.5} aria-hidden="true" />
-            {t("document-facts-changed-title")}
-          </h3>
-          <p>{t("document-facts-changed-text")}</p>
-        </section>
-      )}
-      <section className={styles.section} aria-labelledby="document-versions-title">
-        <h3 id="document-versions-title" className={styles.heading}>
-          {t("document-versions-title")}
-        </h3>
-        <DataTable
-          label={t("document-versions-title")}
-          columns={columns}
-          rows={versions}
-          rowKey={(v) => v.id}
-        />
-        <p className={styles.help}>{t("documents-no-scan")}</p>
-      </section>
-      <section className={styles.section} aria-labelledby="document-preview-title">
-        <h3
-          id="document-preview-title"
-          ref={previewHeading}
-          tabIndex={-1}
-          className={styles.heading}
+    <Page width="flush">
+      <PageToolbar>
+        <StandaloneLink
+          to={`/events/${encodeURIComponent(document.event_id)}/documents`}
+          className={styles.back}
         >
-          {t("document-preview-title")}
-        </h3>
-        {writable && newest && isApprovable(newest) && canApprove && shownDraft === newest.id && (
-          <div>
-            <Button variant="primary" isPending={approving} onPress={() => void approve()}>
-              {t("document-approve")}
-            </Button>
-          </div>
+          <IconArrowLeft size={14} stroke={1.5} aria-hidden="true" />
+          {t("document-back")}
+        </StandaloneLink>
+        <PageTitle ref={heading} compact>
+          {document.name}
+        </PageTitle>
+        <span className={styles.key}>{document.readable_id}</span>
+        <EventMark />
+      </PageToolbar>
+      <div className={styles.content}>
+        <LiveRegion kind="status">{approved}</LiveRegion>
+        <LiveRegion kind="alert">{failed}</LiveRegion>
+        {/* An absent value means that the server does not know: the page then says nothing. */}
+        {document.facts_changed === true && (
+          <section className={styles.changed} aria-labelledby="document-facts-changed-title">
+            <IconAlertTriangle size={16} stroke={1.5} aria-hidden="true" className={styles.icon} />
+            <div className={styles.changedText}>
+              <h2 id="document-facts-changed-title" className={styles.changedTitle}>
+                {t("document-facts-changed-title")}
+              </h2>
+              <p>{t("document-facts-changed-text")}</p>
+            </div>
+          </section>
         )}
-        {newest?.kind === "draft" && rendering.state.kind === "loading" && <Skeleton />}
-        {newest?.kind === "draft" && rendering.state.kind === "failed" && (
-          <InlineError
-            message={rendering.state.message}
-            requestId={rendering.state.requestId}
-            announce={retried ? "focus" : "alert"}
-            onRetry={() =>
-              retry(() => {
-                rendering.loading();
-                return rendering.load();
-              })
-            }
+        <section className={styles.section} aria-labelledby="document-versions-title">
+          <h2 id="document-versions-title" className={styles.heading}>
+            {t("document-versions-title")}
+          </h2>
+          <DataTable
+            label={t("document-versions-title")}
+            columns={columns}
+            rows={versions}
+            rowKey={(v) => v.id}
           />
-        )}
-        {newest?.kind === "draft" && rendering.state.kind === "loaded" && (
-          <LintWarnings warnings={rendering.state.draft.lint_warnings} />
-        )}
-        {newest?.kind === "draft" && rendering.state.kind === "loaded" && (
-          <DraftView
-            onShown={() => setShownDraft(newest.id)}
-            api={api}
-            eventId={document.event_id}
-            timeZone={event.time_zone}
-            draft={rendering.state.draft}
-            headingLevel={4}
-            profile={profile}
-          />
-        )}
-        {newest && preview === "text" && (
-          <iframe
-            className={styles.frame}
-            title={t("document-preview-of", { name: newest.file_name ?? "" })}
-            src={contentUrl(newest, true)}
-          />
-        )}
-        {newest && preview === "pdf" && (
-          // The server sends a download with `sandbox`, which a browser may refuse to show in a
-          // frame. A link to a new tab keeps the CSP unchanged (ADR 0043).
-          <div>
-            <FileLink newTab href={contentUrl(newest, true)}>
-              {t("document-preview-open")}
-            </FileLink>
-          </div>
-        )}
-        {newest?.kind === "upload" && !preview && <p>{t("document-preview-none")}</p>}
-      </section>
-    </>
+          <p className={styles.help}>{t("documents-no-scan")}</p>
+        </section>
+        <section className={styles.section} aria-labelledby="document-preview-title">
+          <h2
+            id="document-preview-title"
+            ref={previewHeading}
+            tabIndex={-1}
+            className={styles.heading}
+          >
+            {t("document-preview-title")}
+          </h2>
+          {writable && newest && isApprovable(newest) && canApprove && shownDraft === newest.id && (
+            <div>
+              <Button
+                variant="primary"
+                size="sm"
+                isPending={approving}
+                onPress={() => void approve()}
+              >
+                <IconCheck size={14} stroke={1.5} aria-hidden="true" />
+                {t("document-approve")}
+              </Button>
+            </div>
+          )}
+          {newest?.kind === "draft" && rendering.state.kind === "loading" && <Skeleton />}
+          {newest?.kind === "draft" && rendering.state.kind === "failed" && (
+            <InlineError
+              message={rendering.state.message}
+              requestId={rendering.state.requestId}
+              announce={retried ? "focus" : "alert"}
+              onRetry={() =>
+                retry(() => {
+                  rendering.loading();
+                  return rendering.load();
+                })
+              }
+            />
+          )}
+          {newest?.kind === "draft" && rendering.state.kind === "loaded" && (
+            <LintWarnings warnings={rendering.state.draft.lint_warnings} />
+          )}
+          {newest?.kind === "draft" && rendering.state.kind === "loaded" && (
+            <DraftView
+              onShown={() => setShownDraft(newest.id)}
+              api={api}
+              eventId={document.event_id}
+              timeZone={event.time_zone}
+              draft={rendering.state.draft}
+              headingLevel={3}
+              profile={profile}
+            />
+          )}
+          {newest && preview === "text" && (
+            <iframe
+              className={styles.frame}
+              title={t("document-preview-of", { name: newest.file_name ?? "" })}
+              src={contentUrl(newest, true)}
+            />
+          )}
+          {newest && preview === "pdf" && (
+            // The server sends a download with `sandbox`, which a browser may refuse to show in a
+            // frame. A link to a new tab keeps the CSP unchanged (ADR 0043).
+            <div>
+              <FileLink newTab href={contentUrl(newest, true)}>
+                {t("document-preview-open")}
+              </FileLink>
+            </div>
+          )}
+          {newest?.kind === "upload" && !preview && <p>{t("document-preview-none")}</p>}
+        </section>
+      </div>
+    </Page>
   );
 }
