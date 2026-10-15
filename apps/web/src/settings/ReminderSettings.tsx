@@ -134,9 +134,9 @@ export function ReminderSettings({ api, onStatus, onFailure }: ReminderSettingsP
 
   return (
     <section className={styles.section} aria-labelledby="reminders-title">
-      <h2 id="reminders-title" ref={title} tabIndex={-1} className={styles.title}>
+      <h3 id="reminders-title" ref={title} tabIndex={-1} className={styles.title}>
         {t("reminders-title")}
-      </h2>
+      </h3>
       <p className={styles.intro}>{t("reminders-intro")}</p>
       {state.kind === "loading" && <SkeletonLines label={t("reminders-loading")} />}
       {state.kind === "failed" && (
@@ -227,7 +227,7 @@ function Controls({
         {!linked && (
           <p id={LINK_HINT} tabIndex={-1} className={styles.help}>
             {t(optedIn ? "reminders-link-lost" : "reminders-not-linked")}{" "}
-            <Link to="/settings/telegram" className={styles.link}>
+            <Link to="/settings?tab=telegram" className={styles.link}>
               {t("reminders-link-telegram")}
             </Link>
           </p>

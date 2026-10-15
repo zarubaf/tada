@@ -22,7 +22,7 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page);
       await fakeReminders(page, notLinked);
-      await page.goto("/settings/account");
+      await page.goto("/settings");
       await setTheme(page, theme);
       await expect(page.getByRole("button", { name: "Überall abmelden" })).toBeVisible();
       await expect(page.getByRole("switch")).toBeVisible();
@@ -45,13 +45,13 @@ test("opt_in_needs_link: without a Telegram link the opt-in is off and leads to 
 }) => {
   await fakeSession(page);
   await fakeReminders(page, notLinked);
-  await page.goto("/settings/account");
+  await page.goto("/settings");
 
   const toggle = page.getByRole("switch", { name: "Erinnerungen in Telegram erhalten" });
   await expect(toggle).toBeDisabled();
   await expect(page.getByText("Für Erinnerungen braucht tada ein verknüpftes")).toBeVisible();
   await page.getByRole("link", { name: "Telegram verknüpfen" }).click();
-  await expect(page).toHaveURL(/\/settings\/telegram$/);
+  await expect(page).toHaveURL(/\/settings\?tab=telegram$/);
 });
 
 test("a linked member opts in, and a lost link answers with the reason", async ({ page }) => {
@@ -61,7 +61,7 @@ test("a linked member opts in, and a lost link answers with the reason", async (
     ...problemBody("validation-failed", 422),
     errors: [{ pointer: "/opt_in", code: "telegram-not-linked" }],
   });
-  await page.goto("/settings/account");
+  await page.goto("/settings");
 
   const toggle = page.getByRole("switch", { name: "Erinnerungen in Telegram erhalten" });
   await expect(toggle).toBeEnabled();

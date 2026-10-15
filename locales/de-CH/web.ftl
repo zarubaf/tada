@@ -499,7 +499,7 @@ members-loaded-more = Weitere Mitglieder geladen.
 
 ## Settings navigation and Telegram link (settings)
 
-settings-nav = Einstellungen
+settings-tabs-label = Bereich
 settings-nav-members = Mitglieder
 settings-nav-telegram = Telegram
 settings-nav-tokens = API-Token

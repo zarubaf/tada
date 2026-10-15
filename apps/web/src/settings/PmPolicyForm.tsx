@@ -155,12 +155,12 @@ export function PmPolicyForm({ policy, busy, onSave, onStatus, onFailure }: PmPo
 
   return (
     <section className={styles.section} aria-labelledby="pm-reminders-title">
-      <h2 id="pm-reminders-title" className={styles.heading}>
+      <h3 id="pm-reminders-title" className={styles.heading}>
         {t("pm-reminders-title")}
-      </h2>
+      </h3>
       <form ref={formRef} className={styles.form} onSubmit={(event) => void save(event)} noValidate>
         <div className={styles.group}>
-          <h3 className={styles.subheading}>{t("pm-check-title")}</h3>
+          <h4 className={styles.subheading}>{t("pm-check-title")}</h4>
           <div className={styles.short}>
             {text("local_time", t("pm-time-label"), t("pm-time-help"))}
           </div>
@@ -210,7 +210,7 @@ export function PmPolicyForm({ policy, busy, onSave, onStatus, onFailure }: PmPo
           />
         </div>
         <div className={`${styles.group} ${styles.short}`}>
-          <h3 className={styles.subheading}>{t("pm-pace-title")}</h3>
+          <h4 className={styles.subheading}>{t("pm-pace-title")}</h4>
           <div className={styles.quiet}>
             {text("quiet_start", t("pm-quiet-start-label"))}
             {text("quiet_end", t("pm-quiet-end-label"))}

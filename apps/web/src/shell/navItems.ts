@@ -64,10 +64,9 @@ const institutions: Destination = {
 };
 const settings: Destination = {
   id: "settings",
-  to: "/settings/members",
+  to: "/settings",
   label: t("nav-settings"),
   icon: IconSettings,
-  within: "/settings",
 };
 const privacy: Destination = {
   id: "privacy",

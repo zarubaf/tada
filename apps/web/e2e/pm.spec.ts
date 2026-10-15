@@ -91,9 +91,9 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page, sessionWithRole("owner"));
       await fakePm(page);
-      await page.goto("/settings/ai-pm");
+      await page.goto("/settings?tab=ai-pm");
       await setTheme(page, theme);
-      await expect(page.getByRole("heading", { level: 1, name: "AI-PM" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2, name: "AI-PM" })).toBeVisible();
       await expect(page.getByRole("table", { name: "Letzte Erinnerungen" })).toBeVisible();
 
       const results = await new AxeBuilder({ page })
@@ -119,7 +119,7 @@ for (const viewport of viewports) {
           asked.push(request.url());
         }
       });
-      await page.goto("/settings/ai-pm");
+      await page.goto("/settings?tab=ai-pm");
       await setTheme(page, theme);
 
       await expect(page.getByText("Sie haben keinen Zugriff auf diesen Bereich.")).toBeVisible();
@@ -144,7 +144,7 @@ for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await fakeSession(page, sessionWithRole("owner"));
       await fakePm(page, { ...policy, paused: true });
-      await page.goto("/settings/ai-pm");
+      await page.goto("/settings?tab=ai-pm");
       await setTheme(page, theme);
 
       await expect(page.getByText("Der AI-PM ist pausiert.")).toBeVisible();
@@ -166,17 +166,17 @@ for (const viewport of viewports) {
 test("an admin finds the page in the settings", async ({ page }) => {
   await fakeSession(page, sessionWithRole("admin"));
   await fakePm(page);
-  await page.goto("/settings/organization");
+  await page.goto("/settings?tab=organization");
 
-  await page.getByRole("link", { name: "AI-PM" }).click();
-  await expect(page).toHaveURL(/\/settings\/ai-pm$/);
-  await expect(page.getByRole("heading", { level: 1, name: "AI-PM" })).toBeVisible();
+  await page.getByRole("tab", { name: "AI-PM" }).click();
+  await expect(page).toHaveURL(/\/settings\?tab=ai-pm$/);
+  await expect(page.getByRole("heading", { level: 2, name: "AI-PM" })).toBeVisible();
 });
 
 test("the unknown outcome of a digest is visible with its meaning", async ({ page }) => {
   await fakeSession(page, sessionWithRole("owner"));
   await fakePm(page);
-  await page.goto("/settings/ai-pm");
+  await page.goto("/settings?tab=ai-pm");
 
   const row = page.getByRole("row", { name: /Bernadette Müller-Lüdenscheidt/ });
   await expect(row).toContainText("unbekannt");
@@ -194,7 +194,7 @@ test("a version conflict shows the new values of the policy", async ({ page }) =
     409,
     problemBody("record-version-conflict", 409),
   );
-  await page.goto("/settings/ai-pm");
+  await page.goto("/settings?tab=ai-pm");
 
   const cooldown = page.getByRole("textbox", { name: "Abklingzeit (Stunden)" });
   await cooldown.fill("30");
@@ -213,7 +213,7 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await fakeSession(page, sessionWithRole("owner"));
     await fakePm(page);
-    await page.goto("/settings/ai-pm?pseudo");
+    await page.goto("/settings?tab=ai-pm&pseudo");
     await expect(page.getByRole("table")).toBeVisible();
     await expect(page.locator("[role=status][aria-label]")).toHaveCount(0);
 
@@ -257,7 +257,7 @@ for (const width of [320, 375]) {
     await page.setViewportSize({ width, height: 800 });
     await fakeSession(page, sessionWithRole("owner"));
     await fakePm(page);
-    await page.goto("/settings/ai-pm");
+    await page.goto("/settings?tab=ai-pm");
     await expect(page.getByRole("textbox", { name: "Ruhezeit bis" })).toBeVisible();
     await expect(page.getByRole("table")).toBeVisible();
 

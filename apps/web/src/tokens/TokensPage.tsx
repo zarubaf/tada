@@ -18,7 +18,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { firstInvalidField, useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
-import { PageTitle } from "../ui/Page";
+import { PanelTitle } from "../ui/Page";
 import { Select } from "../ui/Select";
 import { Skeleton } from "../ui/Skeleton";
 import { TextField } from "../ui/TextField";
@@ -277,12 +277,12 @@ export function TokensPage({ api }: { api: Api }) {
       <LiveRegion kind="status">{confirmation}</LiveRegion>
 
       <section className={styles.section} aria-labelledby="tokens-title">
-        <PageTitle id="tokens-title">{t("tokens-title")}</PageTitle>
+        <PanelTitle id="tokens-title">{t("tokens-title")}</PanelTitle>
         <p>{t("tokens-intro")}</p>
         <div className={styles.notice}>
-          <h2 ref={noticeHeading} tabIndex={-1} className={styles.heading}>
+          <h3 ref={noticeHeading} tabIndex={-1} className={styles.heading}>
             {t("token-notice-title")}
-          </h2>
+          </h3>
           <p>{t("token-notice-access")}</p>
           <p>{t("token-notice-policy")}</p>
         </div>
@@ -296,7 +296,7 @@ export function TokensPage({ api }: { api: Api }) {
         )}
         {mcp === "off" && <p className={styles.off}>{t("tokens-off")}</p>}
 
-        <h2 className={styles.heading}>{t("tokens-create-title")}</h2>
+        <h3 className={styles.heading}>{t("tokens-create-title")}</h3>
         <form
           ref={form}
           className={styles.form}
@@ -357,9 +357,9 @@ export function TokensPage({ api }: { api: Api }) {
       </section>
 
       <section className={`${styles.section} ${styles.wide}`} aria-labelledby="tokens-list-title">
-        <h2 id="tokens-list-title" ref={listHeading} tabIndex={-1} className={styles.heading}>
+        <h3 id="tokens-list-title" ref={listHeading} tabIndex={-1} className={styles.heading}>
           {t("tokens-list-title")}
-        </h2>
+        </h3>
         {list.kind === "loading" && (
           <div className={styles.skeleton} role="status" aria-label={t("tokens-loading")}>
             <Skeleton />
@@ -443,15 +443,15 @@ export function TokensPage({ api }: { api: Api }) {
       </section>
 
       <section className={styles.section} aria-labelledby="tokens-example-title">
-        <h2 id="tokens-example-title" className={styles.heading}>
+        <h3 id="tokens-example-title" className={styles.heading}>
           {t("tokens-example-title")}
-        </h2>
+        </h3>
         <p>{t("tokens-example-intro")}</p>
-        <h3 className={styles.subheading}>{t("tokens-example-claude")}</h3>
+        <h4 className={styles.subheading}>{t("tokens-example-claude")}</h4>
         <pre className={styles.code}>
           <code>{sample.claude}</code>
         </pre>
-        <h3 className={styles.subheading}>{t("tokens-example-codex")}</h3>
+        <h4 className={styles.subheading}>{t("tokens-example-codex")}</h4>
         <p>{t("tokens-example-codex-text")}</p>
         <pre className={styles.code}>
           <code>{sample.codex}</code>
