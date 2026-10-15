@@ -89,6 +89,29 @@ describe("RecordActionDialog", () => {
     expect(confirm).toHaveBeenCalledWith("Erste Zeile Zweite Zeile");
   });
 
+  it("turns a tab of a pasted reason into a space", async () => {
+    const { confirm } = open();
+    await user.click(reason());
+    await user.paste("Erste\tZweite");
+    await user.click(screen.getByRole("button", { name: "Widerrufen" }));
+    expect(confirm).toHaveBeenCalledWith("Erste Zweite");
+  });
+
+  it("refuses a reason that is longer than the caller allows, counted in characters", async () => {
+    const { confirm } = open({
+      reason: { label: "Grund (Pflichtfeld)", maxLength: 5 },
+    });
+    // Two emoji are four UTF-16 units but two characters.
+    await user.type(reason(), "😀😀abc");
+    await user.click(screen.getByRole("button", { name: "Widerrufen" }));
+    expect(confirm).toHaveBeenCalledWith("😀😀abc");
+    await user.type(reason(), "d");
+    await user.click(screen.getByRole("button", { name: "Widerrufen" }));
+    expect(await screen.findByText("Der Grund hat höchstens 5 Zeichen.")).toBeVisible();
+    expect(reason()).toBeInvalid();
+    expect(confirm).toHaveBeenCalledTimes(1);
+  });
+
   it("confirms once with the trimmed reason, and is busy meanwhile", async () => {
     let finish: (refusal?: Refusal) => void = () => undefined;
     const { confirm, onCancel } = open(

@@ -14,7 +14,7 @@ import { wordingError } from "./decisionInput";
 import { type ActionDialogProps, type FieldSpec, type FieldValue, peopleValue } from "./descriptor";
 import { PeopleField } from "./PeopleField";
 import { partiesOf, partyId } from "./parties";
-import { RecordActionDialog } from "./RecordActionDialog";
+import { MAX_REASON, RecordActionDialog } from "./RecordActionDialog";
 import styles from "./RecordActionDialog.module.css";
 import { type Refusal, refusalOf } from "./refusal";
 
@@ -33,7 +33,11 @@ export function RevokeDecisionDialog(props: ActionDialogProps) {
     <RecordActionDialog
       title={t("decision-revoke-title", { id: item.readableId })}
       description={t("decision-revoke-text")}
-      reason={{ label: t("decision-revoke-reason"), help: t("decision-revoke-reason-help") }}
+      reason={{
+        label: t("decision-revoke-reason"),
+        help: t("decision-revoke-reason-help"),
+        maxLength: MAX_REASON,
+      }}
       confirmLabel={t("decision-revoke")}
       danger
       onCancel={onCancel}
