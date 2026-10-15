@@ -60,6 +60,37 @@ describe("EventsPage", () => {
     expect(within(table).getByRole("columnheader", { name: "Kürzel" })).toBeInTheDocument();
   });
 
+  it("has one h1 in the toolbar row", async () => {
+    const { api } = fakeApi(json(200, { items: [event("TEST30", "Fly-in 2030")] }));
+    renderPage(api);
+
+    const heading = await screen.findByRole("heading", { level: 1, name: "Anlässe" });
+    expect(heading.closest("[data-page-toolbar]")).not.toBeNull();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("says the state of each event in words", async () => {
+    const closed = { ...event("OLD27", "Fly-in 2027"), status: "closed" as const };
+    const { api } = fakeApi(json(200, { items: [event("NEW28", "Fly-in 2028"), closed] }));
+    renderPage(api);
+
+    const table = await screen.findByRole("table", { name: "Anlässe" });
+    const [, open, shut] = within(table).getAllByRole("row");
+    expect(within(open as HTMLElement).getByText("Offen")).toBeInTheDocument();
+    expect(within(shut as HTMLElement).getByText("Abgeschlossen")).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
+  });
+
+  it("marks the name of a closed event as quiet and keeps it a link", async () => {
+    const closed = { ...event("OLD27", "Fly-in 2027"), status: "closed" as const };
+    const { api } = fakeApi(json(200, { items: [event("NEW28", "Fly-in 2028"), closed] }));
+    renderPage(api);
+
+    const quiet = await screen.findByRole("link", { name: "Fly-in 2027" });
+    expect(quiet.closest("[data-closed]")).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Fly-in 2028" }).closest("[data-closed]")).toBeNull();
+  });
+
   it("links the name of each event to its page", async () => {
     const { api } = fakeApi(json(200, { items: [event("TEST30", "Fly-in 2030")] }));
     renderPage(api);
@@ -226,6 +257,7 @@ describe("EventsPage toolbar", () => {
     signedIn(role);
     const link = await screen.findByRole("link", { name: "Anlass erfassen" });
     expect(link).toHaveAttribute("href", "/events/new");
+    expect(link.closest("[data-page-toolbar]")).not.toBeNull();
   });
 
   it("does not offer „Anlass erfassen“ to a member", async () => {
