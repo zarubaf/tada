@@ -62,7 +62,16 @@ beforeEach(() => vi.useFakeTimers({ toFake: ["Date"], now: new Date(2030, 4, 16,
 afterEach(() => vi.useRealTimers());
 
 describe("My Work", () => {
-  it("lists my actions by due date with the full reference", async () => {
+  it("has one h1 in the toolbar row of the page", async () => {
+    renderPage(work({ actions: [action()] }));
+
+    const heading = await screen.findByRole("heading", { level: 1, name: "Meine Arbeit" });
+    expect(heading.closest("[data-page-toolbar]")).not.toBeNull();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+  });
+
+  it("lists my actions with the reference, the title as the link to the panel, status and date", async () => {
     renderPage(
       work({
         actions: [
@@ -74,18 +83,38 @@ describe("My Work", () => {
 
     const table = await screen.findByRole("table", { name: "Aufgaben" });
     const rows = within(table).getAllByRole("row");
-    const link = within(rows[1] as HTMLElement).getByRole("link", { name: "FLY28/ACT-042" });
-    expect(link).toHaveAttribute("href", `/events/${EVENT_ID}/work#ACT-042`);
-    expect(within(rows[1] as HTMLElement).getByText("Generator bestellen")).toBeInTheDocument();
-    expect(within(rows[1] as HTMLElement).getByText("18.05.2030")).toBeInTheDocument();
+    const first = rows[1] as HTMLElement;
+    expect(within(first).getByText("FLY28/ACT-042")).toBeInTheDocument();
+    // The reference is text; the title is the link, and it leads to the panel of the record.
+    expect(within(first).queryByRole("link", { name: /ACT-042/ })).not.toBeInTheDocument();
+    expect(within(first).getByRole("link", { name: "Generator bestellen" })).toHaveAttribute(
+      "href",
+      `/events/${EVENT_ID}/work#ACT-042`,
+    );
+    expect(within(first).getByText("offen")).toBeInTheDocument();
+    expect(within(first).getByText("18.05.2030")).toBeInTheDocument();
     expect(within(rows[2] as HTMLElement).getByText("FLY28/ACT-007")).toBeInTheDocument();
   });
 
-  it("lists my commitments with the full reference and the promisor", async () => {
+  it("names each section with a heading and the number of its rows", async () => {
+    renderPage(
+      work({
+        actions: [action({ id: "a1" }), action({ id: "a2", local_id: "ACT-007" })],
+        commitments: [commitment()],
+      }),
+    );
+
+    const actions = await screen.findByRole("heading", { level: 2, name: /Aufgaben/ });
+    expect(actions).toHaveTextContent("2");
+    expect(screen.getByRole("heading", { level: 2, name: /Zusagen/ })).toHaveTextContent("1");
+  });
+
+  it("lists my commitments with the reference, the promisor and the status", async () => {
     renderPage(work({ commitments: [commitment()] }));
 
     const table = await screen.findByRole("table", { name: "Zusagen" });
-    expect(within(table).getByRole("link", { name: "FLY28/COM-003" })).toHaveAttribute(
+    expect(within(table).getByText("FLY28/COM-003")).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Lieferung am Freitag" })).toHaveAttribute(
       "href",
       `/events/${EVENT_ID}/work#COM-003`,
     );
@@ -105,22 +134,38 @@ describe("My Work", () => {
 
     const table = await screen.findByRole("table", { name: "Aufgaben" });
     const rows = within(table).getAllByRole("row");
-    expect(within(rows[1] as HTMLElement).getByText("überfällig")).toBeInTheDocument();
-    expect(within(rows[2] as HTMLElement).queryByText("überfällig")).not.toBeInTheDocument();
+    expect(within(rows[1] as HTMLElement).getByText(/überfällig/)).toBeInTheDocument();
+    expect(within(rows[2] as HTMLElement).queryByText(/überfällig/)).not.toBeInTheDocument();
   });
 
-  it("links the review count to the Inbox", async () => {
+  it("does not mark a finished action as overdue", async () => {
+    renderPage(work({ actions: [action({ due_date: "2030-05-15", status: "done" })] }));
+
+    const table = await screen.findByRole("table", { name: "Aufgaben" });
+    expect(within(table).queryByText(/überfällig/)).not.toBeInTheDocument();
+  });
+
+  it("puts the review count in the toolbar row as a link to the Inbox", async () => {
     renderPage(work({ review_count: 3, actions: [action()] }));
 
     const link = await screen.findByRole("link", { name: "3 Vorschläge warten auf Ihre Prüfung" });
     expect(link).toHaveAttribute("href", "/inbox");
+    expect(link.closest("[data-page-toolbar]")).not.toBeNull();
   });
 
-  it("shows the empty state", async () => {
+  it("has no review link without proposals to review", async () => {
+    renderPage(work({ actions: [action()] }));
+
+    await screen.findByRole("table", { name: "Aufgaben" });
+    expect(screen.queryByRole("link", { name: /Prüfung/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the empty state under the toolbar row", async () => {
     renderPage(work({}));
 
     expect(await screen.findByText("Nichts offen")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Meine Arbeit" })).toBeInTheDocument();
   });
 
   it("shows a failure with a retry", async () => {

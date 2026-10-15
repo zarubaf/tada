@@ -100,7 +100,13 @@ for (const viewport of viewports) {
         await expect(page.getByRole("heading", { level: 1, name: "Meine Arbeit" })).toBeVisible();
         await expect(page.getByText(state.ready, { exact: true }).first()).toBeVisible();
         if (state.name === "filled") {
-          await expect(page.getByText("überfällig")).toHaveCount(1);
+          await expect(page.getByText(/überfällig/)).toHaveCount(1);
+          // The title is the link to the panel; the reference is text (ADR 0082).
+          await expect(page.getByRole("link", { name: "Festzelt reservieren" })).toHaveAttribute(
+            "href",
+            `/events/${event?.id}/work#ACT-002`,
+          );
+          await expect(page.getByRole("link", { name: /Vorschläge warten/ })).toBeVisible();
           expect(await textOverflows(page)).toEqual([]);
         }
 
