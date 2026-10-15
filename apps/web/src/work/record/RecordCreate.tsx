@@ -1,5 +1,4 @@
 import { type FormEvent, useId, useRef, useState } from "react";
-import type { Api } from "../../api/client";
 import { uuidv7 } from "../../api/uuid";
 import { t } from "../../i18n";
 import { Button } from "../../ui/Button";
@@ -12,7 +11,6 @@ import { type ChoiceSources, choicesOf } from "./choices";
 import { CREATE_CONTROLS } from "./createControls";
 import type { FieldSpec, FieldValue, RecordDescriptor } from "./descriptor";
 import { fieldError } from "./fieldError";
-import { PeopleField } from "./PeopleField";
 import styles from "./RecordPanel.module.css";
 
 type Values = Record<string, FieldValue>;
@@ -22,7 +20,6 @@ type Errors = Record<string, string>;
 const isStacked = (spec: FieldSpec) =>
   spec.control === "text" ||
   spec.control === "multiline" ||
-  spec.control === "people" ||
   CREATE_CONTROLS[spec.control]?.stacked === true;
 
 /** The fields of the form in order, in runs of the same layout. */
@@ -109,7 +106,6 @@ function Row({
  */
 export function RecordCreate({
   descriptor,
-  api,
   commands,
   sources,
   owner,
@@ -119,9 +115,8 @@ export function RecordCreate({
   onCancel,
 }: {
   descriptor: RecordDescriptor;
-  /** For the controls that search on the server. */
-  api: Api;
   commands: WorkCommands;
+  /** The choices of the pickers; its `api` serves the controls that search on the server. */
   sources: ChoiceSources;
   /** The default owner: the member who is signed in, if they can own a record. */
   owner: string | undefined;
@@ -238,28 +233,17 @@ export function RecordCreate({
               : t(spec.labelKey);
             const custom = CREATE_CONTROLS[spec.control];
             if (custom) {
-              return (
-                <custom.Control
-                  key={spec.id}
-                  spec={spec}
-                  label={label}
-                  value={values[spec.id] ?? null}
-                  error={errors[spec.id]}
-                  onChange={(value) => set(spec.id, value)}
-                  api={api}
-                />
-              );
-            }
-            if (spec.control === "people") {
+              // A control that searches on the server cannot work without the API.
               return (
                 sources.api && (
-                  <PeopleField
+                  <custom.Control
                     key={spec.id}
+                    spec={spec}
                     label={label}
-                    api={sources.api}
                     value={values[spec.id] ?? null}
-                    onChange={(value) => set(spec.id, value)}
                     error={errors[spec.id]}
+                    onChange={(value) => set(spec.id, value)}
+                    api={sources.api}
                   />
                 )
               );
