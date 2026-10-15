@@ -3,7 +3,7 @@
 import { t } from "../../i18n";
 import type { WorkItem } from "../workItem";
 import type { ActionDialogProps } from "./descriptor";
-import { RecordActionDialog } from "./RecordActionDialog";
+import { MAX_REASON, RecordActionDialog } from "./RecordActionDialog";
 import { refusalOf } from "./refusal";
 
 function asCommitment(item: WorkItem) {
@@ -24,7 +24,11 @@ export function MakeFirmDialog(props: ActionDialogProps) {
     <RecordActionDialog
       title={t("make-firm-title", { id: item.readableId })}
       description={description}
-      reason={{ label: t("make-firm-reason"), help: t("make-firm-reason-help") }}
+      reason={{
+        label: t("make-firm-reason"),
+        help: t("make-firm-reason-help"),
+        maxLength: MAX_REASON,
+      }}
       confirmLabel={t("make-firm-submit")}
       onCancel={onCancel}
       onConfirm={async (reason) => {

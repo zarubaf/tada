@@ -63,6 +63,15 @@ describe("MakeFirmDialog", () => {
     expect(makeFirmCommand).not.toHaveBeenCalled();
   });
 
+  it("refuses a reason of more than 500 characters before it asks the server", async () => {
+    const { makeFirmCommand } = show();
+    await user.click(reason());
+    await user.paste("x".repeat(501));
+    await user.click(submit());
+    expect(await screen.findByText("Der Grund hat höchstens 500 Zeichen.")).toBeVisible();
+    expect(makeFirmCommand).not.toHaveBeenCalled();
+  });
+
   it("makes the commitment firm with the trimmed reason and the version, and tells the result", async () => {
     const { makeFirmCommand, onDone } = show();
     await user.type(reason(), "  Auftrag unterschrieben ");
