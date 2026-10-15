@@ -137,9 +137,7 @@ describe("TimelinePlan", () => {
     render();
     const timeline = await axis();
     expect(within(timeline).getByRole("heading", { name: "Bodenbetrieb" })).toBeInTheDocument();
-    expect(
-      within(timeline).getByRole("heading", { name: "ohne Arbeitsbereich" }),
-    ).toBeInTheDocument();
+    expect(within(timeline).getByRole("heading", { name: "ohne Bereich" })).toBeInTheDocument();
     expect(
       within(timeline).getByRole("link", {
         name: "MIL-001 Bewilligung liegt vor, 15.05.2030, offen",
@@ -170,7 +168,7 @@ describe("TimelinePlan", () => {
       expect.stringContaining("MIL-001"),
     ]);
     expect(within(rows[0] as HTMLElement).getByText("blockiert")).toBeInTheDocument();
-    expect(within(rows[0] as HTMLElement).getByText("ohne Arbeitsbereich")).toBeInTheDocument();
+    expect(within(rows[0] as HTMLElement).getByText("ohne Bereich")).toBeInTheDocument();
   });
 
   it("long_span_scrolls_inside_the_timeline", async () => {

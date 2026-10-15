@@ -96,7 +96,7 @@ describe("EvidencePanel", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Ort" });
     expect(within(dialog).getByRole("heading", { level: 2, name: "Ort" })).toBeVisible();
-    expect(within(dialog).getByRole("heading", { level: 3, name: "Belege" })).toBeVisible();
+    expect(within(dialog).getByRole("heading", { level: 3, name: "Quellen" })).toBeVisible();
     expect(within(dialog).getByText("Flugplatz Testwil", { selector: "mark" })).toBeVisible();
     expect(within(dialog).getByText("erfasst am 03.10.2026, 14:12")).toBeVisible();
     expect(within(dialog).getByText("Seite 3")).toBeVisible();
@@ -119,7 +119,7 @@ describe("EvidencePanel", () => {
     renderPanel({ evidence: [] });
 
     const dialog = await screen.findByRole("dialog", { name: "Ort" });
-    expect(within(dialog).getByText("Für diesen Wert gibt es keinen Beleg.")).toBeVisible();
+    expect(within(dialog).getByText("Für diesen Wert gibt es keine Quelle.")).toBeVisible();
   });
 
   it("shows entfernt for the passage of a redacted source, not an empty quote", async () => {

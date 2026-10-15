@@ -522,7 +522,7 @@ describe("replacing a decision", () => {
   });
 
   it.each([
-    ["/workstream", "closed", "Bereich: Bodenbetrieb", "Dieser Arbeitsbereich ist geschlossen."],
+    ["/workstream", "closed", "Bereich: Bodenbetrieb", "Dieser Bereich ist geschlossen."],
     [
       "/owner",
       "not-assignable",

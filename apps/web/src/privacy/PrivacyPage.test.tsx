@@ -44,7 +44,7 @@ describe("PrivacyPage", () => {
     expect(await screen.findByText(/Lesewerkzeuge \(MCP\)/)).toBeVisible();
     expect(screen.getByText(/Fakten, Quellen mit ihren Textstellen und Dokumente/)).toBeVisible();
     // The quote statement holds for the web client too, so it has its own section.
-    expect(await screen.findByRole("heading", { name: "Zitate als Belege" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Zitate als Quellen" })).toBeVisible();
     expect(
       screen.getByText(/ganzen Text einer Eingabe zeigen, die für die ganze Organisation gilt/),
     ).toBeVisible();

@@ -82,8 +82,8 @@ side-panel-next = Nächster Eintrag
 side-panel-position = { $index } von { $total }
 evidence-accepted-by = Angenommen von
 evidence-accepted-at = Angenommen am
-evidence-sources = Belege
-evidence-none = Für diesen Wert gibt es keinen Beleg.
+evidence-sources = Quellen
+evidence-none = Für diesen Wert gibt es keine Quelle.
 evidence-captured = erfasst am { $time }
 evidence-page = Seite { $page }
 evidence-source-version = Quellversion { $id }
@@ -277,8 +277,8 @@ event-overview-loading = Übersicht wird geladen
 event-overview-questions = Offene Fragen
 event-overview-questions-none = Es gibt keine offenen Fragen.
 event-overview-facts = Fakten
-event-overview-evidence = Beleg
-event-overview-evidence-of = Beleg zu { $label }
+event-overview-evidence = Quelle
+event-overview-evidence-of = Quelle zu { $label }
 event-overview-proposals = Vorschläge
 event-overview-proposals-none = Es gibt keine offenen Vorschläge.
 event-overview-proposals-note = Diese Werte sind noch nicht geprüft. Sie ersetzen keinen bestätigten Wert.
@@ -397,7 +397,7 @@ document-diff-unchanged = unverändert
 # The tombstone of a redacted value (ADR 0072).
 redacted = entfernt
 # $value: the value as the member sees it, with its state of knowledge. $label: the field.
-draft-fact-evidence = { $value }, Beleg zu { $label }
+draft-fact-evidence = { $value }, Quelle zu { $label }
 # $version: the fact version that the draft cites.
 draft-fact-older = (Version { $version } des Fakts, seither geändert)
 # $line: the line of the draft, from 1. $kind: what the lint found.
@@ -666,11 +666,11 @@ value-input-approximate = Ungefährer Wert
 ## Review Inbox (ADR 0050)
 
 inbox-title = Eingang
-inbox-list-label = Offene Änderungen
+inbox-list-label = Offene Vorschläge
 inbox-loading = Eingang wird geladen
 inbox-empty-title = Nichts zu prüfen
 inbox-empty-text = Es gibt keine offenen Vorschläge. Neue Vorschläge von Mitgliedern und KI-Clients erscheinen hier.
-inbox-more = Es gibt weitere offene Änderungen. Die Liste zeigt die ältesten zuerst.
+inbox-more = Es gibt weitere offene Vorschläge. Die Liste zeigt die ältesten zuerst.
 inbox-scope-organization = Organisation
 inbox-event-unknown = Anlass
 # $count: the number of open proposals of the changeset.
@@ -750,7 +750,7 @@ inbox-op-create-question = Offene Frage anlegen
 # $name: the name of the new document.
 inbox-op-create-draft = Dokumentenentwurf „{ $name }“
 inbox-op-create-draft-existing = Entwurf für ein bestehendes Dokument
-inbox-op-unknown = Änderung ohne Darstellung
+inbox-op-unknown = Vorschlag ohne Darstellung
 inbox-op-create-person = Person „{ $name }“ anlegen
 inbox-op-create-institution = Institution „{ $name }“ anlegen
 inbox-op-create-action = Aufgabe „{ $title }“ anlegen
@@ -763,7 +763,7 @@ inbox-op-create-milestone = Meilenstein „{ $title }“ anlegen
 inbox-op-change-milestone-status = Status eines Meilensteins ändern
 inbox-op-change-action-milestone = Meilenstein einer Aufgabe ändern
 # $name: the name of the new workstream.
-inbox-op-create-workstream = Arbeitsbereich „{ $name }“ anlegen
+inbox-op-create-workstream = Bereich „{ $name }“ anlegen
 inbox-op-create-decision = Entscheid anlegen
 inbox-op-supersede-decision = Entscheid ersetzen
 inbox-op-revoke-decision = Entscheid widerrufen
@@ -779,7 +779,7 @@ inbox-row-date = Datum
 inbox-row-start = Startdatum
 inbox-row-milestone = Meilenstein
 inbox-row-new-milestone = Neuer Meilenstein
-inbox-row-lead = Arbeitsbereichsleitung
+inbox-row-lead = Bereichsleitung
 inbox-name-unknown = Nicht lesbar
 inbox-due-removed = Keine Fälligkeit
 inbox-row-email = E-Mail
@@ -787,7 +787,7 @@ inbox-row-phone = Telefon
 inbox-row-institution-kind = Art
 inbox-row-title = Titel
 inbox-row-owner = Verantwortlich
-inbox-row-workstream = Arbeitsbereich
+inbox-row-workstream = Bereich
 inbox-row-due = Fällig
 inbox-row-commitment = Zusage
 inbox-row-promisor = Zusagende Partei
@@ -978,13 +978,13 @@ work-cancel = Abbrechen
 register-saved = „{ $name }“ gespeichert.
 register-conflict = Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.
 work-field-owner = Verantwortlich
-work-field-workstream = Arbeitsbereich
+work-field-workstream = Bereich
 work-field-start = Startdatum
 work-field-due = Fällig am
 work-field-milestone = Meilenstein
 work-no-milestone = Kein Meilenstein
 work-field-status = Status
-work-no-workstream = Kein Arbeitsbereich
+work-no-workstream = Kein Bereich
 work-error-title = Der Titel hat 1 bis 200 Zeichen.
 work-error-title-too-long = Der Titel hat höchstens 200 Zeichen.
 work-error-description = Die Beschreibung hat 1 bis 4000 Zeichen.
@@ -996,8 +996,8 @@ work-error-condition = Die Bedingung hat 1 bis 500 Zeichen.
 work-error-promisor = Wählen Sie eine Person oder eine Institution.
 work-error-promisor-unknown-record = Diese Person oder Institution gibt es nicht.
 work-error-owner = Wählen Sie ein Mitglied des Anlasses mit Mitarbeit oder Anlassleitung.
-work-error-workstream = Wählen Sie einen aktiven Arbeitsbereich dieses Anlasses.
-work-error-workstream-closed = Dieser Arbeitsbereich ist geschlossen.
+work-error-workstream = Wählen Sie einen aktiven Bereich dieses Anlasses.
+work-error-workstream-closed = Dieser Bereich ist geschlossen.
 work-error-due = Das ist kein gültiges Datum.
 work-error-due_date = Das ist kein gültiges Datum.
 work-error-date = Geben Sie ein gültiges Datum an.
@@ -1090,7 +1090,7 @@ timeline-empty-action = Zu den Aufgaben
 timeline-no-match = Keine Treffer für diese Filter.
 timeline-list-empty = Keine Einträge in dieser Ansicht.
 }
-# $count: the actions without a due date. The link opens the register of actions.
+# $count: the actions without a due date. The link opens the list of actions.
 timeline-undated = { $count ->
     [one] 1 Aufgabe ohne Fälligkeit
    *[other] { $count } Aufgaben ohne Fälligkeit
@@ -1098,7 +1098,7 @@ timeline-undated = { $count ->
 timeline-legend = Legende
 timeline-today = heute
 timeline-axis = Zeitachse
-timeline-lane-none = ohne Arbeitsbereich
+timeline-lane-none = ohne Bereich
 timeline-milestones = Meilensteine
 timeline-by-week = Nach Wochen
 # $date: the Monday of the week, for example 04.05.2030.
