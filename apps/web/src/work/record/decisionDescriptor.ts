@@ -96,7 +96,7 @@ const successor: FieldSpec = {
   control: "record",
   pointer: "superseded_by",
   refers: "decision",
-  when: (item) => record(item).superseded_by != null,
+  hideEmpty: true,
   read: (item) => record(item).superseded_by ?? null,
 };
 
@@ -106,7 +106,7 @@ const revokedReason: FieldSpec = {
   icon: IconMessageOff,
   control: "text",
   pointer: "revoked_reason",
-  when: (item) => record(item).revoked_reason != null,
+  hideEmpty: true,
   read: (item) => record(item).revoked_reason ?? null,
 };
 

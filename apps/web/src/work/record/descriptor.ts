@@ -91,7 +91,10 @@ export interface FieldSpec {
   emptyKey?: string;
   /** The Fluent key of the words on a picker that has no choice and cannot be cleared. */
   promptKey?: string;
-  /** The row is absent while the field has no value, for a fact that only some records have. */
+  /**
+   * The row is absent while the field has no value, for a fact that only some records have: the
+   * reason that made a commitment firm, the successor of a decision that was replaced.
+   */
   hideEmpty?: boolean;
   /** A hint under the field in the create form, as the Fluent key of its text. */
   helpKey?: string;
@@ -99,8 +102,6 @@ export interface FieldSpec {
   overdue?: boolean;
   /** The kind of record that a `record` field refers to. Its value is the UUID of that record. */
   refers?: RecordKind;
-  /** The field shows only for an item that this accepts, for example the successor of a decision that was replaced. */
-  when?: (item: WorkItem) => boolean;
   /** The value of the item. */
   read: (item: WorkItem) => FieldRead;
   /**
