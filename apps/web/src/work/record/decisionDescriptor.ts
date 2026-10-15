@@ -11,8 +11,9 @@ import type { Decision } from "../../api/client";
 import type { WorkItem } from "../workItem";
 import { areaField, ownerField } from "./commonFields";
 import { RevokeDecisionDialog, SupersedeDecisionDialog } from "./decisionDialogs";
-import { partiesOf, partyId, wordingError } from "./decisionInput";
+import { wordingError } from "./decisionInput";
 import { type FieldSpec, type FieldValue, REDACTED, type RecordDescriptor } from "./descriptor";
+import { partiesOf, partyId } from "./parties";
 
 type DecisionItem = Extract<WorkItem, { kind: "decision" }>;
 
