@@ -2,10 +2,17 @@
 // commitments and milestones). Only invented data.
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { beforeAll } from "vitest";
 import { createApi, type Event } from "../api/client";
 import { EventContext, type ProfileState } from "../events/eventContext";
 import { Router } from "../router/Router";
 import { SessionProvider } from "../session/SessionProvider";
+
+// The page loads the record panel lazily. The first import is slow on a busy machine and would
+// eat the wait of the first test of a file, so each file loads the panel once before its tests.
+beforeAll(async () => {
+  await import("../work/record/RecordPanel");
+}, 60_000);
 
 export const EVENT: Event = {
   id: "0199b8e0-0000-7000-8000-000000000001",
