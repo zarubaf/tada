@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import {
+  axeBuilder,
   events,
   fakeEvent,
   fakeEvents,
@@ -36,9 +36,7 @@ for (const viewport of viewports) {
         page.getByText("Das Kürzel hat 2 bis 8 Grossbuchstaben oder Ziffern."),
       ).toBeVisible();
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`event-create-${theme}-${viewport.name}.png`, {
@@ -57,9 +55,7 @@ for (const viewport of viewports) {
       await setTheme(page, theme);
       await expect(page.getByRole("heading", { level: 1, name: event?.name })).toBeVisible();
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`event-page-${theme}-${viewport.name}.png`, {
@@ -77,9 +73,7 @@ for (const viewport of viewports) {
       await setTheme(page, theme);
       await expect(page.getByRole("link", { name: "Anlass erfassen" })).toBeVisible();
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
     });
   }

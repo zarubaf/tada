@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { fontsLoaded, setTheme, themes, viewports } from "./fixtures";
+import { axeBuilder, fontsLoaded, setTheme, themes, viewports } from "./fixtures";
 import { actions, event, fakeWork } from "./workFixtures";
 
 // The side panel of the „Arbeit“ page (ADR 0082). The unit tests hold the rules; these checks hold
@@ -8,8 +7,7 @@ import { actions, event, fakeWork } from "./workFixtures";
 // sheet, the 44 px targets on touch, the focus rules and the screenshots.
 const work = `/events/${event?.id}/work`;
 
-const axe = (page: Page) =>
-  new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+const axe = (page: Page) => axeBuilder(page).analyze();
 
 // ACT-001 with everything the panel can show: a description, a start date, a milestone, the next
 // statuses and a source.

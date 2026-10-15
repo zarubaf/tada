@@ -1,10 +1,16 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { fontsLoaded, problemBody, setTheme, textOverflows, themes, viewports } from "./fixtures";
+import {
+  axeBuilder,
+  fontsLoaded,
+  problemBody,
+  setTheme,
+  textOverflows,
+  themes,
+  viewports,
+} from "./fixtures";
 import { event, fakeWork, fulfill } from "./workFixtures";
 
-const axe = (page: Page) =>
-  new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+const axe = (page: Page, openPopover = false) => axeBuilder(page, { openPopover }).analyze();
 
 /** Waits for the board: the columns (wide) or the status picker (narrow). */
 async function boardShown(page: Page, narrow: boolean) {
@@ -82,7 +88,7 @@ for (const theme of themes) {
     await expect(page.getByRole("link", { name: /ACT-003/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /ACT-001/ })).toHaveCount(0);
     await expect(page.getByRole("dialog", { name: "Filter" })).toBeVisible();
-    expect((await axe(page)).violations).toEqual([]);
+    expect((await axe(page, true)).violations).toEqual([]);
     await fontsLoaded(page);
     await expect(page).toHaveScreenshot(`work-board-filter-popover-${theme}-1440.png`);
     // Escape in the search clears its text first, as in every search field; the popover stays.

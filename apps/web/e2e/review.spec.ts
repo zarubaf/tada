@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
+  axeBuilder,
   events,
   expectPageFrame,
   fakeSession,
@@ -335,9 +335,7 @@ for (const viewport of viewports) {
         }
 
         await expectPageFrame(page, viewport);
-        const results = await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-          .analyze();
+        const results = await axeBuilder(page).analyze();
         expect(results.violations).toEqual([]);
         await fontsLoaded(page);
         await expect(page).toHaveScreenshot(`inbox-${state.name}-${theme}-${viewport.name}.png`, {
@@ -358,9 +356,7 @@ for (const viewport of viewports) {
       await card.getByRole("button", { name: /^Bearbeiten und annehmen/ }).click();
       await expect(card.getByRole("textbox", { name: "Text" })).toBeFocused();
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`inbox-edit-${theme}-${viewport.name}.png`, {

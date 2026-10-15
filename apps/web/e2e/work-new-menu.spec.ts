@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { fontsLoaded, setTheme, themes, viewports } from "./fixtures";
+import { axeBuilder, fontsLoaded, setTheme, themes, viewports } from "./fixtures";
 import { event, fakeWork, risks } from "./workFixtures";
 
 // The „Neu“ menu of the „Arbeit“ page (ADR 0082). The unit tests hold the permission rules; these
@@ -8,8 +7,7 @@ import { event, fakeWork, risks } from "./workFixtures";
 // the create form hand on, and a risk made end to end.
 const work = `/events/${event?.id}/work`;
 
-const axe = (page: Page) =>
-  new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+const axe = (page: Page) => axeBuilder(page).analyze();
 
 async function open(page: Page) {
   await fakeWork(page);

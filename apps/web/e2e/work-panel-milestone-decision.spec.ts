@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { fontsLoaded, setTheme, themes, viewports } from "./fixtures";
+import { axeBuilder, fontsLoaded, setTheme, themes, viewports } from "./fixtures";
 import { event, fakeWork, fulfill } from "./workFixtures";
 
 // Milestones and decisions in the side panel of the „Arbeit“ page (ADR 0082). The unit tests hold
@@ -8,8 +7,7 @@ import { event, fakeWork, fulfill } from "./workFixtures";
 // hints, the links, the dialog of „Ersetzen“ with its picker, and the screenshots.
 const work = `/events/${event?.id}/work`;
 
-const axe = (page: Page) =>
-  new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+const axe = (page: Page) => axeBuilder(page).analyze();
 
 const ME = "0199b8e0-0000-7000-8000-0000000000b1";
 const ACTION = "0199b8e0-0000-7000-8000-000000000101";

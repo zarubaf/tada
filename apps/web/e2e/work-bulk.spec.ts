@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import {
+  axeBuilder,
   events,
   fakeEvent,
   fakeSession,
@@ -114,8 +114,7 @@ async function acceptChanges(page: Page): Promise<unknown[]> {
   return sent;
 }
 
-const axe = (page: Page) =>
-  new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+const axe = (page: Page, openPopover = false) => axeBuilder(page, { openPopover }).analyze();
 const work = `/events/${event?.id}/work`;
 const box = (page: Page, id: string) =>
   page.getByRole("checkbox", { name: new RegExp(`^${id} .* auswählen$`) });
@@ -216,7 +215,7 @@ test.describe("a mouse", () => {
       expect((await axe(page)).violations).toEqual([]);
       await bar(page).getByRole("button", { name: "Verantwortlich" }).click();
       await expect(page.getByRole("listbox", { name: "Verantwortlich" })).toBeVisible();
-      expect((await axe(page)).violations).toEqual([]);
+      expect((await axe(page, true)).violations).toEqual([]);
     });
   }
 });
