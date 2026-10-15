@@ -1,14 +1,35 @@
 @layer components {
-  .toolbar {
+  /* The create button stays at the right of the toolbar row, also where the row wraps. */
+  .end {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
+    margin-inline-start: auto;
+  }
+
+  /* As the content of the „Arbeit“ page: one gap between the parts, the gutter around. */
+  .content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
     gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-3) var(--page-gutter, var(--space-3));
+  }
+
+  @media (width < 40rem) {
+    .content {
+      gap: var(--space-2);
+    }
   }
 
   .skeleton {
     display: grid;
     gap: var(--space-2);
+  }
+
+  /* The name of a closed event is quieter; muted text still has the contrast of body text. */
+  .name[data-closed] a {
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-regular);
   }
 }
