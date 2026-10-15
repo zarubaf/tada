@@ -29,7 +29,7 @@ import { WorkViews } from "./WorkViews";
 import { WorkViewTabs } from "./WorkViewTabs";
 import { countsFor, filterWork, groupByColumn, NO_FILTERS, serializeFilters } from "./workFilters";
 import { opensInPanel } from "./workLinks";
-import { canCreate } from "./workPermissions";
+import { creatableKinds } from "./workPermissions";
 import { useWorkSort, useWorkView } from "./workView";
 
 // The panel loads on demand: the board does not pay for the editors of a record (ADR 0082).
@@ -50,6 +50,7 @@ export function WorkPage({ api }: { api: Api }) {
   const record = useRecordRoute();
   const layout = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const newButton = useRef<HTMLButtonElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const { retry } = useRetry(() => heading.current);
@@ -196,15 +197,18 @@ export function WorkPage({ api }: { api: Api }) {
   const { route } = record;
   const openId = route.mode === "open" ? route.id : undefined;
   const writableDirectory = work.directory.kind === "loaded" ? work.directory.directory : undefined;
-  const mayCreate = canCreate(writableDirectory, me, writable);
+  const creatable = creatableKinds(writableDirectory, me, writable);
   // The record that the create state made: the panel puts focus on its title once.
   const [made, setMade] = useState<string>();
   const around = openId === undefined ? undefined : neighbors(order.filter(opensInPanel), openId);
-  // Focus goes back to the card or the row of the record, else to the heading of the page.
+  // Focus goes back to the card or the row of the record, to the „Neu“ button after the create
+  // form, else to the heading of the page.
   const returnFocus = () =>
-    (openId === undefined
-      ? undefined
-      : layout.current?.querySelector<HTMLElement>(`a[href$="#${CSS.escape(openId)}"]`)) ??
+    (route.mode === "create"
+      ? newButton.current
+      : openId === undefined
+        ? undefined
+        : layout.current?.querySelector<HTMLElement>(`a[href$="#${CSS.escape(openId)}"]`)) ??
     heading.current;
   const toolbar = useWorkToolbar({
     filters,
@@ -220,7 +224,9 @@ export function WorkPage({ api }: { api: Api }) {
     ),
     onReset: reset,
     searchRef: search,
-    onCreate: mayCreate ? () => record.startCreate("action") : undefined,
+    creatable,
+    newRef: newButton,
+    onCreate: record.startCreate,
   });
 
   const empty = !loading && failed.length === 0 && work.items.length === 0;
@@ -268,7 +274,7 @@ export function WorkPage({ api }: { api: Api }) {
                 title={t("work-empty-title")}
                 text={t("work-empty-text")}
                 action={
-                  mayCreate ? (
+                  creatable.includes("action") ? (
                     <Button onPress={() => record.startCreate("action")}>
                       {t("work-empty-new-action")}
                     </Button>
