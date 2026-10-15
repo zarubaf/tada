@@ -332,6 +332,23 @@ describe("Router", () => {
       expect(screen.getByRole("link", { name: "Arbeit" })).toHaveAttribute("aria-current", "page");
     });
 
+    it("does not mark a link current on any of several paths that other links claim", () => {
+      window.history.replaceState(null, "", "/events/e1/documents");
+      render(
+        <Router>
+          <Link to="/events" yieldsTo={["/events/e1/work", "/events/e1/documents"]}>
+            Anlässe
+          </Link>
+          <Link to="/events/e1/documents">Dokumente</Link>
+        </Router>,
+      );
+      expect(screen.getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+      expect(screen.getByRole("link", { name: "Dokumente" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+
     it("marks a link current only for its query value, and its sibling not then", () => {
       window.history.replaceState(null, "", "/events/e1/work?view=timeline&q=x");
       render(
