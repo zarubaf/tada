@@ -156,20 +156,20 @@ describe("a decision in the panel", () => {
     ]);
   });
 
-  it("shows plain values and no action to a member who cannot change or end it", async () => {
+  it("shows plain values and no menu to a member who cannot change or end it", async () => {
     openDecision({ can_change: false, can_end: false }, { eventManager: false });
     const view = await region();
     expect(view.getByText("Bernd Beispiel")).toBeVisible();
     expect(view.queryByRole("button", { name: /^Verantwortlich/ })).toBeNull();
-    expect(view.queryByRole("button", { name: "Ersetzen" })).toBeNull();
-    expect(view.queryByRole("button", { name: "Widerrufen" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Aktionen" })).toBeNull();
   });
 
   it("offers Ersetzen and Widerrufen for a decision in force that the member may end", async () => {
     openDecision();
     const view = await region();
-    expect(view.getByRole("button", { name: "Ersetzen" })).toBeVisible();
-    expect(view.getByRole("button", { name: "Widerrufen" })).toBeVisible();
+    await user.click(view.getByRole("button", { name: "Aktionen" }));
+    expect(await screen.findByRole("menuitem", { name: "Ersetzen" })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: "Widerrufen" })).toBeVisible();
   });
 
   it.each([
@@ -177,11 +177,10 @@ describe("a decision in the panel", () => {
     ["a decision that was replaced", { status: "superseded", superseded_by: "rec-dec-002" }, {}],
     ["a decision that was revoked", { status: "revoked", revoked_reason: "Überholt" }, {}],
     ["a redacted decision", { redacted: true, wording: "" }, {}],
-  ] as const)("offers no action in %s", async (_name, over, setup) => {
+  ] as const)("offers no menu in %s", async (_name, over, setup) => {
     openDecision(over, setup);
     const view = await region();
-    expect(view.queryByRole("button", { name: "Ersetzen" })).toBeNull();
-    expect(view.queryByRole("button", { name: "Widerrufen" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Aktionen" })).toBeNull();
   });
 
   it("shows the tombstone for a redacted decision", async () => {
@@ -264,6 +263,12 @@ describe("a decision in the panel", () => {
   });
 });
 
+/** Opens the „Aktionen“ menu of the panel and chooses an action. */
+async function choose(view: ReturnType<typeof within>, action: string) {
+  await user.click(view.getByRole("button", { name: "Aktionen" }));
+  await user.click(await screen.findByRole("menuitem", { name: action }));
+}
+
 describe("revoking a decision", () => {
   const revoked = (reason: string) =>
     dec({ status: "revoked", revoked_reason: reason, version: 2 });
@@ -271,7 +276,7 @@ describe("revoking a decision", () => {
   async function openDialog(answers: Setup["answers"] = {}) {
     const server = openDecision({}, {}, answers);
     const view = await region();
-    await user.click(view.getByRole("button", { name: "Widerrufen" }));
+    await choose(view, "Widerrufen");
     const dialog = within(await screen.findByRole("dialog", { name: "DEC-001 widerrufen" }));
     return { server, view, dialog };
   }
@@ -296,9 +301,9 @@ describe("revoking a decision", () => {
     expect(server.sent("POST")).toEqual([{ reason: "Der Anlass fällt aus.", expected_version: 1 }]);
     expect(await view.findByText("Der Anlass fällt aus.")).toBeVisible();
     expect(view.getByText("widerrufen")).toBeVisible();
-    expect(view.queryByRole("button", { name: "Widerrufen" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Aktionen" })).toBeNull();
     expect(screen.getByText("DEC-001 ist jetzt widerrufen.")).toBeInTheDocument();
-    // The buttons are gone: focus stays in the panel.
+    // The menu is gone: focus stays in the panel.
     expect(screen.getByRole("complementary").contains(document.activeElement)).toBe(true);
   });
 
@@ -335,12 +340,12 @@ describe("revoking a decision", () => {
     );
   });
 
-  it("cancels with Escape and returns focus to the button", async () => {
+  it("cancels with Escape and returns focus to the menu button", async () => {
     const { view } = await openDialog();
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("complementary")).toBeInTheDocument();
-    expect(view.getByRole("button", { name: "Widerrufen" })).toHaveFocus();
+    expect(view.getByRole("button", { name: "Aktionen" })).toHaveFocus();
   });
 });
 
@@ -375,7 +380,7 @@ describe("replacing a decision", () => {
     holder.work = server.work;
     // The fake server reads its lists from this object.
     const view = await region();
-    await user.click(view.getByRole("button", { name: "Ersetzen" }));
+    await choose(view, "Ersetzen");
     const dialog = within(await screen.findByRole("dialog", { name: "DEC-001 ersetzen" }));
     return { server, view, dialog };
   }
@@ -449,12 +454,12 @@ describe("replacing a decision", () => {
     expect(await view.findByText("ersetzt")).toBeVisible();
     expect(await view.findByRole("link", { name: "DEC-002" })).toBeVisible();
     expect(screen.getByText("DEC-002 ersetzt DEC-001.")).toBeInTheDocument();
-    expect(view.queryByRole("button", { name: "Ersetzen" })).toBeNull();
-    // The buttons are gone, and focus is on the heading, not on the body.
+    expect(view.queryByRole("button", { name: "Aktionen" })).toBeNull();
+    // The menu is gone, and focus is on the heading, not on the body.
     expect(view.getByRole("heading", { level: 2 })).toHaveFocus();
   });
 
-  it("moves focus to the heading at once, while the old decision still has its buttons", async () => {
+  it("moves focus to the heading at once, while the old decision still has its menu", async () => {
     const { dialog, view } = await openDialog();
     await user.type(dialog.getByLabelText(/^Entschieden/), "2030-04-01");
     await user.click(dialog.getByRole("button", { name: "Ersetzen" }));
@@ -476,8 +481,7 @@ describe("replacing a decision", () => {
     const message = (await view.findAllByText(words)).find((node) => node.tagName === "P");
     expect(message).toBeVisible();
     expect(await screen.findByRole("alert")).toHaveTextContent(/nicht aktuell/);
-    expect(view.queryByRole("button", { name: "Ersetzen" })).toBeNull();
-    expect(view.queryByRole("button", { name: "Widerrufen" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Aktionen" })).toBeNull();
     expect(view.getByRole("heading", { level: 2 })).toHaveFocus();
   });
 

@@ -14,8 +14,8 @@ import { MakeFirmDialog } from "./commitmentDialogs";
 import {
   type FieldSpec,
   type FieldValue,
-  type MenuAction,
   REDACTED,
+  type RecordActionSpec,
   type RecordDescriptor,
 } from "./descriptor";
 
@@ -136,11 +136,11 @@ const area: FieldSpec = {
 };
 
 /** „Verbindlich machen“: the one way from conditional to firm, with the reason that the commitment keeps. */
-const makeFirm: MenuAction = {
+const makeFirm: RecordActionSpec = {
   id: "make-firm",
   labelKey: "make-firm",
   icon: IconCircleCheck,
-  available: (item) => record(item).can_make_firm,
+  available: (item, env) => env.editable && record(item).can_make_firm,
   dialog: MakeFirmDialog,
 };
 
@@ -169,7 +169,7 @@ export const commitmentDescriptor: RecordDescriptor = {
   title: text,
   properties: [status, promisor, owner, due, condition, firmReason, area],
   evidenceVersionKey: "commitment-evidence-version",
-  menu: [makeFirm],
+  actions: [makeFirm],
   create: {
     titleKey: "record-create-commitment",
     fields: ["text", "promisor", "condition", "owner", "due", "area"],
