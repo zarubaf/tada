@@ -2,6 +2,7 @@
 // for the switcher menu and the command palette. Both use the events API as the events page does.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
+import { LARGEST_PAGE, loadAll } from "../registers/loadAll";
 import { eventKey, readRemembered, writeRemembered } from "./remembered";
 
 function lastEventOf(organizationId: string | undefined) {
@@ -70,7 +71,7 @@ export type EventList =
   | { kind: "loaded"; events: Event[] };
 
 /**
- * The first page of the events of the member. `load` asks again each time; a list that is there
+ * Every page of the events of the member, so that the switcher and the palette miss none. `load` asks again each time; a list that is there
  * stays until the new one comes, so the menu does not flicker.
  */
 export function useEventList(
@@ -98,16 +99,19 @@ export function useEventList(
     const mine = generation.current;
     const current = () => generation.current === mine;
     setList((old) => (old.kind === "loaded" ? old : { kind: "loading" }));
-    api
-      .GET("/api/v1/events", { params: { query: {} } })
-      .then(({ data, error }) => {
+    loadAll((cursor) =>
+      api.GET("/api/v1/events", {
+        params: { query: { limit: LARGEST_PAGE, ...(cursor && { cursor }) } },
+      }),
+    )
+      .then((result) => {
         if (current()) {
           setList((old) =>
-            data
-              ? { kind: "loaded", events: data.items }
+            "items" in result
+              ? { kind: "loaded", events: result.items }
               : old.kind === "loaded"
                 ? old
-                : { kind: "failed", message: problemMessage(error) },
+                : { kind: "failed", message: problemMessage(result.error) },
           );
         }
       })
