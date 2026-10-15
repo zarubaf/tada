@@ -98,6 +98,7 @@ The ADRs are the authority for the decisions in this project.
 | [0080](0080-workstream-proposals.md)                            | Workstream proposals                                     | Proposed                           |
 | [0081](0081-milestones-decisions-risks-and-requirements.md)     | Milestones, decisions, risks and requirements            | Proposed                           |
 | [0082](0082-redesign-of-the-web-client.md)                      | Redesign of the web client                               | Accepted                           |
+| [0083](0083-capture.md)                                         | Capture                                                  | Proposed                           |
 
 ## New ADR
 
