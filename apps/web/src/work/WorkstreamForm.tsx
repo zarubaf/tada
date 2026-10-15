@@ -16,7 +16,7 @@ type Field = (typeof FIELDS)[number];
 type FieldErrors = Partial<Record<Field, string>>;
 const STATUSES: WorkstreamStatus[] = ["active", "closed"];
 
-/** „Arbeitsbereich anlegen“ and the change of a workstream, for an event manager. */
+/** „Bereich anlegen“ and the change of a workstream, for an event manager. */
 export function WorkstreamForm({
   api,
   eventId,
