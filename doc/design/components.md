@@ -69,12 +69,12 @@ See [accessibility.md](accessibility.md#focus).
 
 ### Navigation
 
-| Component | Rules                                                                                                                                                                                                                   |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| NavLink   | A navigation item. The current page has `aria-current="page"` and the current style. `icon` draws a Tabler icon before the label. `large` gives the bottom bar a thumb target.                                          |
-| SubNav    | The sub-navigation of a template, for example of the settings or of an event. It contains NavLink items. `secondary` is a second row below one item, smaller and without a line, for example the registers of an event. |
-| Toolbar   | The filter and display row above a list. One tab stop; arrow keys move between its buttons and menus.                                                                                                                   |
-| SkipLink  | „Zum Inhalt springen“, the first focusable element of each page. It moves to `main`.                                                                                                                                    |
+| Component | Rules                                                                                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| NavLink   | A navigation item. The current page has `aria-current="page"` and the current style. `icon` draws a Tabler icon before the label. `large` gives the bottom bar a thumb target. |
+| SubNav    | The sub-navigation of a template, for example of the settings. It contains NavLink items. `secondary` is a second row below one item, smaller and without a line.              |
+| Toolbar   | The filter and display row above a list. One tab stop; arrow keys move between its buttons and menus.                                                                          |
+| SkipLink  | „Zum Inhalt springen“, the first focusable element of each page. It moves to `main`.                                                                                           |
 
 ### Page
 
