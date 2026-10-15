@@ -1,0 +1,46 @@
+@layer components {
+  /* The title and the tabs: the part of the row that keeps its place at the left. */
+  .lead {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  /* The search and „Neu“ stay together at the right, also where the row wraps. */
+  .end {
+    display: flex;
+    flex: 1 1 16rem;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    min-width: 0;
+    margin-inline-start: auto;
+  }
+
+  .search {
+    flex: 1 1 auto;
+    max-width: 20rem;
+    min-width: 0;
+  }
+
+  /* The banners, the table and the form of a change: one gap, the gutter of the page around. */
+  .content {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-3) var(--page-gutter, var(--space-3)) var(--space-4);
+  }
+
+  /* A phone: the search fills the second row. */
+  @media (width < 40rem) {
+    .end {
+      flex-basis: 100%;
+    }
+
+    .search {
+      max-width: none;
+    }
+  }
+}
