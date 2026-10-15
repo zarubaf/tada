@@ -17,6 +17,7 @@ import {
   type RecordActionSpec,
   type RecordDescriptor,
 } from "./descriptor";
+import { partyOf } from "./parties";
 
 type CommitmentItem = Extract<WorkItem, { kind: "commitment" }>;
 
@@ -137,12 +138,10 @@ const optional = (value: FieldValue): string | undefined =>
 function body(values: Record<string, FieldValue>, id: string): CreateCommitmentRequest {
   const condition = optional(values.condition ?? null);
   const due = optional(values.due ?? null);
-  // The value of the party control is `person:{uuid}` or `institution:{uuid}`.
-  const [kind, party = ""] = (values.promisor ?? "").split(":");
   return {
     id,
     text: optional(values.text ?? null) ?? "",
-    promisor: { kind: kind === "person" ? "person" : "institution", id: party },
+    promisor: partyOf(values.promisor ?? ""),
     owner_user_id: values.owner ?? "",
     ...(condition && { condition }),
     ...(values.area && { workstream_id: values.area }),
