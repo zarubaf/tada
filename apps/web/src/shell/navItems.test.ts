@@ -7,12 +7,7 @@ const EVENT = "/events/e1";
 describe("the bottom bar", () => {
   it("has Anlässe outside an event", () => {
     expect(labels(bottomItems(undefined))).toEqual(["Eingang", "Meine Arbeit", "Anlässe"]);
-    expect(labels(moreItems(undefined))).toEqual([
-      "Personen",
-      "Institutionen",
-      "Einstellungen",
-      "Datenschutz",
-    ]);
+    expect(labels(moreItems(undefined))).toEqual(["Kontakte", "Einstellungen", "Datenschutz"]);
   });
 
   it("has Zeitplan after Arbeit inside an event and not outside", () => {
@@ -36,8 +31,7 @@ describe("the bottom bar", () => {
     expect(labels(moreItems("e1"))).toEqual([
       "Anlässe",
       "Dokumente",
-      "Personen",
-      "Institutionen",
+      "Kontakte",
       "Einstellungen",
       "Datenschutz",
     ]);
@@ -78,6 +72,13 @@ describe("isCurrent", () => {
   it("marks Dokumente and not Anlässe on the documents of an event", () => {
     expect(current(mainItems("e1"), `${EVENT}/documents`)).toEqual(["Dokumente"]);
     expect(current(moreItems("e1"), `${EVENT}/documents`)).toEqual(["Dokumente"]);
+  });
+
+  it("marks Kontakte on both tabs of the page, and nothing else", () => {
+    expect(current(mainItems(undefined), "/contacts")).toEqual(["Kontakte"]);
+    expect(current(mainItems(undefined), "/contacts", "?tab=institutions")).toEqual(["Kontakte"]);
+    expect(current(moreItems(undefined), "/contacts", "?tab=institutions")).toEqual(["Kontakte"]);
+    expect(current(mainItems("e1"), "/contacts")).toEqual(["Kontakte"]);
   });
 
   it("marks Anlässe on the list of events", () => {

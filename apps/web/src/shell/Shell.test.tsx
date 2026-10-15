@@ -256,17 +256,15 @@ describe("Shell", () => {
     expect(calls[1]).toMatchObject({ method: "POST", path: "/api/v1/sign-out" });
   });
 
-  it("links to the persons and institutions in the navigation", async () => {
+  it("links to Kontakte in the navigation, and to no separate register", async () => {
     renderShell(json(200, info([first], first)));
 
-    expect(await screen.findByRole("link", { name: "Personen" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "Kontakte" })).toHaveAttribute(
       "href",
-      "/persons",
+      "/contacts",
     );
-    expect(screen.getByRole("link", { name: "Institutionen" })).toHaveAttribute(
-      "href",
-      "/institutions",
-    );
+    expect(screen.queryByRole("link", { name: "Personen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Institutionen" })).not.toBeInTheDocument();
   });
 
   it("says „Versionen“ in the footer until the server names its build", async () => {
@@ -337,7 +335,7 @@ describe("sidebar", () => {
     const names = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(names).toEqual(["Eingang", "Meine Arbeit", "Anlässe", "Personen", "Institutionen"]);
+    expect(names).toEqual(["Eingang", "Meine Arbeit", "Anlässe", "Kontakte"]);
   });
 
   it("adds Arbeit after Meine Arbeit inside an event, as the current page", async () => {
@@ -355,8 +353,7 @@ describe("sidebar", () => {
       "Zeitplan",
       "Dokumente",
       "Anlässe",
-      "Personen",
-      "Institutionen",
+      "Kontakte",
     ]);
     const work = within(nav).getByRole("link", { name: "Arbeit" });
     expect(work).toHaveAttribute("href", "/events/0199b8e0-0000-7000-8000-0000000000e1/work");
@@ -662,7 +659,8 @@ describe("narrow layout", () => {
   });
 
   it.each([
-    ["/persons", "true"],
+    ["/contacts", "true"],
+    ["/contacts?tab=institutions", "true"],
     ["/settings?tab=members", "true"],
     ["/inbox", null],
   ])("marks Mehr as current on %s when the page is one of its items", async (path, current) => {
@@ -720,7 +718,7 @@ describe("narrow layout", () => {
         .getAllByRole("menuitem")
         .map((item) => item.textContent)
         .slice(0, 3),
-    ).toEqual(["Anlässe", "Dokumente", "Personen"]);
+    ).toEqual(["Anlässe", "Dokumente", "Kontakte"]);
   });
 
   it("shows the open proposals at Eingang in the bottom bar", async () => {
@@ -744,14 +742,13 @@ describe("narrow layout", () => {
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
     ).toEqual([
-      "Personen",
-      "Institutionen",
+      "Kontakte",
       "Einstellungen",
       "Datenschutz",
       expect.stringMatching(/^(tada|Versionen)/),
     ]);
-    await userEvent.click(within(menu).getByRole("menuitem", { name: "Institutionen" }));
-    await vi.waitFor(() => expect(window.location.pathname).toBe("/institutions"));
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Kontakte" }));
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/contacts"));
   });
 
   it("keeps the top bar with the theme toggle, the command box and the member menu", async () => {
@@ -776,7 +773,7 @@ describe("narrow layout", () => {
 
     const drawer = await screen.findByRole("dialog", { name: "Navigation" });
     const nav = within(drawer).getByRole("navigation", { name: "Hauptnavigation" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(5);
+    expect(within(nav).getAllByRole("link")).toHaveLength(4);
     expect(within(drawer).getByRole("button", { name: /Organisation/ })).toBeInTheDocument();
     expect(within(drawer).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
     expect(within(drawer).getByRole("link", { name: "Datenschutz" })).toBeInTheDocument();
@@ -792,9 +789,9 @@ describe("narrow layout", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Navigation öffnen" }));
     const drawer = await screen.findByRole("dialog", { name: "Navigation" });
-    await userEvent.click(within(drawer).getByRole("link", { name: "Personen" }));
+    await userEvent.click(within(drawer).getByRole("link", { name: "Kontakte" }));
 
-    await vi.waitFor(() => expect(window.location.pathname).toBe("/persons"));
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/contacts"));
     await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
@@ -835,7 +832,7 @@ describe("narrow layout", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Navigation öffnen" }));
     const drawer = await screen.findByRole("dialog", { name: "Navigation" });
-    await userEvent.click(within(drawer).getByRole("link", { name: "Personen" }));
+    await userEvent.click(within(drawer).getByRole("link", { name: "Kontakte" }));
 
     await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     // The drawer restores focus to the toggle on its own; the heading must keep it.
@@ -942,8 +939,7 @@ describe("command palette", () => {
         "Eingang",
         "Meine Arbeit",
         "Anlässe",
-        "Personen",
-        "Institutionen",
+        "Kontakte",
         "Einstellungen",
         "Datenschutz",
       ]),
@@ -955,7 +951,7 @@ describe("command palette", () => {
     renderShell(json(200, info([first], first)));
 
     const palette = await openPalette();
-    await userEvent.keyboard("person");
+    await userEvent.keyboard("kontak");
 
     expect(within(palette).getAllByRole("menuitem")).toHaveLength(1);
     await vi.waitFor(() =>
@@ -963,7 +959,7 @@ describe("command palette", () => {
     );
     await userEvent.keyboard("{Enter}");
 
-    await vi.waitFor(() => expect(window.location.pathname).toBe("/persons"));
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/contacts"));
     await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
