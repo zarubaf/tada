@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Router } from "../../router/Router";
@@ -70,13 +70,51 @@ describe("useRecordRoute", () => {
     expect(window.history.length).toBe(before);
   });
 
-  it("starts to create with a new history entry, so that back closes the form", () => {
+  it("goes back from the create state that it started, so that Back does not return to an equal entry", async () => {
+    window.history.replaceState(null, "", "/start");
+    window.history.pushState(null, "", "/events/e1/work?view=table");
+    const { result } = mount("/events/e1/work?view=table");
+    act(() => result.current.startCreate("action"));
+    act(() => result.current.close());
+    await waitFor(() => expect(window.location.search).toBe("?view=table"));
+    expect(result.current.route).toEqual({ mode: "closed" });
+
+    act(() => window.history.back());
+    await waitFor(() => expect(window.location.pathname).toBe("/start"));
+  });
+
+  it("closes a create state that began on an open record with replace, back would reopen it", async () => {
     const { result } = mount("/events/e1/work?view=table#ACT-001");
-    const before = window.history.length;
+    act(() => result.current.startCreate("action"));
+    act(() => result.current.close());
+    expect(window.location.search).toBe("?view=table");
+    expect(window.location.hash).toBe("");
+    expect(result.current.route).toEqual({ mode: "closed" });
+  });
+
+  it("goes back from a record that a link opened with a new entry", async () => {
+    window.history.replaceState(null, "", "/start");
+    window.history.pushState(null, "", "/events/e1/work?view=table");
+    const { result } = mount("/events/e1/work?view=table");
+    // A card is a link: it pushes the address of the record.
+    act(() => result.current.follow("ACT-001"));
+    expect(result.current.route).toEqual({ mode: "open", id: "ACT-001" });
+    act(() => result.current.close());
+    await waitFor(() => expect(result.current.route).toEqual({ mode: "closed" }));
+
+    act(() => window.history.back());
+    await waitFor(() => expect(window.location.pathname).toBe("/start"));
+  });
+
+  it("starts to create with a new history entry, so that back closes the form", async () => {
+    const { result } = mount("/events/e1/work?view=table#ACT-001");
     act(() => result.current.startCreate("action"));
     expect(window.location.search).toBe("?view=table&new=action");
     expect(window.location.hash).toBe("");
-    expect(window.history.length).toBe(before + 1);
+
+    act(() => window.history.back());
+    await waitFor(() => expect(window.location.search).toBe("?view=table"));
+    expect(window.location.hash).toBe("#ACT-001");
   });
 
   it("switches to the created record and drops the key to create", () => {

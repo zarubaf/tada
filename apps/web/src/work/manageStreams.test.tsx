@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Router } from "../router/Router";
@@ -40,6 +40,18 @@ describe("useManageStreams", () => {
     expect(result.current.isOpen).toBe(false);
     expect(window.location.search).toBe("?view=table");
     expect(window.history.length).toBe(before);
+  });
+
+  it("goes back when it opened the dialog, so that Back does not return to an equal entry", async () => {
+    window.history.replaceState(null, "", "/start");
+    window.history.pushState(null, "", "/events/e1/work?view=table");
+    const { result } = mount("/events/e1/work?view=table");
+    act(() => result.current.open());
+    act(() => result.current.close());
+    await waitFor(() => expect(window.location.search).toBe("?view=table"));
+
+    act(() => window.history.back());
+    await waitFor(() => expect(window.location.pathname).toBe("/start"));
   });
 
   it("names the address that the command palette goes to", () => {

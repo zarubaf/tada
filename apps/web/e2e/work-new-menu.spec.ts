@@ -128,3 +128,15 @@ test("Abbrechen in the create form returns focus to the Neu button on a phone", 
   await expect(page.getByRole("complementary")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Neu" })).toBeFocused();
 });
+
+test("Abbrechen leaves no equal history entry, so that Back leaves the page", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page);
+  await page.getByRole("button", { name: "Neu" }).click();
+  await page.getByRole("menuitem", { name: "Risiko" }).click();
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page.getByRole("complementary")).toHaveCount(0);
+
+  await page.goBack();
+  await expect(page).not.toHaveURL(new RegExp(`${work}`));
+});

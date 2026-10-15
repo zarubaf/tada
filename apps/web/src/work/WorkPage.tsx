@@ -177,6 +177,18 @@ export function WorkPage({ api }: { api: Api }) {
     onFailedAgain: () => setAnnouncement(t("work-retry-failed")),
   });
 
+  // The dialog of the workstreams went away, by Escape, Back or a close: focus goes to the heading.
+  // Closing may go back in the history, which takes effect after the press, so the close itself
+  // cannot hand focus on.
+  const managing = useRef(manage.isOpen);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the close of the dialog is the trigger
+  useEffect(() => {
+    if (managing.current && !manage.isOpen) {
+      focusAfterCommit(() => heading.current);
+    }
+    managing.current = manage.isOpen;
+  }, [manage.isOpen]);
+
   // The reset button leaves with the filters, so focus goes to the search; behind the closed
   // sheet of a phone there is none, so it goes to the heading.
   const reset = () => {
@@ -349,10 +361,7 @@ export function WorkPage({ api }: { api: Api }) {
             directory={work.directory.directory}
             writable={writable}
             reloadDirectory={work.reloadDirectory}
-            onClose={() => {
-              manage.close();
-              focusAfterCommit(() => heading.current);
-            }}
+            onClose={manage.close}
           />
         </Suspense>
       )}

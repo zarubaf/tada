@@ -100,6 +100,21 @@ describe("Bereiche verwalten on the Arbeit page", () => {
     );
   });
 
+  it("returns focus to the page when Escape closes the dialog that the filter opened", async () => {
+    open("", { narrow: false });
+    await ready();
+    await openFromFilter();
+    await dialog();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(query().get("manage")).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 1, name: "Arbeit" })).toHaveFocus(),
+    );
+  });
+
   it("lists the workstreams read-only for a member who may not manage", async () => {
     open("?manage=streams", { eventManager: false });
     await dialog();

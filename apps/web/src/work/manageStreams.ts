@@ -26,6 +26,7 @@ export function useManageStreams() {
       const query = params.toString();
       navigate(`${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`, {
         replace: !open,
+        undoPush: !open,
         moveFocus: false,
       });
     },
@@ -36,7 +37,7 @@ export function useManageStreams() {
     isOpen,
     /** Opens the dialog. It makes a history entry, so that Back closes it. */
     open: useCallback(() => go(true), [go]),
-    /** Closes the dialog and keeps the query. It replaces the history entry. */
+    /** Closes the dialog and keeps the query. It goes back over the entry that opened it. */
     close: useCallback(() => go(false), [go]),
   };
 }
