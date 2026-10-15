@@ -22,6 +22,7 @@ import { RevokeDialog } from "./RevokeDialog";
 import { useSuccessorIds } from "./useSuccessorIds";
 import styles from "./Work.module.css";
 import { DecisionStatusLabel } from "./WorkStatus";
+import { mayCreateKind } from "./workPermissions";
 
 /**
  * „Entscheide“ of an event: the register of decisions. The wording never changes. A manager
@@ -102,7 +103,7 @@ function Decisions({ api, directory }: { api: Api; directory: Directory }) {
     instance.current += 1;
     page.closeForm();
   };
-  const canRecord = writable && directory.isManager;
+  const canRecord = mayCreateKind("decision", directory, session.user.id, writable);
   const items = register.state.kind === "loaded" ? register.state.items : [];
 
   const saved = (decision: Decision) => {
