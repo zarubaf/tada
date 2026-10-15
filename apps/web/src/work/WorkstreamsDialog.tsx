@@ -94,8 +94,10 @@ export function WorkstreamsDialog({
                   <span className={styles.name}>{redactedOr(row.redacted, row.name)}</span>
                   <span className={styles.meta}>
                     <span>{directory.nameOf(row.lead_user_id)}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{t(`workstream-status-${row.status}`)}</span>
+                    <span className={styles.status}>
+                      <span aria-hidden="true">· </span>
+                      {t(`workstream-status-${row.status}`)}
+                    </span>
                   </span>
                 </div>
                 {canChange && !row.redacted && (
