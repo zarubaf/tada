@@ -160,7 +160,7 @@ function NavigationDemo() {
 
 export function Gallery() {
   return (
-    <main className={styles.gallery}>
+    <main id="main" className={styles.gallery}>
       <h1 className={styles.title}>Komponenten</h1>
 
       <section className={styles.section}>
