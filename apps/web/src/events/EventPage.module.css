@@ -6,17 +6,30 @@
 
   .header {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-1-5);
   }
 
-  .key {
-    color: var(--color-text-muted);
-    font-family: var(--font-family-mono);
+  /* The title and, at the right, the quiet control to close the event; it wraps under a long name. */
+  .titleRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .control {
+    flex: none;
+  }
+
+  /* Key, state and date window in one row of the interface text size. */
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
     font-size: var(--font-size-sm);
-  }
-
-  .dates {
-    font-size: var(--font-size-base);
+    line-height: var(--line-height-sm);
   }
 
   .datesLabel {

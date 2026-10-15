@@ -121,6 +121,18 @@ describe("EventPage", () => {
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
 
+  it("puts the key and the state of the event in the header, in words", async () => {
+    const { api } = fakeApi(json(200, event));
+    renderAt(`/events/${event.id}`, api);
+
+    const header = (await screen.findByRole("heading", { level: 1 })).closest(
+      "header",
+    ) as HTMLElement;
+    expect(within(header).getByText("FLY28")).toBeInTheDocument();
+    expect(within(header).getByText("Offen")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
   it("shows the date window of the profile in the header with its state", async () => {
     const { api } = fakeApi(json(200, event));
     renderAt(`/events/${event.id}`, api);
