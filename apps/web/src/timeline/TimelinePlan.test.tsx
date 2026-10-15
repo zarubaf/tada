@@ -1,12 +1,11 @@
 import { readFileSync } from "node:fs";
-import { screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render as mount, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Action, Milestone, Workstream } from "../api/client";
 import type { ProfileState } from "../events/eventContext";
-import { BERND, EVENT, ground, ME, renderWork } from "../test/fakeWorkServer";
-import { TimelinePage } from "./TimelinePage";
-
-const user = userEvent.setup({ delay: null });
+import { Router } from "../router/Router";
+import { BERND, EVENT, ground, ME } from "../test/fakeWorkServer";
+import { TimelinePlan } from "./TimelinePlan";
 
 function action(over: Record<string, unknown> = {}) {
   return {
@@ -88,17 +87,31 @@ const profile: ProfileState = {
   },
 };
 
-const render = (setup: Parameters<typeof renderWork>[1] = {}) =>
-  renderWork((api) => <TimelinePage api={api} />, {
-    profile,
-    workstreams: [ground],
-    ...setup,
-    lists: { "/actions": actions, "/milestones": [milestone], ...setup.lists },
-  });
+interface Setup {
+  profile?: ProfileState;
+  actions?: unknown[];
+  milestones?: unknown[];
+}
+
+const render = ({ profile: shown = profile, ...records }: Setup = {}) =>
+  mount(
+    <Router>
+      <TimelinePlan
+        actions={(records.actions ?? actions) as Action[]}
+        milestones={(records.milestones ?? [milestone]) as Milestone[]}
+        workstreams={[ground] as Workstream[]}
+        profile={shown}
+        today="2030-05-08"
+        base={`/events/${EVENT.id}`}
+        nameOf={(userId) => (userId === BERND ? "Bernd Beispiel" : "Anna Muster")}
+        filtered={false}
+      />
+    </Router>,
+  );
 
 const axis = () => screen.findByRole("region", { name: "Zeitachse" });
 
-describe("TimelinePage", () => {
+describe("TimelinePlan", () => {
   it("each bar and point is a link to the action", async () => {
     render();
     const timeline = await axis();
@@ -118,18 +131,6 @@ describe("TimelinePage", () => {
     const diamond = within(timeline).getByRole("link", { name: /MIL-001/ });
     expect(diamond).toHaveAttribute("href", `/events/${EVENT.id}/work#MIL-001`);
     expect(diamond).not.toHaveAttribute("tabindex", "-1");
-  });
-
-  it("shows one message, not two, when the filters hide every action", async () => {
-    widen(500);
-    render({ lists: { "/milestones": [] } });
-    await axis();
-    await user.click(screen.getByRole("button", { name: /Verantwortlich/ }));
-    await user.click(screen.getByRole("option", { name: "Bernd Beispiel" }));
-    await user.click(screen.getByRole("button", { name: /Status/ }));
-    await user.click(screen.getByRole("option", { name: "offen" }));
-    expect(screen.getByText("Keine Treffer für diese Filter.")).toBeInTheDocument();
-    expect(screen.queryByText("Keine Einträge in dieser Ansicht.")).not.toBeInTheDocument();
   });
 
   it("shows the lanes, the milestones, the event window and the undated count", async () => {
@@ -154,28 +155,6 @@ describe("TimelinePage", () => {
     );
   });
 
-  it("filters by owner and by status and resets the filters", async () => {
-    render();
-    // Two actions and one milestone.
-    const timeline = await axis();
-    expect(within(timeline).getAllByRole("link")).toHaveLength(3);
-
-    await user.click(screen.getByRole("button", { name: /Verantwortlich/ }));
-    await user.click(screen.getByRole("option", { name: "Bernd Beispiel" }));
-    expect(within(timeline).getAllByRole("link")).toHaveLength(2);
-    expect(within(timeline).getByRole("link", { name: /ACT-002/ })).toBeInTheDocument();
-    const filters = screen.getByRole("group", { name: "Filter" });
-    expect(within(filters).getByText("2 Aufgaben ausgeblendet")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /Status/ }));
-    await user.click(screen.getByRole("option", { name: "offen" }));
-    expect(screen.getByText("Keine Treffer für diese Filter.")).toBeInTheDocument();
-
-    await user.click(screen.getAllByRole("button", { name: "Filter zurücksetzen" })[0] as Element);
-    const again = await axis();
-    expect(within(again).getAllByRole("link")).toHaveLength(3);
-  });
-
   it("the narrow list groups the items by week", async () => {
     render();
     const list = await screen.findByRole("region", { name: "Nach Wochen" });
@@ -196,10 +175,8 @@ describe("TimelinePage", () => {
 
   it("long_span_scrolls_inside_the_timeline", async () => {
     render({
-      lists: {
-        "/actions": [action({ start_date: "2030-05-06", due_date: "2033-05-01" })],
-        "/milestones": [],
-      },
+      actions: [action({ start_date: "2030-05-06", due_date: "2033-05-01" })],
+      milestones: [],
     });
     const timeline = await axis();
     // The scroll container is the timeline: a keyboard member can reach it and scroll it.
@@ -212,30 +189,9 @@ describe("TimelinePage", () => {
     expect(css).toMatch(/\.timeline\s*{[^}]*min-width:\s*0/);
   });
 
-  const noWindow: ProfileState = {
-    kind: "loaded",
-    fields: [],
-    profile: { facts: [], proposals: [], open_questions: [] },
-  };
-
-  it("shows the empty state for an event without dates, milestones and window", async () => {
-    render({
-      profile: noWindow,
-      lists: { "/actions": [action({ start_date: null, due_date: null })], "/milestones": [] },
-    });
-    expect(await screen.findByText("Noch nichts im Zeitplan")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Zeitachse" })).not.toBeInTheDocument();
-  });
-
   it("shows the milestones of an event without dated actions", async () => {
-    render({
-      lists: {
-        "/actions": [action({ start_date: null, due_date: null })],
-        "/milestones": [milestone],
-      },
-    });
+    render({ actions: [action({ start_date: null, due_date: null })] });
     const timeline = await axis();
-    expect(screen.queryByText("Noch nichts im Zeitplan")).not.toBeInTheDocument();
     expect(
       within(timeline).getByRole("link", {
         name: "MIL-001 Bewilligung liegt vor, 15.05.2030, offen",
@@ -265,7 +221,7 @@ describe("TimelinePage", () => {
     expect(within(timeline).getAllByText("offen")).toHaveLength(2);
   });
 
-  it("links the rows of the list to the rows of the registers", async () => {
+  it("links the rows of the list to the panel of the record", async () => {
     render();
     const list = await screen.findByRole("region", { name: "Nach Wochen" });
     expect(within(list).getByRole("link", { name: /ACT-002/ })).toHaveAttribute(
@@ -304,22 +260,9 @@ describe("TimelinePage", () => {
   });
 
   it("shows a line in the list when nothing is on the axis but the window", async () => {
-    render({ lists: { "/actions": [], "/milestones": [] } });
+    render({ actions: [], milestones: [] });
     const list = await screen.findByRole("region", { name: "Nach Wochen" });
     expect(within(list).getByText("Keine Einträge in dieser Ansicht.")).toBeInTheDocument();
-  });
-
-  it("waits for the profile before it chooses the empty state", async () => {
-    render({
-      profile: { kind: "loading" },
-      lists: { "/actions": [action({ start_date: null, due_date: null })], "/milestones": [] },
-    });
-    // The directory shows a skeleton of the same name first: wait for the page itself.
-    await screen.findByRole("heading", { level: 2, name: "Zeitplan" });
-    expect(
-      screen.getByRole("status", { name: "Daten des Anlasses werden geladen" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Noch nichts im Zeitplan")).not.toBeInTheDocument();
   });
 
   it("names a month window by its month", async () => {
@@ -340,10 +283,8 @@ describe("TimelinePage", () => {
 
   it("draws no node for each week and few labels for a span of years", async () => {
     render({
-      lists: {
-        "/actions": [action({ start_date: "2030-05-06", due_date: "2033-05-01" })],
-        "/milestones": [],
-      },
+      actions: [action({ start_date: "2030-05-06", due_date: "2033-05-01" })],
+      milestones: [],
     });
     const timeline = await axis();
     expect(timeline.querySelectorAll("[class*='weekLine']")).toHaveLength(0);

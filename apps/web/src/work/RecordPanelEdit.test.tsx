@@ -636,6 +636,18 @@ describe("editing an action in the panel", () => {
       expect(view.getByText("Bernd Beispiel")).toBeVisible();
     });
 
+    it("says that the event is closed when the server refuses a change", async () => {
+      // The page loaded before another member closed the event: the server refuses the write.
+      openAction({}, {}, () => problem(409, "event-closed"));
+      const view = await region();
+      await user.click(view.getByRole("button", { name: "Titel: Plakat gestalten" }));
+      await user.type(view.getByRole("textbox", { name: "Titel" }), " neu{Enter}");
+
+      await waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent("Dieser Anlass ist abgeschlossen"),
+      );
+    });
+
     it("names the heading by a title that is on screen, and by nothing that is absent", async () => {
       openAction({}, { event: { ...EVENT, status: "closed" } });
       const closed = await region();

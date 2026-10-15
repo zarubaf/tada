@@ -66,22 +66,18 @@ describe("isCurrent", () => {
   });
 
   it("marks neither Zeitplan nor Anlässe's sibling on other pages of the event", () => {
-    expect(current(mainItems("e1"), `${EVENT}/actions`, "?view=timeline")).toEqual(["Anlässe"]);
+    expect(current(mainItems("e1"), EVENT, "?view=timeline")).toEqual(["Anlässe"]);
   });
 
-  it("marks Anlässe on the other pages of an event, and Arbeit not", () => {
-    expect(current(mainItems("e1"), `${EVENT}/actions`)).toEqual(["Anlässe"]);
-    expect(current(moreItems("e1"), `${EVENT}/actions`)).toEqual(["Anlässe"]);
-    expect(current(bottomItems("e1"), `${EVENT}/actions`)).toEqual([]);
+  it("marks Anlässe on the overview of an event, and Arbeit not", () => {
+    expect(current(mainItems("e1"), EVENT)).toEqual(["Anlässe"]);
+    expect(current(moreItems("e1"), EVENT)).toEqual(["Anlässe"]);
+    expect(current(bottomItems("e1"), EVENT)).toEqual([]);
   });
 
   it("marks Dokumente and not Anlässe on the documents of an event", () => {
     expect(current(mainItems("e1"), `${EVENT}/documents`)).toEqual(["Dokumente"]);
     expect(current(moreItems("e1"), `${EVENT}/documents`)).toEqual(["Dokumente"]);
-  });
-
-  it("marks Anlässe on the overview of an event", () => {
-    expect(current(mainItems("e1"), EVENT)).toEqual(["Anlässe"]);
   });
 
   it("marks Anlässe on the list of events", () => {

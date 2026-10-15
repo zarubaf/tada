@@ -274,18 +274,6 @@ event-error-key = Das Kürzel hat 2 bis 8 Grossbuchstaben oder Ziffern.
 event-error-key-taken = Dieses Kürzel ist schon vergeben.
 event-error-name = Der Name hat 1 bis 200 Zeichen.
 event-error-time_zone = Diese Zeitzone ist unbekannt.
-event-nav = Anlass
-event-nav-overview = Übersicht
-event-nav-members = Mitglieder
-event-nav-documents = Dokumente
-event-nav-actions = Aufgaben
-event-nav-timeline = Zeitplan
-event-nav-registers = Register
-event-nav-workstreams = Arbeitsbereiche
-register-nav = Register
-register-nav-commitments = Zusagen
-register-nav-milestones = Meilensteine
-register-nav-decisions = Entscheide
 event-overview-loading = Übersicht wird geladen
 event-overview-questions = Offene Fragen
 event-overview-questions-none = Es gibt keine offenen Fragen.
@@ -981,19 +969,13 @@ register-loaded-more = Weitere Einträge geladen.
 register-row-not-found = { $id } nicht gefunden
 work-column-id = ID
 work-column-owner = Verantwortlich
-work-column-workstream = Arbeitsbereich
 work-column-due = Fällig
 work-column-status = Status
 work-column-actions = Aktionen
 work-edit = Bearbeiten
-# $id: the readable ID of the record.
-work-edit-of = { $id } bearbeiten
 work-create = Erfassen
 work-save = Speichern
 work-cancel = Abbrechen
-work-evidence = Beleg
-# $id: the readable ID of the record.
-work-evidence-of = Beleg zu { $id }
 # $name: the readable ID or the name of the saved record.
 register-saved = „{ $name }“ gespeichert.
 register-conflict = Der Eintrag wurde inzwischen geändert. Die Liste ist neu geladen.
@@ -1032,15 +1014,12 @@ work-error-name-taken = Diesen Namen gibt es in diesem Anlass schon.
 work-error-lead = Wählen Sie ein Mitglied des Anlasses mit Mitarbeit oder Anlassleitung.
 
 actions-title = Aufgaben
-actions-loading = Aufgaben werden geladen
 actions-empty-title = Noch keine Aufgaben
-actions-empty-text = Erfassen Sie die erste Aufgabe mit dem Formular unter der Liste.
 action-column-title = Titel
 action-create-title = Aufgabe erfassen
 # $id: the readable ID of the action.
 action-change-title = { $id } bearbeiten
 action-field-title = Titel (Pflichtfeld)
-action-field-description = Beschreibung
 action-status-open = offen
 action-status-in-progress = in Arbeit
 action-status-blocked = blockiert
@@ -1048,27 +1027,15 @@ action-status-done = erledigt
 action-status-canceled = abgebrochen
 
 milestones-title = Meilensteine
-milestones-loading = Meilensteine werden geladen
 milestones-empty-title = Noch keine Meilensteine
-milestones-empty-text = Erfassen Sie den ersten Meilenstein mit dem Formular unter der Liste.
 milestone-column-title = Titel
-milestone-column-date = Datum
-milestone-column-open-actions = Offene Aufgaben
 milestone-create-title = Meilenstein erfassen
 # $id: the readable ID of the milestone.
 milestone-change-title = { $id } bearbeiten
 milestone-field-title = Titel (Pflichtfeld)
-milestone-field-description = Beschreibung
-milestone-field-date = Datum (Pflichtfeld)
 milestone-status-open = offen
 milestone-status-reached = erreicht
 milestone-status-canceled = abgesagt
-milestone-reach = Als erreicht markieren
-# $id: the readable ID of the milestone.
-milestone-reach-of = { $id } als erreicht markieren
-milestone-reopen = Wieder öffnen
-# $id: the readable ID of the milestone.
-milestone-reopen-of = { $id } wieder öffnen
 # $id: the readable ID of the milestone. $status: its new status, for example „erreicht“.
 milestone-status-changed = { $id } ist jetzt { $status }.
 milestone-warning-overdue = Datum überschritten
@@ -1081,39 +1048,19 @@ milestone-evidence-version = Stützt die Version { $version } des Meilensteins
 ## Decisions (ADR 0081)
 
 decisions-title = Entscheide
-decisions-loading = Entscheide werden geladen
 decisions-empty-title = Noch keine Entscheide
-decisions-empty-text = Erfassen Sie den ersten Entscheid mit dem Formular unter der Liste.
-decisions-empty-text-read = Die Anlassleitung erfasst die Entscheide dieses Anlasses.
-decision-column-wording = Wortlaut
-decision-column-decided-on = Beschlossen am
-decision-column-decided-by = Beschlossen von
 decision-status-in-force = in Kraft
 decision-status-superseded = ersetzt
 decision-status-revoked = widerrufen
-decision-superseded-by = ersetzt durch
-# $reason: why the decision was revoked.
-decision-revoked-reason-line = Grund: { $reason }
 decision-create-title = Entscheid erfassen
 # $id: the readable ID of the decision that the new one replaces.
 decision-replace-title = { $id } ersetzen
 # $id: the readable ID of the decision that the new one replaces.
-decision-replace-gone = { $id } lässt sich nicht mehr ersetzen. Kopieren Sie den Text, und brechen Sie dann ab.
-# $id: the readable ID of the decision that the new one replaces.
-decision-replace-ended = { $id } lässt sich nicht mehr ersetzen.
-# $id: the readable ID of the decision that the new one replaces.
-decision-replace-stale = Die Fassung von { $id } ist nicht mehr aktuell. Kopieren Sie den Text, und brechen Sie dann ab. Öffnen Sie { $id } danach neu.
-# $id: the readable ID of the decision that the new one replaces.
 decision-replace-inherit = Verantwortlich und Bereich sind die des bisherigen Entscheids. Sie lassen sich hier ändern.
 decision-replace-note = Der neue Entscheid ersetzt { $id }. Der Wortlaut von { $id } bleibt unverändert; { $id } gilt danach als ersetzt.
-decision-field-wording = Wortlaut (Pflichtfeld)
 decision-field-wording-help = Mehrere Zeilen sind möglich. Der Wortlaut lässt sich später nicht ändern. Ein neuer Entscheid ersetzt ihn. 1 bis 2000 Zeichen.
-decision-field-decided-on = Beschlossen am (Pflichtfeld)
-decision-field-decided-by = Beschlossen von (Pflichtfeld)
-decision-parties-list = Beschlossen von
 # $name: the name of a chosen person or institution.
 parties-remove = { $name } entfernen
-parties-remove-short = Entfernen
 # $name: the name of the person or institution that the member chose.
 parties-added = { $name } hinzugefügt
 # $name: the name of the person or institution that the member removed.
@@ -1127,22 +1074,12 @@ people-picker-count = { $count } von { $max } gewählt
 # $max: the most that can be chosen.
 people-picker-full = Höchstens { $max } möglich.
 decision-replace = Ersetzen
-# $id: the readable ID of the decision.
-decision-replace-of = { $id } ersetzen
 decision-revoke = Widerrufen
-# $id: the readable ID of the decision.
-decision-revoke-of = { $id } widerrufen
 # $id: the readable ID of the decision.
 decision-revoke-title = { $id } widerrufen
 decision-revoke-text = Der Entscheid gilt danach als widerrufen. Ein neuer Entscheid folgt nicht. Der Wortlaut und der Grund bleiben sichtbar.
 decision-revoke-reason = Grund (Pflichtfeld)
 decision-revoke-reason-help = Warum gilt der Entscheid nicht mehr? 1 bis 500 Zeichen.
-decision-wording-more = Ganz zeigen
-decision-wording-less = Kürzen
-# $id: the readable ID of the decision.
-decision-wording-more-of = Wortlaut von { $id } ganz zeigen
-# $id: the readable ID of the decision.
-decision-wording-less-of = Wortlaut von { $id } kürzen
 # $id: the new decision. $old: the decision that it replaces.
 decision-replaced = { $id } ersetzt { $old }.
 decision-replaced-stale = { $id } ersetzt { $old }, doch { $old } ist nicht aktuell. Laden Sie die Seite neu.
@@ -1168,17 +1105,10 @@ timeline-title = Zeitplan
 timeline-empty-title = Noch nichts im Zeitplan
 timeline-empty-text = Geben Sie einer Aufgabe ein Fälligkeitsdatum oder erfassen Sie einen Meilenstein.
 timeline-empty-action = Zu den Aufgaben
-timeline-filters = Filter
 timeline-filter-owner = Verantwortlich
 timeline-filter-status = Status
-timeline-filter-all = Alle
-timeline-filter-reset = Filter zurücksetzen
 timeline-no-match = Keine Treffer für diese Filter.
 timeline-list-empty = Keine Einträge in dieser Ansicht.
-# $count: the actions that the filters hide.
-timeline-hidden = { $count ->
-    [one] 1 Aufgabe ausgeblendet
-   *[other] { $count } Aufgaben ausgeblendet
 }
 # $count: the actions without a due date. The link opens the register of actions.
 timeline-undated = { $count ->
@@ -1203,25 +1133,16 @@ timeline-action = { $id } { $title }, { $when }, { $status }
 timeline-milestone = { $id } { $title }, { $date }, { $status }
 
 commitments-title = Zusagen
-commitments-loading = Zusagen werden geladen
 commitments-empty-title = Noch keine Zusagen
-commitments-empty-text = Erfassen Sie die erste Zusage mit dem Formular unter der Liste.
 commitment-column-text = Zusage
 commitment-column-promisor = Zugesagt von
 # $condition: the condition text of the commitment.
 commitment-condition-line = Bedingung: { $condition }
-# $reason: why the commitment became firm.
-commitment-firm-reason-line = Verbindlich, weil: { $reason }
 commitment-create-title = Zusage erfassen
 # $id: the readable ID of the commitment.
 commitment-change-title = { $id } bearbeiten
-commitment-field-text = Zusage (Pflichtfeld)
-commitment-field-promisor = Zugesagt von (Pflichtfeld)
 commitment-field-promisor-placeholder = Person oder Institution wählen
-commitment-field-promisor-fixed = Zugesagt von
-commitment-field-condition = Bedingung
 commitment-field-condition-help = Mit einer Bedingung ist die Zusage bedingt. Ohne Bedingung ist sie verbindlich.
-commitment-field-condition-fixed = Bedingung
 commitment-status-conditional = bedingt
 commitment-status-firm = verbindlich
 commitment-status-fulfilled = erfüllt
@@ -1230,8 +1151,6 @@ commitment-status-withdrawn = zurückgezogen
 # $version: the record version that the evidence supports.
 commitment-evidence-version = Stützt die Version { $version } der Zusage
 make-firm = Verbindlich machen
-# $id: the readable ID of the commitment.
-make-firm-of = { $id } verbindlich machen
 # $id: the readable ID of the commitment.
 make-firm-title = { $id } verbindlich machen
 make-firm-text = Die Bedingung bleibt als Verlauf stehen. Der Grund wird mit der Zusage gespeichert.

@@ -5,7 +5,6 @@ import {
   fakeEvent,
   fakeMemberships,
   fakeSession,
-  fontsLoaded,
   forbidden,
   eventMemberships as memberships,
   sessionWithRole,
@@ -30,13 +29,13 @@ const states = [
 for (const viewport of viewports) {
   for (const theme of themes) {
     for (const state of states) {
-      test(`event members, ${state.name}, ${theme}, ${viewport.name} px: no axe violation${
-        state.name === "manager" ? ", screenshot" : ""
-      }`, async ({ page }) => {
+      test(`event members, ${state.name}, ${theme}, ${viewport.name} px: no axe violation`, async ({
+        page,
+      }) => {
         await page.setViewportSize(viewport);
         await fakeSession(page, sessionWithRole(state.role));
         await fakeMembers(page, state.items, state.status);
-        await page.goto(`/events/${event?.id}/members`);
+        await page.goto(`/events/${event?.id}#mitglieder`);
         await setTheme(page, theme);
         await expect(page.getByRole("heading", { level: 1, name: event?.name })).toBeVisible();
         if (state.status === 200) {
@@ -49,19 +48,16 @@ for (const viewport of viewports) {
         }
         if (state.name === "manager") {
           await expect(page.getByRole("button", { name: "Mitglied hinzufügen" })).toBeVisible();
+          // The anchor of the address takes focus to the heading of the section.
+          await expect(
+            page.getByRole("heading", { name: "Mitglieder des Anlasses" }),
+          ).toBeFocused();
         }
 
         const results = await new AxeBuilder({ page })
           .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
           .analyze();
         expect(results.violations).toEqual([]);
-
-        if (state.name === "manager") {
-          await fontsLoaded(page);
-          await expect(page).toHaveScreenshot(`event-members-${theme}-${viewport.name}.png`, {
-            fullPage: true,
-          });
-        }
       });
     }
   }
@@ -70,7 +66,7 @@ for (const viewport of viewports) {
 test("an event manager picks the member to add from the organization", async ({ page }) => {
   await fakeSession(page, sessionWithRole("member"));
   await fakeMembers(page, memberships);
-  await page.goto(`/events/${event?.id}/members`);
+  await page.goto(`/events/${event?.id}#mitglieder`);
 
   await page.getByRole("button", { name: /Mitglied wählen/ }).click();
   await page.getByRole("option", { name: "Cäcilia Probst" }).click();
@@ -83,7 +79,7 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await fakeSession(page, sessionWithRole("member"));
     await fakeMembers(page, memberships);
-    await page.goto(`/events/${event?.id}/members?pseudo`);
+    await page.goto(`/events/${event?.id}?pseudo#mitglieder`);
     await expect(page.getByRole("table")).toBeVisible();
     await expect(page.locator("[role=status][aria-label]")).toHaveCount(0);
 
