@@ -123,6 +123,45 @@ const user = userEvent.setup({ delay: null });
 afterEach(() => window.history.replaceState(null, "", "/"));
 
 describe("DocumentsPage", () => {
+  it("puts the heading, the search and the upload in the toolbar row", async () => {
+    setup();
+
+    const heading = await screen.findByRole("heading", { level: 1, name: "Dokumente" });
+    const row = heading.closest("[data-page-toolbar]") as HTMLElement;
+    expect(row).not.toBeNull();
+    expect(within(row).getByText("FLY28")).toBeInTheDocument();
+    expect(within(row).getByRole("searchbox", { name: "Dokumente suchen" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Datei hochladen" })).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("data-width", "flush");
+  });
+
+  it("marks a closed event with a chip that has an icon and the word", async () => {
+    setup(undefined, { ...ACTIVE_EVENT, status: "closed", closed_at: "2030-07-01T10:00:00Z" });
+
+    const heading = await screen.findByRole("heading", { level: 1, name: "Dokumente" });
+    const row = heading.closest("[data-page-toolbar]") as HTMLElement;
+    const chip = within(row).getByText("Abgeschlossen").closest("[data-variant]");
+    expect(chip?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("shows a draft as a chip with its status, as muted text for the version", async () => {
+    const draft = makeDocument("d3", "DOC-003", "Ablauf Samstag");
+    draft.newest_version = {
+      ...draft.newest_version,
+      kind: "draft",
+      status: "review",
+      media_type: null,
+      size_bytes: null,
+      file_name: null,
+    };
+    setup({ "": [draft] });
+
+    const table = await screen.findByRole("table", { name: "Dokumente" });
+    const chip = within(table).getByText("Entwurf").closest("[data-variant]");
+    expect(chip?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(within(table).getByText("in Prüfung").closest("[data-variant]")).not.toBeNull();
+  });
+
   it("lists the documents with a link to each", async () => {
     setup();
 
@@ -211,7 +250,7 @@ describe("DocumentsPage", () => {
     await user.click(retry);
 
     await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 2, name: "Dokumente" })).toHaveFocus(),
+      expect(screen.getByRole("heading", { level: 1, name: "Dokumente" })).toHaveFocus(),
     );
   });
 

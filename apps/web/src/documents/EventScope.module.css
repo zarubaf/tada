@@ -1,0 +1,11 @@
+@layer components {
+  /* Until the event has loaded the page has no toolbar row: the state sits in the gutter. */
+  .state {
+    padding: var(--space-3) var(--page-gutter, var(--space-3));
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-2);
+  }
+}

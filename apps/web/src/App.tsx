@@ -1,5 +1,6 @@
 import { lazy } from "react";
 import { type Api, createApi } from "./api/client";
+import { EventScope } from "./documents/EventScope";
 import { EventPage } from "./events/EventPage";
 import { LEGACY_EVENT_PAGES, LegacyEventRedirect } from "./events/LegacyEventRedirect";
 import { t } from "./i18n";
@@ -139,11 +140,11 @@ export function App({ api = defaultApi }: { api?: Api }) {
                       </EventPage>
                     </Route>
                     <Route path="/events/:eventId/documents">
-                      <EventPage api={api}>
-                        <RouteSuspense bare>
+                      <RouteSuspense>
+                        <EventScope api={api}>
                           <DocumentsPage api={api} />
-                        </RouteSuspense>
-                      </EventPage>
+                        </EventScope>
+                      </RouteSuspense>
                     </Route>
                     <Route path="/events/:eventId/work">
                       <RouteSuspense>
