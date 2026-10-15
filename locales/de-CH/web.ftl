@@ -143,8 +143,7 @@ nav-work = Arbeit
 nav-timeline = Zeitplan
 nav-documents = Dokumente
 nav-events = Anlässe
-nav-persons = Personen
-nav-institutions = Institutionen
+nav-contacts = Kontakte
 nav-inbox = Eingang
 # $count: the number of changesets that wait for a review.
 nav-inbox-count = { $count } offen

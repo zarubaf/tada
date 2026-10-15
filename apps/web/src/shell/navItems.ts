@@ -2,7 +2,6 @@
 // palette all read this list. An item appears only when its page exists (ADR 0082).
 import {
   type Icon,
-  IconBuilding,
   IconCalendarEvent,
   IconFiles,
   IconInbox,
@@ -50,17 +49,12 @@ const events: Destination = {
   label: t("nav-events"),
   icon: IconCalendarEvent,
 };
-const persons: Destination = {
-  id: "persons",
-  to: "/persons",
-  label: t("nav-persons"),
+/** „Kontakte“: the persons and the institutions are its two tabs (ADR 0082). */
+const contacts: Destination = {
+  id: "contacts",
+  to: "/contacts",
+  label: t("nav-contacts"),
   icon: IconUsers,
-};
-const institutions: Destination = {
-  id: "institutions",
-  to: "/institutions",
-  label: t("nav-institutions"),
-  icon: IconBuilding,
 };
 const settings: Destination = {
   id: "settings",
@@ -124,8 +118,7 @@ export function mainItems(eventId: string | undefined): Destination[] {
     myWork,
     ...(eventId === undefined ? [] : [work(eventId), timeline(eventId), documents(eventId)]),
     eventsItem(eventId),
-    persons,
-    institutions,
+    contacts,
   ];
 }
 /** The items that do not depend on the event. */
@@ -142,8 +135,7 @@ export function bottomItems(eventId: string | undefined): Destination[] {
 export function moreItems(eventId: string | undefined): Destination[] {
   return [
     ...(eventId === undefined ? [] : [eventsItem(eventId), documents(eventId)]),
-    persons,
-    institutions,
+    contacts,
     settings,
     privacy,
   ];
