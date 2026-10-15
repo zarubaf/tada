@@ -41,6 +41,11 @@
     overflow-wrap: anywhere;
   }
 
+  /* The dot stays with the status, so that a long name of a lead never leaves it alone at a line end. */
+  .status {
+    white-space: nowrap;
+  }
+
   .form {
     display: grid;
     gap: var(--space-3);
