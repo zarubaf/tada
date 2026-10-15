@@ -29,7 +29,7 @@ This ADR records the decisions and their reasons.
 
 - The sidebar has these items: „Eingang“ (with a count of open proposals), „Meine Arbeit“, „Arbeit“, „Zeitplan“, „Dokumente“, „Anlässe“ and „Kontakte“.
   „Arbeit“, „Zeitplan“ and „Dokumente“ appear only while the path names an event.
-  „Anlässe“ opens the list of events, and inside an event the event home „Übersicht“.
+  „Anlässe“ opens the list of events, also inside an event.
   „Einstellungen“ and the member menu sit at the foot.
   An item appears only when its page exists.
 - The sidebar head holds the organization and event switchers.
@@ -182,7 +182,8 @@ It does not add:
   It comes with the capture feature.
 
 The panel shows the existing evidence of a record through the evidence panel.
-A proposal chip on a card means that a proposal in the member's „Eingang“ targets this record.
+A proposal chip appears in „Eingang“, next to a proposed value, and on the event overview.
+A card and the panel show no proposal chip, because a work record carries no flag that a proposal targets it.
 
 ## Consequences
 
