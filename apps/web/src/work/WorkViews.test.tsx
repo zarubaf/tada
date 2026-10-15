@@ -418,10 +418,10 @@ describe("the timeline view", () => {
       within(chart).getByRole("link", {
         name: "ACT-001 Plakat gestalten, fällig 18.05.2030, offen",
       }),
-    ).toHaveAttribute("href", `/events/${EVENT.id}/actions#ACT-001`);
+    ).toHaveAttribute("href", `/events/${EVENT.id}/work#ACT-001`);
     expect(within(chart).getByRole("link", { name: /MIL-001/ })).toHaveAttribute(
       "href",
-      `/events/${EVENT.id}/milestones#MIL-001`,
+      `/events/${EVENT.id}/work#MIL-001`,
     );
     expect(within(chart).getByRole("heading", { name: "Bodenbetrieb" })).toBeInTheDocument();
     const legend = screen.getByRole("list", { name: "Legende" });

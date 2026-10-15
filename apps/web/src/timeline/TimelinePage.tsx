@@ -126,7 +126,9 @@ function Timeline({ directory }: { directory: Directory }) {
             title={t("timeline-empty-title")}
             text={t("timeline-empty-text")}
             action={
-              <StandaloneLink to={`${base}/actions`}>{t("timeline-empty-action")}</StandaloneLink>
+              <StandaloneLink to={`${base}/work?type=action`}>
+                {t("timeline-empty-action")}
+              </StandaloneLink>
             }
           />
         )

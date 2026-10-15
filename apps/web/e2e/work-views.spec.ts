@@ -240,3 +240,14 @@ for (const width of [800, 900, 1024, 1100]) {
     expect(cut.overshoot <= 0 || cut.scrolls).toBe(true);
   });
 }
+
+test("a bar of the timeline opens its record in the panel", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, "?view=timeline");
+  await page
+    .getByRole("region", { name: "Zeitachse" })
+    .getByRole("link", { name: /ACT-001/ })
+    .click();
+  await expect(page).toHaveURL(/\/work(\?.*)?#ACT-001$/);
+  await expect(page.getByRole("complementary", { name: /ACT-001/ })).toBeVisible();
+});

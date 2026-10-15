@@ -21,23 +21,18 @@ import { StandaloneLink } from "../ui/StandaloneLink";
 import { StatusLabel } from "../ui/StatusLabel";
 import styles from "./MyWorkPage.module.css";
 import { ActionStatusLabel, CommitmentStatusLabel } from "./WorkStatus";
+import { recordHref } from "./workLinks";
 
 type State =
   | { kind: "loading" }
   | { kind: "failed"; message: string; requestId: string | undefined }
   | { kind: "loaded"; work: MyWork };
 
-/** The full reference of a record, for example `FLY28/ACT-042`, linked to its register. */
-function Reference({
-  row,
-  register,
-}: {
-  row: { event_id: string; event_key: string; local_id: string };
-  register: "actions" | "commitments";
-}) {
+/** The full reference of a record, for example `FLY28/ACT-042`, linked to its panel. */
+function Reference({ row }: { row: { event_id: string; event_key: string; local_id: string } }) {
   return (
     <StandaloneLink
-      to={`/events/${row.event_id}/${register}`}
+      to={recordHref(row.event_id, { readableId: row.local_id })}
     >{`${row.event_key}/${row.local_id}`}</StandaloneLink>
   );
 }
@@ -60,8 +55,8 @@ function DueDate({ date, today }: { date: string | null | undefined; today: stri
 
 /**
  * „Meine Arbeit“, the start page: my open actions and commitments across my events, and the
- * number of proposals that I review. A reference links to the register of its event; the
- * registers have no page for a single record.
+ * number of proposals that I review. A reference opens its record in the panel of the
+ * „Arbeit“ page of its event.
  */
 export function MyWorkPage({ api }: { api: Api }) {
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -91,7 +86,7 @@ export function MyWorkPage({ api }: { api: Api }) {
     {
       id: "id",
       header: t("work-column-id"),
-      cell: (row) => <Reference row={row} register="actions" />,
+      cell: (row) => <Reference row={row} />,
       mono: true,
     },
     { id: "title", header: t("action-column-title"), cell: (row) => row.title },
@@ -111,7 +106,7 @@ export function MyWorkPage({ api }: { api: Api }) {
     {
       id: "id",
       header: t("work-column-id"),
-      cell: (row) => <Reference row={row} register="commitments" />,
+      cell: (row) => <Reference row={row} />,
       mono: true,
     },
     { id: "text", header: t("commitment-column-text"), cell: (row) => row.text },

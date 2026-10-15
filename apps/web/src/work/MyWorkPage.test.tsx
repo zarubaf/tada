@@ -75,7 +75,7 @@ describe("My Work", () => {
     const table = await screen.findByRole("table", { name: "Aufgaben" });
     const rows = within(table).getAllByRole("row");
     const link = within(rows[1] as HTMLElement).getByRole("link", { name: "FLY28/ACT-042" });
-    expect(link).toHaveAttribute("href", `/events/${EVENT_ID}/actions`);
+    expect(link).toHaveAttribute("href", `/events/${EVENT_ID}/work#ACT-042`);
     expect(within(rows[1] as HTMLElement).getByText("Generator bestellen")).toBeInTheDocument();
     expect(within(rows[1] as HTMLElement).getByText("18.05.2030")).toBeInTheDocument();
     expect(within(rows[2] as HTMLElement).getByText("FLY28/ACT-007")).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe("My Work", () => {
     const table = await screen.findByRole("table", { name: "Zusagen" });
     expect(within(table).getByRole("link", { name: "FLY28/COM-003" })).toHaveAttribute(
       "href",
-      `/events/${EVENT_ID}/commitments`,
+      `/events/${EVENT_ID}/work#COM-003`,
     );
     expect(within(table).getByText("Testwil Generatoren AG")).toBeInTheDocument();
     expect(within(table).getByText("bedingt")).toBeInTheDocument();
