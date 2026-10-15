@@ -97,19 +97,40 @@ Sidebar, from top to bottom:
    The current event is the event of the route, else the event that the member opened last (the browser remembers it for each organization as `tada-event:<organization ID>`), else none.
    The menu lists the events of the member and has „Alle Anlässe“ and, for the owner and the administration, „Neuer Anlass“.
    A closed event shows „abgeschlossen“ in its subtitle.
-3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Arbeit“, „Zeitplan“, „Anlässe“, „Personen“ and „Institutionen“.
-   „Arbeit“ and „Zeitplan“ appear only while the path names an event.
+3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Arbeit“, „Zeitplan“, „Dokumente“, „Anlässe“, „Personen“ and „Institutionen“.
+   „Arbeit“, „Zeitplan“ and „Dokumente“ appear only while the path names an event.
    „Arbeit“ opens the work page of that event. „Zeitplan“ opens the same page in the timeline view, `/events/:id/work?view=timeline`.
-   On that page „Arbeit“ is the current item and „Anlässe“ is not: an item can yield a path to another item.
+   „Dokumente“ opens the documents of the event, `/events/:id/documents`.
+   „Anlässe“ is the item of the event home, „Übersicht“ (`/events/:id`).
+   On the work page „Arbeit“ is the current item and „Anlässe“ is not, and on the documents „Dokumente“ is: an item can yield paths to other items.
    In the timeline view „Zeitplan“ is the current item and „Arbeit“ is not: an item can also be current only for a value of the query (`onlyWith`, `unlessWith`).
    The bottom bar has no „Zeitplan“; on a phone the view tabs reach it.
+   On a phone „Dokumente“ is in the menu „Mehr“, after „Anlässe“.
 4. At the foot: „Einstellungen“, „Datenschutz“, the build of the web client and the member block.
    The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
    The member block shows the name and the role; the member menu is in the top bar.
 
-The event page has its own sub-navigation: „Übersicht“, „Aufgaben“, „Zeitplan“, „Register“, „Dokumente“, „Mitglieder“ and „Arbeitsbereiche“ (until ADR 0082 replaces it).
-It has a second row below „Register“: „Zusagen“, „Meilensteine“, „Entscheide“, „Risiken“ and „Anforderungen“.
-Each tab has its own URL: `/events/:id/commitments`, `/milestones`, `/decisions`, `/risks` and `/requirements`.
+The event page has no navigation of its own: the sidebar items above are the destinations of an event (ADR 0082).
+The event home „Übersicht“ (`/events/:id`) shows the header of the event with its key, name and date window, the control to close the event (`CloseEvent`), the open questions, the facts with their proposals and the section „Mitglieder des Anlasses“.
+That section has the anchor `#mitglieder`: an address with it scrolls to the section and moves focus to its heading.
+A member who may not list the event members sees no such section.
+The documents of an event keep the header of the event above them, and a document page links back to the documents.
+
+The old addresses of the event pages stay valid.
+A client-side route (`LegacyEventRedirect`) replaces the history entry, so Back does not return to the old address, and it keeps the hash and the query keys that it does not set:
+
+| Old address               | New address                        |
+| ------------------------- | ---------------------------------- |
+| `/events/:id/actions`     | `/events/:id/work?type=action`     |
+| `/events/:id/commitments` | `/events/:id/work?type=commitment` |
+| `/events/:id/milestones`  | `/events/:id/work?type=milestone`  |
+| `/events/:id/decisions`   | `/events/:id/work?type=decision`   |
+| `/events/:id/timeline`    | `/events/:id/work?view=timeline`   |
+| `/events/:id/workstreams` | `/events/:id/work`                 |
+| `/events/:id/members`     | `/events/:id#mitglieder`           |
+
+A hash such as `#ACT-001` stays, so that the panel opens the record.
+The links that tada sends (the digests and the Telegram messages) name the new addresses.
 
 Rules:
 
@@ -123,25 +144,24 @@ Rules:
 Each screen uses one of these templates. A new template needs a change to this document.
 Each template uses the `Page` component for the `main` element, the page gutters and the `h1` style.
 
-| Template         | Structure                                                                                                   | Used by                                                          |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| List with detail | A list on the left, the selected item on the right (wide); the list, then the item as its own page (narrow) | „Eingang“, „Meine Arbeit“                                        |
-| Register         | A toolbar with filters and actions, then a table                                                            | Milestones, risks, requirements, decisions, commitments, actions |
-| Overview         | A header with the key facts, then sections in one column                                                    | Event overview                                                   |
-| Portfolio        | A filter bar, then a table of events with readiness columns                                                 | Portfolio                                                        |
-| Form             | One column, at most 40rem wide, the actions at the bottom                                                   | Create and edit pages                                            |
-| Public page      | No shell. The app name, one heading and a form column of at most 40rem                                      | Sign-in, magic link, invitation, organization choice             |
-| Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings                         |
-| Event page       | The event header with the key and the name, the sub-navigation of the event, then the sub-page              | „Übersicht“, „Mitglieder“, „Aufgaben“ of an event                |
-| Timeline         | The event header, a filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)           | „Zeitplan“ of an event                                           |
-| Work             | One toolbar row (title, type filter, view switch, „Filter“, „Neu“), 12 px below it the view                 | „Arbeit“ of an event                                             |
-| Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                                      |
+| Template         | Structure                                                                                                   | Used by                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| List with detail | A list on the left, the selected item on the right (wide); the list, then the item as its own page (narrow) | „Eingang“, „Meine Arbeit“                             |
+| Register         | A toolbar with filters and actions, then a table                                                            | Persons, institutions                                 |
+| Overview         | A header with the key facts, then sections in one column                                                    | Event overview                                        |
+| Portfolio        | A filter bar, then a table of events with readiness columns                                                 | Portfolio                                             |
+| Form             | One column, at most 40rem wide, the actions at the bottom                                                   | Create and edit pages                                 |
+| Public page      | No shell. The app name, one heading and a form column of at most 40rem                                      | Sign-in, magic link, invitation, organization choice  |
+| Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings              |
+| Event page       | The event header with the key and the name, the control to close the event, then the page                   | „Übersicht“ and „Dokumente“ of an event               |
+| Timeline         | A filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)                             | The timeline view of „Arbeit“, „Zeitplan“ of an event |
+| Work             | One toolbar row (title, type filter, view switch, „Filter“, „Neu“), 12 px below it the view                 | „Arbeit“ of an event                                  |
+| Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                           |
 
 ### Work
 
 The „Arbeit“ page (`/events/:id/work`) shows all work records of an event: actions, commitments, milestones, decisions and risks (ADR 0082).
 It has its own `h1` „Arbeit“ and not the header of the event page.
-The page does not use the sub-navigation of the event.
 
 - The page is `Page width="flush"`: it has no gutter of its own, and its rows set `--page-gutter` (16 px on a phone, 12 px from `--bp-medium`).
   The toolbar runs edge to edge; the view below it keeps the gutter at both sides and at the bottom.
@@ -175,8 +195,7 @@ The page does not use the sub-navigation of the event.
   There is no drag and drop.
 - A card is one link to its record.
   An action opens in the record panel: the link goes to the same page with the readable ID as the hash, and it keeps the query, so the view and the filters stay.
-  Until the panels of the other kinds exist, they lead to the old page of the kind, with the readable ID as the hash.
-  A risk opens in the record panel as well and has no old page.
+  Each kind of record has a panel, so every card links in this way.
   A row of the table links in the same way.
 - The record panel shows the record that the hash names (`#ACT-012`).
   From 80rem it is a docked column 30rem wide beside the list, under the top bar; the list stays usable and gets the rest of the width.
@@ -223,7 +242,7 @@ A row is `--row-height` high (28 px, and 44 px on coarse pointers).
   Pressing the sorted column flips its direction; pressing another column sorts it ascending.
   The sorted header has `aria-sort`, and a polite live region says „Sortiert nach Titel, aufsteigend“.
   The sort is stable. A record without a value (an empty title, no owner, no date, no area) comes last in both directions, and a tie is broken by the readable ID.
-- The title is a link with the same target as the card: the old page of the kind with the readable ID as the hash.
+- The title is a link with the same target as the card: the panel of the record.
   A redacted record shows „entfernt“.
 - The title takes the width that is left and ends in an ellipsis in one line; the `title` attribute holds the whole text. Owner and area end in an ellipsis too.
 - Where its container is less than 40rem wide (a narrow viewport, a docked panel or a column to select), the table keeps its columns and scrolls inside itself, never the page.
@@ -243,7 +262,7 @@ A row is `--row-height` high (28 px, and 44 px on coarse pointers).
 ### Timeline
 
 The „Zeitplan“ view of the work page shows the plan of one event: `/events/:id/work?view=timeline`.
-The old page `/events/:id/timeline` shows the same plan until the redirect of ADR 0082 replaces it; both use `TimelinePlan`, which takes the records as props.
+The old address `/events/:id/timeline` redirects to it; the view uses `TimelinePlan`, which takes the records as props.
 It is read-only.
 It has no drag.
 
