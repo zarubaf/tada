@@ -57,6 +57,17 @@ interface Loaded {
   eventManager: boolean;
 }
 
+/** The event memberships, as the server lists them. */
+export type Memberships = { user_id: string; event_role: string }[];
+
+/** True if the event role may own a record or lead a workstream: anybody but a viewer. */
+export const isContributor = (item: Memberships[number]): boolean =>
+  item.event_role !== "event-viewer";
+
+/** True if the member is a manager of the event. */
+export const isEventManager = (items: Memberships, me: string): boolean =>
+  items.some((item) => item.user_id === me && item.event_role === "event-manager");
+
 function failed(error: Problem | undefined): DirectoryState {
   return { kind: "failed", message: problemMessage(error), requestId: error?.request_id };
 }
@@ -126,15 +137,11 @@ export function useDirectory(
         workstreams: workstreams.data.items,
         milestones: milestones.items,
         actions: actions.items,
-        contributors: memberships.data.items
-          .filter((item) => item.event_role !== "event-viewer")
-          .map((item) => ({
-            id: item.user_id,
-            label: names.get(item.user_id) ?? item.display_name,
-          })),
-        eventManager: memberships.data.items.some(
-          (item) => item.user_id === me && item.event_role === "event-manager",
-        ),
+        contributors: memberships.data.items.filter(isContributor).map((item) => ({
+          id: item.user_id,
+          label: names.get(item.user_id) ?? item.display_name,
+        })),
+        eventManager: isEventManager(memberships.data.items, me),
       });
       setError(undefined);
       return true;
