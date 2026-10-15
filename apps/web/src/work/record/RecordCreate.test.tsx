@@ -114,6 +114,21 @@ describe("RecordCreate with a control of its own", () => {
     expect(submitted).toEqual([{ text: "Lieferung", promisor: "institution:i1" }]);
   });
 
+  it("keeps the button pending after the record is made, so that no announcement names a button that is gone", async () => {
+    const { onCreated } = await show(() => ({ ok: true, record: { local_id: "COM-010" } }));
+    await user.type(screen.getByRole("textbox", { name: /^Zusage/ }), "Lieferung");
+    await user.type(screen.getByRole("combobox", { name: /^Zugesagt von/ }), "Testwil");
+    await user.click(
+      await screen.findByRole("option", { name: "Testwil Generatoren AG (INS-001)" }, SEARCH),
+    );
+    await user.click(screen.getByRole("button", { name: "Erstellen" }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith("COM-010"));
+    // The page replaces the form a moment later. Until then the button must not end its pending
+    // state: React Aria then announces it by a role="img" that points at the button, and the
+    // label is gone when the button unmounts.
+    expect(document.querySelector('[data-live-announcer] [role="img"]')).toBeNull();
+  });
+
   it("puts the error of the server at the party control", async () => {
     await show(() => ({
       ok: false,
