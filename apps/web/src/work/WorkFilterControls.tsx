@@ -102,7 +102,12 @@ export function StreamFilter({
   filters,
   onChange,
   directory,
-}: FilterControlProps & { directory: DirectoryState }) {
+  onManage,
+}: FilterControlProps & {
+  directory: DirectoryState;
+  /** Opens the dialog „Bereiche verwalten“, an entry at the end of the list. */
+  onManage: () => void;
+}) {
   const options = useMemo<SearchOption[]>(
     () =>
       directory.kind === "loaded"
@@ -115,6 +120,7 @@ export function StreamFilter({
       label={t("work-stream")}
       placeholder={t("work-stream-any")}
       clearLabel={t("work-stream-any")}
+      action={{ label: t("workstreams-manage-entry"), onPress: onManage }}
       options={options}
       value={filters.workstreams[0]}
       onChange={(id) => onChange({ ...filters, workstreams: id === undefined ? [] : [id] })}
