@@ -94,5 +94,8 @@ export default defineConfig(({ mode }) => ({
     setupFiles: ["src/test/setup.ts"],
     // The timeout guards against a hang, not against slow code: parallel checks load the machine.
     testTimeout: 20_000,
+    // In CI the Rust build and tests share the machine with 146 test workers, and a starved worker
+    // misses a wait that passes alone. A second and third try find a real failure, which fails each try.
+    retry: process.env.CI ? 2 : 0,
   },
 }));
