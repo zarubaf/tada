@@ -131,8 +131,6 @@ export interface FieldSpec {
 }
 
 export interface CreateSpec {
-  /** Only an event manager creates the record. Otherwise the create state says so. */
-  managersOnly?: boolean;
   /** The Fluent key of the heading, for example „Neue Aufgabe“. */
   titleKey: string;
   /** The IDs of the fields of the form, in order. The title comes first. */

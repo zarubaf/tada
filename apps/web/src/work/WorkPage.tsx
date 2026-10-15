@@ -341,7 +341,6 @@ export function WorkPage({ api }: { api: Api }) {
                 : { mode: "open", readableId: route.id }
             }
             me={me}
-            mayCreate={mayCreate}
             focusTitle={openId !== undefined && openId === made}
             onCreated={(readableId) => {
               setMade(readableId);

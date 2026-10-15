@@ -139,8 +139,6 @@ export const decisionDescriptor: RecordDescriptor = {
   ],
   create: {
     titleKey: "record-create-decision",
-    // Only an event manager records a decision (ADR 0081).
-    managersOnly: true,
     fields: ["title", "parties", "decidedOn", "owner", "area"],
     defaults: (owner) => ({ title: "", parties: null, decidedOn: null, owner: owner ?? null }),
     validate: (values): Record<string, string> => {
