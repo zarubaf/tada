@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { type Api, createApi } from "./api/client";
 import { EventScope } from "./documents/EventScope";
+import { LegacyDocumentRedirect } from "./documents/LegacyDocumentRedirect";
 import { EventPage } from "./events/EventPage";
 import { LEGACY_EVENT_PAGES, LegacyEventRedirect } from "./events/LegacyEventRedirect";
 import { t } from "./i18n";
@@ -157,15 +158,22 @@ export function App({ api = defaultApi }: { api?: Api }) {
                         <LegacyEventRedirect page={page} />
                       </Route>
                     ))}
-                    <Route path="/documents/:documentId">
+                    <Route path="/events/:eventId/documents/:documentId">
                       <RouteSuspense>
                         <DocumentPage api={api} />
                       </RouteSuspense>
                     </Route>
-                    <Route path="/documents/:documentId/diff">
+                    <Route path="/events/:eventId/documents/:documentId/diff">
                       <RouteSuspense>
                         <DocumentDiffPage api={api} />
                       </RouteSuspense>
+                    </Route>
+                    {/* The old addresses of a document have no event; they lead below the event. */}
+                    <Route path="/documents/:documentId">
+                      <LegacyDocumentRedirect api={api} />
+                    </Route>
+                    <Route path="/documents/:documentId/diff">
+                      <LegacyDocumentRedirect api={api} diff />
                     </Route>
                     <Route path="/privacy">
                       <RouteSuspense>

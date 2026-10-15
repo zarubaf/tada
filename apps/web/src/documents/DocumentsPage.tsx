@@ -21,6 +21,7 @@ import { DraftChips } from "./DraftChips";
 import { EventMark } from "./EventMark";
 import { formatSize, mediaTypeKind } from "./format";
 import { searchParam } from "./search";
+import { documentPath } from "./versions";
 
 const createdFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" });
 
@@ -35,7 +36,7 @@ const columns: Column<Document>[] = [
     id: "name",
     header: t("documents-column-name"),
     cell: (d) => (
-      <StandaloneLink inRow to={`/documents/${encodeURIComponent(d.id)}`}>
+      <StandaloneLink inRow to={documentPath(d.event_id, d.id)}>
         {d.name}
       </StandaloneLink>
     ),

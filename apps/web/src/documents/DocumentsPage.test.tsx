@@ -169,7 +169,7 @@ describe("DocumentsPage", () => {
     expect(within(table).getByText("DOC-001")).toBeInTheDocument();
     expect(within(table).getByRole("link", { name: "Budget Übersicht.pdf" })).toHaveAttribute(
       "href",
-      "/documents/d2",
+      `/events/${EVENT_ID}/documents/d2`,
     );
     expect(within(table).getAllByText("2.5 MB")).toHaveLength(2);
   });

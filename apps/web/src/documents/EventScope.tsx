@@ -15,18 +15,8 @@ import styles from "./EventScope.module.css";
  * documents pages have their own toolbar row with the `h1` (ADR 0082), and the event home keeps
  * the header of the event and the control to close it.
  */
-export function EventScope({
-  api,
-  children,
-  eventId: eventIdProp,
-}: {
-  api: Api;
-  children: ReactNode;
-  /** For a page whose address has no event, for example a document: the event it belongs to. */
-  eventId?: string;
-}) {
-  const params = useParams();
-  const eventId = eventIdProp ?? params.eventId ?? "";
+export function EventScope({ api, children }: { api: Api; children: ReactNode }) {
+  const { eventId = "" } = useParams();
   // After a failed load the page has no heading yet: focus goes to the heading that the page adds.
   const { state, retried, retry } = useEventState(api, eventId, () =>
     document.querySelector<HTMLElement>("main h1"),

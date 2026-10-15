@@ -28,8 +28,18 @@ export function previousDraft(
     .sort((a, b) => b.number - a.number)[0];
 }
 
+/** The address of a document. It sits below its event, so that the layout of the event stays. */
+export function documentPath(eventId: string, documentId: string): string {
+  return `/events/${encodeURIComponent(eventId)}/documents/${encodeURIComponent(documentId)}`;
+}
+
 /** The address of the comparison of two draft versions. */
-export function diffPath(documentId: string, from: DocumentVersion, to: DocumentVersion): string {
+export function diffPath(
+  eventId: string,
+  documentId: string,
+  from: DocumentVersion,
+  to: DocumentVersion,
+): string {
   const query = new URLSearchParams({ from: from.id, to: to.id });
-  return `/documents/${encodeURIComponent(documentId)}/diff?${query}`;
+  return `${documentPath(eventId, documentId)}/diff?${query}`;
 }
