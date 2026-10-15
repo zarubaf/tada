@@ -207,8 +207,9 @@ describe("DocumentPage", () => {
     ).toHaveAttribute("href", "/api/v1/document-versions/v2/content");
     const heading = screen.getByRole("heading", { level: 2, name: "Programm Flugtag.pdf" });
     await waitFor(() => expect(heading).toHaveFocus());
-    // The event layout stays around the document.
-    expect(screen.getByRole("link", { name: "Mitglieder" })).toBeInTheDocument();
+    // The event header stays around the document, and a link leads back to its documents.
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Zurück zu den Dokumenten" })).toBeInTheDocument();
   });
 
   it("shows entfernt without a download for a redacted version and the note of another", async () => {

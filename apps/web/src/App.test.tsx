@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";
@@ -56,6 +56,22 @@ describe("App", () => {
     renderAt("/events/0199b8e0-0000-7000-8000-000000000001/work");
     expect(await screen.findByRole("heading", { level: 1, name: "Arbeit" })).toBeInTheDocument();
     expect(await screen.findByText("Noch keine Arbeit in diesem Anlass")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["actions#ACT-001", "/work", "?type=action", "#ACT-001"],
+    ["commitments", "/work", "?type=commitment", ""],
+    ["milestones", "/work", "?type=milestone", ""],
+    ["decisions", "/work", "?type=decision", ""],
+    ["timeline", "/work", "?view=timeline", ""],
+    ["workstreams", "/work", "", ""],
+    ["members", "", "", "#mitglieder"],
+  ])("sends the old address /events/:id/%s to its new place", async (old, path, search, hash) => {
+    const id = "0199b8e0-0000-7000-8000-000000000001";
+    renderAt(`/events/${id}/${old}`);
+    await waitFor(() => expect(window.location.pathname).toBe(`/events/${id}${path}`));
+    expect(window.location.search).toBe(search);
+    expect(window.location.hash).toBe(hash);
   });
 
   it("keeps the events list at /events", async () => {

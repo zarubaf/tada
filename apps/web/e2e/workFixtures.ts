@@ -120,7 +120,7 @@ export const commitments = [
   }),
 ];
 
-const milestones = [
+export const milestones = [
   base("21", ME, {
     local_id: "MIL-001",
     title: "Stromversorgung für Festwirtschaft und Flugplatzinfrastruktur gesichert",

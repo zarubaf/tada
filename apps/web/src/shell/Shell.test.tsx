@@ -501,7 +501,7 @@ describe("event switcher", () => {
 
   it("shows the event of the route with its key, and names it in the top bar", async () => {
     eventItems = [open, other];
-    renderShellAt(`/events/${open.id}/actions`, json(200, info([first], first)));
+    renderShellAt(`/events/${open.id}`, json(200, info([first], first)));
 
     const switcher = await screen.findByRole("button", {
       name: "Anlass wechseln: Sommerfest 2030",
@@ -707,10 +707,7 @@ describe("narrow layout", () => {
 
   it("moves Anlässe into Mehr inside an event, and marks Mehr on the other pages of the event", async () => {
     stubNarrow(true);
-    renderShellAt(
-      "/events/0199b8e0-0000-7000-8000-0000000000e1/actions",
-      json(200, info([first], first)),
-    );
+    renderShellAt("/events/0199b8e0-0000-7000-8000-0000000000e1", json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
     expect(within(nav).getByRole("link", { name: "Arbeit" })).not.toHaveAttribute("aria-current");

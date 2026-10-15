@@ -1,10 +1,4 @@
-import type {
-  ActionStatus,
-  CommitmentStatus,
-  DecisionStatus,
-  MilestoneStatus,
-  RecordKind,
-} from "../api/client";
+import type { ActionStatus, CommitmentStatus, MilestoneStatus, RecordKind } from "../api/client";
 import { t } from "../i18n";
 import { type IconSize, StatusIcon } from "../ui/StatusIcon";
 import { StatusLabel } from "../ui/StatusLabel";
@@ -43,7 +37,4 @@ export const CommitmentStatusLabel = ({ status }: { status: CommitmentStatus }) 
 );
 export const MilestoneStatusLabel = ({ status }: { status: MilestoneStatus }) => (
   <RecordStatusLabel kind="milestone" status={status} />
-);
-export const DecisionStatusLabel = ({ status }: { status: DecisionStatus }) => (
-  <RecordStatusLabel kind="decision" status={status} />
 );
