@@ -194,15 +194,38 @@ A descriptor (`RecordDescriptor`) gives each kind its fields and the commands th
 
 ### Review Inbox („Eingang“)
 
-- A list with detail. The list shows proposals that wait for the member, oldest first.
-- The detail shows, from top to bottom:
-  1. The proposed change as a comparison: the current accepted value and the proposed value.
-  2. The source: the excerpt with the cited passage marked, the source version and the capture time.
-  3. Conditions and assumptions of the proposal.
-  4. The actions: „Annehmen“, „Bearbeiten und annehmen“, „Ablehnen“.
-- If the target record changed after the proposal, the detail shows a conflict and disables „Annehmen“ with the reason.
+- A list with detail under the page frame of „Arbeit“: one toolbar row of 44 px with the `h1` „Eingang“ and a chip with the count of open changesets, then the list and the detail.
+  The list holds the changesets with open proposals, oldest first, as dense rows: the event and, where it applies, the chip „Veraltet“ (icon and word) on one line, the open proposals and the sender with the time as muted text below.
+  The current row has a tint and a bar at its start.
+  Below 56 rem the list and the detail are two screens, and the detail has a way back.
+- A proposal is a card with a line around it, a head, a body and a foot, like the proposals card of the capture feature.
+  - The head holds the mark of a proposal, which gives way to the checkbox on hover, on focus within and while any proposal is selected (always on touch), and the title as a heading.
+    The head also holds the state: „Überfällig“, „Andere Prüfung“ or the end state, each with an icon and a word.
+  - The body has the sections „Änderung“, „Quelle“ and „Begründung und Annahmen“ with 12 px headings.
+    A section after the first has the divider rhythm of the record panel (8 px more than the gap, a line, 16 px).
+    „Änderung“ is label and value rows as in the record panel.
+    A fact shows „Aktuell“ and „Vorgeschlagen“; the proposed value ends with the chips „Vorschlag“ and, where it applies, „Annahme“ or „Unbekannt“.
+    „Quelle“ is a card with a line, radius 8 and padding 10/12 for each cited passage, with its version below.
+  - A conflict is a quiet banner in the card with an icon and the reason, and disables „Annehmen“.
+  - The foot holds compact buttons with an icon: „Annehmen“ (primary only while no proposal is selected and the card is active), „Bearbeiten und annehmen“ and „Ablehnen“.
+    The active card shows the key on each button.
+- The hints of the keys are one quiet row of `Kbd` below the title of the detail.
 - Keyboard: `J` and `K` move through the list; `A` accepts, `E` edits and `R` rejects, each with a visible hint.
-- Batch review: a member can select several proposals of the same kind and accept them together after a summary.
+- Batch review: a member can select several proposals and accept them together after a summary.
+  The summary is a bar that sticks to the bottom of the detail.
+
+### Documents („Dokumente“)
+
+- The documents pages use the page frame of „Arbeit“: `Page width="flush"` with the toolbar row and 12 px below it.
+  The `h1` sits in the row, with the key of the event as muted text and, for a closed event, the chip „Abgeschlossen“.
+  The event header and the control to close the event belong to the event home and do not show here.
+- The list has the search and the upload in the row, and a dense table below it.
+  A draft shows the chips „Entwurf“ and its status, each with an icon and a word.
+- A document has the way back, its name as the `h1`, its ID and the event in the row.
+  The parts below it (the note about changed facts, „Versionen“, „Vorschau der neuesten Version“) are `h2` with 12 px headings and the divider rhythm of the record panel.
+  The headings of a draft are `h3`.
+- The comparison of two drafts has the same frame, with „Fakten“ and „Zeilen“ as `h2`.
+- The lint warnings and the note about changed facts are quiet banners with an icon.
 
 ### Evidence panel
 

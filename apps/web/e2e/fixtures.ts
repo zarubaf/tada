@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /** Invented events with long German names and umlauts (doc/design/principles.md). */
 export const events = [
@@ -321,4 +321,25 @@ export async function fakeReminders(
   await page.route("**/api/v1/account/reminders", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(settings) }),
   );
+}
+
+/**
+ * The page frame of ADR 0082: the `h1` sits in the toolbar row, which is one row of 44 px on a
+ * wide viewport, and the page never scrolls sideways.
+ */
+export async function expectPageFrame(page: Page, viewport: { width: number }): Promise<void> {
+  const frame = await page.evaluate(() => {
+    const row = document.querySelector("[data-page-toolbar]");
+    const heading = document.querySelector("main h1");
+    return {
+      inRow: row !== null && heading !== null && row.contains(heading),
+      rowHeight: row?.getBoundingClientRect().height ?? 0,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  expect(frame.inRow).toBe(true);
+  expect(frame.overflow).toBeLessThanOrEqual(0);
+  if (viewport.width >= 1280) {
+    expect(frame.rowHeight).toBeLessThanOrEqual(45);
+  }
 }
