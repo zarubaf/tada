@@ -7,7 +7,7 @@
 //
 // The dialog stays open while the record changes under it, so that the member keeps what they typed
 // and reads why it failed. After a conflict the record is loaded again; if it no longer takes the
-// action, the dialog closes with a sentence.
+// action, the dialog closes with a sentence and the caller moves focus (`onGone`).
 import { IconDots } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
@@ -23,6 +23,7 @@ export function RecordActions({
   env,
   paused = false,
   onDone,
+  onGone,
 }: {
   actions: readonly RecordActionSpec[];
   item: WorkItem;
@@ -34,6 +35,11 @@ export function RecordActions({
    * `alert` if the member must act on it.
    */
   onDone: (message: string, urgency: "status" | "alert") => void;
+  /**
+   * A conflict took the action away and the dialog closed. The dialog and the menu button are
+   * both gone, so the caller moves focus to a place that stays.
+   */
+  onGone: () => void;
 }) {
   const [chosen, setChosen] = useState<string>();
   const [conflicted, setConflicted] = useState(false);
@@ -51,8 +57,9 @@ export function RecordActions({
       setChosen(undefined);
       setConflicted(false);
       env.announce(t("record-action-gone", { id: item.readableId }), "alert");
+      onGone();
     }
-  }, [gone, item.readableId, env]);
+  }, [gone, item.readableId, env, onGone]);
   const Dialog = running?.dialog;
   return (
     <>
