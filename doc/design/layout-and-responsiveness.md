@@ -41,7 +41,7 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 
 - The bottom bar has four items: „Eingang“, „Meine Arbeit“, „Anlässe“ and „Mehr“.
   Inside an event the third item is „Arbeit“ (ADR 0082), and „Anlässe“ moves into „Mehr“.
-  „Mehr“ is a menu with „Personen“, „Institutionen“, „Einstellungen“, „Datenschutz“ and „Versionen“, and inside an event „Anlässe“ first.
+  „Mehr“ is a menu with „Kontakte“, „Einstellungen“, „Datenschutz“ and „Versionen“, and inside an event „Anlässe“ first.
 - The bottom bar shows a count badge on „Eingang“ when proposals wait for the member.
 - The toggle of the top bar opens the sidebar as a drawer from the left edge.
   The drawer holds the whole sidebar: the switchers, all destinations and the foot.
@@ -97,7 +97,7 @@ Sidebar, from top to bottom:
    The current event is the event of the route, else the event that the member opened last (the browser remembers it for each organization as `tada-event:<organization ID>`), else none.
    The menu lists the events of the member and has „Alle Anlässe“ and, for the owner and the administration, „Neuer Anlass“.
    A closed event shows „abgeschlossen“ in its subtitle.
-3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Arbeit“, „Zeitplan“, „Dokumente“, „Anlässe“, „Personen“ and „Institutionen“.
+3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Arbeit“, „Zeitplan“, „Dokumente“, „Anlässe“ and „Kontakte“.
    „Arbeit“, „Zeitplan“ and „Dokumente“ appear only while the path names an event.
    „Arbeit“ opens the work page of that event. „Zeitplan“ opens the same page in the timeline view, `/events/:id/work?view=timeline`.
    „Dokumente“ opens the documents of the event, `/events/:id/documents`.
@@ -156,6 +156,7 @@ Each template uses the `Page` component for the `main` element, the page gutters
 | Event page       | The event header with the key and the name, the control to close the event, then the page                   | „Übersicht“ and „Dokumente“ of an event               |
 | Timeline         | A filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)                             | The timeline view of „Arbeit“, „Zeitplan“ of an event |
 | Work             | One toolbar row (title, type filter, view switch, „Filter“, „Neu“), 12 px below it the view                 | „Arbeit“ of an event                                  |
+| Contacts         | One toolbar row (title, tabs, search, „Neu“), 12 px below it the register of the tab                        | „Kontakte“                                            |
 | Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                           |
 
 ### Settings
@@ -238,6 +239,20 @@ It has its own `h1` „Arbeit“ and not the header of the event page.
   Beside the record panel the bar keeps clear of it: from 80rem the docked panel leaves the bar its own column, and from 40rem to 80rem the bar floats in the space left of the overlay panel (`--size-panel-width`), so that the panel never covers it.
   The value lists open as a sheet from the bottom instead of a popover.
   A failure banner sits above the bar in the same dock.
+
+### Contacts
+
+The „Kontakte“ page (`/contacts`) holds the persons and the institutions of the organization on one page (ADR 0082).
+It is organization-level: the members of an event are on the overview of the event.
+`/persons` and `/institutions` redirect to `/contacts` and `/contacts?tab=institutions`, and keep the query and the fragment.
+
+- The page is `Page width="flush"` and has the toolbar row of „Arbeit“: the compact `h1` „Kontakte“, then the tabs „Personen“ and „Institutionen“ as a segmented switch, then at the right the search field and the primary button „Neu“.
+  On a phone the search and „Neu“ share a second row.
+- The tab is in the query as `tab=institutions`; the persons are the default and have no key.
+  A tab change makes a history entry, clears the search and drops the fragment, because a row ID names a row of one register.
+- Each tab is a `DataTable` with rows of `--row-height`; below 28rem the rows stack, so the page never scrolls sideways.
+  „Neu“ opens the form of a new record in a `TaskDialog`.
+  „Bearbeiten“ opens the form of a change below the table; an owner also sees the data protection section of a person there (ADR 0072).
 
 ### Table
 
