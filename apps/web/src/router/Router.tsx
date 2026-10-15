@@ -331,7 +331,7 @@ export interface LinkProps {
    * Another link claims this path and the paths below it, for example the item of one page of an
    * event, below the item of the events. This link is not current there.
    */
-  yieldsTo?: string;
+  yieldsTo?: string | readonly string[];
   /**
    * The link is current only while the query has this value, for example the „Zeitplan“ item, which
    * opens a view of a page that another item opens too.
@@ -355,6 +355,11 @@ export interface LinkProps {
    */
   onNavigate?: () => void;
   children: ReactNode;
+}
+
+/** True when the path is at or below one of the paths that another link claims. */
+export function yieldsAt(pathname: string, yieldsTo: string | readonly string[] = []): boolean {
+  return [yieldsTo].flat().some((base) => isAtOrBelow(pathname, base));
 }
 
 /** True when the path is `base` or lies below it. */
@@ -388,7 +393,7 @@ export function Link({
   // A query or a hash in `to` does not count: the link is current for its path, and for the query
   // values that its rules name.
   const target = to.split(/[?#]/, 1)[0] ?? to;
-  const yielded = yieldsTo !== undefined && isAtOrBelow(pathname, yieldsTo);
+  const yielded = yieldsAt(pathname, yieldsTo);
   const current =
     target !== "" &&
     !yielded &&

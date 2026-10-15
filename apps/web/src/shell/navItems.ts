@@ -4,6 +4,7 @@ import {
   type Icon,
   IconBuilding,
   IconCalendarEvent,
+  IconFiles,
   IconInbox,
   IconLayoutKanban,
   IconSettings,
@@ -13,7 +14,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { t } from "../i18n";
-import { isAtOrBelow, passesQueryRules, type QueryRule } from "../router/Router";
+import { passesQueryRules, type QueryRule, yieldsAt } from "../router/Router";
 
 export interface Destination {
   id: string;
@@ -25,7 +26,7 @@ export interface Destination {
   /** Current also below this prefix, when the path of the link is not a prefix of its pages. */
   within?: string;
   /** Another item claims this path and the paths below it, so this item is not current there. */
-  yieldsTo?: string;
+  yieldsTo?: string | readonly string[];
   /** Current only while the query has this value: „Zeitplan“ is a view of the work page. */
   onlyWith?: QueryRule;
   /** Not current while the query has this value: the sibling of `onlyWith`. */
@@ -97,9 +98,21 @@ function timeline(eventId: string): Destination {
   };
 }
 
-/** „Anlässe“. Inside an event it yields the work page, which has its own item. */
+/** „Dokumente“ of one event: its documents and their versions. */
+function documents(eventId: string): Destination {
+  return {
+    id: "documents",
+    to: `/events/${encodeURIComponent(eventId)}/documents`,
+    label: t("nav-documents"),
+    icon: IconFiles,
+  };
+}
+
+/** „Anlässe“. Inside an event it yields the pages that have an item of their own. */
 function eventsItem(eventId: string | undefined): Destination {
-  return eventId === undefined ? events : { ...events, yieldsTo: work(eventId).to };
+  return eventId === undefined
+    ? events
+    : { ...events, yieldsTo: [work(eventId).to, documents(eventId).to] };
 }
 
 /**
@@ -110,7 +123,7 @@ export function mainItems(eventId: string | undefined): Destination[] {
   return [
     inbox,
     myWork,
-    ...(eventId === undefined ? [] : [work(eventId), timeline(eventId)]),
+    ...(eventId === undefined ? [] : [work(eventId), timeline(eventId), documents(eventId)]),
     eventsItem(eventId),
     persons,
     institutions,
@@ -129,7 +142,7 @@ export function bottomItems(eventId: string | undefined): Destination[] {
 /** „Mehr“ holds the other destinations; inside an event that includes „Anlässe“. */
 export function moreItems(eventId: string | undefined): Destination[] {
   return [
-    ...(eventId === undefined ? [] : [eventsItem(eventId)]),
+    ...(eventId === undefined ? [] : [eventsItem(eventId), documents(eventId)]),
     persons,
     institutions,
     settings,
@@ -142,7 +155,7 @@ export const ALL: Destination[] = [...MAIN, settings, privacy];
 
 /** True when the path belongs to the destination. */
 export function isCurrent(destination: Destination, pathname: string, search = ""): boolean {
-  if (destination.yieldsTo !== undefined && isAtOrBelow(pathname, destination.yieldsTo)) {
+  if (yieldsAt(pathname, destination.yieldsTo)) {
     return false;
   }
   if (!passesQueryRules(search, destination)) {
