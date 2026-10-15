@@ -30,13 +30,13 @@ function dialog() {
 }
 
 describe("refusalOf", () => {
-  it("is nothing when the command worked", () => {
-    expect(refusalOf({ ok: true, record: {} }, dialog())).toBeUndefined();
+  it("is nothing when the command worked", async () => {
+    expect(await refusalOf({ ok: true, record: {} }, dialog())).toBeUndefined();
   });
 
-  it("says that the record changed after a conflict, and loads the kind again", () => {
+  it("says that the record changed after a conflict, and loads the kind again", async () => {
     const props = dialog();
-    expect(refusalOf(failed("conflict", "Version"), props)).toEqual({
+    expect(await refusalOf(failed("conflict", "Version"), props)).toEqual({
       message:
         "Der Eintrag wurde inzwischen geändert und ist neu geladen. Prüfen Sie ihn und versuchen Sie es erneut.",
     });
@@ -44,32 +44,42 @@ describe("refusalOf", () => {
     expect(props.env.refresh).toHaveBeenCalledWith("commitment");
   });
 
-  it("puts a refused reason at the reason field", () => {
-    const refusal = refusalOf(
+  it("does not say that the record is loaded when the reload failed", async () => {
+    const props = dialog();
+    props.env.refresh = vi.fn(async () => false);
+    expect(await refusalOf(failed("conflict", "Version"), props)).toEqual({
+      message:
+        "Der Eintrag wurde inzwischen geändert, liess sich aber nicht neu laden. Laden Sie die Seite neu und versuchen Sie es erneut.",
+    });
+    expect(props.onConflict).toHaveBeenCalledTimes(1);
+  });
+
+  it("puts a refused reason at the reason field", async () => {
+    const refusal = await refusalOf(
       failed("validation", "x", problem([{ pointer: "/reason", code: "control-character" }])),
       dialog(),
     );
     expect(refusal).toEqual({ reason: "Der Grund enthält ein Zeichen, das nicht erlaubt ist." });
   });
 
-  it("gives the message of a problem that no field knows", () => {
-    const refusal = refusalOf(
+  it("gives the message of a problem that no field knows", async () => {
+    const refusal = await refusalOf(
       failed("validation", "Ungültig", problem([{ pointer: "/other", code: "x" }])),
       dialog(),
     );
     expect(refusal).toEqual({ message: "Ungültig" });
   });
 
-  it("hands the problem to the fields of the dialog, if it has its own", () => {
+  it("hands the problem to the fields of the dialog, if it has its own", async () => {
     const fields = vi.fn(() => ({}));
-    const refusal = refusalOf(failed("validation", "x", problem([])), dialog(), fields);
+    const refusal = await refusalOf(failed("validation", "x", problem([])), dialog(), fields);
     expect(refusal).toEqual({});
     expect(fields).toHaveBeenCalledTimes(1);
   });
 
-  it("gives the message of any other failure, and does not load the kind", () => {
+  it("gives the message of any other failure, and does not load the kind", async () => {
     const props = dialog();
-    expect(refusalOf(failed("other", "Der Server antwortet nicht."), props)).toEqual({
+    expect(await refusalOf(failed("other", "Der Server antwortet nicht."), props)).toEqual({
       message: "Der Server antwortet nicht.",
     });
     expect(props.env.refresh).not.toHaveBeenCalled();
