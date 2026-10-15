@@ -6,12 +6,14 @@ import { uuidv7 } from "../../api/uuid";
 import { hasMessage, t } from "../../i18n";
 import { SearchSelect } from "../../ui/SearchSelect";
 import { TextField } from "../../ui/TextField";
+import { partyLabel } from "../usePromisorSearch";
 import type { WorkItem } from "../workItem";
 import { choicesOf } from "./choices";
 import { areaField, ownerField } from "./commonFields";
-import { partiesOf, partyId, wordingError } from "./decisionInput";
+import { wordingError } from "./decisionInput";
 import { type ActionDialogProps, type FieldSpec, type FieldValue, peopleValue } from "./descriptor";
 import { PeopleField } from "./PeopleField";
+import { partiesOf, partyId } from "./parties";
 import { RecordActionDialog } from "./RecordActionDialog";
 import styles from "./RecordActionDialog.module.css";
 import { type Refusal, refusalOf } from "./refusal";
@@ -147,7 +149,7 @@ export function SupersedeDecisionDialog(props: ActionDialogProps) {
   const directory = env.sources.directory;
   const seed = old.decided_by.map((party) => ({
     id: partyId(party),
-    label: party.redacted ? party.local_id : `${party.name} (${party.local_id})`,
+    label: party.redacted ? party.local_id : partyLabel(party.name, party.local_id),
     ...(!party.redacted && { name: party.name }),
   }));
 

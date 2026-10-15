@@ -1,8 +1,6 @@
-// What a decision takes in when it is made, in the create state and in „Ersetzen“: the wording and
-// the parties, as the form holds them and as the API takes them.
-import type { CreateDecisionRequest, Decision } from "../../api/client";
+// What a decision takes in when it is made, in the create state and in „Ersetzen“: the wording, as
+// the API takes it.
 import { t } from "../../i18n";
-import { type FieldValue, peopleIds } from "./descriptor";
 
 /** The most characters of a wording. */
 const MAX_WORDING = 2000;
@@ -21,14 +19,3 @@ export function wordingError(wording: string): string | undefined {
   }
   return hasForbiddenCharacter(text) ? t("work-error-wording-control-character") : undefined;
 }
-
-/** The parties of a `people` value as the request names them. */
-export function partiesOf(value: FieldValue): CreateDecisionRequest["decided_by"] {
-  return peopleIds(value).map((id) => {
-    const [kind, uuid = ""] = id.split(":");
-    return { kind: kind === "person" ? "person" : "institution", id: uuid };
-  });
-}
-
-/** The ID of a party as a `people` field holds it: `person:{uuid}` or `institution:{uuid}`. */
-export const partyId = (party: Decision["decided_by"][number]) => `${party.kind}:${party.id}`;

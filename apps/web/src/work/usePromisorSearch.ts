@@ -7,6 +7,9 @@ import type { Choice } from "./directory";
 const DEBOUNCE_MS = 250;
 const RESULTS = 6;
 
+/** The label of a party: its name, with its readable ID where the name alone is not unique. */
+export const partyLabel = (name: string, localId: string) => `${name} (${localId})`;
+
 export interface PromisorSearch {
   /**
    * The ID of an option is `person:{uuid}` or `institution:{uuid}`. The label has the readable
@@ -47,12 +50,12 @@ export function usePromisorSearch(api: Api, text: string, enabled: boolean): Pro
                 options: [
                   ...persons.data.items.map((p) => ({
                     id: `person:${p.id}`,
-                    label: `${p.name} (${p.local_id})`,
+                    label: partyLabel(p.name, p.local_id),
                     name: p.name,
                   })),
                   ...institutions.data.items.map((i) => ({
                     id: `institution:${i.id}`,
-                    label: `${i.name} (${i.local_id})`,
+                    label: partyLabel(i.name, i.local_id),
                     name: i.name,
                   })),
                 ],
