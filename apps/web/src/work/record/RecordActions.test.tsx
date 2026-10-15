@@ -1,22 +1,25 @@
-import { render, screen } from "@testing-library/react";
+import { IconBolt } from "@tabler/icons-react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import * as r from "../../test/workRecords";
 import { Button } from "../../ui/Button";
-import { toWorkItem } from "../workItem";
+import type { WorkCommands } from "../workCommands";
+import { toWorkItem, type WorkItem } from "../workItem";
 import type { ActionDialogProps, RecordActionSpec } from "./descriptor";
 import type { FieldEnv } from "./FieldEditor";
 import { RecordActions } from "./RecordActions";
 
 const user = userEvent.setup({ delay: null });
 
-const item = toWorkItem("decision", r.decision("DEC-001") as never, () => "Anna Muster");
+const item: WorkItem = toWorkItem("decision", r.decision("DEC-001") as never, () => "Anna Muster");
 
-function Dialog({ onDone, onCancel }: ActionDialogProps) {
+function Dialog({ onDone, onConflict, onCancel }: ActionDialogProps) {
   return (
     <div role="dialog" aria-label="Probe">
       <Button onPress={() => onDone("DEC-001 ist jetzt widerrufen.")}>Fertig</Button>
       <Button onPress={() => onDone("Nicht aktuell.", "alert")}>Veraltet</Button>
+      <Button onPress={onConflict}>Konflikt</Button>
       <Button onPress={onCancel}>Zurück</Button>
     </div>
   );
@@ -25,7 +28,7 @@ function Dialog({ onDone, onCancel }: ActionDialogProps) {
 const revoke: RecordActionSpec = {
   id: "revoke",
   labelKey: "decision-revoke",
-  danger: true,
+  icon: IconBolt,
   available: (_item, env) => env.writable,
   dialog: Dialog,
 };
@@ -36,67 +39,132 @@ const replace: RecordActionSpec = {
   dialog: Dialog,
 };
 
-const env = (writable: boolean) => ({ writable }) as FieldEnv;
+const envOf = (writable: boolean) =>
+  ({
+    commands: {} as WorkCommands,
+    refresh: vi.fn(async () => true),
+    announce: vi.fn(),
+    sources: { directory: undefined, milestones: undefined },
+    today: "2030-05-08",
+    editable: writable,
+    writable,
+    open: vi.fn(),
+  }) satisfies FieldEnv;
 
-function show(actions: readonly RecordActionSpec[], writable = true) {
-  const announce = vi.fn();
-  render(
+function show(
+  actions: readonly RecordActionSpec[],
+  over: { writable?: boolean; paused?: boolean } = {},
+) {
+  const env = envOf(over.writable ?? true);
+  const onDone = vi.fn();
+  const tree = (list: readonly RecordActionSpec[]) => (
     <aside aria-label="Panel" tabIndex={-1}>
       <h2 tabIndex={-1}>Titel</h2>
       <RecordActions
-        actions={actions}
+        actions={list}
         item={item}
-        env={env(writable)}
-        announce={announce}
-        focusTitle={() => screen.getByRole("heading")}
+        env={env}
+        paused={over.paused ?? false}
+        onDone={onDone}
       />
-    </aside>,
+    </aside>
   );
-  return { announce };
+  const view = render(tree(actions));
+  return {
+    env,
+    onDone,
+    rerender: (list: readonly RecordActionSpec[]) => view.rerender(tree(list)),
+  };
 }
 
+const menu = () => screen.getByRole("button", { name: "Aktionen" });
+const choose = async (name: string) => {
+  await user.click(menu());
+  await user.click(await screen.findByRole("menuitem", { name }));
+};
+
 describe("RecordActions", () => {
-  it("offers the actions that are available, as buttons in order", () => {
+  it("is one menu button with a popup, named „Aktionen“", () => {
+    show([revoke]);
+    expect(menu()).toHaveAttribute("aria-haspopup", "true");
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+  });
+
+  it("offers the actions that are available, in order", async () => {
     show([replace, revoke]);
-    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+    await user.click(menu());
+    expect((await screen.findAllByRole("menuitem")).map((entry) => entry.textContent)).toEqual([
       "Widerrufen",
     ]);
   });
 
-  it("shows nothing when no action is available", () => {
-    show([revoke], false);
-    expect(screen.queryByRole("button")).toBeNull();
-    // Only the title is in the panel: the component renders nothing.
-    expect(document.querySelector("aside")?.children).toHaveLength(1);
+  it("opens with the keyboard and chooses with Enter", async () => {
+    show([revoke]);
+    menu().focus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("menuitem", { name: "Widerrufen" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("dialog", { name: "Probe" })).toBeVisible();
   });
 
-  it("opens the dialog of an action, and cancel returns focus to its button", async () => {
+  it("is absent when no action is available, the member may not write or it is paused", () => {
+    show([replace]);
+    expect(screen.queryByRole("button", { name: "Aktionen" })).toBeNull();
+    show([revoke], { writable: false });
+    expect(screen.queryByRole("button", { name: "Aktionen" })).toBeNull();
+    show([revoke], { paused: true });
+    expect(screen.queryByRole("button", { name: "Aktionen" })).toBeNull();
+  });
+
+  it("opens the dialog of an action, and cancel returns focus to the menu button", async () => {
     show([revoke]);
-    await user.click(screen.getByRole("button", { name: "Widerrufen" }));
-    expect(screen.getByRole("dialog", { name: "Probe" })).toBeVisible();
+    await choose("Widerrufen");
+    expect(await screen.findByRole("dialog", { name: "Probe" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Zurück" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByRole("button", { name: "Widerrufen" })).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(menu()).toHaveFocus());
   });
 
-  it("closes the dialog when the action is done, tells the member and moves focus to the title", async () => {
-    const { announce } = show([revoke]);
-    await user.click(screen.getByRole("button", { name: "Widerrufen" }));
-    await user.click(screen.getByRole("button", { name: "Fertig" }));
+  it("closes the dialog when the action is done and hands the result to the caller", async () => {
+    const { onDone } = show([revoke]);
+    await choose("Widerrufen");
+    await user.click(await screen.findByRole("button", { name: "Fertig" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(announce).toHaveBeenCalledWith("DEC-001 ist jetzt widerrufen.", "status");
-    // The button leaves when the record shows its new state; the title stays.
-    expect(screen.getByRole("heading")).toHaveFocus();
+    expect(onDone).toHaveBeenCalledWith("DEC-001 ist jetzt widerrufen.", "status");
   });
 
-  it("says a result that needs action as text, and offers no action for that state", async () => {
-    const { announce } = show([revoke]);
-    await user.click(screen.getByRole("button", { name: "Widerrufen" }));
-    await user.click(screen.getByRole("button", { name: "Veraltet" }));
-    expect(announce).toHaveBeenCalledWith("Nicht aktuell.", "alert");
-    expect(screen.getByText("Nicht aktuell.")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Widerrufen" })).toBeNull();
-    expect(screen.getByRole("heading")).toHaveFocus();
+  it("hands over a result that needs action as an alert", async () => {
+    const { onDone } = show([revoke]);
+    await choose("Widerrufen");
+    await user.click(await screen.findByRole("button", { name: "Veraltet" }));
+    expect(onDone).toHaveBeenCalledWith("Nicht aktuell.", "alert");
+  });
+
+  it("keeps the dialog open when the action stops being available without a conflict", async () => {
+    const { rerender } = show([revoke]);
+    await choose("Widerrufen");
+    rerender([{ ...revoke, available: () => false }]);
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
+
+  it("keeps the dialog open after a conflict while the action is still available", async () => {
+    show([revoke]);
+    await choose("Widerrufen");
+    await user.click(await screen.findByRole("button", { name: "Konflikt" }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
+
+  it("closes the dialog and says why when a conflict took the action away", async () => {
+    const { env, onDone, rerender } = show([revoke]);
+    await choose("Widerrufen");
+    await user.click(await screen.findByRole("button", { name: "Konflikt" }));
+    rerender([{ ...revoke, available: () => false }]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(env.announce).toHaveBeenCalledWith(
+      "DEC-001 hat sich inzwischen geändert, die Aktion ist nicht mehr möglich.",
+      "alert",
+    );
+    expect(onDone).not.toHaveBeenCalled();
   });
 });

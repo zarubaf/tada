@@ -1,8 +1,10 @@
 import {
+  IconBan,
   IconCalendar,
   IconCircleDashed,
   IconLink,
   IconMessageOff,
+  IconReplace,
   IconUsers,
 } from "@tabler/icons-react";
 import type { Decision } from "../../api/client";
@@ -121,6 +123,7 @@ export const decisionDescriptor: RecordDescriptor = {
     {
       id: "supersede",
       labelKey: "decision-replace",
+      icon: IconReplace,
       available: (item, env) =>
         env.writable && record(item).can_end && record(item).status === "in-force",
       dialog: SupersedeDecisionDialog,
@@ -128,7 +131,7 @@ export const decisionDescriptor: RecordDescriptor = {
     {
       id: "revoke",
       labelKey: "decision-revoke",
-      danger: true,
+      icon: IconBan,
       available: (item, env) =>
         env.writable && record(item).can_end && record(item).status === "in-force",
       dialog: RevokeDecisionDialog,

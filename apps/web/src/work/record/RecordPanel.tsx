@@ -20,7 +20,6 @@ import type { Work } from "../useWork";
 import type { WorkItem } from "../workItem";
 import { recordHref } from "../workLinks";
 import { canEdit } from "../workPermissions";
-import { ActionMenu } from "./ActionMenu";
 import type { ChoiceSources } from "./choices";
 import type { FieldSpec, RecordDescriptor, RecordLookup } from "./descriptor";
 import { descriptorOf } from "./descriptors";
@@ -124,6 +123,10 @@ function TextSection({ spec, item, env }: { spec: FieldSpec; item: WorkItem; env
   );
 }
 
+/** The title is the button of an editable title, else the heading itself. */
+const titleOf = (heading: RefObject<HTMLHeadingElement | null>) =>
+  heading.current?.querySelector<HTMLElement>("button") ?? heading.current;
+
 function Body({
   item,
   descriptor,
@@ -132,9 +135,15 @@ function Body({
   timeZone,
   focusTitle,
   handoff,
+  notice,
   ref,
+  heading,
 }: {
   ref: RefObject<HTMLDivElement | null>;
+  /** The heading element, which the panel also needs to move focus to the title. */
+  heading: RefObject<HTMLHeadingElement | null>;
+  /** What the member must know about the old state that the record shows, if there is such a thing. */
+  notice: string | undefined;
   item: WorkItem;
   descriptor: RecordDescriptor;
   env: FieldEnv;
@@ -147,14 +156,9 @@ function Body({
    */
   handoff: MutableRefObject<boolean>;
 }) {
-  const heading = useRef<HTMLHeadingElement>(null);
   const sourcesId = useId();
   const titleId = useId();
   const { title, description } = descriptor;
-  // The title is the button of an editable title, else the heading itself.
-  const titleElement = () =>
-    heading.current?.querySelector<HTMLElement>("button") ?? heading.current;
-
   // A layout effect, because its cleanup runs before React removes the body: focus is still in it.
   useLayoutEffect(() => {
     const body = ref.current;
@@ -168,7 +172,7 @@ function Body({
   useEffect(() => {
     if (handoff.current) {
       handoff.current = false;
-      titleElement()?.focus();
+      titleOf(heading)?.focus();
     }
   }, []);
 
@@ -192,15 +196,7 @@ function Body({
             <Property key={spec.id} spec={spec} item={item} env={env} />
           ))}
       </dl>
-      {descriptor.actions && !item.redacted && (
-        <RecordActions
-          actions={descriptor.actions}
-          item={item}
-          env={env}
-          announce={env.announce}
-          focusTitle={titleElement}
-        />
-      )}
+      {notice && <p className={styles.error}>{notice}</p>}
       <RecordHints hints={descriptor.hints?.(item, lookup) ?? []} />
       {!item.redacted &&
         [description, ...(descriptor.texts ?? [])].map(
@@ -251,7 +247,10 @@ export default function RecordPanel({
   const handoff = useRef(false);
   const [status, setStatus] = useState<string>();
   const [alert, setAlert] = useState<string>();
+  // An action that ran, but the record shows the old state: no action is offered for that state.
+  const [stale, setStale] = useState<{ id: string; version: number; message: string }>();
   const body = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const frame = {
     onClose,
@@ -342,6 +341,8 @@ export default function RecordPanel({
     writable,
     open: onFollow,
   };
+  const notice =
+    stale?.id === item.id && stale.version === item.version ? stale.message : undefined;
   const lookup = lookupOf(work);
   // A decision has a long wording: the name of the region has its first line.
   const name = item.redacted ? item.readableId : `${item.readableId} ${oneLineWording(item.title)}`;
@@ -350,13 +351,21 @@ export default function RecordPanel({
       title={name}
       heading={<Head item={item} />}
       more={
-        descriptor.menu && (
-          <ActionMenu
-            actions={descriptor.menu}
+        descriptor.actions &&
+        !item.redacted && (
+          <RecordActions
+            actions={descriptor.actions}
             item={item}
             env={env}
-            // The menu may be gone with the action that ran: focus goes to the panel.
-            onDone={() => focusAfterCommit(() => body.current?.closest("aside"))}
+            paused={notice !== undefined}
+            onDone={(message, urgency) => {
+              env.announce(message, urgency);
+              if (urgency === "alert") {
+                setStale({ id: item.id, version: item.version, message });
+              }
+              // The menu leaves with the state that the record has now; the title stays.
+              focusAfterCommit(() => titleOf(heading));
+            }}
           />
         )
       }
@@ -364,6 +373,8 @@ export default function RecordPanel({
     >
       <Body
         ref={body}
+        heading={heading}
+        notice={notice}
         key={item.id}
         item={item}
         descriptor={descriptor}
