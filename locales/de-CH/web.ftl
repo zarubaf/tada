@@ -700,8 +700,6 @@ inbox-hint-k = vorheriger Eintrag
 inbox-hint-a = annehmen
 inbox-hint-e = bearbeiten
 inbox-hint-r = ablehnen
-inbox-active = Tastenkürzel gelten für diesen Vorschlag
-inbox-list-position = Eintrag { $position } von { $total }
 
 ## Review Inbox: one proposal
 
@@ -712,11 +710,9 @@ inbox-section-source = Quelle
 inbox-section-reason = Begründung und Annahmen
 inbox-current = Aktuell
 inbox-proposed = Vorgeschlagen
-inbox-reason = Begründung
 inbox-assumption-note = Der Vorschlag gilt als Annahme. Er ist nicht bestätigt.
 inbox-unknown-note = Der Vorschlag setzt den Wert auf „unbekannt“.
 inbox-approximate-note = Der vorgeschlagene Wert ist ungefähr.
-inbox-no-assumptions = Keine Annahmen.
 inbox-source-none = Der Vorschlag nennt keine Quelle.
 # $id: the start of the ID of the source version.
 inbox-source-version = Quellversion { $id }
@@ -1121,7 +1117,6 @@ commitment-column-text = Zusage
 commitment-column-promisor = Zugesagt von
 # $condition: the condition text of the commitment.
 commitment-condition-line = Bedingung: { $condition }
-commitment-create-title = Zusage erfassen
 commitment-field-promisor-placeholder = Person oder Institution wählen
 commitment-field-condition-help = Mit einer Bedingung ist die Zusage bedingt. Ohne Bedingung ist sie verbindlich.
 commitment-status-conditional = bedingt
