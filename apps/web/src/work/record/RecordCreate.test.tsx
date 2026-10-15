@@ -56,9 +56,8 @@ async function show(submit: (values: Record<string, FieldValue>) => CommandResul
           submitted.push(values);
           return submit(values);
         })}
-        api={api}
         commands={{} as WorkCommands}
-        sources={{ directory: undefined, milestones: undefined }}
+        sources={{ api, directory: undefined, milestones: undefined }}
         owner={undefined}
         onCreated={onCreated}
         recover={async () => undefined}
