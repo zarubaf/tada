@@ -56,27 +56,64 @@ function openWork(
 const form = async () =>
   within(await screen.findByRole("complementary", { name: "Neue Aufgabe" }, { timeout: 3000 }));
 
-describe("the Neu button", () => {
-  it("opens the create state and makes a history entry", async () => {
+/** Opens the „Neu“ menu and chooses a kind. */
+async function choose(kind: string) {
+  await user.click(await screen.findByRole("button", { name: "Neu" }));
+  await user.click(await screen.findByRole("menuitem", { name: kind }));
+}
+
+const menuKinds = async () => {
+  await user.click(await screen.findByRole("button", { name: "Neu" }));
+  const items = within(await screen.findByRole("menu", { name: "Neu" })).getAllByRole("menuitem");
+  return items.map((item) => item.textContent);
+};
+
+describe("the Neu menu", () => {
+  it("opens the create state of an action and makes a history entry", async () => {
     openWork("?view=table");
     const before = window.history.length;
-    await user.click(await screen.findByRole("button", { name: "Neu" }));
+    await choose("Aufgabe");
 
     await form();
     expect(window.location.search).toBe("?view=table&new=action");
     expect(window.history.length).toBe(before + 1);
   });
 
+  it.each([
+    ["Zusage", "commitment", "Neue Zusage"],
+    ["Meilenstein", "milestone", "Neuer Meilenstein"],
+    ["Risiko", "risk", "Neues Risiko"],
+  ])("opens the create form of %s with focus on its first field", async (item, kind, title) => {
+    openWork("");
+    await choose(item);
+
+    const panel = await screen.findByRole("complementary", { name: title }, { timeout: 3000 });
+    expect(window.location.search).toBe(`?new=${kind}`);
+    await vi.waitFor(() => expect(within(panel).getAllByRole("textbox")[0]).toHaveFocus());
+  });
+
+  it("lists the decision for a manager", async () => {
+    openWork("", { eventManager: true });
+    expect(await menuKinds()).toEqual(["Aufgabe", "Zusage", "Meilenstein", "Entscheid", "Risiko"]);
+    await user.click(screen.getByRole("menuitem", { name: "Entscheid" }));
+    await screen.findByRole("complementary", { name: "Neuer Entscheid" }, { timeout: 3000 });
+    expect(window.location.search).toBe("?new=decision");
+  });
+
+  it("leaves out the decision for a contributor", async () => {
+    openWork("");
+    expect(await menuKinds()).toEqual(["Aufgabe", "Zusage", "Meilenstein", "Risiko"]);
+  });
+
+  it("lists every kind for an organization admin who is only a viewer of the event", async () => {
+    openWork("", { role: "admin", viewer: true });
+    expect(await menuKinds()).toHaveLength(5);
+  });
+
   it("is absent in a closed event", async () => {
     openWork("", { event: { ...EVENT, status: "closed" } });
     await screen.findByRole("heading", { level: 2, name: /^Offen/ });
     expect(screen.queryByRole("button", { name: "Neu" })).toBeNull();
-  });
-
-  it("is offered to an organization admin who is not a member of the event", async () => {
-    // The admin is only a viewer of the event, yet has manager level there.
-    openWork("", { role: "admin", viewer: true });
-    expect(await screen.findByRole("button", { name: "Neu" })).toBeVisible();
   });
 
   it("is absent for a viewer, who cannot own a record", async () => {
@@ -335,10 +372,19 @@ describe("the create state", () => {
     expect(window.location.search).toBe("");
   });
 
+  it("closes with Abbrechen and returns focus to the Neu button when a menu item opened it", async () => {
+    openWork("");
+    await choose("Risiko");
+    const view = await screen.findByRole("complementary", { name: "Neues Risiko" });
+    await user.click(within(view).getByRole("button", { name: "Abbrechen" }));
+
+    await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
+    expect(screen.getByRole("button", { name: "Neu" })).toHaveFocus();
+  });
+
   it("closes with Escape and brings focus back to the button that opened it", async () => {
     openWork("");
-    const neu = await screen.findByRole("button", { name: "Neu" });
-    await user.click(neu);
+    await choose("Aufgabe");
     await form();
     await user.keyboard("{Escape}");
 
