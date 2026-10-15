@@ -9,13 +9,13 @@ import { useHash, useNavigate, useSearch } from "../../router/Router";
 /** The query key that opens the create state of the panel. */
 export const NEW_PARAM = "new";
 
-/** The kinds that the panel can create. A kind joins with its descriptor. */
+/** The kinds that the panel can create, in the order of the „Neu“ menu. A kind joins with its descriptor. */
 export const CREATABLE: readonly RecordKind[] = [
   "action",
   "commitment",
-  "risk",
   "milestone",
   "decision",
+  "risk",
 ];
 
 export type RecordRoute =
