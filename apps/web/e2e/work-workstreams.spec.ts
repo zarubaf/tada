@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { fontsLoaded, setTheme, themes, viewports } from "./fixtures";
+import { axeBuilder, fontsLoaded, setTheme, themes, viewports } from "./fixtures";
 import { event, fakeWork } from "./workFixtures";
 
 // „Bereiche verwalten“ on the „Arbeit“ page (ADR 0082). The unit tests hold the rules of the
@@ -9,8 +8,7 @@ import { event, fakeWork } from "./workFixtures";
 const work = `/events/${event?.id}/work`;
 const MADE = "0199b8e0-0000-7000-8000-0000000000c9";
 
-const axe = (page: Page) =>
-  new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+const axe = (page: Page) => axeBuilder(page).analyze();
 
 async function open(page: Page) {
   await fakeWork(page);

@@ -1,12 +1,18 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { fakeProfile, fontsLoaded, setTheme, textOverflows, themes, viewports } from "./fixtures";
+import {
+  axeBuilder,
+  fakeProfile,
+  fontsLoaded,
+  setTheme,
+  textOverflows,
+  themes,
+  viewports,
+} from "./fixtures";
 import { actions, event, fakeWork } from "./workFixtures";
 
 const work = `/events/${event?.id}/work`;
 
-const axe = (page: Page) =>
-  new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+const axe = (page: Page) => axeBuilder(page).analyze();
 
 /** An event window around the dates of the records, so that the plan has a band. */
 const eventWindow = {

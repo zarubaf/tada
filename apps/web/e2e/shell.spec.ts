@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
+  axeBuilder,
   events,
   fakeEvent,
   fakeEvents,
@@ -18,9 +18,7 @@ if (!event) {
 }
 
 async function expectNoAxeViolation(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
+  const results = await axeBuilder(page).analyze();
   expect(results.violations).toEqual([]);
 }
 

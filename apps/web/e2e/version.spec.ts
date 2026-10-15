@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
+  axeBuilder,
   e2eBuild,
   events,
   fakeEvents,
@@ -18,9 +18,7 @@ const ownFooter = `tada ${e2eBuild.version} · ${e2eBuild.commit}`;
 const other = { version: "0.0.1", commit: "9f8e7d6", webBuild: "fedcba9876543210fedcba9876543210" };
 
 async function noAxeViolation(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
+  const results = await axeBuilder(page).analyze();
   expect(results.violations).toEqual([]);
 }
 
@@ -116,6 +114,7 @@ for (const viewport of viewports) {
       await expect(
         page.getByText("Eine neue Version von tada ist installiert.", { exact: true }),
       ).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await noAxeViolation(page);
       await fontsLoaded(page);
       await expect(page).toHaveScreenshot(`reload-${theme}-${viewport.name}.png`);

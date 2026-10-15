@@ -1,6 +1,13 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { fakeSession, fontsLoaded, sessionWithRole, setTheme, themes, viewports } from "./fixtures";
+import {
+  axeBuilder,
+  fakeSession,
+  fontsLoaded,
+  sessionWithRole,
+  setTheme,
+  themes,
+  viewports,
+} from "./fixtures";
 
 // Invented tokens with a long name and umlauts (doc/design/principles.md).
 const tokens = [
@@ -83,9 +90,7 @@ for (const viewport of viewports) {
           await expect(page.getByText("Wird nur einmal angezeigt")).toBeVisible();
         }
 
-        const results = await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-          .analyze();
+        const results = await axeBuilder(page).analyze();
         expect(results.violations).toEqual([]);
 
         await fontsLoaded(page);
@@ -123,9 +128,7 @@ for (const viewport of viewports) {
         page.getByRole("textbox", { name: "Abgeschlossene Anlässe (Monate)" }),
       ).toHaveValue("24");
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
 
       await fontsLoaded(page);

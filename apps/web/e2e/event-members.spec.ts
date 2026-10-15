@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
+  axeBuilder,
   events,
   fakeEvent,
   fakeMemberships,
@@ -54,9 +54,7 @@ for (const viewport of viewports) {
           ).toBeFocused();
         }
 
-        const results = await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-          .analyze();
+        const results = await axeBuilder(page).analyze();
         expect(results.violations).toEqual([]);
       });
     }

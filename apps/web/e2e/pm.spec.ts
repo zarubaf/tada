@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
+  axeBuilder,
   fakePost,
   fakeSession,
   fontsLoaded,
@@ -96,9 +96,7 @@ for (const viewport of viewports) {
       await expect(page.getByRole("heading", { level: 2, name: "AI-PM" })).toBeVisible();
       await expect(page.getByRole("table", { name: "Letzte Erinnerungen" })).toBeVisible();
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
 
       await fontsLoaded(page);
@@ -127,9 +125,7 @@ for (const viewport of viewports) {
       await expect(page.getByRole("link", { name: "AI-PM" })).toHaveCount(0);
       await expect(page.getByRole("textbox")).toHaveCount(0);
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
 
       await fontsLoaded(page);
@@ -151,9 +147,7 @@ for (const viewport of viewports) {
       await expect(page.getByRole("switch", { name: "Pause für alle Nachrichten" })).toBeChecked();
       await expect(page.getByRole("table", { name: "Letzte Erinnerungen" })).toBeVisible();
 
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
 
       await fontsLoaded(page);

@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
+  axeBuilder,
   events,
   expectPageFrame,
   fakeEvent,
@@ -202,9 +202,7 @@ for (const viewport of viewports) {
       await expect(page.getByRole("table", { name: "Dokumente" })).toBeVisible();
 
       await expectPageFrame(page, viewport);
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
 
       await fontsLoaded(page);
@@ -234,9 +232,7 @@ for (const viewport of viewports) {
       await expect(page.getByRole("button", { name: "Version freigeben" })).toBeVisible();
 
       await expectPageFrame(page, viewport);
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
 
       await fontsLoaded(page);
@@ -329,9 +325,7 @@ for (const viewport of viewports) {
       await expect(page.getByText("Veranstaltungsort: Version 1 zu Version 2")).toBeVisible();
 
       await expectPageFrame(page, viewport);
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
+      const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);
 
       await fontsLoaded(page);
