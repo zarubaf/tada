@@ -1,4 +1,5 @@
 import type { Icon } from "@tabler/icons-react";
+import type { Ref } from "react";
 import { Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
 import { IconButton } from "./IconButton";
 import menu from "./MenuButton.module.css";
@@ -18,6 +19,8 @@ export interface IconMenuProps {
   items: readonly IconMenuItem[];
   onAction: (id: string) => void;
   size?: "sm" | "md";
+  /** The trigger button, for a caller that returns focus to it. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -25,10 +28,10 @@ export interface IconMenuProps {
  * (doc/design/components.md). The button is an `IconButton`, so it has the name, the tooltip and
  * the touch target of one; the list opens under its right edge.
  */
-export function IconMenu({ icon, label, items, onAction, size = "sm" }: IconMenuProps) {
+export function IconMenu({ icon, label, items, onAction, size = "sm", ref }: IconMenuProps) {
   return (
     <MenuTrigger>
-      <IconButton icon={icon} label={label} size={size} />
+      <IconButton ref={ref} icon={icon} label={label} size={size} />
       <Popover className={popover.popover} placement="bottom end">
         <Menu className={popover.list} aria-label={label} onAction={(key) => onAction(String(key))}>
           {items.map((item) => (

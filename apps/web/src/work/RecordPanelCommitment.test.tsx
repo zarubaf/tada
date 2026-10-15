@@ -524,14 +524,17 @@ describe("a commitment in the panel", () => {
       expect(view.queryByText("Verbindlich, weil")).toBeNull();
     });
 
-    it("moves focus into the panel when the menu leaves with the action", async () => {
+    it("moves focus to the title when the menu leaves with the action", async () => {
       openWork("#COM-001");
       const step = await openStep();
       await user.type(step.getByRole("textbox", { name: /^Grund/ }), "Auftrag ist unterschrieben");
       await user.click(step.getByRole("button", { name: "Verbindlich machen" }));
+      const view = await region();
+      // The title is a button in the heading, so that the member can rename the commitment.
       await waitFor(() =>
-        expect(screen.getByRole("complementary", { name: /COM-001/ })).toHaveFocus(),
+        expect(view.getByRole("heading", { level: 2 }).contains(document.activeElement)).toBe(true),
       );
+      expect(view.queryByRole("button", { name: "Aktionen" })).toBeNull();
     });
 
     it("puts the refusal of the reason at the reason", async () => {

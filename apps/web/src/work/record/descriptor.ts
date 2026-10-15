@@ -180,35 +180,19 @@ export interface ActionDialogProps {
 }
 
 /**
- * An action on a record that a click does not run, for example „Widerrufen“ of a decision: a
- * button in the panel that opens a dialog. The dialog is the component of the kind; it is open while
- * it is mounted.
+ * An action on the record as a whole that a click does not run, for example „Widerrufen“ of a
+ * decision or „Verbindlich machen“ of a commitment (ADR 0068, 0081). The panel offers it in the
+ * „Aktionen“ menu of its head while `available` holds, and opens its dialog, which is the
+ * component of the kind. The dialog is open while it is mounted.
  */
 export interface RecordActionSpec {
   /** Stable key of the action. */
   id: string;
-  /** The Fluent key of the button. */
-  labelKey: string;
-  /** The action ends something for good. */
-  danger?: boolean;
-  /** True if the member may run it now. The server checks the right again. */
-  available: (item: WorkItem, env: FieldEnv) => boolean;
-  dialog: ComponentType<ActionDialogProps>;
-}
-
-/**
- * A command of the record that is no field: it ends or changes the record as a whole, and asks for
- * a reason first (ADR 0068: make a commitment firm). The panel offers it in the „Aktionen“ menu of
- * its head, to a member who may change the record, while `available` holds. Its dialog is the
- * component of the kind.
- */
-export interface MenuAction {
-  id: string;
   /** The Fluent key of the name in the menu. */
   labelKey: string;
   icon?: Icon;
-  /** True if the record can take the command now, for example it is conditional. */
-  available: (item: WorkItem) => boolean;
+  /** True if the member may run it now. The server checks the right again. */
+  available: (item: WorkItem, env: FieldEnv) => boolean;
   dialog: ComponentType<ActionDialogProps>;
 }
 
@@ -222,7 +206,7 @@ export interface RecordDescriptor {
   description?: FieldSpec;
   /** Further long texts under the description, each in its own section, for example a mitigation. */
   texts?: readonly FieldSpec[];
-  /** The actions under the properties, in order. */
+  /** The actions for the whole record, in the order of the menu in the head. */
   actions?: readonly RecordActionSpec[];
   /**
    * Sentences about the record that the member should know, for a read-only section „Hinweise“
@@ -231,7 +215,5 @@ export interface RecordDescriptor {
   hints?: (item: WorkItem, lookup: RecordLookup) => string[];
   /** The Fluent key of the line that names the record version that a passage of evidence supports. */
   evidenceVersionKey: string;
-  /** The commands for the whole record, in the order of the menu. */
-  menu?: readonly MenuAction[];
   create?: CreateSpec;
 }
