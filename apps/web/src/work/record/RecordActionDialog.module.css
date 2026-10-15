@@ -5,6 +5,19 @@
     min-width: 0;
   }
 
+  /* The warning of an action that cannot be undone: the icon in the warning color, then the sentence. */
+  .warning {
+    display: flex;
+    align-items: start;
+    gap: var(--space-2);
+  }
+
+  .warning > svg {
+    flex: none;
+    margin-block-start: var(--space-0-5);
+    color: var(--color-warning);
+  }
+
   /*
    * The fields scroll inside the dialog, so that a form with a picker still shows its buttons on a
    * small screen. The padding keeps the focus ring of a field inside the scroll area.

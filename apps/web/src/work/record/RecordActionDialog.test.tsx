@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { TextField } from "../../ui/TextField";
-import { RecordActionDialog, type Refusal } from "./RecordActionDialog";
+import { RecordActionDialog } from "./RecordActionDialog";
+import type { Refusal } from "./refusal";
 
 const user = userEvent.setup({ delay: null });
 
@@ -37,6 +38,22 @@ describe("RecordActionDialog", () => {
     expect(screen.getByText("1 bis 500 Zeichen.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Widerrufen" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Abbrechen" })).toBeVisible();
+  });
+
+  it("says that a danger action cannot be undone, with a warning icon and not by color alone", () => {
+    open({ danger: true });
+    expect(screen.getByRole("button", { name: "Widerrufen" })).toHaveAttribute(
+      "data-variant",
+      "danger",
+    );
+    const warning = screen.getByText("Das lässt sich nicht rückgängig machen.");
+    expect(warning).toBeVisible();
+    expect(warning.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("has no warning for an action that can be undone", () => {
+    open();
+    expect(screen.queryByText("Das lässt sich nicht rückgängig machen.")).toBeNull();
   });
 
   it("keeps a readable ID on one line in the title and in the description", () => {

@@ -9,8 +9,8 @@ import {
   IconUserCheck,
 } from "@tabler/icons-react";
 import type { Commitment, CommitmentStatus, CreateCommitmentRequest } from "../../api/client";
-import { t } from "../../i18n";
 import type { WorkItem } from "../workItem";
+import { MakeFirmDialog } from "./commitmentDialogs";
 import {
   type FieldSpec,
   type FieldValue,
@@ -141,21 +141,7 @@ const makeFirm: MenuAction = {
   labelKey: "make-firm",
   icon: IconCircleCheck,
   available: (item) => record(item).can_make_firm,
-  step: {
-    title: (item) => t("make-firm-title", { id: item.readableId }),
-    description: (item) => {
-      const given = record(item).condition;
-      return [
-        t("make-firm-text"),
-        ...(given ? [t("commitment-condition-line", { condition: given })] : []),
-      ];
-    },
-    reasonKey: "make-firm-reason",
-    reasonHelpKey: "make-firm-reason-help",
-    confirmKey: "make-firm-submit",
-  },
-  run: (commands, item, reason) => commands.commitment.makeFirm(target(item), reason),
-  doneKey: "make-firm-done",
+  dialog: MakeFirmDialog,
 };
 
 /** The text of a form field as the API takes it: no text is no value. */

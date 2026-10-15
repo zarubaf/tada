@@ -170,6 +170,11 @@ export interface ActionDialogProps {
    * record could not be loaded again.
    */
   onDone: (message: string, urgency?: "status" | "alert") => void;
+  /**
+   * The server refused the command because the record changed meanwhile. The dialog stays open
+   * with a sentence and the kind loads again; the panel closes it if the action is gone then.
+   */
+  onConflict: () => void;
   /** The member gave up. */
   onCancel: () => void;
 }
@@ -194,7 +199,8 @@ export interface RecordActionSpec {
 /**
  * A command of the record that is no field: it ends or changes the record as a whole, and asks for
  * a reason first (ADR 0068: make a commitment firm). The panel offers it in the „Aktionen“ menu of
- * its head, to a member who may change the record, while `available` holds.
+ * its head, to a member who may change the record, while `available` holds. Its dialog is the
+ * component of the kind.
  */
 export interface MenuAction {
   id: string;
@@ -203,21 +209,7 @@ export interface MenuAction {
   icon?: Icon;
   /** True if the record can take the command now, for example it is conditional. */
   available: (item: WorkItem) => boolean;
-  /** What the step before the command says; the dialog is `RecordActionDialog`. */
-  step: {
-    title: (item: WorkItem) => string;
-    /** One sentence for each line. */
-    description?: (item: WorkItem) => string[];
-    /** The Fluent key of the label of the reason. */
-    reasonKey: string;
-    reasonHelpKey?: string;
-    confirmKey: string;
-    /** The command ends something that does not come back. */
-    danger?: boolean;
-  };
-  run: (commands: WorkCommands, item: WorkItem, reason: string) => Promise<CommandResult<unknown>>;
-  /** The Fluent key of the words that tell the result; they take `id`, the readable ID. */
-  doneKey: string;
+  dialog: ComponentType<ActionDialogProps>;
 }
 
 export interface RecordDescriptor {
