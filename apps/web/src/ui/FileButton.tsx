@@ -7,10 +7,12 @@ export interface FileButtonProps {
   onSelect: (file: File) => void;
   /** The upload runs. The button stays mounted, so that it keeps focus. */
   isPending?: boolean;
+  /** `sm` is the compact button of a toolbar row. */
+  size?: "md" | "sm";
 }
 
 /** A primary button that opens the file picker (doc/design/components.md, „FileDrop“). */
-export function FileButton({ children, onSelect, isPending }: FileButtonProps) {
+export function FileButton({ children, onSelect, isPending, size }: FileButtonProps) {
   return (
     <FileTrigger
       onSelect={(files) => {
@@ -20,7 +22,7 @@ export function FileButton({ children, onSelect, isPending }: FileButtonProps) {
         }
       }}
     >
-      <Button variant="primary" isPending={isPending}>
+      <Button variant="primary" isPending={isPending} {...(size && { size })}>
         {children}
       </Button>
     </FileTrigger>
