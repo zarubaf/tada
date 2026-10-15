@@ -44,11 +44,6 @@
     gap: var(--space-2);
   }
 
-  .note {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-  }
-
   /* The comparison reads left to right where the container is wide enough. */
   @container (width >= 28rem) {
     .comparison {
