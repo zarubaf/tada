@@ -38,9 +38,9 @@ export function TimelineList({
       )}
       {groups.map(({ week, entries }) => (
         <div key={week} className={styles.week}>
-          <h3 id={`${id}-${week}`} className={styles.weekHeading}>
+          <h2 id={`${id}-${week}`} className={styles.weekHeading}>
             {t("timeline-week", { date: formatDate(week) })}
-          </h3>
+          </h2>
           <ul className={styles.entries} aria-labelledby={`${id}-${week}`}>
             {entries.map((entry) =>
               entry.kind === "action" ? (
