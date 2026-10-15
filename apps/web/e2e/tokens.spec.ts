@@ -56,9 +56,9 @@ for (const viewport of viewports) {
         await page.setViewportSize(viewport);
         await fakeSession(page);
         await fakeTokens(page, [...state.items], state.enabled);
-        await page.goto("/settings/tokens");
+        await page.goto("/settings?tab=tokens");
         await setTheme(page, theme);
-        await expect(page.getByRole("heading", { level: 1, name: "API-Token" })).toBeVisible();
+        await expect(page.getByRole("heading", { level: 2, name: "API-Token" })).toBeVisible();
         if (state.items.length > 0) {
           await expect(page.getByRole("table", { name: "Ihre Token" })).toBeVisible();
         } else {
@@ -113,7 +113,7 @@ for (const viewport of viewports) {
         source_months: null,
         version: 3,
       });
-      await page.goto("/settings/organization");
+      await page.goto("/settings?tab=organization");
       await setTheme(page, theme);
       await expect(page.getByRole("switch", { name: "MCP-Token erlauben" })).toBeChecked();
       await expect(
@@ -136,16 +136,15 @@ for (const viewport of viewports) {
   }
 }
 
-test("the settings navigation leads to the token page and the organization page", async ({
+test("the tabs of the settings lead to the token page and the organization page", async ({
   page,
 }) => {
   await fakeSession(page);
   await fakeTokens(page, []);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/settings/tokens");
-  const nav = page.getByRole("navigation", { name: "Einstellungen" });
-  await nav.getByRole("link", { name: "Organisation" }).click();
-  await expect(page).toHaveURL(/\/settings\/organization$/);
-  await nav.getByRole("link", { name: "API-Token" }).click();
-  await expect(page).toHaveURL(/\/settings\/tokens$/);
+  await page.goto("/settings?tab=tokens");
+  await page.getByRole("tab", { name: "Organisation" }).click();
+  await expect(page).toHaveURL(/\/settings\?tab=organization$/);
+  await page.getByRole("tab", { name: "API-Token" }).click();
+  await expect(page).toHaveURL(/\/settings\?tab=tokens$/);
 });

@@ -51,3 +51,23 @@ export function PageTitle({
     </h1>
   );
 }
+
+/**
+ * The title of a panel in a page with tabs: an `h2` below the `h1` of the page. Focus moves to it
+ * by script, as to a page title, for example after a retry.
+ */
+export function PanelTitle({
+  id,
+  children,
+  ref,
+}: {
+  id?: string;
+  children: ReactNode;
+  ref?: Ref<HTMLHeadingElement>;
+}) {
+  return (
+    <h2 id={id} ref={ref} tabIndex={-1} className={styles.panelTitle}>
+      {children}
+    </h2>
+  );
+}

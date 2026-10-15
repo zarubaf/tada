@@ -252,7 +252,7 @@ describe("MembersPage", () => {
     expect(call?.call).toBe("POST /api/v1/members/u2/remove");
     expect(call?.body).toEqual({ expected_version: 3 });
     await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 1, name: "Mitglieder" })).toHaveFocus(),
+      expect(screen.getByRole("heading", { level: 2, name: "Mitglieder" })).toHaveFocus(),
     );
   });
 
@@ -403,7 +403,7 @@ describe("MembersPage", () => {
     expect(await screen.findByText("Bernd Beispiel")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Weitere Mitglieder geladen.");
     await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 1, name: "Mitglieder" })).toHaveFocus(),
+      expect(screen.getByRole("heading", { level: 2, name: "Mitglieder" })).toHaveFocus(),
     );
     expect(
       screen.queryByRole("button", { name: "Weitere Mitglieder laden" }),

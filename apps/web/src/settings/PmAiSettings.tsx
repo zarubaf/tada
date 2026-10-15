@@ -123,9 +123,9 @@ export function PmAiSettings({
 
   return (
     <section className={styles.section} aria-labelledby="pm-ai-title">
-      <h2 id="pm-ai-title" className={styles.heading}>
+      <h3 id="pm-ai-title" className={styles.heading}>
         {t("pm-ai-title")}
-      </h2>
+      </h3>
       <div className={styles.switchGroup}>
         <Switch
           label={t("pm-ai-switch")}

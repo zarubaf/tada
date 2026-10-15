@@ -74,7 +74,7 @@ describe("ReminderSettings", () => {
     );
     expect(screen.getByRole("link", { name: "Telegram verknüpfen" })).toHaveAttribute(
       "href",
-      "/settings/telegram",
+      "/settings?tab=telegram",
     );
   });
 

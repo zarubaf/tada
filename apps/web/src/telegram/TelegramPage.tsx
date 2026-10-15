@@ -16,7 +16,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { useFocusAfterCommit, useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
-import { PageTitle } from "../ui/Page";
+import { PanelTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import styles from "./TelegramPage.module.css";
 
@@ -213,7 +213,7 @@ export function TelegramPage({ api }: { api: Api }) {
       <LiveRegion kind="status">{confirmation}</LiveRegion>
 
       <section className={styles.section} aria-labelledby="telegram-title">
-        <PageTitle id="telegram-title">{t("telegram-title")}</PageTitle>
+        <PanelTitle id="telegram-title">{t("telegram-title")}</PanelTitle>
         <p>{t("telegram-intro")}</p>
         {link && (
           <div className={styles.linked}>
@@ -230,7 +230,7 @@ export function TelegramPage({ api }: { api: Api }) {
             </div>
           </div>
         )}
-        <h2 className={styles.heading}>{t("telegram-steps-title")}</h2>
+        <h3 className={styles.heading}>{t("telegram-steps-title")}</h3>
         <ol className={styles.steps}>
           <li>{t("telegram-step-create")}</li>
           <li>{t("telegram-step-send")}</li>
@@ -258,14 +258,14 @@ export function TelegramPage({ api }: { api: Api }) {
       </section>
 
       <section className={styles.section} aria-labelledby="telegram-requests-title">
-        <h2
+        <h3
           id="telegram-requests-title"
           ref={requestsHeading}
           tabIndex={-1}
           className={styles.heading}
         >
           {t("telegram-requests-title")}
-        </h2>
+        </h3>
         {requests.kind === "loading" && (
           <div
             className={styles.skeleton}

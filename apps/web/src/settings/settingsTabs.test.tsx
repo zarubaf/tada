@@ -39,9 +39,7 @@ describe("resolveTab", () => {
 describe("redirectTarget", () => {
   it("names the tab of each old settings path and keeps the rest", () => {
     expect(redirectTarget("/settings/ai-pm", "", "")).toBe("/settings?tab=ai-pm");
-    expect(redirectTarget("/settings/tokens", "?pseudo", "#x")).toBe(
-      "/settings?pseudo=&tab=tokens#x",
-    );
+    expect(redirectTarget("/settings/tokens", "?x=1", "#y")).toBe("/settings?x=1&tab=tokens#y");
     expect(redirectTarget("/settings/account", "", "")).toBe("/settings");
   });
 });

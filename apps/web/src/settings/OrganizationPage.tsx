@@ -7,7 +7,7 @@ import { useSession } from "../session/SessionProvider";
 import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
-import { PageTitle } from "../ui/Page";
+import { PanelTitle } from "../ui/Page";
 import { Skeleton } from "../ui/Skeleton";
 import { Switch } from "../ui/Switch";
 import { loadMcpSwitch } from "./mcpSwitch";
@@ -78,9 +78,9 @@ export function OrganizationPage({ api }: { api: Api }) {
       <LiveRegion kind="alert">{failure}</LiveRegion>
       <LiveRegion kind="status">{confirmation}</LiveRegion>
       <section className={styles.section} aria-labelledby="org-title">
-        <PageTitle id="org-title" ref={title}>
+        <PanelTitle id="org-title" ref={title}>
           {t("org-title")}
-        </PageTitle>
+        </PanelTitle>
         {state.kind === "loading" && (
           <div className={styles.skeleton} role="status" aria-label={t("org-mcp-loading")}>
             <Skeleton />

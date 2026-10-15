@@ -79,10 +79,24 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Anlässe" })).toBeInTheDocument();
   });
 
-  it("loads a settings page on demand inside the settings template", async () => {
-    renderAt("/settings/account");
-    expect(await screen.findByRole("heading", { name: "Konto" })).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Einstellungen" })).toBeInTheDocument();
+  it("loads Einstellungen on demand with the h1 of the page and the panel of the tab", async () => {
+    renderAt("/settings");
+    expect(await screen.findByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 2, name: "Konto" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("redirects an old settings address to its tab and keeps the query and the hash", async () => {
+    renderAt("/settings/telegram?x=1#schritte");
+    expect(await screen.findByRole("tab", { name: "Telegram", selected: true })).toBeVisible();
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe(
+      "/settings?x=1&tab=telegram#schritte",
+    );
+  });
+
+  it("shows the not-found page for an unknown settings address", async () => {
+    renderAt("/settings/nowhere");
+    expect(await screen.findByText("Seite nicht gefunden")).toBeInTheDocument();
   });
 
   it("shows the not-found page for an unknown path", async () => {

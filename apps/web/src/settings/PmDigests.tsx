@@ -68,9 +68,9 @@ export function PmDigests({ api, timeZone }: { api: Api; timeZone: string }) {
 
   return (
     <section className={styles.digests} aria-labelledby="pm-digests-title">
-      <h2 id="pm-digests-title" ref={heading} tabIndex={-1} className={styles.heading}>
+      <h3 id="pm-digests-title" ref={heading} tabIndex={-1} className={styles.heading}>
         {t("pm-digests-title")}
-      </h2>
+      </h3>
       {state.kind === "loading" && <SkeletonLines label={t("pm-digests-loading")} />}
       {state.kind === "failed" && (
         <InlineError

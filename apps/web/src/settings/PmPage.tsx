@@ -17,7 +17,7 @@ import { useRetry } from "../ui/focus";
 import { InlineError } from "../ui/InlineError";
 import { LiveRegion } from "../ui/LiveRegion";
 import { NoAccess } from "../ui/NoAccess";
-import { PageTitle } from "../ui/Page";
+import { PanelTitle } from "../ui/Page";
 import { SkeletonLines } from "../ui/Skeleton";
 import { Switch } from "../ui/Switch";
 import { PmAiSettings } from "./PmAiSettings";
@@ -65,7 +65,7 @@ export function PmPage({ api }: { api: Api }) {
 function PmHeader({ title }: { title?: Ref<HTMLHeadingElement> }) {
   return (
     <header className={styles.header}>
-      <PageTitle ref={title}>{t("pm-title")}</PageTitle>
+      <PanelTitle ref={title}>{t("pm-title")}</PanelTitle>
       <p className={styles.intro}>{t("pm-intro")}</p>
     </header>
   );

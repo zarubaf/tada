@@ -152,11 +152,21 @@ Each template uses the `Page` component for the `main` element, the page gutters
 | Portfolio        | A filter bar, then a table of events with readiness columns                                                 | Portfolio                                             |
 | Form             | One column, at most 40rem wide, the actions at the bottom                                                   | Create and edit pages                                 |
 | Public page      | No shell. The app name, one heading and a form column of at most 40rem                                      | Sign-in, magic link, invitation, organization choice  |
-| Settings         | The sub-navigation of the settings, then the settings page                                                  | „Mitglieder“, „Telegram“ in the settings              |
+| Settings         | One toolbar row (title, tabs or, on a phone, a select), 16 px below it the page of the tab                  | „Einstellungen“                                       |
 | Event page       | The event header with the key and the name, the control to close the event, then the page                   | „Übersicht“ and „Dokumente“ of an event               |
 | Timeline         | A filter bar, then lanes on a time axis (wide); a list grouped by week (narrow)                             | The timeline view of „Arbeit“, „Zeitplan“ of an event |
 | Work             | One toolbar row (title, type filter, view switch, „Filter“, „Neu“), 12 px below it the view                 | „Arbeit“ of an event                                  |
 | Documents        | A folder tree (wide) or a breadcrumb (narrow), then a file list                                             | „Dokumente“                                           |
+
+### Settings
+
+„Einstellungen“ (`/settings`) is one page with a tab for each area (ADR 0082): „Konto“, „Mitglieder“, „Organisation“, „AI-PM“, „Telegram“ and „API-Token“.
+The old addresses `/settings/members` and the like redirect to `/settings?tab=<tab>`; „Konto“ is the first tab and has no `tab` in the address.
+
+- The page is `Page width="flush"` with the toolbar row of the „Arbeit“ page: the `h1` „Einstellungen“ as a compact heading, then the tabs (`Tabs`, `variant="segmented"`).
+  Below 40rem the tabs are a select in the same row, because six tabs do not fit; the row never scrolls sideways.
+- The tab is the query `tab`. A tab that the role may not see is not in the list. Its address shows the first tab, a banner says that the member has no access, and the address drops the `tab`.
+- The panel holds the page of the tab, loaded on demand. The page of a tab has no `h1`: its title is a `PanelTitle` (`h2`), its sections are `h3`, and the parts of a section `h4`.
 
 ### Work
 
