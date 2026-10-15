@@ -15,13 +15,20 @@ import { TextField } from "../../ui/TextField";
 import styles from "./RecordActionDialog.module.css";
 import type { Refusal } from "./refusal";
 
+/** The most characters of the reason of a record action. */
+export const MAX_REASON = 500;
+
 export interface RecordActionDialogProps {
   /** The heading and the name of the dialog, for example „DEC-001 widerrufen“. */
   title: string;
   /** What the action does, in one or two sentences. */
   description?: string;
-  /** Asks for a reason, a required line of text. Without it the dialog asks for none. */
-  reason?: { label: string; help?: string };
+  /**
+   * Asks for a reason, a required line of text. Without it the dialog asks for none. With
+   * `maxLength` the dialog refuses a longer reason, counted in characters of the trimmed text, as
+   * the server counts them.
+   */
+  reason?: { label: string; help?: string; maxLength?: number };
   /** Extra fields before the reason. They keep their own values; the caller reads them in `onConfirm`. */
   children?: ReactNode;
   confirmLabel: string;
@@ -76,6 +83,11 @@ export function RecordActionDialog({
       focusAfterCommit(() => firstInvalidField(form.current));
       return;
     }
+    if (reasonField?.maxLength !== undefined && [...text].length > reasonField.maxLength) {
+      setError(t("record-action-reason-too-long", { max: reasonField.maxLength }));
+      focusAfterCommit(() => firstInvalidField(form.current));
+      return;
+    }
     if (/\p{Cc}/u.test(text)) {
       setError(t("work-error-reason-control-character"));
       focusAfterCommit(() => firstInvalidField(form.current));
@@ -127,14 +139,14 @@ export function RecordActionDialog({
                 }}
                 onPaste={(event) => {
                   // A reason is one line, and the browser would drop the line breaks of a paste
-                  // without a space: they become spaces.
+                  // without a space: they become spaces, and so do tabs, which a reason refuses.
                   const pasted = event.clipboardData.getData("text");
-                  if (/[\r\n]/.test(pasted)) {
+                  if (/[\r\n\t]/.test(pasted)) {
                     event.preventDefault();
                     const field = event.currentTarget as HTMLInputElement;
                     const start = field.selectionStart ?? reason.length;
                     const end = field.selectionEnd ?? start;
-                    const line = pasted.replace(/\s*[\r\n]+\s*/g, " ");
+                    const line = pasted.replace(/\s*[\r\n\t]+\s*/g, " ");
                     setReason(reason.slice(0, start) + line + reason.slice(end));
                     caret.current = { field, at: start + line.length };
                   }

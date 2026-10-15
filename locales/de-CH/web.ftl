@@ -1502,6 +1502,8 @@ record-choose-level = Stufe wählen
 record-actions = Aktionen
 # $id: the readable ID of the record.
 record-action-gone = { $id } hat sich inzwischen geändert, die Aktion ist nicht mehr möglich.
+# $max: the most characters of the reason.
+record-action-reason-too-long = Der Grund hat höchstens { $max } Zeichen.
 record-action-irreversible = Das lässt sich nicht rückgängig machen.
 record-action-conflict = Der Eintrag wurde inzwischen geändert und ist neu geladen. Prüfen Sie ihn und versuchen Sie es erneut.
 record-action-conflict-stale = Der Eintrag wurde inzwischen geändert, liess sich aber nicht neu laden. Laden Sie die Seite neu und versuchen Sie es erneut.
