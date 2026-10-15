@@ -64,7 +64,7 @@ describe("App", () => {
     ["milestones", "/work", "?type=milestone", ""],
     ["decisions", "/work", "?type=decision", ""],
     ["timeline", "/work", "?view=timeline", ""],
-    ["workstreams", "/work", "", ""],
+    ["workstreams", "/work", "?manage=streams", ""],
     ["members", "", "", "#mitglieder"],
   ])("sends the old address /events/:id/%s to its new place", async (old, path, search, hash) => {
     const id = "0199b8e0-0000-7000-8000-000000000001";
