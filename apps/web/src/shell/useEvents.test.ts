@@ -92,6 +92,13 @@ function knownApi(known: Event[]): Api {
 }
 
 describe("mostRecentOpen", () => {
+  it("breaks a tie of the creation time by the ID", () => {
+    const a = full("a", "2026-01-01T00:00:00Z");
+    const b = full("b", "2026-01-01T00:00:00Z");
+    expect(mostRecentOpen([a, b])?.id).toBe("b");
+    expect(mostRecentOpen([b, a])?.id).toBe("b");
+  });
+
   it("takes the newest active event and skips the closed ones", () => {
     const events = [
       full("old", "2026-01-01T00:00:00Z"),
@@ -144,6 +151,16 @@ describe("useScopedEvent", () => {
       useScopedEvent(knownApi(events), undefined, org, { list: loaded, load: vi.fn() }),
     );
     await vi.waitFor(() => expect(result.current?.id).toBe("b"));
+  });
+
+  it("gives a route event that the server does not find no other event", async () => {
+    const api = knownApi(events);
+    const load = vi.fn();
+    const { result } = renderHook(() => useScopedEvent(api, "dead", org, { list: loaded, load }));
+    await vi.waitFor(() => expect(api.GET).toHaveBeenCalled());
+    await act(async () => undefined);
+    expect(result.current).toBeUndefined();
+    expect(load).not.toHaveBeenCalled();
   });
 
   it("is none without any open event", () => {
