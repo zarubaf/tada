@@ -12,7 +12,7 @@ import Palette, { type CommandGroup } from "../ui/CommandPalette";
 import { manageStreamsAddress } from "../work/manageStreams";
 import { useCreatableKinds } from "../work/useCreatableKinds";
 import { NEW_EVENT } from "./EventSwitcher";
-import { ALL } from "./navItems";
+import { paletteDestinations } from "./navItems";
 import { useSwitchEvent } from "./switchEvent";
 import type { EventList } from "./useEvents";
 
@@ -27,6 +27,8 @@ interface Props {
   events: EventList;
   loadEvents: () => void;
   currentEventId: string | undefined;
+  /** The scoped Anlass (ADR 0084): the Anlass destinations act on it, on every page. */
+  scopedEventId: string | undefined;
   /** False for a closed event, which is read-only for everybody. */
   eventWritable: boolean;
   canCreateEvent: boolean;
@@ -42,6 +44,7 @@ export default function CommandPalette({
   events,
   loadEvents,
   currentEventId,
+  scopedEventId,
   eventWritable,
   canCreateEvent,
   onClose,
@@ -56,7 +59,7 @@ export default function CommandPalette({
     {
       id: "goto",
       label: t("command-group-goto"),
-      commands: ALL.map((destination) => ({
+      commands: paletteDestinations(scopedEventId).map((destination) => ({
         id: `${GOTO}${destination.to}`,
         label: destination.label,
         icon: destination.icon,
