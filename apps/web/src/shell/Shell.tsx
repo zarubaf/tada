@@ -45,7 +45,11 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const framed = session?.organization !== undefined && !frameless;
   const framedOrganizationId = framed ? organizationId : undefined;
   const events = useEventList(api, framedOrganizationId);
-  const scopedEvent = useScopedEvent(api, routeEventId, framedOrganizationId, events);
+  const {
+    event: scopedEvent,
+    eventId: menuEventId,
+    pending: eventPending,
+  } = useScopedEvent(api, routeEventId, framedOrganizationId, events);
   const canCreateEvent = useCanCreateEvent();
   const narrow = useNarrow();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -163,7 +167,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
         />
       }
       eventNameId={eventNameId}
-      eventId={scopedEvent?.id}
+      eventId={menuEventId}
+      eventPending={eventPending}
       server={server}
       onOpenVersions={openVersions}
       onNavigate={() => setDrawerOpen(false)}

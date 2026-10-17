@@ -70,13 +70,19 @@ const privacy: Destination = {
   icon: IconShieldLock,
 };
 
+/** What the event items look like, with no event: the disabled menu has the same four items. */
+const face = (id: string, key: string, icon: Icon) => ({ id, label: t(key), icon });
+const OVERVIEW = face("overview", "nav-overview", IconLayoutDashboard);
+const WORK = face("work", "nav-work", IconLayoutKanban);
+const TIMELINE_ITEM = face("timeline", "nav-timeline", IconTimeline);
+const DOCUMENTS = face("documents", "nav-documents", IconFiles);
+export const EVENT_ITEM_FACES = [OVERVIEW, WORK, TIMELINE_ITEM, DOCUMENTS];
+
 /** „Übersicht“ of one event: its home, current only on its own path (ADR 0084). */
 function overview(eventId: string): Destination {
   return {
-    id: "overview",
+    ...OVERVIEW,
     to: `/events/${encodeURIComponent(eventId)}`,
-    label: t("nav-overview"),
-    icon: IconLayoutDashboard,
     exact: true,
   };
 }
@@ -84,10 +90,8 @@ function overview(eventId: string): Destination {
 /** „Arbeit“ of one event: all its work records on one page (ADR 0082). */
 function work(eventId: string): Destination {
   return {
-    id: "work",
+    ...WORK,
     to: `/events/${encodeURIComponent(eventId)}/work`,
-    label: t("nav-work"),
-    icon: IconLayoutKanban,
     unlessWith: TIMELINE,
   };
 }
@@ -95,10 +99,8 @@ function work(eventId: string): Destination {
 /** „Zeitplan“ of one event: the timeline view of the work page (ADR 0082). */
 function timeline(eventId: string): Destination {
   return {
-    id: "timeline",
+    ...TIMELINE_ITEM,
     to: `/events/${encodeURIComponent(eventId)}/work?view=${TIMELINE.value}`,
-    label: t("nav-timeline"),
-    icon: IconTimeline,
     onlyWith: TIMELINE,
   };
 }
@@ -106,10 +108,8 @@ function timeline(eventId: string): Destination {
 /** „Dokumente“ of one event: its documents and their versions. */
 function documents(eventId: string): Destination {
   return {
-    id: "documents",
+    ...DOCUMENTS,
     to: `/events/${encodeURIComponent(eventId)}/documents`,
-    label: t("nav-documents"),
-    icon: IconFiles,
   };
 }
 

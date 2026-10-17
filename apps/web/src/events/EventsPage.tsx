@@ -72,7 +72,6 @@ type State =
   | { kind: "failed"; message: string; requestId: string | undefined }
   | { kind: "loaded"; events: Event[]; nextCursor: string | undefined; loadingMore: boolean };
 
-/** „Anlässe“: the events that the member can see, in the order of their keys. */
 function CreateEventLink({ compact }: { compact?: boolean }) {
   return (
     <LinkButton to="/events/new" primary compact={compact}>
@@ -82,6 +81,7 @@ function CreateEventLink({ compact }: { compact?: boolean }) {
   );
 }
 
+/** „Anlässe“: the events that the member can see, in the order of their keys. */
 export function EventsPage({ api }: { api: Api }) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const canCreate = useCanCreateEvent();
@@ -156,7 +156,7 @@ export function EventsPage({ api }: { api: Api }) {
         <PageTitle ref={heading} compact>
           {t("events-title")}
         </PageTitle>
-        {canCreate && !empty && (
+        {canCreate && state.kind === "loaded" && !empty && (
           <div className={styles.end}>
             <CreateEventLink compact />
           </div>

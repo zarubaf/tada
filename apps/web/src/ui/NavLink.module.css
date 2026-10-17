@@ -22,7 +22,7 @@
     cursor: not-allowed;
   }
 
-  .disabled:hover {
+  .link.disabled:hover {
     background: none;
   }
 

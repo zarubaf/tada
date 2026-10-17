@@ -25,25 +25,30 @@ export function NavLink({ large, icon: Icon, children, ...props }: NavLinkProps)
 
 export interface DisabledNavItemProps {
   icon?: Icon;
-  /** The ID of the element that says why the item is off: a screen reader reads it with the label. */
-  describedBy: string;
+  /**
+   * The ID of the element that says why the item is off: a screen reader reads it with the label.
+   * Without it the item is a placeholder for a target that is on its way: it looks like a link,
+   * is hidden from assistive technology and takes no focus, so the menu keeps its shape.
+   */
+  describedBy?: string;
   children: ReactNode;
 }
 
 /**
- * A navigation item that has no target yet. It stays in the list so that the menu does not change,
- * and it keeps keyboard focus so that a screen reader reads the reason. It has no `href`, so a
- * press goes nowhere.
+ * A navigation item that has no target. It stays in the list so that the menu does not change,
+ * and a disabled one keeps keyboard focus so that a screen reader reads the reason. It has no
+ * `href`, so a press goes nowhere.
  */
 export function DisabledNavItem({ icon: Icon, describedBy, children }: DisabledNavItemProps) {
+  const disabled = describedBy !== undefined;
   return (
     // biome-ignore lint/a11y/useSemanticElements: a link without a target is not an `a` element
     <span
       role="link"
-      aria-disabled="true"
-      aria-describedby={describedBy}
-      tabIndex={0}
-      className={`${styles.link} ${styles.disabled}`}
+      {...(disabled
+        ? { "aria-disabled": true, "aria-describedby": describedBy, tabIndex: 0 }
+        : { "aria-hidden": true })}
+      className={disabled ? `${styles.link} ${styles.disabled}` : styles.link}
     >
       {Icon && <Icon size={16} stroke={1.5} aria-hidden="true" className={styles.icon} />}
       {children}

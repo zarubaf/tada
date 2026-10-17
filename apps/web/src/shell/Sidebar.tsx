@@ -6,7 +6,14 @@ import { t } from "../i18n";
 import { InboxCount } from "../review/InboxCount";
 import { Avatar } from "../ui/Avatar";
 import { DisabledNavItem, NavLink } from "../ui/NavLink";
-import { type Destination, eventItems, ORGANIZATION_ITEMS, PRIVACY, SETTINGS } from "./navItems";
+import {
+  type Destination,
+  EVENT_ITEM_FACES,
+  eventItems,
+  ORGANIZATION_ITEMS,
+  PRIVACY,
+  SETTINGS,
+} from "./navItems";
 import styles from "./Sidebar.module.css";
 import { VersionButton } from "./VersionFooter";
 
@@ -18,6 +25,8 @@ export interface SidebarProps {
   eventNameId: string;
   /** The scoped event: the event items act on it (ADR 0084). */
   eventId: string | undefined;
+  /** The scoped event is still on its way: the menu keeps its shape and shows no hint yet. */
+  eventPending: boolean;
   server: SystemVersion | undefined;
   onOpenVersions: () => void;
   /** Called when a link starts a navigation: the drawer closes then. */
@@ -30,6 +39,7 @@ export function Sidebar({
   eventSwitcher,
   eventNameId,
   eventId,
+  eventPending,
   server,
   onOpenVersions,
   onNavigate,
@@ -63,14 +73,20 @@ export function Sidebar({
         <div role="group" aria-labelledby={eventNameId} className={styles.eventItems}>
           {eventId === undefined ? (
             <>
-              {eventItems("").map((destination) => (
-                <DisabledNavItem key={destination.id} icon={destination.icon} describedBy={hintId}>
-                  {destination.label}
+              {EVENT_ITEM_FACES.map((face) => (
+                <DisabledNavItem
+                  key={face.id}
+                  icon={face.icon}
+                  {...(eventPending ? {} : { describedBy: hintId })}
+                >
+                  {face.label}
                 </DisabledNavItem>
               ))}
-              <p id={hintId} className={styles.hint}>
-                {t("nav-needs-event")}
-              </p>
+              {!eventPending && (
+                <p id={hintId} className={styles.hint}>
+                  {t("nav-needs-event")}
+                </p>
+              )}
             </>
           ) : (
             eventItems(eventId).map(link)

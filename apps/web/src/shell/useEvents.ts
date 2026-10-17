@@ -30,19 +30,30 @@ export function mostRecentOpen(events: readonly Event[]): Event | undefined {
   return newest;
 }
 
+/** The scoped event, the ID that the menu acts on, and whether the answer is still on its way. */
+export interface ScopedEvent {
+  event: Event | undefined;
+  eventId: string | undefined;
+  pending: boolean;
+}
+
 /**
  * The scoped event, the one that the event items of the shell act on (ADR 0084): the event of
  * the route, else the one the member opened last in this organization (kept in the browser),
  * else the most recent open event, else none. The route event that the server does not find
  * leaves the remembered one alone; a remembered event that the server does not find is
  * forgotten. Without an organization (a page without the frame) it asks for nothing.
+ *
+ * `pending` is true while the answer is still on its way, so that the menu does not flash its
+ * "no event" state; `eventId` is then the event that the menu acts on in the meantime: the one
+ * that the hook asks for.
  */
 export function useScopedEvent(
   api: Api,
   routeEventId: string | undefined,
   organizationId: string | undefined,
   events: { list: EventList; load: () => void },
-): Event | undefined {
+): ScopedEvent {
   const [state, setState] = useState(() => lastEventOf(organizationId));
   const [event, setEvent] = useState<Event>();
   // Another organization has another last event: adjust while rendering, not in an effect.
@@ -102,15 +113,24 @@ export function useScopedEvent(
   }, [needsFallback, load]);
 
   if (organizationId === undefined) {
-    return undefined;
+    return { event: undefined, eventId: undefined, pending: false };
   }
-  if (event !== undefined && event.id === id) {
-    return event;
-  }
+  const resolved = event !== undefined && event.id === id ? event : undefined;
   // A route event that the server does not find has no scoped event: the page says so.
-  return needsFallback && events.list.kind === "loaded"
-    ? mostRecentOpen(events.list.events)
-    : undefined;
+  const fallback =
+    resolved === undefined && needsFallback && events.list.kind === "loaded"
+      ? mostRecentOpen(events.list.events)
+      : undefined;
+  const scoped = resolved ?? fallback;
+  const waitsForEvent = id !== undefined && resolved === undefined && state.missing !== id;
+  const waitsForList =
+    needsFallback && (events.list.kind === "idle" || events.list.kind === "loading");
+  const pending = scoped === undefined && (waitsForEvent || waitsForList);
+  return {
+    event: scoped,
+    eventId: scoped?.id ?? (pending ? id : undefined),
+    pending,
+  };
 }
 
 export type EventList =
