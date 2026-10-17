@@ -15,6 +15,8 @@ import styles from "./TopBar.module.css";
 export interface TopBarProps {
   /** The event name or the section: plain text. */
   title: string;
+  /** The title is the event name that the switcher of the top bar shows on wide layouts. */
+  titleIsSwitcher?: boolean;
   /** What the toggle does now, for example „Seitenleiste ausblenden“. */
   toggleLabel: string;
   /** Whether the sidebar or the drawer is open. */
@@ -30,6 +32,7 @@ export interface TopBarProps {
 
 export function TopBar({
   title,
+  titleIsSwitcher,
   toggleLabel,
   expanded,
   onToggle,
@@ -48,7 +51,10 @@ export function TopBar({
         onPress={onToggle}
       />
       {eventSwitcher}
-      <p className={styles.title} title={title}>
+      <p
+        className={titleIsSwitcher ? `${styles.title} ${styles.titleIsSwitcher}` : styles.title}
+        title={title}
+      >
         {title}
       </p>
       <button

@@ -5,7 +5,7 @@
     z-index: var(--z-shell);
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--space-1);
     box-sizing: border-box;
     height: var(--topbar-height);
     padding-inline: var(--space-2) var(--space-3);
@@ -23,7 +23,7 @@
     white-space: nowrap;
   }
 
-  /* On narrow layouts the box is an icon button; the text and the hint come back from --bp-medium. */
+  /* On narrow layouts the box is an icon button; the text comes back from --bp-medium and the key hint from --bp-wide. */
   .command {
     display: inline-flex;
     flex: none;
@@ -82,11 +82,15 @@
     outline-offset: 2px;
   }
 
-  /* --bp-medium: the command box shows its text and the key hint. */
+  /* --bp-medium: the command box shows its text. */
   @media (width >= 40rem) {
+    .bar {
+      gap: var(--space-2);
+    }
+
     .command {
       justify-content: flex-start;
-      flex: 0 1 22rem;
+      flex: 0 1 18rem;
       padding-inline: var(--space-2);
       border-color: var(--color-border-control);
       background: var(--color-bg-canvas);
@@ -105,9 +109,24 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+  }
+
+  /*
+   * --bp-wide: the command box has its full width and the key hint. The switcher of the top bar
+   * shows the event name, so the title would say it twice: it keeps its room (the bar spaces its
+   * items by it) but shows nothing.
+   */
+  @media (width >= 64rem) {
+    .command {
+      flex-basis: 22rem;
+    }
 
     .hint {
       display: inline-flex;
+    }
+
+    .titleIsSwitcher {
+      visibility: hidden;
     }
   }
 }
