@@ -122,7 +122,7 @@ describe("useScopedEvent", () => {
     const { result } = renderHook(() =>
       useScopedEvent(knownApi(events), "a", org, { list: loaded, load: vi.fn() }),
     );
-    await vi.waitFor(() => expect(result.current?.id).toBe("a"));
+    await vi.waitFor(() => expect(result.current.event?.id).toBe("a"));
   });
 
   it("falls back to the remembered event", async () => {
@@ -130,7 +130,7 @@ describe("useScopedEvent", () => {
     const { result } = renderHook(() =>
       useScopedEvent(knownApi(events), undefined, org, { list: loaded, load: vi.fn() }),
     );
-    await vi.waitFor(() => expect(result.current?.id).toBe("a"));
+    await vi.waitFor(() => expect(result.current.event?.id).toBe("a"));
   });
 
   it("falls back to the most recent open event and asks for the list", async () => {
@@ -139,10 +139,11 @@ describe("useScopedEvent", () => {
       ({ list }) => useScopedEvent(knownApi(events), undefined, org, { list, load }),
       { initialProps: { list: { kind: "idle" } as EventList } },
     );
-    expect(result.current).toBeUndefined();
+    expect(result.current.event).toBeUndefined();
+    expect(result.current.pending).toBe(true);
     expect(load).toHaveBeenCalled();
     rerender({ list: loaded });
-    expect(result.current?.id).toBe("b");
+    expect(result.current.event?.id).toBe("b");
   });
 
   it("falls back when the remembered event is gone", async () => {
@@ -150,7 +151,7 @@ describe("useScopedEvent", () => {
     const { result } = renderHook(() =>
       useScopedEvent(knownApi(events), undefined, org, { list: loaded, load: vi.fn() }),
     );
-    await vi.waitFor(() => expect(result.current?.id).toBe("b"));
+    await vi.waitFor(() => expect(result.current.event?.id).toBe("b"));
   });
 
   it("gives a route event that the server does not find no other event", async () => {
@@ -159,7 +160,8 @@ describe("useScopedEvent", () => {
     const { result } = renderHook(() => useScopedEvent(api, "dead", org, { list: loaded, load }));
     await vi.waitFor(() => expect(api.GET).toHaveBeenCalled());
     await act(async () => undefined);
-    expect(result.current).toBeUndefined();
+    expect(result.current.event).toBeUndefined();
+    expect(result.current.pending).toBe(false);
     expect(load).not.toHaveBeenCalled();
   });
 
@@ -171,6 +173,7 @@ describe("useScopedEvent", () => {
     const { result } = renderHook(() =>
       useScopedEvent(knownApi([]), undefined, org, { list, load: vi.fn() }),
     );
-    expect(result.current).toBeUndefined();
+    expect(result.current.event).toBeUndefined();
+    expect(result.current.pending).toBe(false);
   });
 });
