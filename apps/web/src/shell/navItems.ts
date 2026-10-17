@@ -5,6 +5,7 @@ import {
   IconCalendarEvent,
   IconFiles,
   IconInbox,
+  IconLayoutDashboard,
   IconLayoutKanban,
   IconSettings,
   IconShieldLock,
@@ -13,7 +14,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { t } from "../i18n";
-import { passesQueryRules, type QueryRule, yieldsAt } from "../router/Router";
+import { passesQueryRules, type QueryRule } from "../router/Router";
 
 export interface Destination {
   id: string;
@@ -24,8 +25,6 @@ export interface Destination {
   exact?: boolean;
   /** Current also below this prefix, when the path of the link is not a prefix of its pages. */
   within?: string;
-  /** Another item claims this path and the paths below it, so this item is not current there. */
-  yieldsTo?: string | readonly string[];
   /** Current only while the query has this value: „Zeitplan“ is a view of the work page. */
   onlyWith?: QueryRule;
   /** Not current while the query has this value: the sibling of `onlyWith`. */
@@ -43,10 +42,11 @@ const myWork: Destination = {
   icon: IconUser,
   exact: true,
 };
+/** The list of all events: not a menu item (ADR 0084), but a place of the bottom bar and the palette. */
 const events: Destination = {
   id: "events",
   to: "/events",
-  label: t("nav-events"),
+  label: t("events-title"),
   icon: IconCalendarEvent,
 };
 /** „Kontakte“: the persons and the institutions are its two tabs (ADR 0082). */
@@ -68,6 +68,17 @@ const privacy: Destination = {
   label: t("nav-privacy"),
   icon: IconShieldLock,
 };
+
+/** „Übersicht“ of one event: its home, current only on its own path (ADR 0084). */
+function overview(eventId: string): Destination {
+  return {
+    id: "overview",
+    to: `/events/${encodeURIComponent(eventId)}`,
+    label: t("nav-overview"),
+    icon: IconLayoutDashboard,
+    exact: true,
+  };
+}
 
 /** „Arbeit“ of one event: all its work records on one page (ADR 0082). */
 function work(eventId: string): Destination {
@@ -101,40 +112,24 @@ function documents(eventId: string): Destination {
   };
 }
 
-/** „Anlässe“. Inside an event it yields the pages that have an item of their own. */
-function eventsItem(eventId: string | undefined): Destination {
-  return eventId === undefined
-    ? events
-    : { ...events, yieldsTo: [work(eventId).to, documents(eventId).to] };
+/** The items of the member's organization; they do not depend on the event. */
+export const ORGANIZATION_ITEMS: Destination[] = [inbox, myWork, contacts];
+/** The items of the scoped event, below the event switcher (ADR 0084). */
+export function eventItems(eventId: string): Destination[] {
+  return [overview(eventId), work(eventId), timeline(eventId), documents(eventId)];
 }
-
-/**
- * The items of the sidebar and of the drawer, from top to bottom. Einstellungen sits at the foot.
- * „Arbeit“ belongs to an event, so it appears only while the path names one.
- */
-export function mainItems(eventId: string | undefined): Destination[] {
-  return [
-    inbox,
-    myWork,
-    ...(eventId === undefined ? [] : [work(eventId), timeline(eventId), documents(eventId)]),
-    eventsItem(eventId),
-    contacts,
-  ];
-}
-/** The items that do not depend on the event. */
-export const MAIN: Destination[] = mainItems(undefined);
 export const SETTINGS = settings;
 /**
  * The bottom bar on narrow layouts has room for three items and „Mehr“ (ADR 0082). The third is
- * „Anlässe“, and inside an event it is „Arbeit“.
+ * „Alle Anlässe“, and inside an event it is „Arbeit“.
  */
 export function bottomItems(eventId: string | undefined): Destination[] {
   return [inbox, myWork, eventId === undefined ? events : work(eventId)];
 }
-/** „Mehr“ holds the other destinations; inside an event that includes „Anlässe“. */
+/** „Mehr“ holds the other destinations; inside an event that includes „Übersicht“. */
 export function moreItems(eventId: string | undefined): Destination[] {
   return [
-    ...(eventId === undefined ? [] : [eventsItem(eventId), documents(eventId)]),
+    ...(eventId === undefined ? [] : [overview(eventId), documents(eventId)]),
     contacts,
     settings,
     privacy,
@@ -142,13 +137,10 @@ export function moreItems(eventId: string | undefined): Destination[] {
 }
 export const PRIVACY = privacy;
 /** Each destination, for the command palette. */
-export const ALL: Destination[] = [...MAIN, settings, privacy];
+export const ALL: Destination[] = [...ORGANIZATION_ITEMS, events, settings, privacy];
 
 /** True when the path belongs to the destination. */
 export function isCurrent(destination: Destination, pathname: string, search = ""): boolean {
-  if (yieldsAt(pathname, destination.yieldsTo)) {
-    return false;
-  }
   if (!passesQueryRules(search, destination)) {
     return false;
   }

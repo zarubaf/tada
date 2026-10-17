@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "../api/client";
 import { InboxProvider } from "../review/InboxProvider";
 import { Router } from "../router/Router";
@@ -182,7 +182,8 @@ describe("Shell", () => {
     renderShell(json(200, info([first], first)));
 
     expect(await screen.findByText("Seiteninhalt")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Anlässe" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Alle Anlässe", { selector: "header p" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Anlässe" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Organisation/ })).not.toBeInTheDocument();
   });
 
@@ -192,7 +193,7 @@ describe("Shell", () => {
     const link = await screen.findByRole("link", { name: "Meine Arbeit" });
     expect(link).toHaveAttribute("href", "/");
     expect(link).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+    expect(screen.queryByRole("link", { name: "Anlässe" })).not.toBeInTheDocument();
   });
 
   it("does not mark Meine Arbeit as current on the events list", async () => {
@@ -212,7 +213,7 @@ describe("Shell", () => {
         "aria-current",
         "page",
       );
-      expect(screen.getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+      expect(screen.queryByRole("link", { name: "Anlässe" })).not.toBeInTheDocument();
     },
   );
 
@@ -328,6 +329,11 @@ describe("Shell", () => {
 });
 
 describe("sidebar", () => {
+  const scoped = event("0199b8e0-0000-7000-8000-0000000000e1", "Sommerfest 2030", "SF30");
+  beforeEach(() => {
+    eventItems = [scoped];
+  });
+
   it("lists the destinations in a named navigation, in this order", async () => {
     renderShell(json(200, info([first], first)));
 
@@ -335,31 +341,73 @@ describe("sidebar", () => {
     const names = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(names).toEqual(["Eingang", "Meine Arbeit", "Anlässe", "Kontakte"]);
+    expect(names).toEqual(["Eingang", "Meine Arbeit", "Kontakte"]);
   });
 
-  it("adds Arbeit after Meine Arbeit inside an event, as the current page", async () => {
+  it("lists the event items of the remembered event on an organization page", async () => {
+    localStorage.setItem(`tada-event:${first.organization_id}`, scoped.id);
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    await within(nav).findByRole("link", { name: "Übersicht" });
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual([
+      "Eingang",
+      "Meine Arbeit",
+      "Kontakte",
+      "Übersicht",
+      "Arbeit",
+      "Zeitplan",
+      "Dokumente",
+    ]);
+    expect(within(nav).getByRole("link", { name: "Übersicht" })).toHaveAttribute(
+      "href",
+      `/events/${scoped.id}`,
+    );
+    expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("marks Übersicht on the event home, and nothing on the list of events", async () => {
+    renderShellAt(`/events/${scoped.id}`, json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    expect(await within(nav).findByRole("link", { name: "Übersicht" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(nav).getByRole("link", { name: "Arbeit" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("adds the event items after Kontakte inside an event, Arbeit as the current page", async () => {
     renderShellAt(
       "/events/0199b8e0-0000-7000-8000-0000000000e1/work",
       json(200, info([first], first)),
     );
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    await within(nav).findByRole("link", { name: "Arbeit" });
     const links = within(nav).getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
       "Eingang",
       "Meine Arbeit",
+      "Kontakte",
+      "Übersicht",
       "Arbeit",
       "Zeitplan",
       "Dokumente",
-      "Anlässe",
-      "Kontakte",
     ]);
     const work = within(nav).getByRole("link", { name: "Arbeit" });
     expect(work).toHaveAttribute("href", "/events/0199b8e0-0000-7000-8000-0000000000e1/work");
     expect(work).toHaveAttribute("aria-current", "page");
-    // Two items are not current at once: Arbeit claims the page.
-    expect(within(nav).getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+    // Two items are not current at once: Übersicht is current on its exact path only.
+    expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
+      "aria-current",
+    );
   });
 
   it("marks Zeitplan, not Arbeit, on the timeline view of the work page", async () => {
@@ -369,17 +417,19 @@ describe("sidebar", () => {
     );
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    const timeline = within(nav).getByRole("link", { name: "Zeitplan" });
+    const timeline = await within(nav).findByRole("link", { name: "Zeitplan" });
     expect(timeline).toHaveAttribute(
       "href",
       "/events/0199b8e0-0000-7000-8000-0000000000e1/work?view=timeline",
     );
     expect(timeline).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "Arbeit" })).not.toHaveAttribute("aria-current");
-    expect(within(nav).getByRole("link", { name: "Anlässe" })).not.toHaveAttribute("aria-current");
+    expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
+      "aria-current",
+    );
   });
 
-  it("has no Arbeit item outside an event", async () => {
+  it("has no Arbeit item without a scoped event", async () => {
     renderShellAt("/inbox", json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
@@ -395,6 +445,7 @@ describe("sidebar", () => {
   });
 
   it("puts the brand, the switchers and the links in one labelled region", async () => {
+    eventItems = [];
     renderShell(json(200, info([first, second], first)));
 
     const region = await screen.findByRole("region", { name: "Seitenleiste" });
@@ -644,7 +695,7 @@ describe("event switcher", () => {
 });
 
 describe("narrow layout", () => {
-  it("has a bottom bar with Eingang, Meine Arbeit, Anlässe and Mehr, and no sidebar", async () => {
+  it("has a bottom bar with Eingang, Meine Arbeit, Alle Anlässe and Mehr, and no sidebar", async () => {
     stubNarrow(true);
     renderShell(json(200, info([first], first)));
 
@@ -653,7 +704,7 @@ describe("narrow layout", () => {
       within(nav)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Eingang", "Meine Arbeit", "Anlässe"]);
+    ).toEqual(["Eingang", "Meine Arbeit", "Alle Anlässe"]);
     expect(within(nav).getByRole("button", { name: "Mehr" })).toBeInTheDocument();
     expect(screen.getAllByRole("navigation")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Anlass wählen" })).not.toBeInTheDocument();
@@ -672,12 +723,12 @@ describe("narrow layout", () => {
     expect(more.getAttribute("aria-current")).toBe(current);
   });
 
-  it("marks Anlässe as current on the list of events, in the bottom bar", async () => {
+  it("marks Alle Anlässe as current on the list of events, in the bottom bar", async () => {
     stubNarrow(true);
     renderShellAt("/events", json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    expect(within(nav).getByRole("link", { name: "Anlässe" })).toHaveAttribute(
+    expect(within(nav).getByRole("link", { name: "Alle Anlässe" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -700,11 +751,11 @@ describe("narrow layout", () => {
       "aria-current",
       "page",
     );
-    // Anlässe is in Mehr, and the work page is not one of its pages.
+    // Übersicht is in Mehr, and the work page is not one of its pages.
     expect(within(nav).getByRole("button", { name: "Mehr" })).not.toHaveAttribute("aria-current");
   });
 
-  it("moves Anlässe into Mehr inside an event, and marks Mehr on the other pages of the event", async () => {
+  it("moves Übersicht into Mehr inside an event, and marks Mehr on the other pages of the event", async () => {
     stubNarrow(true);
     renderShellAt("/events/0199b8e0-0000-7000-8000-0000000000e1", json(200, info([first], first)));
 
@@ -719,7 +770,7 @@ describe("narrow layout", () => {
         .getAllByRole("menuitem")
         .map((item) => item.textContent)
         .slice(0, 3),
-    ).toEqual(["Anlässe", "Dokumente", "Kontakte"]);
+    ).toEqual(["Übersicht", "Dokumente", "Kontakte"]);
   });
 
   it("shows the open proposals at Eingang in the bottom bar", async () => {
@@ -774,7 +825,7 @@ describe("narrow layout", () => {
 
     const drawer = await screen.findByRole("dialog", { name: "Navigation" });
     const nav = within(drawer).getByRole("navigation", { name: "Hauptnavigation" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(4);
+    expect(within(nav).getAllByRole("link")).toHaveLength(3);
     expect(within(drawer).getByRole("button", { name: /Organisation/ })).toBeInTheDocument();
     expect(within(drawer).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
     expect(within(drawer).getByRole("link", { name: "Datenschutz" })).toBeInTheDocument();
@@ -939,7 +990,7 @@ describe("command palette", () => {
       expect.arrayContaining([
         "Eingang",
         "Meine Arbeit",
-        "Anlässe",
+        "Alle Anlässe",
         "Kontakte",
         "Einstellungen",
         "Datenschutz",

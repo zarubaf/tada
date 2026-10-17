@@ -29,7 +29,7 @@ for (const viewport of viewports) {
         await fakeEvents(page, state.status, state.body);
         await page.goto("/events");
         await setTheme(page, theme);
-        await expect(page.getByRole("heading", { level: 1, name: "Anlässe" })).toBeVisible();
+        await expect(page.getByRole("heading", { level: 1, name: "Alle Anlässe" })).toBeVisible();
         // The skeleton is a labelled status; the live regions have no label.
         await expect(page.locator("[role=status][aria-label]")).toHaveCount(0);
 
@@ -104,9 +104,9 @@ test("in forced colors the current navigation item keeps a mark", async ({ page 
   await page.emulateMedia({ forcedColors: "active" });
   await fakeSession(page);
   await fakeEvents(page, 200, { items: events });
-  await page.goto("/events");
+  await page.goto("/");
 
-  const current = page.getByRole("link", { name: "Anlässe" });
+  const current = page.getByRole("link", { name: "Meine Arbeit" });
   await expect(current).toHaveAttribute("aria-current", "page");
   await expect(current).toHaveCSS("text-decoration-line", "underline");
   await expect(page.getByRole("link", { name: "Einstellungen" })).toHaveCSS(

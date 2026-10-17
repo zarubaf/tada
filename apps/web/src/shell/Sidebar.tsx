@@ -6,7 +6,7 @@ import { t } from "../i18n";
 import { InboxCount } from "../review/InboxCount";
 import { Avatar } from "../ui/Avatar";
 import { NavLink } from "../ui/NavLink";
-import { mainItems, PRIVACY, SETTINGS } from "./navItems";
+import { type Destination, eventItems, ORGANIZATION_ITEMS, PRIVACY, SETTINGS } from "./navItems";
 import styles from "./Sidebar.module.css";
 import { VersionButton } from "./VersionFooter";
 
@@ -14,7 +14,7 @@ export interface SidebarProps {
   /** Only a member of more than one organization has it. */
   organizationSwitcher: ReactNode;
   eventSwitcher: ReactNode;
-  /** The event of the route, if the path names one: „Arbeit“ then appears. */
+  /** The scoped event: the event items act on it (ADR 0084). */
   eventId: string | undefined;
   server: SystemVersion | undefined;
   onOpenVersions: () => void;
@@ -32,28 +32,29 @@ export function Sidebar({
   onNavigate,
   member,
 }: SidebarProps) {
+  const link = (destination: Destination) => (
+    <NavLink
+      key={destination.id}
+      onNavigate={onNavigate}
+      to={destination.to}
+      icon={destination.icon}
+      {...(destination.exact ? { exact: true } : {})}
+      {...(destination.within ? { within: destination.within } : {})}
+      {...(destination.onlyWith ? { onlyWith: destination.onlyWith } : {})}
+      {...(destination.unlessWith ? { unlessWith: destination.unlessWith } : {})}
+    >
+      {destination.label}
+      {destination.id === "inbox" && <InboxCount />}
+    </NavLink>
+  );
   return (
     <section className={styles.sidebar} aria-label={t("shell-sidebar")}>
       <p className={styles.brand}>{t("app-name")}</p>
       {organizationSwitcher}
-      {eventSwitcher}
       <nav className={styles.nav} aria-label={t("shell-nav")}>
-        {mainItems(eventId).map((destination) => (
-          <NavLink
-            key={destination.id}
-            onNavigate={onNavigate}
-            to={destination.to}
-            icon={destination.icon}
-            {...(destination.exact ? { exact: true } : {})}
-            {...(destination.within ? { within: destination.within } : {})}
-            {...(destination.yieldsTo ? { yieldsTo: destination.yieldsTo } : {})}
-            {...(destination.onlyWith ? { onlyWith: destination.onlyWith } : {})}
-            {...(destination.unlessWith ? { unlessWith: destination.unlessWith } : {})}
-          >
-            {destination.label}
-            {destination.id === "inbox" && <InboxCount />}
-          </NavLink>
-        ))}
+        {ORGANIZATION_ITEMS.map(link)}
+        <div className={styles.eventHead}>{eventSwitcher}</div>
+        {eventId !== undefined && eventItems(eventId).map(link)}
       </nav>
       <div className={styles.foot}>
         <NavLink
