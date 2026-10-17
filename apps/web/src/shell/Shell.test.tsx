@@ -921,16 +921,55 @@ describe("narrow layout", () => {
     expect(within(nav).queryByRole("button", { name: "Anlass wählen" })).not.toBeInTheDocument();
   });
 
-  it("shows the reason above the bar when the inert Arbeit is pressed", async () => {
-    stubNarrow(true);
-    renderShell(json(200, info([first], first)));
+  describe("the reason of the inert Arbeit", () => {
+    const shown = (hint: HTMLElement) => /hintShown/.test(hint.className);
+    async function bar() {
+      stubNarrow(true);
+      renderShell(json(200, info([first], first)));
+      const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+      const work = await within(nav).findByRole("link", { name: "Arbeit" });
+      return { nav, work, hint: within(nav).getByText("Zuerst einen Anlass wählen") };
+    }
 
-    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    const work = await within(nav).findByRole("link", { name: "Arbeit" });
-    const hint = within(nav).getByText("Zuerst einen Anlass wählen");
-    expect(hint.className).toMatch(/hint(?!Shown)/);
-    await userEvent.click(work);
-    expect(hint.className).toMatch(/hintShown/);
+    it("shows on a press, with no timer, and goes with the next press", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const { work, hint } = await bar();
+        expect(shown(hint)).toBe(false);
+        await userEvent.click(work);
+        expect(shown(hint)).toBe(true);
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(shown(hint)).toBe(true);
+        await userEvent.click(work);
+        expect(shown(hint)).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("shows on Enter and goes with Escape", async () => {
+      const { work, hint } = await bar();
+      work.focus();
+      await userEvent.keyboard("{Enter}");
+      expect(shown(hint)).toBe(true);
+      await userEvent.keyboard("{Escape}");
+      expect(shown(hint)).toBe(false);
+    });
+
+    it("goes when the item loses focus", async () => {
+      const { work, hint } = await bar();
+      await userEvent.click(work);
+      expect(shown(hint)).toBe(true);
+      await userEvent.tab();
+      expect(shown(hint)).toBe(false);
+    });
+
+    it("goes when the page changes", async () => {
+      const { nav, work, hint } = await bar();
+      await userEvent.click(work);
+      await userEvent.click(within(nav).getByRole("link", { name: "Meine Arbeit" }));
+      await vi.waitFor(() => expect(shown(hint)).toBe(false));
+    });
   });
 
   it("shows Arbeit in the bottom bar as an inert item with no Anlass, and the same Mehr", async () => {
@@ -954,6 +993,7 @@ describe("narrow layout", () => {
       "Datenschutz",
       expect.stringMatching(/^(tada|Versionen)/),
     ]);
+    expect(items[0]).toHaveAccessibleName("Übersicht");
     expect(items[0]).toHaveAccessibleDescription("Zuerst einen Anlass wählen");
     expect(items[0]).toHaveAttribute("aria-disabled", "true");
     expect(items[1]).toHaveAttribute("aria-disabled", "true");

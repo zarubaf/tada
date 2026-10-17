@@ -12,7 +12,6 @@ import styles from "./BottomBar.module.css";
 import { bottomItems, hasTarget, isCurrent, moreItems } from "./navItems";
 
 const VERSIONS = "versions";
-const HINT_MS = 4000;
 
 export function BottomBar({
   eventId,
@@ -31,14 +30,22 @@ export function BottomBar({
   const navigate = useNavigate();
   const pathname = usePathname();
   const hintId = useId();
-  // The bar has no room for a line of text: a press on the inert „Arbeit“ shows the reason for a while.
+  // The bar has no room for a line of text: a press on the inert „Arbeit“ shows the reason. It stays
+  // until the next press, Escape, the loss of focus or a change of the page or of the Anlass.
   const [hintShown, setHintShown] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the page and the Anlass are the triggers
+  useEffect(() => setHintShown(false), [pathname, eventId]);
   useEffect(() => {
     if (!hintShown) {
       return;
     }
-    const timer = window.setTimeout(() => setHintShown(false), HINT_MS);
-    return () => window.clearTimeout(timer);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setHintShown(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [hintShown]);
   const more = moreItems(eventId);
   const hint = eventPending ? {} : { describedBy: hintId };
@@ -65,7 +72,8 @@ export function BottomBar({
             key={destination.id}
             icon={destination.icon}
             large
-            onPress={() => setHintShown(true)}
+            onPress={() => setHintShown((shown) => !shown)}
+            onBlur={() => setHintShown(false)}
             {...hint}
           >
             <span className={styles.label}>{destination.label}</span>
