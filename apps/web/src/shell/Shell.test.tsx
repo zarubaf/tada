@@ -823,6 +823,19 @@ describe("event switcher", () => {
   });
 
   // `other` is the current event on a page without an event: it has the greater ID on a tie.
+  it("leaves the address alone when the switcher chooses the open event", async () => {
+    eventItems = [open, other];
+    const address = `/events/${open.id}/work?status=open#R-1`;
+    renderShellAt(address, json(200, info([first], first)));
+    const before = window.history.length;
+
+    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: /^Sommerfest/ }));
+
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe(address);
+    expect(window.history.length).toBe(before);
+  });
+
   it("opens Übersicht of the chosen event from a page of the organization", async () => {
     eventItems = [open, other];
     renderShellAt("/inbox", json(200, info([first], first)));
@@ -1375,6 +1388,17 @@ describe("command palette", () => {
         `/events/${other.id}/work?view=timeline`,
       ),
     );
+  });
+
+  it("keeps the documents when it jumps to another event", async () => {
+    eventItems = [open, other];
+    renderShellAt(`/events/${open.id}/documents/d1`, json(200, info([first], first)));
+
+    const palette = await openPalette();
+    await userEvent.keyboard("herbst");
+    await userEvent.click(await within(palette).findByRole("menuitem", { name: "Herbstflug" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${other.id}/documents`));
   });
 
   it("switches the theme and the toggle in the top bar follows", async () => {
