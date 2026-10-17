@@ -28,12 +28,15 @@ export function EventSwitcher({
   canCreate,
   onOpen,
   onAction,
+  nameId,
 }: {
   current: Event | undefined;
   list: EventList;
   canCreate: boolean;
   onOpen: () => void;
   onAction: (item: string) => void;
+  /** The ID of the name, for a group that the switcher heads. */
+  nameId?: string;
 }) {
   const items: MenuButtonItem[] = [
     ...(list.kind === "loaded"
@@ -64,7 +67,7 @@ export function EventSwitcher({
           </span>
           <span className={styles.text}>
             {/* A long name is cut: the full name is the title and in the name of the button. */}
-            <span className={styles.name} title={current?.name}>
+            <span id={nameId} className={styles.name} title={current?.name}>
               {current?.name ?? t("event-switcher-pick")}
             </span>
             {current && (
