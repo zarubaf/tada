@@ -1,5 +1,5 @@
 // The destinations of the shell, once: the sidebar, the bottom bar, the menu „Mehr“ and the command
-// palette all read this list. An item appears only when its page exists (ADR 0082).
+// palette all read this list. The menu has the same items in every state (ADR 0084).
 import {
   type Icon,
   IconCalendarEvent,
@@ -120,7 +120,7 @@ export function eventItems(eventId: string): Destination[] {
   return [overview(eventId), work(eventId), timeline(eventId), documents(eventId)];
 }
 export const SETTINGS = settings;
-/** A place of the bottom bar or of „Mehr“: without a target it is the inert face of an Anlass item. */
+/** A place of the bottom bar or of „Mehr“: without a target it is the inert face of an event item. */
 export type BarItem = Destination | (Omit<Destination, "to"> & { to?: undefined });
 /** True when the place has a target. */
 export function hasTarget(item: BarItem): item is Destination {
@@ -128,12 +128,12 @@ export function hasTarget(item: BarItem): item is Destination {
 }
 /**
  * The bottom bar on narrow layouts: the same four places in every state (ADR 0084). „Arbeit“ is
- * the one of the scoped Anlass; with no Anlass it has no target.
+ * the one of the scoped event; with no event it has no target.
  */
 export function bottomItems(eventId: string | undefined): BarItem[] {
   return [inbox, myWork, eventId === undefined ? WORK : work(eventId)];
 }
-/** „Mehr“ holds the other destinations, the same list in every state; the Anlass items need an Anlass. */
+/** „Mehr“ holds the other destinations, the same list in every state; the event items need an event. */
 export function moreItems(eventId: string | undefined): BarItem[] {
   return [
     eventId === undefined ? OVERVIEW : overview(eventId),
@@ -144,16 +144,19 @@ export function moreItems(eventId: string | undefined): BarItem[] {
   ];
 }
 export const PRIVACY = privacy;
-/** Each destination that needs no Anlass, for the page titles. */
+/** Each destination that needs no event, for the page titles. */
 export const ALL: Destination[] = [...ORGANIZATION_ITEMS, events, settings, privacy];
 /**
- * The destinations of the command palette: ALL plus the Anlass items of the scoped Anlass. With no
- * Anlass the palette lists none of them, because a result that goes nowhere is worse than none.
+ * The destinations of the command palette: ALL plus the event items of the scoped event. With no
+ * event the palette lists none of them, because a result that goes nowhere is worse than none.
  */
 export function paletteDestinations(eventId: string | undefined): Destination[] {
-  return eventId === undefined
-    ? ALL
-    : [...ORGANIZATION_ITEMS, ...eventItems(eventId), events, settings, privacy];
+  if (eventId === undefined) {
+    return ALL;
+  }
+  // The event items sit after the organization items, before „Alle Anlässe“.
+  const rest = ALL.slice(ORGANIZATION_ITEMS.length);
+  return [...ORGANIZATION_ITEMS, ...eventItems(eventId), ...rest];
 }
 
 /** True when the path belongs to the destination. */

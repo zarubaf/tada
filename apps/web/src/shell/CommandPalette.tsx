@@ -26,9 +26,9 @@ interface Props {
   api: Api;
   events: EventList;
   loadEvents: () => void;
-  /** The Anlass of the route: the record actions act on it. */
+  /** The event of the route: the record actions act on it. */
   routeEventId: string | undefined;
-  /** The scoped Anlass (ADR 0084): the Anlass destinations act on it, on every page. */
+  /** The scoped event (ADR 0084): the event destinations act on it, on every page. */
   scopedEventId: string | undefined;
   /** False for a closed event, which is read-only for everybody. */
   eventWritable: boolean;

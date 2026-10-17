@@ -1,5 +1,5 @@
 // The app shell (doc/design/layout-and-responsiveness.md): a sidebar, a top bar on all widths, and on
-// narrow layouts a bottom bar. It shows only the items that exist.
+// narrow layouts a bottom bar. The menu keeps the same items in every state (ADR 0084).
 import { IconRefresh } from "@tabler/icons-react";
 import { Fragment, lazy, type ReactNode, Suspense, useEffect, useId, useState } from "react";
 import { type Api, problemMessage } from "../api/client";
@@ -49,7 +49,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const events = useEventList(api, framedOrganizationId);
   const {
     event: scopedEvent,
-    eventId: menuEventId,
+    eventId: scopedEventId,
     pending: eventPending,
   } = useScopedEvent(api, routeEventId, framedOrganizationId, events);
   const canCreateEvent = useCanCreateEvent();
@@ -174,7 +174,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       eventSwitcher={narrow ? undefined : eventSwitcher(false)}
       eventName={scopedEvent?.name}
       eventNameId={eventNameId}
-      eventId={menuEventId}
+      eventId={scopedEventId}
       eventPending={eventPending}
       server={server}
       onOpenVersions={openVersions}
@@ -243,7 +243,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       </div>
       {narrow && (
         <BottomBar
-          eventId={menuEventId}
+          eventId={scopedEventId}
           eventPending={eventPending}
           versionsLabel={versionsLabel}
           onOpenVersions={openVersions}
@@ -263,7 +263,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
             events={events.list}
             loadEvents={events.load}
             routeEventId={routeEventId === undefined ? undefined : scopedEvent?.id}
-            scopedEventId={menuEventId}
+            scopedEventId={scopedEventId}
             eventWritable={scopedEvent?.status !== "closed"}
             canCreateEvent={canCreateEvent}
             onClose={() => setPaletteOpen(false)}

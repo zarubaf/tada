@@ -7,12 +7,13 @@ export const WORK_VIEWS = ["board", "table", "timeline"] as const;
 export type WorkView = (typeof WORK_VIEWS)[number];
 
 const VIEW = "view";
-const DEFAULT: WorkView = "board";
+/** The view that has no key in the address. */
+export const DEFAULT_WORK_VIEW: WorkView = "board";
 
 /** Reads the view from a query string. What it does not know, it shows as the board. */
 export function parseWorkView(params: Pick<URLSearchParams, "get">): WorkView {
   const view = params.get(VIEW);
-  return WORK_VIEWS.find((candidate) => candidate === view) ?? DEFAULT;
+  return WORK_VIEWS.find((candidate) => candidate === view) ?? DEFAULT_WORK_VIEW;
 }
 
 /**
@@ -24,7 +25,7 @@ export function useWorkView(): [WorkView, (next: WorkView) => void] {
   const setSearch = useSetSearch();
   const view = useMemo(() => parseWorkView(search), [search]);
   const set = useCallback(
-    (next: WorkView) => setSearch({ [VIEW]: next === DEFAULT ? null : next }),
+    (next: WorkView) => setSearch({ [VIEW]: next === DEFAULT_WORK_VIEW ? null : next }),
     [setSearch],
   );
   return [view, set];
