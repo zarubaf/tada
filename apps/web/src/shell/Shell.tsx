@@ -160,7 +160,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           onAction={openEvent}
         />
       }
-      eventId={routeEventId}
+      eventId={scopedEvent?.id}
       server={server}
       onOpenVersions={openVersions}
       onNavigate={() => setDrawerOpen(false)}

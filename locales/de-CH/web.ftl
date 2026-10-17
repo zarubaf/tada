@@ -5,7 +5,7 @@ app-name = tada
 
 ## Events
 
-events-title = Anlässe
+events-title = Alle Anlässe
 events-column-key = Kürzel
 events-column-name = Name
 events-column-time-zone = Zeitzone
@@ -145,7 +145,7 @@ nav-my-work = Meine Arbeit
 nav-work = Arbeit
 nav-timeline = Zeitplan
 nav-documents = Dokumente
-nav-events = Anlässe
+nav-overview = Übersicht
 nav-contacts = Kontakte
 nav-inbox = Eingang
 # $count: the number of changesets that wait for a review.

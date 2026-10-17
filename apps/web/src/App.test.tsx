@@ -47,8 +47,11 @@ describe("App", () => {
   it("moves focus to the h1 of a lazy page after a navigation", async () => {
     renderAt("/");
     await screen.findByRole("heading", { name: "Meine Arbeit" });
-    await userEvent.click(screen.getAllByRole("link", { name: "Anlässe" })[0] as HTMLElement);
-    const heading = await screen.findByRole("heading", { level: 1, name: "Anlässe" });
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Anlass wählen" })[0] as HTMLElement,
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Alle Anlässe" }));
+    const heading = await screen.findByRole("heading", { level: 1, name: "Alle Anlässe" });
     expect(heading).toHaveFocus();
   });
 
@@ -76,7 +79,7 @@ describe("App", () => {
 
   it("keeps the events list at /events", async () => {
     renderAt("/events");
-    expect(await screen.findByRole("heading", { name: "Anlässe" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Alle Anlässe" })).toBeInTheDocument();
   });
 
   it("loads Einstellungen on demand with the h1 of the page and the panel of the tab", async () => {
@@ -112,7 +115,7 @@ describe("App", () => {
 
   it("has the skip link as its first focusable element, and it targets main", async () => {
     renderAt("/events");
-    await screen.findByRole("heading", { name: "Anlässe" });
+    await screen.findByRole("heading", { name: "Alle Anlässe" });
 
     await userEvent.tab();
     const link = screen.getByRole("link", { name: "Zum Inhalt springen" });

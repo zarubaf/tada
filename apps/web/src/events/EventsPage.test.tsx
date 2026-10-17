@@ -54,7 +54,7 @@ describe("EventsPage", () => {
     );
     renderPage(api);
 
-    const table = await screen.findByRole("table", { name: "Anlässe" });
+    const table = await screen.findByRole("table", { name: "Alle Anlässe" });
     expect(within(table).getByText("TEST30")).toBeInTheDocument();
     expect(within(table).getByText("Tag der offenen Tür Testwil-Ämmerlibüel")).toBeInTheDocument();
     expect(within(table).getByRole("columnheader", { name: "Kürzel" })).toBeInTheDocument();
@@ -64,7 +64,7 @@ describe("EventsPage", () => {
     const { api } = fakeApi(json(200, { items: [event("TEST30", "Fly-in 2030")] }));
     renderPage(api);
 
-    const heading = await screen.findByRole("heading", { level: 1, name: "Anlässe" });
+    const heading = await screen.findByRole("heading", { level: 1, name: "Alle Anlässe" });
     expect(heading.closest("[data-page-toolbar]")).not.toBeNull();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
@@ -74,7 +74,7 @@ describe("EventsPage", () => {
     const { api } = fakeApi(json(200, { items: [event("NEW28", "Fly-in 2028"), closed] }));
     renderPage(api);
 
-    const table = await screen.findByRole("table", { name: "Anlässe" });
+    const table = await screen.findByRole("table", { name: "Alle Anlässe" });
     const [, open, shut] = within(table).getAllByRole("row");
     expect(within(open as HTMLElement).getByText("Offen")).toBeInTheDocument();
     expect(within(shut as HTMLElement).getByText("Abgeschlossen")).toBeInTheDocument();
@@ -150,7 +150,9 @@ describe("EventsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
     expect(await screen.findByText("FLY28")).toBeInTheDocument();
-    await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Anlässe" })).toHaveFocus());
+    await vi.waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Alle Anlässe" })).toHaveFocus(),
+    );
   });
 
   it("keeps the rows and the focus when the next page fails", async () => {
@@ -228,7 +230,7 @@ describe("EventsPage", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Weitere Anlässe laden" }));
 
     expect(await screen.findByText("BB")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Anlässe" })).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "Alle Anlässe" })).toHaveFocus();
   });
 });
 
@@ -272,7 +274,7 @@ describe("EventsPage toolbar", () => {
     );
     renderPage(api);
 
-    const table = await screen.findByRole("table", { name: "Anlässe" });
+    const table = await screen.findByRole("table", { name: "Alle Anlässe" });
     expect(within(table).getByText("TEST31")).toBeInTheDocument();
     expect(within(table).getByText("Fly-in 2031")).toBeInTheDocument();
     expect(within(table).queryByText("entfernt")).not.toBeInTheDocument();
