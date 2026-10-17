@@ -614,7 +614,9 @@ describe("sidebar", () => {
     const region = await screen.findByRole("region", { name: "Seitenleiste" });
     expect(within(region).getByText("tada")).toBeInTheDocument();
     expect(within(region).getByRole("button", { name: /Organisation/ })).toBeInTheDocument();
-    expect(within(region).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
+    expect(
+      await within(region).findByRole("button", { name: "Anlass wählen" }),
+    ).toBeInTheDocument();
     expect(within(region).getByRole("navigation", { name: "Hauptnavigation" })).toBeInTheDocument();
     expect(within(region).getByRole("link", { name: "Datenschutz" })).toBeInTheDocument();
   });
