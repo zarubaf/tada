@@ -40,18 +40,29 @@ export interface DisabledNavItemProps {
  * `href`, so a press goes nowhere.
  */
 export function DisabledNavItem({ icon: Icon, describedBy, children }: DisabledNavItemProps) {
-  const disabled = describedBy !== undefined;
+  const content = (
+    <>
+      {Icon && <Icon size={16} stroke={1.5} aria-hidden="true" className={styles.icon} />}
+      {children}
+    </>
+  );
+  if (describedBy === undefined) {
+    return (
+      <span aria-hidden="true" className={styles.link}>
+        {content}
+      </span>
+    );
+  }
   return (
     // biome-ignore lint/a11y/useSemanticElements: a link without a target is not an `a` element
     <span
       role="link"
-      {...(disabled
-        ? { "aria-disabled": true, "aria-describedby": describedBy, tabIndex: 0 }
-        : { "aria-hidden": true })}
-      className={disabled ? `${styles.link} ${styles.disabled}` : styles.link}
+      aria-disabled="true"
+      aria-describedby={describedBy}
+      tabIndex={0}
+      className={`${styles.link} ${styles.disabled}`}
     >
-      {Icon && <Icon size={16} stroke={1.5} aria-hidden="true" className={styles.icon} />}
-      {children}
+      {content}
     </span>
   );
 }
