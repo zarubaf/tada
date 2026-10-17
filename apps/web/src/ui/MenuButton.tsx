@@ -98,7 +98,9 @@ export function MenuButton({
               )}
               {item.description ? (
                 <span className={styles.text}>
-                  <span className={styles.label}>{item.label}</span>
+                  <Text slot="label" className={styles.label}>
+                    {item.label}
+                  </Text>
                   <Text slot="description" className={styles.description}>
                     {item.description}
                   </Text>

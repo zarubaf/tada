@@ -29,6 +29,8 @@ export interface DisabledNavItemProps {
   large?: boolean;
   /** Called on a press or on Enter or Space: for a hint that shows the reason. */
   onPress?: () => void;
+  /** Called when the item loses focus: the hint of the press goes away then. */
+  onBlur?: () => void;
   /**
    * The ID of the element that says why the item is off: a screen reader reads it with the label.
    * Without it the item is a placeholder for a target that is on its way: it looks like a link,
@@ -47,6 +49,7 @@ export function DisabledNavItem({
   icon: Icon,
   large,
   onPress,
+  onBlur,
   describedBy,
   children,
 }: DisabledNavItemProps) {
@@ -72,6 +75,7 @@ export function DisabledNavItem({
       aria-describedby={describedBy}
       tabIndex={0}
       onClick={onPress}
+      onBlur={onBlur}
       onKeyDown={(event) => {
         if (onPress && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
