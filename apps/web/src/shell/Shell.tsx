@@ -19,6 +19,7 @@ import { readRemembered, SIDEBAR_KEY, writeRemembered } from "./remembered";
 import styles from "./Shell.module.css";
 import { Sidebar } from "./Sidebar";
 import { isPaletteKey } from "./shortcut";
+import { useSwitchEvent } from "./switchEvent";
 import { TopBar } from "./TopBar";
 import { useEventList, useScopedEvent } from "./useEvents";
 import { useNarrow } from "./useNarrow";
@@ -34,6 +35,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const [failure, setFailure] = useState<string>();
   const pathname = usePathname();
   const navigate = useNavigate();
+  const switchEvent = useSwitchEvent();
   const frameless = isPublicPath(pathname) || pathname === CHOOSE_ORGANIZATION_PATH;
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => readRemembered(SIDEBAR_KEY) !== "collapsed");
@@ -107,7 +109,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
     setDrawerOpen(false);
     const eventId = eventIdOfItem(item);
     if (eventId !== undefined) {
-      navigate(`/events/${encodeURIComponent(eventId)}`);
+      switchEvent(eventId);
     } else if (item === ALL_EVENTS) {
       navigate("/events");
     } else if (item === NEW_EVENT) {

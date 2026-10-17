@@ -822,14 +822,34 @@ describe("event switcher", () => {
     expect(within(menu).queryByRole("menuitem", { name: "Neuer Anlass" })).not.toBeInTheDocument();
   });
 
-  it("opens the chosen event", async () => {
+  // `other` is the current event on a page without an event: it has the greater ID on a tie.
+  it("opens Übersicht of the chosen event from a page of the organization", async () => {
     eventItems = [open, other];
     renderShellAt("/inbox", json(200, info([first], first)));
 
     await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: /^Sommerfest/ }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}`));
+  });
+
+  it.each([
+    ["the work page", "/work", "/work"],
+    ["the timeline view", "/work?view=timeline&status=open#R-1", "/work?view=timeline"],
+    ["the documents", "/documents", "/documents"],
+    ["a document", "/documents/d1", "/documents"],
+  ])("keeps %s when the switcher chooses another event", async (_name, from, to) => {
+    eventItems = [open, other];
+    renderShellAt(`/events/${open.id}${from}`, json(200, info([first], first)));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: /^Herbstflug/ }));
 
-    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${other.id}`));
+    await vi.waitFor(() =>
+      expect(window.location.pathname + window.location.search + window.location.hash).toBe(
+        `/events/${other.id}${to}`,
+      ),
+    );
   });
 
   it("leads to all events", async () => {
@@ -1337,6 +1357,24 @@ describe("command palette", () => {
     await userEvent.click(await within(palette).findByRole("menuitem", { name: "Herbstflug" }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${other.id}`));
+  });
+
+  it("keeps the page of the event when it jumps to another event", async () => {
+    eventItems = [open, other];
+    renderShellAt(
+      `/events/${open.id}/work?view=timeline&status=open`,
+      json(200, info([first], first)),
+    );
+
+    const palette = await openPalette();
+    await userEvent.keyboard("herbst");
+    await userEvent.click(await within(palette).findByRole("menuitem", { name: "Herbstflug" }));
+
+    await vi.waitFor(() =>
+      expect(window.location.pathname + window.location.search).toBe(
+        `/events/${other.id}/work?view=timeline`,
+      ),
+    );
   });
 
   it("switches the theme and the toggle in the top bar follows", async () => {
