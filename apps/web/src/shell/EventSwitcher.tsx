@@ -76,7 +76,7 @@ export function EventSwitcher({
           </span>
           <span className={styles.text}>
             {/* A long name is cut: the full name is the title and in the name of the button. */}
-            <span id={nameId} className={styles.name} title={current?.name}>
+            <span id={nameId} className={styles.name} title={current?.name ?? unknown}>
               {current?.name ?? unknown}
             </span>
             {current && (
