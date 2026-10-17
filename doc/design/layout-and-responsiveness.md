@@ -1,6 +1,6 @@
 # Layout and responsiveness
 
-[ADR 0023](../adr/0023-responsive-layout.md) defines the strategy, and [ADR 0082](../adr/0082-redesign-of-the-web-client.md) amends it.
+[ADR 0023](../adr/0023-responsive-layout.md) defines the strategy, and [ADR 0082](../adr/0082-redesign-of-the-web-client.md) and [ADR 0084](../adr/0084-event-scope-in-the-navigation.md) amend it.
 This document gives the layouts, the navigation and the page templates.
 
 ## App shell
@@ -14,7 +14,7 @@ If the server runs another build than the web client, a Banner below the top bar
 The top bar is 48 px high and sticks to the top of the page. It is the `banner` landmark.
 
 - A toggle for the sidebar. It collapses the docked sidebar on medium and wide layouts and opens the drawer on narrow layouts.
-- The title of the context in plain text, not a heading: the name of the current event on an event page, else the name of the section, for example „Eingang“.
+- The title of the context in plain text, not a heading: the name of the scoped event on an event page, else the name of the section, for example „Eingang“.
   Each page keeps its own `h1`.
   A long name is cut and has the full name as its title.
 - The command box „Suchen oder Befehl ausführen…“ with the key hint (`⌘K` or `Ctrl K`).
@@ -38,9 +38,9 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 └──────────────────────────┘
 ```
 
-- The bottom bar has four items: „Eingang“, „Meine Arbeit“, „Anlässe“ and „Mehr“.
-  Inside an event the third item is „Arbeit“ (ADR 0082), and „Anlässe“ moves into „Mehr“.
-  „Mehr“ is a menu with „Kontakte“, „Einstellungen“, „Datenschutz“ and „Versionen“, and inside an event „Anlässe“ first.
+- The bottom bar is fixed and has four items: „Eingang“, „Meine Arbeit“, „Arbeit“ (of the scoped event) and „Mehr“ (ADR 0084).
+  „Mehr“ is a menu with „Übersicht“, „Dokumente“, „Kontakte“, „Einstellungen“, „Datenschutz“ and „Versionen“.
+- The event switcher sits in the top bar, so a member changes the event without the drawer.
 - The bottom bar shows a count badge on „Eingang“ when proposals wait for the member.
 - The toggle of the top bar opens the sidebar as a drawer from the left edge.
   The drawer holds the whole sidebar: the switchers, all destinations and the foot.
@@ -86,30 +86,37 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 
 The destinations are defined once in `apps/web/src/shell/navItems.ts`.
 The sidebar, the bottom bar, „Mehr“ and the command palette read that list.
-An item appears only when its page exists.
+The menu has the same items in every state: none appears or disappears (ADR 0084).
+
+The scoped event is the event of the route, else the event that the member opened last (the browser remembers it for each organization as `tada-event:<organization ID>`), else the most recent open event, else none.
+One hook returns it, and every part of the shell reads that hook.
 
 The sidebar is a region with the label „Seitenleiste“; its main navigation is the `nav` „Hauptnavigation“.
 Sidebar, from top to bottom:
 
 1. The app name, then the organization switcher (only if the member belongs to more than one organization).
-2. The event switcher: the name and the key of the current event, and a chevron.
-   The current event is the event of the route, else the event that the member opened last (the browser remembers it for each organization as `tada-event:<organization ID>`), else none.
-   The menu lists the events of the member and has „Alle Anlässe“ and, for the owner and the administration, „Neuer Anlass“.
+2. The organization items: „Eingang“ (with the count of open proposals), „Meine Arbeit“ and „Kontakte“.
+3. The event switcher as the heading of the event group: the name and the key of the scoped event, and a chevron.
+   It is the only control that chooses an event.
+   The menu lists the events of the member, then „Alle Anlässe“ (opens `/events`) and, for the owner and the administration, „Neuer Anlass“.
    A closed event shows „abgeschlossen“ in its subtitle.
-3. The main navigation: „Eingang“ (with the count of open proposals), „Meine Arbeit“, „Arbeit“, „Zeitplan“, „Dokumente“, „Anlässe“ and „Kontakte“.
-   „Arbeit“, „Zeitplan“ and „Dokumente“ appear only while the path names an event.
-   „Arbeit“ opens the work page of that event. „Zeitplan“ opens the same page in the timeline view, `/events/:id/work?view=timeline`.
+   A switch on an event page keeps the page: `/events/A/work` goes to `/events/B/work`, and `/events/A/documents` goes to `/events/B/documents`.
+   The view parameter, for example `?view=timeline`, stays; other query parameters and the hash drop.
+   A document page goes to the documents of B.
+   A switch on an organization page opens „Übersicht“ of the new event (`/events/B`).
+4. The event items: „Übersicht“, „Arbeit“, „Zeitplan“ and „Dokumente“.
+   „Übersicht“ opens `/events/:id` and is current only on an exact match.
+   „Arbeit“ opens the work page of the scoped event. „Zeitplan“ opens the same page in the timeline view, `/events/:id/work?view=timeline`.
    „Dokumente“ opens the documents of the event, `/events/:id/documents`.
-   „Anlässe“ links to the list of events (`/events`) and is the current item on the event home, „Übersicht“ (`/events/:id`).
-   On the work page „Arbeit“ is the current item and „Anlässe“ is not, and on the documents „Dokumente“ is: an item can yield paths to other items.
-   In the timeline view „Zeitplan“ is the current item and „Arbeit“ is not: an item can also be current only for a value of the query (`onlyWith`, `unlessWith`).
+   In the timeline view „Zeitplan“ is the current item and „Arbeit“ is not: an item can be current only for a value of the query (`onlyWith`, `unlessWith`).
+   No item is current on `/events`.
+   With no scoped event, the four items are disabled and show the hint „Zuerst einen Anlass wählen“; the empty list of events offers an action to create an event.
    The bottom bar has no „Zeitplan“; on a phone the view tabs reach it.
-   On a phone „Dokumente“ is in the menu „Mehr“, after „Anlässe“.
-4. At the foot: „Einstellungen“, „Datenschutz“, the build of the web client and the member block.
+5. At the foot: „Einstellungen“, „Datenschutz“, the build of the web client and the member block.
    The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
    The member block shows the name and the role; the member menu is in the top bar.
 
-The event page has no navigation of its own: the sidebar items above are the destinations of an event (ADR 0082).
+The event page has no navigation of its own: the event items of the sidebar above are the destinations of an event (ADR 0082, ADR 0084).
 The event home „Übersicht“ (`/events/:id`) shows the header of the event, the open questions with a link to all work of the event, the facts with their proposals and the section „Mitglieder des Anlasses“.
 The header has the name with the quiet control to close the event (`CloseEvent`) at its right, and under it one row with the key, the state of the event (an icon and a word) and the date window.
 The sections are divided by a line and have the spacing of the record panel: 16 px around the line, 12 px between the heading and its content.
