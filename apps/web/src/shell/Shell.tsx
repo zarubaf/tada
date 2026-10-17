@@ -1,7 +1,7 @@
 // The app shell (doc/design/layout-and-responsiveness.md): a sidebar, a top bar on all widths, and on
 // narrow layouts a bottom bar. It shows only the items that exist.
 import { IconRefresh } from "@tabler/icons-react";
-import { Fragment, lazy, type ReactNode, Suspense, useEffect, useState } from "react";
+import { Fragment, lazy, type ReactNode, Suspense, useEffect, useId, useState } from "react";
 import { type Api, problemMessage } from "../api/client";
 import { useCanCreateEvent } from "../events/useCanCreateEvent";
 import { t } from "../i18n";
@@ -50,6 +50,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   const narrow = useNarrow();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const eventNameId = useId();
 
   // Ctrl+K and ⌘K open the palette from every place of the framed shell.
   useEffect(() => {
@@ -158,8 +159,10 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           canCreate={canCreateEvent}
           onOpen={events.load}
           onAction={openEvent}
+          nameId={eventNameId}
         />
       }
+      eventNameId={eventNameId}
       eventId={scopedEvent?.id}
       server={server}
       onOpenVersions={openVersions}

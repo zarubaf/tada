@@ -381,7 +381,7 @@ describe("sidebar", () => {
     ]);
     // The switcher names the group: it carries the name of the scoped event.
     expect(within(nav).getByRole("group")).toHaveAccessibleName(
-      remembered ? /Sommerfest 2030/ : /Herbstflug/,
+      remembered ? scoped.name : other.name,
     );
     // Only the organization item of the page is current; no event item is.
     expect(
@@ -457,8 +457,13 @@ describe("sidebar", () => {
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
     // The list of events answers empty: nothing is scoped.
-    await vi.waitFor(() => expect(requested).toContain("/api/v1/events"));
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // The menu of the switcher shows when the list has answered: it has no event.
+    await userEvent.click(await within(nav).findByRole("button", { name: "Anlass wählen" }));
+    await screen.findByRole("menuitem", { name: "Alle Anlässe" });
+    await vi.waitFor(() =>
+      expect(screen.queryByRole("menuitem", { name: "Anlässe werden geladen …" })).toBeNull(),
+    );
+    await userEvent.keyboard("{Escape}");
     expect(within(nav).queryByRole("link", { name: "Arbeit" })).not.toBeInTheDocument();
   });
 

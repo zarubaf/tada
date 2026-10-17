@@ -10,13 +10,12 @@ import { type Destination, eventItems, ORGANIZATION_ITEMS, PRIVACY, SETTINGS } f
 import styles from "./Sidebar.module.css";
 import { VersionButton } from "./VersionFooter";
 
-// The id of the heading of the event group. Both layouts never render two sidebars at once.
-const SWITCHER_ID = "event-group-heading";
-
 export interface SidebarProps {
   /** Only a member of more than one organization has it. */
   organizationSwitcher: ReactNode;
   eventSwitcher: ReactNode;
+  /** The ID of the element of the switcher that holds the event name: it names the event group. */
+  eventNameId: string;
   /** The scoped event: the event items act on it (ADR 0084). */
   eventId: string | undefined;
   server: SystemVersion | undefined;
@@ -29,6 +28,7 @@ export interface SidebarProps {
 export function Sidebar({
   organizationSwitcher,
   eventSwitcher,
+  eventNameId,
   eventId,
   server,
   onOpenVersions,
@@ -56,13 +56,11 @@ export function Sidebar({
       {organizationSwitcher}
       <nav className={styles.nav} aria-label={t("shell-nav")}>
         {ORGANIZATION_ITEMS.map(link)}
-        <div id={SWITCHER_ID} className={styles.eventHead}>
-          {eventSwitcher}
-        </div>
+        <div className={styles.eventHead}>{eventSwitcher}</div>
         {eventId !== undefined && (
           // The switcher heads the group and names it. A fieldset is for form controls.
           // biome-ignore lint/a11y/useSemanticElements: a group of links, not of form controls
-          <div role="group" aria-labelledby={SWITCHER_ID} className={styles.eventItems}>
+          <div role="group" aria-labelledby={eventNameId} className={styles.eventItems}>
             {eventItems(eventId).map(link)}
           </div>
         )}
