@@ -190,6 +190,7 @@ event-switcher-label = Anlass wechseln: { $name }
 event-switcher-menu = Anlässe
 # $name: the name of the current event, in the list of the events.
 event-switcher-current-item = { $name }, aktuell
+event-switcher-wait = Anlass lädt …
 event-switcher-loading = Anlässe werden geladen …
 event-switcher-failed = Die Anlässe liessen sich nicht laden.
 event-switcher-all = Alle Anlässe

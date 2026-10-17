@@ -68,6 +68,8 @@ let eventRole = "event-contributor";
 let requested: string[] = [];
 /** While set, the fake server holds back the answer for a single event until it resolves. */
 let eventGate: Promise<void> | undefined;
+/** When set, the request for one event fails with this status. */
+let eventFailure: number | undefined;
 /** The key of the remembered event of the first organization. */
 const EVENT_KEY = `tada-event:${first.organization_id}`;
 
@@ -118,6 +120,9 @@ function renderShellAt(path: string, ...responses: Response[]) {
     const one = pathname.match(/^\/api\/v1\/events\/([^/]+)$/);
     if (one) {
       await eventGate;
+      if (eventFailure !== undefined) {
+        return json(eventFailure, { title: "Failed", status: eventFailure });
+      }
       const found = eventItems.find((item) => item.id === one[1]);
       return found ? json(200, found) : json(404, { title: "Not found", status: 404 });
     }
@@ -172,6 +177,7 @@ afterEach(() => {
   eventRole = "event-contributor";
   requested = [];
   eventGate = undefined;
+  eventFailure = undefined;
   pageHeading = false;
   localStorage.clear();
   document.documentElement.removeAttribute("data-theme");
@@ -656,7 +662,8 @@ describe("sidebar", () => {
     renderShell(json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    expect(within(nav).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
+    // The list of events answers empty, and the switcher settles from „lädt“ to „wählen“.
+    expect(await within(nav).findByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
     expect(
       within(screen.getByRole("banner")).queryByRole("button", { name: "Anlass wählen" }),
     ).toBeNull();
@@ -781,13 +788,28 @@ describe("event switcher", () => {
     expect(localStorage.getItem(EVENT_KEY)).toBe(open.id);
   });
 
+  it("says that the remembered event is loading while the server cannot confirm it", async () => {
+    eventItems = [open];
+    eventFailure = 503;
+    localStorage.setItem(EVENT_KEY, open.id);
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    // The items already link to the event, so the switcher must not say „wählen“.
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    expect(await within(nav).findByRole("link", { name: "Übersicht" })).toHaveAttribute(
+      "href",
+      `/events/${open.id}`,
+    );
+    expect(within(nav).getByRole("button", { name: "Anlass lädt …" })).toBeInTheDocument();
+  });
+
   it("remembers an event for each organization", async () => {
     eventItems = [open];
     localStorage.setItem(`tada-event:${second.organization_id}`, other.id);
     renderShellAt("/inbox", json(200, info([first, second], first)));
 
     // The event of the other organization does not show here, and the shell does not ask for it.
-    await screen.findByRole("button", { name: "Anlass wählen" });
+    await screen.findByRole("button", { name: /^Anlass wechseln/ });
     expect(requested).not.toContain(`/api/v1/events/${other.id}`);
   });
 
@@ -846,7 +868,7 @@ describe("event switcher", () => {
     renderShellAt(address, json(200, info([first], first)));
     const before = window.history.length;
 
-    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Anlass (wählen|lädt)/ }));
     await userEvent.click(await screen.findByRole("menuitem", { name: /^Sommerfest/ }));
 
     expect(window.location.pathname + window.location.search + window.location.hash).toBe(address);
@@ -857,7 +879,7 @@ describe("event switcher", () => {
     eventItems = [open, other];
     renderShellAt("/inbox", json(200, info([first], first)));
 
-    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Anlass (wählen|lädt)/ }));
     await userEvent.click(await screen.findByRole("menuitem", { name: /^Sommerfest/ }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}`));
@@ -872,7 +894,7 @@ describe("event switcher", () => {
     eventItems = [open, other];
     renderShellAt(`/events/${open.id}${from}`, json(200, info([first], first)));
 
-    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Anlass (wählen|lädt)/ }));
     await userEvent.click(await screen.findByRole("menuitem", { name: /^Herbstflug/ }));
 
     await vi.waitFor(() =>
@@ -885,7 +907,7 @@ describe("event switcher", () => {
   it("leads to all events", async () => {
     renderShellAt("/inbox", json(200, info([first], first)));
 
-    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Anlass (wählen|lädt)/ }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Alle Anlässe" }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe("/events"));
@@ -894,7 +916,7 @@ describe("event switcher", () => {
   it("offers a new event to an administration", async () => {
     renderShellAt("/inbox", json(200, info([second], second)));
 
-    await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Anlass (wählen|lädt)/ }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Neuer Anlass" }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe("/events/new"));

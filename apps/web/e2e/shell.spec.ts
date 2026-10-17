@@ -117,7 +117,7 @@ test("the event switcher leads to another event", async ({ page }) => {
   await fakeEvent(page, event);
   await page.goto("/events");
 
-  await page.getByRole("button", { name: "Anlass wählen" }).click();
+  await page.getByRole("button", { name: /^Anlass (wählen|wechseln)/ }).click();
   await page.getByRole("menuitem", { name: event.name }).click();
 
   await expect(page).toHaveURL(new RegExp(`/events/${event.id}$`));
