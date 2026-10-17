@@ -7,21 +7,23 @@ import { useNavigate, usePathname } from "../router/Router";
 import { MenuButton } from "../ui/MenuButton";
 import { NavLink } from "../ui/NavLink";
 import styles from "./BottomBar.module.css";
-import { bottomItems, eventIdOf, isCurrent, moreItems } from "./navItems";
+import { bottomItems, isCurrent, moreItems } from "./navItems";
 
 const VERSIONS = "versions";
 
 export function BottomBar({
+  eventId,
   versionsLabel,
   onOpenVersions,
 }: {
+  /** The event that the bar acts on. */
+  eventId: string | undefined;
   /** The label of the item that opens the list of the components. */
   versionsLabel: string;
   onOpenVersions: () => void;
 }) {
   const navigate = useNavigate();
   const pathname = usePathname();
-  const eventId = eventIdOf(pathname);
   const more = moreItems(eventId);
   return (
     <nav className={styles.bar} aria-label={t("shell-nav")}>
