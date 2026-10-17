@@ -1,7 +1,7 @@
 {
   "name": "@tada/web",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "generate": "openapi-typescript ../../contracts/openapi.json --output src/api/schema.gen.ts",

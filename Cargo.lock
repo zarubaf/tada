@@ -3784,7 +3784,7 @@ dependencies = [
 
 [[package]]
 name = "tada"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3817,7 +3817,7 @@ dependencies = [
 
 [[package]]
 name = "tada-adapters"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "aws-sdk-s3",
@@ -3840,7 +3840,7 @@ dependencies = [
 
 [[package]]
 name = "tada-ai-tools"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "schemars 1.2.2",
@@ -3852,7 +3852,7 @@ dependencies = [
 
 [[package]]
 name = "tada-api"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -3877,7 +3877,7 @@ dependencies = [
 
 [[package]]
 name = "tada-app"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3901,7 +3901,7 @@ dependencies = [
 
 [[package]]
 name = "tada-domain"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "jiff",
  "thiserror",
@@ -3911,7 +3911,7 @@ dependencies = [
 
 [[package]]
 name = "tada-mcp"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "axum",
  "rmcp",
@@ -3925,7 +3925,7 @@ dependencies = [
 
 [[package]]
 name = "tada-store-pg"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -3948,7 +3948,7 @@ dependencies = [
 
 [[package]]
 name = "tada-telegram"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
