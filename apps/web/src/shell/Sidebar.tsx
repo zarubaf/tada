@@ -1,11 +1,11 @@
 // The content of the sidebar: it sits docked on medium and wide layouts and in the drawer on narrow
 // ones (doc/design/layout-and-responsiveness.md).
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 import type { SystemVersion } from "../api/client";
 import { t } from "../i18n";
 import { InboxCount } from "../review/InboxCount";
 import { Avatar } from "../ui/Avatar";
-import { NavLink } from "../ui/NavLink";
+import { DisabledNavItem, NavLink } from "../ui/NavLink";
 import { type Destination, eventItems, ORGANIZATION_ITEMS, PRIVACY, SETTINGS } from "./navItems";
 import styles from "./Sidebar.module.css";
 import { VersionButton } from "./VersionFooter";
@@ -35,6 +35,7 @@ export function Sidebar({
   onNavigate,
   member,
 }: SidebarProps) {
+  const hintId = useId();
   const link = (destination: Destination) => (
     <NavLink
       key={destination.id}
@@ -57,13 +58,24 @@ export function Sidebar({
       <nav className={styles.nav} aria-label={t("shell-nav")}>
         {ORGANIZATION_ITEMS.map(link)}
         <div className={styles.eventHead}>{eventSwitcher}</div>
-        {eventId !== undefined && (
-          // The switcher heads the group and names it. A fieldset is for form controls.
-          // biome-ignore lint/a11y/useSemanticElements: a group of links, not of form controls
-          <div role="group" aria-labelledby={eventNameId} className={styles.eventItems}>
-            {eventItems(eventId).map(link)}
-          </div>
-        )}
+        {/* The switcher heads the group and names it. A fieldset is for form controls. */}
+        {/* biome-ignore lint/a11y/useSemanticElements: a group of links, not of form controls */}
+        <div role="group" aria-labelledby={eventNameId} className={styles.eventItems}>
+          {eventId === undefined ? (
+            <>
+              {eventItems("").map((destination) => (
+                <DisabledNavItem key={destination.id} icon={destination.icon} describedBy={hintId}>
+                  {destination.label}
+                </DisabledNavItem>
+              ))}
+              <p id={hintId} className={styles.hint}>
+                {t("nav-needs-event")}
+              </p>
+            </>
+          ) : (
+            eventItems(eventId).map(link)
+          )}
+        </div>
       </nav>
       <div className={styles.foot}>
         <NavLink
