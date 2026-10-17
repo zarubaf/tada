@@ -22,6 +22,8 @@
     cursor: not-allowed;
   }
 
+  /* A placeholder for a target on its way is inert: no hover either. */
+  .link[aria-hidden="true"]:hover,
   .link.disabled:hover {
     background: none;
   }
