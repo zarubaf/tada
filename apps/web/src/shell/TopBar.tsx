@@ -1,5 +1,6 @@
-// The top bar of 48 px on all widths (ADR 0082): the toggle of the sidebar, the event switcher when the sidebar does not hold it, the plain title of the
-// context, the command box, the theme toggle and the member menu. Each page keeps its own `h1`.
+// The top bar of 48 px on all widths (ADR 0082): the toggle of the sidebar, the event switcher when
+// the sidebar does not hold it, the plain title of the context, the command box, the theme toggle
+// and the member menu. Each page keeps its own `h1`.
 import { IconLayoutSidebar, IconSearch } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { t } from "../i18n";

@@ -160,6 +160,24 @@ test("at 375 px the bottom bar is fixed and the top bar holds the event switcher
   );
 });
 
+for (const width of [640, 768, 1024]) {
+  test(`at ${width} px the switcher and the title share the top bar`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await fakeSession(page);
+    await fakeEvents(page, 200, { items: events });
+    await fakeEvent(page, event);
+    await page.goto(`/events/${event.id}`);
+    await page.getByRole("button", { name: "Seitenleiste ausblenden" }).click();
+
+    const bar = page.getByRole("banner");
+    const switcher = await bar.getByRole("button", { name: /^Anlass wechseln/ }).boundingBox();
+    const title = await bar.locator("p", { hasText: event.name }).boundingBox();
+    console.log(`top bar at ${width}px: switcher ${switcher?.width}px, title ${title?.width}px`);
+    expect(switcher?.width).toBeLessThanOrEqual(256);
+    expect(title?.width).toBeGreaterThanOrEqual(64);
+  });
+}
+
 test("at 375 px the drawer holds the sidebar, traps focus and returns it on Escape", async ({
   page,
 }) => {

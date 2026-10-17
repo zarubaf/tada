@@ -24,4 +24,14 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
+
+  .text {
+    display: grid;
+    min-width: 0;
+  }
+
+  .description {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+  }
 }

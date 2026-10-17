@@ -27,6 +27,8 @@ export interface DisabledNavItemProps {
   icon?: Icon;
   /** A large target, as of `NavLink`. */
   large?: boolean;
+  /** Called on a press or on Enter or Space: for a hint that shows the reason. */
+  onPress?: () => void;
   /**
    * The ID of the element that says why the item is off: a screen reader reads it with the label.
    * Without it the item is a placeholder for a target that is on its way: it looks like a link,
@@ -44,6 +46,7 @@ export interface DisabledNavItemProps {
 export function DisabledNavItem({
   icon: Icon,
   large,
+  onPress,
   describedBy,
   children,
 }: DisabledNavItemProps) {
@@ -68,6 +71,13 @@ export function DisabledNavItem({
       aria-disabled="true"
       aria-describedby={describedBy}
       tabIndex={0}
+      onClick={onPress}
+      onKeyDown={(event) => {
+        if (onPress && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onPress();
+        }
+      }}
       className={`${styles.link} ${styles.disabled}${size}`}
     >
       {content}

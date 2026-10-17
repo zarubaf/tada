@@ -172,7 +172,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
     <Sidebar
       organizationSwitcher={organizationSwitcher}
       eventSwitcher={narrow ? undefined : eventSwitcher(false)}
-      eventName={scopedEvent?.name ?? (eventPending ? undefined : t("event-switcher-pick"))}
+      eventName={scopedEvent?.name}
       eventNameId={eventNameId}
       eventId={menuEventId}
       eventPending={eventPending}
