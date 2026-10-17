@@ -28,6 +28,15 @@
     border-top: 1px solid var(--color-border-subtle);
   }
 
+  /* In the drawer the name stands where the switcher stands on the docked sidebar. */
+  .eventName {
+    padding-inline: var(--space-3);
+    overflow: hidden;
+    font-weight: var(--font-weight-semibold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .eventItems {
     display: grid;
     gap: var(--space-0-5);

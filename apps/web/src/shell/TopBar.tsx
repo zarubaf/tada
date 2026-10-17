@@ -1,6 +1,7 @@
-// The top bar of 48 px on all widths (ADR 0082): the toggle of the sidebar, the plain title of the
+// The top bar of 48 px on all widths (ADR 0082): the toggle of the sidebar, the event switcher when the sidebar does not hold it, the plain title of the
 // context, the command box, the theme toggle and the member menu. Each page keeps its own `h1`.
 import { IconLayoutSidebar, IconSearch } from "@tabler/icons-react";
+import type { ReactNode } from "react";
 import { t } from "../i18n";
 import { Avatar } from "../ui/Avatar";
 import { IconButton } from "../ui/IconButton";
@@ -18,6 +19,8 @@ export interface TopBarProps {
   /** Whether the sidebar or the drawer is open. */
   expanded: boolean;
   onToggle: () => void;
+  /** The event switcher, when the sidebar does not hold it: on narrow layouts or while it is collapsed. */
+  eventSwitcher?: ReactNode;
   onOpenPalette: () => void;
   member: { id: string; name: string };
   memberItems: MenuButtonItem[];
@@ -29,6 +32,7 @@ export function TopBar({
   toggleLabel,
   expanded,
   onToggle,
+  eventSwitcher,
   onOpenPalette,
   member,
   memberItems,
@@ -42,6 +46,7 @@ export function TopBar({
         aria-expanded={expanded}
         onPress={onToggle}
       />
+      {eventSwitcher}
       <p className={styles.title} title={title}>
         {title}
       </p>

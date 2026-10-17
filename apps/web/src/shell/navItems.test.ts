@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  type BarItem,
   bottomItems,
   eventIdOf,
   eventItems,
+  hasTarget,
   isCurrent,
   moreItems,
   ORGANIZATION_ITEMS,
@@ -11,6 +13,7 @@ import {
 
 const labels = (items: { label: string }[]) => items.map((item) => item.label);
 const EVENT = "/events/e1";
+const moreLabels = ["Übersicht", "Dokumente", "Kontakte", "Einstellungen", "Datenschutz"];
 
 describe("the menu", () => {
   it("has the organization items, whatever the event", () => {
@@ -29,26 +32,36 @@ describe("the menu", () => {
 });
 
 describe("the bottom bar", () => {
-  it("has Alle Anlässe outside an event", () => {
-    expect(labels(bottomItems(undefined))).toEqual(["Eingang", "Meine Arbeit", "Alle Anlässe"]);
-    expect(labels(moreItems(undefined))).toEqual(["Kontakte", "Einstellungen", "Datenschutz"]);
+  it("has the same four places in every state, with no Anlass or with one", () => {
+    expect(labels(bottomItems(undefined))).toEqual(["Eingang", "Meine Arbeit", "Arbeit"]);
+    expect(labels(bottomItems("e1"))).toEqual(["Eingang", "Meine Arbeit", "Arbeit"]);
+    expect(labels(moreItems(undefined))).toEqual(moreLabels);
+    expect(labels(moreItems("e1"))).toEqual(moreLabels);
   });
 
-  it("has Arbeit inside an event, and Übersicht and Dokumente move into Mehr", () => {
-    expect(labels(bottomItems("e1"))).toEqual(["Eingang", "Meine Arbeit", "Arbeit"]);
-    expect(labels(moreItems("e1"))).toEqual([
-      "Übersicht",
-      "Dokumente",
-      "Kontakte",
-      "Einstellungen",
-      "Datenschutz",
+  it("has no target for the Anlass items without an Anlass", () => {
+    const targets = (items: BarItem[]) => items.map(hasTarget);
+    expect(targets(bottomItems(undefined))).toEqual([true, true, false]);
+    expect(targets(moreItems(undefined))).toEqual([false, false, true, true, true]);
+    expect(targets(bottomItems("e1"))).toEqual([true, true, true]);
+    expect(targets(moreItems("e1"))).toEqual([true, true, true, true, true]);
+  });
+
+  it("links the Anlass items to the scoped Anlass", () => {
+    expect(bottomItems("e1").map((item) => item.to)).toEqual(["/inbox", "/", "/events/e1/work"]);
+    expect(moreItems("e1").map((item) => item.to)).toEqual([
+      "/events/e1",
+      "/events/e1/documents",
+      "/contacts",
+      "/settings",
+      "/privacy",
     ]);
   });
 });
 
 describe("isCurrent", () => {
-  const current = (items: ReturnType<typeof eventItems>, pathname: string, search = "") =>
-    labels(items.filter((item) => isCurrent(item, pathname, search)));
+  const current = (items: BarItem[], pathname: string, search = "") =>
+    labels(items.filter((item) => hasTarget(item) && isCurrent(item, pathname, search)));
 
   it("marks only Arbeit on the work page of an event", () => {
     expect(current(eventItems("e1"), `${EVENT}/work`)).toEqual(["Arbeit"]);
@@ -95,7 +108,8 @@ describe("isCurrent", () => {
   it("marks no event item and no organization item on the list of events", () => {
     expect(current(eventItems("e1"), "/events")).toEqual([]);
     expect(current(ORGANIZATION_ITEMS, "/events")).toEqual([]);
-    expect(current(bottomItems(undefined), "/events")).toEqual(["Alle Anlässe"]);
+    expect(current(bottomItems("e1"), "/events")).toEqual([]);
+    expect(current(moreItems("e1"), "/events")).toEqual([]);
   });
 });
 

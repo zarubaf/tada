@@ -117,8 +117,8 @@ test("at 320 px all four items of the bottom bar are inside the viewport", async
   await fakeSession(page, sessionWithRole("owner"));
   await fakeMembers(page, true);
   await page.goto("/settings?tab=members");
-  // Three links and the menu „Mehr“.
-  const items = page.getByRole("navigation", { name: "Hauptnavigation" }).locator("a, button");
+  // Eingang, Meine Arbeit, Arbeit (inert with no Anlass) and the menu „Mehr“.
+  const items = page.locator("nav[aria-label='Hauptnavigation'] > :not(p)");
   await expect(items).toHaveCount(4);
   for (const item of await items.all()) {
     const box = await item.boundingBox();

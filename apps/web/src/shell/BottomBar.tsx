@@ -1,48 +1,67 @@
-// The bottom bar on narrow layouts (ADR 0082): Eingang, Meine Arbeit, Anlässe (inside an event:
-// Arbeit) and „Mehr“, a menu with the other destinations.
+// The bottom bar on narrow layouts (ADR 0084): Eingang, Meine Arbeit, Arbeit of the scoped Anlass
+// and „Mehr“, a menu with the other destinations. It is the same in every state: with no Anlass the
+// Anlass items are off, as in the sidebar.
 import { IconDots } from "@tabler/icons-react";
+import { useId } from "react";
 import { t } from "../i18n";
 import { InboxCount } from "../review/InboxCount";
 import { useNavigate, usePathname } from "../router/Router";
 import { MenuButton } from "../ui/MenuButton";
-import { NavLink } from "../ui/NavLink";
+import { DisabledNavItem, NavLink } from "../ui/NavLink";
 import styles from "./BottomBar.module.css";
-import { bottomItems, isCurrent, moreItems } from "./navItems";
+import { bottomItems, hasTarget, isCurrent, moreItems } from "./navItems";
 
 const VERSIONS = "versions";
 
 export function BottomBar({
   eventId,
+  eventPending,
   versionsLabel,
   onOpenVersions,
 }: {
-  /** The event that the bar acts on. */
+  /** The scoped Anlass that the bar acts on. */
   eventId: string | undefined;
+  /** The scoped Anlass is still on its way: the bar keeps its shape and says nothing yet. */
+  eventPending: boolean;
   /** The label of the item that opens the list of the components. */
   versionsLabel: string;
   onOpenVersions: () => void;
 }) {
   const navigate = useNavigate();
   const pathname = usePathname();
+  const hintId = useId();
   const more = moreItems(eventId);
+  const hint = eventPending ? {} : { describedBy: hintId };
   return (
     <nav className={styles.bar} aria-label={t("shell-nav")}>
-      {bottomItems(eventId).map((destination) => (
-        <NavLink
-          key={destination.id}
-          to={destination.to}
-          icon={destination.icon}
-          large
-          {...(destination.exact ? { exact: true } : {})}
-        >
-          <span className={styles.label}>{destination.label}</span>
-          {destination.id === "inbox" && (
-            <span className={styles.badge}>
-              <InboxCount />
-            </span>
-          )}
-        </NavLink>
-      ))}
+      {bottomItems(eventId).map((destination) =>
+        hasTarget(destination) ? (
+          <NavLink
+            key={destination.id}
+            to={destination.to}
+            icon={destination.icon}
+            large
+            {...(destination.exact ? { exact: true } : {})}
+            {...(destination.unlessWith ? { unlessWith: destination.unlessWith } : {})}
+          >
+            <span className={styles.label}>{destination.label}</span>
+            {destination.id === "inbox" && (
+              <span className={styles.badge}>
+                <InboxCount />
+              </span>
+            )}
+          </NavLink>
+        ) : (
+          <DisabledNavItem key={destination.id} icon={destination.icon} large {...hint}>
+            <span className={styles.label}>{destination.label}</span>
+          </DisabledNavItem>
+        ),
+      )}
+      {!eventPending && eventId === undefined && (
+        <p id={hintId} className={styles.hint}>
+          {t("nav-needs-event")}
+        </p>
+      )}
       <MenuButton
         trigger={
           <>
@@ -52,14 +71,20 @@ export function BottomBar({
         }
         triggerLabel={t("nav-more")}
         triggerClassName={styles.more}
-        current={more.some((destination) => isCurrent(destination, pathname))}
+        current={more.some((item) => hasTarget(item) && isCurrent(item, pathname))}
         label={t("nav-more-menu")}
         items={[
-          ...more.map((destination) => ({
-            id: destination.to,
-            label: destination.label,
-            icon: destination.icon,
-          })),
+          ...more.map((item) =>
+            hasTarget(item)
+              ? { id: item.to, label: item.label, icon: item.icon }
+              : {
+                  id: item.id,
+                  label: item.label,
+                  icon: item.icon,
+                  isDisabled: true,
+                  ...(eventPending ? {} : { ariaLabel: `${item.label}, ${t("nav-needs-event")}` }),
+                },
+          ),
           { id: VERSIONS, label: versionsLabel },
         ]}
         onAction={(id) => (id === VERSIONS ? onOpenVersions() : navigate(id))}

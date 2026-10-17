@@ -1,4 +1,4 @@
-// The event switcher at the head of the sidebar (ADR 0082): the current event with its key, and a
+// The event switcher at the head of the Anlass group (ADR 0084), or in the top bar when the sidebar is not docked: the current event with its key, and a
 // menu with the events of the member, „Alle Anlässe“ and, for the administration, „Neuer Anlass“.
 import { IconCalendarEvent, IconPlus, IconSelector } from "@tabler/icons-react";
 import type { Event } from "../api/client";
@@ -29,6 +29,7 @@ export function EventSwitcher({
   onOpen,
   onAction,
   nameId,
+  inTopBar,
 }: {
   current: Event | undefined;
   list: EventList;
@@ -37,6 +38,8 @@ export function EventSwitcher({
   onAction: (item: string) => void;
   /** The ID of the name, for a group that the switcher heads. */
   nameId?: string;
+  /** The switcher of the top bar: the tile and the chevron only on narrow layouts. */
+  inTopBar?: boolean;
 }) {
   const items: MenuButtonItem[] = [
     ...(list.kind === "loaded"
@@ -82,7 +85,7 @@ export function EventSwitcher({
       triggerLabel={
         current ? t("event-switcher-label", { name: current.name }) : t("event-switcher-pick")
       }
-      triggerClassName={styles.trigger}
+      triggerClassName={inTopBar ? `${styles.trigger} ${styles.topBar}` : styles.trigger}
       label={t("event-switcher-menu")}
       items={items}
       onAction={onAction}
