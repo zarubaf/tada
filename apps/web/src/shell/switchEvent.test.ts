@@ -27,8 +27,14 @@ describe("eventAddress", () => {
     expect(eventAddress("/events/a/work", null, "b/c")).toBe("/events/b%2Fc/work");
   });
 
-  it("stays on the page when the Anlass is the same", () => {
-    expect(eventAddress("/events/a/documents/d1", null, "a")).toBe("/events/a/documents/d1");
-    expect(eventAddress("/events/a/work", "timeline", "a")).toBe("/events/a/work?view=timeline");
+  it.each([["garbage"], ["board"], [""]])(
+    "drops the view %j that is unknown or the default",
+    (view) => {
+      expect(eventAddress("/events/a/work", view, "b")).toBe("/events/b/work");
+    },
+  );
+
+  it.each([["table"], ["timeline"]])("keeps the view %s", (view) => {
+    expect(eventAddress("/events/a/work", view, "b")).toBe(`/events/b/work?view=${view}`);
   });
 });
