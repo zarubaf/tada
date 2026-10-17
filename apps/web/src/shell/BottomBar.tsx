@@ -1,6 +1,6 @@
-// The bottom bar on narrow layouts (ADR 0084): Eingang, Meine Arbeit, Arbeit of the scoped Anlass
-// and „Mehr“, a menu with the other destinations. It is the same in every state: with no Anlass the
-// Anlass items are off, as in the sidebar.
+// The bottom bar on narrow layouts (ADR 0084): Eingang, Meine Arbeit, Arbeit of the scoped event
+// and „Mehr“, a menu with the other destinations. It is the same in every state: with no event the
+// event items are off, as in the sidebar.
 import { IconDots } from "@tabler/icons-react";
 import { useEffect, useId, useState } from "react";
 import { t } from "../i18n";
@@ -19,9 +19,9 @@ export function BottomBar({
   versionsLabel,
   onOpenVersions,
 }: {
-  /** The scoped Anlass that the bar acts on. */
+  /** The scoped event that the bar acts on. */
   eventId: string | undefined;
-  /** The scoped Anlass is still on its way: the bar keeps its shape and says nothing yet. */
+  /** The scoped event is still on its way: the bar keeps its shape and says nothing yet. */
   eventPending: boolean;
   /** The label of the item that opens the list of the components. */
   versionsLabel: string;
@@ -31,9 +31,9 @@ export function BottomBar({
   const pathname = usePathname();
   const hintId = useId();
   // The bar has no room for a line of text: a press on the inert „Arbeit“ shows the reason. It stays
-  // until the next press, Escape, the loss of focus or a change of the page or of the Anlass.
+  // until the next press, Escape, the loss of focus or a change of the page or of the event.
   const [hintShown, setHintShown] = useState(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the page and the Anlass are the triggers
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the page and the event are the triggers
   useEffect(() => setHintShown(false), [pathname, eventId]);
   useEffect(() => {
     if (!hintShown) {

@@ -172,7 +172,6 @@ for (const width of [640, 768, 1024]) {
     const bar = page.getByRole("banner");
     const switcher = await bar.getByRole("button", { name: /^Anlass wechseln/ }).boundingBox();
     const title = await bar.locator("p", { hasText: event.name }).boundingBox();
-    console.log(`top bar at ${width}px: switcher ${switcher?.width}px, title ${title?.width}px`);
     expect(switcher?.width).toBeLessThanOrEqual(256);
     expect(title?.width).toBeGreaterThanOrEqual(64);
   });
