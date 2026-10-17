@@ -48,7 +48,7 @@ describe("App", () => {
     renderAt("/");
     await screen.findByRole("heading", { name: "Meine Arbeit" });
     await userEvent.click(
-      screen.getAllByRole("button", { name: "Anlass wählen" })[0] as HTMLElement,
+      (await screen.findAllByRole("button", { name: /^Anlass (wählen|lädt)/ }))[0] as HTMLElement,
     );
     await userEvent.click(await screen.findByRole("menuitem", { name: "Alle Anlässe" }));
     const heading = await screen.findByRole("heading", { level: 1, name: "Alle Anlässe" });

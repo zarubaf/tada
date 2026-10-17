@@ -164,6 +164,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       canCreate={canCreateEvent}
       onOpen={events.load}
       onAction={openEvent}
+      pending={eventPending}
       {...(inTopBar ? { inTopBar } : { nameId: eventNameId })}
     />
   );

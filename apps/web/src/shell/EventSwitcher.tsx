@@ -31,6 +31,7 @@ export function EventSwitcher({
   onAction,
   nameId,
   inTopBar,
+  pending,
 }: {
   current: Event | undefined;
   list: EventList;
@@ -41,7 +42,11 @@ export function EventSwitcher({
   nameId?: string;
   /** The switcher of the top bar: the tile and the chevron only on narrow layouts. */
   inTopBar?: boolean;
+  /** The event is not confirmed yet: the menu items already act on it, so the button says so. */
+  pending?: boolean;
 }) {
+  const unknown =
+    current === undefined ? t(pending ? "event-switcher-wait" : "event-switcher-pick") : "";
   const items: MenuButtonItem[] = [
     ...(list.kind === "loaded"
       ? list.events.map((event) => ({
@@ -72,7 +77,7 @@ export function EventSwitcher({
           <span className={styles.text}>
             {/* A long name is cut: the full name is the title and in the name of the button. */}
             <span id={nameId} className={styles.name} title={current?.name}>
-              {current?.name ?? t("event-switcher-pick")}
+              {current?.name ?? unknown}
             </span>
             {current && (
               <span className={styles.sub} title={subtitle(current)}>
@@ -83,9 +88,7 @@ export function EventSwitcher({
           <IconSelector size={16} stroke={1.5} aria-hidden="true" className={styles.chevron} />
         </>
       }
-      triggerLabel={
-        current ? t("event-switcher-label", { name: current.name }) : t("event-switcher-pick")
-      }
+      triggerLabel={current ? t("event-switcher-label", { name: current.name }) : unknown}
       triggerClassName={inTopBar ? `${styles.trigger} ${styles.topBar}` : styles.trigger}
       label={t("event-switcher-menu")}
       items={items}
