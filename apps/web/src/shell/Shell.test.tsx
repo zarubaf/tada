@@ -595,7 +595,7 @@ describe("event switcher", () => {
 
     // The old list stays while the new one loads: no loading item replaces it.
     expect(screen.queryByRole("menuitem", { name: "Anlässe werden geladen …" })).toBeNull();
-    expect(await screen.findByRole("menuitem", { name: "Herbstflug" })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: /^Herbstflug/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /^Sommerfest 2030/ })).toBeInTheDocument();
   });
 
@@ -619,7 +619,7 @@ describe("event switcher", () => {
     renderShellAt("/inbox", json(200, info([first], first)));
 
     await userEvent.click(await screen.findByRole("button", { name: "Anlass wählen" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Herbstflug" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: /^Herbstflug/ }));
 
     await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${other.id}`));
   });

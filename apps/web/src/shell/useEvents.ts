@@ -14,11 +14,16 @@ function lastEventOf(organizationId: string | undefined) {
   };
 }
 
-/** The newest event that is not closed, or none. */
+/** The newest event that is not closed, or none. `created_at` is the recency key; the ID breaks a tie. */
 export function mostRecentOpen(events: readonly Event[]): Event | undefined {
   let newest: Event | undefined;
   for (const event of events) {
-    if (event.status !== "closed" && (!newest || event.created_at > newest.created_at)) {
+    if (
+      event.status !== "closed" &&
+      (!newest ||
+        event.created_at > newest.created_at ||
+        (event.created_at === newest.created_at && event.id > newest.id))
+    ) {
       newest = event;
     }
   }
@@ -45,7 +50,14 @@ export function useScopedEvent(
     setState(lastEventOf(organizationId));
   }
   const id = routeEventId ?? state.remembered;
-  const needsFallback = organizationId !== undefined && (id === undefined || state.missing === id);
+  // A "not found" belongs to one ID: another ID, or a return to this one, asks again.
+  if (state.missing !== undefined && state.missing !== id) {
+    setState({ ...state, missing: undefined });
+  }
+  // The most recent open event stands in for a missing remembered event, never for a wrong link.
+  const needsFallback =
+    organizationId !== undefined &&
+    (id === undefined || (routeEventId === undefined && state.missing === id));
   const { load } = events;
 
   useEffect(() => {
@@ -95,6 +107,7 @@ export function useScopedEvent(
   if (event !== undefined && event.id === id) {
     return event;
   }
+  // A route event that the server does not find has no scoped event: the page says so.
   return needsFallback && events.list.kind === "loaded"
     ? mostRecentOpen(events.list.events)
     : undefined;
