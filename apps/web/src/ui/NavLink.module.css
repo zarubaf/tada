@@ -16,6 +16,23 @@
     color: var(--color-text-muted);
   }
 
+  /* An item without a target: muted, with no hover. The hint below the group says why. */
+  .disabled {
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+  }
+
+  .disabled:hover {
+    background: none;
+  }
+
+  @media (forced-colors: active) {
+    .disabled,
+    .disabled .icon {
+      color: GrayText;
+    }
+  }
+
   .link[aria-current="page"] .icon {
     color: inherit;
   }

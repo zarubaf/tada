@@ -235,7 +235,7 @@ describe("EventsPage", () => {
 });
 
 describe("EventsPage toolbar", () => {
-  function signedIn(role: string) {
+  function signedIn(role: string, items: unknown[] = []) {
     const membership = { organization_id: "o1", name: "Fliegergruppe Testwil", role };
     const session = {
       user_id: "u1",
@@ -244,7 +244,7 @@ describe("EventsPage toolbar", () => {
       memberships: [membership],
     };
     const fetch = async (request: Request) =>
-      json(200, new URL(request.url).pathname.endsWith("/session") ? session : { items: [] });
+      json(200, new URL(request.url).pathname.endsWith("/session") ? session : { items });
     const api = createApi(fetch as unknown as typeof globalThis.fetch);
     render(
       <Router>
@@ -255,17 +255,26 @@ describe("EventsPage toolbar", () => {
     );
   }
 
-  it.each(["owner", "admin"])("offers „Anlass erfassen“ to the role %s", async (role) => {
-    signedIn(role);
-    const link = await screen.findByRole("link", { name: "Anlass erfassen" });
+  it.each(["owner", "admin"])("offers „Neuer Anlass“ to the role %s", async (role) => {
+    signedIn(role, [event("AA", "Erster Anlass")]);
+    const link = await screen.findByRole("link", { name: "Neuer Anlass" });
     expect(link).toHaveAttribute("href", "/events/new");
     expect(link.closest("[data-page-toolbar]")).not.toBeNull();
   });
 
-  it("does not offer „Anlass erfassen“ to a member", async () => {
+  it("offers „Neuer Anlass“ once, in the empty state and not in the toolbar", async () => {
+    signedIn("owner");
+    const link = await screen.findByRole("link", { name: "Neuer Anlass" });
+    await screen.findByText("Noch keine Anlässe erfasst");
+    expect(screen.getAllByRole("link", { name: "Neuer Anlass" })).toHaveLength(1);
+    expect(link).toHaveAttribute("href", "/events/new");
+    expect(link.closest("[data-page-toolbar]")).toBeNull();
+  });
+
+  it("does not offer „Neuer Anlass“ to a member", async () => {
     signedIn("member");
     await screen.findByText("Noch keine Anlässe erfasst");
-    expect(screen.queryByRole("link", { name: "Anlass erfassen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Neuer Anlass" })).not.toBeInTheDocument();
   });
 
   it("keeps the name of a redacted event", async () => {

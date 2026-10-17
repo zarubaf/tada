@@ -33,6 +33,13 @@
     gap: var(--space-0-5);
   }
 
+  /* The reason why the event items are off; visible, and the description of each item. */
+  .hint {
+    padding-inline: var(--space-3);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+  }
+
   .foot {
     display: grid;
     gap: var(--space-0-5);

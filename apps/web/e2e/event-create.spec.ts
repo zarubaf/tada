@@ -71,7 +71,7 @@ for (const viewport of viewports) {
       await fakeEvents(page, 200, { items: events });
       await page.goto("/events");
       await setTheme(page, theme);
-      await expect(page.getByRole("link", { name: "Anlass erfassen" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Neuer Anlass" })).toBeVisible();
 
       const results = await axeBuilder(page).analyze();
       expect(results.violations).toEqual([]);

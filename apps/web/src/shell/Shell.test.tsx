@@ -177,6 +177,15 @@ afterEach(() => {
   document.documentElement.removeAttribute("data-theme");
 });
 
+/** An event item is disabled until the scoped event has loaded: wait for the real link. */
+function enabledLink(nav: HTMLElement, name: string) {
+  return vi.waitFor(() => {
+    const link = within(nav).getByRole("link", { name });
+    expect(link).not.toHaveAttribute("aria-disabled");
+    return link;
+  });
+}
+
 const isCurrentLink = (link: HTMLElement) => link.getAttribute("aria-current") === "page";
 
 describe("Shell", () => {
@@ -344,7 +353,16 @@ describe("sidebar", () => {
     const names = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(names).toEqual(["Eingang", "Meine Arbeit", "Kontakte"]);
+    // The four event items are there from the start; they are disabled until an event is scoped.
+    expect(names).toEqual([
+      "Eingang",
+      "Meine Arbeit",
+      "Kontakte",
+      "Übersicht",
+      "Arbeit",
+      "Zeitplan",
+      "Dokumente",
+    ]);
   });
 
   // The owner's bug: on a page outside an event, the event items stayed away.
@@ -363,7 +381,7 @@ describe("sidebar", () => {
     renderShellAt(path, json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    const overview = await within(nav).findByRole("link", { name: "Übersicht" });
+    const overview = await enabledLink(nav, "Übersicht");
     // The remembered event, else the most recent open one (the larger ID breaks the tie).
     expect(overview).toHaveAttribute("href", `/events/${remembered ? scoped.id : other.id}`);
     expect(
@@ -397,10 +415,7 @@ describe("sidebar", () => {
     renderShellAt(`/events/${scoped.id}`, json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    expect(await within(nav).findByRole("link", { name: "Übersicht" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(await enabledLink(nav, "Übersicht")).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "Arbeit" })).not.toHaveAttribute("aria-current");
   });
 
@@ -412,7 +427,7 @@ describe("sidebar", () => {
     );
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    await within(nav).findByRole("link", { name: "Arbeit" });
+    await enabledLink(nav, "Arbeit");
     const links = within(nav).getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
       "Eingang",
@@ -440,7 +455,7 @@ describe("sidebar", () => {
     );
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    const timeline = await within(nav).findByRole("link", { name: "Zeitplan" });
+    const timeline = await enabledLink(nav, "Zeitplan");
     expect(timeline).toHaveAttribute(
       "href",
       "/events/0199b8e0-0000-7000-8000-0000000000e1/work?view=timeline",
@@ -452,7 +467,7 @@ describe("sidebar", () => {
     );
   });
 
-  it("has no event item while the member has no event", async () => {
+  it("keeps the event items disabled while the member has no event", async () => {
     renderShellAt("/inbox", json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
@@ -464,7 +479,35 @@ describe("sidebar", () => {
       expect(screen.queryByRole("menuitem", { name: "Anlässe werden geladen …" })).toBeNull(),
     );
     await userEvent.keyboard("{Escape}");
-    expect(within(nav).queryByRole("link", { name: "Arbeit" })).not.toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Arbeit" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it.each([
+    ["with no Anlass", "/inbox"],
+    ["on a link to an Anlass that does not exist", "/events/0199b8e0-0000-7000-8000-00000000dead"],
+  ])("keeps the four event items, disabled with the hint, %s", async (_name, path) => {
+    renderShellAt(path, json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    for (const name of ["Übersicht", "Arbeit", "Zeitplan", "Dokumente"]) {
+      const item = await within(nav).findByRole("link", { name });
+      expect(item).toHaveAttribute("aria-disabled", "true");
+      expect(item).not.toHaveAttribute("href");
+      expect(item).toHaveAttribute("tabindex", "0");
+      expect(item).toHaveAccessibleDescription("Zuerst einen Anlass wählen");
+    }
+    expect(within(nav).getByText("Zuerst einen Anlass wählen")).toBeVisible();
+  });
+
+  it("does not follow a press on a disabled event item", async () => {
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    await userEvent.click(await within(nav).findByRole("link", { name: "Arbeit" }));
+    expect(window.location.pathname).toBe("/inbox");
   });
 
   it("shows the number of open proposals at Eingang for a screen reader as text", async () => {
@@ -855,7 +898,8 @@ describe("narrow layout", () => {
 
     const drawer = await screen.findByRole("dialog", { name: "Navigation" });
     const nav = within(drawer).getByRole("navigation", { name: "Hauptnavigation" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(3);
+    // Three organization links and the four event items, which are disabled with no event.
+    expect(within(nav).getAllByRole("link")).toHaveLength(7);
     expect(within(drawer).getByRole("button", { name: /Organisation/ })).toBeInTheDocument();
     expect(within(drawer).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
     expect(within(drawer).getByRole("link", { name: "Datenschutz" })).toBeInTheDocument();

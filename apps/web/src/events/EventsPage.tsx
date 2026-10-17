@@ -73,6 +73,15 @@ type State =
   | { kind: "loaded"; events: Event[]; nextCursor: string | undefined; loadingMore: boolean };
 
 /** „Anlässe“: the events that the member can see, in the order of their keys. */
+function CreateEventLink({ compact }: { compact?: boolean }) {
+  return (
+    <LinkButton to="/events/new" primary compact={compact}>
+      <IconPlus size={14} stroke={1.5} aria-hidden="true" />
+      {t("events-create")}
+    </LinkButton>
+  );
+}
+
 export function EventsPage({ api }: { api: Api }) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const canCreate = useCanCreateEvent();
@@ -138,18 +147,18 @@ export function EventsPage({ api }: { api: Api }) {
     setFailure(message);
   };
 
+  // The empty list offers the action in its empty state: one way to the goal.
+  const empty = state.kind === "loaded" && state.events.length === 0;
+
   return (
     <Page width="flush">
       <PageToolbar>
         <PageTitle ref={heading} compact>
           {t("events-title")}
         </PageTitle>
-        {canCreate && (
+        {canCreate && !empty && (
           <div className={styles.end}>
-            <LinkButton to="/events/new" primary compact>
-              <IconPlus size={14} stroke={1.5} aria-hidden="true" />
-              {t("events-create")}
-            </LinkButton>
+            <CreateEventLink compact />
           </div>
         )}
       </PageToolbar>
@@ -175,7 +184,11 @@ export function EventsPage({ api }: { api: Api }) {
           />
         )}
         {state.kind === "loaded" && state.events.length === 0 && (
-          <EmptyState title={t("events-empty-title")} text={t("events-empty-text")} />
+          <EmptyState
+            title={t("events-empty-title")}
+            text={t("events-empty-text")}
+            action={canCreate ? <CreateEventLink /> : undefined}
+          />
         )}
         {state.kind === "loaded" && state.events.length > 0 && (
           <>

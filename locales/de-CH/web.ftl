@@ -146,6 +146,7 @@ nav-work = Arbeit
 nav-timeline = Zeitplan
 nav-documents = Dokumente
 nav-overview = Übersicht
+nav-needs-event = Zuerst einen Anlass wählen
 nav-contacts = Kontakte
 nav-inbox = Eingang
 # $count: the number of changesets that wait for a review.
@@ -264,7 +265,7 @@ choose-organization-empty-text = Sie sind noch in keiner Organisation Mitglied. 
 
 ## Event screens (create, event page and event memberships)
 
-events-create = Anlass erfassen
+events-create = Neuer Anlass
 event-create-title = Anlass erfassen
 event-create-submit = Anlass erfassen
 event-create-key-label = Kürzel (Pflichtfeld)
