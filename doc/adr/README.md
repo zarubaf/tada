@@ -97,8 +97,9 @@ The ADRs are the authority for the decisions in this project.
 | [0079](0079-changesets-without-member-words.md)                 | Changesets without member words                          | Accepted                           |
 | [0080](0080-workstream-proposals.md)                            | Workstream proposals                                     | Proposed                           |
 | [0081](0081-milestones-decisions-risks-and-requirements.md)     | Milestones, decisions, risks and requirements            | Proposed                           |
-| [0082](0082-redesign-of-the-web-client.md)                      | Redesign of the web client                               | Accepted                           |
+| [0082](0082-redesign-of-the-web-client.md)                      | Redesign of the web client                               | Accepted, amended by 0084          |
 | [0083](0083-capture.md)                                         | Capture                                                  | Proposed                           |
+| [0084](0084-event-scope-in-the-navigation.md)                   | Event scope in the navigation                            | Accepted                           |
 
 ## New ADR
 

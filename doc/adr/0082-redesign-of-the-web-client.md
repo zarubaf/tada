@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-14
+- Amended by: [0084](0084-event-scope-in-the-navigation.md)
 - Amends: [0018](0018-design-system-foundation.md), [0020](0020-component-primitives.md), [0021](0021-typography-and-icons.md), [0022](0022-accessibility.md), [0023](0023-responsive-layout.md)
 
 ## Context
