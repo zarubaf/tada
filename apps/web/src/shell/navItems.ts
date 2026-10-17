@@ -48,6 +48,7 @@ const events: Destination = {
   to: "/events",
   label: t("events-title"),
   icon: IconCalendarEvent,
+  exact: true,
 };
 /** „Kontakte“: the persons and the institutions are its two tabs (ADR 0082). */
 const contacts: Destination = {
@@ -153,8 +154,15 @@ export function isCurrent(destination: Destination, pathname: string, search = "
   );
 }
 
-/** The label of the destination that the path belongs to, or nothing for an unknown path. */
+/**
+ * The label of the destination that the path belongs to, or nothing for an unknown path. The pages
+ * below `/events` have no destination: „Alle Anlässe“ names the list only, so the title never
+ * contradicts the event switcher.
+ */
 export function sectionTitle(pathname: string): string | undefined {
+  if (pathname === "/events/new") {
+    return t("event-create-title");
+  }
   return ALL.find((destination) => isCurrent(destination, pathname))?.label;
 }
 

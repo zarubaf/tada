@@ -139,12 +139,41 @@ test("at 375 px the drawer holds the sidebar, traps focus and returns it on Esca
   await expect(drawer).toBeVisible();
   await expectNoAxeViolation(page);
 
-  // Tab never leaves the drawer. Thirteen steps end on an item, not on the close button: Escape
-  // does not close the drawer from that button, a gap to fix apart from the menu.
-  for (let step = 0; step < 13; step++) {
+  // Tab never leaves the drawer and wraps back to the first stop, whatever the number of stops.
+  const stop = () =>
+    drawer.evaluate((node) => {
+      const active = document.activeElement;
+      return {
+        inside: node.contains(active),
+        key: `${active?.tagName}:${active?.getAttribute("aria-label") ?? active?.textContent}`,
+      };
+    });
+  await page.keyboard.press("Tab");
+  const first = (await stop()).key;
+  const seen = [first];
+  for (let step = 0; step < 40; step++) {
     await page.keyboard.press("Tab");
-    expect(await drawer.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+    const now = await stop();
+    expect(now.inside).toBe(true);
+    if (now.key === first) {
+      break;
+    }
+    seen.push(now.key);
   }
+  // The focus came back to the first stop, and the close button was on the way.
+  expect((await stop()).key).toBe(first);
+  expect(seen.length).toBeGreaterThan(8);
+  expect(seen).toContain("BUTTON:Navigation schliessen");
+
+  // On the close button the tooltip is open: the first Escape closes it (WCAG 1.4.13), the
+  // second closes the drawer.
+  while ((await stop()).key !== "BUTTON:Navigation schliessen") {
+    await page.keyboard.press("Tab");
+  }
+  await expect(page.getByRole("tooltip")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await expect(drawer).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await expect(toggle).toBeFocused();

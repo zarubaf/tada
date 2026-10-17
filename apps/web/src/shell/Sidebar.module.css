@@ -28,6 +28,11 @@
     border-top: 1px solid var(--color-border-subtle);
   }
 
+  .eventItems {
+    display: grid;
+    gap: var(--space-0-5);
+  }
+
   .foot {
     display: grid;
     gap: var(--space-0-5);
