@@ -53,7 +53,7 @@ From top to bottom:
 4. „Übersicht“ (current only on an exact match of `/events/:id`), „Arbeit“, „Zeitplan“ and „Dokumente“.
 5. At the foot: „Einstellungen“, „Datenschutz“ and „Versionen“.
 
-- The menu has no „Anlässe“ item and no rule that lets an item yield paths to another item.
+- The menu has no „Anlässe“ item and the former item „Anlässe“ no longer yields its path to other items.
   No item is current on `/events`.
 - With no scoped event, the four event items are disabled with the hint „Zuerst einen Anlass wählen“.
   The empty list of events offers an action to create an event.
