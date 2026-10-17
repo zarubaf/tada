@@ -25,9 +25,11 @@
     overflow-wrap: anywhere;
   }
 
+  /* Two lines of 16 px fit the row of a one-line item: a hint does not make the row taller. */
   .text {
     display: grid;
     min-width: 0;
+    line-height: var(--line-height-xs);
   }
 
   .description {

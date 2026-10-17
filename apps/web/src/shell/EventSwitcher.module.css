@@ -5,9 +5,11 @@
     gap: var(--space-2);
     box-sizing: border-box;
     width: 100%;
-    min-height: var(--control-height-lg);
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid transparent;
+
+    /* The same height with an event (two lines) and without (one): the menu below does not move. */
+    min-height: calc(var(--line-height-ui) + var(--line-height-xs) + var(--space-2));
+    padding: var(--space-1) var(--space-3);
+    border: 0;
     border-radius: var(--radius-md);
     background: none;
     color: var(--color-text);
@@ -66,6 +68,7 @@
   .sub {
     color: var(--color-text-muted);
     font-size: var(--font-size-xs);
+    line-height: var(--line-height-xs);
   }
 
   .chevron {
@@ -96,7 +99,7 @@
     }
   }
 
-  /* The command box takes 22rem from --bp-medium: the name needs the room of --bp-wide. */
+  /* The command box takes 22rem from --bp-wide: the name needs that room. */
   @media (width >= 64rem) {
     .topBar {
       max-width: 16rem;

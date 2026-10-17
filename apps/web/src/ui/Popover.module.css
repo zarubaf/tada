@@ -24,6 +24,12 @@
     outline: none;
   }
 
+  /* An item that cannot be chosen: muted, as the disabled items of the sidebar. */
+  .item[data-disabled] {
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+  }
+
   .item[data-focused],
   .item[data-selected] {
     background: var(--color-accent-subtle);
