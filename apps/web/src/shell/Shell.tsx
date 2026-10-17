@@ -193,6 +193,9 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
             sectionTitle(pathname) ??
             t("app-name")
           }
+          {...(!docked && routeEventId !== undefined && scopedEvent !== undefined
+            ? { titleIsSwitcher: true }
+            : {})}
           toggleLabel={
             narrow
               ? t("shell-drawer-open")
