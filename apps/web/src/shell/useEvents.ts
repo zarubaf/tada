@@ -1,4 +1,4 @@
-// The events that the shell shows: the current one for the switcher and the title, and the list
+// The events that the shell shows: the scoped one for the switcher and the title, and the list
 // for the switcher menu and the command palette. Both use the events API as the events page does.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Api, type Event, problemMessage } from "../api/client";
@@ -9,19 +9,34 @@ function lastEventOf(organizationId: string | undefined) {
   return {
     organizationId,
     remembered: organizationId === undefined ? undefined : readRemembered(eventKey(organizationId)),
+    // The event that the server did not find: the hook then falls back to the list.
+    missing: undefined as string | undefined,
   };
 }
 
+/** The newest event that is not closed, or none. */
+export function mostRecentOpen(events: readonly Event[]): Event | undefined {
+  let newest: Event | undefined;
+  for (const event of events) {
+    if (event.status !== "closed" && (!newest || event.created_at > newest.created_at)) {
+      newest = event;
+    }
+  }
+  return newest;
+}
+
 /**
- * The current event: the one of the route, else the one the member opened last in this
- * organization (kept in the browser). The route event that the server does not find leaves the
- * remembered one alone; a remembered event that the server does not find is forgotten. Without an
- * organization (a page without the frame) it asks for nothing.
+ * The scoped event, the one that the event items of the shell act on (ADR 0084): the event of
+ * the route, else the one the member opened last in this organization (kept in the browser),
+ * else the most recent open event, else none. The route event that the server does not find
+ * leaves the remembered one alone; a remembered event that the server does not find is
+ * forgotten. Without an organization (a page without the frame) it asks for nothing.
  */
-export function useCurrentEvent(
+export function useScopedEvent(
   api: Api,
   routeEventId: string | undefined,
   organizationId: string | undefined,
+  events: { list: EventList; load: () => void },
 ): Event | undefined {
   const [state, setState] = useState(() => lastEventOf(organizationId));
   const [event, setEvent] = useState<Event>();
@@ -30,6 +45,8 @@ export function useCurrentEvent(
     setState(lastEventOf(organizationId));
   }
   const id = routeEventId ?? state.remembered;
+  const needsFallback = organizationId !== undefined && (id === undefined || state.missing === id);
+  const { load } = events;
 
   useEffect(() => {
     if (id === undefined || organizationId === undefined) {
@@ -44,15 +61,20 @@ export function useCurrentEvent(
         }
         if (data) {
           setEvent(data);
-          setState({ organizationId, remembered: id });
+          setState({ organizationId, remembered: id, missing: undefined });
           writeRemembered(eventKey(organizationId), id);
         } else if (response.status === 404 || response.status === 403) {
           setEvent(undefined);
           // Only the remembered event is forgotten, not the one that a wrong link names.
-          if (readRemembered(eventKey(organizationId)) === id) {
-            setState({ organizationId, remembered: undefined });
+          const forget = readRemembered(eventKey(organizationId)) === id;
+          if (forget) {
             writeRemembered(eventKey(organizationId), undefined);
           }
+          setState((old) => ({
+            organizationId,
+            remembered: forget ? undefined : old.remembered,
+            missing: id,
+          }));
         }
       })
       .catch(() => undefined);
@@ -61,7 +83,21 @@ export function useCurrentEvent(
     };
   }, [api, id, organizationId]);
 
-  return organizationId !== undefined && event?.id === id ? event : undefined;
+  useEffect(() => {
+    if (needsFallback) {
+      load();
+    }
+  }, [needsFallback, load]);
+
+  if (organizationId === undefined) {
+    return undefined;
+  }
+  if (event !== undefined && event.id === id) {
+    return event;
+  }
+  return needsFallback && events.list.kind === "loaded"
+    ? mostRecentOpen(events.list.events)
+    : undefined;
 }
 
 export type EventList =

@@ -20,7 +20,7 @@ import styles from "./Shell.module.css";
 import { Sidebar } from "./Sidebar";
 import { isPaletteKey } from "./shortcut";
 import { TopBar } from "./TopBar";
-import { useCurrentEvent, useEventList } from "./useEvents";
+import { useEventList, useScopedEvent } from "./useEvents";
 import { useNarrow } from "./useNarrow";
 import { VersionSheet } from "./VersionFooter";
 import { footerText, outdated as isOutdated, useServerVersion } from "./version";
@@ -44,8 +44,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   // A page without the frame has no organization to ask for events.
   const framed = session?.organization !== undefined && !frameless;
   const framedOrganizationId = framed ? organizationId : undefined;
-  const currentEvent = useCurrentEvent(api, routeEventId, framedOrganizationId);
   const events = useEventList(api, framedOrganizationId);
+  const scopedEvent = useScopedEvent(api, routeEventId, framedOrganizationId, events);
   const canCreateEvent = useCanCreateEvent();
   const narrow = useNarrow();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -153,7 +153,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       organizationSwitcher={organizationSwitcher}
       eventSwitcher={
         <EventSwitcher
-          current={currentEvent}
+          current={scopedEvent}
           list={events.list}
           canCreate={canCreateEvent}
           onOpen={events.load}
@@ -174,7 +174,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       <div className={styles.workspace}>
         <TopBar
           title={
-            (routeEventId !== undefined ? currentEvent?.name : undefined) ??
+            (routeEventId !== undefined ? scopedEvent?.name : undefined) ??
             sectionTitle(pathname) ??
             t("app-name")
           }
@@ -225,7 +225,13 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
         )}
         <Fragment key={organization.organization_id}>{children}</Fragment>
       </div>
-      {narrow && <BottomBar versionsLabel={versionsLabel} onOpenVersions={openVersions} />}
+      {narrow && (
+        <BottomBar
+          eventId={routeEventId}
+          versionsLabel={versionsLabel}
+          onOpenVersions={openVersions}
+        />
+      )}
       {narrow && drawerOpen && (
         <Suspense fallback={null}>
           <Drawer title={t("shell-drawer-title")} onClose={() => setDrawerOpen(false)}>
@@ -239,8 +245,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
             api={api}
             events={events.list}
             loadEvents={events.load}
-            currentEventId={routeEventId === undefined ? undefined : currentEvent?.id}
-            eventWritable={currentEvent?.status !== "closed"}
+            currentEventId={routeEventId === undefined ? undefined : scopedEvent?.id}
+            eventWritable={scopedEvent?.status !== "closed"}
             canCreateEvent={canCreateEvent}
             onClose={() => setPaletteOpen(false)}
           />

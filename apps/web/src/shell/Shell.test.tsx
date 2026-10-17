@@ -584,9 +584,10 @@ describe("event switcher", () => {
     eventItems = [open];
     renderShellAt("/inbox", json(200, info([first], first)));
 
-    const trigger = await screen.findByRole("button", { name: "Anlass wählen" });
+    // With no remembered event the most recent open one is the scoped event.
+    const trigger = await screen.findByRole("button", { name: /^Anlass (wählen|wechseln)/ });
     await userEvent.click(trigger);
-    await screen.findByRole("menuitem", { name: "Sommerfest 2030" });
+    await screen.findByRole("menuitem", { name: /^Sommerfest 2030/ });
     await userEvent.keyboard("{Escape}");
 
     eventItems = [open, other];
@@ -595,7 +596,7 @@ describe("event switcher", () => {
     // The old list stays while the new one loads: no loading item replaces it.
     expect(screen.queryByRole("menuitem", { name: "Anlässe werden geladen …" })).toBeNull();
     expect(await screen.findByRole("menuitem", { name: "Herbstflug" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "Sommerfest 2030" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /^Sommerfest 2030/ })).toBeInTheDocument();
   });
 
   it("lists the events of the member, all events and no new event for a member", async () => {
