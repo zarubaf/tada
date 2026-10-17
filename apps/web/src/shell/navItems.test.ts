@@ -8,6 +8,7 @@ import {
   isCurrent,
   moreItems,
   ORGANIZATION_ITEMS,
+  paletteDestinations,
   sectionTitle,
 } from "./navItems";
 
@@ -131,5 +132,38 @@ describe("eventIdOf", () => {
   it("names the event of a document and of its differences", () => {
     expect(eventIdOf("/events/e1/documents/d1")).toBe("e1");
     expect(eventIdOf("/events/e1/documents/d1/diff")).toBe("e1");
+  });
+});
+
+describe("the command palette", () => {
+  it("adds the four Anlass items of the scoped Anlass, once each", () => {
+    const list = paletteDestinations("e1");
+    expect(labels(list)).toEqual([
+      "Eingang",
+      "Meine Arbeit",
+      "Kontakte",
+      "Übersicht",
+      "Arbeit",
+      "Zeitplan",
+      "Dokumente",
+      "Alle Anlässe",
+      "Einstellungen",
+      "Datenschutz",
+    ]);
+    expect(list.filter((item) => item.id === "timeline").map((item) => item.to)).toEqual([
+      "/events/e1/work?view=timeline",
+    ]);
+    expect(new Set(list.map((item) => item.to)).size).toBe(list.length);
+  });
+
+  it("lists no Anlass item with no Anlass", () => {
+    expect(labels(paletteDestinations(undefined))).toEqual([
+      "Eingang",
+      "Meine Arbeit",
+      "Kontakte",
+      "Alle Anlässe",
+      "Einstellungen",
+      "Datenschutz",
+    ]);
   });
 });

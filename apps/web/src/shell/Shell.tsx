@@ -263,6 +263,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
             events={events.list}
             loadEvents={events.load}
             currentEventId={routeEventId === undefined ? undefined : scopedEvent?.id}
+            scopedEventId={menuEventId}
             eventWritable={scopedEvent?.status !== "closed"}
             canCreateEvent={canCreateEvent}
             onClose={() => setPaletteOpen(false)}

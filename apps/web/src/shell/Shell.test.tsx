@@ -1330,6 +1330,33 @@ describe("command palette", () => {
     expect(names).not.toContain("Neue Aufgabe");
   });
 
+  it("lists the four Anlass destinations of the scoped Anlass once, with their targets", async () => {
+    const palette = await paletteInEvent("event-contributor");
+
+    const goto = ["Übersicht", "Arbeit", "Zeitplan", "Dokumente"];
+    for (const name of goto) {
+      expect(within(palette).getAllByRole("menuitem", { name })).toHaveLength(1);
+    }
+    await userEvent.click(within(palette).getByRole("menuitem", { name: "Zeitplan" }));
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/events/${open.id}/work`));
+    expect(window.location.search).toBe("?view=timeline");
+  });
+
+  it("lists no Anlass destination while there is no scoped Anlass", async () => {
+    eventItems = [];
+    renderShell(json(200, info([first], first)));
+
+    const palette = await openPalette();
+
+    const names = within(palette)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent);
+    for (const name of ["Übersicht", "Arbeit", "Zeitplan", "Dokumente"]) {
+      expect(names).not.toContain(name);
+    }
+  });
+
   it("filters while typing, announces the number of results and opens the choice with Enter", async () => {
     renderShell(json(200, info([first], first)));
 

@@ -144,8 +144,17 @@ export function moreItems(eventId: string | undefined): BarItem[] {
   ];
 }
 export const PRIVACY = privacy;
-/** Each destination, for the command palette. */
+/** Each destination that needs no Anlass, for the page titles. */
 export const ALL: Destination[] = [...ORGANIZATION_ITEMS, events, settings, privacy];
+/**
+ * The destinations of the command palette: ALL plus the Anlass items of the scoped Anlass. With no
+ * Anlass the palette lists none of them, because a result that goes nowhere is worse than none.
+ */
+export function paletteDestinations(eventId: string | undefined): Destination[] {
+  return eventId === undefined
+    ? ALL
+    : [...ORGANIZATION_ITEMS, ...eventItems(eventId), events, settings, privacy];
+}
 
 /** True when the path belongs to the destination. */
 export function isCurrent(destination: Destination, pathname: string, search = ""): boolean {
