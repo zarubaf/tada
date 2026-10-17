@@ -2,7 +2,7 @@
 // and „Mehr“, a menu with the other destinations. It is the same in every state: with no Anlass the
 // Anlass items are off, as in the sidebar.
 import { IconDots } from "@tabler/icons-react";
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 import { t } from "../i18n";
 import { InboxCount } from "../review/InboxCount";
 import { useNavigate, usePathname } from "../router/Router";
@@ -12,6 +12,7 @@ import styles from "./BottomBar.module.css";
 import { bottomItems, hasTarget, isCurrent, moreItems } from "./navItems";
 
 const VERSIONS = "versions";
+const HINT_MS = 4000;
 
 export function BottomBar({
   eventId,
@@ -30,6 +31,15 @@ export function BottomBar({
   const navigate = useNavigate();
   const pathname = usePathname();
   const hintId = useId();
+  // The bar has no room for a line of text: a press on the inert „Arbeit“ shows the reason for a while.
+  const [hintShown, setHintShown] = useState(false);
+  useEffect(() => {
+    if (!hintShown) {
+      return;
+    }
+    const timer = window.setTimeout(() => setHintShown(false), HINT_MS);
+    return () => window.clearTimeout(timer);
+  }, [hintShown]);
   const more = moreItems(eventId);
   const hint = eventPending ? {} : { describedBy: hintId };
   return (
@@ -42,7 +52,6 @@ export function BottomBar({
             icon={destination.icon}
             large
             {...(destination.exact ? { exact: true } : {})}
-            {...(destination.unlessWith ? { unlessWith: destination.unlessWith } : {})}
           >
             <span className={styles.label}>{destination.label}</span>
             {destination.id === "inbox" && (
@@ -52,13 +61,19 @@ export function BottomBar({
             )}
           </NavLink>
         ) : (
-          <DisabledNavItem key={destination.id} icon={destination.icon} large {...hint}>
+          <DisabledNavItem
+            key={destination.id}
+            icon={destination.icon}
+            large
+            onPress={() => setHintShown(true)}
+            {...hint}
+          >
             <span className={styles.label}>{destination.label}</span>
           </DisabledNavItem>
         ),
       )}
       {!eventPending && eventId === undefined && (
-        <p id={hintId} className={styles.hint}>
+        <p id={hintId} className={hintShown ? styles.hintShown : styles.hint}>
           {t("nav-needs-event")}
         </p>
       )}
@@ -82,7 +97,7 @@ export function BottomBar({
                   label: item.label,
                   icon: item.icon,
                   isDisabled: true,
-                  ...(eventPending ? {} : { ariaLabel: `${item.label}, ${t("nav-needs-event")}` }),
+                  ...(eventPending ? {} : { description: t("nav-needs-event") }),
                 },
           ),
           { id: VERSIONS, label: versionsLabel },

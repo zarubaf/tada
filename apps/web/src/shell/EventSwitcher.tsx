@@ -1,5 +1,6 @@
-// The event switcher at the head of the Anlass group (ADR 0084), or in the top bar when the sidebar is not docked: the current event with its key, and a
-// menu with the events of the member, „Alle Anlässe“ and, for the administration, „Neuer Anlass“.
+// The event switcher (ADR 0084): at the head of the Anlass group of the docked sidebar, else in the
+// top bar. It shows the current event with its key, and a menu with the events of the member,
+// „Alle Anlässe“ and, for the administration, „Neuer Anlass“.
 import { IconCalendarEvent, IconPlus, IconSelector } from "@tabler/icons-react";
 import type { Event } from "../api/client";
 import { t } from "../i18n";

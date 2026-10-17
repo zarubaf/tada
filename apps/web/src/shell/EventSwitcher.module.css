@@ -75,8 +75,8 @@
 
   /*
    * In the top bar the switcher shares the row with four more controls: on a phone only the tile
-   * and the chevron show, 44 px high; the name is in the name of the button. From --bp-medium it
-   * shows the name, up to 16rem.
+   * and the chevron show, 44 px high; the name is in the name of the button. From 64rem it shows
+   * the name, up to 16rem.
    */
   .topBar {
     flex: none;
@@ -92,8 +92,14 @@
 
   @media (width >= 40rem) {
     .topBar {
-      max-width: 16rem;
       min-height: var(--control-height-md);
+    }
+  }
+
+  /* The command box takes 22rem from --bp-medium: the name needs the room of --bp-wide. */
+  @media (width >= 64rem) {
+    .topBar {
+      max-width: 16rem;
       padding-inline: var(--space-2);
     }
 

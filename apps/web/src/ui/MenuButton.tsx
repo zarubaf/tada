@@ -8,6 +8,7 @@ import {
   Popover,
   type PopoverProps,
   Separator,
+  Text,
 } from "react-aria-components";
 import styles from "./MenuButton.module.css";
 import popover from "./Popover.module.css";
@@ -21,6 +22,8 @@ export interface MenuButtonItem {
   /** The accessible name when it differs from the label, for example to say „aktuell“. */
   ariaLabel?: string;
   isDisabled?: boolean;
+  /** A second line under the label, for example why the item is off; a screen reader reads it. */
+  description?: string;
   /** A line above the item. */
   separated?: boolean;
 }
@@ -93,7 +96,16 @@ export function MenuButton({
               {item.icon && (
                 <item.icon size={16} stroke={1.5} aria-hidden="true" className={styles.icon} />
               )}
-              <span className={styles.label}>{item.label}</span>
+              {item.description ? (
+                <span className={styles.text}>
+                  <span className={styles.label}>{item.label}</span>
+                  <Text slot="description" className={styles.description}>
+                    {item.description}
+                  </Text>
+                </span>
+              ) : (
+                <span className={styles.label}>{item.label}</span>
+              )}
               {item.current && <IconCheck size={14} aria-hidden="true" className={styles.check} />}
             </MenuItem>,
           ])}

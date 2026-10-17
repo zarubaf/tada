@@ -41,6 +41,8 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 - The bottom bar is fixed and has four items: „Eingang“, „Meine Arbeit“, „Arbeit“ (of the scoped event) and „Mehr“ (ADR 0084).
   „Mehr“ is a menu with „Übersicht“, „Dokumente“, „Kontakte“, „Einstellungen“, „Datenschutz“ and „Versionen“.
 - The event switcher sits in the top bar, so a member changes the event without the drawer.
+  With no scoped event, the inert „Arbeit“ and the disabled items of „Mehr“ give the reason „Zuerst einen Anlass wählen“: „Mehr“ shows it under each item, and a press on „Arbeit“ shows it above the bar for a few seconds.
+  In the timeline view „Arbeit“ is the current item, because the timeline is a tab of the work page.
 - The bottom bar shows a count badge on „Eingang“ when proposals wait for the member.
 - The toggle of the top bar opens the sidebar as a drawer from the left edge.
   The drawer holds the whole sidebar: the organization switcher (if any), all destinations and the foot. The event switcher is in the top bar only.
@@ -63,7 +65,7 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 ```
 
 - The sidebar is 232 px wide, docked, and the full height of the window.
-  The toggle of the top bar collapses it completely.
+  The toggle of the top bar collapses it completely; then the event switcher sits in the top bar, so there is one switcher in each layout.
   The browser remembers the choice (`tada-sidebar`).
 - The evidence panel opens as a sheet from the right, 400 px wide, over the content.
 - The page gutter is `--space-6`.

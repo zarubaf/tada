@@ -22,7 +22,7 @@ export interface SidebarProps {
   organizationSwitcher: ReactNode;
   /** Only the docked sidebar has it; in the drawer the top bar holds the switcher (ADR 0084). */
   eventSwitcher: ReactNode | undefined;
-  /** The name of the scoped event, shown instead of the switcher in the drawer. */
+  /** The name of the scoped event when it is known, shown instead of the switcher in the drawer. */
   eventName: string | undefined;
   /** The ID of the element that holds the event name: it names the event group. */
   eventNameId: string;
@@ -72,15 +72,22 @@ export function Sidebar({
       <nav className={styles.nav} aria-label={t("shell-nav")}>
         {ORGANIZATION_ITEMS.map(link)}
         <div className={styles.eventHead}>
-          {eventSwitcher ?? (
-            <p id={eventNameId} className={styles.eventName}>
-              {eventName}
-            </p>
-          )}
+          {eventSwitcher ??
+            (eventName !== undefined && (
+              <p id={eventNameId} className={styles.eventName}>
+                {eventName}
+              </p>
+            ))}
         </div>
         {/* The switcher heads the group and names it. A fieldset is for form controls. */}
         {/* biome-ignore lint/a11y/useSemanticElements: a group of links, not of form controls */}
-        <div role="group" aria-labelledby={eventNameId} className={styles.eventItems}>
+        <div
+          role="group"
+          {...(eventSwitcher !== undefined || eventName !== undefined
+            ? { "aria-labelledby": eventNameId }
+            : { "aria-label": t("nav-event-group") })}
+          className={styles.eventItems}
+        >
           {eventId === undefined ? (
             <>
               {EVENT_ITEM_FACES.map((face) => (

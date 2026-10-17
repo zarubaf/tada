@@ -147,6 +147,8 @@ nav-timeline = Zeitplan
 nav-documents = Dokumente
 nav-overview = Übersicht
 nav-needs-event = Zuerst einen Anlass wählen
+# The name of the group of the event items when no event name is known, in the drawer.
+nav-event-group = Anlass
 nav-contacts = Kontakte
 nav-inbox = Eingang
 # $count: the number of changesets that wait for a review.
