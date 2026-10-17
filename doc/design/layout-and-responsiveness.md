@@ -17,7 +17,10 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 - The title of the context in plain text, not a heading: the name of the scoped event on an event page, else the name of the section, for example „Eingang“, or „Alle Anlässe“ on `/events`.
   Each page keeps its own `h1`.
   A long name is cut and has the full name as its title.
-- The command box „Suchen oder Befehl ausführen…“ with the key hint (`⌘K` or `Ctrl K`).
+- The event switcher, when the sidebar does not hold it: on a phone, and on wider layouts while the sidebar is collapsed.
+  It shows the tile with the initials and the chevron; its name shows only from 64rem.
+  There the title does not repeat the event name.
+- The command box „Suchen oder Befehl ausführen…“ with the key hint (`⌘K` or `Ctrl K`) from 64rem.
   It opens the command menu, as does `Ctrl+K` or `⌘K` from anywhere in the shell.
   Below 40rem it is an icon button.
 - The theme toggle as an icon button, then the member menu as an avatar.
@@ -41,7 +44,7 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 - The bottom bar is fixed and has four items: „Eingang“, „Meine Arbeit“, „Arbeit“ (of the scoped event) and „Mehr“ (ADR 0084).
   „Mehr“ is a menu with „Übersicht“, „Dokumente“, „Kontakte“, „Einstellungen“, „Datenschutz“ and „Versionen“.
 - The event switcher sits in the top bar, so a member changes the event without the drawer.
-  With no scoped event, the inert „Arbeit“ and the disabled items of „Mehr“ give the reason „Zuerst einen Anlass wählen“: „Mehr“ shows it under each item, and a press on „Arbeit“ shows it above the bar for a few seconds.
+  With no scoped event, the inert „Arbeit“ and the disabled items of „Mehr“ give the reason „Zuerst einen Anlass wählen“: „Mehr“ shows it under each item, and a press on „Arbeit“ shows it above the bar until the next press, `Esc`, a loss of focus or a change of page or event.
   In the timeline view „Arbeit“ is the current item, because the timeline is a tab of the work page.
 - The bottom bar shows a count badge on „Eingang“ when proposals wait for the member.
 - The toggle of the top bar opens the sidebar as a drawer from the left edge.
@@ -263,7 +266,8 @@ It has its own `h1` „Arbeit“ and not the header of the event page.
 ### Work lists
 
 „Meine Arbeit“ (`/`) and „Alle Anlässe“ (`/events`) are `Page width="flush"` with the toolbar row of the „Arbeit“ page: the `h1` as a compact heading at the left and, at the right, the one action or link of the page as a compact `LinkButton`.
-On „Meine Arbeit“ this is the count of proposals that wait for the member (a link to „Eingang“), and on „Alle Anlässe“ it is „Anlass erfassen“ as the primary button, for the roles that may create an event.
+On „Meine Arbeit“ this is the count of proposals that wait for the member (a link to „Eingang“), and on „Alle Anlässe“ it is „Neuer Anlass“ as the primary button, for the roles that may create an event.
+When there are no events, the empty state holds this action instead.
 Below the row, 12 px from it, the page is dense tables of 28 px rows (`DataTable`).
 Below 28rem of the container, a table is a list of two-line rows; there is no sideways scroll.
 
