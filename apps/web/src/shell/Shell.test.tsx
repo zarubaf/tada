@@ -651,6 +651,23 @@ describe("sidebar", () => {
     await screen.findByRole("button", { name: "Seitenleiste einblenden" });
     expect(screen.queryByRole("navigation", { name: "Hauptnavigation" })).not.toBeInTheDocument();
   });
+
+  it("holds the event switcher in the sidebar while it is docked, and in the top bar while it is collapsed", async () => {
+    renderShell(json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    expect(within(nav).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).queryByRole("button", { name: "Anlass wählen" }),
+    ).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Seitenleiste ausblenden" }));
+
+    expect(
+      within(screen.getByRole("banner")).getByRole("button", { name: "Anlass wählen" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Anlass wählen" })).toHaveLength(1);
+  });
 });
 
 describe("top bar", () => {
@@ -885,19 +902,49 @@ describe("event switcher", () => {
 });
 
 describe("narrow layout", () => {
-  it("has a bottom bar with Eingang, Meine Arbeit, Alle Anlässe and Mehr, and no sidebar", async () => {
+  it("has a bottom bar with Eingang, Meine Arbeit, Arbeit and Mehr, and no sidebar", async () => {
     stubNarrow(true);
     renderShell(json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    await within(nav).findByRole("link", { name: "Arbeit" });
     expect(
       within(nav)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Eingang", "Meine Arbeit", "Alle Anlässe"]);
+    ).toEqual(["Eingang", "Meine Arbeit", "Arbeit"]);
     expect(within(nav).getByRole("button", { name: "Mehr" })).toBeInTheDocument();
     expect(screen.getAllByRole("navigation")).toHaveLength(1);
-    expect(screen.queryByRole("button", { name: "Anlass wählen" })).not.toBeInTheDocument();
+    // The one event switcher of the layout sits in the top bar, not in the bar below.
+    const banner = screen.getByRole("banner");
+    expect(within(banner).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
+    expect(within(nav).queryByRole("button", { name: "Anlass wählen" })).not.toBeInTheDocument();
+  });
+
+  it("shows Arbeit in the bottom bar as an inert item with no Anlass, and the same Mehr", async () => {
+    stubNarrow(true);
+    renderShell(json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    const work = await within(nav).findByRole("link", { name: "Arbeit" });
+    expect(work).toHaveAttribute("aria-disabled", "true");
+    expect(work).not.toHaveAttribute("href");
+    expect(work).toHaveAccessibleDescription("Zuerst einen Anlass wählen");
+
+    await userEvent.click(within(nav).getByRole("button", { name: "Mehr" }));
+    const menu = await screen.findByRole("menu");
+    const items = within(menu).getAllByRole("menuitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Übersicht",
+      "Dokumente",
+      "Kontakte",
+      "Einstellungen",
+      "Datenschutz",
+      expect.stringMatching(/^(tada|Versionen)/),
+    ]);
+    expect(items[0]).toHaveAttribute("aria-disabled", "true");
+    expect(items[1]).toHaveAttribute("aria-disabled", "true");
+    expect(items[2]).not.toHaveAttribute("aria-disabled");
   });
 
   it.each([
@@ -913,19 +960,37 @@ describe("narrow layout", () => {
     expect(more.getAttribute("aria-current")).toBe(current);
   });
 
-  it("marks Alle Anlässe as current on the list of events, in the bottom bar", async () => {
+  it("marks nothing current in the bottom bar on the list of events", async () => {
     stubNarrow(true);
     renderShellAt("/events", json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    expect(within(nav).getByRole("link", { name: "Alle Anlässe" })).toHaveAttribute(
-      "aria-current",
-      "page",
+    expect(within(nav).queryByRole("link", { name: "Alle Anlässe" })).not.toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: "Mehr" })).not.toHaveAttribute("aria-current");
+    expect(within(nav).queryAllByRole("link", { current: "page" })).toHaveLength(0);
+  });
+
+  it("links Arbeit to the remembered Anlass on an organization page", async () => {
+    stubNarrow(true);
+    eventItems = [event("0199b8e0-0000-7000-8000-0000000000e1", "Sommerfest 2030", "SF30")];
+    localStorage.setItem(
+      `tada-event:${first.organization_id}`,
+      "0199b8e0-0000-7000-8000-0000000000e1",
+    );
+    renderShellAt("/inbox", json(200, info([first], first)));
+
+    const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    await vi.waitFor(() =>
+      expect(within(nav).getByRole("link", { name: "Arbeit" })).toHaveAttribute(
+        "href",
+        "/events/0199b8e0-0000-7000-8000-0000000000e1/work",
+      ),
     );
   });
 
-  it("has Arbeit in the third place inside an event, as the current page", async () => {
+  it("has Arbeit of the scoped Anlass in the third place, as the current page", async () => {
     stubNarrow(true);
+    eventItems = [event("0199b8e0-0000-7000-8000-0000000000e1", "Sommerfest 2030", "SF30")];
     renderShellAt(
       "/events/0199b8e0-0000-7000-8000-0000000000e1/work",
       json(200, info([first], first)),
@@ -945,8 +1010,9 @@ describe("narrow layout", () => {
     expect(within(nav).getByRole("button", { name: "Mehr" })).not.toHaveAttribute("aria-current");
   });
 
-  it("moves Übersicht into Mehr inside an event, and marks Mehr on the other pages of the event", async () => {
+  it("holds Übersicht in Mehr, and marks Mehr on the other pages of the Anlass", async () => {
     stubNarrow(true);
+    eventItems = [event("0199b8e0-0000-7000-8000-0000000000e1", "Sommerfest 2030", "SF30")];
     renderShellAt("/events/0199b8e0-0000-7000-8000-0000000000e1", json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
@@ -984,6 +1050,8 @@ describe("narrow layout", () => {
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
     ).toEqual([
+      "Übersicht",
+      "Dokumente",
       "Kontakte",
       "Einstellungen",
       "Datenschutz",
@@ -1018,7 +1086,8 @@ describe("narrow layout", () => {
     // Three organization links and the four event items, which are disabled with no event.
     expect(within(nav).getAllByRole("link")).toHaveLength(7);
     expect(within(drawer).getByRole("button", { name: /Organisation/ })).toBeInTheDocument();
-    expect(within(drawer).getByRole("button", { name: "Anlass wählen" })).toBeInTheDocument();
+    // The event switcher is in the top bar only: one for the layout.
+    expect(within(drawer).queryByRole("button", { name: "Anlass wählen" })).not.toBeInTheDocument();
     expect(within(drawer).getByRole("link", { name: "Datenschutz" })).toBeInTheDocument();
 
     await userEvent.keyboard("{Escape}");

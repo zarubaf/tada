@@ -25,6 +25,8 @@ export function NavLink({ large, icon: Icon, children, ...props }: NavLinkProps)
 
 export interface DisabledNavItemProps {
   icon?: Icon;
+  /** A large target, as of `NavLink`. */
+  large?: boolean;
   /**
    * The ID of the element that says why the item is off: a screen reader reads it with the label.
    * Without it the item is a placeholder for a target that is on its way: it looks like a link,
@@ -39,7 +41,13 @@ export interface DisabledNavItemProps {
  * and a disabled one keeps keyboard focus so that a screen reader reads the reason. It has no
  * `href`, so a press goes nowhere.
  */
-export function DisabledNavItem({ icon: Icon, describedBy, children }: DisabledNavItemProps) {
+export function DisabledNavItem({
+  icon: Icon,
+  large,
+  describedBy,
+  children,
+}: DisabledNavItemProps) {
+  const size = large ? ` ${styles.large}` : "";
   const content = (
     <>
       {Icon && <Icon size={16} stroke={1.5} aria-hidden="true" className={styles.icon} />}
@@ -48,7 +56,7 @@ export function DisabledNavItem({ icon: Icon, describedBy, children }: DisabledN
   );
   if (describedBy === undefined) {
     return (
-      <span aria-hidden="true" className={styles.link}>
+      <span aria-hidden="true" className={`${styles.link}${size}`}>
         {content}
       </span>
     );
@@ -60,7 +68,7 @@ export function DisabledNavItem({ icon: Icon, describedBy, children }: DisabledN
       aria-disabled="true"
       aria-describedby={describedBy}
       tabIndex={0}
-      className={`${styles.link} ${styles.disabled}`}
+      className={`${styles.link} ${styles.disabled}${size}`}
     >
       {content}
     </span>

@@ -42,7 +42,7 @@ const myWork: Destination = {
   icon: IconUser,
   exact: true,
 };
-/** The list of all events: not a menu item (ADR 0084), but a place of the bottom bar and the palette. */
+/** The list of all events: not a menu item (ADR 0084), but a destination of the palette. */
 const events: Destination = {
   id: "events",
   to: "/events",
@@ -120,17 +120,24 @@ export function eventItems(eventId: string): Destination[] {
   return [overview(eventId), work(eventId), timeline(eventId), documents(eventId)];
 }
 export const SETTINGS = settings;
-/**
- * The bottom bar on narrow layouts has room for three items and „Mehr“ (ADR 0082). The third is
- * „Alle Anlässe“, and inside an event it is „Arbeit“.
- */
-export function bottomItems(eventId: string | undefined): Destination[] {
-  return [inbox, myWork, eventId === undefined ? events : work(eventId)];
+/** A place of the bottom bar or of „Mehr“: without a target it is the inert face of an Anlass item. */
+export type BarItem = Destination | (Omit<Destination, "to"> & { to?: undefined });
+/** True when the place has a target. */
+export function hasTarget(item: BarItem): item is Destination {
+  return item.to !== undefined;
 }
-/** „Mehr“ holds the other destinations; inside an event that includes „Übersicht“. */
-export function moreItems(eventId: string | undefined): Destination[] {
+/**
+ * The bottom bar on narrow layouts: the same four places in every state (ADR 0084). „Arbeit“ is
+ * the one of the scoped Anlass; with no Anlass it has no target.
+ */
+export function bottomItems(eventId: string | undefined): BarItem[] {
+  return [inbox, myWork, eventId === undefined ? WORK : work(eventId)];
+}
+/** „Mehr“ holds the other destinations, the same list in every state; the Anlass items need an Anlass. */
+export function moreItems(eventId: string | undefined): BarItem[] {
   return [
-    ...(eventId === undefined ? [] : [overview(eventId), documents(eventId)]),
+    eventId === undefined ? OVERVIEW : overview(eventId),
+    eventId === undefined ? DOCUMENTS : documents(eventId),
     contacts,
     settings,
     privacy,

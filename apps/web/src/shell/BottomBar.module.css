@@ -19,6 +19,7 @@
 
   /* The items of the bar share its width; the labels use the small size and wrap to two lines. */
   .bar > a,
+  .bar > span,
   .more {
     flex: 1 1 0;
     flex-direction: column;
@@ -34,6 +35,16 @@
 
   .bar > a {
     position: relative;
+  }
+
+  /* An item without a target is a span with the look of a link; the reason is read, not shown. */
+  .hint {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* The count sits at the top right of the icon: below the label it would make the item taller. */

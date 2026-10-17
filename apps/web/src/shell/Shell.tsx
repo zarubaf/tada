@@ -155,19 +155,24 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
     />
   );
 
+  // One switcher for each layout: the docked sidebar holds it; otherwise the top bar does (ADR 0084).
+  const docked = sidebarOpen && !narrow;
+  const eventSwitcher = (inTopBar: boolean) => (
+    <EventSwitcher
+      current={scopedEvent}
+      list={events.list}
+      canCreate={canCreateEvent}
+      onOpen={events.load}
+      onAction={openEvent}
+      {...(inTopBar ? { inTopBar } : { nameId: eventNameId })}
+    />
+  );
+
   const sidebar = (
     <Sidebar
       organizationSwitcher={organizationSwitcher}
-      eventSwitcher={
-        <EventSwitcher
-          current={scopedEvent}
-          list={events.list}
-          canCreate={canCreateEvent}
-          onOpen={events.load}
-          onAction={openEvent}
-          nameId={eventNameId}
-        />
-      }
+      eventSwitcher={narrow ? undefined : eventSwitcher(false)}
+      eventName={scopedEvent?.name ?? (eventPending ? undefined : t("event-switcher-pick"))}
       eventNameId={eventNameId}
       eventId={menuEventId}
       eventPending={eventPending}
@@ -179,8 +184,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
   );
 
   return (
-    <div className={styles.shell} data-sidebar={sidebarOpen && !narrow ? "open" : "closed"}>
-      {sidebarOpen && !narrow && <div className={styles.sidebar}>{sidebar}</div>}
+    <div className={styles.shell} data-sidebar={docked ? "open" : "closed"}>
+      {docked && <div className={styles.sidebar}>{sidebar}</div>}
       <div className={styles.workspace}>
         <TopBar
           title={
@@ -197,6 +202,7 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
           }
           expanded={narrow ? false : sidebarOpen}
           onToggle={toggleSidebar}
+          {...(docked ? {} : { eventSwitcher: eventSwitcher(true) })}
           onOpenPalette={() => setPaletteOpen(true)}
           member={{ id: user.id, name: user.displayName }}
           memberItems={memberItems}
@@ -237,7 +243,8 @@ export function Shell({ api, children }: { api: Api; children: ReactNode }) {
       </div>
       {narrow && (
         <BottomBar
-          eventId={routeEventId}
+          eventId={menuEventId}
+          eventPending={eventPending}
           versionsLabel={versionsLabel}
           onOpenVersions={openVersions}
         />

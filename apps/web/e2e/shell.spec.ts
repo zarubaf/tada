@@ -32,8 +32,8 @@ for (const viewport of viewports) {
       await page.goto(`/events/${event.id}`);
       await setTheme(page, theme);
       await expect(page.getByRole("heading", { level: 1, name: event.name })).toBeVisible();
-      // On narrow layouts the switcher is in the drawer; the top bar names the event.
-      await expect(page.getByRole("banner").getByText(event.name)).toBeVisible();
+      // The top bar names the event; on narrow layouts the switcher there shows its tile only.
+      await expect(page.getByRole("banner").locator("p", { hasText: event.name })).toBeVisible();
 
       await expectNoAxeViolation(page);
     });
@@ -100,6 +100,10 @@ test("the sidebar collapses, and it stays collapsed after a reload", async ({ pa
 
   await page.getByRole("button", { name: "Seitenleiste ausblenden" }).click();
   await expect(page.getByRole("navigation", { name: "Hauptnavigation" })).toHaveCount(0);
+  // The switcher stays reachable: the top bar holds it while the sidebar is away.
+  await expect(
+    page.getByRole("banner").getByRole("button", { name: /^Anlass (wählen|wechseln)/ }),
+  ).toBeVisible();
   await page.reload();
 
   await expect(page.getByRole("button", { name: "Seitenleiste einblenden" })).toBeVisible();
@@ -117,6 +121,43 @@ test("the event switcher leads to another event", async ({ page }) => {
   await page.getByRole("menuitem", { name: event.name }).click();
 
   await expect(page).toHaveURL(new RegExp(`/events/${event.id}$`));
+});
+
+test("at 375 px the bottom bar is fixed and the top bar holds the event switcher", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await fakeSession(page);
+  await fakeEvents(page, 200, { items: events });
+  await fakeEvent(page, event);
+  await page.goto(`/events/${event.id}/work`);
+
+  const bar = page.getByRole("navigation", { name: "Hauptnavigation" });
+  await expect(bar.getByRole("link", { name: "Arbeit", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(bar.getByRole("link")).toHaveText(["Eingang", "Meine Arbeit", "Arbeit"]);
+  await bar.getByRole("button", { name: "Mehr" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Übersicht",
+    "Dokumente",
+    "Kontakte",
+    "Einstellungen",
+    "Datenschutz",
+    /^(tada|Versionen)/,
+  ]);
+  await page.keyboard.press("Escape");
+
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: /^Anlass (wählen|wechseln)/ })
+    .click();
+  await page.getByRole("menuitem", { name: "Alle Anlässe" }).click();
+  await expect(page).toHaveURL(/\/events$/);
+  await expect(bar.getByRole("link", { name: "Arbeit", exact: true })).not.toHaveAttribute(
+    "aria-current",
+  );
 });
 
 test("at 375 px the drawer holds the sidebar, traps focus and returns it on Escape", async ({

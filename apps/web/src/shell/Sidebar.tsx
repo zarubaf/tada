@@ -20,8 +20,11 @@ import { VersionButton } from "./VersionFooter";
 export interface SidebarProps {
   /** Only a member of more than one organization has it. */
   organizationSwitcher: ReactNode;
-  eventSwitcher: ReactNode;
-  /** The ID of the element of the switcher that holds the event name: it names the event group. */
+  /** Only the docked sidebar has it; in the drawer the top bar holds the switcher (ADR 0084). */
+  eventSwitcher: ReactNode | undefined;
+  /** The name of the scoped event, shown instead of the switcher in the drawer. */
+  eventName: string | undefined;
+  /** The ID of the element that holds the event name: it names the event group. */
   eventNameId: string;
   /** The scoped event: the event items act on it (ADR 0084). */
   eventId: string | undefined;
@@ -37,6 +40,7 @@ export interface SidebarProps {
 export function Sidebar({
   organizationSwitcher,
   eventSwitcher,
+  eventName,
   eventNameId,
   eventId,
   eventPending,
@@ -67,7 +71,13 @@ export function Sidebar({
       {organizationSwitcher}
       <nav className={styles.nav} aria-label={t("shell-nav")}>
         {ORGANIZATION_ITEMS.map(link)}
-        <div className={styles.eventHead}>{eventSwitcher}</div>
+        <div className={styles.eventHead}>
+          {eventSwitcher ?? (
+            <p id={eventNameId} className={styles.eventName}>
+              {eventName}
+            </p>
+          )}
+        </div>
         {/* The switcher heads the group and names it. A fieldset is for form controls. */}
         {/* biome-ignore lint/a11y/useSemanticElements: a group of links, not of form controls */}
         <div role="group" aria-labelledby={eventNameId} className={styles.eventItems}>
