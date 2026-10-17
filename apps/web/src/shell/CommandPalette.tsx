@@ -13,6 +13,7 @@ import { manageStreamsAddress } from "../work/manageStreams";
 import { useCreatableKinds } from "../work/useCreatableKinds";
 import { NEW_EVENT } from "./EventSwitcher";
 import { ALL } from "./navItems";
+import { useSwitchEvent } from "./switchEvent";
 import type { EventList } from "./useEvents";
 
 const GOTO = "goto:";
@@ -46,6 +47,7 @@ export default function CommandPalette({
   onClose,
 }: Props) {
   const navigate = useNavigate();
+  const switchEvent = useSwitchEvent();
   const creatable = useCreatableKinds(api, currentEventId, eventWritable);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the list loads once, when the palette opens
   useEffect(loadEvents, []);
@@ -101,7 +103,7 @@ export default function CommandPalette({
     if (id.startsWith(GOTO)) {
       navigate(id.slice(GOTO.length));
     } else if (id.startsWith(EVENT)) {
-      navigate(`/events/${encodeURIComponent(id.slice(EVENT.length))}`);
+      switchEvent(id.slice(EVENT.length));
     } else if (id.startsWith(THEME)) {
       chooseTheme(id.slice(THEME.length) as (typeof THEMES)[number]);
     } else if (id.startsWith(NEW_RECORD) && currentEventId !== undefined) {
