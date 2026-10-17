@@ -14,11 +14,11 @@ If the server runs another build than the web client, a Banner below the top bar
 The top bar is 48 px high and sticks to the top of the page. It is the `banner` landmark.
 
 - A toggle for the sidebar. It collapses the docked sidebar on medium and wide layouts and opens the drawer on narrow layouts.
-- The title of the context in plain text, not a heading: the name of the scoped event on an event page, else the name of the section, for example „Eingang“.
+- The title of the context in plain text, not a heading: the name of the scoped event on an event page, else the name of the section, for example „Eingang“, or „Alle Anlässe“ on `/events`.
   Each page keeps its own `h1`.
   A long name is cut and has the full name as its title.
 - The command box „Suchen oder Befehl ausführen…“ with the key hint (`⌘K` or `Ctrl K`).
-  It opens the command palette, as does `Ctrl+K` or `⌘K` from anywhere in the shell.
+  It opens the command menu, as does `Ctrl+K` or `⌘K` from anywhere in the shell.
   Below 40rem it is an icon button.
 - The theme toggle as an icon button, then the member menu as an avatar.
   The member menu has „Konto“, „Datenschutz“, „Versionen“ and „Abmelden“.
@@ -43,7 +43,7 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 - The event switcher sits in the top bar, so a member changes the event without the drawer.
 - The bottom bar shows a count badge on „Eingang“ when proposals wait for the member.
 - The toggle of the top bar opens the sidebar as a drawer from the left edge.
-  The drawer holds the whole sidebar: the switchers, all destinations and the foot.
+  The drawer holds the whole sidebar: the organization switcher (if any), all destinations and the foot. The event switcher is in the top bar only.
   It closes with `Esc`, with its close button, with a press outside and when a destination opens.
   Focus stays inside while it is open and returns to the toggle.
 - The targets are 44 px high with a coarse pointer, and the page never scrolls sideways.
@@ -85,7 +85,7 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 ## Navigation
 
 The destinations are defined once in `apps/web/src/shell/navItems.ts`.
-The sidebar, the bottom bar, „Mehr“ and the command palette read that list.
+The sidebar, the bottom bar, „Mehr“ and the command menu read that list.
 The menu has the same items in every state: none appears or disappears (ADR 0084).
 
 The scoped event is the event of the route, else the event that the member opened last (the browser remembers it for each organization as `tada-event:<organization ID>`), else the most recent open event, else none.
@@ -112,8 +112,8 @@ Sidebar, from top to bottom:
    No item is current on `/events`.
    With no scoped event, the four items are disabled and show the hint „Zuerst einen Anlass wählen“; the empty list of events offers an action to create an event.
    The bottom bar has no „Zeitplan“; on a phone the view tabs reach it.
-5. At the foot: „Einstellungen“, „Datenschutz“, the build of the web client and the member block.
-   The build, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
+5. At the foot: „Einstellungen“, „Datenschutz“, „Versionen“ and the member block.
+   „Versionen“ shows the build of the web client, for example `tada 0.3.0 · 1a2b3c4`, opens the list of the components in a sheet.
    The member block shows the name and the role; the member menu is in the top bar.
 
 The event page has no navigation of its own: the event items of the sidebar above are the destinations of an event (ADR 0082, ADR 0084).
@@ -204,7 +204,7 @@ It has its own `h1` „Arbeit“ and not the header of the event page.
   From `--bp-medium` the dialog is a popover that is not modal, so the board stays usable and shows the result of each change behind it; the first Escape in the search clears its text and the second closes it, and focus returns to the button.
   On a phone it is a sheet from the bottom.
   It holds the search (title and ID), „Verantwortlich“ („Ich“ first, then the contributors; there is no „Niemand“, because an action needs an owner), „Bereich“, „Fällig“ („Überfällig“, „Diese Woche“, „Ohne Datum“) and „Filter zurücksetzen“, which shows only while a filter is set.
-  The list of „Bereich“ ends with „Bereiche verwalten …“, which closes the filter and opens the sheet „Bereiche verwalten“ (the command palette opens it too).
+  The list of „Bereich“ ends with „Bereiche verwalten …“, which closes the filter and opens the sheet „Bereiche verwalten“ (the command menu opens it too).
   The sheet lists the workstreams and offers an event manager the form to create and change them; on a phone it is a sheet from the bottom like the filter, and above 40 rem it is 25 rem wide from the right.
   The button shows the number of set filters (the type is not counted: it has its own control) and has the accessible name „Filter, 2 gesetzt“.
   The active filters are not repeated as chips: the count is enough, and the sheet shows the values.
@@ -259,14 +259,14 @@ It has its own `h1` „Arbeit“ and not the header of the event page.
 
 ### Work lists
 
-„Meine Arbeit“ (`/`) and „Anlässe“ (`/events`) are `Page width="flush"` with the toolbar row of the „Arbeit“ page: the `h1` as a compact heading at the left and, at the right, the one action or link of the page as a compact `LinkButton`.
-On „Meine Arbeit“ this is the count of proposals that wait for the member (a link to „Eingang“), and on „Anlässe“ it is „Anlass erfassen“ as the primary button, for the roles that may create an event.
+„Meine Arbeit“ (`/`) and „Alle Anlässe“ (`/events`) are `Page width="flush"` with the toolbar row of the „Arbeit“ page: the `h1` as a compact heading at the left and, at the right, the one action or link of the page as a compact `LinkButton`.
+On „Meine Arbeit“ this is the count of proposals that wait for the member (a link to „Eingang“), and on „Alle Anlässe“ it is „Anlass erfassen“ as the primary button, for the roles that may create an event.
 Below the row, 12 px from it, the page is dense tables of 28 px rows (`DataTable`).
 Below 28rem of the container, a table is a list of two-line rows; there is no sideways scroll.
 
 - „Meine Arbeit“ has one table each for „Aufgaben“ and „Zusagen“, under an `h2` with the count of its rows.
   A row has the reference with the key of the event (`FLY28/ACT-042`) as muted mono text, the title as the link to the record in the panel of „Arbeit“ (`/events/:id/work#ACT-042`), the status with its icon and word, and a date chip that says „überfällig“ in words for a record that is not finished.
-- „Anlässe“ has a row for each event: the key, the name as the link, the state (an icon and a word: „Offen“, „Abgeschlossen“), the time zone and the date of the entry. The time zone and the date go first where the container is narrow.
+- „Alle Anlässe“ has a row for each event: the key, the name as the link, the state (an icon and a word: „Offen“, „Abgeschlossen“), the time zone and the date of the entry. The time zone and the date go first where the container is narrow.
   The name of a closed event is quieter, but keeps the contrast of text.
 
 ### Contacts

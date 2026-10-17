@@ -27,7 +27,7 @@ We split the destinations into two scopes and give each scope fixed items.
 - The event scope has „Übersicht“, „Arbeit“, „Zeitplan“ and „Dokumente“.
 - The scoped event is the event in the route, else the remembered event, else the most recent open event, else none.
   One hook returns it.
-  The switcher, the menu, the title of the top bar, the bottom bar and the command palette all read that hook.
+  The switcher, the menu, the title of the top bar, the bottom bar and the command menu all read that hook.
 
 ### Switcher
 
@@ -51,16 +51,17 @@ From top to bottom:
 2. „Eingang“, „Meine Arbeit“ and „Kontakte“.
 3. The event switcher as the heading of the event group.
 4. „Übersicht“ (current only on an exact match of `/events/:id`), „Arbeit“, „Zeitplan“ and „Dokumente“.
-5. At the foot: „Einstellungen“, „Datenschutz“ and the build.
+5. At the foot: „Einstellungen“, „Datenschutz“ and „Versionen“.
 
 - The menu has no „Anlässe“ item and no rule that lets an item yield paths to another item.
   No item is current on `/events`.
 - With no scoped event, the four event items are disabled with the hint „Zuerst einen Anlass wählen“.
   The empty list of events offers an action to create an event.
 - The bottom bar is fixed: „Eingang“, „Meine Arbeit“, „Arbeit“ (of the scoped event) and „Mehr“.
-  „Mehr“ is fixed: „Übersicht“, „Dokumente“, „Kontakte“, „Einstellungen“, „Datenschutz“ and the build.
-- The command palette lists the destinations of the scoped event under „Zum Ziel“.
+  „Mehr“ is fixed: „Übersicht“, „Dokumente“, „Kontakte“, „Einstellungen“, „Datenschutz“ and „Versionen“.
+- The command menu lists the destinations of the scoped event under „Zum Ziel“.
   Its list of events stays as a search shortcut, and a choice there follows the switch rule above.
+- The page title of `/events` is „Alle Anlässe“ in the top bar and as the `h1`, so it matches the entry of the switcher.
 - The addresses do not change, and the legacy redirects stay.
   Back is the Back button of the browser.
   There are no breadcrumbs.
@@ -77,7 +78,8 @@ The other decisions of ADR 0082 stay in force.
   The group takes space that a menu without it would not need.
 - A member with no event sees four disabled items until the member creates or chooses an event.
 - The code must read the scoped event from one hook.
-  We remove the rules `unlessWith`, `onlyWith` and the path yield for „Anlässe“ from the destinations.
+  We remove the path yield of „Anlässe“ from the destinations.
+  The rules `onlyWith` and `unlessWith` stay for „Zeitplan“.
 - The tests and the screenshot baselines of the shell change.
 
 ## Alternatives
