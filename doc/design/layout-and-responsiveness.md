@@ -89,6 +89,7 @@ The top bar is 48 px high and sticks to the top of the page. It is the `banner` 
 The destinations are defined once in `apps/web/src/shell/navItems.ts`.
 The sidebar, the bottom bar, „Mehr“ and the command menu read that list.
 The menu has the same items in every state: none appears or disappears (ADR 0084).
+The command menu is the exception: with no scoped Anlass it omits the four Anlass destinations, because it has no place for the hint.
 
 The scoped event is the event of the route, else the event that the member opened last (the browser remembers it for each organization as `tada-event:<organization ID>`), else the most recent open event, else none.
 One hook returns it, and every part of the shell reads that hook.

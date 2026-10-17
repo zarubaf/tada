@@ -1343,10 +1343,25 @@ describe("command palette", () => {
     expect(window.location.search).toBe("?view=timeline");
   });
 
+  it("lists the Anlass destinations of the remembered Anlass on a page outside any Anlass", async () => {
+    eventItems = [event(open.id, open.name, open.key)];
+    localStorage.setItem(`tada-event:${first.organization_id}`, open.id);
+    renderShellAt("/inbox", json(200, info([first], first)));
+    await screen.findByRole("button", { name: "Anlass wechseln: Sommerfest 2030" });
+
+    const palette = await openPalette();
+
+    for (const name of ["Übersicht", "Arbeit", "Zeitplan", "Dokumente"]) {
+      expect(within(palette).getAllByRole("menuitem", { name })).toHaveLength(1);
+    }
+  });
+
   it("lists no Anlass destination while there is no scoped Anlass", async () => {
     eventItems = [];
     renderShell(json(200, info([first], first)));
 
+    // The hint shows once the list of events has settled with no Anlass.
+    await screen.findByText("Zuerst einen Anlass wählen");
     const palette = await openPalette();
 
     const names = within(palette)

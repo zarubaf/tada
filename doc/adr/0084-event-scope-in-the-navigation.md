@@ -60,6 +60,7 @@ From top to bottom:
 - The bottom bar is fixed: „Eingang“, „Meine Arbeit“, „Arbeit“ (of the scoped event) and „Mehr“.
   „Mehr“ is fixed: „Übersicht“, „Dokumente“, „Kontakte“, „Einstellungen“, „Datenschutz“ and „Versionen“.
 - The command menu lists the destinations of the scoped event under „Zum Ziel“.
+  With no scoped event it omits them; it has no place for the hint.
   Its list of events stays as a search shortcut, and a choice there follows the switch rule above.
 - The page title of `/events` is „Alle Anlässe“ in the top bar and as the `h1`, so it matches the entry of the switcher.
 - The addresses do not change, and the legacy redirects stay.

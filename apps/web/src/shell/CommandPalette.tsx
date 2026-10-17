@@ -26,7 +26,8 @@ interface Props {
   api: Api;
   events: EventList;
   loadEvents: () => void;
-  currentEventId: string | undefined;
+  /** The Anlass of the route: the record actions act on it. */
+  routeEventId: string | undefined;
   /** The scoped Anlass (ADR 0084): the Anlass destinations act on it, on every page. */
   scopedEventId: string | undefined;
   /** False for a closed event, which is read-only for everybody. */
@@ -43,7 +44,7 @@ export default function CommandPalette({
   api,
   events,
   loadEvents,
-  currentEventId,
+  routeEventId,
   scopedEventId,
   eventWritable,
   canCreateEvent,
@@ -51,7 +52,7 @@ export default function CommandPalette({
 }: Props) {
   const navigate = useNavigate();
   const switchEvent = useSwitchEvent();
-  const creatable = useCreatableKinds(api, currentEventId, eventWritable);
+  const creatable = useCreatableKinds(api, routeEventId, eventWritable);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the list loads once, when the palette opens
   useEffect(loadEvents, []);
 
@@ -75,7 +76,7 @@ export default function CommandPalette({
           icon: IconPlus,
         })),
         // Every member of the event reads the workstreams; the dialog offers what each may change.
-        ...(currentEventId === undefined
+        ...(routeEventId === undefined
           ? []
           : [{ id: MANAGE_STREAMS, label: t("workstreams-manage-title"), icon: IconFilter }]),
         ...(canCreateEvent
@@ -109,11 +110,11 @@ export default function CommandPalette({
       switchEvent(id.slice(EVENT.length));
     } else if (id.startsWith(THEME)) {
       chooseTheme(id.slice(THEME.length) as (typeof THEMES)[number]);
-    } else if (id.startsWith(NEW_RECORD) && currentEventId !== undefined) {
+    } else if (id.startsWith(NEW_RECORD) && routeEventId !== undefined) {
       const kind = id.slice(NEW_RECORD.length);
-      navigate(`/events/${encodeURIComponent(currentEventId)}/work?new=${kind}`);
-    } else if (id === MANAGE_STREAMS && currentEventId !== undefined) {
-      navigate(manageStreamsAddress(currentEventId));
+      navigate(`/events/${encodeURIComponent(routeEventId)}/work?new=${kind}`);
+    } else if (id === MANAGE_STREAMS && routeEventId !== undefined) {
+      navigate(manageStreamsAddress(routeEventId));
     } else if (id === NEW_EVENT) {
       navigate("/events/new");
     }
