@@ -6,6 +6,7 @@ import {
   isCurrent,
   moreItems,
   ORGANIZATION_ITEMS,
+  sectionTitle,
 } from "./navItems";
 
 const labels = (items: { label: string }[]) => items.map((item) => item.label);
@@ -95,6 +96,20 @@ describe("isCurrent", () => {
     expect(current(eventItems("e1"), "/events")).toEqual([]);
     expect(current(ORGANIZATION_ITEMS, "/events")).toEqual([]);
     expect(current(bottomItems(undefined), "/events")).toEqual(["Alle Anlässe"]);
+  });
+});
+
+describe("sectionTitle", () => {
+  it("names the list of events only on exactly /events", () => {
+    expect(sectionTitle("/events")).toBe("Alle Anlässe");
+    expect(sectionTitle("/events/new")).toBe("Anlass erfassen");
+    expect(sectionTitle("/events/e1")).toBeUndefined();
+    expect(sectionTitle("/events/e1/work")).toBeUndefined();
+  });
+
+  it("names the other destinations", () => {
+    expect(sectionTitle("/inbox")).toBe("Eingang");
+    expect(sectionTitle("/")).toBe("Meine Arbeit");
   });
 });
 

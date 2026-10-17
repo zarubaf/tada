@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "../api/client";
 import { InboxProvider } from "../review/InboxProvider";
 import { Router } from "../router/Router";
@@ -177,6 +177,8 @@ afterEach(() => {
   document.documentElement.removeAttribute("data-theme");
 });
 
+const isCurrentLink = (link: HTMLElement) => link.getAttribute("aria-current") === "page";
+
 describe("Shell", () => {
   it("shows the navigation, the page and no switcher for one membership", async () => {
     renderShell(json(200, info([first], first)));
@@ -184,6 +186,9 @@ describe("Shell", () => {
     expect(await screen.findByText("Seiteninhalt")).toBeInTheDocument();
     expect(screen.getByText("Alle Anlässe", { selector: "header p" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Anlässe" })).not.toBeInTheDocument();
+    // No item is current on the list of events.
+    const nav = screen.getByRole("navigation", { name: "Hauptnavigation" });
+    expect(within(nav).queryAllByRole("link").filter(isCurrentLink)).toEqual([]);
     expect(screen.queryByRole("button", { name: /Organisation/ })).not.toBeInTheDocument();
   });
 
@@ -330,9 +335,7 @@ describe("Shell", () => {
 
 describe("sidebar", () => {
   const scoped = event("0199b8e0-0000-7000-8000-0000000000e1", "Sommerfest 2030", "SF30");
-  beforeEach(() => {
-    eventItems = [scoped];
-  });
+  const other = event("0199b8e0-0000-7000-8000-0000000000e2", "Herbstflug", "HF30");
 
   it("lists the destinations in a named navigation, in this order", async () => {
     renderShell(json(200, info([first], first)));
@@ -344,12 +347,25 @@ describe("sidebar", () => {
     expect(names).toEqual(["Eingang", "Meine Arbeit", "Kontakte"]);
   });
 
-  it("lists the event items of the remembered event on an organization page", async () => {
-    localStorage.setItem(`tada-event:${first.organization_id}`, scoped.id);
-    renderShellAt("/inbox", json(200, info([first], first)));
+  // The owner's bug: on a page outside an event, the event items stayed away.
+  it.each([
+    ["/", true],
+    ["/inbox", true],
+    ["/events", true],
+    ["/", false],
+    ["/inbox", false],
+    ["/events", false],
+  ])("lists the four event items on %s (event remembered: %s)", async (path, remembered) => {
+    eventItems = [scoped, other];
+    if (remembered) {
+      localStorage.setItem(`tada-event:${first.organization_id}`, scoped.id);
+    }
+    renderShellAt(path, json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
-    await within(nav).findByRole("link", { name: "Übersicht" });
+    const overview = await within(nav).findByRole("link", { name: "Übersicht" });
+    // The remembered event, else the most recent open one (the larger ID breaks the tie).
+    expect(overview).toHaveAttribute("href", `/events/${remembered ? scoped.id : other.id}`);
     expect(
       within(nav)
         .getAllByRole("link")
@@ -363,16 +379,21 @@ describe("sidebar", () => {
       "Zeitplan",
       "Dokumente",
     ]);
-    expect(within(nav).getByRole("link", { name: "Übersicht" })).toHaveAttribute(
-      "href",
-      `/events/${scoped.id}`,
+    // The switcher names the group: it carries the name of the scoped event.
+    expect(within(nav).getByRole("group")).toHaveAccessibleName(
+      remembered ? /Sommerfest 2030/ : /Herbstflug/,
     );
-    expect(within(nav).getByRole("link", { name: "Übersicht" })).not.toHaveAttribute(
-      "aria-current",
-    );
+    // Only the organization item of the page is current; no event item is.
+    expect(
+      within(nav)
+        .queryAllByRole("link")
+        .filter(isCurrentLink)
+        .map((link) => link.textContent),
+    ).toEqual({ "/": ["Meine Arbeit"], "/inbox": ["Eingang"], "/events": [] }[path]);
   });
 
-  it("marks Übersicht on the event home, and nothing on the list of events", async () => {
+  it("marks Übersicht on the event home and not Arbeit", async () => {
+    eventItems = [scoped];
     renderShellAt(`/events/${scoped.id}`, json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
@@ -384,6 +405,7 @@ describe("sidebar", () => {
   });
 
   it("adds the event items after Kontakte inside an event, Arbeit as the current page", async () => {
+    eventItems = [scoped];
     renderShellAt(
       "/events/0199b8e0-0000-7000-8000-0000000000e1/work",
       json(200, info([first], first)),
@@ -411,6 +433,7 @@ describe("sidebar", () => {
   });
 
   it("marks Zeitplan, not Arbeit, on the timeline view of the work page", async () => {
+    eventItems = [scoped];
     renderShellAt(
       "/events/0199b8e0-0000-7000-8000-0000000000e1/work?view=timeline",
       json(200, info([first], first)),
@@ -429,10 +452,13 @@ describe("sidebar", () => {
     );
   });
 
-  it("has no Arbeit item without a scoped event", async () => {
+  it("has no event item while the member has no event", async () => {
     renderShellAt("/inbox", json(200, info([first], first)));
 
     const nav = await screen.findByRole("navigation", { name: "Hauptnavigation" });
+    // The list of events answers empty: nothing is scoped.
+    await vi.waitFor(() => expect(requested).toContain("/api/v1/events"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
     expect(within(nav).queryByRole("link", { name: "Arbeit" })).not.toBeInTheDocument();
   });
 
@@ -445,7 +471,6 @@ describe("sidebar", () => {
   });
 
   it("puts the brand, the switchers and the links in one labelled region", async () => {
-    eventItems = [];
     renderShell(json(200, info([first, second], first)));
 
     const region = await screen.findByRole("region", { name: "Seitenleiste" });
